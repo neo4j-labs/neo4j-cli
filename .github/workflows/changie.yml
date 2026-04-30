@@ -30,13 +30,13 @@ jobs:
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project aura-cli
+          args: batch auto --project aura-cli --prerelease alpha
 
       - name: Batch neo4j-cli changes
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project neo4j-cli
+          args: batch auto --project neo4j-cli --prerelease alpha
 
       - name: Merge changelogs
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
