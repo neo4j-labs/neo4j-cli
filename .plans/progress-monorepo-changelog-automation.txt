@@ -71,3 +71,36 @@ Key Decisions:
 - All three added to the single `.PHONY` line at the top of the Makefile
 
 Next Task: task-004 (Update changie CI workflow; depends on task-001)
+
+================================================================================
+TASK-004: Update changie CI workflow for cascade and dual-project batching
+Date: 2026-04-30T18:30:00Z
+================================================================================
+
+Summary:
+Rewrote `.github/workflows/changie.yml` to support dual-project batching and
+cascading. The cascade step idempotently copies unreleased `aura-cli` YAML entries
+(those tagged `project: aura-cli`) into neo4j-cli variants by rewriting the
+`project:` field in-place. Both projects are batched separately with `--project`
+flags, then `changie merge` (no flags needed) writes both `CHANGELOG-aura.md` and
+`CHANGELOG-neo4j.md` in one call. Version numbers are extracted via
+`changie latest --project`, with `sed` stripping the project-key prefix
+(e.g. `aura-cliv1.7.0` → `v1.7.0`). A single release PR is created with both
+versions in its title and body.
+
+Files Changed:
+- .github/workflows/changie.yml (modified — full rewrite for multi-project cascade and batching)
+
+Key Decisions:
+- `changie merge` (no --project flag) automatically iterates all configured projects and
+  writes each to its own `changelog:` path — confirmed from changie v1.21.0 source
+  (`cmd/merge.go`). A single `merge` call is correct; calling per-project is not supported.
+- Cascade operates on `.changes/unreleased/*.yaml` (the shared dir), not per-project subdirs.
+  Files are identified by `project: aura-cli` inside the YAML; cascade creates
+  `<original>-neo4j-cli.yaml` copies with `project: neo4j-cli`.
+- `changie latest --project aura-cli` returns `aura-cliv1.7.0`; `sed 's/^aura-cli//'`
+  strips the prefix to get the bare version string `v1.7.0`.
+- The `for ... done || true` pattern plus `[ -e "$file" ] || continue` guard ensures
+  the cascade step never fails when the unreleased directory is empty.
+
+Next Task: task-005 (Update release workflow for dual versions and combined release notes)

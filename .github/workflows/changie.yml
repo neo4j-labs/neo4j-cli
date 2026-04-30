@@ -11,32 +11,74 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Batch changes
+      - name: Cascade aura-cli entries to neo4j-cli
+        run: |
+          # For each unreleased aura-cli change file, create a neo4j-cli copy (idempotent).
+          # The cascade copies .changes/unreleased/*.yaml files tagged project: aura-cli
+          # and creates neo4j-cli variants so they are picked up by changie batch --project neo4j-cli.
+          for file in .changes/unreleased/*.yaml; do
+            [ -e "$file" ] || continue  # skip if glob matches nothing (no unreleased changes)
+            if grep -q "^project: aura-cli$" "$file"; then
+              cascade_file="${file%.yaml}-neo4j-cli.yaml"
+              if [ ! -f "$cascade_file" ]; then
+                sed 's/^project: aura-cli$/project: neo4j-cli/' "$file" > "$cascade_file"
+              fi
+            fi
+          done || true
+
+      - name: Batch aura-cli changes
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto
+          args: batch auto --project aura-cli
 
-      - name: Merge changes
+      - name: Batch neo4j-cli changes
+        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
+        with:
+          version: latest
+          args: batch auto --project neo4j-cli
+
+      - name: Merge changelogs
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
           args: merge
 
-      - name: Get the latest version
-        id: latest
+      - name: Get aura-cli latest version
+        id: latest-aura
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: latest
+          args: latest --project aura-cli
+
+      - name: Get neo4j-cli latest version
+        id: latest-neo4j
+        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
+        with:
+          version: latest
+          args: latest --project neo4j-cli
+
+      - name: Extract version numbers
+        id: versions
+        run: |
+          AURA_VERSION=$(echo "${{ steps.latest-aura.outputs.output }}" | sed 's/^aura-cli//')
+          NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
+          echo "aura=$AURA_VERSION" >> $GITHUB_OUTPUT
+          echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
         with:
-          title: Release ${{ steps.latest.outputs.output }}
-          branch: release/${{ steps.latest.outputs.output }}
-          body-path: .changes/${{ steps.latest.outputs.output }}.md
-          commit-message: Release ${{ steps.latest.outputs.output }}
+          title: "Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}"
+          branch: "release/neo4j-cli-${{ steps.versions.outputs.neo4j }}"
+          body: |
+            ## Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}
+
+            This release includes updates to both binaries.
+
+            - **aura-cli** ${{ steps.versions.outputs.aura }} — see [CHANGELOG-aura.md](CHANGELOG-aura.md)
+            - **neo4j-cli** ${{ steps.versions.outputs.neo4j }} — see [CHANGELOG-neo4j.md](CHANGELOG-neo4j.md)
+          commit-message: "Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}"
           token: ${{ env.TOKEN }}
         env:
           TOKEN: ${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}

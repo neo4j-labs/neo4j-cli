@@ -69,7 +69,7 @@ tasks:
       (2) run `changie batch auto` and `changie merge` for both projects, (3) read both new
       version numbers via `changie latest --project`, and (4) create a single release PR whose
       title and body reference both versions (e.g. "Release aura-cli vX.Y.Z / neo4j-cli vA.B.C").
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -78,7 +78,7 @@ tasks:
       - "`changie merge --project aura-cli` and `changie merge --project neo4j-cli` are both run, updating `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`"
       - "Both version numbers are captured and used in the release PR title and body"
       - "The workflow does not reference `CHANGELOG.md` (old single-project file)"
-    completed_at: null
+    completed_at: "2026-04-30T18:30:00Z"
 
   - id: task-005
     title: "Update release workflow for dual versions and combined release notes"
