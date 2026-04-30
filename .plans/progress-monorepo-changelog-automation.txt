@@ -104,3 +104,33 @@ Key Decisions:
   the cascade step never fails when the unreleased directory is empty.
 
 Next Task: task-005 (Update release workflow for dual versions and combined release notes)
+
+================================================================================
+TASK-005: Update release workflow for dual versions and combined release notes
+Date: 2026-04-30T19:00:00Z
+================================================================================
+
+Summary:
+Updated `.github/workflows/release.yml` to trigger on `CHANGELOG-neo4j.md` changes
+(replacing the old `CHANGELOG.md` trigger). Added separate `changie latest --project`
+steps for both binaries, a version extraction step using `sed` to strip project-key
+prefixes, and a release notes generation step that writes a `release-notes.md` with
+`## Versions` and `## Changes` sections. GoReleaser is invoked with
+`--release-notes=release-notes.md` and `AURA_CLI_VERSION` passed explicitly in the env
+block alongside the usual secrets.
+
+Files Changed:
+- .github/workflows/release.yml (modified — new trigger path, dual-version extraction, release-notes.md generation, AURA_CLI_VERSION env var for GoReleaser)
+
+Key Decisions:
+- Used `printf` with a grouped `{ ... } > release-notes.md` redirect to avoid heredoc
+  indentation issues that would produce leading whitespace in the generated file
+- `AURA_CLI_VERSION` is set via `Add env vars` step and re-referenced as
+  `${{ env.AURA_CLI_VERSION }}` in the GoReleaser env block (GitHub Actions requires
+  this pattern to forward env vars set in a previous step into an action's env)
+- The neo4j-cli version file path follows `.changes/neo4j-cli/${NEO4J_VERSION}.md`;
+  `tail -n +2` strips the `## vX.Y.Z - DATE` header to get just the changelog body
+- Removed the old `RELEASE_NOTES_PATH` env var in favour of a hardcoded
+  `--release-notes=release-notes.md` argument (file always has the same name per run)
+
+Next Task: task-006 (Update CONTRIBUTING.md with new changelog workflow)

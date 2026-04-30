@@ -89,7 +89,7 @@ tasks:
       (`neo4j-cli: vA.B.C`, `aura-cli: vX.Y.Z`) followed by the neo4j-cli changelog body for
       the current version. Pass this file via `--release-notes=release-notes.md` and expose
       `AURA_CLI_VERSION` as an additional environment variable to GoReleaser.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-004
@@ -99,7 +99,7 @@ tasks:
       - "A `release-notes.md` file is generated before GoReleaser runs, containing a `## Versions` section with both version numbers and a `## Changes` section with the neo4j-cli changelog body"
       - "GoReleaser is invoked with `--release-notes=release-notes.md` and `AURA_CLI_VERSION` in its env block"
       - "The workflow no longer references `CHANGELOG.md` or the old single-version `RELEASE_NOTES_PATH`"
-    completed_at: null
+    completed_at: "2026-04-30T19:00:00Z"
 
   - id: task-006
     title: "Update CONTRIBUTING.md with new changelog workflow"

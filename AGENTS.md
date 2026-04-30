@@ -104,6 +104,13 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
 - CI cascade pattern: `for file in .changes/unreleased/*.yaml; do [ -e "$file" ] || continue; grep -q "^project: aura-cli$" "$file" && sed 's/^project: aura-cli$/project: neo4j-cli/' "$file" > "${file%.yaml}-neo4j-cli.yaml"; done || true`
 
+## Release Workflow Notes
+
+- Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)
+- `AURA_CLI_VERSION` env var set in an earlier step must be re-referenced as `${{ env.AURA_CLI_VERSION }}` in the GoReleaser action's `env:` block — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
+- The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
+- Avoid heredoc indentation issues in `run: |` blocks: use `{ printf ...; } > file` instead of `cat > file << EOF ... EOF` when shell lines are indented under YAML
+
 ## GoReleaser Notes
 
 - GoReleaser v2 deprecates `archives.format` (string) — use `archives.formats` (list)
