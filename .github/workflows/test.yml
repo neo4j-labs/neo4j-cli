@@ -26,15 +26,12 @@ jobs:
 
             - name: Build
               run: make build
-
-            - name: Test
-              run: make test
-
+            
             - name: Lint
               uses: golangci/golangci-lint-action@v6
               with:
                   version: v2.11.4
                   install-mode: binary
 
-            - name: Format
-              run: make fmt
+            - name: Test
+              run: make test
