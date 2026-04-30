@@ -1,0 +1,29 @@
+================================================================================
+TASK-001: Migrate changie to multi-project config and restructure history
+Date: 2026-04-30T17:00:00Z
+================================================================================
+
+Summary:
+Migrated changie from a single-project config to a multi-project setup with
+`aura-cli` and `neo4j-cli` projects. Updated `.changie.yaml` to use the
+`projects:` array, moved all existing versioned files into `.changes/aura-cli/`,
+created `CHANGELOG-aura.md` (copy of historical `CHANGELOG.md`), created empty
+`CHANGELOG-neo4j.md`, and replaced root `CHANGELOG.md` with a forwarding note.
+
+Files Changed:
+- .changie.yaml (modified — added `projects:` array with aura-cli and neo4j-cli entries using `key` and `changelog` fields)
+- .changes/aura-cli/v*.md (created — migrated 15 versioned files from .changes/ root)
+- .changes/unreleased/.gitkeep (created — shared unreleased directory preserved at root)
+- CHANGELOG-aura.md (created — full historical changelog v0.1.0 through v1.7.0)
+- CHANGELOG-neo4j.md (created — empty changelog with standard header)
+- CHANGELOG.md (modified — replaced with forwarding note pointing to per-binary changelogs)
+- .changes/v*.md (deleted — 15 versioned files removed from root)
+
+Key Decisions:
+- changie's `ProjectConfig` struct does NOT support per-project `changesDir` — it uses root `changesDir` + `key` as subdirectory for versioned files (confirmed from source at changie@v1.21.0/core/utils.go:GetAllVersions)
+- The `ProjectConfig` field for changelog path is `changelog` (not `changelogPath`) — using the wrong field name silently fails
+- All unreleased change files share `.changes/unreleased/` (root level); per-project unreleased subdirs are not used by changie — cascade in task-004 must duplicate files with different `project:` field values, not copy between directories
+- `changie latest --project aura-cli` returns `aura-cliv1.7.0` (project key prepended) — downstream workflows need to strip the prefix or use `--remove-prefix`
+- `ProjectsVersionSeparator` defaults to empty string; tasks 004/005 should set it to `-` if cleaner output is needed
+
+Next Task: task-002 or task-003 (both depend on task-001, neither depends on each other)

@@ -14,7 +14,7 @@ tasks:
       directory, copy `CHANGELOG.md` to `CHANGELOG-aura.md`, create an empty
       `CHANGELOG-neo4j.md` with the standard header, and create the `neo4j-cli` unreleased
       directory. Remove or replace the root `CHANGELOG.md` with a forwarding note.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.changie.yaml` contains a `projects:` array with `aura-cli` and `neo4j-cli` entries each with distinct `changesDir` and `changelogPath`"
@@ -22,7 +22,7 @@ tasks:
       - "`CHANGELOG-aura.md` contains the full historical changelog (v0.1.0 through v1.7.0) with content identical to the original `CHANGELOG.md`"
       - "`CHANGELOG-neo4j.md` exists with the standard header and no version entries"
       - "`.changes/aura-cli/` contains all migrated versioned files and the unreleased directory; `.changes/neo4j-cli/unreleased/` exists and is empty"
-    completed_at: null
+    completed_at: "2026-04-30T17:00:00Z"
 
   - id: task-002
     title: "Update GoReleaser for per-binary version injection and release assets"

@@ -28,8 +28,8 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 - Local run (no build): `make run-aura` / `make run-neo4j`
 - Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --clean`
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry added via `changie new`
-- Cascade rule: `aura-cli` changes also need a `neo4j-cli` `changie new` entry
+- PRs require a changelog entry added via `changie new` (prompts for project selection: `aura-cli` or `neo4j-cli`)
+- Cascade rule: `aura-cli` changes automatically cascade into `neo4j-cli` via CI — no second `changie new` call needed
 
 ## Testing Framework
 
@@ -92,6 +92,15 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 - `license-check` target uses `$(GOPATH)/bin/addlicense` (not bare `addlicense`) — GOPATH/bin may not be on PATH
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
+
+## Changie Multi-Project Notes
+
+- `ProjectConfig` in changie does NOT support `changesDir` or `changelogPath` fields — only `label`, `key`, `changelog`, and `replacements`
+- Version files live at `changesDir/<key>/v*.md` (e.g., `.changes/aura-cli/v1.7.0.md`) — changie appends the project key to `changesDir` automatically
+- All projects share a single unreleased directory at `changesDir/unreleasedDir/` (e.g., `.changes/unreleased/`) — change files are tagged with `project:` field inside the YAML, not by directory
+- `changie latest --project aura-cli` outputs `aura-cliv1.7.0` (project key prepended with no separator by default) — use `--remove-prefix` to strip `v` but key is always prepended; shell workflows must strip `aura-cli` prefix (e.g., `sed 's/^aura-cli//'`)
+- `ProjectsVersionSeparator` in `.changie.yaml` can be set to `-` to get `aura-cli-v1.7.0` instead of `aura-cliv1.7.0`; leave unset (empty) for `aura-cliv1.7.0`
+- The cascade (aura-cli changes appearing in neo4j-cli) must copy unreleased YAML files and change their `project:` field, not copy between directories
 
 ## GoReleaser Notes
 
