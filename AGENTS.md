@@ -16,7 +16,7 @@ LICENSE CHECK: [`make license-check`]
 
 PRIMARY LANGUAGES: [Go]
 
-Neo4j Aura CLI (`aura-cli`) is a command-line tool for interacting with the [Neo4j Aura API](https://neo4j.com/docs/aura/platform/api/specification/). It allows users to manage Aura instances, credentials, tenants, deployments, data APIs, and more from the terminal.
+Neo4j CLI (`neo4j-cli`) is a command-line tool for interacting with Neo4j.
 
 ## Build System
 
