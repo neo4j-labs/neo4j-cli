@@ -78,7 +78,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		panic(err)
 	}
 
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
 
 	if IsSuccessful(res.StatusCode) {
 		responseBody, err = io.ReadAll(res.Body)

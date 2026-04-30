@@ -34,7 +34,7 @@ func GetTestFs(config string, credentials string) (afero.Fs, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 
 	if _, err = f.Write([]byte(config)); err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func GetTestFs(config string, credentials string) (afero.Fs, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer credentialsFile.Close()
+	defer credentialsFile.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 
 	if _, err = credentialsFile.Write([]byte(credentials)); err != nil {
 		return nil, err

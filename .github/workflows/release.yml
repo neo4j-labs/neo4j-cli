@@ -3,7 +3,7 @@ name: release
 on:
   push:
     branches: ["main"]
-    paths: ["CHANGELOG.md"]
+    paths: ["CHANGELOG-neo4j.md"]
 
 jobs:
   release:
@@ -16,25 +16,56 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Get the latest version
-        id: latest
+      - name: Get aura-cli latest version
+        id: latest-aura
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: latest
+          args: latest --project aura-cli
+
+      - name: Get neo4j-cli latest version
+        id: latest-neo4j
+        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
+        with:
+          version: latest
+          args: latest --project neo4j-cli
+
+      - name: Extract version numbers
+        id: versions
+        run: |
+          AURA_VERSION=$(echo "${{ steps.latest-aura.outputs.output }}" | sed 's/^aura-cli//')
+          NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
+          echo "aura=$AURA_VERSION" >> $GITHUB_OUTPUT
+          echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        run: |
+          NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
+          AURA_VERSION="${{ steps.versions.outputs.aura }}"
+          NEO4J_CHANGES_FILE=".changes/neo4j-cli/${NEO4J_VERSION}.md"
+          # Extract the changelog body: skip the first line (## vX.Y.Z - DATE header)
+          NEO4J_BODY=$(tail -n +2 "$NEO4J_CHANGES_FILE")
+          {
+            printf '## Versions\n\n'
+            printf -- '- neo4j-cli: %s\n' "${NEO4J_VERSION}"
+            printf -- '- aura-cli: %s\n' "${AURA_VERSION}"
+            printf '\n## Changes\n\n'
+            printf '%s\n' "${NEO4J_BODY}"
+          } > release-notes.md
 
       - name: Add env vars
         run: |
-          echo GORELEASER_CURRENT_TAG=${{ steps.latest.outputs.output }} >> $GITHUB_ENV
-          echo RELEASE_NOTES_PATH=.changes/${{ steps.latest.outputs.output }}.md >> $GITHUB_ENV
+          echo "GORELEASER_CURRENT_TAG=${{ steps.versions.outputs.neo4j }}" >> $GITHUB_ENV
+          echo "AURA_CLI_VERSION=${{ steps.versions.outputs.aura }}" >> $GITHUB_ENV
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
         with:
           version: latest
-          args: --clean --release-notes=${{ env.RELEASE_NOTES_PATH }} --skip=validate --verbose
+          args: --clean --release-notes=release-notes.md --skip=validate --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}
+          AURA_CLI_VERSION: ${{ env.AURA_CLI_VERSION }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}

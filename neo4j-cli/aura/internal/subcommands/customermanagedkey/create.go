@@ -47,7 +47,7 @@ You can poll the current status of this operation by periodically getting the ke
 Once the key has a status of ready you can use it for creating new instances by setting the --customer-managed-key-id flag.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cfg.Aura.DefaultTenant() == "" {
-				cmd.MarkFlagRequired(tenantIdFlag)
+				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			}
 
 			return nil
@@ -102,21 +102,21 @@ Once the key has a status of ready you can use it for creating new instances by 
 	}
 
 	cmd.Flags().StringVar(&region, regionFlag, "", "(required) The region where the instance is hosted.")
-	cmd.MarkFlagRequired(regionFlag)
+	cmd.MarkFlagRequired(regionFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the customer managed key (any UTF-8 characters with no trailing or leading whitespace).")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().Var(&instanceType, instanceTypeFlag, "(required) The type of the instance.")
-	cmd.MarkFlagRequired(instanceTypeFlag)
+	cmd.MarkFlagRequired(instanceTypeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, "(required) The cloud provider hosting the instance.")
-	cmd.MarkFlagRequired(cloudProviderFlag)
+	cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&keyId, keyIdFlag, "", "(required) Encryption Key ARN")
-	cmd.MarkFlagRequired(keyIdFlag)
+	cmd.MarkFlagRequired(keyIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created customer managed key is ready.")
 

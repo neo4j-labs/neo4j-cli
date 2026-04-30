@@ -99,7 +99,7 @@ Updating a GraphQL Data API is an asynchronous operation. Use the --await flag t
 	}
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance to update the Data API for")
-	cmd.MarkFlagRequired(instanceIdFlag)
+	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the GraphQL Data API")
 

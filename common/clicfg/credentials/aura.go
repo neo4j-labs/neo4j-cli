@@ -42,7 +42,7 @@ func (c *AuraCredentials) Add(name string, clientId string, clientSecret string)
 
 	c.Credentials = append(c.Credentials, &AuraCredential{Name: name, ClientId: clientId, ClientSecret: clientSecret})
 	if len(c.Credentials) == 1 {
-		c.SetDefault(name)
+		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
 	}
 	c.onUpdate()
 	return nil

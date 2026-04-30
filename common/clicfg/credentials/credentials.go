@@ -35,7 +35,7 @@ func (c *Credentials) load() {
 	data := fileutils.ReadFileSafe(c.fs, c.filePath)
 	fileHasData := len(data) != 0
 
-	var credentials CredentialsFile = CredentialsFile{
+	credentials := CredentialsFile{
 		Aura: &AuraCredentials{
 			Credentials: []*AuraCredential{},
 			onUpdate:    c.save,

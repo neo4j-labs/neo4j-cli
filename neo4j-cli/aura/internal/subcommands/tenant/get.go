@@ -76,8 +76,8 @@ func getMetricsIntegrationEndpointUrl(cfg *clicfg.Config, tenantId string) (stri
 	if err != nil && statusCode != http.StatusBadRequest {
 		return "", err
 	}
-	switch {
-	case statusCode == http.StatusOK:
+	switch statusCode {
+	case http.StatusOK:
 		metricsIntegrationResponse := api.ParseBody(resBody)
 		metricsIntegration, err := metricsIntegrationResponse.GetSingleOrError()
 		if err != nil {
@@ -89,7 +89,7 @@ func getMetricsIntegrationEndpointUrl(cfg *clicfg.Config, tenantId string) (stri
 			}
 		}
 		return "", nil
-	case statusCode == http.StatusBadRequest:
+	case http.StatusBadRequest:
 		return "", nil
 	default:
 		panic(clierr.NewFatalError("unexpected statusCode %d", statusCode))

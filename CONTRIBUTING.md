@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to the Neo4j Aura CLI, [issues](https://github.com/neo4j/aura-cli/issues) and [pull requests](https://github.com/neo4j/aura-cli/pulls) are welcome.
+Thanks for your interest in contributing to the Neo4j CLI, [issues](https://github.com/neo4j-labs/neo4j-cli/issues) and [pull requests](https://github.com/neo4j-labs/neo4j-cli/pulls) are welcome.
 
 If you want to contribute code, make sure to [sign the CLA](https://neo4j.com/developer/contributing-code/#sign-cla).
 
@@ -11,15 +11,35 @@ If you want to contribute code, make sure to [sign the CLA](https://neo4j.com/de
 The full suite of tests can be run using the following command:
 
 ```bash
-go test ./...
+make test
 ```
 
 ### Local running
 
-The CLI can be run locally without building by running the following command:
+The CLI can be run locally without building a binary. To run the standalone `aura-cli`:
 
 ```bash
-go run neo4j-cli/main.go aura-cli
+make run-aura
+```
+
+To run the `neo4j-cli` super CLI:
+
+```bash
+make run-neo4j
+```
+
+### Linting and formatting
+
+To lint the codebase:
+
+```bash
+make lint
+```
+
+To format all Go source files:
+
+```bash
+make fmt
 ```
 
 ### Pull requests
@@ -30,15 +50,23 @@ As well as your code changes, pull requests need a changelog entry. These are ad
 go install github.com/miniscruff/changie@latest
 ```
 
-With this installed, the following command will guide through the process of adding a changelog entry:
+If changie is not available, you may need to add `/go/bin` to your path: `export PATH="$HOME/go/bin:$PATH"`
+
+This repository uses a **multi-project** changie setup with two projects: `aura-cli` and `neo4j-cli`.
+
+Run `make changelog` and follow the prompts. Changie will ask you to select one or more projects and a change kind, then generate a YAML file per project in `.changes/unreleased/`. Commit those files alongside your code changes.
+
+#### Changes affecting multiple projects
+
+Because `neo4j-cli` bundles its child CLIs, any change to a child CLI also affects `neo4j-cli`. Select both projects when prompted — `make changelog` supports multi-select in interactive mode.
+
+For non-interactive use (e.g. scripts or agents), pass `--projects` multiple times:
 
 ```bash
-changie new
+changie new --projects aura-cli --projects neo4j-cli --kind Patch --body "your change description"
 ```
 
-Simply commit the file that this command produces and you're done!
-
-If changie is not available, you may need to add /go/bin to your path: `export PATH="$HOME/go/bin:$PATH"`
+Only changes specific to the `neo4j-cli` wrapper itself need a single `neo4j-cli` entry.
 
 ### License
 
@@ -49,14 +77,35 @@ All `.go` files must begin with the following license comment:
 // Neo4j Sweden AB [http://neo4j.com]
 ```
 
+To check that all files comply, run:
+
+```bash
+make license-check
+```
+
+> Note: `make license-check` requires a Unix shell (`bash`/`sh`) with `find` and `xargs`. It will not work natively on Windows without WSL or Git Bash.
+
 ### Building
 
 Builds for releases are handled in GitHub Actions. If you want to create local builds, there are a couple of approaches.
 
-To create a simply binary using `go` directly, you can execute the following command:
+To build both `aura-cli` and `neo4j-cli` into the `bin/` directory:
 
 ```bash
-go build -o bin/ ./...
+make build
+```
+
+You can also build each binary individually:
+
+```bash
+make build-aura   # produces bin/aura-cli
+make build-neo4j  # produces bin/neo4j-cli
+```
+
+To remove build artifacts:
+
+```bash
+make clean
 ```
 
 If you want to build binaries for all varieties of platforms, you can do so with the following command:

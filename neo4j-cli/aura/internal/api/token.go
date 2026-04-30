@@ -46,7 +46,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 	if err != nil {
 		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
 	}
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
 
 	switch statusCode := res.StatusCode; statusCode {
 	case http.StatusUnauthorized:

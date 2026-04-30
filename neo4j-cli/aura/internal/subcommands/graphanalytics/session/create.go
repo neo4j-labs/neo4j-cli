@@ -42,16 +42,16 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 				Creating a session is an asynchronous operation that can be awaited with --await.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if instance_id == "" {
-				cmd.MarkFlagRequired(cloudProviderFlag)
-				cmd.MarkFlagRequired(regionFlag)
+				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+				cmd.MarkFlagRequired(regionFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 				if cfg.Aura.DefaultTenant() != "" {
-					cmd.MarkFlagRequired(tenantIdFlag)
+					cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 				}
 			}
 
-			cmd.MarkFlagRequired(nameFlag)
-			cmd.MarkFlagRequired(memoryFlag)
+			cmd.MarkFlagRequired(nameFlag)   //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+			cmd.MarkFlagRequired(memoryFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 			return nil
 		},
@@ -120,10 +120,10 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&memory, memoryFlag, "", "(required) The size of the session memory in GB.")
-	cmd.MarkFlagRequired(memoryFlag)
+	cmd.MarkFlagRequired(memoryFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the session.")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&tenant_id, tenantIdFlag, "", "The Aura project/tenant ID")
 

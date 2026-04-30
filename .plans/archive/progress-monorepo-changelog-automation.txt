@@ -1,0 +1,183 @@
+================================================================================
+TASK-001: Migrate changie to multi-project config and restructure history
+Date: 2026-04-30T17:00:00Z
+================================================================================
+
+Summary:
+Migrated changie from a single-project config to a multi-project setup with
+`aura-cli` and `neo4j-cli` projects. Updated `.changie.yaml` to use the
+`projects:` array, moved all existing versioned files into `.changes/aura-cli/`,
+created `CHANGELOG-aura.md` (copy of historical `CHANGELOG.md`), created empty
+`CHANGELOG-neo4j.md`, and replaced root `CHANGELOG.md` with a forwarding note.
+
+Files Changed:
+- .changie.yaml (modified — added `projects:` array with aura-cli and neo4j-cli entries using `key` and `changelog` fields)
+- .changes/aura-cli/v*.md (created — migrated 15 versioned files from .changes/ root)
+- .changes/unreleased/.gitkeep (created — shared unreleased directory preserved at root)
+- CHANGELOG-aura.md (created — full historical changelog v0.1.0 through v1.7.0)
+- CHANGELOG-neo4j.md (created — empty changelog with standard header)
+- CHANGELOG.md (modified — replaced with forwarding note pointing to per-binary changelogs)
+- .changes/v*.md (deleted — 15 versioned files removed from root)
+
+Key Decisions:
+- changie's `ProjectConfig` struct does NOT support per-project `changesDir` — it uses root `changesDir` + `key` as subdirectory for versioned files (confirmed from source at changie@v1.21.0/core/utils.go:GetAllVersions)
+- The `ProjectConfig` field for changelog path is `changelog` (not `changelogPath`) — using the wrong field name silently fails
+- All unreleased change files share `.changes/unreleased/` (root level); per-project unreleased subdirs are not used by changie — cascade in task-004 must duplicate files with different `project:` field values, not copy between directories
+- `changie latest --project aura-cli` returns `aura-cliv1.7.0` (project key prepended) — downstream workflows need to strip the prefix or use `--remove-prefix`
+- `ProjectsVersionSeparator` defaults to empty string; tasks 004/005 should set it to `-` if cleaner output is needed
+
+Next Task: task-002 or task-003 (both depend on task-001, neither depends on each other)
+
+================================================================================
+TASK-002: Update GoReleaser for per-binary version injection and release assets
+Date: 2026-04-30T17:30:00Z
+================================================================================
+
+Summary:
+Updated `.goreleaser.yaml` to inject separate version strings per binary:
+`aura-cli` now reads from `{{.Env.AURA_CLI_VERSION}}` while `neo4j-cli` continues
+using `{{.Env.GORELEASER_CURRENT_TAG}}`. Disabled GoReleaser's auto-changelog
+generation and added `release.extra_files` to attach both changelogs to GitHub Releases.
+Validated with snapshot build: each binary correctly reports its own independent version.
+
+Files Changed:
+- .goreleaser.yaml (modified — aura-cli ldflags uses AURA_CLI_VERSION; changelog disabled; release.extra_files added)
+
+Key Decisions:
+- `release.extra_files` uses `glob:` syntax (not `path:`) for GoReleaser v2 compatibility
+- GoReleaser v2 `changelog.disable: true` suppresses auto-generated changelog in release body, allowing custom `--release-notes` in task-005
+- The `neo4j-cli` build continues to use `GORELEASER_CURRENT_TAG` unchanged — GoReleaser sets this automatically from the git tag at release time
+- Snapshot build requires AURA_CLI_VERSION env var to be set explicitly since it's not a built-in GoReleaser variable
+
+Next Task: task-003 (Makefile targets; depends only on task-001)
+
+================================================================================
+TASK-003: Add changelog Makefile targets
+Date: 2026-04-30T18:00:00Z
+================================================================================
+
+Summary:
+Added three Makefile targets for creating changie changelog entries:
+`changelog` (interactive, prompts for project), `changelog-aura` (aura-cli
+project, no project prompt), and `changelog-neo4j` (neo4j-cli project, no
+project prompt). All three declared as `.PHONY`.
+
+Files Changed:
+- Makefile (modified — added changelog, changelog-aura, changelog-neo4j targets with .PHONY declarations)
+
+Key Decisions:
+- Used `changie new --project <key>` flag to bypass the project selection prompt for the targeted targets
+- Followed existing Makefile comment style (`## target: description`) for consistency
+- All three added to the single `.PHONY` line at the top of the Makefile
+
+Next Task: task-004 (Update changie CI workflow; depends on task-001)
+
+================================================================================
+TASK-004: Update changie CI workflow for cascade and dual-project batching
+Date: 2026-04-30T18:30:00Z
+================================================================================
+
+Summary:
+Rewrote `.github/workflows/changie.yml` to support dual-project batching and
+cascading. The cascade step idempotently copies unreleased `aura-cli` YAML entries
+(those tagged `project: aura-cli`) into neo4j-cli variants by rewriting the
+`project:` field in-place. Both projects are batched separately with `--project`
+flags, then `changie merge` (no flags needed) writes both `CHANGELOG-aura.md` and
+`CHANGELOG-neo4j.md` in one call. Version numbers are extracted via
+`changie latest --project`, with `sed` stripping the project-key prefix
+(e.g. `aura-cliv1.7.0` → `v1.7.0`). A single release PR is created with both
+versions in its title and body.
+
+Files Changed:
+- .github/workflows/changie.yml (modified — full rewrite for multi-project cascade and batching)
+
+Key Decisions:
+- `changie merge` (no --project flag) automatically iterates all configured projects and
+  writes each to its own `changelog:` path — confirmed from changie v1.21.0 source
+  (`cmd/merge.go`). A single `merge` call is correct; calling per-project is not supported.
+- Cascade operates on `.changes/unreleased/*.yaml` (the shared dir), not per-project subdirs.
+  Files are identified by `project: aura-cli` inside the YAML; cascade creates
+  `<original>-neo4j-cli.yaml` copies with `project: neo4j-cli`.
+- `changie latest --project aura-cli` returns `aura-cliv1.7.0`; `sed 's/^aura-cli//'`
+  strips the prefix to get the bare version string `v1.7.0`.
+- The `for ... done || true` pattern plus `[ -e "$file" ] || continue` guard ensures
+  the cascade step never fails when the unreleased directory is empty.
+
+Next Task: task-005 (Update release workflow for dual versions and combined release notes)
+
+================================================================================
+TASK-005: Update release workflow for dual versions and combined release notes
+Date: 2026-04-30T19:00:00Z
+================================================================================
+
+Summary:
+Updated `.github/workflows/release.yml` to trigger on `CHANGELOG-neo4j.md` changes
+(replacing the old `CHANGELOG.md` trigger). Added separate `changie latest --project`
+steps for both binaries, a version extraction step using `sed` to strip project-key
+prefixes, and a release notes generation step that writes a `release-notes.md` with
+`## Versions` and `## Changes` sections. GoReleaser is invoked with
+`--release-notes=release-notes.md` and `AURA_CLI_VERSION` passed explicitly in the env
+block alongside the usual secrets.
+
+Files Changed:
+- .github/workflows/release.yml (modified — new trigger path, dual-version extraction, release-notes.md generation, AURA_CLI_VERSION env var for GoReleaser)
+
+Key Decisions:
+- Used `printf` with a grouped `{ ... } > release-notes.md` redirect to avoid heredoc
+  indentation issues that would produce leading whitespace in the generated file
+- `AURA_CLI_VERSION` is set via `Add env vars` step and re-referenced as
+  `${{ env.AURA_CLI_VERSION }}` in the GoReleaser env block (GitHub Actions requires
+  this pattern to forward env vars set in a previous step into an action's env)
+- The neo4j-cli version file path follows `.changes/neo4j-cli/${NEO4J_VERSION}.md`;
+  `tail -n +2` strips the `## vX.Y.Z - DATE` header to get just the changelog body
+- Removed the old `RELEASE_NOTES_PATH` env var in favour of a hardcoded
+  `--release-notes=release-notes.md` argument (file always has the same name per run)
+
+Next Task: task-006 (Update CONTRIBUTING.md with new changelog workflow)
+
+================================================================================
+TASK-006: Update CONTRIBUTING.md with new changelog workflow
+Date: 2026-04-30T19:30:00Z
+================================================================================
+
+Summary:
+Updated CONTRIBUTING.md to replace the old single-project changie instructions
+(including the now-obsolete "Versioning cascade policy" section that told contributors
+to run `changie new` twice) with the new multi-project workflow. The section now
+describes using `make changelog`, `make changelog-aura`, or `make changelog-neo4j`
+via a clear table, and explains the cascade behaviour so contributors know they only
+need one entry even when touching aura-cli.
+
+Files Changed:
+- CONTRIBUTING.md (modified — replaced changie section with multi-project make targets table and cascade explanation; removed dual-run instructions)
+
+Key Decisions:
+- Used a markdown table for the three targets to keep the section scannable
+- Cascade explanation placed immediately after the table for discoverability
+- changie install command and PATH hint preserved unchanged
+- "Versioning cascade policy" subsection removed entirely as it contained the now-incorrect dual-run instructions
+
+Next Task: task-007 (Update AGENTS.md and .agents/ docs for new release flow)
+
+================================================================================
+TASK-007: Update AGENTS.md and .agents/ docs for new release flow
+Date: 2026-04-30T20:00:00Z
+================================================================================
+
+Summary:
+Updated AGENTS.md, .agents/build.md, and .agents/deployment.md to reflect the
+multi-project changie setup, the three `make changelog*` targets, the dual-version
+GoReleaser flow, the cascade mechanism, and combined release notes generation.
+Removed all references to the old single-project changie workflow and CHANGELOG.md.
+
+Files Changed:
+- AGENTS.md (modified — updated Build System bullet points with make changelog-aura/neo4j targets and snapshot command; updated Deployment section with CHANGELOG-neo4j.md trigger, AURA_CLI_VERSION, and release-notes.md note)
+- .agents/build.md (modified — added changelog targets to Makefile table, updated GoReleaser version injection, rewrote Changelog section with cascade rule, updated snapshot command with AURA_CLI_VERSION, updated release trigger path)
+- .agents/deployment.md (modified — full rewrite: new trigger path, cascade policy with make targets, detailed release flow steps, dual-version injection table, snapshot command, GoReleaser auto-changelog note)
+
+Key Decisions:
+- AGENTS.md Build System section explicitly lists make changelog-aura and make changelog-neo4j to satisfy acceptance criteria; .agents/build.md provides the full table and cascade explanation
+- Snapshot build command updated in both AGENTS.md and .agents/build.md to include AURA_CLI_VERSION=dev (required since aura-cli now uses that env var instead of GORELEASER_CURRENT_TAG)
+- .agents/deployment.md rewritten from scratch to document the full 3-step release flow in numbered list format matching the actual CI implementation
+
+Next Task: All tasks complete

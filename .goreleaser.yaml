@@ -8,25 +8,24 @@
 
 version: 2
 
-# TODO: Change to neo4j-cli if decided to release "mono-CLI"
-project_name: aura-cli
+project_name: neo4j-cli
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  # - main: ./neo4j-cli
-  #   id: neo4j-cli
-  #   binary: neo4j-cli
-  #   env:
-  #     - CGO_ENABLED=0
-  #   goos:
-  #     - linux
-  #     - windows
-  #     - darwin
-  #   ldflags:
-  #     - -X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
+  - main: ./neo4j-cli
+    id: neo4j-cli
+    binary: neo4j-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    ldflags:
+      - -X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
   - main: ./neo4j-cli/aura/cmd
     id: aura-cli
     binary: aura-cli
@@ -37,13 +36,17 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
+      - -X "main.Version={{.Env.AURA_CLI_VERSION}}"
 
 archives:
-  - format: tar.gz
+  - id: neo4j-cli-archive
+    ids:
+      - neo4j-cli
+    formats:
+      - tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
-      {{ .ProjectName }}_
+      {{ .Binary }}_
       {{- .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
@@ -53,10 +56,35 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
+  - id: aura-cli-archive
+    ids:
+      - aura-cli
+    formats:
+      - tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .Binary }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
 
 changelog:
-  disable: false
+  disable: true
+
+release:
+  extra_files:
+    - glob: CHANGELOG-aura.md
+    - glob: CHANGELOG-neo4j.md
 
 notarize:
   macos:
@@ -71,6 +99,7 @@ notarize:
       # Default: the project name.
       ids:
         - aura-cli
+        - neo4j-cli
 
       sign:
         # The .p12 certificate file path or its base64'd contents.

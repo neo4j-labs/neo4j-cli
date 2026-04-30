@@ -30,13 +30,13 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Oragnization ID")
-	cmd.MarkFlagRequired(organizationIdFlag)
+	cmd.MarkFlagRequired(organizationIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
-	cmd.MarkFlagRequired(projectIdFlag)
+	cmd.MarkFlagRequired(projectIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	return cmd
 }

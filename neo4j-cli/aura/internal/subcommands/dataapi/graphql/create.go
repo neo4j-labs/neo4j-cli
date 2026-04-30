@@ -108,16 +108,16 @@ If you lose your API key, you will need to create a new Authentication provider.
 	}
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance to create the GraphQL Data API for")
-	cmd.MarkFlagRequired(instanceIdFlag)
+	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&instanceUsername, instanceUsernameFlag, "", "(required) The username of the instance this GraphQL Data API will be connected to")
-	cmd.MarkFlagRequired(instanceUsernameFlag)
+	cmd.MarkFlagRequired(instanceUsernameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&instancePassword, instancePasswordFlag, "", "(required) The password of the instance this GraphQL Data API will be connected to")
-	cmd.MarkFlagRequired(instancePasswordFlag)
+	cmd.MarkFlagRequired(instancePasswordFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the GraphQL Data API")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&typeDefs, typeDefsFlag, "", "The GraphQL type definitions, NOTE: must be base64 encoded")
 

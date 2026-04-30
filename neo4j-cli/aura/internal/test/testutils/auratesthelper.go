@@ -60,7 +60,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	cmd.SetOut(helper.out)
 	cmd.SetErr(helper.err)
 
-	cmd.Execute()
+	cmd.Execute() //nolint:errcheck // cobra prints the error itself; test assertions check cmd output
 }
 
 func (helper *AuraTestHelper) SetConfig(cfg string) {
@@ -137,7 +137,7 @@ func (helper *AuraTestHelper) AssertOutJson(expected string) {
 func (helper *AuraTestHelper) AssertConfig(expected string) {
 	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
 	assert.Nil(helper.t, err)
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 
 	out, err := io.ReadAll(file)
 	assert.Nil(helper.t, err)
@@ -151,7 +151,7 @@ func (helper *AuraTestHelper) AssertConfig(expected string) {
 func (helper *AuraTestHelper) AssertConfigValue(key string, expected string) {
 	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
 	assert.Nil(helper.t, err)
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 
 	out, err := io.ReadAll(file)
 	assert.Nil(helper.t, err)
@@ -175,7 +175,7 @@ func (helper *AuraTestHelper) AssertConfigValue(key string, expected string) {
 func (helper *AuraTestHelper) AssertCredentialsValue(key string, expected string) { // TODO: merge with assertConfig
 	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
 	assert.Nil(helper.t, err)
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 
 	out, err := io.ReadAll(file)
 	assert.Nil(helper.t, err)
@@ -219,7 +219,7 @@ func (helper *AuraTestHelper) NewRequestHandlerMock(path string, status int, bod
 			response := mock.Responses[requestCount]
 
 			res.WriteHeader(response.status)
-			res.Write([]byte(response.body))
+			res.Write([]byte(response.body)) //nolint:errcheck // test HTTP response write; errors would manifest as test assertion failures
 		}
 	})
 
@@ -237,7 +237,7 @@ func NewAuraTestHelper(t *testing.T) AuraTestHelper {
 	helper.mux = http.NewServeMux()
 	helper.mux.HandleFunc("/oauth/token", func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(200)
-		res.Write([]byte(`{"access_token":"<token>","expires_in":3600,"token_type":"bearer"}`))
+		res.Write([]byte(`{"access_token":"<token>","expires_in":3600,"token_type":"bearer"}`)) //nolint:errcheck // test HTTP response write; errors would manifest as test assertion failures
 	})
 
 	server := httptest.NewServer(helper.mux)

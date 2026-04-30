@@ -84,8 +84,8 @@ func NewConfig(fs afero.Fs, version string) *Config {
 }
 
 func bindEnvironmentVariables(Viper *viper.Viper) {
-	Viper.BindEnv("aura.base-url", "AURA_BASE_URL")
-	Viper.BindEnv("aura.auth-url", "AURA_AUTH_URL")
+	Viper.BindEnv("aura.base-url", "AURA_BASE_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+	Viper.BindEnv("aura.auth-url", "AURA_AUTH_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
 }
 
 func setDefaultValues(Viper *viper.Viper) {

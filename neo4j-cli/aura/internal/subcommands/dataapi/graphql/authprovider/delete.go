@@ -44,10 +44,10 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to delete the Data API for")
-	cmd.MarkFlagRequired("instance-id")
+	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&dataApiId, "data-api-id", "", "(required) The ID of the GraphQL Data API to delete the Authentication provider for")
-	cmd.MarkFlagRequired("data-api-id")
+	cmd.MarkFlagRequired("data-api-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	return cmd
 }

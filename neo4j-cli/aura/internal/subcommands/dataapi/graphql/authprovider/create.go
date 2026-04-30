@@ -49,7 +49,7 @@ If you create an 'api-key' Authentication provider, an API key will be created. 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if _type == api.GraphQLDataApiAuthProviderTypeJwks {
-				cmd.MarkFlagRequired(urlFlag)
+				cmd.MarkFlagRequired(urlFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			}
 
 			if _type == api.GraphQLDataApiAuthProviderTypeApiKey && url != "" {
@@ -105,17 +105,17 @@ If you lose your API key, you will need to create a new Authentication provider.
 	}
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance to create the GraphQL Data API for")
-	cmd.MarkFlagRequired(instanceIdFlag)
+	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&dataApiId, dataApiIdFlag, "", "(required) The ID of the GraphQL Data API to create the authentication provider for")
-	cmd.MarkFlagRequired(dataApiIdFlag)
+	cmd.MarkFlagRequired(dataApiIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	msgTypeFlag := fmt.Sprintf("(required) The type of the Authentication provider, one of '%s' or '%s'", api.GraphQLDataApiAuthProviderTypeApiKey, api.GraphQLDataApiAuthProviderTypeJwks)
 	cmd.Flags().Var(&_type, typeFlag, msgTypeFlag)
-	cmd.MarkFlagRequired(typeFlag)
+	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the Authentication provider")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().BoolVar(&disabled, disabledFlag, disabledDefault, "Whether or not the Authentication provider is disabled")
 

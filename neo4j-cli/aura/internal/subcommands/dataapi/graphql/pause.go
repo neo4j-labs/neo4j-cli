@@ -56,7 +56,7 @@ Pausing a GraphQL Data API is an asynchronous operation. Use the --await flag to
 	}
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to pause the Data API for")
-	cmd.MarkFlagRequired("instance-id")
+	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().BoolVar(&await, "await", false, "Waits until GraphQL Data API is paused.")
 

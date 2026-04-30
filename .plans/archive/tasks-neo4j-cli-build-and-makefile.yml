@@ -1,0 +1,178 @@
+feature: neo4j-cli-build-and-makefile
+prd: ./prd-neo4j-cli-build-and-makefile.md
+created_at: 2026-04-30T15:00:00Z
+updated_at: 2026-04-30T15:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Fix neo4j-cli aura subcommand Use field"
+    description: |
+      In `neo4j-cli/main.go`, capture the command returned by `aura.NewCmd(cfg)`,
+      override its `Use` field to `"aura"`, then pass it to `cmd.AddCommand`. This
+      makes the command path `neo4j-cli aura <subcommand>` instead of
+      `neo4j-cli aura-cli <subcommand>`. `aura.NewCmd` itself must not be changed
+      so the standalone `aura-cli` binary is unaffected.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli aura instance list` executes without error"
+      - "`neo4j-cli aura-cli` does not resolve as a valid subcommand"
+      - "`aura-cli instance list` (standalone binary) continues to work unchanged"
+      - "`aura.NewCmd` in `neo4j-cli/aura/aura.go` is not modified"
+    completed_at: 2026-04-30T15:30:00Z
+
+  - id: task-002
+    title: "Add minimal golangci-lint config"
+    description: |
+      Create `.golangci.yml` at the repo root with a minimal linter set: `govet`,
+      `errcheck`, `staticcheck`, `unused`, and `gofmt`. Set `max-issues-per-linter`
+      and `max-same-issues` to 0 so all issues are reported. This config will be
+      used by both the Makefile and CI.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`.golangci.yml` exists at the repo root"
+      - "Running `golangci-lint run ./...` locally completes without a config error"
+      - "Only the five specified linters are enabled"
+      - "`max-issues-per-linter: 0` and `max-same-issues: 0` are set"
+    completed_at: 2026-04-30T16:00:00Z
+
+  - id: task-003
+    title: "Fix all existing golangci-lint errors"
+    description: |
+      Run `golangci-lint run ./...` against the codebase and resolve every reported
+      issue. Fixes must not introduce breaking changes to CLI behaviour or alter
+      public API signatures. If `errcheck` flags intentionally ignored errors (e.g.
+      `cmd.Execute()`), use `//nolint:errcheck` with a comment rather than silently
+      swallowing them.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`golangci-lint run ./...` exits with code 0 and zero reported issues"
+      - "`go test ./...` still passes after all fixes"
+      - "No breaking changes to CLI command signatures or output format"
+      - "Any `//nolint` directives added are narrowly scoped with a justification comment"
+    completed_at: 2026-04-30T16:30:00Z
+
+  - id: task-004
+    title: "Create Makefile with all required targets"
+    description: |
+      Create a `Makefile` at the repo root exposing the targets: `build`,
+      `build-aura`, `build-neo4j`, `test`, `lint`, `fmt`, `license-check`,
+      `run-aura`, `run-neo4j`, and `clean`. Use `go env GOPATH` for tool paths
+      rather than hardcoded values. Mark all non-file targets as `.PHONY`. The
+      `license-check` target may assume a Unix shell (matching existing behaviour);
+      add a comment noting this. All other targets must work on macOS, Linux, and
+      Windows.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`make build` produces `bin/aura-cli` and `bin/neo4j-cli`"
+      - "`make test` runs `go test ./...` and exits 0 on a clean codebase"
+      - "`make lint` runs `golangci-lint run ./...` and exits 0"
+      - "`make fmt` runs `go fmt ./...` without error"
+      - "`make license-check` runs the addlicense check and exits 0"
+      - "`make clean` removes the `bin/` directory"
+      - "All non-file targets are declared `.PHONY`"
+    completed_at: 2026-04-30T17:00:00Z
+
+  - id: task-005
+    title: "Update GoReleaser for dual-binary release with macOS signing"
+    description: |
+      Update `.goreleaser.yaml` to build and archive both `aura-cli` (from
+      `./neo4j-cli/aura/cmd`) and `neo4j-cli` (from `./neo4j-cli`). Each binary
+      should produce its own archive per platform. Both binaries must inject the
+      version via `-ldflags "-X main.Version={{.Env.GORELEASER_CURRENT_TAG}}"`. Extend
+      the `notarize.macos[].ids` list to include `neo4j-cli` so both binaries are
+      code-signed and notarized on macOS.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --clean` completes without error"
+      - "Snapshot produces separate archives for `aura-cli` and `neo4j-cli` for each platform/arch combination"
+      - "Both binaries report the injected version when invoked with `--version`"
+      - "`notarize.macos[].ids` includes both `aura-cli` and `neo4j-cli`"
+      - "The commented-out neo4j-cli build block is removed (not just uncommented)"
+    completed_at: 2026-04-30T17:30:00Z
+
+  - id: task-006
+    title: "Update CI workflows to use make targets"
+    description: |
+      Update `.github/workflows/test.yml` to call `make build`, `make test`,
+      `make lint`, and `make fmt` instead of raw `go` commands and the
+      `staticcheck-action` step. Install `golangci-lint` via the official
+      `golangci-lint-action` (which caches the binary). Update
+      `.github/workflows/license.yml` to call `make license-check`. Remove the
+      `dominikh/staticcheck-action` step entirely.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`test.yml` contains no direct `go build`, `go test`, `go vet`, or `go fmt` run steps"
+      - "`test.yml` contains no reference to `dominikh/staticcheck-action`"
+      - "`golangci-lint-action` is used to install golangci-lint in CI"
+      - "`license.yml` calls `make license-check` instead of running addlicense directly"
+      - "CI workflow passes on ubuntu, windows, and macos matrix jobs"
+    completed_at: 2026-04-30T18:00:00Z
+
+  - id: task-007
+    title: "Update CONTRIBUTING.md and README.md with make-based workflow"
+    description: |
+      Update `CONTRIBUTING.md` to replace all raw `go` command examples with their
+      `make` equivalents (build, test, run, license check). Add a section documenting
+      the versioning cascade policy: every `aura-cli` release requires a corresponding
+      `neo4j-cli` changelog entry via `changie new`. Update `README.md` quick-start
+      examples (local run, build) to use `make` targets.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "CONTRIBUTING.md references `make build`, `make test`, `make lint`, `make fmt`, `make license-check`"
+      - "CONTRIBUTING.md contains no bare `go build`, `go test`, `go vet`, `go fmt` command examples"
+      - "CONTRIBUTING.md includes the versioning cascade policy (aura-cli change → neo4j-cli changie entry)"
+      - "README.md build and local-run examples use `make` targets"
+    completed_at: 2026-04-30T19:00:00Z
+
+  - id: task-008
+    title: "Update agent docs (AGENTS.md and .agents/ detail files)"
+    description: |
+      Update `AGENTS.md` between the generated markers: replace raw `go` commands
+      with `make` targets in Feedback Instructions, update the Build System section,
+      and add `neo4j-cli` to the Architecture binary overview. Update
+      `.agents/build.md` with all Makefile targets, the golangci-lint switch, the
+      dual-binary GoReleaser setup, and the cascade versioning policy. Update
+      `.agents/testing.md` to show `make test`. Update `.agents/deployment.md` to
+      reflect dual-binary releases, separate versioning, and the cascade rule.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "AGENTS.md Feedback Instructions show `make build`, `make test`, `make lint`, `make fmt`"
+      - "AGENTS.md Architecture section mentions `neo4j-cli` as the super-CLI entrypoint"
+      - "`.agents/build.md` lists all Makefile targets and documents golangci-lint usage"
+      - "`.agents/deployment.md` describes the dual-binary release and cascade versioning policy"
+      - "`.agents/testing.md` shows `make test` as the canonical test command"
+    completed_at: 2026-04-30T19:30:00Z
+
+  - id: task-009
+    title: "Update usage guide to document neo4j-cli"
+    description: |
+      Update `docs/usageGuide/A Guide To The New Aura CLI.md` to introduce the
+      `neo4j-cli` super CLI: what it is, how to download and install it, and that
+      all aura commands are accessible via `neo4j-cli aura <subcommand>` in addition
+      to the standalone `aura-cli` binary. Existing aura-cli instructions should
+      remain intact; neo4j-cli coverage is additive.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The guide includes a section introducing `neo4j-cli` and its relationship to `aura-cli`"
+      - "Installation instructions for `neo4j-cli` are provided (download, extract, move to PATH)"
+      - "At least one example shows `neo4j-cli aura <subcommand>` usage"
+      - "Existing `aura-cli` instructions are preserved and accurate"
+    completed_at: 2026-04-30T20:00:00Z

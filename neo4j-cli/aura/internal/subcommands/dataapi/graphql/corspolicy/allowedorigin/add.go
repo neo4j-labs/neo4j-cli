@@ -90,10 +90,10 @@ Adding a new allowed origin to the CORS policy of a GraphQL Data API allows brow
 	}
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance the GraphQL Data API is connected to")
-	cmd.MarkFlagRequired(instanceIdFlag)
+	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&dataApiId, dataApiIdFlag, "", "(required) The ID of the GraphQL Data API to add the CORS allowed origin for")
-	cmd.MarkFlagRequired(dataApiIdFlag)
+	cmd.MarkFlagRequired(dataApiIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until updated GraphQL Data API is ready.")
 

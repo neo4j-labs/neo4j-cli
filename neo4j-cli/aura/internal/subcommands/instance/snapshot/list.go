@@ -45,7 +45,7 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "The ID of the instance to list the snapshots of")
-	cmd.MarkFlagRequired("instance-id")
+	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 	cmd.Flags().StringVar(&date, "date", "", "An optional date to list snapshots for a given day, defaults to today. Must be formatted with an ISO formatted date string (YYYY-MM-DD)")
 
 	return cmd

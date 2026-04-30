@@ -61,9 +61,9 @@ You must also provide a --cloud-provider flag with the subcommand, which specifi
 For Enterprise instances you can specify a --customer-managed-key-id flag to use a Customer Managed Key for encryption.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if _type != "free-db" {
-				cmd.MarkFlagRequired(memoryFlag)
-				cmd.MarkFlagRequired(regionFlag)
-				cmd.MarkFlagRequired(cloudProviderFlag)
+				cmd.MarkFlagRequired(memoryFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+				cmd.MarkFlagRequired(regionFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			} else {
 				if memory != "" {
 					return fmt.Errorf(`invalid argument "%s" for "--memory" flag: must not be set when "--type" flag is set to "free-db"`, memory)
@@ -85,7 +85,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			if cfg.Aura.DefaultTenant() == "" {
-				cmd.MarkFlagRequired(tenantIdFlag)
+				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			}
 
 			return nil
@@ -164,10 +164,10 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory in GB.")
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace).")
-	cmd.MarkFlagRequired(nameFlag)
+	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().Var(&_type, typeFlag, "(required) The type of the instance.")
-	cmd.MarkFlagRequired(typeFlag)
+	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 

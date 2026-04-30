@@ -1,0 +1,20 @@
+# golangci-lint configuration (v2)
+# See https://golangci-lint.run/usage/configuration/
+
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
