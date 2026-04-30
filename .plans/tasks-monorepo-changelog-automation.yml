@@ -33,7 +33,7 @@ tasks:
       (`changelog: disable: true`) so custom release notes are not overwritten. Add a
       `release.extra_files` block to attach `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md` as
       downloadable assets on the GitHub Release.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -42,7 +42,7 @@ tasks:
       - "`changelog: disable: true` is set in `.goreleaser.yaml`"
       - "`release.extra_files` includes `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`"
       - "GoReleaser snapshot build succeeds when both `AURA_CLI_VERSION=v1.7.0` and `GORELEASER_CURRENT_TAG=v0.1.0` are set; each binary reports its own version with `--version`"
-    completed_at: null
+    completed_at: "2026-04-30T17:30:00Z"
 
   - id: task-003
     title: "Add changelog Makefile targets"

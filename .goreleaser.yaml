@@ -36,7 +36,7 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
+      - -X "main.Version={{.Env.AURA_CLI_VERSION}}"
 
 archives:
   - id: neo4j-cli-archive
@@ -79,7 +79,12 @@ archives:
           - zip
 
 changelog:
-  disable: false
+  disable: true
+
+release:
+  extra_files:
+    - glob: CHANGELOG-aura.md
+    - glob: CHANGELOG-neo4j.md
 
 notarize:
   macos:

@@ -27,3 +27,26 @@ Key Decisions:
 - `ProjectsVersionSeparator` defaults to empty string; tasks 004/005 should set it to `-` if cleaner output is needed
 
 Next Task: task-002 or task-003 (both depend on task-001, neither depends on each other)
+
+================================================================================
+TASK-002: Update GoReleaser for per-binary version injection and release assets
+Date: 2026-04-30T17:30:00Z
+================================================================================
+
+Summary:
+Updated `.goreleaser.yaml` to inject separate version strings per binary:
+`aura-cli` now reads from `{{.Env.AURA_CLI_VERSION}}` while `neo4j-cli` continues
+using `{{.Env.GORELEASER_CURRENT_TAG}}`. Disabled GoReleaser's auto-changelog
+generation and added `release.extra_files` to attach both changelogs to GitHub Releases.
+Validated with snapshot build: each binary correctly reports its own independent version.
+
+Files Changed:
+- .goreleaser.yaml (modified — aura-cli ldflags uses AURA_CLI_VERSION; changelog disabled; release.extra_files added)
+
+Key Decisions:
+- `release.extra_files` uses `glob:` syntax (not `path:`) for GoReleaser v2 compatibility
+- GoReleaser v2 `changelog.disable: true` suppresses auto-generated changelog in release body, allowing custom `--release-notes` in task-005
+- The `neo4j-cli` build continues to use `GORELEASER_CURRENT_TAG` unchanged — GoReleaser sets this automatically from the git tag at release time
+- Snapshot build requires AURA_CLI_VERSION env var to be set explicitly since it's not a built-in GoReleaser variable
+
+Next Task: task-003 (Makefile targets; depends only on task-001)
