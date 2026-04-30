@@ -158,3 +158,26 @@ Key Decisions:
 - "Versioning cascade policy" subsection removed entirely as it contained the now-incorrect dual-run instructions
 
 Next Task: task-007 (Update AGENTS.md and .agents/ docs for new release flow)
+
+================================================================================
+TASK-007: Update AGENTS.md and .agents/ docs for new release flow
+Date: 2026-04-30T20:00:00Z
+================================================================================
+
+Summary:
+Updated AGENTS.md, .agents/build.md, and .agents/deployment.md to reflect the
+multi-project changie setup, the three `make changelog*` targets, the dual-version
+GoReleaser flow, the cascade mechanism, and combined release notes generation.
+Removed all references to the old single-project changie workflow and CHANGELOG.md.
+
+Files Changed:
+- AGENTS.md (modified — updated Build System bullet points with make changelog-aura/neo4j targets and snapshot command; updated Deployment section with CHANGELOG-neo4j.md trigger, AURA_CLI_VERSION, and release-notes.md note)
+- .agents/build.md (modified — added changelog targets to Makefile table, updated GoReleaser version injection, rewrote Changelog section with cascade rule, updated snapshot command with AURA_CLI_VERSION, updated release trigger path)
+- .agents/deployment.md (modified — full rewrite: new trigger path, cascade policy with make targets, detailed release flow steps, dual-version injection table, snapshot command, GoReleaser auto-changelog note)
+
+Key Decisions:
+- AGENTS.md Build System section explicitly lists make changelog-aura and make changelog-neo4j to satisfy acceptance criteria; .agents/build.md provides the full table and cascade explanation
+- Snapshot build command updated in both AGENTS.md and .agents/build.md to include AURA_CLI_VERSION=dev (required since aura-cli now uses that env var instead of GORELEASER_CURRENT_TAG)
+- .agents/deployment.md rewritten from scratch to document the full 3-step release flow in numbered list format matching the actual CI implementation
+
+Next Task: All tasks complete

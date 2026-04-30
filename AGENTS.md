@@ -26,10 +26,10 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 
 - Local build: `make build` (produces `bin/aura-cli` and `bin/neo4j-cli`)
 - Local run (no build): `make run-aura` / `make run-neo4j`
-- Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --clean`
+- Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean`
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry added via `changie new` (prompts for project selection: `aura-cli` or `neo4j-cli`)
-- Cascade rule: `aura-cli` changes automatically cascade into `neo4j-cli` via CI — no second `changie new` call needed
+- PRs require a changelog entry: `make changelog-aura` (aura changes), `make changelog-neo4j` (neo4j-wrapper-only changes), or `make changelog` (interactive)
+- Cascade rule: `aura-cli` changes automatically cascade into `neo4j-cli` via CI — no second changelog command needed
 
 ## Testing Framework
 
@@ -80,13 +80,15 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 
 ## Deployment
 
-DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by CHANGELOG.md updates on `main`
+DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG-neo4j.md` updates on `main`
 
 See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
-- `changie` batches changelog entries and opens release PRs automatically
+- `changie` batches changelog entries and opens release PRs automatically (dual-project: `aura-cli` + `neo4j-cli`)
 - Merging a release PR triggers GoReleaser to publish binaries for linux/windows/darwin (amd64 + arm64)
 - macOS binaries are code-signed and notarized
+- Each binary gets its own version: `AURA_CLI_VERSION` for `aura-cli`, `GORELEASER_CURRENT_TAG` for `neo4j-cli`
+- Combined `release-notes.md` is generated with `## Versions` and `## Changes` sections before GoReleaser runs
 
 ## Makefile Notes
 

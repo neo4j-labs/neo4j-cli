@@ -24,6 +24,9 @@ All targets are `.PHONY`. Run `make <target>`:
 | `run-aura` | Run `aura-cli` without building (`go run ./neo4j-cli/aura/cmd`) |
 | `run-neo4j` | Run `neo4j-cli` without building (`go run ./neo4j-cli`) |
 | `clean` | Remove `bin/` and `dist/` directories |
+| `changelog` | Interactive changie entry — prompts for project selection |
+| `changelog-aura` | Create a changie entry for `aura-cli` (no project prompt) |
+| `changelog-neo4j` | Create a changie entry for `neo4j-cli` (no project prompt) |
 
 The Makefile uses `$(shell go env GOPATH)` to resolve tool paths — `license-check` calls `$(GOPATH)/bin/addlicense` directly because `GOPATH/bin` may not be on `PATH`.
 
@@ -45,8 +48,8 @@ make fmt
 # License header check (Unix/macOS only)
 make license-check
 
-# Multi-platform release snapshot (local)
-GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --clean
+# Multi-platform release snapshot (local) — both version env vars required
+GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean
 
 # Clean build artifacts
 make clean
@@ -72,28 +75,31 @@ GoReleaser builds two separate binaries per release:
 | `aura-cli` | `./neo4j-cli/aura/cmd` |
 | `neo4j-cli` | `./neo4j-cli` |
 
-Each binary gets its own archive per platform. Both inject the version via:
-```
--X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
-```
+Each binary gets its own archive per platform. Version injection differs per binary:
+- `aura-cli` uses `-X "main.Version={{.Env.AURA_CLI_VERSION}}"` (custom env var)
+- `neo4j-cli` uses `-X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"` (GoReleaser built-in)
 
 Config key: each `archives` entry must have a unique `id`; archive `name_template` uses `{{ .Binary }}` (not `{{ .ProjectName }}`) so archives are named per binary.
 
-## Changelog and Cascade Versioning Policy
+## Changelog Targets
 
-Uses `changie` to manage changelog entries. Before merging a PR that changes either binary, run:
+Uses `changie` with a multi-project config (`aura-cli` and `neo4j-cli` projects). Three Makefile targets are available:
 
-```bash
-changie new
-```
+| Target | Description |
+|--------|-------------|
+| `make changelog` | Interactive — prompts for project selection (`aura-cli` or `neo4j-cli`) |
+| `make changelog-aura` | Creates an entry in `.changes/unreleased/` tagged `project: aura-cli` (no project prompt) |
+| `make changelog-neo4j` | Creates an entry in `.changes/unreleased/` tagged `project: neo4j-cli` (no project prompt) |
 
-**Cascade rule**: every `aura-cli` release that ships in a `neo4j-cli` release must also have a corresponding `neo4j-cli` changelog entry. Both `CHANGELOG.md` files must stay accurate. Run `changie new` once for `aura-cli` and once for `neo4j-cli` when the change affects both.
+**Cascade rule**: you only need to run `make changelog-aura` (or `make changelog`) for changes to the `aura` subcommand tree. CI automatically copies those entries into `neo4j-cli` before batching — no second command needed. Only run `make changelog-neo4j` for changes that are specific to the `neo4j-cli` wrapper itself.
 
-Commit the generated files from `.changes/`. The `changie` CI workflow auto-batches entries and opens release PRs.
+All unreleased change files live in the shared `.changes/unreleased/` directory and are tagged with a `project:` field inside the YAML. The CI cascade step rewrites `project: aura-cli` → `project: neo4j-cli` when creating neo4j-cli copies.
+
+Commit the generated files from `.changes/unreleased/`. The `changie` CI workflow auto-batches entries and opens release PRs.
 
 ## Release Process
 
-Releases are triggered automatically in CI when `CHANGELOG.md` is updated on `main`. GoReleaser produces binaries for:
+Releases are triggered automatically in CI when `CHANGELOG-neo4j.md` is updated on `main`. GoReleaser produces binaries for:
 - `linux/amd64`, `linux/arm64`
 - `windows/amd64`
 - `darwin/amd64`, `darwin/arm64`

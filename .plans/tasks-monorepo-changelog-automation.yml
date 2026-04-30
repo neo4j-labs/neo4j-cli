@@ -127,7 +127,7 @@ tasks:
       targets, the dual-version GoReleaser flow (`AURA_CLI_VERSION` + `GORELEASER_CURRENT_TAG`),
       the cascade mechanism, and the combined release notes generation. Remove all references
       to the old single-project changie commands and single `CHANGELOG.md`.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -136,4 +136,4 @@ tasks:
       - "`.agents/build.md` documents the three `make changelog*` targets and explains the cascade rule"
       - "`.agents/deployment.md` documents the dual-version release flow: separate `AURA_CLI_VERSION` and `GORELEASER_CURRENT_TAG`, combined `release-notes.md`, and the `CHANGELOG-*.md` extra files on the GitHub Release"
       - "No remaining references to the old single-project changie workflow or `CHANGELOG.md` in the updated files"
-    completed_at: null
+    completed_at: "2026-04-30T20:00:00Z"
