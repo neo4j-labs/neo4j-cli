@@ -15,17 +15,16 @@ Each release produces two separate binaries:
 
 Each binary gets its own archive per platform/arch combination. Both `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md` are attached as downloadable assets on the GitHub Release via `release.extra_files`.
 
-## Cascade Versioning Policy
+## Versioning Policy
 
 `aura-cli` and `neo4j-cli` have **separate version numbers** tracked in separate changelogs (`CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`). Changie uses a multi-project config with `aura-cli` and `neo4j-cli` as project keys.
 
-**Cascade rule**: when a change affects `aura-cli`, you only need one `make changelog-aura` entry. CI automatically creates a `neo4j-cli` copy by rewriting the `project:` field before batching. Only use `make changelog-neo4j` for changes specific to the `neo4j-cli` wrapper itself.
+Run `make changelog` (interactive, supports multi-select) or `changie new --projects <a> --projects <b> --kind <kind> --body <body>` for non-interactive use. Because `neo4j-cli` bundles its child CLIs, changes to a child require entries for both the child and `neo4j-cli`.
 
 ## Release Flow
 
-1. Developer creates a changelog entry with `make changelog-aura` (or `make changelog-neo4j` for neo4j-specific changes)
+1. Developer creates a changelog entry with `make changelog` (or `changie new --projects ...` non-interactively)
 2. On push to `main`, the `changie` CI workflow:
-   - Cascades unreleased `aura-cli` entries to `neo4j-cli` (idempotent `project:` field rewrite)
    - Runs `changie batch auto --project aura-cli` and `changie batch auto --project neo4j-cli`
    - Runs `changie merge` (no flags — automatically writes both `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`)
    - Extracts both version numbers via `changie latest --project <key>` and strips the project-key prefix with `sed`

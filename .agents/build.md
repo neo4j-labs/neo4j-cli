@@ -24,9 +24,7 @@ All targets are `.PHONY`. Run `make <target>`:
 | `run-aura` | Run `aura-cli` without building (`go run ./neo4j-cli/aura/cmd`) |
 | `run-neo4j` | Run `neo4j-cli` without building (`go run ./neo4j-cli`) |
 | `clean` | Remove `bin/` and `dist/` directories |
-| `changelog` | Interactive changie entry — prompts for project selection |
-| `changelog-aura` | Create a changie entry for `aura-cli` (no project prompt) |
-| `changelog-neo4j` | Create a changie entry for `neo4j-cli` (no project prompt) |
+| `changelog` | Create a changie entry — interactive prompt for project(s) and kind |
 
 The Makefile uses `$(shell go env GOPATH)` to resolve tool paths — `license-check` calls `$(GOPATH)/bin/addlicense` directly because `GOPATH/bin` may not be on `PATH`.
 
@@ -81,21 +79,21 @@ Each binary gets its own archive per platform. Version injection differs per bin
 
 Config key: each `archives` entry must have a unique `id`; archive `name_template` uses `{{ .Binary }}` (not `{{ .ProjectName }}`) so archives are named per binary.
 
-## Changelog Targets
+## Changelog
 
-Uses `changie` with a multi-project config (`aura-cli` and `neo4j-cli` projects). Three Makefile targets are available:
+Uses `changie` with a multi-project config (`aura-cli` and `neo4j-cli` projects). Change files are created in `.changes/unreleased/` and tagged with a `project:` field.
 
-| Target | Description |
-|--------|-------------|
-| `make changelog` | Interactive — prompts for project selection (`aura-cli` or `neo4j-cli`) |
-| `make changelog-aura` | Creates an entry in `.changes/unreleased/` tagged `project: aura-cli` (no project prompt) |
-| `make changelog-neo4j` | Creates an entry in `.changes/unreleased/` tagged `project: neo4j-cli` (no project prompt) |
+**`make changelog`** opens an interactive prompt for project(s) and kind — the project selector supports multi-select. Because `neo4j-cli` bundles its child CLIs, changes to a child require entries for both the child and `neo4j-cli`.
 
-**Cascade rule**: you only need to run `make changelog-aura` (or `make changelog`) for changes to the `aura` subcommand tree. CI automatically copies those entries into `neo4j-cli` before batching — no second command needed. Only run `make changelog-neo4j` for changes that are specific to the `neo4j-cli` wrapper itself.
+For non-interactive use (agents/scripts):
 
-All unreleased change files live in the shared `.changes/unreleased/` directory and are tagged with a `project:` field inside the YAML. The CI cascade step rewrites `project: aura-cli` → `project: neo4j-cli` when creating neo4j-cli copies.
+```bash
+changie new --projects aura-cli --projects neo4j-cli --kind Patch --body "description"
+```
 
-Commit the generated files from `.changes/unreleased/`. The `changie` CI workflow auto-batches entries and opens release PRs.
+Changes specific to the `neo4j-cli` wrapper only need a `neo4j-cli` entry.
+
+Commit the generated files — the `changie` CI workflow batches them and opens a release PR.
 
 ## Release Process
 

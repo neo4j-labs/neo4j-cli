@@ -54,21 +54,19 @@ If changie is not available, you may need to add `/go/bin` to your path: `export
 
 This repository uses a **multi-project** changie setup with two projects: `aura-cli` and `neo4j-cli`.
 
-#### Choosing a target
+Run `make changelog` and follow the prompts. Changie will ask you to select one or more projects and a change kind, then generate a YAML file per project in `.changes/unreleased/`. Commit those files alongside your code changes.
 
-Use the appropriate `make` target to add your changelog entry:
+#### Changes affecting multiple projects
 
-| Target | Use when... |
-|---|---|
-| `make changelog` | Interactive — prompts you to choose `aura-cli` or `neo4j-cli` |
-| `make changelog-aura` | Your change affects `aura-cli` (the standalone Aura CLI) |
-| `make changelog-neo4j` | Your change affects `neo4j-cli` only (not the embedded `aura-cli`) |
+Because `neo4j-cli` bundles its child CLIs, any change to a child CLI also affects `neo4j-cli`. Select both projects when prompted — `make changelog` supports multi-select in interactive mode.
 
-Commit the YAML file that the command produces alongside your code changes and you're done.
+For non-interactive use (e.g. scripts or agents), pass `--projects` multiple times:
 
-#### Cascade behaviour
+```bash
+changie new --projects aura-cli --projects neo4j-cli --kind Patch --body "your change description"
+```
 
-When you add an `aura-cli` entry, you **do not** need to add a second entry for `neo4j-cli`. The release automation automatically cascades every `aura-cli` changelog entry into `neo4j-cli`, so both binaries receive accurate, independently versioned changelogs without any manual duplication.
+Only changes specific to the `neo4j-cli` wrapper itself need a single `neo4j-cli` entry.
 
 ### License
 

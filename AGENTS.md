@@ -28,8 +28,7 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 - Local run (no build): `make run-aura` / `make run-neo4j`
 - Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean`
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry: `make changelog-aura` (aura changes), `make changelog-neo4j` (neo4j-wrapper-only changes), or `make changelog` (interactive)
-- Cascade rule: `aura-cli` changes automatically cascade into `neo4j-cli` via CI — no second changelog command needed
+- PRs require a changelog entry via `make changelog`; because `neo4j-cli` bundles all child CLIs, changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
 
 ## Testing Framework
 
@@ -102,9 +101,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - All projects share a single unreleased directory at `changesDir/unreleasedDir/` (e.g., `.changes/unreleased/`) — change files are tagged with `project:` field inside the YAML, not by directory
 - `changie latest --project aura-cli` outputs `aura-cliv1.7.0` (project key prepended with no separator by default) — use `--remove-prefix` to strip `v` but key is always prepended; shell workflows must strip `aura-cli` prefix (e.g., `sed 's/^aura-cli//'`)
 - `ProjectsVersionSeparator` in `.changie.yaml` can be set to `-` to get `aura-cli-v1.7.0` instead of `aura-cliv1.7.0`; leave unset (empty) for `aura-cliv1.7.0`
-- The cascade (aura-cli changes appearing in neo4j-cli) must copy unreleased YAML files and change their `project:` field, not copy between directories
 - `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
-- CI cascade pattern: `for file in .changes/unreleased/*.yaml; do [ -e "$file" ] || continue; grep -q "^project: aura-cli$" "$file" && sed 's/^project: aura-cli$/project: neo4j-cli/' "$file" > "${file%.yaml}-neo4j-cli.yaml"; done || true`
+- `changie new --projects <a> --projects <b>` creates entries for multiple projects in one call; the interactive prompt (`make changelog`) also supports multi-select
 
 ## Release Workflow Notes
 

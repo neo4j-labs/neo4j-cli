@@ -11,21 +11,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Cascade aura-cli entries to neo4j-cli
-        run: |
-          # For each unreleased aura-cli change file, create a neo4j-cli copy (idempotent).
-          # The cascade copies .changes/unreleased/*.yaml files tagged project: aura-cli
-          # and creates neo4j-cli variants so they are picked up by changie batch --project neo4j-cli.
-          for file in .changes/unreleased/*.yaml; do
-            [ -e "$file" ] || continue  # skip if glob matches nothing (no unreleased changes)
-            if grep -q "^project: aura-cli$" "$file"; then
-              cascade_file="${file%.yaml}-neo4j-cli.yaml"
-              if [ ! -f "$cascade_file" ]; then
-                sed 's/^project: aura-cli$/project: neo4j-cli/' "$file" > "$cascade_file"
-              fi
-            fi
-          done || true
-
       - name: Batch aura-cli changes
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
