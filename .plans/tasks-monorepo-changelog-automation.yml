@@ -109,7 +109,7 @@ tasks:
       `make changelog-aura` / `make changelog-neo4j` for targeted entry creation. Explain
       the cascade behaviour (aura-cli entries automatically appear in neo4j-cli). Remove any
       text describing manual duplication of changie entries across binaries.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -117,7 +117,7 @@ tasks:
       - "CONTRIBUTING.md explains the cascade: an `aura-cli` entry automatically bumps and populates `neo4j-cli` without a second command"
       - "CONTRIBUTING.md contains no instructions to run `changie new` twice or to manually duplicate entries"
       - "The install instructions for `changie` itself are preserved (users still need it locally)"
-    completed_at: null
+    completed_at: "2026-04-30T19:30:00Z"
 
   - id: task-007
     title: "Update AGENTS.md and .agents/ docs for new release flow"

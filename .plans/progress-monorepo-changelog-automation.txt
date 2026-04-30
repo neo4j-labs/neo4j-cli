@@ -134,3 +134,27 @@ Key Decisions:
   `--release-notes=release-notes.md` argument (file always has the same name per run)
 
 Next Task: task-006 (Update CONTRIBUTING.md with new changelog workflow)
+
+================================================================================
+TASK-006: Update CONTRIBUTING.md with new changelog workflow
+Date: 2026-04-30T19:30:00Z
+================================================================================
+
+Summary:
+Updated CONTRIBUTING.md to replace the old single-project changie instructions
+(including the now-obsolete "Versioning cascade policy" section that told contributors
+to run `changie new` twice) with the new multi-project workflow. The section now
+describes using `make changelog`, `make changelog-aura`, or `make changelog-neo4j`
+via a clear table, and explains the cascade behaviour so contributors know they only
+need one entry even when touching aura-cli.
+
+Files Changed:
+- CONTRIBUTING.md (modified — replaced changie section with multi-project make targets table and cascade explanation; removed dual-run instructions)
+
+Key Decisions:
+- Used a markdown table for the three targets to keep the section scannable
+- Cascade explanation placed immediately after the table for discoverability
+- changie install command and PATH hint preserved unchanged
+- "Versioning cascade policy" subsection removed entirely as it contained the now-incorrect dual-run instructions
+
+Next Task: task-007 (Update AGENTS.md and .agents/ docs for new release flow)

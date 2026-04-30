@@ -50,24 +50,25 @@ As well as your code changes, pull requests need a changelog entry. These are ad
 go install github.com/miniscruff/changie@latest
 ```
 
-With this installed, the following command will guide through the process of adding a changelog entry:
+If changie is not available, you may need to add `/go/bin` to your path: `export PATH="$HOME/go/bin:$PATH"`
 
-```bash
-changie new
-```
+This repository uses a **multi-project** changie setup with two projects: `aura-cli` and `neo4j-cli`.
 
-Simply commit the file that this command produces and you're done!
+#### Choosing a target
 
-If changie is not available, you may need to add /go/bin to your path: `export PATH="$HOME/go/bin:$PATH"`
+Use the appropriate `make` target to add your changelog entry:
 
-### Versioning cascade policy
+| Target | Use when... |
+|---|---|
+| `make changelog` | Interactive — prompts you to choose `aura-cli` or `neo4j-cli` |
+| `make changelog-aura` | Your change affects `aura-cli` (the standalone Aura CLI) |
+| `make changelog-neo4j` | Your change affects `neo4j-cli` only (not the embedded `aura-cli`) |
 
-`neo4j-cli` embeds `aura-cli` as a subcommand. Every `aura-cli` release therefore also affects `neo4j-cli`. When a change is made to `aura-cli` (including any `aura-cli` release):
+Commit the YAML file that the command produces alongside your code changes and you're done.
 
-1. Run `changie new` once for `aura-cli` (as usual).
-2. Run `changie new` a **second time** to add a corresponding changelog entry for `neo4j-cli`, briefly describing what changed in the embedded `aura-cli`.
+#### Cascade behaviour
 
-This ensures both binaries have accurate, independently versioned changelogs.
+When you add an `aura-cli` entry, you **do not** need to add a second entry for `neo4j-cli`. The release automation automatically cascades every `aura-cli` changelog entry into `neo4j-cli`, so both binaries receive accurate, independently versioned changelogs without any manual duplication.
 
 ### License
 
