@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to the Neo4j Aura CLI, [issues](https://github.com/neo4j/aura-cli/issues) and [pull requests](https://github.com/neo4j/aura-cli/pulls) are welcome.
+Thanks for your interest in contributing to the Neo4j CLI, [issues](https://github.com/neo4j-labs/neo4j-cli/issues) and [pull requests](https://github.com/neo4j-labs/neo4j-cli/pulls) are welcome.
 
 If you want to contribute code, make sure to [sign the CLA](https://neo4j.com/developer/contributing-code/#sign-cla).
 
