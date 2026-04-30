@@ -50,3 +50,24 @@ Key Decisions:
 - Snapshot build requires AURA_CLI_VERSION env var to be set explicitly since it's not a built-in GoReleaser variable
 
 Next Task: task-003 (Makefile targets; depends only on task-001)
+
+================================================================================
+TASK-003: Add changelog Makefile targets
+Date: 2026-04-30T18:00:00Z
+================================================================================
+
+Summary:
+Added three Makefile targets for creating changie changelog entries:
+`changelog` (interactive, prompts for project), `changelog-aura` (aura-cli
+project, no project prompt), and `changelog-neo4j` (neo4j-cli project, no
+project prompt). All three declared as `.PHONY`.
+
+Files Changed:
+- Makefile (modified — added changelog, changelog-aura, changelog-neo4j targets with .PHONY declarations)
+
+Key Decisions:
+- Used `changie new --project <key>` flag to bypass the project selection prompt for the targeted targets
+- Followed existing Makefile comment style (`## target: description`) for consistency
+- All three added to the single `.PHONY` line at the top of the Makefile
+
+Next Task: task-004 (Update changie CI workflow; depends on task-001)

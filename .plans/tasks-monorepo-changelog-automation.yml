@@ -51,7 +51,7 @@ tasks:
       for project selection interactively), `changelog-aura` (runs `changie new --project aura-cli`,
       skipping the project prompt), and `changelog-neo4j` (runs `changie new --project neo4j-cli`).
       Declare all three as `.PHONY`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -59,7 +59,7 @@ tasks:
       - "`make changelog-neo4j` creates a YAML file in `.changes/neo4j-cli/unreleased/` without prompting for project"
       - "All three targets are declared `.PHONY` in the Makefile"
       - "`make help` or `make` (if a help target exists) lists the new targets, or they are at minimum present in the file"
-    completed_at: null
+    completed_at: "2026-04-30T18:00:00Z"
 
   - id: task-004
     title: "Update changie CI workflow for cascade and dual-project batching"

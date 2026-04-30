@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-aura build-neo4j test lint fmt license-check run-aura run-neo4j clean
+.PHONY: build build-aura build-neo4j test lint fmt license-check run-aura run-neo4j clean changelog changelog-aura changelog-neo4j
 
 ## build: build both aura-cli and neo4j-cli into bin/
 build: build-aura build-neo4j
@@ -44,3 +44,15 @@ run-neo4j:
 clean:
 	rm -rf bin/
 	rm -rf dist/
+
+## changelog: add a new changelog entry (prompts for project: aura-cli or neo4j-cli)
+changelog:
+	changie new
+
+## changelog-aura: add a new changelog entry for aura-cli (skips project prompt)
+changelog-aura:
+	changie new --project aura-cli
+
+## changelog-neo4j: add a new changelog entry for neo4j-cli (skips project prompt)
+changelog-neo4j:
+	changie new --project neo4j-cli
