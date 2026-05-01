@@ -42,3 +42,26 @@ Key Decisions:
 - All shell constructs remain POSIX-compatible (`printf`, `tail`, shell variable expansion).
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Guard each project section so empty/missing change files are skipped gracefully
+Date: 2026-05-01T00:02:00Z
+================================================================================
+
+Summary:
+Updated the "Generate release notes" step in `.github/workflows/release.yml` to wrap
+each project's changelog body extraction in a `test -f` guard, and each `### <project>`
+subsection write in a `[ -n "${BODY}" ]` guard. If a project's version file is absent
+or its body is empty after stripping the header line, the subsection is silently omitted
+and the workflow step still exits with code 0.
+
+Files Changed:
+- .github/workflows/release.yml (modified: added test -f and [ -n ] guards around each per-project subsection)
+
+Key Decisions:
+- Initialize `NEO4J_BODY` and `AURA_BODY` to empty string before the `test -f` guard so
+  the `[ -n ]` check is always defined even when the file is absent.
+- Added a trailing `printf '\n'` after the neo4j-cli block (when present) to keep consistent
+  spacing between subsections regardless of which combination of sections is written.
+
+Next Task: All tasks complete

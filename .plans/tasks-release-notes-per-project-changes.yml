@@ -48,7 +48,7 @@ tasks:
       version file is absent or its body is empty after stripping the header, the corresponding
       subsection is silently omitted. The workflow must not fail with a non-zero exit code in
       this case.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -56,4 +56,4 @@ tasks:
       - "When a project's changes file exists but contains only the header line (empty body), the subsection is not written."
       - "When both projects have valid change bodies, both subsections appear as normal."
       - "The guard logic uses `test -f` (or equivalent) for file existence and `[ -n \"$VAR\" ]` for non-empty body."
-    completed_at: null
+    completed_at: "2026-05-01T00:02:00Z"
