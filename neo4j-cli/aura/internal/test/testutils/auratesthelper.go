@@ -58,7 +58,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 		cfg.Aura.SetBetaEnabled(true)
 	}
 
-	cmd := aura.NewCmd(cfg)
+	cmd := aura.NewStandaloneCmd(cfg)
 
 	cmd.SetArgs(args)
 
