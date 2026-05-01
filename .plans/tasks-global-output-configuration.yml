@@ -85,14 +85,14 @@ tasks:
       Two files call cfg.Aura.Output() directly rather than going through output.PrintBodyMap:
       subcommands/import/job/get.go (2 calls) and subcommands/tenant/get.go (1 call). Change
       each call to cfg.Global.Output() so they read from the new top-level config key.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "No file in neo4j-cli/aura/internal/subcommands/ references cfg.Aura.Output()"
       - "import/job/get.go and tenant/get.go reference cfg.Global.Output() for format decisions"
       - "make build succeeds"
-    completed_at: null
+    completed_at: 2026-05-01T03:00:00Z
 
   - id: task-006
     title: "Remove output from aura config ValidConfigKeys and fix aura config commands"

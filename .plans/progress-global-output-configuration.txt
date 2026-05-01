@@ -122,3 +122,27 @@ Key Decisions:
 - cobra.EnableTraverseRunHooks = true moved to NewAuraTestHelper for clarity
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Migrate direct cfg.Aura.Output() call sites
+Date: 2026-05-01T03:00:00Z
+================================================================================
+
+Summary:
+Task-005 was already completed as part of task-001. When AuraConfig.Output() was
+removed from the struct, all call sites including import/job/get.go and tenant/get.go
+were updated to cfg.Global.Output() in the same commit to maintain compilation. This
+task verified that the migration was complete and ran make build + make test to confirm
+all acceptance criteria are met.
+
+Files Changed:
+- No additional changes required (already applied in task-001)
+- neo4j-cli/aura/internal/subcommands/import/job/get.go (verified: cfg.Global.Output())
+- neo4j-cli/aura/internal/subcommands/tenant/get.go (verified: cfg.Global.Output())
+
+Key Decisions:
+- When removing methods from a struct causes compilation failures, all call sites must
+  be updated in the same task — this is why task-005 work was absorbed into task-001.
+- Zero cfg.Aura.Output() references remain anywhere in the codebase (confirmed by grep).
+
+Next Task: task-006
