@@ -12,3 +12,30 @@
   - Added "Skip — no unreleased changes" no-op step gated on neither project having changes
   - Added if: guard to "Create Pull Request" step (critical fix from reviewer): prevents malformed PR when no changes detected
   Reviewer critical issue resolved: Create Pull Request step now gated on at least one project having changes.
+
+================================================================================
+TASK-003: Compute dynamic PR metadata and update create-pull-request step
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Added "Compute PR metadata" step (id: pr-meta) to .github/workflows/changie.yml after
+"Extract version numbers". The step branches on has_aura/has_neo4j detect outputs to
+produce single-project or dual-project PR title, branch name, and body. Updated
+"Create Pull Request" step to reference steps.pr-meta.outputs.pr_title/pr_branch/pr_body
+instead of hardcoded strings. Used printf to build multiline PR body to avoid leading
+whitespace from shell script indentation within YAML run: | blocks.
+
+Files Changed:
+- .github/workflows/changie.yml (modified — added pr-meta step, updated Create Pull Request step)
+- .plans/tasks-per-project-independent-releases.yml (modified — task-003 marked completed)
+- .plans/progress-per-project-independent-releases.txt (modified — appended task-003 entry)
+
+Key Decisions:
+- Used printf with \n escapes instead of multiline string assignment to avoid YAML indentation
+  carrying into the PR body as literal leading whitespace
+- Multiline pr_body output uses GitHub Actions heredoc syntax (<<PR_BODY_EOF) for correctness
+- Dual-project branch name uses release/neo4j-cli-<version> (unchanged from previous hardcoded format)
+- Single-project aura-only uses release/aura-cli-<version>; neo4j-only uses release/neo4j-cli-<version>
+
+Next Task: task-004

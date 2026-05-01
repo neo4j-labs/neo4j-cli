@@ -50,7 +50,7 @@ tasks:
       uses the existing combined format. Update the create-pull-request step to reference
       these outputs instead of hardcoded strings, and gate it on at least one project having
       changes.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -59,7 +59,7 @@ tasks:
       - "Aura-CLI-only: title is 'Release aura-cli <version>', branch is 'release/aura-cli-<version>', body mentions only aura-cli"
       - "Dual-project: title and branch match the existing combined format; body lists both projects"
       - "create-pull-request step references steps.pr-meta.outputs.pr_title, pr_branch, pr_body"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
 
   - id: task-004
     title: 'Update release.yml trigger and per-project release notes detection'
