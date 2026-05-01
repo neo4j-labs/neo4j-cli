@@ -20,6 +20,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -59,6 +60,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	}
 
 	cmd := aura.NewStandaloneCmd(cfg)
+	aura.RegisterOutputFlag(cmd, cfg)
 
 	cmd.SetArgs(args)
 
@@ -232,6 +234,8 @@ func (helper *AuraTestHelper) NewRequestHandlerMock(path string, status int, bod
 }
 
 func NewAuraTestHelper(t *testing.T) AuraTestHelper {
+	cobra.EnableTraverseRunHooks = true
+
 	helper := AuraTestHelper{}
 
 	helper.t = t

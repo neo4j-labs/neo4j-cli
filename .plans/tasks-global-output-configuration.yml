@@ -69,7 +69,7 @@ tasks:
       only the base-url and auth-url binding logic. The files are: instance/instance.go,
       tenant/tenant.go, customermanagedkey/customermanagedkey.go, graphanalytics/graphanalytics.go,
       graphanalytics/session/session.go, import/import.go, dataapi/data_api.go, deployment/deployment.go.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -77,7 +77,7 @@ tasks:
       - "Each file's PersistentPreRunE retains base-url and auth-url binding where applicable"
       - "make build succeeds after removals"
       - "grep -r 'BindOutput\\|Lookup.*output' across the 8 files returns no results"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
 
   - id: task-005
     title: "Migrate direct cfg.Aura.Output() call sites"

@@ -147,7 +147,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Migration from old `aura.output` to `output` runs silently on first `NewConfig` call; the pattern uses `gjson.GetBytes` + `sjson.Set`/`sjson.Delete` + `Viper.ReadInConfig()` to refresh state
 - Test helpers default to `"output": "json"` at the JSON root; set output overrides with `helper.SetConfigValue("output", "table")` (not `"aura.output"`)
 - Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
-- `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process
+- `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process; in test helpers set it once in the constructor (`NewAuraTestHelper`), not on each `ExecuteCommand` call
 - `pflag.AddFlagSet` silently ignores duplicate-named flags (the flag already present in the target set wins); child `PersistentFlags` shadow a parent's `PersistentFlags` with the same name — the root's `PersistentPreRunE` still finds the resolved flag via `cmd.Flags().Lookup()`
 
 ---

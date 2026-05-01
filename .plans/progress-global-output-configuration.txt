@@ -93,3 +93,32 @@ Key Decisions:
   correctly reads and binds the resolved flag value via cmd.Flags().Lookup("output")
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Strip output logic from 8 resource-group PersistentPreRunE hooks
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Removed --output PersistentFlag registration, validation, and BindOutput calls from all 8
+resource-group parent commands. The import package's PersistentPreRunE was removed entirely
+since it had no other logic. Output handling is now centralized at the root via RegisterOutputFlag.
+Also applied review feedback: moved cobra.EnableTraverseRunHooks = true from ExecuteCommand
+to NewAuraTestHelper so it is set once at helper construction rather than on each command execution.
+
+Files Changed:
+- subcommands/instance/instance.go (removed output flag logic)
+- subcommands/tenant/tenant.go (removed output flag logic)
+- subcommands/customermanagedkey/customermanagedkey.go (removed output flag logic)
+- subcommands/graphanalytics/graphanalytics.go (removed output flag logic)
+- subcommands/graphanalytics/session/session.go (removed output flag logic)
+- subcommands/import/import.go (removed entire PersistentPreRunE)
+- subcommands/dataapi/data_api.go (removed output flag logic)
+- subcommands/deployment/deployment.go (removed output flag logic)
+- test/testutils/auratesthelper.go (added RegisterOutputFlag + moved EnableTraverseRunHooks to NewAuraTestHelper)
+
+Key Decisions:
+- import.go PersistentPreRunE removed entirely since output was its only content
+- cobra.EnableTraverseRunHooks = true moved to NewAuraTestHelper for clarity
+
+Next Task: task-005
