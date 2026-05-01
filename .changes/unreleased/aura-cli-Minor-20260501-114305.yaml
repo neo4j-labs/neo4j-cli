@@ -1,4 +1,0 @@
-project: aura-cli
-kind: Minor
-body: Surface credential commands at neo4j-cli top level
-time: 2026-05-01T11:43:05.877761+01:00
