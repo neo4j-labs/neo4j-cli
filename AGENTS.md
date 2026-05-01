@@ -140,6 +140,16 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Config lives at `.golangci.yml` in repo root
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
 
+## Config Architecture Notes
+
+- `Config.Global` (`*GlobalConfig`) holds top-level (non-namespaced) viper keys; `Config.Aura` holds `aura.*`-prefixed keys
+- The `output` setting lives at the top-level viper key `"output"`, not `"aura.output"` — always read/write via `cfg.Global.Output()` and `cfg.Global.BindOutput()`
+- Migration from old `aura.output` to `output` runs silently on first `NewConfig` call; the pattern uses `gjson.GetBytes` + `sjson.Set`/`sjson.Delete` + `Viper.ReadInConfig()` to refresh state
+- Test helpers default to `"output": "json"` at the JSON root; set output overrides with `helper.SetConfigValue("output", "table")` (not `"aura.output"`)
+- Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
+- `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process
+- `pflag.AddFlagSet` silently ignores duplicate-named flags (the flag already present in the target set wins); child `PersistentFlags` shadow a parent's `PersistentFlags` with the same name — the root's `PersistentPreRunE` still finds the resolved flag via `cmd.Flags().Lookup()`
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._

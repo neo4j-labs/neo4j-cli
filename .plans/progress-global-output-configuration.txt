@@ -64,3 +64,32 @@ Key Decisions:
   inherited persistent flags, so leaf command context finds the root-registered flag.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Wire EnableTraverseRunHooks and registerOutputFlag into both binary entry points
+Date: 2026-05-01T02:00:00Z
+================================================================================
+
+Summary:
+Called aura.RegisterOutputFlag on the root command in neo4j-cli/main.go NewCmd(),
+and called aura.RegisterOutputFlag on the standalone aura-cli root in
+neo4j-cli/aura/cmd/main.go. Set cobra.EnableTraverseRunHooks = true before
+cmd.Execute() in both main() functions so the root-level PersistentPreRunE
+validation hook fires for every subcommand even when child PersistentPreRunE
+hooks are present.
+
+Files Changed:
+- neo4j-cli/main.go (modified: added RegisterOutputFlag call in NewCmd, EnableTraverseRunHooks in main)
+- neo4j-cli/aura/cmd/main.go (modified: added RegisterOutputFlag call and EnableTraverseRunHooks in main)
+
+Key Decisions:
+- cobra.EnableTraverseRunHooks is a package-level global, set before Execute() in main()
+- RegisterOutputFlag is called in NewCmd() (not main()) for neo4j-cli so the flag is
+  available to tests that call NewCmd() directly; EnableTraverseRunHooks stays in main()
+  since it's a binary-level concern
+- pflag's AddFlagSet silently ignores duplicate-named flags (child's flag shadows parent's),
+  so the root's --output flag is temporarily shadowed by the resource-group subcommands'
+  own --output registrations until task-004 removes them; the root PersistentPreRunE still
+  correctly reads and binds the resolved flag value via cmd.Flags().Lookup("output")
+
+Next Task: task-004

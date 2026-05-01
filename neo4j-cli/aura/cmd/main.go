@@ -27,6 +27,7 @@ func main() {
 	cfg := clicfg.NewConfig(afero.NewOsFs(), Version)
 
 	cmd := aura.NewStandaloneCmd(cfg)
+	aura.RegisterOutputFlag(cmd, cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
@@ -35,6 +36,8 @@ func main() {
 		fmt.Printf("[aura-cli] help displayed: %s\n", c.CommandPath()) // TODO: remove this log in favour of real metrics on help displayed
 		origHelp(c, args)
 	})
+
+	cobra.EnableTraverseRunHooks = true
 
 	// cobra prints the error itself; we only add the hook for errors that bypassed
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
