@@ -21,3 +21,14 @@ func TestListConfig(t *testing.T) {
 
 	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null,"output": "default"}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
 }
+
+func TestListConfigFiltersUnrecognisedKeys(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.OverwriteConfig(`{"aura": {"beta-enabled": true}}`)
+
+	helper.ExecuteCommand("config list")
+
+	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null,"output": "default"}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
+}

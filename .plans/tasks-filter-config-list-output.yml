@@ -29,11 +29,11 @@ tasks:
       writes a config file containing an unrecognised key (e.g. `beta-enabled`) and
       asserts it does not appear in `config list` output. Verify the existing
       `TestListConfig` still passes with only the expected ValidConfigKeys present.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "New test writes a config with an extra unknown key and asserts it is absent from `config list` output"
       - "Existing TestListConfig continues to pass with the correct set of keys"
       - "`make test` passes"
-    completed_at: null
+    completed_at: 2026-05-01T00:20:00Z
