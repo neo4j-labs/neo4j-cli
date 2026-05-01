@@ -1,0 +1,59 @@
+feature: release-notes-per-project-changes
+prd: ./prd-release-notes-per-project-changes.md
+created_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Verify release-notes.md is written to workspace root and found by GoReleaser"
+    description: |
+      Audit the "Generate release notes" step in `.github/workflows/release.yml` to confirm
+      `release-notes.md` is written to the workspace root (`$GITHUB_WORKSPACE`) and that the
+      `--release-notes=release-notes.md` flag passed to GoReleaser resolves to the same path.
+      If the working directory is inconsistent between steps, add an explicit `working-directory`
+      or use an absolute path (`$GITHUB_WORKSPACE/release-notes.md`) in both the write and the
+      GoReleaser `args`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "The 'Generate release notes' step writes `release-notes.md` to `$GITHUB_WORKSPACE` (the repo checkout root)."
+      - "The GoReleaser step references the same path via `--release-notes=release-notes.md` (relative to workspace root, which is the default working directory)."
+      - "No path mismatch exists that would cause GoReleaser to fall back to the commit message."
+    completed_at: null
+
+  - id: task-002
+    title: "Add per-project subsections under ## Changes in release-notes.md"
+    description: |
+      Update the "Generate release notes" shell script in `.github/workflows/release.yml` to read
+      both `.changes/aura-cli/${AURA_VERSION}.md` and `.changes/neo4j-cli/${NEO4J_VERSION}.md`,
+      strip their version-header lines with `tail -n +2`, and write them as `### aura-cli` and
+      `### neo4j-cli` subsections under `## Changes`. The `## Versions` section listing both
+      binary versions must remain above the `## Changes` section.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`release-notes.md` contains a `## Versions` section listing both `neo4j-cli` and `aura-cli` version numbers."
+      - "`release-notes.md` contains a `## Changes` section with a `### aura-cli` subsection populated from `.changes/aura-cli/<version>.md`."
+      - "`release-notes.md` contains a `## Changes` section with a `### neo4j-cli` subsection populated from `.changes/neo4j-cli/<version>.md`."
+      - "The version header line (`## vX.Y.Z - DATE`) is stripped from each project's body — only kind headings and bullet points appear."
+      - "The script is POSIX-compatible bash (no bash-isms beyond what ubuntu runner provides)."
+    completed_at: null
+
+  - id: task-003
+    title: "Guard each project section so empty/missing change files are skipped gracefully"
+    description: |
+      Wrap each `### <project>` block in the generation script with a `test -f` guard before
+      reading the file and a `[ -n \"$BODY\" ]` guard before writing the section. If a project's
+      version file is absent or its body is empty after stripping the header, the corresponding
+      subsection is silently omitted. The workflow must not fail with a non-zero exit code in
+      this case.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "When a project's `.changes/<project>/<version>.md` file does not exist, the workflow step succeeds and the subsection is not written."
+      - "When a project's changes file exists but contains only the header line (empty body), the subsection is not written."
+      - "When both projects have valid change bodies, both subsections appear as normal."
+      - "The guard logic uses `test -f` (or equivalent) for file existence and `[ -n \"$VAR\" ]` for non-empty body."
+    completed_at: null
