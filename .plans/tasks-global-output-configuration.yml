@@ -192,7 +192,7 @@ tasks:
       invalid errors; config set unknown-key errors; config list returns the expected shape; output
       flag overrides the rendered format for get and list; the silent aura.output migration is tested
       via a config fixture with the old key.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -201,7 +201,7 @@ tasks:
       - "Tests verify table rendering when --output table is passed to config list"
       - "Tests verify JSON rendering when --output json is passed to config get"
       - "make test passes for the new neo4j-cli/internal/subcommands/config package"
-    completed_at: null
+    completed_at: 2026-05-01T11:00:00Z
 
   - id: task-012
     title: "Update clicfg_test.go config fixture and run full test suite"

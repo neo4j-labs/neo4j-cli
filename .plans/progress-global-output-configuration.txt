@@ -287,3 +287,36 @@ Key Decisions:
   completed in verification mode with no new file changes.
 
 Next Task: task-011
+
+================================================================================
+TASK-011: Add tests for the new neo4j config commands
+Date: 2026-05-01T11:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/internal/subcommands/config/config_test.go with 17 table-
+driven tests covering all acceptance criteria for the neo4j config package.
+Also discovered and fixed a bug in the aura.output migration: Viper.IsSet()
+returns true for keys set only via SetDefault, so the migration condition
+`!Viper.IsSet("output")` was always false and the migration never ran. Fixed
+by switching to gjson.GetBytes().Exists() on the raw JSON file to distinguish
+between a file-backed value and a viper default.
+
+Files Changed:
+- neo4j-cli/internal/subcommands/config/config_test.go (created: 17 tests for neo4j config get/set/list)
+- common/clicfg/clicfg.go (fixed: migration condition uses gjson.Exists() not Viper.IsSet())
+
+Key Decisions:
+- Wrote a self-contained neo4jTestHelper in the test file (not a shared package)
+  since the neo4j root binary has no equivalent to AuraTestHelper yet and one
+  helper file per test package keeps dependencies clear.
+- The --output flag binds viper's "output" key via BindPFlag, so passing
+  --output json overrides both the rendering format AND the reported "output"
+  config value — tests reflect this by asserting the flag value, not "default".
+- go-pretty renders table header rows in uppercase with StyleLight; table
+  rendering tests assert for "KEY" and "VALUE" (uppercase), not lowercase.
+- Migration fix: replace Viper.IsSet("output") with !gjson.GetBytes(data, "output").Exists()
+  so the migration correctly detects when "output" is absent from the JSON file
+  (not just not-yet-set in viper overlays).
+
+Next Task: task-012

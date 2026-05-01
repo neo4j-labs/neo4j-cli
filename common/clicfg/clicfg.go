@@ -67,18 +67,23 @@ func NewConfig(fs afero.Fs, version string) *Config {
 		panic(err)
 	}
 
-	// Silent one-time migration: move aura.output -> output (top-level key)
-	if Viper.IsSet("aura.output") && !Viper.IsSet("output") {
+	// Silent one-time migration: move aura.output -> output (top-level key).
+	// We inspect the raw JSON rather than using Viper.IsSet because Viper.IsSet
+	// returns true for keys that are only set via SetDefault, which would prevent
+	// the migration from ever running.
+	{
 		data := fileutils.ReadFileSafe(fs, fullConfigPath)
-		oldValue := gjson.GetBytes(data, "aura.output").String()
-		updated, err := sjson.Set(string(data), "output", oldValue)
-		if err == nil {
-			updated, err = sjson.Delete(updated, "aura.output")
+		if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "output").Exists() {
+			oldValue := gjson.GetBytes(data, "aura.output").String()
+			updated, err := sjson.Set(string(data), "output", oldValue)
 			if err == nil {
-				fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
-				if err := Viper.ReadInConfig(); err != nil {
-					fmt.Println("Cannot re-read config file after migration.")
-					panic(err)
+				updated, err = sjson.Delete(updated, "aura.output")
+				if err == nil {
+					fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
+					if err := Viper.ReadInConfig(); err != nil {
+						fmt.Println("Cannot re-read config file after migration.")
+						panic(err)
+					}
 				}
 			}
 		}
