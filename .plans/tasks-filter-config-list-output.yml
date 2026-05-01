@@ -12,7 +12,7 @@ tasks:
       `map[string]interface{}` by calling `config.viper.Get("aura.<key>")` for each
       key, then JSON-encodes that filtered map. Separate `PrintAuraConfig` from the
       shared `print` helper so the filtering does not affect `PrintAuraProjects`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`config list` output contains exactly the keys in ValidConfigKeys and no others"
@@ -20,7 +20,7 @@ tasks:
       - "Values reflect viper's resolved value (defaults and env var overrides honoured)"
       - "`PrintAuraProjects` behaviour is unchanged"
       - "`make build` succeeds"
-    completed_at: null
+    completed_at: 2026-05-01T00:10:00Z
 
   - id: task-002
     title: "Add/update config list test for unrecognised key filtering"

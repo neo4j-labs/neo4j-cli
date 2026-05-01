@@ -138,7 +138,17 @@ func (config *AuraConfig) Set(key string, value string) {
 }
 
 func (config *AuraConfig) PrintAuraConfig(cmd *cobra.Command) {
-	config.print(cmd, "aura")
+	filtered := make(map[string]interface{}, len(config.ValidConfigKeys))
+	for _, key := range config.ValidConfigKeys {
+		filtered[key] = config.viper.Get(fmt.Sprintf("aura.%s", key))
+	}
+
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetIndent("", "\t")
+
+	if err := encoder.Encode(filtered); err != nil {
+		panic(err)
+	}
 }
 
 func (config *AuraConfig) PrintAuraProjects(cmd *cobra.Command) {
