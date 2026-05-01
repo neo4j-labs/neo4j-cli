@@ -32,7 +32,7 @@ tasks:
       PersistentFlag on cmd, then sets PersistentPreRunE to validate the flag value against
       ValidOutputValues and call cfg.Global.BindOutput. Also update neo4j-cli/aura/internal/output/output.go
       to call cfg.Global.Output() instead of cfg.Aura.Output() (line 20).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -40,7 +40,7 @@ tasks:
       - "Passing an invalid --output value via the registered PersistentPreRunE returns a usage error"
       - "output.go compiles with cfg.Global.Output() and no longer references cfg.Aura.Output()"
       - "PrintBodyMap still routes json/table/default correctly based on cfg.Global.Output()"
-    completed_at: null
+    completed_at: 2026-05-01T01:00:00Z
 
   - id: task-003
     title: "Wire EnableTraverseRunHooks and registerOutputFlag into both binary entry points"

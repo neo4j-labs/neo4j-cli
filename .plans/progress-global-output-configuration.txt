@@ -39,3 +39,28 @@ Key Decisions:
 - The migration block uses gjson to read the old value from raw JSON and sjson to write/delete, matching the existing pattern in the codebase.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Extract registerOutputFlag helper and update output.go
+Date: 2026-05-01T01:00:00Z
+================================================================================
+
+Summary:
+Created RegisterOutputFlag function in neo4j-cli/aura/flags.go (exported, in the
+aura package which both binary entry points already import). The function registers
+--output as a PersistentFlag on the given command and installs a PersistentPreRunE
+hook that validates the value against ValidOutputValues and binds it to cfg.Global.
+output.go was already updated to cfg.Global.Output() in task-001 so no change needed.
+
+Files Changed:
+- neo4j-cli/aura/flags.go (created: RegisterOutputFlag helper function)
+
+Key Decisions:
+- Placed RegisterOutputFlag in the aura package (not a new internal package) since
+  both neo4j-cli/main.go and neo4j-cli/aura/cmd/main.go already import this package,
+  avoiding a new dependency cycle.
+- Function is exported (PascalCase) so entry-point main packages can call it.
+- PersistentPreRunE uses cmd.Flags().Lookup("output") — cobra's Flags() includes
+  inherited persistent flags, so leaf command context finds the root-registered flag.
+
+Next Task: task-003
