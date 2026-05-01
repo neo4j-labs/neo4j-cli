@@ -10,7 +10,6 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +31,7 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 
 Resizing an instance is an asynchronous operation. The instance remains available throughout.`,
 		Args: cobra.ExactArgs(1),
-		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{}
 
 			if memory != "" {
@@ -58,7 +57,7 @@ Resizing an instance is an asynchronous operation. The instance remains availabl
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 			return nil
-		}),
+		},
 	}
 
 	cmd.Flags().StringVar(&memory, memoryFlag, "", "The size of the instance memory in GB.")

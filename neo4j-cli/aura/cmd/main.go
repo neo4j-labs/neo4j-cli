@@ -29,7 +29,4 @@ func main() {
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 	cmd.Execute() //nolint:errcheck // cobra prints the error itself; exit code is handled by os.Exit in the cobra command
-
-	// Flush out any remaining events to mixPanel before shutdown
-	cfg.Events.Flush()
 }

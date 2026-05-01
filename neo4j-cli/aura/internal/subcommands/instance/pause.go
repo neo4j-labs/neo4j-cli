@@ -10,7 +10,6 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +25,7 @@ The pause time depends on the amount of data stored in the instance; larger quan
 
 If another operation is being performed on the instance you are trying to pause, an error will be returned that indicates that the pause operation cannot be performed.`,
 		Args: cobra.ExactArgs(1),
-		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/instances/%s/pause", args[0])
 
 			cmd.SilenceUsage = true
@@ -42,6 +41,6 @@ If another operation is being performed on the instance you are trying to pause,
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "tenant_id", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 			return nil
-		}),
+		},
 	}
 }

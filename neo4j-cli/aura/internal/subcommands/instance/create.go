@@ -13,7 +13,6 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -91,7 +90,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			return nil
 		},
-		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{
 				"version":        version,
 				"region":         region,
@@ -155,7 +154,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			return nil
-		}),
+		},
 	}
 
 	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")

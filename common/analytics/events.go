@@ -31,23 +31,28 @@ type toolEventProperties struct {
 	Success  bool   `json:"success"`
 }
 
-// ActiveFlags is the set of flags explicitly provided by the user for a
-// command invocation. Keys are flag names; values are their string
-// representations. Sensitive flags (credentials, secrets) are redacted.
-type ActiveFlags map[string]string
+// ActiveFlags captures which agent-relevant persistent flags were set for
+// a given invocation. Sensitive flags (credentials, URIs) are intentionally
+// excluded.
+type ActiveFlags struct {
+	AgentMode    bool   `json:"agent_mode"`
+	AllowWrites  bool   `json:"allow_writes"`
+	OutputFormat string `json:"output_format,omitempty"`
+	TimeoutSet   bool   `json:"timeout_set"`
+}
 
 // commandEventProperties carries the fields for a COMMAND_USED event.
 type commandEventProperties struct {
 	baseProperties
-	Command string      `json:"command"`
-	Success bool        `json:"success"`
-	Flags   ActiveFlags `json:"flags,omitempty"`
+	Command string `json:"command"`
+	Success bool   `json:"success"`
+	ActiveFlags
 }
 
 // TrackEvent is the envelope sent to Mixpanel for every analytics event.
 type TrackEvent struct {
 	Event      string      `json:"event"`
-	Properties any `json:"properties"`
+	Properties interface{} `json:"properties"`
 }
 
 // NewStartupEvent records that the CLI has started.
@@ -79,7 +84,7 @@ func (a *Analytics) NewCommandEvent(command string, success bool, flags ActiveFl
 			baseProperties: a.getBaseProperties(),
 			Command:        command,
 			Success:        success,
-			Flags:          flags,
+			ActiveFlags:    flags,
 		},
 	}
 }
