@@ -15,7 +15,7 @@ tasks:
       `setDefaultValues` to prevent the key appearing in viper-backed config output.
       Retain the `DefaultAuraBetaEnabled` constant and the `AuraBetaEnabled()` method
       signature to keep re-enablement straightforward.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "ValidConfigKeys slice in clicfg.go no longer contains \"beta-enabled\""
@@ -23,7 +23,7 @@ tasks:
       - "Viper.SetDefault for aura.beta-enabled is removed from setDefaultValues"
       - "DefaultAuraBetaEnabled constant and AuraBetaEnabled() method signature are retained"
       - "`make build` succeeds with no compilation errors"
-    completed_at: null
+    completed_at: "2026-05-01T00:10:00Z"
 
   - id: task-002
     title: "Update config set tests to expect invalid-key error for beta-enabled"

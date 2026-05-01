@@ -1,0 +1,21 @@
+================================================================================
+TASK-001: Remove beta-enabled from ValidConfigKeys and hardcode AuraBetaEnabled to false
+Date: 2026-05-01T00:10:00Z
+================================================================================
+
+Summary:
+Disabled beta-enabled config key in clicfg.go by removing it from ValidConfigKeys,
+removing its viper default, and hardcoding AuraBetaEnabled() to return false.
+The DefaultAuraBetaEnabled constant and AuraBetaEnabled() method signature are retained
+for future re-enablement.
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: removed "beta-enabled" from ValidConfigKeys slice,
+  removed Viper.SetDefault for aura.beta-enabled, changed AuraBetaEnabled() to return false)
+
+Key Decisions:
+- DefaultAuraBetaEnabled constant kept even though it is now unused at runtime, to signal
+  intent and make re-enablement a one-line change.
+- Tests for config set/list/get beta-enabled now break; these will be fixed in task-002 and task-003.
+
+Next Task: task-002

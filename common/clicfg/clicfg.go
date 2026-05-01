@@ -76,7 +76,7 @@ func NewConfig(fs afero.Fs, version string) *Config {
 				MaxRetries: 60,
 				Interval:   20,
 			},
-			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant", "output", "beta-enabled"},
+			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant", "output"},
 			Projects:        projects,
 		},
 		Credentials: credentials,
@@ -92,7 +92,6 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.base-url", DefaultAuraBaseUrl)
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
 	Viper.SetDefault("aura.output", "default")
-	Viper.SetDefault("aura.beta-enabled", DefaultAuraBetaEnabled)
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
 
@@ -205,7 +204,7 @@ func (config *AuraConfig) BindOutput(flag *pflag.Flag) {
 }
 
 func (config *AuraConfig) AuraBetaEnabled() bool {
-	return config.viper.GetBool("aura.beta-enabled")
+	return false
 }
 
 func (config *AuraConfig) DefaultTenant() string {
