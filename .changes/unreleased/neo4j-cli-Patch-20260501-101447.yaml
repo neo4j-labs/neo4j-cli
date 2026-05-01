@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Removed the option to enable `beta` aura commands
+time: 2026-05-01T10:14:47.58104+01:00
