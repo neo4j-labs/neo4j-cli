@@ -30,7 +30,7 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 - Local run (no build): `make run-aura` / `make run-neo4j`
 - Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean`
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry via `make changelog`; because `neo4j-cli` bundles all child CLIs, changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
+- PRs require a changelog entry via `make changelog` **only for user-facing changes** (new features, bug fixes, behaviour changes visible to CLI users). Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries. Because `neo4j-cli` bundles all child CLIs, user-facing changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
 
 ## Testing Framework
 
