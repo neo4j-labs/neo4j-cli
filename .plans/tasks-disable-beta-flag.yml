@@ -49,10 +49,10 @@ tasks:
       In `neo4j-cli/aura/internal/subcommands/config/list_test.go`, remove
       `"beta-enabled": false` from the expected JSON output of `config list`, since the
       key is no longer registered as a valid config key or set as a viper default.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "Expected JSON in config list test does not contain a beta-enabled field"
       - "`make test` passes"
-    completed_at: null
+    completed_at: "2026-05-01T00:30:00Z"
