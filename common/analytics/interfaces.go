@@ -3,7 +3,7 @@
 
 package analytics
 
-//go:generate mockgen -destination=mocks/mock_analytics.go -package=analytics_mocks -typed github.com/neo4j/cli/common/analytics/mocks Service,HTTPClient
+//go:generate mockgen -destination=mocks/mock_analytics.go -package=analytics_mocks -typed github.com/neo4j/cli/common/analytics Service,HTTPClient
 
 import (
 	"io"
