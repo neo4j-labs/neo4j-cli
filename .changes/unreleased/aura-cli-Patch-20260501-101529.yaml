@@ -1,4 +1,0 @@
-project: aura-cli
-kind: Patch
-body: 'Bugfix: `aura config list` now only prints valid config values'
-time: 2026-05-01T10:15:29.482935+01:00
