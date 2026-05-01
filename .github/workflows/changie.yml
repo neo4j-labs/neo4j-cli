@@ -45,19 +45,27 @@ jobs:
             echo "has_neo4j=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Skip — no unreleased changes
+        if: steps.detect.outputs.has_aura != 'true' && steps.detect.outputs.has_neo4j != 'true'
+        run: |
+          echo "No unreleased changes found for either project. Nothing to release."
+
       - name: Batch aura-cli changes
+        if: steps.detect.outputs.has_aura == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
           args: batch auto --project aura-cli --prerelease ${{ steps.prerelease.outputs.aura }}
 
       - name: Batch neo4j-cli changes
+        if: steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
           args: batch auto --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
 
       - name: Merge changelogs
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -65,6 +73,7 @@ jobs:
 
       - name: Get aura-cli latest version
         id: latest-aura
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -72,6 +81,7 @@ jobs:
 
       - name: Get neo4j-cli latest version
         id: latest-neo4j
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -79,6 +89,7 @@ jobs:
 
       - name: Extract version numbers
         id: versions
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         run: |
           AURA_VERSION=$(echo "${{ steps.latest-aura.outputs.output }}" | sed 's/^aura-cli//')
           NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
@@ -86,6 +97,7 @@ jobs:
           echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
         with:
           title: "Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}"

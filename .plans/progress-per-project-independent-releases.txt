@@ -3,3 +3,12 @@
   Step uses grep -rl to check .changes/unreleased/ for 'project: aura-cli' and 'project: neo4j-cli'
   and writes has_aura and has_neo4j boolean outputs to GITHUB_OUTPUT. Placed before both batch steps.
   Reviewer confirmed no blocking issues.
+
+2026-05-01T00:00:00Z task-002 completed
+  Gated all batch/merge/version/PR steps on detect outputs in .github/workflows/changie.yml.
+  - "Batch aura-cli changes": if: steps.detect.outputs.has_aura == 'true'
+  - "Batch neo4j-cli changes": if: steps.detect.outputs.has_neo4j == 'true'
+  - "Merge changelogs", "Get aura-cli/neo4j-cli latest version", "Extract version numbers": gated on either project having changes
+  - Added "Skip — no unreleased changes" no-op step gated on neither project having changes
+  - Added if: guard to "Create Pull Request" step (critical fix from reviewer): prevents malformed PR when no changes detected
+  Reviewer critical issue resolved: Create Pull Request step now gated on at least one project having changes.

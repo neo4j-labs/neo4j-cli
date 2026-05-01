@@ -30,7 +30,7 @@ tasks:
       changes" run step that prints a summary and is itself gated with
       if: steps.detect.outputs.has_aura != 'true' && steps.detect.outputs.has_neo4j != 'true',
       so the workflow log is clear when it is a no-op.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "'Batch neo4j-cli changes' step has if: steps.detect.outputs.has_neo4j == 'true'"
       - "'Merge changelogs', 'Get aura-cli latest version', 'Get neo4j-cli latest version', and 'Extract version numbers' steps are all gated on at least one project having changes"
       - "A no-op summary step runs and the workflow exits successfully when neither project has changes"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
 
   - id: task-003
     title: 'Compute dynamic PR metadata and update create-pull-request step'
