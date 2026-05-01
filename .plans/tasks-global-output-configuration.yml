@@ -139,14 +139,14 @@ tasks:
       inside the "aura": {...} block to the top level of the embedded config JSON string in
       NewAuraTestHelper. This single change propagates the correct default to all tests that use
       NewAuraTestHelper without additional changes.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "The embedded config string in NewAuraTestHelper has \"output\": \"json\" at the top level, not under \"aura\""
       - "The \"aura\" object in the embedded config no longer contains an \"output\" key"
       - "make test compiles (whether or not all tests pass yet)"
-    completed_at: null
+    completed_at: 2026-05-01T06:00:00Z
 
   - id: task-009
     title: "Update test files that set aura.output config value"

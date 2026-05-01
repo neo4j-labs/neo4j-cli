@@ -210,3 +210,26 @@ Key Decisions:
 - make build and make test both pass with zero failures.
 
 Next Task: task-008
+
+================================================================================
+TASK-008: Update test helper default config fixture
+Date: 2026-05-01T06:00:00Z
+================================================================================
+
+Summary:
+Task-008 was already completed as part of task-001. The test helper
+neo4j-cli/aura/internal/test/testutils/auratesthelper.go already has
+"output": "json" at the top level of the embedded config string (not under "aura").
+The "aura" block only contains "auth-url" and "base-url". All acceptance criteria
+are met and make test passes with zero failures.
+
+Files Changed:
+- No additional changes required (already applied in task-001)
+- neo4j-cli/aura/internal/test/testutils/auratesthelper.go (verified: "output": "json" at top level, not under "aura")
+
+Key Decisions:
+- When a task's changes are absorbed into an earlier task for compilation continuity,
+  the later task's status can be moved to completed in the same iteration once verified.
+- make test passes with all tests green; build succeeds for both binaries.
+
+Next Task: task-009
