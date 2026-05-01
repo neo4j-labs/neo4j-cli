@@ -36,7 +36,7 @@ func TestListDeployment(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -85,7 +85,7 @@ func TestListDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 				}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand("deployment list")
 
@@ -135,7 +135,7 @@ func TestListDeploymentWithTableOutput(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "table")
+	helper.SetConfigValue("output", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -163,7 +163,7 @@ func TestListDeploymentsWithNoDeployments(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -184,7 +184,7 @@ func TestListDeploymentsWithMissingProjectId(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s", organizationId))
 
 	mockHandler.AssertCalledTimes(0)
@@ -204,7 +204,7 @@ func TestListDeploymentsWithMissingOrganizationId(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --project-id=%s", projectId))
 
 	mockHandler.AssertCalledTimes(0)

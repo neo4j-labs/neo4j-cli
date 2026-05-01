@@ -29,13 +29,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			if outputValue != "" {
 				for _, v := range clicfg.ValidOutputValues {
 					if v == outputValue {
-						cfg.Aura.BindOutput(cmd.Flags().Lookup("output"))
+						cfg.Global.BindOutput(cmd.Flags().Lookup("output"))
 						return nil
 					}
 				}
 				return clierr.NewUsageError("invalid output value specified: %s", outputValue)
 			}
-			cfg.Aura.BindOutput(cmd.Flags().Lookup("output"))
+			cfg.Global.BindOutput(cmd.Flags().Lookup("output"))
 
 			return nil
 		},

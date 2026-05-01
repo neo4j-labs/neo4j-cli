@@ -40,7 +40,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 					return err
 				}
 				output.PrintBodyMap(cmd, cfg, values, fields)
-				if cfg.Aura.Output() == "table" || cfg.Aura.Output() == "default" {
+				if cfg.Global.Output() == "table" || cfg.Global.Output() == "default" {
 					cmd.Println("instance configurations are not visible with table output - please use a different output setting using --output if you would like to view these")
 				}
 			}

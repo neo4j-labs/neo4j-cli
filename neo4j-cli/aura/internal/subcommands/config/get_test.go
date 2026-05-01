@@ -28,7 +28,7 @@ func TestGetConfigDefault(t *testing.T) {
 
 	helper.ExecuteCommand("config get output")
 
-	helper.AssertOut("default")
+	helper.AssertErr("Error: invalid argument \"output\" for \"aura-cli config get\"")
 }
 
 func TestGetConfigBetaEnabled(t *testing.T) {

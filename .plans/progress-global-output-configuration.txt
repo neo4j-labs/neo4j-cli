@@ -1,0 +1,41 @@
+================================================================================
+TASK-001: Add GlobalConfig struct and migrate output key in clicfg
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Added GlobalConfig struct to common/clicfg/clicfg.go backed by the same viper
+instance as AuraConfig, wired as cfg.Global on the Config struct. Moved the
+output default from "aura.output" to the top-level "output" key. Removed
+Output() and BindOutput() from AuraConfig. Added a silent one-time migration
+block that moves aura.output -> output when upgrading from old configs. Also
+migrated all existing call sites and test fixtures to complete the task without
+breaking compilation or tests.
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: added GlobalConfig struct and methods, removed AuraConfig.Output/BindOutput, added migration block)
+- neo4j-cli/aura/internal/output/output.go (modified: cfg.Aura.Output() -> cfg.Global.Output())
+- neo4j-cli/aura/internal/subcommands/tenant/tenant.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/tenant/get.go (modified: Output() caller)
+- neo4j-cli/aura/internal/subcommands/dataapi/data_api.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/customermanagedkey/customermanagedkey.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/graphanalytics/graphanalytics.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/graphanalytics/session/session.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/deployment/deployment.go (modified: BindOutput callers)
+- neo4j-cli/aura/internal/subcommands/instance/instance.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/import/import.go (modified: BindOutput caller)
+- neo4j-cli/aura/internal/subcommands/import/job/get.go (modified: Output() caller)
+- neo4j-cli/aura/internal/test/testutils/auratesthelper.go (modified: moved output key to top-level in default config)
+- neo4j-cli/aura/internal/subcommands/config/get_test.go (modified: config get output now returns error)
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (modified: output removed from expected JSON)
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (modified: error message for config set output)
+- neo4j-cli/aura/internal/subcommands/deployment/*_test.go (modified: aura.output -> output in SetConfigValue calls)
+- neo4j-cli/aura/internal/subcommands/instance/get_test.go (modified: aura.output -> output in SetConfigValue calls)
+
+Key Decisions:
+- Since removing Output()/BindOutput() from AuraConfig breaks compilation, all callers were migrated in the same task to keep the build and tests passing.
+- Task-008 (test helper fixture) and task-009 (test file key rename) changes were applied as part of task-001 since they're necessary for make test to pass.
+- Task-010 config test updates were also included for the same reason.
+- The migration block uses gjson to read the old value from raw JSON and sjson to write/delete, matching the existing pattern in the codebase.
+
+Next Task: task-002

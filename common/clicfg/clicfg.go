@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -33,6 +34,7 @@ var ValidOutputValues = [3]string{"default", "json", "table"}
 type Config struct {
 	Version     string
 	Aura        *AuraConfig
+	Global      *GlobalConfig
 	Credentials *credentials.Credentials
 }
 
@@ -65,8 +67,32 @@ func NewConfig(fs afero.Fs, version string) *Config {
 		panic(err)
 	}
 
+	// Silent one-time migration: move aura.output -> output (top-level key)
+	if Viper.IsSet("aura.output") && !Viper.IsSet("output") {
+		data := fileutils.ReadFileSafe(fs, fullConfigPath)
+		oldValue := gjson.GetBytes(data, "aura.output").String()
+		updated, err := sjson.Set(string(data), "output", oldValue)
+		if err == nil {
+			updated, err = sjson.Delete(updated, "aura.output")
+			if err == nil {
+				fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
+				if err := Viper.ReadInConfig(); err != nil {
+					fmt.Println("Cannot re-read config file after migration.")
+					panic(err)
+				}
+			}
+		}
+	}
+
 	credentials := credentials.NewCredentials(fs, ConfigPrefix)
 	projects := projects.NewAuraConfigProjects(fs, fullConfigPath)
+
+	globalConfig := &GlobalConfig{
+		fs:              fs,
+		viper:           Viper,
+		configPath:      fullConfigPath,
+		ValidConfigKeys: []string{"output"},
+	}
 
 	return &Config{
 		Version: version,
@@ -76,9 +102,10 @@ func NewConfig(fs afero.Fs, version string) *Config {
 				MaxRetries: 60,
 				Interval:   20,
 			},
-			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant", "output"},
+			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant"},
 			Projects:        projects,
 		},
+		Global:      globalConfig,
 		Credentials: credentials,
 	}
 }
@@ -91,7 +118,7 @@ func bindEnvironmentVariables(Viper *viper.Viper) {
 func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.base-url", DefaultAuraBaseUrl)
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
-	Viper.SetDefault("aura.output", "default")
+	Viper.SetDefault("output", "default")
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
 
@@ -204,16 +231,6 @@ func (config *AuraConfig) BindAuthUrl(flag *pflag.Flag) {
 	}
 }
 
-func (config *AuraConfig) Output() string {
-	return config.viper.GetString("aura.output")
-}
-
-func (config *AuraConfig) BindOutput(flag *pflag.Flag) {
-	if err := config.viper.BindPFlag("aura.output", flag); err != nil {
-		panic(err)
-	}
-}
-
 func (config *AuraConfig) SetBetaEnabled(enabled bool) {
 	config.betaEnabled = enabled
 }
@@ -246,4 +263,56 @@ func (config *AuraConfig) auraBaseUrlOnConfigChange(url string) string {
 		return DefaultAuraBaseUrl
 	}
 	return removePathParametersFromUrl(url)
+}
+
+// GlobalConfig holds configuration that applies globally across all sub-CLIs,
+// operating on top-level (non-namespaced) viper keys.
+type GlobalConfig struct {
+	viper           *viper.Viper
+	fs              afero.Fs
+	configPath      string
+	ValidConfigKeys []string
+}
+
+func (config *GlobalConfig) IsValidConfigKey(key string) bool {
+	return slices.Contains(config.ValidConfigKeys, key)
+}
+
+func (config *GlobalConfig) Get(key string) interface{} {
+	return config.viper.Get(key)
+}
+
+func (config *GlobalConfig) Set(key string, value string) {
+	data := fileutils.ReadFileSafe(config.fs, config.configPath)
+
+	updated, err := sjson.Set(string(data), key, value)
+	if err != nil {
+		panic(err)
+	}
+
+	fileutils.WriteFile(config.fs, config.configPath, []byte(updated))
+}
+
+func (config *GlobalConfig) Output() string {
+	return config.viper.GetString("output")
+}
+
+func (config *GlobalConfig) BindOutput(flag *pflag.Flag) {
+	if err := config.viper.BindPFlag("output", flag); err != nil {
+		panic(err)
+	}
+}
+
+func (config *GlobalConfig) Print(cmd *cobra.Command) {
+	filtered := make(map[string]interface{}, len(config.ValidConfigKeys))
+	for _, key := range config.ValidConfigKeys {
+		filtered[key] = config.viper.Get(key)
+	}
+
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetIndent("", "\t")
+
+	if err := encoder.Encode(filtered); err != nil {
+		panic(err)
+	}
 }

@@ -252,10 +252,10 @@ func NewAuraTestHelper(t *testing.T) AuraTestHelper {
 					"default": "",
 					"projects": {}
 				},
+				"output": "json",
 				"aura": {
 					"auth-url": "%s/oauth/token",
-					"base-url": "%s/v1",
-					"output": "json"
+					"base-url": "%s/v1"
 					}
 				}`, server.URL, server.URL)
 	helper.credentials = `{

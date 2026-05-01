@@ -17,7 +17,7 @@ import (
 )
 
 func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values api.ResponseData, fields []string) {
-	outputType := cfg.Aura.Output()
+	outputType := cfg.Global.Output()
 
 	switch output := outputType; output {
 	case "json":

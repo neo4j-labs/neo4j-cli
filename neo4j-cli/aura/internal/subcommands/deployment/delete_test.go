@@ -22,7 +22,7 @@ func TestDeleteDeployment(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -42,7 +42,7 @@ func TestDeleteDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s", deploymentId))
 
@@ -65,7 +65,7 @@ func TestDeleteDeploymentWhenDeploymentDoesNotExist(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)

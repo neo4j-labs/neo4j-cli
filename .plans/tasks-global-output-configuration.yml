@@ -14,7 +14,7 @@ tasks:
       Remove "output" from AuraConfig.ValidConfigKeys and remove Output() and BindOutput() from
       AuraConfig. Add a silent one-time migration block in NewConfig: if viper.IsSet("aura.output")
       and !viper.IsSet("output"), move the value to the top-level key via sjson and delete "aura.output".
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "cfg.Global is non-nil after NewConfig and cfg.Global.Output() returns \"default\" with an empty config"
@@ -22,7 +22,7 @@ tasks:
       - "A config.json containing {\"aura\":{\"output\":\"json\"}} is silently migrated to {\"output\":\"json\"} on first NewConfig call"
       - "cfg.Aura.Output() and cfg.Aura.BindOutput() no longer exist; callers that reference them fail to compile"
       - "\"output\" is absent from AuraConfig.ValidConfigKeys"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
 
   - id: task-002
     title: "Extract registerOutputFlag helper and update output.go"

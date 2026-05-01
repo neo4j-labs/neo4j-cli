@@ -39,7 +39,7 @@ func TestSetConfigWithInvalidOutputValue(t *testing.T) {
 
 	helper.ExecuteCommand("config set output invalid")
 
-	helper.AssertErr("Error: invalid output value specified: invalid")
+	helper.AssertErr("Error: invalid config key specified: output")
 }
 
 func TestSetBetaEnabledConfig(t *testing.T) {

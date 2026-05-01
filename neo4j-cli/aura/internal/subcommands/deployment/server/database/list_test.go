@@ -58,7 +58,7 @@ func TestListDeploymentServerDatabase(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment server database list --deployment-id=%s --server-id=%s --organization-id=%s --project-id=%s", deploymentId, serverId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -149,7 +149,7 @@ func TestListDeploymentServerDatabaseWithOrganizationAndProjectIdFromConfig(t *t
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment server database list --deployment-id=%s --server-id=%s", deploymentId, serverId))
 
@@ -241,7 +241,7 @@ func TestListDeploymentServerDatabaseWithTableOutput(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "table")
+	helper.SetConfigValue("output", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment server database list --deployment-id=%s --server-id=%s --organization-id=%s --project-id=%s", deploymentId, serverId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -271,7 +271,7 @@ func TestListDeploymentServerDatabasesWithNoData(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment server database list --deployment-id=%s --server-id=%s --organization-id=%s --project-id=%s", deploymentId, serverId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)

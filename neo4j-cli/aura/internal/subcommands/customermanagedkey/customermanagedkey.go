@@ -36,7 +36,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 				}
 			}
 
-			cfg.Aura.BindOutput(cmd.Flags().Lookup("output"))
+			cfg.Global.BindOutput(cmd.Flags().Lookup("output"))
 
 			return nil
 		},
