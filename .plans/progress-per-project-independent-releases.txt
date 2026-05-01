@@ -39,3 +39,28 @@ Key Decisions:
 - Single-project aura-only uses release/aura-cli-<version>; neo4j-only uses release/neo4j-cli-<version>
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Update release.yml trigger and per-project release notes detection
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Updated .github/workflows/release.yml with two changes:
+1. Added CHANGELOG-aura.md to on.push.paths so aura-cli-only releases trigger GoReleaser.
+2. Added 'git diff HEAD~1 --name-only' detection in "Generate release notes" step to set
+   INCLUDE_NEO4J and INCLUDE_AURA variables; subsections under ## Changes are now gated
+   on these variables instead of checking whether the body string is non-empty.
+3. Added fetch-depth: 2 to the actions/checkout step (critical fix) so HEAD~1 exists —
+   without this, the shallow clone (default depth 1) causes git diff HEAD~1 to fail,
+   keeping both INCLUDE_* flags false and the ## Changes section always empty.
+
+Files Changed:
+- .github/workflows/release.yml (modified — checkout fetch-depth: 2, paths trigger, INCLUDE_* detection)
+- .plans/tasks-per-project-independent-releases.yml (modified — task-004 marked completed)
+- .plans/progress-per-project-independent-releases.txt (modified — appended task-004 entry)
+
+Key Decisions:
+- fetch-depth: 2 is the minimum depth needed for HEAD~1 to exist on a triggered push commit
+- Detection uses git diff HEAD~1 --name-only piped through grep -q for each changelog file
+- ## Versions section and both changie latest steps remain unconditional (always run)

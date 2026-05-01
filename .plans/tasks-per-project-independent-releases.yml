@@ -72,7 +72,7 @@ tasks:
       [ "$INCLUDE_AURA" = "true" ] guards so that only the project(s) released in
       this commit appear under ## Changes. The ## Versions section and both
       changie latest calls remain unconditional.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "release.yml on.push.paths includes both 'CHANGELOG-neo4j.md' and 'CHANGELOG-aura.md'"
@@ -80,4 +80,4 @@ tasks:
       - "The ### neo4j-cli subsection is written only when INCLUDE_NEO4J=true"
       - "The ### aura-cli subsection is written only when INCLUDE_AURA=true"
       - "The ## Versions section and both changie latest steps are unchanged (always run)"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
