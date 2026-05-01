@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-aura build-neo4j test lint fmt license-check run-aura run-neo4j clean changelog
+.PHONY: build build-aura build-neo4j snapshot test lint fmt license-check run-aura run-neo4j clean changelog
 
 ## build: build both aura-cli and neo4j-cli into bin/
 build: build-aura build-neo4j
@@ -13,6 +13,13 @@ build-aura:
 ## build-neo4j: build the neo4j-cli binary into bin/
 build-neo4j:
 	go build -o bin/neo4j-cli ./neo4j-cli
+
+## snapshot: release build for current platform only (uses goreleaser, outputs to bin/)
+snapshot:
+	@mkdir -p bin/
+	GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser build --snapshot --single-target --clean
+	cp dist/neo4j-cli_*/neo4j-cli bin/neo4j-cli
+	cp dist/aura-cli_*/aura-cli bin/aura-cli
 
 ## test: run all tests
 test:

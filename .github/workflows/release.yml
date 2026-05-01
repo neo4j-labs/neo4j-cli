@@ -3,13 +3,15 @@ name: release
 on:
   push:
     branches: ["main"]
-    paths: ["CHANGELOG-neo4j.md"]
+    paths: ["CHANGELOG-neo4j.md", "CHANGELOG-aura.md"]
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 2
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
@@ -43,15 +45,42 @@ jobs:
           NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
           AURA_VERSION="${{ steps.versions.outputs.aura }}"
           NEO4J_CHANGES_FILE=".changes/neo4j-cli/${NEO4J_VERSION}.md"
+          AURA_CHANGES_FILE=".changes/aura-cli/${AURA_VERSION}.md"
+          # Detect which changelogs were updated in this commit
+          CHANGED_FILES=$(git diff HEAD~1 --name-only)
+          INCLUDE_NEO4J="false"
+          INCLUDE_AURA="false"
+          if echo "$CHANGED_FILES" | grep -q "CHANGELOG-neo4j.md"; then
+            INCLUDE_NEO4J="true"
+          fi
+          if echo "$CHANGED_FILES" | grep -q "CHANGELOG-aura.md"; then
+            INCLUDE_AURA="true"
+          fi
           # Extract the changelog body: skip the first line (## vX.Y.Z - DATE header)
-          NEO4J_BODY=$(tail -n +2 "$NEO4J_CHANGES_FILE")
+          # Guard: only read the file if it exists
+          NEO4J_BODY=""
+          if test -f "$NEO4J_CHANGES_FILE"; then
+            NEO4J_BODY=$(tail -n +2 "$NEO4J_CHANGES_FILE")
+          fi
+          AURA_BODY=""
+          if test -f "$AURA_CHANGES_FILE"; then
+            AURA_BODY=$(tail -n +2 "$AURA_CHANGES_FILE")
+          fi
           {
             printf '## Versions\n\n'
             printf -- '- neo4j-cli: %s\n' "${NEO4J_VERSION}"
             printf -- '- aura-cli: %s\n' "${AURA_VERSION}"
             printf '\n## Changes\n\n'
-            printf '%s\n' "${NEO4J_BODY}"
-          } > release-notes.md
+            if [ "$INCLUDE_NEO4J" = "true" ]; then
+              printf '### neo4j-cli\n\n'
+              printf '%s\n' "${NEO4J_BODY}"
+              printf '\n'
+            fi
+            if [ "$INCLUDE_AURA" = "true" ]; then
+              printf '### aura-cli\n\n'
+              printf '%s\n' "${AURA_BODY}"
+            fi
+          } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Add env vars
         run: |

@@ -1,0 +1,67 @@
+================================================================================
+TASK-001: Verify release-notes.md is written to workspace root and found by GoReleaser
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Audited the "Generate release notes" step in .github/workflows/release.yml. Both the
+write step and GoReleaser step were already using consistent paths (both relative to
+$GITHUB_WORKSPACE). Made the write path explicit by using "$GITHUB_WORKSPACE/release-notes.md"
+instead of a bare relative path, removing any ambiguity if a working-directory override
+were ever added to a step.
+
+Files Changed:
+- .github/workflows/release.yml (modified: write path for release-notes.md is now explicit $GITHUB_WORKSPACE/release-notes.md)
+
+Key Decisions:
+- GoReleaser `--release-notes=release-notes.md` kept as relative path — goreleaser-action
+  runs from workspace root, so it resolves correctly and the action's `args:` field doesn't
+  support $GITHUB_WORKSPACE expansion.
+- Write step uses absolute path to be unambiguous regardless of future working-directory changes.
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Add per-project subsections under ## Changes in release-notes.md
+Date: 2026-05-01T00:01:00Z
+================================================================================
+
+Summary:
+Updated the "Generate release notes" shell script in `.github/workflows/release.yml` to read
+both `.changes/aura-cli/${AURA_VERSION}.md` and `.changes/neo4j-cli/${NEO4J_VERSION}.md`,
+strip their version-header lines with `tail -n +2`, and write them as `### neo4j-cli` and
+`### aura-cli` subsections under `## Changes`. The `## Versions` section listing both
+binary versions is preserved above `## Changes`.
+
+Files Changed:
+- .github/workflows/release.yml (modified: Generate release notes step now reads both project change files and writes per-project subsections)
+
+Key Decisions:
+- `### neo4j-cli` placed before `### aura-cli` to match the ordering in `## Versions`.
+- Used `tail -n +2` to strip the `## vX.Y.Z - DATE` header from each project's changelog file.
+- All shell constructs remain POSIX-compatible (`printf`, `tail`, shell variable expansion).
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Guard each project section so empty/missing change files are skipped gracefully
+Date: 2026-05-01T00:02:00Z
+================================================================================
+
+Summary:
+Updated the "Generate release notes" step in `.github/workflows/release.yml` to wrap
+each project's changelog body extraction in a `test -f` guard, and each `### <project>`
+subsection write in a `[ -n "${BODY}" ]` guard. If a project's version file is absent
+or its body is empty after stripping the header line, the subsection is silently omitted
+and the workflow step still exits with code 0.
+
+Files Changed:
+- .github/workflows/release.yml (modified: added test -f and [ -n ] guards around each per-project subsection)
+
+Key Decisions:
+- Initialize `NEO4J_BODY` and `AURA_BODY` to empty string before the `test -f` guard so
+  the `[ -n ]` check is always defined even when the file is absent.
+- Added a trailing `printf '\n'` after the neo4j-cli block (when present) to keep consistent
+  spacing between subsections regardless of which combination of sections is written.
+
+Next Task: All tasks complete
