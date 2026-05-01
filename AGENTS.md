@@ -144,7 +144,10 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 - `Config.Global` (`*GlobalConfig`) holds top-level (non-namespaced) viper keys; `Config.Aura` holds `aura.*`-prefixed keys
 - The `output` setting lives at the top-level viper key `"output"`, not `"aura.output"` — always read/write via `cfg.Global.Output()` and `cfg.Global.BindOutput()`
-- Migration from old `aura.output` to `output` runs silently on first `NewConfig` call; the pattern uses `gjson.GetBytes` + `sjson.Set`/`sjson.Delete` + `Viper.ReadInConfig()` to refresh state
+- Migration from old `aura.output` to `output` runs silently on first `NewConfig` call; the pattern uses `gjson.GetBytes().Exists()` (not `Viper.IsSet()`) to check the raw JSON file, then `sjson.Set`/`sjson.Delete` + `Viper.ReadInConfig()` to refresh state
+- `Viper.IsSet()` returns `true` for keys set via `SetDefault` — use `gjson.GetBytes(data, key).Exists()` to distinguish file-backed values from viper defaults when writing migration conditions
+- `cfg.Global.BindOutput(flag)` binds viper's `"output"` key to the pflag value; passing `--output json` overrides both the rendering format AND the config value returned by `cfg.Global.Get("output")` — they are the same viper key
+- go-pretty renders table header rows in **uppercase** with `table.StyleLight` — assert for `"KEY"` and `"VALUE"` (not lowercase) in table output tests
 - Test helpers default to `"output": "json"` at the JSON root; set output overrides with `helper.SetConfigValue("output", "table")` (not `"aura.output"`)
 - Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
 - `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process; in test helpers set it once in the constructor (`NewAuraTestHelper`), not on each `ExecuteCommand` call

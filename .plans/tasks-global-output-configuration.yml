@@ -210,7 +210,7 @@ tasks:
       to the top level of the JSON config, matching the new storage layout. After all previous
       tasks are complete, run make test to confirm the entire test suite passes with no regressions.
       Fix any remaining compilation errors or test failures surfaced by the full run.
-    status: pending
+    status: completed
     dependencies:
       - task-009
       - task-010
@@ -220,4 +220,4 @@ tasks:
       - "make test passes with zero failures across all packages"
       - "make build produces working binaries for both neo4j-cli and aura-cli"
       - "No file in the repo references cfg.Aura.Output() or cfg.Aura.BindOutput()"
-    completed_at: null
+    completed_at: 2026-05-01T12:00:00Z

@@ -19,10 +19,10 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 	server := httptest.NewServer(mux)
 
 	cfgStr := fmt.Sprintf(`{
+		"output": "json",
 		"aura": {
 			"auth-url": "%s/oauth/token",
-			"base-url": "%s/v1",
-			"output": "json"
+			"base-url": "%s/v1"
 			}
 		}`, server.URL, server.URL)
 

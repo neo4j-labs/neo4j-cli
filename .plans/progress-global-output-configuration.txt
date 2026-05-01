@@ -320,3 +320,26 @@ Key Decisions:
   (not just not-yet-set in viper overlays).
 
 Next Task: task-012
+
+================================================================================
+TASK-012: Update clicfg_test.go config fixture and run full test suite
+Date: 2026-05-01T12:00:00Z
+================================================================================
+
+Summary:
+Moved "output": "json" from inside the "aura" block to the top level of the JSON
+config fixture in common/clicfg/clicfg_test.go, matching the new storage layout
+established in task-001. Ran make test (all packages pass) and make build (both
+binaries compile). Confirmed zero remaining references to cfg.Aura.Output() or
+cfg.Aura.BindOutput() anywhere in the codebase. All acceptance criteria met.
+
+Files Changed:
+- common/clicfg/clicfg_test.go (modified: moved "output" key from "aura" block to JSON root)
+
+Key Decisions:
+- Only one fixture in clicfg_test.go contained the misplaced "output" key; the fix
+  is minimal and keeps the test semantically equivalent since the migration code in
+  NewConfig would have moved it anyway during the test run.
+- make test passes with zero failures across all packages after the fixture correction.
+
+Next Task: (none — all tasks complete)
