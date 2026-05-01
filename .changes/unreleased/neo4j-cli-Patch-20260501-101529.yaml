@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Bugfix: `aura config list` now only prints valid config values'
-time: 2026-05-01T10:15:29.482942+01:00
