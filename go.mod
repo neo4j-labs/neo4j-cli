@@ -3,27 +3,27 @@ module github.com/neo4j/cli
 go 1.25.0
 
 require (
+	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/google/uuid v1.6.0
+	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
+	go.uber.org/mock v0.6.0
 	golang.org/x/sys v0.43.0
 )
 
 require (
-	github.com/denisbrodbeck/machineid v1.0.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mixpanel/mixpanel-go v1.2.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
 
