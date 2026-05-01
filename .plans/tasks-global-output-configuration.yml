@@ -121,7 +121,7 @@ tasks:
       key and value, calls cfg.Global.Set), and list.go (calls cfg.Global.Print or equivalent,
       respecting output format). Register the package in neo4j-cli/main.go NewCmd() with
       cmd.AddCommand(config.NewCmd(cfg)). Mirror the structure of the existing aura config package.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -130,7 +130,7 @@ tasks:
       - "neo4j config set output invalid returns a validation error"
       - "neo4j config set unknown-key value returns a usage error"
       - "neo4j config list --output table renders as a table; neo4j config list --output json renders as JSON"
-    completed_at: null
+    completed_at: 2026-05-01T05:00:00Z
 
   - id: task-008
     title: "Update test helper default config fixture"

@@ -176,3 +176,37 @@ Key Decisions:
 - Dead "output" validation in set.go removed entirely since "output" is not a valid key.
 
 Next Task: task-007
+
+================================================================================
+TASK-007: Create neo4j config get/set/list command package
+Date: 2026-05-01T05:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/internal/subcommands/config/ package with config.go, get.go,
+set.go, and list.go. Registered the package in neo4j-cli/main.go with
+cmd.AddCommand(config.NewCmd(cfg)). The package mirrors the aura config package
+structure but targets cfg.Global (not cfg.Aura) for top-level config keys.
+get.go uses cfg.Global.ValidConfigKeys for ValidArgs validation. set.go validates
+the key via cfg.Global.IsValidConfigKey and validates the value inline against
+clicfg.ValidOutputValues. list.go renders a table when output=="table" and falls
+through to cfg.Global.Print() (JSON) otherwise. All helper functions (printConfigKeyValueAsJSON,
+printConfigKeyValueAsTable, printGlobalConfigTable) are in list.go as exported-only
+to the package.
+
+Files Changed:
+- neo4j-cli/internal/subcommands/config/config.go (created: NewCmd assembling subcommands)
+- neo4j-cli/internal/subcommands/config/get.go (created: get command with output-aware rendering)
+- neo4j-cli/internal/subcommands/config/set.go (created: set command with key+value validation)
+- neo4j-cli/internal/subcommands/config/list.go (created: list command with table/JSON rendering)
+- neo4j-cli/main.go (modified: added config import and cmd.AddCommand(config.NewCmd(cfg)))
+
+Key Decisions:
+- Package placed at neo4j-cli/internal/subcommands/config/ mirroring the aura config package.
+- Value validation for "output" key uses inline loop against clicfg.ValidOutputValues since
+  no helper function exists in clicfg for this; keeps the pattern consistent with flags.go.
+- list.go holds shared helpers (printConfigKeyValueAsJSON, printConfigKeyValueAsTable) used
+  by get.go since they're in the same package.
+- make build and make test both pass with zero failures.
+
+Next Task: task-008
