@@ -6,10 +6,12 @@ package clicfg
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path/filepath"
 	"slices"
 
+	"github.com/neo4j/cli/common/analytics"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clicfg/projects"
@@ -23,9 +25,11 @@ import (
 var ConfigPrefix string
 
 const (
-	DefaultAuraBaseUrl     = "https://api.neo4j.io"
-	DefaultAuraAuthUrl     = "https://api.neo4j.io/oauth/token"
-	DefaultAuraBetaEnabled = false
+	DefaultAuraBaseUrl      = "https://api.neo4j.io"
+	DefaultAuraAuthUrl      = "https://api.neo4j.io/oauth/token"
+	DefaultAuraBetaEnabled  = false
+	DefaultmixpanelEndpoint = "https://api.mixpanel.com"
+	DefaultmixpanelToken    = "4bfb2414ab973c741b6f067bf06d5575"
 )
 
 var ValidOutputValues = [3]string{"default", "json", "table"}
@@ -34,11 +38,16 @@ type Config struct {
 	Version     string
 	Aura        *AuraConfig
 	Credentials *credentials.Credentials
+	Events      *analytics.Analytics
 }
 
 func NewConfig(fs afero.Fs, version string) *Config {
 	configPath := filepath.Join(ConfigPrefix, "neo4j", "cli")
 	fullConfigPath := filepath.Join(configPath, "config.json")
+
+	logger := slog.Default()
+
+	events := analytics.NewAnalytics(DefaultmixpanelToken, DefaultmixpanelEndpoint, "NEO4J-CLI", version, logger)
 
 	Viper := viper.New()
 
@@ -80,6 +89,7 @@ func NewConfig(fs afero.Fs, version string) *Config {
 			Projects:        projects,
 		},
 		Credentials: credentials,
+		Events:      events,
 	}
 }
 

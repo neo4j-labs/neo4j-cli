@@ -39,8 +39,13 @@ func main() {
 
 	cfg := clicfg.NewConfig(afero.NewOsFs(), Version)
 
+	// Send start up event
+	cfg.Events.EmitStartupEvent()
+
 	cmd := NewCmd(cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 	cmd.Execute() //nolint:errcheck // cobra prints the error itself; exit code is handled by os.Exit in the cobra command
+
+	cfg.Events.Flush() // Flush any remaining events
 }
