@@ -38,7 +38,7 @@ type Config struct {
 	Version     string
 	Aura        *AuraConfig
 	Credentials *credentials.Credentials
-	Events      *analytics.Analytics
+	Events      *analytics.Analytics // Look to refactor this in the future
 }
 
 func NewConfig(fs afero.Fs, version string) *Config {
