@@ -1,0 +1,39 @@
+feature: filter-config-list-output
+prd: ./prd-filter-config-list-output.md
+created_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Filter PrintAuraConfig output to ValidConfigKeys"
+    description: |
+      In `common/clicfg/clicfg.go`, replace the `viper.Get("aura")` call in the
+      `PrintAuraConfig` path with a loop over `ValidConfigKeys` that builds a
+      `map[string]interface{}` by calling `config.viper.Get("aura.<key>")` for each
+      key, then JSON-encodes that filtered map. Separate `PrintAuraConfig` from the
+      shared `print` helper so the filtering does not affect `PrintAuraProjects`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`config list` output contains exactly the keys in ValidConfigKeys and no others"
+      - "A config file with an unrecognised key on disk produces no extra fields in `config list` output"
+      - "Values reflect viper's resolved value (defaults and env var overrides honoured)"
+      - "`PrintAuraProjects` behaviour is unchanged"
+      - "`make build` succeeds"
+    completed_at: 2026-05-01T00:10:00Z
+
+  - id: task-002
+    title: "Add/update config list test for unrecognised key filtering"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/config/list_test.go`, add a test that
+      writes a config file containing an unrecognised key (e.g. `beta-enabled`) and
+      asserts it does not appear in `config list` output. Verify the existing
+      `TestListConfig` still passes with only the expected ValidConfigKeys present.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "New test writes a config with an extra unknown key and asserts it is absent from `config list` output"
+      - "Existing TestListConfig continues to pass with the correct set of keys"
+      - "`make test` passes"
+    completed_at: 2026-05-01T00:20:00Z

@@ -1,0 +1,58 @@
+feature: disable-beta-flag
+prd: ./prd-disable-beta-flag.md
+created_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Remove beta-enabled from ValidConfigKeys and hardcode AuraBetaEnabled to false"
+    description: |
+      In `common/clicfg/clicfg.go`, remove `"beta-enabled"` from the `ValidConfigKeys`
+      slice so the existing `IsValidConfigKey` validation rejects it like any unknown key.
+      Change `AuraBetaEnabled()` to `return false` unconditionally instead of reading from
+      viper, so any existing `beta-enabled: true` on disk is silently ignored. Remove the
+      `Viper.SetDefault("aura.beta-enabled", DefaultAuraBetaEnabled)` call from
+      `setDefaultValues` to prevent the key appearing in viper-backed config output.
+      Retain the `DefaultAuraBetaEnabled` constant and the `AuraBetaEnabled()` method
+      signature to keep re-enablement straightforward.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "ValidConfigKeys slice in clicfg.go no longer contains \"beta-enabled\""
+      - "AuraBetaEnabled() returns false unconditionally (no viper read)"
+      - "Viper.SetDefault for aura.beta-enabled is removed from setDefaultValues"
+      - "DefaultAuraBetaEnabled constant and AuraBetaEnabled() method signature are retained"
+      - "`make build` succeeds with no compilation errors"
+    completed_at: "2026-05-01T00:10:00Z"
+
+  - id: task-002
+    title: "Update config set tests to expect invalid-key error for beta-enabled"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/config/set_test.go`, update
+      `TestSetBetaEnabledConfig` so that `config set beta-enabled true` and
+      `config set beta-enabled false` are both asserted to return
+      `Error: invalid config key specified: beta-enabled`, matching the behaviour
+      of any unrecognised key. Remove assertions that the config value was written.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "TestSetBetaEnabledConfig asserts an error for `config set beta-enabled true`"
+      - "TestSetBetaEnabledConfig asserts an error for `config set beta-enabled false`"
+      - "Error message matches \"Error: invalid config key specified: beta-enabled\""
+      - "`make test` passes"
+    completed_at: "2026-05-01T00:20:00Z"
+
+  - id: task-003
+    title: "Update config list test to exclude beta-enabled from expected output"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/config/list_test.go`, remove
+      `"beta-enabled": false` from the expected JSON output of `config list`, since the
+      key is no longer registered as a valid config key or set as a viper default.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Expected JSON in config list test does not contain a beta-enabled field"
+      - "`make test` passes"
+    completed_at: "2026-05-01T00:30:00Z"
