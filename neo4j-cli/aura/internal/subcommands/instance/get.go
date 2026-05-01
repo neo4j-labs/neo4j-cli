@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 )
 
 func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
@@ -20,7 +21,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Returns instance details",
 		Long:  "This endpoint returns details about a specific Aura Instance.",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
 			instanceId := args[0]
 			path := fmt.Sprintf("/instances/%s", instanceId)
 
@@ -41,7 +42,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 			}
 
 			return nil
-		},
+		}),
 	}
 }
 

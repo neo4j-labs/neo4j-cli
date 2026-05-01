@@ -10,6 +10,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ The overwrite process mimics the 'Clone to existing' functionality of the Aura C
 If only --source-instance-id is provided, a new snapshot of that instance is created and used for overwriting. Alternatively, you can specify an additional --source-snapshot-id to use a specific snapshot for overwriting, from --source-instance-id provided, otherwise as a snapshot of the instance being overwritten. The snapshot specified must be exportable.
 		`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
 			instanceId := args[0]
 			path := fmt.Sprintf("/instances/%s/overwrite", instanceId)
 
@@ -74,7 +75,7 @@ If only --source-instance-id is provided, a new snapshot of that instance is cre
 			}
 
 			return nil
-		},
+		}),
 	}
 
 	cmd.Flags().StringVar(&sourceInstanceId, sourceInstanceIdFlag, "", "The ID of the instance to overwrite with, from the source snapshot ID if provided, otherwise takes a new snapshot and overwrites")

@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +33,7 @@ Resuming an instance is an asynchronous operation. You can poll the current stat
 
 If another operation is being performed on the instance you are trying to resume, an error will be returned that indicates that resume cannot be performed.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/instances/%s/resume", args[0])
 
 			cmd.SilenceUsage = true
@@ -63,7 +64,7 @@ If another operation is being performed on the instance you are trying to resume
 				}
 			}
 			return nil
-		},
+		}),
 	}
 
 	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until resumed instance is ready.")

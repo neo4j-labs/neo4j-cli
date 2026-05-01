@@ -10,6 +10,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns a list of snapshots",
 		Long:  `This subcommand returns a list of available snapshots from the current day.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/snapshots", instanceId)
 			var queryParams map[string]string
@@ -41,7 +42,7 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id", "instance_id", "profile", "status", "timestamp"})
 			}
 			return nil
-		},
+		}),
 	}
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "The ID of the instance to list the snapshots of")

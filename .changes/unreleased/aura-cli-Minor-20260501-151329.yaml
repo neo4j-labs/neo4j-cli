@@ -1,0 +1,4 @@
+project: aura-cli
+kind: Minor
+body: Track CLI command invocations and active flags via analytics (instance commands and instance snapshot commands)
+time: 2026-05-01T15:13:29.521111+01:00

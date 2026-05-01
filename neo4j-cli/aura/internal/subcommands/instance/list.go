@@ -9,6 +9,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This subcommand returns a list containing a summary of each of your Aura instances. To find out more about a specific instance, retrieve the details using the get subcommand.
 
 You can filter instances in a particular tenant using --tenant-id. If the tenant flag is not specified, this subcommand lists all instances a user has access to across all tenants.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: utils.WrapRunE(cfg, func(cmd *cobra.Command, args []string) error {
 			path := "/instances"
 
 			queryParams := make(map[string]string)
@@ -42,7 +43,7 @@ You can filter instances in a particular tenant using --tenant-id. If the tenant
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "cloud_provider"})
 			}
 			return nil
-		},
+		}),
 	}
 
 	cmd.Flags().StringVar(&tenantId, "tenant-id", "", "An optional Tenant ID to filter instances in a tenant")
