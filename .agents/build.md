@@ -17,6 +17,7 @@ All targets are `.PHONY`. Run `make <target>`:
 | `build` | Build both `bin/aura-cli` and `bin/neo4j-cli` |
 | `build-aura` | Build `bin/aura-cli` from `./neo4j-cli/aura/cmd` |
 | `build-neo4j` | Build `bin/neo4j-cli` from `./neo4j-cli` |
+| `snapshot` | Release build for current platform with ldflags baked in; copies to `bin/` |
 | `test` | Run `go test ./...` |
 | `lint` | Run `golangci-lint run ./...` |
 | `fmt` | Run `go fmt ./...` |
@@ -46,7 +47,10 @@ make fmt
 # License header check (Unix/macOS only)
 make license-check
 
-# Multi-platform release snapshot (local) — both version env vars required
+# Single-platform release build (goreleaser + ldflags, outputs to bin/)
+make snapshot
+
+# Multi-platform snapshot (all platforms) — both version env vars required
 GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean
 
 # Clean build artifacts
