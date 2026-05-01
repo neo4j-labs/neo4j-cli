@@ -12,6 +12,8 @@ LINT COMMANDS: [`make lint`]
 FORMAT COMMANDS: [`make fmt`]
 LICENSE CHECK: [`make license-check`]
 
+**Always run `make test` as the final gate before marking any task or plan complete.** All tests must pass — a build that compiles but has failing tests is not done.
+
 ## Project Overview
 
 PRIMARY LANGUAGES: [Go]
@@ -26,9 +28,9 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 
 - Local build: `make build` (produces `bin/aura-cli` and `bin/neo4j-cli`)
 - Local run (no build): `make run-aura` / `make run-neo4j`
-- Multi-platform snapshot: `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean`
+- Release build (current platform, ldflags baked in): `make snapshot` (uses goreleaser, outputs to `bin/`)
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry via `make changelog`; because `neo4j-cli` bundles all child CLIs, changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
+- PRs require a changelog entry via `make changelog` **only for user-facing changes** (new features, bug fixes, behaviour changes visible to CLI users). Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries. Because `neo4j-cli` bundles all child CLIs, user-facing changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
 
 ## Testing Framework
 
@@ -40,6 +42,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details.
 - Run with `go test ./...`; CI runs on ubuntu, windows, and macos
 - Mock HTTP server and filesystem helpers live in `neo4j-cli/aura/internal/test/testutils/`
 - `neo4j-cli/` (the super-CLI package) has no test files; this is a pre-existing gap
+- **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 
 ## Architecture
 
@@ -76,6 +79,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 - One positional argument max; extras become flags
 - `--output json|table` for all read commands
 - `--await` flag for async operations
+- Follow CLI best practices from https://clig.dev/ — source at https://github.com/cli-guidelines/cli-guidelines/blob/main/content/_index.md (fetch the raw markdown for token-efficient reference)
 
 ## Deployment
 
@@ -103,6 +107,15 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `ProjectsVersionSeparator` in `.changie.yaml` can be set to `-` to get `aura-cli-v1.7.0` instead of `aura-cliv1.7.0`; leave unset (empty) for `aura-cliv1.7.0`
 - `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
 - `changie new --projects <a> --projects <b>` creates entries for multiple projects in one call; the interactive prompt (`make changelog`) also supports multi-select
+- This repo uses kind labels `Major`, `Minor`, `Patch` (not `added`/`feat`) — check `.changie.yaml` `kinds:` before using `--kind`
+
+## Changie Workflow Notes
+
+- To detect whether `.changes/unreleased/` contains entries for a given project, use `grep -rl 'project: <key>' .changes/unreleased/ 2>/dev/null | grep -q .` — the `2>/dev/null` handles an absent/empty directory and `grep -q .` converts the file list to a boolean exit code
+- Write boolean outputs to `GITHUB_OUTPUT` with `echo "has_<project>=true" >> $GITHUB_OUTPUT` / `false` in an if/else so downstream steps can use `if: steps.<id>.outputs.has_<project> == 'true'`
+- Always gate terminal steps (e.g. `create-pull-request`) on the same detection outputs — skipped upstream steps produce empty outputs, not skipped downstream steps; without a guard the terminal step runs with blank inputs and creates a malformed artifact
+- For multiline GitHub Actions outputs, use the heredoc form: `{ echo "key<<EOF"; echo "${VALUE}"; echo "EOF"; } >> $GITHUB_OUTPUT` — this avoids issues with inline `|` syntax
+- When building multiline strings in `run: |` shell blocks, use `printf '...\n...'` instead of multi-line string assignment — the YAML indentation level (e.g. 10 spaces) carries into continuation lines as literal whitespace
 
 ## Release Workflow Notes
 

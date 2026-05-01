@@ -11,19 +11,59 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Compute next pre-release versions
+        id: prerelease
+        run: |
+          LAST_AURA=$(ls .changes/aura-cli/v*-alpha.[0-9]*.md 2>/dev/null \
+            | grep -oE 'alpha\.[0-9]+\.md' | grep -oE '[0-9]+' | sort -n | tail -1)
+          if [ -z "$LAST_AURA" ]; then
+            echo "aura=alpha.0" >> $GITHUB_OUTPUT
+          else
+            echo "aura=alpha.$((LAST_AURA + 1))" >> $GITHUB_OUTPUT
+          fi
+          LAST_NEO=$(ls .changes/neo4j-cli/v*-alpha.[0-9]*.md 2>/dev/null \
+            | grep -oE 'alpha\.[0-9]+\.md' | grep -oE '[0-9]+' | sort -n | tail -1)
+          if [ -z "$LAST_NEO" ]; then
+            echo "neo4j=alpha.0" >> $GITHUB_OUTPUT
+          else
+            echo "neo4j=alpha.$((LAST_NEO + 1))" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect unreleased changes per project
+        id: detect
+        run: |
+          if grep -rl 'project: aura-cli' .changes/unreleased/ 2>/dev/null | grep -q .; then
+            echo "has_aura=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_aura=false" >> $GITHUB_OUTPUT
+          fi
+          if grep -rl 'project: neo4j-cli' .changes/unreleased/ 2>/dev/null | grep -q .; then
+            echo "has_neo4j=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_neo4j=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip — no unreleased changes
+        if: steps.detect.outputs.has_aura != 'true' && steps.detect.outputs.has_neo4j != 'true'
+        run: |
+          echo "No unreleased changes found for either project. Nothing to release."
+
       - name: Batch aura-cli changes
+        if: steps.detect.outputs.has_aura == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project aura-cli --prerelease alpha
+          args: batch auto --project aura-cli --prerelease ${{ steps.prerelease.outputs.aura }}
 
       - name: Batch neo4j-cli changes
+        if: steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project neo4j-cli --prerelease alpha
+          args: batch auto --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
 
       - name: Merge changelogs
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -31,6 +71,7 @@ jobs:
 
       - name: Get aura-cli latest version
         id: latest-aura
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -38,6 +79,7 @@ jobs:
 
       - name: Get neo4j-cli latest version
         id: latest-neo4j
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
@@ -45,25 +87,52 @@ jobs:
 
       - name: Extract version numbers
         id: versions
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         run: |
           AURA_VERSION=$(echo "${{ steps.latest-aura.outputs.output }}" | sed 's/^aura-cli//')
           NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
           echo "aura=$AURA_VERSION" >> $GITHUB_OUTPUT
           echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Compute PR metadata
+        id: pr-meta
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
+        run: |
+          HAS_AURA="${{ steps.detect.outputs.has_aura }}"
+          HAS_NEO4J="${{ steps.detect.outputs.has_neo4j }}"
+          AURA_VERSION="${{ steps.versions.outputs.aura }}"
+          NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
+
+          if [ "$HAS_AURA" = "true" ] && [ "$HAS_NEO4J" = "true" ]; then
+            PR_TITLE="Release aura-cli ${AURA_VERSION} / neo4j-cli ${NEO4J_VERSION}"
+            PR_BRANCH="release/neo4j-cli-${NEO4J_VERSION}"
+            PR_BODY="$(printf '## Release aura-cli %s / neo4j-cli %s\n\nThis release includes updates to both binaries.\n\n- **aura-cli** %s — see [CHANGELOG-aura.md](CHANGELOG-aura.md)\n- **neo4j-cli** %s — see [CHANGELOG-neo4j.md](CHANGELOG-neo4j.md)' "${AURA_VERSION}" "${NEO4J_VERSION}" "${AURA_VERSION}" "${NEO4J_VERSION}")"
+          elif [ "$HAS_AURA" = "true" ]; then
+            PR_TITLE="Release aura-cli ${AURA_VERSION}"
+            PR_BRANCH="release/aura-cli-${AURA_VERSION}"
+            PR_BODY="$(printf '## Release aura-cli %s\n\n- **aura-cli** %s — see [CHANGELOG-aura.md](CHANGELOG-aura.md)' "${AURA_VERSION}" "${AURA_VERSION}")"
+          else
+            PR_TITLE="Release neo4j-cli ${NEO4J_VERSION}"
+            PR_BRANCH="release/neo4j-cli-${NEO4J_VERSION}"
+            PR_BODY="$(printf '## Release neo4j-cli %s\n\n- **neo4j-cli** %s — see [CHANGELOG-neo4j.md](CHANGELOG-neo4j.md)' "${NEO4J_VERSION}" "${NEO4J_VERSION}")"
+          fi
+
+          echo "pr_title=${PR_TITLE}" >> $GITHUB_OUTPUT
+          echo "pr_branch=${PR_BRANCH}" >> $GITHUB_OUTPUT
+          {
+            echo "pr_body<<PR_BODY_EOF"
+            echo "${PR_BODY}"
+            echo "PR_BODY_EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Create Pull Request
+        if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8
         with:
-          title: "Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}"
-          branch: "release/neo4j-cli-${{ steps.versions.outputs.neo4j }}"
-          body: |
-            ## Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}
-
-            This release includes updates to both binaries.
-
-            - **aura-cli** ${{ steps.versions.outputs.aura }} — see [CHANGELOG-aura.md](CHANGELOG-aura.md)
-            - **neo4j-cli** ${{ steps.versions.outputs.neo4j }} — see [CHANGELOG-neo4j.md](CHANGELOG-neo4j.md)
-          commit-message: "Release aura-cli ${{ steps.versions.outputs.aura }} / neo4j-cli ${{ steps.versions.outputs.neo4j }}"
+          title: "${{ steps.pr-meta.outputs.pr_title }}"
+          branch: "${{ steps.pr-meta.outputs.pr_branch }}"
+          body: "${{ steps.pr-meta.outputs.pr_body }}"
+          commit-message: "${{ steps.pr-meta.outputs.pr_title }}"
           token: ${{ env.TOKEN }}
         env:
           TOKEN: ${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}

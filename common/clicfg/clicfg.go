@@ -85,7 +85,7 @@ func NewConfig(fs afero.Fs, version string) *Config {
 				MaxRetries: 60,
 				Interval:   20,
 			},
-			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant", "output", "beta-enabled"},
+			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant", "output"},
 			Projects:        projects,
 		},
 		Credentials: credentials,
@@ -102,7 +102,6 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.base-url", DefaultAuraBaseUrl)
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
 	Viper.SetDefault("aura.output", "default")
-	Viper.SetDefault("aura.beta-enabled", DefaultAuraBetaEnabled)
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
 
@@ -112,6 +111,7 @@ type AuraConfig struct {
 	pollingOverride PollingConfig
 	ValidConfigKeys []string
 	Projects        *projects.AuraConfigProjects
+	betaEnabled     bool
 }
 
 type PollingConfig struct {
@@ -149,7 +149,17 @@ func (config *AuraConfig) Set(key string, value string) {
 }
 
 func (config *AuraConfig) PrintAuraConfig(cmd *cobra.Command) {
-	config.print(cmd, "aura")
+	filtered := make(map[string]interface{}, len(config.ValidConfigKeys))
+	for _, key := range config.ValidConfigKeys {
+		filtered[key] = config.viper.Get(fmt.Sprintf("aura.%s", key))
+	}
+
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetIndent("", "\t")
+
+	if err := encoder.Encode(filtered); err != nil {
+		panic(err)
+	}
 }
 
 func (config *AuraConfig) PrintAuraProjects(cmd *cobra.Command) {
@@ -214,8 +224,12 @@ func (config *AuraConfig) BindOutput(flag *pflag.Flag) {
 	}
 }
 
+func (config *AuraConfig) SetBetaEnabled(enabled bool) {
+	config.betaEnabled = enabled
+}
+
 func (config *AuraConfig) AuraBetaEnabled() bool {
-	return config.viper.GetBool("aura.beta-enabled")
+	return config.betaEnabled
 }
 
 func (config *AuraConfig) DefaultTenant() string {

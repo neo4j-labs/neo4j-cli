@@ -10,6 +10,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 )
 
 var Version = "dev"
@@ -25,8 +26,21 @@ func main() {
 
 	cfg := clicfg.NewConfig(afero.NewOsFs(), Version)
 
-	cmd := aura.NewCmd(cfg)
+	cmd := aura.NewStandaloneCmd(cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
-	cmd.Execute() //nolint:errcheck // cobra prints the error itself; exit code is handled by os.Exit in the cobra command
+
+	origHelp := cmd.HelpFunc()
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		fmt.Printf("[aura-cli] help displayed: %s\n", c.CommandPath()) // TODO: remove this log in favour of real metrics on help displayed
+		origHelp(c, args)
+	})
+
+	// cobra prints the error itself; we only add the hook for errors that bypassed
+	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
+	if err := cmd.Execute(); err != nil {
+		fmt.Printf("[aura-cli] invalid command with args %s: %v\n", os.Args[1:], err) // TODO: remove this log in favour of real metrics in case of invalid command
+	} else {
+		fmt.Printf("[aura-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
+	}
 }

@@ -1,0 +1,83 @@
+feature: per-project-independent-releases
+prd: ./prd-per-project-independent-releases.md
+created_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add per-project change detection step to changie.yml'
+    description: |
+      Add a new "Detect unreleased changes per project" run step to changie.yml, placed
+      before the two batch steps. The step greps .changes/unreleased/ for YAML files
+      containing 'project: aura-cli' and 'project: neo4j-cli' and writes has_aura and
+      has_neo4j boolean outputs to GITHUB_OUTPUT. Use grep -rl with 2>/dev/null to
+      handle an empty directory gracefully.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Step id is 'detect' and runs before both batch steps"
+      - "has_aura=true is written to GITHUB_OUTPUT when .changes/unreleased/ contains a file with 'project: aura-cli'"
+      - "has_neo4j=true is written to GITHUB_OUTPUT when .changes/unreleased/ contains a file with 'project: neo4j-cli'"
+      - "has_aura=false and has_neo4j=false are written when .changes/unreleased/ is empty or contains only .gitkeep"
+    completed_at: 2026-05-01T00:00:00Z
+
+  - id: task-002
+    title: 'Gate batch/merge/version steps on detection outputs; early-exit when empty'
+    description: |
+      Add if: conditions to the two changie-action batch steps so they only run when
+      the corresponding has_* output is 'true'. Add the same gate to the merge step and
+      both changie latest steps. After the detect step, add a "Skip — no unreleased
+      changes" run step that prints a summary and is itself gated with
+      if: steps.detect.outputs.has_aura != 'true' && steps.detect.outputs.has_neo4j != 'true',
+      so the workflow log is clear when it is a no-op.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "'Batch aura-cli changes' step has if: steps.detect.outputs.has_aura == 'true'"
+      - "'Batch neo4j-cli changes' step has if: steps.detect.outputs.has_neo4j == 'true'"
+      - "'Merge changelogs', 'Get aura-cli latest version', 'Get neo4j-cli latest version', and 'Extract version numbers' steps are all gated on at least one project having changes"
+      - "A no-op summary step runs and the workflow exits successfully when neither project has changes"
+    completed_at: 2026-05-01T00:00:00Z
+
+  - id: task-003
+    title: 'Compute dynamic PR metadata and update create-pull-request step'
+    description: |
+      Add a "Compute PR metadata" run step after "Extract version numbers" that reads
+      steps.detect.outputs.has_aura and has_neo4j alongside steps.versions.outputs.aura
+      and neo4j to set pr_title, pr_branch, and pr_body outputs. Single-project releases
+      use 'Release <project> <version>' and 'release/<project>-<version>'; dual-project
+      uses the existing combined format. Update the create-pull-request step to reference
+      these outputs instead of hardcoded strings, and gate it on at least one project having
+      changes.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Step id is 'pr-meta' and sets pr_title, pr_branch, and pr_body outputs"
+      - "Neo4j-CLI-only: title is 'Release neo4j-cli <version>', branch is 'release/neo4j-cli-<version>', body mentions only neo4j-cli"
+      - "Aura-CLI-only: title is 'Release aura-cli <version>', branch is 'release/aura-cli-<version>', body mentions only aura-cli"
+      - "Dual-project: title and branch match the existing combined format; body lists both projects"
+      - "create-pull-request step references steps.pr-meta.outputs.pr_title, pr_branch, pr_body"
+    completed_at: 2026-05-01T00:00:00Z
+
+  - id: task-004
+    title: 'Update release.yml trigger and per-project release notes detection'
+    description: |
+      Add CHANGELOG-aura.md to the paths: list in release.yml's on.push trigger so
+      aura-cli-only releases also kick off GoReleaser. In the "Generate release notes"
+      run step, detect which changelogs changed in the triggering commit using
+      'git diff HEAD~1 --name-only', then replace the existing [ -n "${NEO4J_BODY}" ]
+      and [ -n "${AURA_BODY}" ] guards with [ "$INCLUDE_NEO4J" = "true" ] and
+      [ "$INCLUDE_AURA" = "true" ] guards so that only the project(s) released in
+      this commit appear under ## Changes. The ## Versions section and both
+      changie latest calls remain unconditional.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "release.yml on.push.paths includes both 'CHANGELOG-neo4j.md' and 'CHANGELOG-aura.md'"
+      - "INCLUDE_NEO4J and INCLUDE_AURA variables are set via git diff HEAD~1 --name-only before the printf block"
+      - "The ### neo4j-cli subsection is written only when INCLUDE_NEO4J=true"
+      - "The ### aura-cli subsection is written only when INCLUDE_AURA=true"
+      - "The ## Versions section and both changie latest steps are unchanged (always run)"
+    completed_at: 2026-05-01T00:00:00Z

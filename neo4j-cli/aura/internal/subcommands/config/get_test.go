@@ -39,5 +39,5 @@ func TestGetConfigBetaEnabled(t *testing.T) {
 
 	helper.ExecuteCommand("config get beta-enabled")
 
-	helper.AssertOut("true")
+	helper.AssertErr("Error: invalid argument \"beta-enabled\" for \"aura-cli config get\"")
 }

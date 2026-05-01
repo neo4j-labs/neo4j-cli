@@ -25,6 +25,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
 	cmd.AddCommand(auraCmd)
+	cmd.AddCommand(aura.NewCredentialCmd(cfg))
 	return cmd
 }
 
@@ -45,7 +46,18 @@ func main() {
 	cmd := NewCmd(cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
-	cmd.Execute() //nolint:errcheck // cobra prints the error itself; exit code is handled by os.Exit in the cobra command
 
-	cfg.Events.Flush() // Flush any remaining events
+	origHelp := cmd.HelpFunc()
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		fmt.Printf("[neo4j-cli] help displayed: %s\n", c.CommandPath()) // TODO: remove this log in favour of real metrics on help displayed
+		origHelp(c, args)
+	})
+
+	// cobra prints the error itself; we only add the hook for errors that bypassed
+	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
+	if err := cmd.Execute(); err != nil {
+		fmt.Printf("[neo4j-cli] invalid command with args %s: %v\n", os.Args[1:], err) // TODO: remove this log in favour of real metrics in case of invalid command
+	} else {
+		fmt.Printf("[neo4j-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
+	}
 }

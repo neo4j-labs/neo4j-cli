@@ -1,0 +1,46 @@
+================================================================================
+TASK-001: Filter PrintAuraConfig output to ValidConfigKeys
+Date: 2026-05-01T00:10:00Z
+================================================================================
+
+Summary:
+Replaced `PrintAuraConfig`'s call to `config.print(cmd, "aura")` (which used
+`viper.Get("aura")` and returned all keys including unrecognised ones) with a
+loop over `ValidConfigKeys` that builds a filtered `map[string]interface{}` and
+JSON-encodes only those keys. `PrintAuraProjects` is unaffected. Updated
+`TestListConfig` to include `"default-tenant": null` in expected output since
+`default-tenant` is in `ValidConfigKeys` but has no viper default.
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: PrintAuraConfig now filters to ValidConfigKeys)
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (modified: updated expected output to include default-tenant: null)
+- .plans/tasks-filter-config-list-output.yml (modified: task-001 marked completed)
+
+Key Decisions:
+- Used `viper.Get("aura.<key>")` per key (same as existing `config.Get(key)`) so defaults and env vars are honoured
+- Kept the shared `print` helper intact for `PrintAuraProjects` use
+- `default-tenant` appears as `null` when unset — this is correct; it's a valid config key with no default
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Add/update config list test for unrecognised key filtering
+Date: 2026-05-01T00:20:00Z
+================================================================================
+
+Summary:
+Added `TestListConfigFiltersUnrecognisedKeys` to `list_test.go`. The test writes
+a config containing `{"aura": {"beta-enabled": true}}` (an unrecognised key) and
+asserts that `config list` output still shows only the 4 ValidConfigKeys with
+defaults applied — confirming the filtering introduced in task-001 works correctly.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (modified: added TestListConfigFiltersUnrecognisedKeys)
+- .plans/tasks-filter-config-list-output.yml (modified: task-002 marked completed)
+
+Key Decisions:
+- Placed the unknown key inside the `aura` JSON namespace so viper would see it if filtering were absent
+- Expected output is identical to TestListConfig (defaults apply; unknown key filtered out)
+- Pre-existing failures in config/project subpackage are unrelated to this feature
+
+Next Task: All tasks complete
