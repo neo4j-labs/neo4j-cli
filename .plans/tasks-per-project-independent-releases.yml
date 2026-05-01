@@ -12,14 +12,14 @@ tasks:
       containing 'project: aura-cli' and 'project: neo4j-cli' and writes has_aura and
       has_neo4j boolean outputs to GITHUB_OUTPUT. Use grep -rl with 2>/dev/null to
       handle an empty directory gracefully.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Step id is 'detect' and runs before both batch steps"
       - "has_aura=true is written to GITHUB_OUTPUT when .changes/unreleased/ contains a file with 'project: aura-cli'"
       - "has_neo4j=true is written to GITHUB_OUTPUT when .changes/unreleased/ contains a file with 'project: neo4j-cli'"
       - "has_aura=false and has_neo4j=false are written when .changes/unreleased/ is empty or contains only .gitkeep"
-    completed_at: null
+    completed_at: 2026-05-01T00:00:00Z
 
   - id: task-002
     title: 'Gate batch/merge/version steps on detection outputs; early-exit when empty'

@@ -108,6 +108,11 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
 - `changie new --projects <a> --projects <b>` creates entries for multiple projects in one call; the interactive prompt (`make changelog`) also supports multi-select
 
+## Changie Workflow Notes
+
+- To detect whether `.changes/unreleased/` contains entries for a given project, use `grep -rl 'project: <key>' .changes/unreleased/ 2>/dev/null | grep -q .` — the `2>/dev/null` handles an absent/empty directory and `grep -q .` converts the file list to a boolean exit code
+- Write boolean outputs to `GITHUB_OUTPUT` with `echo "has_<project>=true" >> $GITHUB_OUTPUT` / `false` in an if/else so downstream steps can use `if: steps.<id>.outputs.has_<project> == 'true'`
+
 ## Release Workflow Notes
 
 - Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)

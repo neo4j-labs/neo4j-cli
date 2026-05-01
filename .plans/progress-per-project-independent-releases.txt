@@ -1,0 +1,5 @@
+2026-05-01T00:00:00Z task-001 completed
+  Added "Detect unreleased changes per project" step (id: detect) to .github/workflows/changie.yml.
+  Step uses grep -rl to check .changes/unreleased/ for 'project: aura-cli' and 'project: neo4j-cli'
+  and writes has_aura and has_neo4j boolean outputs to GITHUB_OUTPUT. Placed before both batch steps.
+  Reviewer confirmed no blocking issues.
