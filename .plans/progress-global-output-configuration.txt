@@ -146,3 +146,33 @@ Key Decisions:
 - Zero cfg.Aura.Output() references remain anywhere in the codebase (confirmed by grep).
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Remove output from aura config ValidConfigKeys and fix aura config commands
+Date: 2026-05-01T04:00:00Z
+================================================================================
+
+Summary:
+Verified that "output" was already removed from AuraConfig.ValidConfigKeys in task-001,
+so `aura config set output json` already returns 'invalid config key specified: output'.
+Removed the now-dead `if args[0] == "output"` validation block from set.go. Updated
+list.go to render as a key-value table when cfg.Global.Output() == "table", falling
+through to the existing JSON behavior otherwise. Updated get.go to render JSON or table
+when the output setting is "json" or "table" respectively, falling through to plain text
+for "default". Added helper functions printAuraConfigTable, printConfigKeyValueAsJSON,
+and printConfigKeyValueAsTable in list.go (same package, accessible from get.go).
+Updated get_test.go to expect JSON output since the test helper defaults to output="json".
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/config/set.go (removed dead output validation block)
+- neo4j-cli/aura/internal/subcommands/config/list.go (added table rendering, helper functions)
+- neo4j-cli/aura/internal/subcommands/config/get.go (output-aware rendering switch)
+- neo4j-cli/aura/internal/subcommands/config/get_test.go (updated assertion to expect JSON)
+
+Key Decisions:
+- "default" output mode falls through to existing JSON behavior for config commands
+  (not table like API responses), preserving backward compatibility and existing tests.
+- Helper functions placed in list.go since both list and get use them (same package).
+- Dead "output" validation in set.go removed entirely since "output" is not a valid key.
+
+Next Task: task-007

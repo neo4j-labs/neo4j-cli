@@ -22,19 +22,6 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 				return clierr.NewUsageError("invalid config key specified: %s", args[0])
 			}
 
-			if args[0] == "output" {
-				validOutputValue := false
-				for _, v := range clicfg.ValidOutputValues {
-					if v == args[1] {
-						validOutputValue = true
-						break
-					}
-				}
-				if !validOutputValue {
-					return clierr.NewUsageError("invalid output value specified: %s", args[1])
-				}
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

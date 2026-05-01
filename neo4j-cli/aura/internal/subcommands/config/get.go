@@ -15,9 +15,17 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		ValidArgs: cfg.Aura.ValidConfigKeys[:],
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			value := cfg.Aura.Get(args[0])
+			key := args[0]
+			value := cfg.Aura.Get(key)
 
-			cmd.Println(value)
+			switch cfg.Global.Output() {
+			case "json":
+				printConfigKeyValueAsJSON(cmd, key, value)
+			case "table":
+				printConfigKeyValueAsTable(cmd, key, value)
+			default:
+				cmd.Println(value)
+			}
 
 			return nil
 		},

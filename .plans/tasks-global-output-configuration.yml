@@ -103,7 +103,7 @@ tasks:
       respect the global output setting for their own rendered output (using cfg.Global.Output()
       to choose between JSON and table rendering), since they currently always emit JSON via
       json.NewEncoder directly.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -111,7 +111,7 @@ tasks:
       - "neo4j aura config list no longer includes an output key in its output"
       - "neo4j aura config list rendered output respects the global output setting (table vs json)"
       - "neo4j aura config get auth-url rendered output respects the global output setting"
-    completed_at: null
+    completed_at: 2026-05-01T04:00:00Z
 
   - id: task-007
     title: "Create neo4j config get/set/list command package"
