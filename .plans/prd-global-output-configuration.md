@@ -4,14 +4,16 @@
 
 Today the `--output` flag and its config-backed default (`aura.output`) only apply to a subset of `neo4j aura` commands. Commands like `neo4j aura config list`, `neo4j aura config get`, and all `neo4j credential` commands ignore the output setting. There is also no way to set the output default outside of the aura-specific config.
 
-This feature moves output configuration to a top-level viper key (`output`), removes `output` from the aura config, adds `neo4j config get/set/list` commands, and makes every command in the CLI respect the configured default.
+This feature moves output configuration to a top-level viper key (`output`), removes `output` from the aura config, adds `neo4j config get/set/list` commands, and makes every command in the CLI respect the configured default. It also restructures the aura config commands to mirror the credential pattern: `neo4j aura config` is removed and replaced by `neo4j config aura`, while the standalone `aura-cli config` command becomes a flat interface over both global and aura-scoped keys.
 
 ## Goals
 
 - Provide a single, CLI-wide default output format setting
-- Add `neo4j config get <key>`, `neo4j config set <key> <value>`, and `neo4j config list` commands
+- Add `neo4j config get <key>`, `neo4j config set <key> <value>`, and `neo4j config list` commands for global config
+- Add `neo4j config aura get/set/list` commands for aura-scoped config, replacing `neo4j aura config`
 - Ensure every command in every binary that produces output respects the `--output` flag and configured default
-- Remove `output` from the aura-specific config (`aura.output` and `neo4j aura config set/get output`)
+- Remove `output` from the aura-specific config (`aura.output` and any aura config set/get output path)
+- Provide a flat `aura-cli config` interface in standalone mode covering both global and aura-scoped keys, following the same pattern as credentials
 
 ## Non-Goals
 
@@ -28,14 +30,19 @@ This feature moves output configuration to a top-level viper key (`output`), rem
 - REQ-F-002: `neo4j config set output <value>` persists the value to config.json at the top-level `output` key; invalid values return an error
 - REQ-F-003: `neo4j config list` prints all top-level config keys and their current values as JSON
 - REQ-F-004: `neo4j config get <invalid-key>` and `neo4j config set <invalid-key> <value>` return a usage error
-- REQ-F-005: `output` is removed from aura `ValidConfigKeys`; `neo4j aura config set output <value>` returns "invalid config key specified: output"
+- REQ-F-005: `output` is removed from aura `ValidConfigKeys`; `neo4j config aura set output <value>` returns "invalid config key specified: output"
 - REQ-F-006: The `--output` flag on every resource command continues to override the config for that invocation only
 - REQ-F-007: All `neo4j aura` resource commands resolve output via the top-level `output` key when the flag is not explicitly passed
-- REQ-F-008: `neo4j aura config list` and `neo4j aura config get` respect the top-level output config for their rendered output
+- REQ-F-008: `neo4j config aura list` and `neo4j config aura get` respect the top-level output config for their rendered output
 - REQ-F-009: `neo4j credential` subcommands bind the `--output` flag and respect the top-level output config
 - REQ-F-012: `neo4j config list` and `neo4j config get` also respect the `--output` flag, rendering as JSON or table accordingly
-- REQ-F-010: Users who previously set `aura.output` in config.json are silently migrated on first run: the value is moved to the top-level `output` key and the `aura.output` key is deleted
+- REQ-F-010: The one-time `aura.output` → `output` migration block in `NewConfig` is commented out (not deleted), with a comment explaining it is untested code reserved for a future stable-release upgrade path and must not run in this experimental release
 - REQ-F-011: Valid output values remain: `default`, `json`, `table` (unchanged)
+- REQ-F-013: When running `aura-cli` standalone, `aura-cli config` is a flat command that handles both global (no `.` in the value) and aura-scoped (`aura.` viper prefix) config keys; routing is determined by which `ValidConfigKeys` list the key belongs to
+- REQ-F-014: When running `aura-cli` standalone, `aura-cli config set output <value>` persists to the global `output` key; `aura-cli config set auth-url <value>` persists to the aura-scoped `aura.auth-url` key; invalid keys or values return errors
+- REQ-F-015: When running `aura-cli` standalone, `aura-cli config list` shows all keys from both global and aura config domains
+- REQ-F-016: `neo4j aura config` is removed; aura config is accessible at `neo4j config aura get/set/list`, following the same pattern as `neo4j credential` (moved from `neo4j aura credential`)
+- REQ-F-017: `neo4j config aura get <key>`, `neo4j config aura set <key> <value>`, and `neo4j config aura list` behave identically to the former `neo4j aura config` commands (same keys, same validation, same output rendering)
 
 ### Non-Functional Requirements
 
@@ -43,6 +50,8 @@ This feature moves output configuration to a top-level viper key (`output`), rem
 - REQ-NF-002: The `neo4j config` command structure is extensible — adding new top-level keys in future requires only adding them to `ValidConfigKeys` in `GlobalConfig`
 - REQ-NF-003: `make test` passes with no regressions
 - REQ-NF-004: Output flag registration, validation, and viper binding must be centralized — individual resource-group commands (instance, tenant, etc.) must not contain any output flag logic
+- REQ-NF-005: The `ResponseData` interface and the core rendering logic are extracted from `neo4j-cli/aura/internal/output/output.go` and `neo4j-cli/aura/internal/api/response.go` into a new `common/output` package, making them available to all sub-CLIs; `aura/internal/output/output.go` becomes a thin adapter; the extraction and its design rationale are documented in AGENTS.md
+- REQ-NF-006: New tests use table-driven style (`for _, tc := range []struct{...}{...}`) and are split into per-command files (`get_test.go`, `set_test.go`, `list_test.go`) matching the rest of the repo's convention; AGENTS.md is updated with this naming convention
 
 ## Technical Considerations
 
@@ -91,9 +100,40 @@ Placing the flag at the binary root rather than at the `aura` intermediate level
 
 Create `neo4j-cli/internal/subcommands/config/` (new directory) with `config.go`, `get.go`, `set.go`, `list.go`. Register in `neo4j-cli/main.go` with `cmd.AddCommand(config.NewCmd(cfg))`.
 
-### Silent config migration
+### Silent config migration (disabled for experimental release)
 
-In `NewConfig`, after reading the config file: if `viper.IsSet("aura.output")` and `!viper.IsSet("output")`, move the value to the top-level key via `GlobalConfig.Set` and delete `aura.output` from the file via `sjson.Delete`.
+The migration block in `NewConfig` is commented out rather than deleted. This code would move `aura.output` → `output` on first run for users upgrading from an old config. It must not run in this experimental release because users may switch between the stable and experimental CLIs; running the migration in the experimental version would break the stable version's `aura.output` config. The block is kept as commented-out reference code for when the stable release is ready to ship this change.
+
+### Config command restructuring (credential pattern)
+
+The aura config commands follow the same pattern used for credentials: they are lifted out of `neo4j aura` and made accessible at the root `neo4j config` level. Concretely:
+
+- `config.NewCmd(cfg)` (the aura config package) is no longer added in `aura.NewCmd`. It is instead added as an `aura` subcommand of the `neo4j-cli/internal/subcommands/config` package, so the full path becomes `neo4j config aura`.
+- `neo4j-cli/main.go` registers the top-level `config.NewCmd(cfg)` (global config) which now also includes an `aura` subcommand wiring `neo4j config aura`.
+- `neo4j aura config` no longer exists; existing users must migrate to `neo4j config aura`.
+
+Export a `NewAuraSubCmd(cfg)` function from the aura config package (or re-use `NewCmd`) and register it under the global config command.
+
+### Standalone aura-cli flat config
+
+The standalone `aura-cli config` command must expose both global and aura-scoped keys in a single flat interface — no `aura-cli config aura` subcommand. This mirrors how `aura-cli credential` works: credentials are flat at the root, not nested.
+
+Recommended approach: create a `NewStandaloneConfigCmd(cfg)` that builds a merged `config` command whose `get`/`set`/`list` subcommands are aware of all keys from `cfg.Aura.ValidConfigKeys` and `cfg.Global.ValidConfigKeys`. Routing logic:
+- For `set`/`get`: if key is in `cfg.Global.ValidConfigKeys` → call `cfg.Global` methods; if in `cfg.Aura.ValidConfigKeys` → call `cfg.Aura` methods; otherwise return "invalid config key" error.
+- For `list`: render all keys from both domains.
+
+`NewStandaloneCmd` replaces the current `config.NewCmd(cfg)` reference with `NewStandaloneConfigCmd(cfg)`. Global and aura keys are currently disjoint, so routing is unambiguous. Adding new keys to either domain requires only updating the relevant `ValidConfigKeys` slice.
+
+### output.go extraction to common
+
+`ResponseData` (defined in `neo4j-cli/aura/internal/api/response.go`) is a generic interface over `[]map[string]any` with no aura-specific dependencies — it belongs in `common`. The rendering functions in `neo4j-cli/aura/internal/output/output.go` (`PrintBodyMap`, `printTable`, `getNestedField`) also have no aura-specific dependencies beyond the `ResponseData` interface.
+
+Extraction plan:
+1. Create `common/output/output.go` with the `ResponseData` interface (`AsArray() []map[string]any` and `GetSingleOrError() (map[string]any, error)`) and all rendering functions (`PrintBodyMap`, `printTable`, `getNestedField`), accepting `common/output.ResponseData`.
+2. `api/response.go` retains `ListResponseData`, `SingleValueResponseData`, and `ParseBody` — they already satisfy the interface, so no changes needed beyond the import path update.
+3. `aura/internal/output/output.go` becomes a thin adapter: it keeps `PrintBody` (which calls `api.ParseBody` and delegates to `common/output.PrintBodyMap`) and re-exports `PrintBodyMap` as a pass-through so callers don't need import changes.
+4. All callers continue importing `aura/internal/output` — no changes required at call sites.
+5. Document the package design (interface in common, parse logic stays in api, thin adapter in aura) in AGENTS.md.
 
 ## Acceptance Criteria
 
@@ -102,12 +142,24 @@ In `NewConfig`, after reading the config file: if `viper.IsSet("aura.output")` a
 - [ ] `neo4j config set output invalid` returns an error
 - [ ] `neo4j config set unknown-key value` returns an error
 - [ ] `neo4j config list` returns `{"output": "default"}` (or current value)
-- [ ] `neo4j aura config set output json` returns "invalid config key specified: output"
-- [ ] `neo4j aura config list` no longer shows `output`
+- [ ] `neo4j config aura set output json` returns "invalid config key specified: output"
+- [ ] `neo4j config aura list` no longer shows `output`
+- [ ] `neo4j config aura get auth-url` returns the configured auth-url (same behaviour as former `neo4j aura config get`)
 - [ ] `neo4j aura instance list` respects `neo4j config set output json` without `--output` flag
-- [ ] `neo4j aura config list` (the config command itself) respects the global output setting
+- [ ] `neo4j config aura list` respects the global output setting for its own rendered output
+- [ ] `neo4j aura config` no longer exists (unknown command error)
 - [ ] `neo4j credential list --output json` overrides the config for that invocation
-- [ ] A config.json with `"aura": {"output": "json"}` is silently migrated on next run
+- [ ] The `aura.output` migration block in `NewConfig` is commented out with a clear note explaining it must not run in this experimental release
+- [ ] `aura-cli config set output json` (standalone) writes `"output": "json"` at the JSON root
+- [ ] `aura-cli config set auth-url <url>` (standalone) writes the value under `aura.auth-url`
+- [ ] `aura-cli config get output` (standalone) returns the current global output value
+- [ ] `aura-cli config list` (standalone) includes both global keys (`output`) and aura keys (`auth-url`, `base-url`, `default-tenant`)
+- [ ] New `neo4j config` tests use table-driven style and are split into `get_test.go`, `set_test.go`, `list_test.go`
+- [ ] `common/output` package exists with `ResponseData` interface and rendering functions
+- [ ] `aura/internal/output/output.go` is a thin adapter — only `PrintBody` logic remains there
+- [ ] `api/response.go` types (`ListResponseData`, `SingleValueResponseData`) satisfy `common/output.ResponseData`
+- [ ] All existing callers of `output.PrintBodyMap` continue to work without import changes
+- [ ] AGENTS.md documents the per-command test file convention and the common/output package design
 - [ ] `make test` passes
 - [ ] No resource-group command (instance, tenant, etc.) contains any `--output` flag registration or `BindOutput` call
 - [ ] `neo4j config list --output table` renders config keys as a table
@@ -204,12 +256,24 @@ Update config fixture: move `"output"` to top-level JSON.
 # Build
 make build
 
-# Manual smoke test
+# Global config smoke test
 ./bin/neo4j-cli config list
 ./bin/neo4j-cli config set output json
-./bin/neo4j-cli config get output   # should return "json"
-./bin/neo4j-cli aura config list    # should NOT show output
-./bin/neo4j-cli aura config set output json  # should error
+./bin/neo4j-cli config get output         # should return "json"
+
+# Aura config (new path)
+./bin/neo4j-cli config aura list          # should NOT show output
+./bin/neo4j-cli config aura get auth-url  # should return configured value
+./bin/neo4j-cli config aura set output json  # should error
+
+# Old path should be gone
+./bin/neo4j-cli aura config list          # should error: unknown command
+
+# Standalone flat config
+./bin/aura-cli config list                # should show both output and aura keys
+./bin/aura-cli config set output table
+./bin/aura-cli config set auth-url https://example.com
+./bin/aura-cli config get output          # should return "table"
 
 # Run all tests
 make test

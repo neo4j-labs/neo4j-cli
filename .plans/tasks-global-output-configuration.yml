@@ -1,7 +1,7 @@
 feature: global-output-configuration
 prd: ./prd-global-output-configuration.md
 created_at: 2026-05-01T00:00:00Z
-updated_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-01T15:00:00Z
 
 tasks:
   - id: task-001
@@ -221,3 +221,186 @@ tasks:
       - "make build produces working binaries for both neo4j-cli and aura-cli"
       - "No file in the repo references cfg.Aura.Output() or cfg.Aura.BindOutput()"
     completed_at: 2026-05-01T12:00:00Z
+
+  - id: task-013
+    title: "Comment out the one-time aura.output migration block"
+    description: |
+      In common/clicfg/clicfg.go, comment out the entire migration block (lines ~70-90) that
+      silently moves aura.output → output on first run. Add a comment above the block explaining
+      that this code is untested, has never run in this experimental release, and is preserved as
+      reference code for a future stable-release upgrade path. The block must not execute because
+      users may switch between the stable CLI (which still uses aura.output) and this experimental
+      version; running the migration would corrupt stable-version config files.
+      Also remove or comment out the corresponding test cases in config_test.go that assert the
+      migration behaviour (TestConfigMigrationAuraOutputToTopLevel, TestConfigMigrationAuraOutputStoredAtTopLevel),
+      replacing them with a comment explaining they are disabled alongside the migration code.
+    status: todo
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "The migration block in NewConfig is fully commented out with an explanatory comment"
+      - "No migration-related code executes when NewConfig is called with a config that has aura.output set"
+      - "Migration test cases in config_test.go are commented out (not deleted) with an explanatory note"
+      - "make test passes after the change"
+
+  - id: task-014
+    title: "Extract ResponseData interface and rendering logic to common/output"
+    description: |
+      Extract the ResponseData interface and core rendering logic from the aura-specific packages
+      into a new common/output package so all sub-CLIs can share it.
+
+      Steps:
+      1. Create common/output/output.go with the copyright header and package declaration.
+         Move into it:
+         - The ResponseData interface (currently in neo4j-cli/aura/internal/api/response.go)
+         - PrintBodyMap, printTable, getNestedField (currently in neo4j-cli/aura/internal/output/output.go)
+         Function signatures use common/output.ResponseData instead of api.ResponseData.
+      2. Update neo4j-cli/aura/internal/api/response.go: remove the ResponseData interface
+         definition (ListResponseData and SingleValueResponseData already satisfy the new
+         common/output.ResponseData via structural typing — no code changes needed to the
+         implementations themselves, just remove the now-redundant local interface).
+      3. Update neo4j-cli/aura/internal/output/output.go: keep only PrintBody (which calls
+         api.ParseBody and delegates to common/output.PrintBodyMap). Add a re-export shim:
+           func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values common_output.ResponseData, fields []string) {
+               common_output.PrintBodyMap(cmd, cfg, values, fields)
+           }
+         so that all existing call sites continue to compile without import changes.
+      4. Confirm make build and make test both pass with no changes to callers.
+      5. Document the common/output package design in AGENTS.md under a new
+         "Output Rendering Notes" section: interface in common, parse logic stays in api,
+         thin adapter in aura/internal/output.
+    status: todo
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "common/output/output.go exists with ResponseData interface and rendering functions"
+      - "api/response.go no longer defines ResponseData; ListResponseData and SingleValueResponseData satisfy common/output.ResponseData"
+      - "aura/internal/output/output.go contains only PrintBody and a PrintBodyMap shim"
+      - "No call sites in subcommands/ need import changes — make build succeeds"
+      - "make test passes with no failures"
+      - "AGENTS.md documents the common/output package design"
+
+  - id: task-015
+    title: "Build flat standalone aura-cli config command"
+    description: |
+      The standalone aura-cli binary needs a flat config command that covers both global keys
+      (e.g. output) and aura-scoped keys (auth-url, base-url, default-tenant) in a single
+      interface — mirroring how aura-cli credential works (flat at the root, not nested).
+
+      Implementation approach:
+      1. Create a NewStandaloneConfigCmd(cfg) function (in the aura config package or a new
+         standalone-specific file under neo4j-cli/aura/). This builds a config command whose
+         get/set/list subcommands understand all keys from both cfg.Aura.ValidConfigKeys and
+         cfg.Global.ValidConfigKeys.
+      2. Routing in set/get: if key is in cfg.Global.ValidConfigKeys → call cfg.Global methods;
+         if in cfg.Aura.ValidConfigKeys → call cfg.Aura methods; otherwise return error.
+      3. list renders all keys from both domains.
+      4. In NewStandaloneCmd (aura.go), replace the existing config.NewCmd(cfg) reference with
+         NewStandaloneConfigCmd(cfg).
+
+      The change applies ONLY to the standalone path (NewStandaloneCmd). NewCmd (used when
+      mounted as neo4j aura) must not include this standalone config command — the neo4j super-CLI
+      already has neo4j config and neo4j config aura for this purpose (see task-018).
+    status: todo
+    dependencies:
+      - task-013
+      - task-018
+    acceptance_criteria:
+      - "aura-cli config set output json writes {\"output\":\"json\"} at the JSON root"
+      - "aura-cli config get output returns the current global output value"
+      - "aura-cli config list includes output alongside auth-url, base-url, default-tenant"
+      - "aura-cli config set auth-url <value> writes to aura.auth-url (aura key routing)"
+      - "aura-cli config get auth-url returns the current aura auth-url value"
+      - "aura-cli config set unknown-key errors with 'invalid config key specified'"
+      - "make build succeeds for both binaries"
+
+  - id: task-016
+    title: "Refactor new config tests: table-driven + per-command files + AGENTS.md convention"
+    description: |
+      The tests in neo4j-cli/internal/subcommands/config/config_test.go were written as individual
+      top-level test functions instead of table-driven tests, and all live in one file rather than
+      per-command files matching the rest of the repo's convention.
+
+      1. Split config_test.go into three files: get_test.go, set_test.go, list_test.go. Move the
+         neo4jTestHelper struct and constructor into a shared test file (e.g. helpers_test.go or
+         keep it in one of the files if it stays small).
+      2. Convert each group of tests to table-driven style:
+         - get_test.go: table over (command, configSetup, expectedOut, expectedErr) for all get variants
+         - set_test.go: table over (command, expectedConfigValue, expectedErr) for all set variants
+         - list_test.go: table over (command, configSetup, outContains, expectedErr) for list variants
+      3. Update AGENTS.md with a note in the Testing Framework section: test files should be named
+         per command (get_test.go, set_test.go, list_test.go) mirroring the source files, not
+         aggregated in a single config_test.go.
+      4. Make sure make test passes after the refactor.
+    status: todo
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "config_test.go no longer exists; tests live in get_test.go, set_test.go, list_test.go"
+      - "All test groups use table-driven style with a for-range over a []struct slice"
+      - "AGENTS.md Testing Framework section documents the per-command file naming convention"
+      - "Test coverage is equivalent to before (same scenarios covered, none removed)"
+      - "make test passes for neo4j-cli/internal/subcommands/config"
+
+  - id: task-017
+    title: "Tests for standalone flat config and neo4j config aura"
+    description: |
+      Add table-driven tests covering both the flat standalone config (task-015) and the
+      neo4j config aura restructuring (task-018).
+
+      Standalone tests (new file or extension of aura config test package, wired to NewStandaloneCmd):
+      - aura-cli config set output json → writes global key
+      - aura-cli config get output → returns global value
+      - aura-cli config list → includes both output and aura keys
+      - aura-cli config set auth-url <url> → routes to aura config
+      - aura-cli config get auth-url → returns aura value
+      - aura-cli config set unknown-key → errors
+
+      neo4j config aura tests (in neo4j-cli/internal/subcommands/config/aura/ or alongside
+      existing aura config tests, wired to the full neo4j root NewCmd):
+      - neo4j config aura get auth-url → returns configured value
+      - neo4j config aura set auth-url <url> → writes aura key
+      - neo4j config aura list → shows aura keys only (not output)
+      - neo4j config aura set output json → errors with invalid key
+      - neo4j aura config list → errors (command no longer exists)
+
+      All tests must use table-driven style per REQ-NF-006.
+    status: todo
+    dependencies:
+      - task-015
+      - task-016
+      - task-018
+    acceptance_criteria:
+      - "Table-driven tests cover all acceptance criteria from task-015 and task-018"
+      - "Standalone tests are wired to NewStandaloneCmd"
+      - "neo4j config aura tests are wired to the full neo4j root (NewCmd from main.go)"
+      - "make test passes for both aura and neo4j-cli/internal config packages"
+
+  - id: task-018
+    title: "Move neo4j aura config → neo4j config aura"
+    description: |
+      Restructure the aura config commands to follow the credential pattern: remove config from
+      the aura subcommand tree and expose it at the neo4j root under neo4j config aura.
+
+      Steps:
+      1. In neo4j-cli/aura/aura.go, remove the config.NewCmd(cfg) line from NewCmd so that
+         neo4j aura config no longer exists. NewStandaloneCmd must NOT be affected — it will
+         get its own config command via NewStandaloneConfigCmd (task-015).
+      2. In neo4j-cli/internal/subcommands/config/config.go (the global config package), add
+         an aura subcommand: import the aura config package and call
+         cmd.AddCommand(auraconfig.NewCmd(cfg)) (or a renamed export). This makes the path
+         neo4j config aura get/set/list.
+      3. Verify that neo4j config aura set output still errors (output is not in
+         aura ValidConfigKeys), and that neo4j config aura get auth-url returns the correct value.
+      4. make build must succeed; grep for "aura config" in integration test output to confirm
+         the old path is gone and the new path works.
+    status: todo
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "neo4j aura config list returns an unknown command error"
+      - "neo4j config aura list shows aura keys (auth-url, base-url, default-tenant)"
+      - "neo4j config aura set auth-url <url> writes to aura.auth-url in config.json"
+      - "neo4j config aura set output json errors with 'invalid config key specified: output'"
+      - "aura.NewCmd no longer calls config.NewCmd(cfg)"
+      - "make build succeeds for both binaries"
