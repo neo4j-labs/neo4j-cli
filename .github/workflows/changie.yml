@@ -11,17 +11,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Compute next pre-release versions
+        id: prerelease
+        run: |
+          LAST_AURA=$(ls .changes/aura-cli/v*-alpha.[0-9]*.md 2>/dev/null \
+            | grep -oE 'alpha\.[0-9]+\.md' | grep -oE '[0-9]+' | sort -n | tail -1)
+          if [ -z "$LAST_AURA" ]; then
+            echo "aura=alpha.0" >> $GITHUB_OUTPUT
+          else
+            echo "aura=alpha.$((LAST_AURA + 1))" >> $GITHUB_OUTPUT
+          fi
+          LAST_NEO=$(ls .changes/neo4j-cli/v*-alpha.[0-9]*.md 2>/dev/null \
+            | grep -oE 'alpha\.[0-9]+\.md' | grep -oE '[0-9]+' | sort -n | tail -1)
+          if [ -z "$LAST_NEO" ]; then
+            echo "neo4j=alpha.0" >> $GITHUB_OUTPUT
+          else
+            echo "neo4j=alpha.$((LAST_NEO + 1))" >> $GITHUB_OUTPUT
+          fi
+          find .changes/aura-cli -name 'v*-*.md' -delete 2>/dev/null || true
+          find .changes/neo4j-cli -name 'v*-*.md' -delete 2>/dev/null || true
+
       - name: Batch aura-cli changes
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project aura-cli --prerelease alpha
+          args: batch auto --project aura-cli --prerelease ${{ steps.prerelease.outputs.aura }}
 
       - name: Batch neo4j-cli changes
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project neo4j-cli --prerelease alpha
+          args: batch auto --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
 
       - name: Merge changelogs
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
