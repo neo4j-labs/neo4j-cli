@@ -25,6 +25,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
 	cmd.AddCommand(auraCmd)
+	cmd.AddCommand(aura.NewCredentialCmd(cfg))
 	return cmd
 }
 
