@@ -155,14 +155,14 @@ tasks:
       helper.SetConfigValue("output", ...) instead. Known locations include
       subcommands/instance/get_test.go and multiple files under subcommands/deployment/. Run a
       grep to confirm no remaining references to "aura.output" exist in test files.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
       - "grep -r 'aura\\.output' in test files returns no results"
       - "All previously-passing instance and deployment tests still pass after the key rename"
       - "make test passes for the instance and deployment packages"
-    completed_at: null
+    completed_at: 2026-05-01T07:00:00Z
 
   - id: task-010
     title: "Update existing aura config command tests"

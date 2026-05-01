@@ -233,3 +233,30 @@ Key Decisions:
 - make test passes with all tests green; build succeeds for both binaries.
 
 Next Task: task-009
+
+================================================================================
+TASK-009: Update test files that set aura.output config value
+Date: 2026-05-01T07:00:00Z
+================================================================================
+
+Summary:
+Task-009 was already completed as part of task-001. When AuraConfig.Output() was
+removed and the "output" key moved to the top-level config, all test files in
+subcommands/instance/ and subcommands/deployment/ that called
+helper.SetConfigValue("aura.output", ...) were updated to use
+helper.SetConfigValue("output", ...) in the same task. Zero remaining references
+to "aura.output" exist in any test file. Instance and deployment tests pass.
+make test passes with all tests green.
+
+Files Changed:
+- No additional changes required (already applied in task-001)
+- neo4j-cli/aura/internal/subcommands/instance/get_test.go (verified: uses "output" not "aura.output")
+- neo4j-cli/aura/internal/subcommands/deployment/*_test.go (verified: all use "output" not "aura.output")
+
+Key Decisions:
+- When removing a config key requires updating test fixtures across many files, it is
+  more efficient to apply all changes in the same task that removes the key to avoid
+  intermediate compilation or test failures.
+- grep -rn 'aura\.output' in test files returns no results (confirmed).
+
+Next Task: task-010
