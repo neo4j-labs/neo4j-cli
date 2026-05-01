@@ -29,7 +29,7 @@ tasks:
       strip their version-header lines with `tail -n +2`, and write them as `### aura-cli` and
       `### neo4j-cli` subsections under `## Changes`. The `## Versions` section listing both
       binary versions must remain above the `## Changes` section.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "`release-notes.md` contains a `## Changes` section with a `### neo4j-cli` subsection populated from `.changes/neo4j-cli/<version>.md`."
       - "The version header line (`## vX.Y.Z - DATE`) is stripped from each project's body — only kind headings and bullet points appear."
       - "The script is POSIX-compatible bash (no bash-isms beyond what ubuntu runner provides)."
-    completed_at: null
+    completed_at: "2026-05-01T00:01:00Z"
 
   - id: task-003
     title: "Guard each project section so empty/missing change files are skipped gracefully"

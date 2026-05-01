@@ -43,14 +43,19 @@ jobs:
           NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
           AURA_VERSION="${{ steps.versions.outputs.aura }}"
           NEO4J_CHANGES_FILE=".changes/neo4j-cli/${NEO4J_VERSION}.md"
+          AURA_CHANGES_FILE=".changes/aura-cli/${AURA_VERSION}.md"
           # Extract the changelog body: skip the first line (## vX.Y.Z - DATE header)
           NEO4J_BODY=$(tail -n +2 "$NEO4J_CHANGES_FILE")
+          AURA_BODY=$(tail -n +2 "$AURA_CHANGES_FILE")
           {
             printf '## Versions\n\n'
             printf -- '- neo4j-cli: %s\n' "${NEO4J_VERSION}"
             printf -- '- aura-cli: %s\n' "${AURA_VERSION}"
             printf '\n## Changes\n\n'
+            printf '### neo4j-cli\n\n'
             printf '%s\n' "${NEO4J_BODY}"
+            printf '\n### aura-cli\n\n'
+            printf '%s\n' "${AURA_BODY}"
           } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Add env vars
