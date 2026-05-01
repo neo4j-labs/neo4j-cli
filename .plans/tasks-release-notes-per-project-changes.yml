@@ -13,13 +13,13 @@ tasks:
       If the working directory is inconsistent between steps, add an explicit `working-directory`
       or use an absolute path (`$GITHUB_WORKSPACE/release-notes.md`) in both the write and the
       GoReleaser `args`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "The 'Generate release notes' step writes `release-notes.md` to `$GITHUB_WORKSPACE` (the repo checkout root)."
       - "The GoReleaser step references the same path via `--release-notes=release-notes.md` (relative to workspace root, which is the default working directory)."
       - "No path mismatch exists that would cause GoReleaser to fall back to the commit message."
-    completed_at: null
+    completed_at: "2026-05-01T00:00:00Z"
 
   - id: task-002
     title: "Add per-project subsections under ## Changes in release-notes.md"

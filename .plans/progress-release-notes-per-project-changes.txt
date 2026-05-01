@@ -1,0 +1,22 @@
+================================================================================
+TASK-001: Verify release-notes.md is written to workspace root and found by GoReleaser
+Date: 2026-05-01T00:00:00Z
+================================================================================
+
+Summary:
+Audited the "Generate release notes" step in .github/workflows/release.yml. Both the
+write step and GoReleaser step were already using consistent paths (both relative to
+$GITHUB_WORKSPACE). Made the write path explicit by using "$GITHUB_WORKSPACE/release-notes.md"
+instead of a bare relative path, removing any ambiguity if a working-directory override
+were ever added to a step.
+
+Files Changed:
+- .github/workflows/release.yml (modified: write path for release-notes.md is now explicit $GITHUB_WORKSPACE/release-notes.md)
+
+Key Decisions:
+- GoReleaser `--release-notes=release-notes.md` kept as relative path — goreleaser-action
+  runs from workspace root, so it resolves correctly and the action's `args:` field doesn't
+  support $GITHUB_WORKSPACE expansion.
+- Write step uses absolute path to be unambiguous regardless of future working-directory changes.
+
+Next Task: task-002

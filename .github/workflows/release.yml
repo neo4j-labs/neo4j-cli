@@ -51,7 +51,7 @@ jobs:
             printf -- '- aura-cli: %s\n' "${AURA_VERSION}"
             printf '\n## Changes\n\n'
             printf '%s\n' "${NEO4J_BODY}"
-          } > release-notes.md
+          } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Add env vars
         run: |
