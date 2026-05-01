@@ -12,6 +12,8 @@ LINT COMMANDS: [`make lint`]
 FORMAT COMMANDS: [`make fmt`]
 LICENSE CHECK: [`make license-check`]
 
+**Always run `make test` as the final gate before marking any task or plan complete.** All tests must pass — a build that compiles but has failing tests is not done.
+
 ## Project Overview
 
 PRIMARY LANGUAGES: [Go]
@@ -40,6 +42,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details.
 - Run with `go test ./...`; CI runs on ubuntu, windows, and macos
 - Mock HTTP server and filesystem helpers live in `neo4j-cli/aura/internal/test/testutils/`
 - `neo4j-cli/` (the super-CLI package) has no test files; this is a pre-existing gap
+- **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 
 ## Architecture
 
@@ -76,6 +79,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 - One positional argument max; extras become flags
 - `--output json|table` for all read commands
 - `--await` flag for async operations
+- Follow CLI best practices from https://clig.dev/ — source at https://github.com/cli-guidelines/cli-guidelines/blob/main/content/_index.md (fetch the raw markdown for token-efficient reference)
 
 ## Deployment
 
