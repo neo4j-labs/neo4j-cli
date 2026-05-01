@@ -28,8 +28,6 @@ jobs:
           else
             echo "neo4j=alpha.$((LAST_NEO + 1))" >> $GITHUB_OUTPUT
           fi
-          find .changes/aura-cli -name 'v*-*.md' -delete 2>/dev/null || true
-          find .changes/neo4j-cli -name 'v*-*.md' -delete 2>/dev/null || true
 
       - name: Detect unreleased changes per project
         id: detect
