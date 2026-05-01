@@ -50,9 +50,9 @@ func TestSetBetaEnabledConfig(t *testing.T) {
 
 	helper.ExecuteCommand("config set beta-enabled true")
 
-	helper.AssertConfigValue("aura.beta-enabled", "true")
+	helper.AssertErr("Error: invalid config key specified: beta-enabled")
 
 	helper.ExecuteCommand("config set beta-enabled false")
 
-	helper.AssertConfigValue("aura.beta-enabled", "false")
+	helper.AssertErr("Error: invalid config key specified: beta-enabled")
 }

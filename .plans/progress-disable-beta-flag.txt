@@ -19,3 +19,25 @@ Key Decisions:
 - Tests for config set/list/get beta-enabled now break; these will be fixed in task-002 and task-003.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Update config set tests to expect invalid-key error for beta-enabled
+Date: 2026-05-01T00:20:00Z
+================================================================================
+
+Summary:
+Updated TestSetBetaEnabledConfig in set_test.go to assert that both
+`config set beta-enabled true` and `config set beta-enabled false` return
+`Error: invalid config key specified: beta-enabled`, matching the behaviour of
+any unrecognised key. Replaced AssertConfigValue calls with AssertErr calls.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (modified: replaced
+  AssertConfigValue assertions with AssertErr for both beta-enabled set cases)
+
+Key Decisions:
+- Used the same error message format as TestSetConfigWithInvalidConfigKey for
+  consistency.
+- Both the `true` and `false` cases now assert the same invalid-key error.
+
+Next Task: task-003

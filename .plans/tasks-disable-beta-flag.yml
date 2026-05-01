@@ -33,7 +33,7 @@ tasks:
       `config set beta-enabled false` are both asserted to return
       `Error: invalid config key specified: beta-enabled`, matching the behaviour
       of any unrecognised key. Remove assertions that the config value was written.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "TestSetBetaEnabledConfig asserts an error for `config set beta-enabled false`"
       - "Error message matches \"Error: invalid config key specified: beta-enabled\""
       - "`make test` passes"
-    completed_at: null
+    completed_at: "2026-05-01T00:20:00Z"
 
   - id: task-003
     title: "Update config list test to exclude beta-enabled from expected output"
