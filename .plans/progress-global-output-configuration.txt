@@ -260,3 +260,30 @@ Key Decisions:
 - grep -rn 'aura\.output' in test files returns no results (confirmed).
 
 Next Task: task-010
+
+================================================================================
+TASK-010: Update existing aura config command tests
+Date: 2026-05-01T08:00:00Z
+================================================================================
+
+Summary:
+Task-010 was already completed as part of earlier tasks. The three test files in
+neo4j-cli/aura/internal/subcommands/config/ already match the new behaviour:
+- list_test.go: expected JSON has no "output" field (applied in task-001)
+- get_test.go: 'config get output' asserts an error via AssertErr (applied in task-001)
+- set_test.go: error message matches 'invalid config key specified: output' (applied in task-006)
+All acceptance criteria are met and make test passes with zero failures for the config package.
+
+Files Changed:
+- No additional changes required (already applied in task-001 and task-006)
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (verified: no "output" in expected JSON)
+- neo4j-cli/aura/internal/subcommands/config/get_test.go (verified: 'config get output' expects error)
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (verified: error is 'invalid config key specified: output')
+
+Key Decisions:
+- Changes were absorbed into task-001 (list/get test updates) and task-006 (set test update)
+  to maintain compilation and test passing throughout the implementation sequence.
+- When upstream tasks absorb a downstream task's changes, the downstream task can be marked
+  completed in verification mode with no new file changes.
+
+Next Task: task-011

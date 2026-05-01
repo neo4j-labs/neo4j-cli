@@ -172,7 +172,7 @@ tasks:
       update the test for 'config get output' to expect an error (invalid key); set_test.go
       should update the expected error message for 'config set output invalid' since the error
       now fires on the key check before the value check.
-    status: pending
+    status: completed
     dependencies:
       - task-006
       - task-008
@@ -181,7 +181,7 @@ tasks:
       - "get_test.go test for 'config get output' asserts an error is returned"
       - "set_test.go error assertion matches the new 'invalid config key specified: output' message"
       - "make test passes for the config package"
-    completed_at: null
+    completed_at: 2026-05-01T08:00:00Z
 
   - id: task-011
     title: "Add tests for the new neo4j config commands"
