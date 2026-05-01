@@ -101,6 +101,7 @@ type AuraConfig struct {
 	pollingOverride PollingConfig
 	ValidConfigKeys []string
 	Projects        *projects.AuraConfigProjects
+	betaEnabled     bool
 }
 
 type PollingConfig struct {
@@ -213,8 +214,12 @@ func (config *AuraConfig) BindOutput(flag *pflag.Flag) {
 	}
 }
 
+func (config *AuraConfig) SetBetaEnabled(enabled bool) {
+	config.betaEnabled = enabled
+}
+
 func (config *AuraConfig) AuraBetaEnabled() bool {
-	return false
+	return config.betaEnabled
 }
 
 func (config *AuraConfig) DefaultTenant() string {
