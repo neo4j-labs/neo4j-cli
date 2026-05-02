@@ -20,7 +20,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(NewGetCmd(cfg))
 	cmd.AddCommand(NewListCmd(cfg))
 	cmd.AddCommand(NewSetCmd(cfg))
-	cmd.AddCommand(aura.NewAuraConfigCmd(cfg))
+	if cfg.Aura.AuraBetaEnabled() {
+		cmd.AddCommand(aura.NewAuraProjectCmd(cfg))
+	}
 
 	return cmd
 }

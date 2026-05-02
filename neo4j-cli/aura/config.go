@@ -5,15 +5,12 @@ package aura
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config/project"
 	"github.com/spf13/cobra"
 )
 
-// NewAuraConfigCmd returns the aura config command mounted under the "aura"
-// use-name, suitable for nesting under the neo4j root as "neo4j config aura".
-func NewAuraConfigCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := config.NewCmd(cfg)
-	cmd.Use = "aura"
-	cmd.Short = "Manage and view Aura-specific configuration values"
-	return cmd
+// NewAuraProjectCmd returns the project subcommand, suitable for mounting
+// directly under the neo4j config command.
+func NewAuraProjectCmd(cfg *clicfg.Config) *cobra.Command {
+	return project.NewCmd(cfg)
 }
