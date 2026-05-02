@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add top-level `neo4j config` commands (`config get`, `config set`, `config list`) supporting dot-notation keys (e.g. `neo4j config get aura.base-url`, `neo4j config get output`)
+time: 2026-05-02T21:41:55.788929+01:00

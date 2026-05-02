@@ -1,0 +1,4 @@
+project: aura-cli
+kind: Minor
+body: '`--output` flag now applies uniformly to config and credential commands; `aura credential list` now renders as a table by default with `name`, `type`, and `identifier` columns (sensitive fields omitted)'
+time: 2026-05-02T21:41:58.128848+01:00
