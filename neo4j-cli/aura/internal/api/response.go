@@ -14,7 +14,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
-	output "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/common/output"
 )
 
 type ErrorResponse struct {

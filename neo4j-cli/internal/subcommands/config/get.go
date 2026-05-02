@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
-	output "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
 

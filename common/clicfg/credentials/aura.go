@@ -5,7 +5,6 @@ package credentials
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -123,7 +122,7 @@ func (c *AuraCredentials) credentialExists(name string) bool {
 }
 
 // PrintableAuraCredentials wraps a slice of AuraCredential and satisfies the
-// common/output.ResponseData interface (AsArray + GetSingleOrError) via
+// common/output.ResponseData interface (AsArray) via
 // structural typing, so PrintBodyMap can render it as a table or JSON.
 type PrintableAuraCredentials []*AuraCredential
 
@@ -139,19 +138,6 @@ func (d PrintableAuraCredentials) AsArray() []map[string]any {
 		}
 	}
 	return result
-}
-
-// GetSingleOrError returns the single credential map, or an error if the slice
-// does not contain exactly one entry.
-func (d PrintableAuraCredentials) GetSingleOrError() (map[string]any, error) {
-	if len(d) != 1 {
-		return nil, fmt.Errorf("expected exactly 1 credential, got %d", len(d))
-	}
-	return map[string]any{
-		"name":       d[0].Name,
-		"type":       "aura-client",
-		"identifier": d[0].ClientId,
-	}, nil
 }
 
 // MarshalJSON renders CredentialData as a JSON array of objects with name, type,

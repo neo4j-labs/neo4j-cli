@@ -123,7 +123,6 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 				MaxRetries: 60,
 				Interval:   20,
 			},
-			// TODO: just append global here if just aura scope?
 			ValidConfigKeys: validAuraConfigKeys,
 			Projects:        projects,
 		},
@@ -259,12 +258,12 @@ func (config *AuraConfig) IsValidConfigKey(key string) bool {
 }
 
 func (config *AuraConfig) Get(key string) interface{} {
-	// Bit of a hack for a global config key
-	// TODO: refactor this for global config keys to be properly namespaced (e.g. "output" vs "aura.output") and remove this special case
+	// Bit of a hack for a global config key - it's fine with just the one value but if we're adding more we should refactor
+	// TODO: refactor this for global config keys to be properly namespaced (i.e. "output" vs "aura.output") and remove this special case
 	if key == "output" {
 		return config.viper.Get(key)
 	}
-	// TODO: also clean up this hack for aura-projects key
+	// TODO: this hack should be fixed by renaming to aura.projects
 	if key == "aura-projects" {
 		return config.viper.Get(key)
 	}
