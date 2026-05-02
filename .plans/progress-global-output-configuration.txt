@@ -376,3 +376,36 @@ Key Decisions:
   re-enabled easily for a future stable-release upgrade path.
 
 Next Task: task-014
+
+================================================================================
+TASK-014: Extract ResponseData interface and rendering logic to common/output
+Date: 2026-05-02T10:00:00Z
+================================================================================
+
+Summary:
+Created common/output/output.go with the ResponseData interface and core rendering
+functions (PrintBodyMap, printTable, getNestedField). Replaced the ResponseData
+interface definition in api/response.go with a type alias (type ResponseData =
+common_output.ResponseData) so all existing api.ResponseData callers continue to
+compile without any import changes. Replaced the implementation in
+aura/internal/output/output.go with a thin shim (PrintBodyMap delegates to
+common_output.PrintBodyMap) and kept PrintBody as the parse-and-delegate adapter.
+Both make build and make test pass with zero failures. Documented the design in
+AGENTS.md under "Output Rendering Notes".
+
+Files Changed:
+- common/output/output.go (created: ResponseData interface, PrintBodyMap, printTable, getNestedField)
+- neo4j-cli/aura/internal/api/response.go (modified: ResponseData replaced with type alias to common/output.ResponseData, added import)
+- neo4j-cli/aura/internal/output/output.go (modified: replaced implementation with shim + PrintBody adapter, removed unused imports)
+- AGENTS.md (modified: added Output Rendering Notes section)
+
+Key Decisions:
+- Used a Go type alias (type ResponseData = common_output.ResponseData) instead of
+  removing api.ResponseData entirely, allowing all existing api.ResponseData call
+  sites (including tenant/get.go function signatures) to compile without changes.
+- api.ParseBody stays in aura/internal/api/response.go since it's tightly coupled
+  to the Aura HTTP response format.
+- The shim in aura/internal/output/output.go ensures PrintBody call sites need no
+  import changes while the real logic now lives in common/output.
+
+Next Task: task-015

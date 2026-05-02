@@ -270,7 +270,8 @@ tasks:
       5. Document the common/output package design in AGENTS.md under a new
          "Output Rendering Notes" section: interface in common, parse logic stays in api,
          thin adapter in aura/internal/output.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T10:00:00Z
     dependencies:
       - task-012
     acceptance_criteria:
