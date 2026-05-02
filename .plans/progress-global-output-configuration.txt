@@ -595,3 +595,41 @@ Key Decisions:
   since make lint was already failing before this task.
 
 Next Task: task-020
+
+================================================================================
+TASK-020: Update credential commands to respect --output flag using PrintBodyMap
+Date: 2026-05-02T15:00:00Z
+================================================================================
+
+Summary:
+Added CredentialData type to common/clicfg/credentials/aura.go that satisfies
+common/output.ResponseData via structural typing (AsArray, GetSingleOrError,
+MarshalJSON). Replaced cfg.Credentials.Aura.Print() calls in both credential
+list commands (neo4j credential list aura-client and aura-cli credential list)
+with output.PrintBodyMap using CredentialData. Updated pre-existing test cases
+in credential_test.go to match new table/json output format and added
+RegisterOutputFlag to the test helper. Added new table-driven list_test.go in
+the credential subcommand package covering json, table, default, and empty cases.
+
+Files Changed:
+- common/clicfg/credentials/aura.go (added CredentialData type with AsArray, GetSingleOrError, MarshalJSON)
+- neo4j-cli/aura/credential.go (replaced Print with PrintBodyMap using CredentialData)
+- neo4j-cli/aura/internal/subcommands/credential/list.go (replaced Print with PrintBodyMap using CredentialData)
+- neo4j-cli/aura/credential_test.go (updated existing tests for new output format, added RegisterOutputFlag)
+- neo4j-cli/aura/internal/subcommands/credential/list_test.go (created: table-driven tests for credential list)
+
+Key Decisions:
+- CredentialData defined in common/clicfg/credentials/ (not in the subcommand package)
+  so both command paths (neo4j credential.go and aura/internal credential) can use it
+  without duplication and without import cycles.
+- common/clicfg/credentials cannot import common/output due to cycle (common/output
+  imports common/clicfg which imports common/clicfg/credentials). CredentialData
+  satisfies ResponseData via structural typing without importing common/output.
+- Sensitive fields (client-secret, access-token, token-expiry) are omitted from both
+  table and JSON rendering - only name and client-id are shown.
+- MarshalJSON returns a JSON array (not an object) matching AsArray output, so JSON
+  and table renderings are consistent.
+- Pre-existing tests in credential_test.go updated to expect table output in default
+  mode (was JSON with all fields; now table with name/client-id only).
+
+Next Task: All tasks complete

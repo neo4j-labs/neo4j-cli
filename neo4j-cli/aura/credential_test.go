@@ -16,6 +16,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -33,6 +34,7 @@ type credentialTestHelper struct {
 
 func newCredentialTestHelper(t *testing.T) credentialTestHelper {
 	t.Helper()
+	cobra.EnableTraverseRunHooks = true
 	return credentialTestHelper{
 		out: bytes.NewBufferString(""),
 		err: bytes.NewBufferString(""),
@@ -63,6 +65,7 @@ func (h *credentialTestHelper) executeCommand(command string) {
 	cfg := clicfg.NewConfig(fs, "test")
 
 	cmd := aura.NewCredentialCmd(cfg)
+	aura.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
@@ -168,24 +171,37 @@ func TestCredentialAddAuraClient(t *testing.T) {
 func TestCredentialListAuraClient(t *testing.T) {
 	tests := []struct {
 		name         string
+		command      string
 		initialCreds []map[string]string
 		wantOut      string
+		wantContains []string
 	}{
 		{
-			name:         "lists all stored credentials",
+			name:         "lists all stored credentials as table (default)",
+			command:      "list aura-client",
+			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
+			wantContains: []string{"NAME", "CLIENT-ID", "test", "testclientid"},
+		},
+		{
+			name:         "lists all stored credentials as json",
+			command:      "list aura-client --output json",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantOut: `[
 	{
-		"name": "test",
 		"client-id": "testclientid",
-		"client-secret": "testclientsecret",
-		"access-token": "",
-		"token-expiry": 0
+		"name": "test"
 	}
 ]`,
 		},
 		{
-			name:         "lists empty credentials",
+			name:         "lists empty credentials as table (default)",
+			command:      "list aura-client",
+			initialCreds: []map[string]string{},
+			wantContains: []string{"NAME", "CLIENT-ID"},
+		},
+		{
+			name:         "lists empty credentials as json",
+			command:      "list aura-client --output json",
 			initialCreds: []map[string]string{},
 			wantOut:      "[]",
 		},
@@ -196,10 +212,20 @@ func TestCredentialListAuraClient(t *testing.T) {
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand("list aura-client")
+			h.executeCommand(tc.command)
 
 			h.assertErr("")
-			h.assertOut(tc.wantOut)
+			if tc.wantOut != "" {
+				h.assertOut(tc.wantOut)
+			}
+			if len(tc.wantContains) > 0 {
+				out, err := io.ReadAll(h.out)
+				assert.Nil(t, err)
+				outStr := string(out)
+				for _, want := range tc.wantContains {
+					assert.Contains(t, outStr, want)
+				}
+			}
 		})
 	}
 }

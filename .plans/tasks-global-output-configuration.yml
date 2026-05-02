@@ -487,7 +487,8 @@ tasks:
       5. Add or update tests to cover --output table and --output json for credential list
          (table-driven, per-command files per REQ-NF-006).
       6. Run make test to confirm no regressions.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T15:00:00Z
     dependencies:
       - task-019
     acceptance_criteria:
