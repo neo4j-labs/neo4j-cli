@@ -54,7 +54,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			outputType := cfg.Aura.Output()
+			outputType := cfg.Global.Output()
 
 			if statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "import_type", "info:state", "info:exit_status:state", "info:percentage_complete", "data_source:name", "aura_target:db_id"})

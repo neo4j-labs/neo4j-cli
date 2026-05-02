@@ -5,6 +5,8 @@ package aura
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -82,7 +84,8 @@ func newCredentialListAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "aura-client",
 		Short: "Lists Aura client credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Aura.Print(cmd.OutOrStdout())
+			output.PrintBodyMap(cmd, cfg, credentials.PrintableAuraCredentials(cfg.Credentials.Aura.Printable()), []string{"name", "type", "identifier"})
+			return nil
 		},
 	}
 }

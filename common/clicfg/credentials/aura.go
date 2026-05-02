@@ -5,7 +5,6 @@ package credentials
 
 import (
 	"encoding/json"
-	"io"
 	"time"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -17,19 +16,8 @@ type AuraCredentials struct {
 	onUpdate          func()
 }
 
-func (c *AuraCredentials) List() []*AuraCredential {
+func (c *AuraCredentials) Printable() PrintableAuraCredentials {
 	return c.Credentials
-}
-
-func (config *AuraCredentials) Print(writer io.Writer) error {
-	encoder := json.NewEncoder(writer)
-	encoder.SetIndent("", "\t")
-
-	if err := encoder.Encode(config.Credentials); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *AuraCredentials) Add(name string, clientId string, clientSecret string) error {
@@ -131,6 +119,31 @@ func (c *AuraCredentials) credentialExists(name string) bool {
 		}
 	}
 	return false
+}
+
+// PrintableAuraCredentials wraps a slice of AuraCredential and satisfies the
+// common/output.ResponseData interface (AsArray) via
+// structural typing, so PrintBodyMap can render it as a table or JSON.
+type PrintableAuraCredentials []*AuraCredential
+
+// AsArray returns each credential as a {"name": ..., "type": ..., "identifier": ...}
+// map for table rendering. Sensitive fields (client-secret, access-token) are omitted.
+func (d PrintableAuraCredentials) AsArray() []map[string]any {
+	result := make([]map[string]any, len(d))
+	for i, cred := range d {
+		result[i] = map[string]any{
+			"name":       cred.Name,
+			"type":       "aura-client",
+			"identifier": cred.ClientId,
+		}
+	}
+	return result
+}
+
+// MarshalJSON renders CredentialData as a JSON array of objects with name, type,
+// and identifier fields, matching what the table renders.
+func (d PrintableAuraCredentials) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.AsArray())
 }
 
 type AuraCredential struct {

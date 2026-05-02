@@ -78,10 +78,8 @@ archives:
         formats:
           - zip
 
-changelog:
-  disable: true
-
 release:
+  prerelease: true
   extra_files:
     - glob: CHANGELOG-aura.md
     - glob: CHANGELOG-neo4j.md

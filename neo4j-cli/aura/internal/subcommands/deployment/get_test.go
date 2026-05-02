@@ -44,7 +44,7 @@ func TestGetDeployment(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -108,7 +108,7 @@ func TestGetDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s", deploymentId))
 
@@ -173,7 +173,7 @@ func TestGetDeploymentWithTableOutput(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "default")
+	helper.SetConfigValue("output", "default")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -201,7 +201,7 @@ func TestGetDeploymentWithMissingProjectId(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s", deploymentId, organizationId))
 
 	mockHandler.AssertCalledTimes(0)
@@ -222,7 +222,7 @@ func TestGetDeploymentWithMissingOrganizationId(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --project-id=%s", deploymentId, projectId))
 
 	mockHandler.AssertCalledTimes(0)
@@ -243,7 +243,7 @@ func TestGetDeploymentWithMissingArgs(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get --organization-id=%s --project-id=%s", organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(0)
@@ -264,7 +264,7 @@ func TestGetDeploymentWithInvalidDeploymentId(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -286,7 +286,7 @@ func TestGetDeploymentWhenDeploymentDoesNotExist(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("aura.output", "json")
+	helper.SetConfigValue("output", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)

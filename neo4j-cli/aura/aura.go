@@ -4,13 +4,13 @@
 package aura
 
 import (
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/deployment"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
 	_import "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/import"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/dataapi"
@@ -25,7 +25,6 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: cfg.Version,
 	}
 
-	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(customermanagedkey.NewCmd(cfg))
 	cmd.AddCommand(instance.NewCmd(cfg))
 	cmd.AddCommand(tenant.NewCmd(cfg))
@@ -41,6 +40,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := NewCmd(cfg)
+	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCmd(cfg))
 	return cmd
 }

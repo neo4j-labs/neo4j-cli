@@ -1,0 +1,501 @@
+feature: global-output-configuration
+prd: ./prd-global-output-configuration.md
+created_at: 2026-05-01T00:00:00Z
+updated_at: 2026-05-02T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add GlobalConfig struct and migrate output key in clicfg"
+    description: |
+      Add a GlobalConfig struct to common/clicfg/clicfg.go backed by the same viper instance as
+      AuraConfig. Wire it onto Config as cfg.Global. Implement Output(), BindOutput(), Get(), Set(),
+      IsValidConfigKey(), and Print() methods operating on the top-level "output" viper key.
+      Change setDefaultValues to use Viper.SetDefault("output", "default") instead of "aura.output".
+      Remove "output" from AuraConfig.ValidConfigKeys and remove Output() and BindOutput() from
+      AuraConfig. Add a silent one-time migration block in NewConfig: if viper.IsSet("aura.output")
+      and !viper.IsSet("output"), move the value to the top-level key via sjson and delete "aura.output".
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "cfg.Global is non-nil after NewConfig and cfg.Global.Output() returns \"default\" with an empty config"
+      - "cfg.Global.Set(\"output\", \"json\") writes {\"output\":\"json\"} at the JSON root (not under \"aura\")"
+      - "A config.json containing {\"aura\":{\"output\":\"json\"}} is silently migrated to {\"output\":\"json\"} on first NewConfig call"
+      - "cfg.Aura.Output() and cfg.Aura.BindOutput() no longer exist; callers that reference them fail to compile"
+      - "\"output\" is absent from AuraConfig.ValidConfigKeys"
+    completed_at: 2026-05-01T00:00:00Z
+
+  - id: task-002
+    title: "Extract registerOutputFlag helper and update output.go"
+    description: |
+      Create a shared helper function registerOutputFlag(cmd *cobra.Command, cfg *clicfg.Config)
+      in a new package or alongside the entry-point code. The function registers --output as a
+      PersistentFlag on cmd, then sets PersistentPreRunE to validate the flag value against
+      ValidOutputValues and call cfg.Global.BindOutput. Also update neo4j-cli/aura/internal/output/output.go
+      to call cfg.Global.Output() instead of cfg.Aura.Output() (line 20).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "registerOutputFlag exists and can be called with any cobra.Command root without error"
+      - "Passing an invalid --output value via the registered PersistentPreRunE returns a usage error"
+      - "output.go compiles with cfg.Global.Output() and no longer references cfg.Aura.Output()"
+      - "PrintBodyMap still routes json/table/default correctly based on cfg.Global.Output()"
+    completed_at: 2026-05-01T01:00:00Z
+
+  - id: task-003
+    title: "Wire EnableTraverseRunHooks and registerOutputFlag into both binary entry points"
+    description: |
+      In neo4j-cli/main.go NewCmd(), call registerOutputFlag on the neo4j root command and add
+      cmd.AddCommand for the future config package. Set cobra.EnableTraverseRunHooks = true in
+      main() before cmd.Execute(). Apply the same changes in neo4j-cli/aura/cmd/main.go: call
+      registerOutputFlag on the standalone root returned by aura.NewStandaloneCmd and set
+      cobra.EnableTraverseRunHooks = true before cmd.Execute(). This ensures the root-level output
+      hook runs for every command in every binary even when child PersistentPreRunE hooks are present.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "cobra.EnableTraverseRunHooks = true appears in both main() functions before Execute()"
+      - "registerOutputFlag is called on the neo4j root in neo4j-cli/main.go"
+      - "registerOutputFlag is called on the standalone aura-cli root in neo4j-cli/aura/cmd/main.go"
+      - "make build succeeds for both binaries"
+    completed_at: 2026-05-01T02:00:00Z
+
+  - id: task-004
+    title: "Strip output logic from 8 resource-group PersistentPreRunE hooks"
+    description: |
+      In each of the 8 resource-group parent commands, remove the --output PersistentFlag
+      registration, the output value validation block, and the cfg.Aura.BindOutput call. Retain
+      only the base-url and auth-url binding logic. The files are: instance/instance.go,
+      tenant/tenant.go, customermanagedkey/customermanagedkey.go, graphanalytics/graphanalytics.go,
+      graphanalytics/session/session.go, import/import.go, dataapi/data_api.go, deployment/deployment.go.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "None of the 8 files contains a --output PersistentFlag registration or BindOutput call"
+      - "Each file's PersistentPreRunE retains base-url and auth-url binding where applicable"
+      - "make build succeeds after removals"
+      - "grep -r 'BindOutput\\|Lookup.*output' across the 8 files returns no results"
+    completed_at: 2026-05-01T00:00:00Z
+
+  - id: task-005
+    title: "Migrate direct cfg.Aura.Output() call sites"
+    description: |
+      Two files call cfg.Aura.Output() directly rather than going through output.PrintBodyMap:
+      subcommands/import/job/get.go (2 calls) and subcommands/tenant/get.go (1 call). Change
+      each call to cfg.Global.Output() so they read from the new top-level config key.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "No file in neo4j-cli/aura/internal/subcommands/ references cfg.Aura.Output()"
+      - "import/job/get.go and tenant/get.go reference cfg.Global.Output() for format decisions"
+      - "make build succeeds"
+    completed_at: 2026-05-01T03:00:00Z
+
+  - id: task-006
+    title: "Remove output from aura config ValidConfigKeys and fix aura config commands"
+    description: |
+      With "output" already removed from AuraConfig.ValidConfigKeys in task-001, verify that
+      neo4j aura config set output <value> and neo4j aura config get output return the expected
+      error. Update neo4j-cli/aura/internal/subcommands/config/list.go and get.go so they
+      respect the global output setting for their own rendered output (using cfg.Global.Output()
+      to choose between JSON and table rendering), since they currently always emit JSON via
+      json.NewEncoder directly.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "neo4j aura config set output json returns 'invalid config key specified: output'"
+      - "neo4j aura config list no longer includes an output key in its output"
+      - "neo4j aura config list rendered output respects the global output setting (table vs json)"
+      - "neo4j aura config get auth-url rendered output respects the global output setting"
+    completed_at: 2026-05-01T04:00:00Z
+
+  - id: task-007
+    title: "Create neo4j config get/set/list command package"
+    description: |
+      Create neo4j-cli/internal/subcommands/config/ with config.go (NewCmd assembling subcommands),
+      get.go (validates key, prints cfg.Global.Get(key) respecting output format), set.go (validates
+      key and value, calls cfg.Global.Set), and list.go (calls cfg.Global.Print or equivalent,
+      respecting output format). Register the package in neo4j-cli/main.go NewCmd() with
+      cmd.AddCommand(config.NewCmd(cfg)). Mirror the structure of the existing aura config package.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "neo4j config get output returns the current configured value"
+      - "neo4j config set output json writes {\"output\":\"json\"} at the JSON root"
+      - "neo4j config set output invalid returns a validation error"
+      - "neo4j config set unknown-key value returns a usage error"
+      - "neo4j config list --output table renders as a table; neo4j config list --output json renders as JSON"
+    completed_at: 2026-05-01T05:00:00Z
+
+  - id: task-008
+    title: "Update test helper default config fixture"
+    description: |
+      In neo4j-cli/aura/internal/test/testutils/auratesthelper.go, move "output": "json" from
+      inside the "aura": {...} block to the top level of the embedded config JSON string in
+      NewAuraTestHelper. This single change propagates the correct default to all tests that use
+      NewAuraTestHelper without additional changes.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The embedded config string in NewAuraTestHelper has \"output\": \"json\" at the top level, not under \"aura\""
+      - "The \"aura\" object in the embedded config no longer contains an \"output\" key"
+      - "make test compiles (whether or not all tests pass yet)"
+    completed_at: 2026-05-01T06:00:00Z
+
+  - id: task-009
+    title: "Update test files that set aura.output config value"
+    description: |
+      Find and update all test files that call helper.SetConfigValue("aura.output", ...) to use
+      helper.SetConfigValue("output", ...) instead. Known locations include
+      subcommands/instance/get_test.go and multiple files under subcommands/deployment/. Run a
+      grep to confirm no remaining references to "aura.output" exist in test files.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "grep -r 'aura\\.output' in test files returns no results"
+      - "All previously-passing instance and deployment tests still pass after the key rename"
+      - "make test passes for the instance and deployment packages"
+    completed_at: 2026-05-01T07:00:00Z
+
+  - id: task-010
+    title: "Update existing aura config command tests"
+    description: |
+      Update three test files in neo4j-cli/aura/internal/subcommands/config/ to match the new
+      behaviour: list_test.go should drop "output" from the expected JSON; get_test.go should
+      update the test for 'config get output' to expect an error (invalid key); set_test.go
+      should update the expected error message for 'config set output invalid' since the error
+      now fires on the key check before the value check.
+    status: completed
+    dependencies:
+      - task-006
+      - task-008
+    acceptance_criteria:
+      - "list_test.go expected JSON no longer contains an output field"
+      - "get_test.go test for 'config get output' asserts an error is returned"
+      - "set_test.go error assertion matches the new 'invalid config key specified: output' message"
+      - "make test passes for the config package"
+    completed_at: 2026-05-01T08:00:00Z
+
+  - id: task-011
+    title: "Add tests for the new neo4j config commands"
+    description: |
+      Create neo4j-cli/internal/subcommands/config/config_test.go. Tests should use an equivalent
+      test helper to AuraTestHelper wired to the neo4j root NewCmd. Cover: config get output returns
+      "default" with empty config; config set output json writes the correct key; config set output
+      invalid errors; config set unknown-key errors; config list returns the expected shape; output
+      flag overrides the rendered format for get and list; the silent aura.output migration is tested
+      via a config fixture with the old key.
+    status: completed
+    dependencies:
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "All acceptance criteria from REQ-F-001 through REQ-F-004 and REQ-F-010 through REQ-F-012 are covered by tests"
+      - "Tests verify table rendering when --output table is passed to config list"
+      - "Tests verify JSON rendering when --output json is passed to config get"
+      - "make test passes for the new neo4j-cli/internal/subcommands/config package"
+    completed_at: 2026-05-01T11:00:00Z
+
+  - id: task-012
+    title: "Update clicfg_test.go config fixture and run full test suite"
+    description: |
+      Update common/clicfg/clicfg_test.go to move any "output" fixture value from under "aura"
+      to the top level of the JSON config, matching the new storage layout. After all previous
+      tasks are complete, run make test to confirm the entire test suite passes with no regressions.
+      Fix any remaining compilation errors or test failures surfaced by the full run.
+    status: completed
+    dependencies:
+      - task-009
+      - task-010
+      - task-011
+    acceptance_criteria:
+      - "clicfg_test.go config fixture has \"output\" at the JSON root, not under \"aura\""
+      - "make test passes with zero failures across all packages"
+      - "make build produces working binaries for both neo4j-cli and aura-cli"
+      - "No file in the repo references cfg.Aura.Output() or cfg.Aura.BindOutput()"
+    completed_at: 2026-05-01T12:00:00Z
+
+  - id: task-013
+    title: "Comment out the one-time aura.output migration block"
+    description: |
+      In common/clicfg/clicfg.go, comment out the entire migration block (lines ~70-90) that
+      silently moves aura.output → output on first run. Add a comment above the block explaining
+      that this code is untested, has never run in this experimental release, and is preserved as
+      reference code for a future stable-release upgrade path. The block must not execute because
+      users may switch between the stable CLI (which still uses aura.output) and this experimental
+      version; running the migration would corrupt stable-version config files.
+      Also remove or comment out the corresponding test cases in config_test.go that assert the
+      migration behaviour (TestConfigMigrationAuraOutputToTopLevel, TestConfigMigrationAuraOutputStoredAtTopLevel),
+      replacing them with a comment explaining they are disabled alongside the migration code.
+    status: completed
+    completed_at: 2026-05-02T00:00:00Z
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "The migration block in NewConfig is fully commented out with an explanatory comment"
+      - "No migration-related code executes when NewConfig is called with a config that has aura.output set"
+      - "Migration test cases in config_test.go are commented out (not deleted) with an explanatory note"
+      - "make test passes after the change"
+
+  - id: task-014
+    title: "Extract ResponseData interface and rendering logic to common/output"
+    description: |
+      Extract the ResponseData interface and core rendering logic from the aura-specific packages
+      into a new common/output package so all sub-CLIs can share it.
+
+      Steps:
+      1. Create common/output/output.go with the copyright header and package declaration.
+         Move into it:
+         - The ResponseData interface (currently in neo4j-cli/aura/internal/api/response.go)
+         - PrintBodyMap, printTable, getNestedField (currently in neo4j-cli/aura/internal/output/output.go)
+         Function signatures use common/output.ResponseData instead of api.ResponseData.
+      2. Update neo4j-cli/aura/internal/api/response.go: remove the ResponseData interface
+         definition (ListResponseData and SingleValueResponseData already satisfy the new
+         common/output.ResponseData via structural typing — no code changes needed to the
+         implementations themselves, just remove the now-redundant local interface).
+      3. Update neo4j-cli/aura/internal/output/output.go: keep only PrintBody (which calls
+         api.ParseBody and delegates to common/output.PrintBodyMap). Add a re-export shim:
+           func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values output.ResponseData, fields []string) {
+               output.PrintBodyMap(cmd, cfg, values, fields)
+           }
+         so that all existing call sites continue to compile without import changes.
+      4. Confirm make build and make test both pass with no changes to callers.
+      5. Document the common/output package design in AGENTS.md under a new
+         "Output Rendering Notes" section: interface in common, parse logic stays in api,
+         thin adapter in aura/internal/output.
+    status: completed
+    completed_at: 2026-05-02T10:00:00Z
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "common/output/output.go exists with ResponseData interface and rendering functions"
+      - "api/response.go no longer defines ResponseData; ListResponseData and SingleValueResponseData satisfy common/output.ResponseData"
+      - "aura/internal/output/output.go contains only PrintBody and a PrintBodyMap shim"
+      - "No call sites in subcommands/ need import changes — make build succeeds"
+      - "make test passes with no failures"
+      - "AGENTS.md documents the common/output package design"
+
+  - id: task-015
+    title: "Build flat standalone aura-cli config command"
+    description: |
+      The standalone aura-cli binary needs a flat config command that covers both global keys
+      (e.g. output) and aura-scoped keys (auth-url, base-url, default-tenant) in a single
+      interface — mirroring how aura-cli credential works (flat at the root, not nested).
+
+      Implementation approach:
+      1. Create a NewStandaloneConfigCmd(cfg) function (in the aura config package or a new
+         standalone-specific file under neo4j-cli/aura/). This builds a config command whose
+         get/set/list subcommands understand all keys from both cfg.Aura.ValidConfigKeys and
+         cfg.Global.ValidConfigKeys.
+      2. Routing in set/get: if key is in cfg.Global.ValidConfigKeys → call cfg.Global methods;
+         if in cfg.Aura.ValidConfigKeys → call cfg.Aura methods; otherwise return error.
+      3. list renders all keys from both domains.
+      4. In NewStandaloneCmd (aura.go), replace the existing config.NewCmd(cfg) reference with
+         NewStandaloneConfigCmd(cfg).
+
+      The change applies ONLY to the standalone path (NewStandaloneCmd). NewCmd (used when
+      mounted as neo4j aura) must not include this standalone config command — the neo4j super-CLI
+      already has neo4j config and neo4j config aura for this purpose (see task-018).
+    status: completed
+    completed_at: 2026-05-02T00:00:00Z
+    dependencies:
+      - task-013
+      - task-018
+    acceptance_criteria:
+      - "aura-cli config set output json writes {\"output\":\"json\"} at the JSON root"
+      - "aura-cli config get output returns the current global output value"
+      - "aura-cli config list includes output alongside auth-url, base-url, default-tenant"
+      - "aura-cli config set auth-url <value> writes to aura.auth-url (aura key routing)"
+      - "aura-cli config get auth-url returns the current aura auth-url value"
+      - "aura-cli config set unknown-key errors with 'invalid config key specified'"
+      - "make build succeeds for both binaries"
+
+  - id: task-016
+    title: "Refactor new config tests: table-driven + per-command files + AGENTS.md convention"
+    description: |
+      The tests in neo4j-cli/internal/subcommands/config/config_test.go were written as individual
+      top-level test functions instead of table-driven tests, and all live in one file rather than
+      per-command files matching the rest of the repo's convention.
+
+      1. Split config_test.go into three files: get_test.go, set_test.go, list_test.go. Move the
+         neo4jTestHelper struct and constructor into a shared test file (e.g. helpers_test.go or
+         keep it in one of the files if it stays small).
+      2. Convert each group of tests to table-driven style:
+         - get_test.go: table over (command, configSetup, expectedOut, expectedErr) for all get variants
+         - set_test.go: table over (command, expectedConfigValue, expectedErr) for all set variants
+         - list_test.go: table over (command, configSetup, outContains, expectedErr) for list variants
+      3. Update AGENTS.md with a note in the Testing Framework section: test files should be named
+         per command (get_test.go, set_test.go, list_test.go) mirroring the source files, not
+         aggregated in a single config_test.go.
+      4. Make sure make test passes after the refactor.
+    status: completed
+    completed_at: 2026-05-02T12:00:00Z
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "config_test.go no longer exists; tests live in get_test.go, set_test.go, list_test.go"
+      - "All test groups use table-driven style with a for-range over a []struct slice"
+      - "AGENTS.md Testing Framework section documents the per-command file naming convention"
+      - "Test coverage is equivalent to before (same scenarios covered, none removed)"
+      - "make test passes for neo4j-cli/internal/subcommands/config"
+
+  - id: task-017
+    title: "Tests for standalone flat config and neo4j config aura"
+    description: |
+      Add table-driven tests covering both the flat standalone config (task-015) and the
+      neo4j config aura restructuring (task-018).
+
+      Standalone tests (new file or extension of aura config test package, wired to NewStandaloneCmd):
+      - aura-cli config set output json → writes global key
+      - aura-cli config get output → returns global value
+      - aura-cli config list → includes both output and aura keys
+      - aura-cli config set auth-url <url> → routes to aura config
+      - aura-cli config get auth-url → returns aura value
+      - aura-cli config set unknown-key → errors
+
+      neo4j config aura tests (in neo4j-cli/internal/subcommands/config/aura/ or alongside
+      existing aura config tests, wired to the full neo4j root NewCmd):
+      - neo4j config aura get auth-url → returns configured value
+      - neo4j config aura set auth-url <url> → writes aura key
+      - neo4j config aura list → shows aura keys only (not output)
+      - neo4j config aura set output json → errors with invalid key
+      - neo4j aura config list → errors (command no longer exists)
+
+      All tests must use table-driven style per REQ-NF-006.
+    status: completed
+    completed_at: 2026-05-02T13:00:00Z
+    dependencies:
+      - task-015
+      - task-016
+      - task-018
+    acceptance_criteria:
+      - "Table-driven tests cover all acceptance criteria from task-015 and task-018"
+      - "Standalone tests are wired to NewStandaloneCmd"
+      - "neo4j config aura tests are wired to the full neo4j root (NewCmd from main.go)"
+      - "make test passes for both aura and neo4j-cli/internal config packages"
+
+  - id: task-018
+    title: "Move neo4j aura config → neo4j config aura"
+    description: |
+      Restructure the aura config commands to follow the credential pattern: remove config from
+      the aura subcommand tree and expose it at the neo4j root under neo4j config aura.
+
+      Steps:
+      1. In neo4j-cli/aura/aura.go, remove the config.NewCmd(cfg) line from NewCmd so that
+         neo4j aura config no longer exists. NewStandaloneCmd must NOT be affected — it will
+         get its own config command via NewStandaloneConfigCmd (task-015).
+      2. In neo4j-cli/internal/subcommands/config/config.go (the global config package), add
+         an aura subcommand: import the aura config package and call
+         cmd.AddCommand(auraconfig.NewCmd(cfg)) (or a renamed export). This makes the path
+         neo4j config aura get/set/list.
+      3. Verify that neo4j config aura set output still errors (output is not in
+         aura ValidConfigKeys), and that neo4j config aura get auth-url returns the correct value.
+      4. make build must succeed; grep for "aura config" in integration test output to confirm
+         the old path is gone and the new path works.
+    status: completed
+    completed_at: 2026-05-02T11:00:00Z
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "neo4j aura config list returns an unknown command error"
+      - "neo4j config aura list shows aura keys (auth-url, base-url, default-tenant)"
+      - "neo4j config aura set auth-url <url> writes to aura.auth-url in config.json"
+      - "neo4j config aura set output json errors with 'invalid config key specified: output'"
+      - "aura.NewCmd no longer calls config.NewCmd(cfg)"
+      - "make build succeeds for both binaries"
+
+  - id: task-019
+    title: "Add ConfigData/ConfigEntry to common/output and migrate config commands to use PrintBodyMap"
+    description: |
+      The config commands across three packages each contain identical private JSON/table rendering
+      helpers (printXxxTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable, etc.).
+      Eliminate all of these by adding a ConfigData type to common/output that satisfies ResponseData,
+      then replacing every config command's rendering with a single PrintBodyMap call.
+
+      Steps:
+      1. Add to common/output/output.go:
+         - ConfigEntry struct { Key string; Value interface{} }
+         - ConfigData []ConfigEntry, implementing ResponseData:
+             AsArray() returns [{"key": k, "value": v}, ...] for table rendering with fields ["key","value"]
+             GetSingleOrError() returns the single entry map or an error if len != 1
+             MarshalJSON() returns a flat map {k: v, ...} so PrintBodyMap JSON output is {"output":"json",...}
+      2. Update neo4j-cli/aura/internal/subcommands/config/get.go — replace the output switch with:
+             output.PrintBodyMap(cmd, cfg, output.ConfigData{{Key: key, Value: value}}, []string{"key","value"})
+         Remove printConfigKeyValueAsJSON and printConfigKeyValueAsTable from list.go.
+      3. Update neo4j-cli/aura/internal/subcommands/config/list.go — build ConfigData from
+         cfg.Aura.ValidConfigKeys, call PrintBodyMap; remove printAuraConfigTable and the
+         cfg.Aura.PrintAuraConfig(cmd) call.
+      4. Update neo4j-cli/internal/subcommands/config/get.go — same as step 2 for global config.
+      5. Update neo4j-cli/internal/subcommands/config/list.go — same as step 3 for global config
+         (replace printGlobalConfigTable and cfg.Global.Print(cmd) with PrintBodyMap + ConfigData).
+      6. Update neo4j-cli/aura/standalone_config.go — delete the following four helpers and replace
+         their call sites with PrintBodyMap + ConfigData:
+           - standaloneConfigPrintKeyValueAsJSON
+           - standaloneConfigPrintKeyValueAsTable
+           - standaloneConfigPrintAllJSON
+           - standaloneConfigPrintAllTable
+         The list variant builds ConfigData from both cfg.Global.ValidConfigKeys and cfg.Aura.ValidConfigKeys.
+      7. Delete PrintAuraConfig from AuraConfig in common/clicfg/clicfg.go (now dead code).
+      8. Delete Print from GlobalConfig in common/clicfg/clicfg.go (now dead code).
+      9. Import common/output in the config packages (not aura/internal/output — no ParseBody needed).
+      10. Run make test and fix any assertion failures caused by the default-mode behaviour change
+          (config get/list now render as table when output=default, matching all other commands).
+    status: completed
+    completed_at: 2026-05-02T14:00:00Z
+    dependencies:
+      - task-014
+      - task-017
+      - task-018
+    acceptance_criteria:
+      - "common/output/output.go exports ConfigEntry and ConfigData; ConfigData satisfies ResponseData and MarshalJSON produces a flat map"
+      - "The following functions no longer exist anywhere in the codebase: printAuraConfigTable, printGlobalConfigTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable, standaloneConfigPrintKeyValueAsJSON, standaloneConfigPrintKeyValueAsTable, standaloneConfigPrintAllJSON, standaloneConfigPrintAllTable"
+      - "PrintAuraConfig and GlobalConfig.Print no longer exist in common/clicfg/clicfg.go"
+      - "neo4j config list --output table renders a key/value table with KEY and VALUE columns"
+      - "neo4j config list (default) renders as a table"
+      - "neo4j config get output --output json renders {\"output\": \"<value>\"} (flat map, not array)"
+      - "aura-cli config list renders correctly for both table and json output"
+      - "make test passes with no failures"
+
+  - id: task-020
+    title: "Update credential commands to respect --output flag using PrintBodyMap"
+    description: |
+      The credential list/get commands currently call cfg.Credentials.Aura.Print which always
+      outputs JSON regardless of the --output flag. Update them to use the common rendering
+      infrastructure so --output table produces a structured table with named columns (matching
+      the pattern of neo4j aura instance list) and --output json produces JSON.
+
+      Steps:
+      1. Explore the credential command files:
+         - neo4j-cli/aura/credential.go (standalone aura-cli credential commands)
+         - neo4j-cli/aura/internal/subcommands/credential/ (neo4j aura credential subcommands, now
+           surfaced as neo4j credential via the credential pattern)
+         Understand the data returned by cfg.Credentials.Aura and its structure.
+      2. Make credential data satisfy common/output.ResponseData (implement AsArray() and
+         GetSingleOrError()) — either by adding methods to an existing type or creating a thin
+         wrapper type. Identify the field list to display (e.g. ["name", "client-id"] or similar).
+      3. Replace the cfg.Credentials.Aura.Print(cmd.OutOrStdout()) calls with
+         output.PrintBodyMap(cmd, cfg, credData, fields) using the aura/internal/output adapter,
+         so --output table renders a structured table and --output json renders JSON.
+      4. Do the same for any credential get command if it also has hard-coded rendering.
+      5. Add or update tests to cover --output table and --output json for credential list
+         (table-driven, per-command files per REQ-NF-006).
+      6. Run make test to confirm no regressions.
+    status: completed
+    completed_at: 2026-05-02T15:00:00Z
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "neo4j credential list --output table renders a structured table with named columns (not a key/value table)"
+      - "neo4j credential list --output json renders JSON"
+      - "neo4j credential list (no flag) respects the configured output default"
+      - "aura-cli credential list --output table renders a structured table"
+      - "aura-cli credential list --output json renders JSON"
+      - "No credential command calls cfg.Credentials.Aura.Print directly for rendering"
+      - "make test passes with no failures"

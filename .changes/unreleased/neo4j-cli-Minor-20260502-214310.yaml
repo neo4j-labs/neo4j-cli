@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`neo4j aura config` has been removed; use `neo4j config aura` instead'
+time: 2026-05-02T21:43:10.890373+01:00
