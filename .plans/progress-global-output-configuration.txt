@@ -478,3 +478,37 @@ Key Decisions:
 - make build and make test both pass with zero failures.
 
 Next Task: task-016
+
+================================================================================
+TASK-016: Refactor new config tests: table-driven + per-command files + AGENTS.md convention
+Date: 2026-05-02T12:00:00Z
+================================================================================
+
+Summary:
+Split neo4j-cli/internal/subcommands/config/config_test.go into four files:
+helpers_test.go (shared helper struct and constructor), get_test.go (table-driven
+TestConfigGet), set_test.go (table-driven TestConfigSet), and list_test.go
+(table-driven TestConfigList). Converted all individual top-level test functions
+to table-driven style using for-range over []struct slices. Deleted config_test.go
+via git rm. Added a naming convention note to AGENTS.md Testing Framework section.
+
+Files Changed:
+- neo4j-cli/internal/subcommands/config/config_test.go (deleted via git rm)
+- neo4j-cli/internal/subcommands/config/helpers_test.go (created: neo4jTestHelper struct and constructor)
+- neo4j-cli/internal/subcommands/config/get_test.go (created: table-driven TestConfigGet, 5 cases)
+- neo4j-cli/internal/subcommands/config/set_test.go (created: table-driven TestConfigSet, 6 cases)
+- neo4j-cli/internal/subcommands/config/list_test.go (created: table-driven TestConfigList, 4 cases)
+- AGENTS.md (modified: added per-command test file naming convention note)
+- .plans/tasks-global-output-configuration.yml (modified: status completed)
+
+Key Decisions:
+- Shared helpers placed in helpers_test.go (not inlined in one of the test files)
+  since all three test files use the same struct, keeping the split clean.
+- get_test.go uses a wantOutFunc field for table-output cases where Contains-style
+  assertions are needed, avoiding a separate test function while staying table-driven.
+- list_test.go uses a wantContains []string field for table-output cases for the same reason.
+- Commented-out migration tests from config_test.go are not carried over (they were
+  already disabled in task-013 and belong with the migration block, not here).
+- make test passes with zero failures after the refactor.
+
+Next Task: task-017

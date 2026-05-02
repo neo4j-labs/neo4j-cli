@@ -43,6 +43,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details.
 - Mock HTTP server and filesystem helpers live in `neo4j-cli/aura/internal/test/testutils/`
 - `neo4j-cli/` (the super-CLI package) has no test files; this is a pre-existing gap
 - **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
+- **Name test files per command**, not per package — use `get_test.go`, `set_test.go`, `list_test.go` mirroring the source files; put shared helpers in `helpers_test.go`. Avoid aggregating all tests in a single `config_test.go`.
 
 ## Architecture
 

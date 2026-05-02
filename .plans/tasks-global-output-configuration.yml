@@ -335,7 +335,8 @@ tasks:
          per command (get_test.go, set_test.go, list_test.go) mirroring the source files, not
          aggregated in a single config_test.go.
       4. Make sure make test passes after the refactor.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T12:00:00Z
     dependencies:
       - task-013
     acceptance_criteria:
