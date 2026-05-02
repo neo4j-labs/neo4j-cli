@@ -342,4 +342,37 @@ Key Decisions:
   NewConfig would have moved it anyway during the test run.
 - make test passes with zero failures across all packages after the fixture correction.
 
-Next Task: (none — all tasks complete)
+Next Task: task-013
+
+================================================================================
+TASK-013: Comment out the one-time aura.output migration block
+Date: 2026-05-02T00:00:00Z
+================================================================================
+
+Summary:
+Commented out the entire migration block in common/clicfg/clicfg.go that silently
+moves aura.output → output on first run. Added an explanatory comment above the
+block noting that: (1) this experimental release has never shipped, so the migration
+has never run in the field; (2) users may switch between the stable CLI and this
+experimental version, so running the migration would corrupt stable-version config
+files; (3) the code is preserved as reference for a future stable-release upgrade path.
+Removed the now-unused gjson import from clicfg.go. Commented out the two migration
+test functions (TestConfigMigrationAuraOutputToTopLevel,
+TestConfigMigrationAuraOutputStoredAtTopLevel) in config_test.go with an explanatory
+note linking them to the disabled migration code. Both gjson and filepath imports
+remain in use by the active assertConfigValue helper so no import changes were needed
+in the test file.
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: migration block commented out, gjson import removed)
+- neo4j-cli/internal/subcommands/config/config_test.go (modified: two migration test functions commented out with note)
+
+Key Decisions:
+- Removed the gjson import entirely from clicfg.go since it was only used by the
+  migration block (sjson is still needed elsewhere and was kept).
+- gjson and filepath imports in config_test.go remain valid because assertConfigValue
+  still uses them; no import changes were needed in the test file.
+- Commented out rather than deleted all migration code per task spec, so it can be
+  re-enabled easily for a future stable-release upgrade path.
+
+Next Task: task-014

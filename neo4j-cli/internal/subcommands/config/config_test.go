@@ -280,41 +280,47 @@ func TestConfigListWithTableConfigSetting(t *testing.T) {
 	h.assertErr("")
 }
 
-func TestConfigMigrationAuraOutputToTopLevel(t *testing.T) {
-	// Simulate an old config with "aura.output" set (the pre-migration format).
-	// NewConfig should silently migrate it to "output" at the top level.
-	h := newNeo4jTestHelper(t)
-	h.overwriteConfig(`{"aura": {"output": "json"}}`)
-
-	h.executeCommand("config get output")
-
-	// After migration, the value "json" is at the top-level "output" key.
-	// cfg.Global.Output() == "json" so the rendering format is JSON,
-	// and cfg.Global.Get("output") == "json" so the shown value is "json".
-	h.assertOut(`{
-	"output": "json"
-}`)
-	h.assertErr("")
-}
-
-func TestConfigMigrationAuraOutputStoredAtTopLevel(t *testing.T) {
-	// After migration, the config file should have "output" at the root.
-	h := newNeo4jTestHelper(t)
-	h.overwriteConfig(`{"aura": {"output": "table"}}`)
-
-	h.executeCommand("config get output")
-
-	// Confirm the migrated value in the config file
-	h.assertConfigValue("output", "table")
-
-	// "aura.output" should be gone
-	file, err := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
-	assert.Nil(t, err)
-	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
-
-	raw, err := io.ReadAll(file)
-	assert.Nil(t, err)
-
-	auraOutput := gjson.GetBytes(raw, "aura.output")
-	assert.False(t, auraOutput.Exists(), "aura.output should have been removed after migration")
-}
+// NOTE: The following migration tests are intentionally commented out.
+// They are disabled alongside the migration block in common/clicfg/clicfg.go.
+// This experimental release has never shipped to users, so the migration
+// has never run in the field. Re-enable both the migration code and these
+// tests together when introducing a stable-release upgrade path.
+//
+// func TestConfigMigrationAuraOutputToTopLevel(t *testing.T) {
+// 	// Simulate an old config with "aura.output" set (the pre-migration format).
+// 	// NewConfig should silently migrate it to "output" at the top level.
+// 	h := newNeo4jTestHelper(t)
+// 	h.overwriteConfig(`{"aura": {"output": "json"}}`)
+//
+// 	h.executeCommand("config get output")
+//
+// 	// After migration, the value "json" is at the top-level "output" key.
+// 	// cfg.Global.Output() == "json" so the rendering format is JSON,
+// 	// and cfg.Global.Get("output") == "json" so the shown value is "json".
+// 	h.assertOut(`{
+// 	"output": "json"
+// }`)
+// 	h.assertErr("")
+// }
+//
+// func TestConfigMigrationAuraOutputStoredAtTopLevel(t *testing.T) {
+// 	// After migration, the config file should have "output" at the root.
+// 	h := newNeo4jTestHelper(t)
+// 	h.overwriteConfig(`{"aura": {"output": "table"}}`)
+//
+// 	h.executeCommand("config get output")
+//
+// 	// Confirm the migrated value in the config file
+// 	h.assertConfigValue("output", "table")
+//
+// 	// "aura.output" should be gone
+// 	file, err := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
+// 	assert.Nil(t, err)
+// 	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+//
+// 	raw, err := io.ReadAll(file)
+// 	assert.Nil(t, err)
+//
+// 	auraOutput := gjson.GetBytes(raw, "aura.output")
+// 	assert.False(t, auraOutput.Exists(), "aura.output should have been removed after migration")
+// }

@@ -234,7 +234,8 @@ tasks:
       Also remove or comment out the corresponding test cases in config_test.go that assert the
       migration behaviour (TestConfigMigrationAuraOutputToTopLevel, TestConfigMigrationAuraOutputStoredAtTopLevel),
       replacing them with a comment explaining they are disabled alongside the migration code.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T00:00:00Z
     dependencies:
       - task-012
     acceptance_criteria:

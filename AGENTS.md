@@ -144,7 +144,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 - `Config.Global` (`*GlobalConfig`) holds top-level (non-namespaced) viper keys; `Config.Aura` holds `aura.*`-prefixed keys
 - The `output` setting lives at the top-level viper key `"output"`, not `"aura.output"` — always read/write via `cfg.Global.Output()` and `cfg.Global.BindOutput()`
-- Migration from old `aura.output` to `output` runs silently on first `NewConfig` call; the pattern uses `gjson.GetBytes().Exists()` (not `Viper.IsSet()`) to check the raw JSON file, then `sjson.Set`/`sjson.Delete` + `Viper.ReadInConfig()` to refresh state
+- Migration from old `aura.output` to `output` is **commented out** in `NewConfig` — this experimental release never shipped so the migration has never run; re-enable it (alongside the paired tests in `config_test.go`) for the first stable-release upgrade path
+- When migration code is commented out, remove any imports it uniquely used (e.g. `gjson` was removed from `clicfg.go` when the migration block was commented out) to avoid unused-import compilation errors
 - `Viper.IsSet()` returns `true` for keys set via `SetDefault` — use `gjson.GetBytes(data, key).Exists()` to distinguish file-backed values from viper defaults when writing migration conditions
 - `cfg.Global.BindOutput(flag)` binds viper's `"output"` key to the pflag value; passing `--output json` overrides both the rendering format AND the config value returned by `cfg.Global.Get("output")` — they are the same viper key
 - go-pretty renders table header rows in **uppercase** with `table.StyleLight` — assert for `"KEY"` and `"VALUE"` (not lowercase) in table output tests

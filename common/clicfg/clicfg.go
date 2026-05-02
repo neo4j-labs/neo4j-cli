@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -67,27 +66,30 @@ func NewConfig(fs afero.Fs, version string) *Config {
 		panic(err)
 	}
 
-	// Silent one-time migration: move aura.output -> output (top-level key).
-	// We inspect the raw JSON rather than using Viper.IsSet because Viper.IsSet
-	// returns true for keys that are only set via SetDefault, which would prevent
-	// the migration from ever running.
-	{
-		data := fileutils.ReadFileSafe(fs, fullConfigPath)
-		if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "output").Exists() {
-			oldValue := gjson.GetBytes(data, "aura.output").String()
-			updated, err := sjson.Set(string(data), "output", oldValue)
-			if err == nil {
-				updated, err = sjson.Delete(updated, "aura.output")
-				if err == nil {
-					fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
-					if err := Viper.ReadInConfig(); err != nil {
-						fmt.Println("Cannot re-read config file after migration.")
-						panic(err)
-					}
-				}
-			}
-		}
-	}
+	// NOTE: The migration block below is intentionally commented out.
+	// This experimental release has never shipped to users, so the migration
+	// has never run in the field. Users may switch between the stable CLI
+	// (which still uses "aura.output") and this experimental version; running
+	// the migration would corrupt stable-version config files.
+	// This code is preserved as reference for a future stable-release upgrade path.
+	//
+	// {
+	// 	data := fileutils.ReadFileSafe(fs, fullConfigPath)
+	// 	if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "output").Exists() {
+	// 		oldValue := gjson.GetBytes(data, "aura.output").String()
+	// 		updated, err := sjson.Set(string(data), "output", oldValue)
+	// 		if err == nil {
+	// 			updated, err = sjson.Delete(updated, "aura.output")
+	// 			if err == nil {
+	// 				fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
+	// 				if err := Viper.ReadInConfig(); err != nil {
+	// 					fmt.Println("Cannot re-read config file after migration.")
+	// 					panic(err)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	credentials := credentials.NewCredentials(fs, ConfigPrefix)
 	projects := projects.NewAuraConfigProjects(fs, fullConfigPath)
