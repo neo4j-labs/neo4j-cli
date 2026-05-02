@@ -420,3 +420,39 @@ func (config *GlobalConfig) BindOutput(flag *pflag.Flag) {
 		panic(err)
 	}
 }
+
+// ResolveConfigKey resolves a dot-notation key string against the provided Config
+// and returns which namespace it belongs to (GlobalScope or AuraScope) and the bare
+// key name (without the "aura." prefix).
+//
+// Rules:
+//   - Keys prefixed with "aura." resolve to AuraScope; the prefix is stripped.
+//   - All other keys resolve to GlobalScope.
+//   - Keys that exist in GlobalScope (e.g. "output") can never be addressed via
+//     the "aura." prefix — "aura.output" is always rejected as invalid.
+//   - Unrecognised keys in either namespace return an error.
+func ResolveConfigKey(key string, cfg *Config) (ConfigScope, string, error) {
+	const auraPrefix = "aura."
+
+	if strings.HasPrefix(key, auraPrefix) {
+		bareKey := strings.TrimPrefix(key, auraPrefix)
+
+		// Reject if the bare key is a global-only key (e.g. "aura.output" is invalid)
+		if cfg.Global.IsValidConfigKey(bareKey) {
+			return "", "", clierr.NewUsageError("invalid config key: %q is a global key and cannot be addressed with the \"aura.\" prefix", key)
+		}
+
+		if !cfg.Aura.IsValidConfigKey(bareKey) {
+			return "", "", clierr.NewUsageError("invalid config key: %q", key)
+		}
+
+		return AuraScope, bareKey, nil
+	}
+
+	// No "aura." prefix — must be a global key
+	if !cfg.Global.IsValidConfigKey(key) {
+		return "", "", clierr.NewUsageError("invalid config key: %q", key)
+	}
+
+	return GlobalScope, key, nil
+}
