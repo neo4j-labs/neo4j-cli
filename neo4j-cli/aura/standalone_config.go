@@ -4,13 +4,11 @@
 package aura
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	common_output "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config/project"
 	"github.com/spf13/cobra"
 )
@@ -58,14 +56,7 @@ func newStandaloneConfigGetCmd(cfg *clicfg.Config) *cobra.Command {
 				value = cfg.Aura.Get(key)
 			}
 
-			switch cfg.Global.Output() {
-			case "json":
-				standaloneConfigPrintKeyValueAsJSON(cmd, key, value)
-			case "table":
-				standaloneConfigPrintKeyValueAsTable(cmd, key, value)
-			default:
-				cmd.Println(value)
-			}
+			common_output.PrintBodyMap(cmd, cfg, common_output.ConfigData{{Key: key, Value: value}}, []string{"key", "value"})
 
 			return nil
 		},
@@ -122,80 +113,14 @@ func newStandaloneConfigListCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Lists all current configuration values",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cfg.Global.Output() == "table" {
-				standaloneConfigPrintAllTable(cmd, cfg)
-			} else {
-				standaloneConfigPrintAllJSON(cmd, cfg)
+			data := make(common_output.ConfigData, 0, len(cfg.Global.ValidConfigKeys)+len(cfg.Aura.ValidConfigKeys))
+			for _, key := range cfg.Global.ValidConfigKeys {
+				data = append(data, common_output.ConfigEntry{Key: key, Value: cfg.Global.Get(key)})
 			}
+			for _, key := range cfg.Aura.ValidConfigKeys {
+				data = append(data, common_output.ConfigEntry{Key: key, Value: cfg.Aura.Get(key)})
+			}
+			common_output.PrintBodyMap(cmd, cfg, data, []string{"key", "value"})
 		},
 	}
-}
-
-func standaloneConfigPrintAllJSON(cmd *cobra.Command, cfg *clicfg.Config) {
-	m := make(map[string]interface{})
-	for _, key := range cfg.Global.ValidConfigKeys {
-		m[key] = cfg.Global.Get(key)
-	}
-	for _, key := range cfg.Aura.ValidConfigKeys {
-		m[key] = cfg.Aura.Get(key)
-	}
-
-	bytes, err := json.MarshalIndent(m, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-	cmd.Println(string(bytes))
-}
-
-func standaloneConfigPrintAllTable(cmd *cobra.Command, cfg *clicfg.Config) {
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"key", "value"})
-
-	for _, key := range cfg.Global.ValidConfigKeys {
-		value := cfg.Global.Get(key)
-		var displayValue string
-		if value == nil {
-			displayValue = ""
-		} else {
-			displayValue = fmt.Sprintf("%v", value)
-		}
-		t.AppendRow(table.Row{key, displayValue})
-	}
-
-	for _, key := range cfg.Aura.ValidConfigKeys {
-		value := cfg.Aura.Get(key)
-		var displayValue string
-		if value == nil {
-			displayValue = ""
-		} else {
-			displayValue = fmt.Sprintf("%v", value)
-		}
-		t.AppendRow(table.Row{key, displayValue})
-	}
-
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
-}
-
-func standaloneConfigPrintKeyValueAsJSON(cmd *cobra.Command, key string, value interface{}) {
-	m := map[string]interface{}{key: value}
-	bytes, err := json.MarshalIndent(m, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-	cmd.Println(string(bytes))
-}
-
-func standaloneConfigPrintKeyValueAsTable(cmd *cobra.Command, key string, value interface{}) {
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"key", "value"})
-	var displayValue string
-	if value == nil {
-		displayValue = ""
-	} else {
-		displayValue = fmt.Sprintf("%v", value)
-	}
-	t.AppendRow(table.Row{key, displayValue})
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
 }

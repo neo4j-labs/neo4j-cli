@@ -5,6 +5,7 @@ package config
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	common_output "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
 
@@ -18,14 +19,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 			key := args[0]
 			value := cfg.Global.Get(key)
 
-			switch cfg.Global.Output() {
-			case "json":
-				printConfigKeyValueAsJSON(cmd, key, value)
-			case "table":
-				printConfigKeyValueAsTable(cmd, key, value)
-			default:
-				cmd.Println(value)
-			}
+			common_output.PrintBodyMap(cmd, cfg, common_output.ConfigData{{Key: key, Value: value}}, []string{"key", "value"})
 
 			return nil
 		},

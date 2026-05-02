@@ -23,7 +23,13 @@ func TestConfigGet(t *testing.T) {
 			name:        "get output returns default when no config set",
 			configSetup: func(h *neo4jTestHelper) {},
 			command:     "config get output",
-			wantOut:     "default",
+			// "default" output mode renders as a table via PrintBodyMap
+			wantOutFunc: func(t *testing.T, outStr string) {
+				assert.Contains(t, outStr, "KEY")
+				assert.Contains(t, outStr, "VALUE")
+				assert.Contains(t, outStr, "output")
+				assert.Contains(t, outStr, "default")
+			},
 		},
 		{
 			name: "get output returns JSON when output configured to json",

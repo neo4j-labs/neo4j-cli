@@ -50,10 +50,6 @@ func (h *neo4jTestHelper) setConfigValue(key string, value interface{}) {
 	h.cfg = updated
 }
 
-func (h *neo4jTestHelper) overwriteConfig(cfg string) {
-	h.cfg = cfg
-}
-
 func (h *neo4jTestHelper) executeCommand(command string) {
 	h.out = bytes.NewBufferString("")
 	h.err = bytes.NewBufferString("")

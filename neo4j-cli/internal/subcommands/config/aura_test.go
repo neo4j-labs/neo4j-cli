@@ -34,7 +34,11 @@ func TestConfigAuraGet(t *testing.T) {
 				h.setConfigValue("aura.auth-url", "https://custom.example.com/oauth/token")
 			},
 			command: "config aura get auth-url",
-			wantOut: "https://custom.example.com/oauth/token",
+			// "default" output mode renders as a table via PrintBodyMap
+			wantOutFunc: func(t *testing.T, outStr string) {
+				assert.Contains(t, outStr, "auth-url")
+				assert.Contains(t, outStr, "https://custom.example.com/oauth/token")
+			},
 		},
 		{
 			name:    "config aura get with invalid key returns error",

@@ -12,12 +12,12 @@ import (
 
 func TestConfigSet(t *testing.T) {
 	tests := []struct {
-		name              string
-		command           string
-		wantConfigKey     string
-		wantConfigValue   string
-		wantErr           string
-		wantErrSubstring  string
+		name             string
+		command          string
+		wantConfigKey    string
+		wantConfigValue  string
+		wantErr          string
+		wantErrSubstring string
 	}{
 		{
 			name:            "set output to json writes json at root",
@@ -48,8 +48,8 @@ func TestConfigSet(t *testing.T) {
 			wantErr: "Error: invalid config key specified: unknown-key",
 		},
 		{
-			name:            "set with missing value returns error",
-			command:         "config set output",
+			name:             "set with missing value returns error",
+			command:          "config set output",
 			wantErrSubstring: "Error",
 		},
 	}

@@ -447,7 +447,8 @@ tasks:
       9. Import common/output in the config packages (not aura/internal/output — no ParseBody needed).
       10. Run make test and fix any assertion failures caused by the default-mode behaviour change
           (config get/list now render as table when output=default, matching all other commands).
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T14:00:00Z
     dependencies:
       - task-014
       - task-017

@@ -12,20 +12,18 @@ import (
 
 func TestConfigList(t *testing.T) {
 	tests := []struct {
-		name        string
-		configSetup func(h *neo4jTestHelper)
-		command     string
-		wantOut     string
-		wantErr     string
+		name         string
+		configSetup  func(h *neo4jTestHelper)
+		command      string
+		wantOut      string
+		wantErr      string
 		wantContains []string
 	}{
 		{
-			name:    "list with default output renders JSON",
+			name:    "list with default output renders a table",
 			command: "config list",
-			// Default output mode: JSON (default falls through to JSON in list)
-			wantOut: `{
-	"output": "default"
-}`,
+			// "default" output mode now renders as a table via PrintBodyMap
+			wantContains: []string{"KEY", "VALUE", "output", "default"},
 		},
 		{
 			name: "list with output set to json and --output json flag renders JSON",

@@ -35,13 +35,13 @@ func TestStandaloneConfigGet(t *testing.T) {
 }`,
 		},
 		{
-			name: "get output returns default when no config set",
+			name:    "get output returns default when no config set",
 			command: "config get output",
 			configSetup: func(h *testutils.AuraTestHelper) {
 				h.OverwriteConfig("{}")
 			},
-			// default output: plain text
-			wantOut: "default",
+			// "default" output mode renders as a table via PrintBodyMap
+			wantContains: []string{"KEY", "VALUE", "output", "default"},
 		},
 		{
 			name: "get auth-url returns aura value",

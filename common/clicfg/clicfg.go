@@ -172,20 +172,6 @@ func (config *AuraConfig) Set(key string, value string) {
 	fileutils.WriteFile(config.fs, filename, []byte(updateConfig))
 }
 
-func (config *AuraConfig) PrintAuraConfig(cmd *cobra.Command) {
-	filtered := make(map[string]interface{}, len(config.ValidConfigKeys))
-	for _, key := range config.ValidConfigKeys {
-		filtered[key] = config.viper.Get(fmt.Sprintf("aura.%s", key))
-	}
-
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "\t")
-
-	if err := encoder.Encode(filtered); err != nil {
-		panic(err)
-	}
-}
-
 func (config *AuraConfig) PrintAuraProjects(cmd *cobra.Command) {
 	config.print(cmd, "aura-projects")
 }
@@ -306,20 +292,6 @@ func (config *GlobalConfig) Output() string {
 
 func (config *GlobalConfig) BindOutput(flag *pflag.Flag) {
 	if err := config.viper.BindPFlag("output", flag); err != nil {
-		panic(err)
-	}
-}
-
-func (config *GlobalConfig) Print(cmd *cobra.Command) {
-	filtered := make(map[string]interface{}, len(config.ValidConfigKeys))
-	for _, key := range config.ValidConfigKeys {
-		filtered[key] = config.viper.Get(key)
-	}
-
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "\t")
-
-	if err := encoder.Encode(filtered); err != nil {
 		panic(err)
 	}
 }

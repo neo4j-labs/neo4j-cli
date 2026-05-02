@@ -169,6 +169,9 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `PrintBodyMap`, `printTable`, and `getNestedField` live in `common/output/output.go`; `aura/internal/output/output.go` contains only `PrintBody` (parse + delegate) and a thin `PrintBodyMap` shim
 - `api.ParseBody` stays in `aura/internal/api/response.go` since it is tightly coupled to the Aura HTTP response format
 - Adding a type alias (`type X = pkg.X`) in an existing package is the zero-change way to move an interface while keeping all callers compiling — prefer this over updating all call sites
+- `ConfigEntry` and `ConfigData` in `common/output` let config commands use `PrintBodyMap` without `ParseBody` — import `common/output` directly (not `aura/internal/output`) in config packages
+- `ConfigData.MarshalJSON()` returns a flat `{key: value}` map so JSON output is `{"output": "json"}` rather than `[{"key": "output", "value": "json"}]`; the `AsArray()` method returns the `[{"key":k, "value":v}]` form used only for table rendering
+- `PrintBodyMap` routes both `"table"` and `"default"` to table rendering — config commands in default mode now render as tables, matching all other commands. Tests must assert for `"KEY"` / `"VALUE"` column headers for default-mode output cases
 
 ---
 

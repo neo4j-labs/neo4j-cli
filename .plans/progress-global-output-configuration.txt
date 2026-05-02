@@ -552,3 +552,46 @@ Key Decisions:
 - make test passes with zero failures across all packages.
 
 Next Task: All tasks complete
+
+================================================================================
+TASK-019: Add ConfigData/ConfigEntry to common/output and migrate config commands to use PrintBodyMap
+Date: 2026-05-02T14:00:00Z
+================================================================================
+
+Summary:
+Added ConfigEntry struct and ConfigData slice type to common/output/output.go.
+ConfigData implements ResponseData (AsArray, GetSingleOrError) and json.Marshaler
+(MarshalJSON returns a flat map for JSON output). Migrated all config command
+rendering to use common_output.PrintBodyMap with ConfigData, eliminating 8
+private helper functions across 3 packages. Deleted PrintAuraConfig and Print
+from clicfg.go. Updated all affected tests to expect table output in "default"
+mode. Fixed pre-existing unused overwriteConfig function in helpers_test.go.
+Ran make fmt to fix import ordering; make lint and make test both pass.
+
+Files Changed:
+- common/output/output.go (modified: added ConfigEntry, ConfigData with AsArray/GetSingleOrError/MarshalJSON)
+- common/clicfg/clicfg.go (modified: deleted PrintAuraConfig from AuraConfig, deleted Print from GlobalConfig)
+- neo4j-cli/aura/internal/subcommands/config/get.go (modified: replaced switch with PrintBodyMap call)
+- neo4j-cli/aura/internal/subcommands/config/list.go (modified: replaced helpers with PrintBodyMap; deleted printAuraConfigTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable)
+- neo4j-cli/aura/standalone_config.go (modified: replaced helpers with PrintBodyMap; deleted standaloneConfigPrintAllJSON/Table, standaloneConfigPrintKeyValueAsJSON/Table)
+- neo4j-cli/internal/subcommands/config/get.go (modified: replaced switch with PrintBodyMap call)
+- neo4j-cli/internal/subcommands/config/list.go (modified: replaced helpers with PrintBodyMap; deleted printGlobalConfigTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable)
+- neo4j-cli/aura/internal/subcommands/config/get_test.go (modified: TestGetConfigDefault updated for table output in default mode)
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (modified: updated assertions for table output in default mode)
+- neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go (modified: wantContains for default mode table case)
+- neo4j-cli/internal/subcommands/config/get_test.go (modified: wantOutFunc for default mode table case)
+- neo4j-cli/internal/subcommands/config/list_test.go (modified: wantContains for default mode table case)
+- neo4j-cli/internal/subcommands/config/aura_test.go (modified: wantOutFunc for default mode table case)
+- neo4j-cli/internal/subcommands/config/helpers_test.go (modified: removed pre-existing unused overwriteConfig function)
+
+Key Decisions:
+- ConfigData.MarshalJSON() returns a flat {key: value} map so PrintBodyMap JSON
+  output is {"output": "json"} rather than an array [{key: "output", value: "json"}].
+- "default" output mode now renders as a table via PrintBodyMap (matching all other
+  commands), which required updating tests that previously expected plain text.
+- Imported common/output directly in config packages (not aura/internal/output since
+  no ParseBody is needed).
+- Fixed the pre-existing unused overwriteConfig lint warning while handling formatting
+  since make lint was already failing before this task.
+
+Next Task: task-020
