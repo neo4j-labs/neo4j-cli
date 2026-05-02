@@ -161,6 +161,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - When moving a subcommand from one path to another (e.g. `neo4j aura config` → `neo4j config aura`), the `cmd.Use` field must be renamed to match the new path segment — set it on the returned command before mounting
 - If `NewStandaloneCmd` calls `NewCmd` and then adds extras, removing a subcommand from `NewCmd` also removes it from standalone; add it back directly in `NewStandaloneCmd` as a temporary hold until the standalone-specific version is implemented
 - The standalone aura-cli flat config command (`NewStandaloneConfigCmd`) routes key operations by checking `cfg.Global.IsValidConfigKey(key)` first, then `cfg.Aura.IsValidConfigKey(key)` — global keys take precedence; use `allStandaloneConfigKeys(cfg)` to combine both for `ValidArgs` on get subcommands
+- Cobra's `legacyArgs` behavior: child commands (those with a parent) accept arbitrary positional args by default — only root commands with subcommands produce "unknown command" errors via `legacyArgs`. This means `neo4j aura config list` (where `config` doesn't exist under `aura`) shows the `aura` help and exits 0 rather than erroring. Test for help display and absence of "config" in the help output instead of asserting an error string.
 
 ## Output Rendering Notes
 

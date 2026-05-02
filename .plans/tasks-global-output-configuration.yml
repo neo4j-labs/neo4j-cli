@@ -1,7 +1,7 @@
 feature: global-output-configuration
 prd: ./prd-global-output-configuration.md
 created_at: 2026-05-01T00:00:00Z
-updated_at: 2026-05-01T15:00:00Z
+updated_at: 2026-05-02T00:00:00Z
 
 tasks:
   - id: task-001
@@ -410,3 +410,90 @@ tasks:
       - "neo4j config aura set output json errors with 'invalid config key specified: output'"
       - "aura.NewCmd no longer calls config.NewCmd(cfg)"
       - "make build succeeds for both binaries"
+
+  - id: task-019
+    title: "Add ConfigData/ConfigEntry to common/output and migrate config commands to use PrintBodyMap"
+    description: |
+      The config commands across three packages each contain identical private JSON/table rendering
+      helpers (printXxxTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable, etc.).
+      Eliminate all of these by adding a ConfigData type to common/output that satisfies ResponseData,
+      then replacing every config command's rendering with a single PrintBodyMap call.
+
+      Steps:
+      1. Add to common/output/output.go:
+         - ConfigEntry struct { Key string; Value interface{} }
+         - ConfigData []ConfigEntry, implementing ResponseData:
+             AsArray() returns [{"key": k, "value": v}, ...] for table rendering with fields ["key","value"]
+             GetSingleOrError() returns the single entry map or an error if len != 1
+             MarshalJSON() returns a flat map {k: v, ...} so PrintBodyMap JSON output is {"output":"json",...}
+      2. Update neo4j-cli/aura/internal/subcommands/config/get.go — replace the output switch with:
+             output.PrintBodyMap(cmd, cfg, output.ConfigData{{Key: key, Value: value}}, []string{"key","value"})
+         Remove printConfigKeyValueAsJSON and printConfigKeyValueAsTable from list.go.
+      3. Update neo4j-cli/aura/internal/subcommands/config/list.go — build ConfigData from
+         cfg.Aura.ValidConfigKeys, call PrintBodyMap; remove printAuraConfigTable and the
+         cfg.Aura.PrintAuraConfig(cmd) call.
+      4. Update neo4j-cli/internal/subcommands/config/get.go — same as step 2 for global config.
+      5. Update neo4j-cli/internal/subcommands/config/list.go — same as step 3 for global config
+         (replace printGlobalConfigTable and cfg.Global.Print(cmd) with PrintBodyMap + ConfigData).
+      6. Update neo4j-cli/aura/standalone_config.go — delete the following four helpers and replace
+         their call sites with PrintBodyMap + ConfigData:
+           - standaloneConfigPrintKeyValueAsJSON
+           - standaloneConfigPrintKeyValueAsTable
+           - standaloneConfigPrintAllJSON
+           - standaloneConfigPrintAllTable
+         The list variant builds ConfigData from both cfg.Global.ValidConfigKeys and cfg.Aura.ValidConfigKeys.
+      7. Delete PrintAuraConfig from AuraConfig in common/clicfg/clicfg.go (now dead code).
+      8. Delete Print from GlobalConfig in common/clicfg/clicfg.go (now dead code).
+      9. Import common/output in the config packages (not aura/internal/output — no ParseBody needed).
+      10. Run make test and fix any assertion failures caused by the default-mode behaviour change
+          (config get/list now render as table when output=default, matching all other commands).
+    status: todo
+    dependencies:
+      - task-014
+      - task-017
+      - task-018
+    acceptance_criteria:
+      - "common/output/output.go exports ConfigEntry and ConfigData; ConfigData satisfies ResponseData and MarshalJSON produces a flat map"
+      - "The following functions no longer exist anywhere in the codebase: printAuraConfigTable, printGlobalConfigTable, printConfigKeyValueAsJSON, printConfigKeyValueAsTable, standaloneConfigPrintKeyValueAsJSON, standaloneConfigPrintKeyValueAsTable, standaloneConfigPrintAllJSON, standaloneConfigPrintAllTable"
+      - "PrintAuraConfig and GlobalConfig.Print no longer exist in common/clicfg/clicfg.go"
+      - "neo4j config list --output table renders a key/value table with KEY and VALUE columns"
+      - "neo4j config list (default) renders as a table"
+      - "neo4j config get output --output json renders {\"output\": \"<value>\"} (flat map, not array)"
+      - "aura-cli config list renders correctly for both table and json output"
+      - "make test passes with no failures"
+
+  - id: task-020
+    title: "Update credential commands to respect --output flag using PrintBodyMap"
+    description: |
+      The credential list/get commands currently call cfg.Credentials.Aura.Print which always
+      outputs JSON regardless of the --output flag. Update them to use the common rendering
+      infrastructure so --output table produces a structured table with named columns (matching
+      the pattern of neo4j aura instance list) and --output json produces JSON.
+
+      Steps:
+      1. Explore the credential command files:
+         - neo4j-cli/aura/credential.go (standalone aura-cli credential commands)
+         - neo4j-cli/aura/internal/subcommands/credential/ (neo4j aura credential subcommands, now
+           surfaced as neo4j credential via the credential pattern)
+         Understand the data returned by cfg.Credentials.Aura and its structure.
+      2. Make credential data satisfy common/output.ResponseData (implement AsArray() and
+         GetSingleOrError()) — either by adding methods to an existing type or creating a thin
+         wrapper type. Identify the field list to display (e.g. ["name", "client-id"] or similar).
+      3. Replace the cfg.Credentials.Aura.Print(cmd.OutOrStdout()) calls with
+         output.PrintBodyMap(cmd, cfg, credData, fields) using the aura/internal/output adapter,
+         so --output table renders a structured table and --output json renders JSON.
+      4. Do the same for any credential get command if it also has hard-coded rendering.
+      5. Add or update tests to cover --output table and --output json for credential list
+         (table-driven, per-command files per REQ-NF-006).
+      6. Run make test to confirm no regressions.
+    status: todo
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "neo4j credential list --output table renders a structured table with named columns (not a key/value table)"
+      - "neo4j credential list --output json renders JSON"
+      - "neo4j credential list (no flag) respects the configured output default"
+      - "aura-cli credential list --output table renders a structured table"
+      - "aura-cli credential list --output json renders JSON"
+      - "No credential command calls cfg.Credentials.Aura.Print directly for rendering"
+      - "make test passes with no failures"

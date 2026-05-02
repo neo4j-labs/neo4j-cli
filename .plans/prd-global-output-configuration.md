@@ -18,7 +18,6 @@ This feature moves output configuration to a top-level viper key (`output`), rem
 ## Non-Goals
 
 - Adding any top-level config keys beyond `output` in this iteration
-- Changing the rendering format of credential commands (they will bind the flag correctly but rendering improvements are a follow-up)
 - Supporting per-product output overrides (e.g., an aura-specific output that overrides the global one)
 - Manual per-command output flag registration or binding — individual resource commands must not need to implement output logic themselves
 
@@ -43,6 +42,9 @@ This feature moves output configuration to a top-level viper key (`output`), rem
 - REQ-F-015: When running `aura-cli` standalone, `aura-cli config list` shows all keys from both global and aura config domains
 - REQ-F-016: `neo4j aura config` is removed; aura config is accessible at `neo4j config aura get/set/list`, following the same pattern as `neo4j credential` (moved from `neo4j aura credential`)
 - REQ-F-017: `neo4j config aura get <key>`, `neo4j config aura set <key> <value>`, and `neo4j config aura list` behave identically to the former `neo4j aura config` commands (same keys, same validation, same output rendering)
+- REQ-F-018: All config commands (`neo4j config get/list`, `neo4j config aura get/list`, `aura-cli config get/list`) use `common/output.PrintBodyMap` with a `ConfigData` value for rendering; duplicate private JSON/table helpers are removed from each config package; the `default` output mode renders as a table (consistent with all other commands)
+- REQ-F-019: `neo4j credential list`, `neo4j credential get`, `aura-cli credential list`, and `aura-cli credential get` respect the `--output` flag: `--output table` renders a structured table with named columns (same pattern as `neo4j aura instance list`), `--output json` renders JSON; the default output format is respected when no flag is passed
+- REQ-F-020: Credential rendering uses `common/output.PrintBodyMap` (via the `aura/internal/output` adapter) with the appropriate field list, rather than calling `cfg.Credentials.Aura.Print` directly
 
 ### Non-Functional Requirements
 
@@ -52,6 +54,7 @@ This feature moves output configuration to a top-level viper key (`output`), rem
 - REQ-NF-004: Output flag registration, validation, and viper binding must be centralized — individual resource-group commands (instance, tenant, etc.) must not contain any output flag logic
 - REQ-NF-005: The `ResponseData` interface and the core rendering logic are extracted from `neo4j-cli/aura/internal/output/output.go` and `neo4j-cli/aura/internal/api/response.go` into a new `common/output` package, making them available to all sub-CLIs; `aura/internal/output/output.go` becomes a thin adapter; the extraction and its design rationale are documented in AGENTS.md
 - REQ-NF-006: New tests use table-driven style (`for _, tc := range []struct{...}{...}`) and are split into per-command files (`get_test.go`, `set_test.go`, `list_test.go`) matching the rest of the repo's convention; AGENTS.md is updated with this naming convention
+- REQ-NF-007: No config or credential subcommand package defines its own JSON/table rendering logic; all rendering goes through `common/output.PrintBodyMap`
 
 ## Technical Considerations
 
@@ -124,6 +127,66 @@ Recommended approach: create a `NewStandaloneConfigCmd(cfg)` that builds a merge
 
 `NewStandaloneCmd` replaces the current `config.NewCmd(cfg)` reference with `NewStandaloneConfigCmd(cfg)`. Global and aura keys are currently disjoint, so routing is unambiguous. Adding new keys to either domain requires only updating the relevant `ValidConfigKeys` slice.
 
+### ConfigData type in common/output
+
+Add a `ConfigData` type to `common/output/output.go` that satisfies `ResponseData` and can be passed directly to the existing `PrintBodyMap`:
+
+```go
+type ConfigData []ConfigEntry
+
+type ConfigEntry struct {
+    Key   string
+    Value interface{}
+}
+
+// AsArray returns rows suitable for table rendering: [{"key": k, "value": v}, ...]
+func (c ConfigData) AsArray() []map[string]any { ... }
+
+// GetSingleOrError returns the single entry as a map or an error if len != 1
+func (c ConfigData) GetSingleOrError() (map[string]any, error) { ... }
+
+// MarshalJSON produces a flat map {"key1": v1, "key2": v2, ...} so that
+// json.MarshalIndent in PrintBodyMap emits the expected config JSON shape
+func (c ConfigData) MarshalJSON() ([]byte, error) { ... }
+```
+
+Config commands pass `ConfigData` to `PrintBodyMap` with fields `["key", "value"]`:
+
+```go
+// config list
+data := output.ConfigData{{Key: "output", Value: cfg.Global.Get("output")}, ...}
+output.PrintBodyMap(cmd, cfg, data, []string{"key", "value"})
+
+// config get
+data := output.ConfigData{{Key: key, Value: value}}
+output.PrintBodyMap(cmd, cfg, data, []string{"key", "value"})
+```
+
+The `default` output mode is handled by `PrintBodyMap`'s `"table", "default"` case — config commands render as a table by default, consistent with all other commands.
+
+The following private rendering functions must be deleted entirely (not refactored):
+- `printAuraConfigTable` — `aura/internal/subcommands/config/list.go`
+- `printConfigKeyValueAsJSON` — `aura/internal/subcommands/config/list.go`
+- `printConfigKeyValueAsTable` — `aura/internal/subcommands/config/list.go`
+- `printGlobalConfigTable` — `neo4j-cli/internal/subcommands/config/list.go`
+- `printConfigKeyValueAsJSON` — `neo4j-cli/internal/subcommands/config/list.go`
+- `printConfigKeyValueAsTable` — `neo4j-cli/internal/subcommands/config/list.go`
+- `standaloneConfigPrintKeyValueAsJSON` — `aura/standalone_config.go`
+- `standaloneConfigPrintKeyValueAsTable` — `aura/standalone_config.go`
+- `standaloneConfigPrintAllJSON` — `aura/standalone_config.go`
+- `standaloneConfigPrintAllTable` — `aura/standalone_config.go`
+
+The now-redundant `PrintAuraConfig` method on `AuraConfig` and `Print` method on `GlobalConfig` are also deleted.
+
+### Credential rendering update
+
+Credential list/get commands currently call `cfg.Credentials.Aura.Print` which always outputs JSON. They should instead:
+
+1. Convert the credential data to a type satisfying `common/output.ResponseData` (implement `AsArray()` and `GetSingleOrError()`)
+2. Call `output.PrintBodyMap` with the appropriate field list (e.g., `["name", "client-id"]`)
+
+This ensures `--output table` produces a structured table matching the pattern of `neo4j aura instance list`.
+
 ### output.go extraction to common
 
 `ResponseData` (defined in `neo4j-cli/aura/internal/api/response.go`) is a generic interface over `[]map[string]any` with no aura-specific dependencies — it belongs in `common`. The rendering functions in `neo4j-cli/aura/internal/output/output.go` (`PrintBodyMap`, `printTable`, `getNestedField`) also have no aura-specific dependencies beyond the `ResponseData` interface.
@@ -154,6 +217,16 @@ Extraction plan:
 - [ ] `aura-cli config set auth-url <url>` (standalone) writes the value under `aura.auth-url`
 - [ ] `aura-cli config get output` (standalone) returns the current global output value
 - [ ] `aura-cli config list` (standalone) includes both global keys (`output`) and aura keys (`auth-url`, `base-url`, `default-tenant`)
+- [ ] `neo4j config list --output table` renders a key/value table via `common/output.PrintBodyMap` with `ConfigData`
+- [ ] `neo4j config get output --output json` renders `{"output": "<value>"}` via `common/output.PrintBodyMap` with `ConfigData`
+- [ ] `neo4j config list` (default mode) renders as a table, consistent with all other commands
+- [ ] `neo4j config aura list` and `neo4j config aura get` use `ConfigData` + `PrintBodyMap`
+- [ ] `aura-cli config list` and `aura-cli config get` use `ConfigData` + `PrintBodyMap`
+- [ ] `neo4j credential list --output table` renders a structured table with named columns (not a key/value table)
+- [ ] `neo4j credential list --output json` renders JSON
+- [ ] `neo4j credential list` (no flag) respects the configured output default
+- [ ] `aura-cli credential list --output table` renders a structured table
+- [ ] No config or credential package contains its own JSON/table rendering logic after this change
 - [ ] New `neo4j config` tests use table-driven style and are split into `get_test.go`, `set_test.go`, `list_test.go`
 - [ ] `common/output` package exists with `ResponseData` interface and rendering functions
 - [ ] `aura/internal/output/output.go` is a thin adapter — only `PrintBody` logic remains there
@@ -169,7 +242,6 @@ Extraction plan:
 
 - Per-product output overrides (aura-specific output config that takes precedence over global)
 - Adding other top-level config keys (auth-url, base-url promotion)
-- Changing credential command rendering (table vs JSON formatting)
 
 ## Open Questions
 
