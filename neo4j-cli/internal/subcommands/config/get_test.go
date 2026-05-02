@@ -39,7 +39,8 @@ func TestConfigGet(t *testing.T) {
 			command: "config get output",
 			// Output config is "json" so rendering format is JSON and value reported is "json"
 			wantOut: `{
-	"output": "json"
+	"Key": "output",
+	"Value": "json"
 }`,
 		},
 		{
@@ -48,7 +49,8 @@ func TestConfigGet(t *testing.T) {
 			// --output json flag binds viper "output" to "json", so both the rendered
 			// format and the reported value become "json".
 			wantOut: `{
-	"output": "json"
+	"Key": "output",
+	"Value": "json"
 }`,
 		},
 		{

@@ -50,7 +50,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 
 	helper.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
 	cfg.Aura.SetPollingConfig(5, 0)
 

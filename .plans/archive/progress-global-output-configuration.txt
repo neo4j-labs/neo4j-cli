@@ -386,10 +386,10 @@ Summary:
 Created common/output/output.go with the ResponseData interface and core rendering
 functions (PrintBodyMap, printTable, getNestedField). Replaced the ResponseData
 interface definition in api/response.go with a type alias (type ResponseData =
-common_output.ResponseData) so all existing api.ResponseData callers continue to
+output.ResponseData) so all existing api.ResponseData callers continue to
 compile without any import changes. Replaced the implementation in
 aura/internal/output/output.go with a thin shim (PrintBodyMap delegates to
-common_output.PrintBodyMap) and kept PrintBody as the parse-and-delegate adapter.
+output.PrintBodyMap) and kept PrintBody as the parse-and-delegate adapter.
 Both make build and make test pass with zero failures. Documented the design in
 AGENTS.md under "Output Rendering Notes".
 
@@ -400,7 +400,7 @@ Files Changed:
 - AGENTS.md (modified: added Output Rendering Notes section)
 
 Key Decisions:
-- Used a Go type alias (type ResponseData = common_output.ResponseData) instead of
+- Used a Go type alias (type ResponseData = output.ResponseData) instead of
   removing api.ResponseData entirely, allowing all existing api.ResponseData call
   sites (including tenant/get.go function signatures) to compile without changes.
 - api.ParseBody stays in aura/internal/api/response.go since it's tightly coupled
@@ -562,7 +562,7 @@ Summary:
 Added ConfigEntry struct and ConfigData slice type to common/output/output.go.
 ConfigData implements ResponseData (AsArray, GetSingleOrError) and json.Marshaler
 (MarshalJSON returns a flat map for JSON output). Migrated all config command
-rendering to use common_output.PrintBodyMap with ConfigData, eliminating 8
+rendering to use output.PrintBodyMap with ConfigData, eliminating 8
 private helper functions across 3 packages. Deleted PrintAuraConfig and Print
 from clicfg.go. Updated all affected tests to expect table output in "default"
 mode. Fixed pre-existing unused overwriteConfig function in helpers_test.go.

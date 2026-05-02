@@ -61,7 +61,7 @@ func (h *neo4jTestHelper) executeCommand(command string) {
 	assert.Nil(h.t, err)
 	h.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	// Build a minimal neo4j root command with just the config subcommand
 	rootCmd := &cobra.Command{

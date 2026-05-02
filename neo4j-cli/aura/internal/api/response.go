@@ -14,7 +14,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
-	common_output "github.com/neo4j/cli/common/output"
+	output "github.com/neo4j/cli/common/output"
 )
 
 type ErrorResponse struct {
@@ -265,9 +265,10 @@ var GraphAnalyticsSessionWaitingStatus = []string{
 	GraphAnalyticsSessionInitial,
 }
 
-// ResponseData is a type alias for common/output.ResponseData so that existing
-// callers using api.ResponseData continue to compile without import changes.
-type ResponseData = common_output.ResponseData
+type ResponseData interface {
+	output.ResponseData
+	GetSingleOrError() (map[string]any, error)
+}
 
 type ListResponseData struct {
 	Data []map[string]any `json:"data"`

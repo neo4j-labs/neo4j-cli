@@ -7,14 +7,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	common_output "github.com/neo4j/cli/common/output"
+	output "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 )
 
 // PrintBodyMap is a shim that delegates to common/output.PrintBodyMap so that
 // all existing call sites in subcommands/ continue to compile without import changes.
-func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values common_output.ResponseData, fields []string) {
-	common_output.PrintBodyMap(cmd, cfg, values, fields)
+func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values output.ResponseData, fields []string) {
+	output.PrintBodyMap(cmd, cfg, values, fields)
 }
 
 // PrintBody parses the raw response body and then calls PrintBodyMap.

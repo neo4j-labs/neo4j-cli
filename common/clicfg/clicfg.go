@@ -4,17 +4,17 @@
 package clicfg
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clicfg/projects"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/tidwall/sjson"
@@ -30,14 +30,22 @@ const (
 
 var ValidOutputValues = [3]string{"default", "json", "table"}
 
+type ConfigScope string
+
+const (
+	GlobalScope ConfigScope = "global"
+	AuraScope   ConfigScope = "aura"
+)
+
 type Config struct {
 	Version     string
 	Aura        *AuraConfig
 	Global      *GlobalConfig
 	Credentials *credentials.Credentials
+	scope       ConfigScope
 }
 
-func NewConfig(fs afero.Fs, version string) *Config {
+func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	configPath := filepath.Join(ConfigPrefix, "neo4j", "cli")
 	fullConfigPath := filepath.Join(configPath, "config.json")
 
@@ -109,13 +117,78 @@ func NewConfig(fs afero.Fs, version string) *Config {
 				MaxRetries: 60,
 				Interval:   20,
 			},
+			// TODO: just append global here if just aura scope?
 			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant"},
 			Projects:        projects,
 		},
 		Global:      globalConfig,
 		Credentials: credentials,
+		scope:       scope,
 	}
 }
+
+func (c *Config) Printable() PrintableConfigData {
+	data := make(PrintableConfigData, 0, len(c.Global.ValidConfigKeys))
+	for _, key := range c.Global.ValidConfigKeys {
+		data = append(data, PrintableConfigEntry{Key: key, Value: c.Global.Get(key)})
+	}
+
+	if c.scope == AuraScope {
+		auraData := make(PrintableConfigData, 0, len(c.Aura.ValidConfigKeys))
+		for _, key := range c.Aura.ValidConfigKeys {
+			auraData = append(auraData, PrintableConfigEntry{Key: key, Value: c.Aura.Get(key)})
+		}
+		data = append(data, auraData...)
+	}
+
+	if c.scope == GlobalScope {
+		auraData := make(PrintableConfigData, 0, len(c.Aura.ValidConfigKeys))
+		for _, key := range c.Aura.ValidConfigKeys {
+			auraData = append(auraData, PrintableConfigEntry{Key: fmt.Sprintf("aura.%s", key), Value: c.Aura.Get(key)})
+		}
+		data = append(data, auraData...)
+	}
+
+	return data
+}
+
+// PrintableConfigEntry represents a single configuration key-value pair.
+type PrintableConfigEntry struct {
+	Key   string
+	Value interface{}
+}
+
+func (e PrintableConfigEntry) AsArray() []map[string]any {
+	return []map[string]any{
+		{"key": e.Key, "value": e.Value},
+	}
+}
+
+// PrintableConfigData is a slice of ConfigEntry that satisfies the ResponseData interface,
+// enabling config commands to use PrintBodyMap for consistent rendering.
+type PrintableConfigData []PrintableConfigEntry
+
+// AsArray returns each entry as a {"key": k, "value": v} map for table rendering.
+func (d PrintableConfigData) AsArray() []map[string]any {
+	result := make([]map[string]any, len(d))
+	for i, e := range d {
+		result[i] = map[string]any{
+			"key":   e.Key,
+			"value": e.Value,
+		}
+	}
+	return result
+}
+
+// // MarshalJSON renders ConfigData as a flat map {key: value, ...} so that
+// // PrintBodyMap JSON output is {"output": "json", ...} rather than an array.
+// func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
+// 	m := make(map[string]interface{}, len(d))
+// 	for _, e := range d {
+// 		m[e.Key] = e.Value
+// 	}
+// 	return json.Marshal(m)
+// }
 
 func bindEnvironmentVariables(Viper *viper.Viper) {
 	Viper.BindEnv("aura.base-url", "AURA_BASE_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
@@ -126,6 +199,7 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.base-url", DefaultAuraBaseUrl)
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
 	Viper.SetDefault("output", "default")
+	// TODO: should this become aura.projects?
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
 
@@ -148,7 +222,16 @@ func (config *AuraConfig) IsValidConfigKey(key string) bool {
 }
 
 func (config *AuraConfig) Get(key string) interface{} {
+	// Bit of a hack for a global config key
+	// TODO: refactor this for global config keys to be properly namespaced (e.g. "output" vs "aura.output") and remove this special case
+	if key == "output" {
+		return config.viper.Get(key)
+	}
 	return config.viper.Get(fmt.Sprintf("aura.%s", key))
+}
+
+func (config *AuraConfig) GetPrintable(key string) PrintableConfigEntry {
+	return PrintableConfigEntry{Key: key, Value: config.Get(key)}
 }
 
 func (config *AuraConfig) Set(key string, value string) {
@@ -170,19 +253,6 @@ func (config *AuraConfig) Set(key string, value string) {
 	}
 
 	fileutils.WriteFile(config.fs, filename, []byte(updateConfig))
-}
-
-func (config *AuraConfig) PrintAuraProjects(cmd *cobra.Command) {
-	config.print(cmd, "aura-projects")
-}
-
-func (config *AuraConfig) print(cmd *cobra.Command, path string) {
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "\t")
-
-	if err := encoder.Encode(config.viper.Get(path)); err != nil {
-		panic(err)
-	}
 }
 
 func (config *AuraConfig) BaseUrl() string {
@@ -275,7 +345,24 @@ func (config *GlobalConfig) Get(key string) interface{} {
 	return config.viper.Get(key)
 }
 
-func (config *GlobalConfig) Set(key string, value string) {
+func (config *GlobalConfig) GetPrintable(key string) PrintableConfigEntry {
+	return PrintableConfigEntry{Key: key, Value: config.Get(key)}
+}
+
+func (config *GlobalConfig) Set(key string, value string) error {
+	if key == "output" {
+		valid := false
+		for _, v := range ValidOutputValues {
+			if v == value {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return clierr.NewUsageError("invalid value for 'output': %s (valid values: %s)", value, strings.Join(ValidOutputValues[:], ", "))
+		}
+	}
+
 	data := fileutils.ReadFileSafe(config.fs, config.configPath)
 
 	updated, err := sjson.Set(string(data), key, value)
@@ -284,6 +371,7 @@ func (config *GlobalConfig) Set(key string, value string) {
 	}
 
 	fileutils.WriteFile(config.fs, config.configPath, []byte(updated))
+	return nil
 }
 
 func (config *GlobalConfig) Output() string {

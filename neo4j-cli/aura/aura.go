@@ -4,6 +4,7 @@
 package aura
 
 import (
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/deployment"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
 	_import "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/import"
@@ -39,7 +40,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := NewCmd(cfg)
-	cmd.AddCommand(NewStandaloneConfigCmd(cfg))
+	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCmd(cfg))
 	return cmd
 }

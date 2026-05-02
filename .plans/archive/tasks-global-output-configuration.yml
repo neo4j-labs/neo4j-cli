@@ -262,8 +262,8 @@ tasks:
          implementations themselves, just remove the now-redundant local interface).
       3. Update neo4j-cli/aura/internal/output/output.go: keep only PrintBody (which calls
          api.ParseBody and delegates to common/output.PrintBodyMap). Add a re-export shim:
-           func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values common_output.ResponseData, fields []string) {
-               common_output.PrintBodyMap(cmd, cfg, values, fields)
+           func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values output.ResponseData, fields []string) {
+               output.PrintBodyMap(cmd, cfg, values, fields)
            }
          so that all existing call sites continue to compile without import changes.
       4. Confirm make build and make test both pass with no changes to callers.

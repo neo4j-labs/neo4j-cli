@@ -31,9 +31,24 @@ func TestConfigList(t *testing.T) {
 				h.setConfigValue("output", "json")
 			},
 			command: "config list --output json",
-			wantOut: `{
-	"output": "json"
-}`,
+			wantOut: `[
+	{
+		"Key": "output",
+		"Value": "json"
+	},
+	{
+		"Key": "aura.auth-url",
+		"Value": "https://api.neo4j.io/oauth/token"
+	},
+	{
+		"Key": "aura.base-url",
+		"Value": "https://api.neo4j.io"
+	},
+	{
+		"Key": "aura.default-tenant",
+		"Value": null
+	}
+]`,
 		},
 		{
 			name:    "list with --output table flag renders a table",

@@ -39,7 +39,7 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 
 	fs, err := testfs.GetTestFs(cfgStr, credentialsStr)
 	assert.Nil(t, err)
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	//The path parameter will be removed from GET base url
 	assert.Equal(t, server.URL, cfg.Aura.BaseUrl())

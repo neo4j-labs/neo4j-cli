@@ -165,7 +165,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 ## Output Rendering Notes
 
-- `ResponseData` interface lives in `common/output` (not `aura/internal/api`) — `api.ResponseData` is a type alias (`= common_output.ResponseData`) so all existing callers continue to compile without import changes
+- `ResponseData` interface lives in `common/output` (not `aura/internal/api`) — `api.ResponseData` is a type alias (`= output.ResponseData`) so all existing callers continue to compile without import changes
 - `PrintBodyMap`, `printTable`, and `getNestedField` live in `common/output/output.go`; `aura/internal/output/output.go` contains only `PrintBody` (parse + delegate) and a thin `PrintBodyMap` shim
 - `api.ParseBody` stays in `aura/internal/api/response.go` since it is tightly coupled to the Aura HTTP response format
 - Adding a type alias (`type X = pkg.X`) in an existing package is the zero-change way to move an interface while keeping all callers compiling — prefer this over updating all call sites

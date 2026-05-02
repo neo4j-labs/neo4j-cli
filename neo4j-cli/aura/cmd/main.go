@@ -24,7 +24,7 @@ func main() {
 		}
 	}()
 
-	cfg := clicfg.NewConfig(afero.NewOsFs(), Version)
+	cfg := clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.AuraScope)
 
 	cmd := aura.NewStandaloneCmd(cfg)
 	aura.RegisterOutputFlag(cmd, cfg)

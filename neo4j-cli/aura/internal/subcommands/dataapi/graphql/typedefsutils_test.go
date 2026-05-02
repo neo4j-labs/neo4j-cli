@@ -24,7 +24,7 @@ func TestGetTypeDefsFromFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
 	fileutils.WriteFile(fs, pathToTypeDefsFile, []byte(typDefs))
 

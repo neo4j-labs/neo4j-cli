@@ -5,7 +5,7 @@ package config
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
-	common_output "github.com/neo4j/cli/common/output"
+	output "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
 
@@ -13,14 +13,11 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:       "get <key>",
 		Short:     "Displays the specified configuration value",
-		ValidArgs: cfg.Aura.ValidConfigKeys[:],
+		ValidArgs: getValidConfigKeys(cfg),
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
-			value := cfg.Aura.Get(key)
-
-			common_output.PrintBodyMap(cmd, cfg, common_output.ConfigData{{Key: key, Value: value}}, []string{"key", "value"})
-
+			output.PrintBodyMap(cmd, cfg, cfg.Aura.GetPrintable(key), configPrintFields)
 			return nil
 		},
 	}

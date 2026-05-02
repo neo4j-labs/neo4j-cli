@@ -62,7 +62,7 @@ func (h *credentialTestHelper) executeCommand(command string) {
 	assert.Nil(h.t, err)
 	h.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
 	cmd := aura.NewCredentialCmd(cfg)
 	aura.RegisterOutputFlag(cmd, cfg)

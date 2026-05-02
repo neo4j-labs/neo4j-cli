@@ -6,7 +6,6 @@ package credentials
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -18,19 +17,8 @@ type AuraCredentials struct {
 	onUpdate          func()
 }
 
-func (c *AuraCredentials) List() []*AuraCredential {
+func (c *AuraCredentials) Printable() PrintableAuraCredentials {
 	return c.Credentials
-}
-
-func (config *AuraCredentials) Print(writer io.Writer) error {
-	encoder := json.NewEncoder(writer)
-	encoder.SetIndent("", "\t")
-
-	if err := encoder.Encode(config.Credentials); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *AuraCredentials) Add(name string, clientId string, clientSecret string) error {
@@ -134,14 +122,14 @@ func (c *AuraCredentials) credentialExists(name string) bool {
 	return false
 }
 
-// CredentialData wraps a slice of AuraCredential and satisfies the
+// PrintableAuraCredentials wraps a slice of AuraCredential and satisfies the
 // common/output.ResponseData interface (AsArray + GetSingleOrError) via
 // structural typing, so PrintBodyMap can render it as a table or JSON.
-type CredentialData []*AuraCredential
+type PrintableAuraCredentials []*AuraCredential
 
 // AsArray returns each credential as a {"name": ..., "client-id": ...} map for
 // table rendering. Sensitive fields (client-secret, access-token) are omitted.
-func (d CredentialData) AsArray() []map[string]any {
+func (d PrintableAuraCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d))
 	for i, cred := range d {
 		result[i] = map[string]any{
@@ -154,7 +142,7 @@ func (d CredentialData) AsArray() []map[string]any {
 
 // GetSingleOrError returns the single credential map, or an error if the slice
 // does not contain exactly one entry.
-func (d CredentialData) GetSingleOrError() (map[string]any, error) {
+func (d PrintableAuraCredentials) GetSingleOrError() (map[string]any, error) {
 	if len(d) != 1 {
 		return nil, fmt.Errorf("expected exactly 1 credential, got %d", len(d))
 	}
@@ -166,7 +154,7 @@ func (d CredentialData) GetSingleOrError() (map[string]any, error) {
 
 // MarshalJSON renders CredentialData as a JSON array of objects with name and
 // client-id fields, matching what the table renders.
-func (d CredentialData) MarshalJSON() ([]byte, error) {
+func (d PrintableAuraCredentials) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.AsArray())
 }
 

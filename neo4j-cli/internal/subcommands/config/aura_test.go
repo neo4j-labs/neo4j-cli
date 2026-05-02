@@ -213,7 +213,7 @@ func TestNeo4jAuraConfigNoLongerExists(t *testing.T) {
 			fs, err := testfs.GetTestFs(`{}`, `{}`)
 			assert.Nil(t, err)
 
-			cfg := clicfg.NewConfig(fs, "test")
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 			cobra.EnableTraverseRunHooks = true
 
 			// Build a full neo4j root command with both aura and config subcommands.

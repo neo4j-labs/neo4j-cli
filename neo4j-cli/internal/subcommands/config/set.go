@@ -4,8 +4,6 @@
 package config
 
 import (
-	"strings"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
@@ -29,24 +27,7 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 			value := args[1]
-
-			// Validate value for "output" key
-			if key == "output" {
-				valid := false
-				for _, v := range clicfg.ValidOutputValues {
-					if v == value {
-						valid = true
-						break
-					}
-				}
-				if !valid {
-					return clierr.NewUsageError("invalid value for 'output': %s (valid values: %s)", value, strings.Join(clicfg.ValidOutputValues[:], ", "))
-				}
-			}
-
-			cfg.Global.Set(key, value)
-
-			return nil
+			return cfg.Global.Set(key, value)
 		},
 	}
 }

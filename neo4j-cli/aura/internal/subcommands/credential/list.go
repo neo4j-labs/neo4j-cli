@@ -5,7 +5,6 @@ package credential
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +16,7 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "list credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			output.PrintBodyMap(cmd, cfg, credentials.CredentialData(cfg.Credentials.Aura.List()), credentialFields)
+			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), credentialFields)
 			return nil
 		},
 	}

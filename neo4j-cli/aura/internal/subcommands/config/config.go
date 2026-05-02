@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var configPrintFields = []string{"key", "value"}
+
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -23,4 +25,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	return cmd
+}
+
+func getValidConfigKeys(cfg *clicfg.Config) []string {
+	return append(append([]string{}, cfg.Aura.ValidConfigKeys[:]...), cfg.Global.ValidConfigKeys[:]...) // valid keys are both global and subcommand-specific keys
 }
