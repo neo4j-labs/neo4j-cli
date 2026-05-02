@@ -68,6 +68,44 @@ func TestConfigGet(t *testing.T) {
 			command: `config get invalid-key`,
 			wantErr: `Error: invalid argument "invalid-key" for "neo4j-cli config get"`,
 		},
+		{
+			name:    "get aura.default-tenant returns default (null) value as JSON",
+			command: "config get aura.default-tenant --output json",
+			wantOut: `{
+	"aura.default-tenant": null
+}`,
+		},
+		{
+			name: "get aura.default-tenant returns configured value as JSON",
+			configSetup: func(h *neo4jTestHelper) {
+				h.setConfigValue("aura.default-tenant", "my-tenant")
+			},
+			command: "config get aura.default-tenant --output json",
+			wantOut: `{
+	"aura.default-tenant": "my-tenant"
+}`,
+		},
+		{
+			name:    "get aura.default-tenant renders as table",
+			command: "config get aura.default-tenant --output table",
+			wantOutFunc: func(t *testing.T, outStr string) {
+				assert.Contains(t, outStr, "KEY")
+				assert.Contains(t, outStr, "VALUE")
+				assert.Contains(t, outStr, "aura.default-tenant")
+			},
+		},
+		{
+			name:    "get aura.output returns error (output is global-only)",
+			command: "config get aura.output",
+			wantErr: `Error: invalid argument "aura.output" for "neo4j-cli config get"`,
+		},
+		{
+			name:    "get aura.base-url returns default value as JSON",
+			command: "config get aura.base-url --output json",
+			wantOut: `{
+	"aura.base-url": "https://api.neo4j.io"
+}`,
+		},
 	}
 
 	for _, tc := range tests {
