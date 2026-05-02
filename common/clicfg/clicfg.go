@@ -142,6 +142,10 @@ func (c *Config) Printable() PrintableConfigData {
 	if c.scope == AuraScope {
 		auraData := make(PrintableConfigData, 0, len(c.Aura.ValidConfigKeys))
 		for _, key := range c.Aura.ValidConfigKeys {
+			// Skip keys that are already included as global keys to avoid duplication
+			if c.Global.IsValidConfigKey(key) {
+				continue
+			}
 			auraData = append(auraData, PrintableConfigEntry{Key: key, Value: c.Aura.Get(key)})
 		}
 		data = append(data, auraData...)

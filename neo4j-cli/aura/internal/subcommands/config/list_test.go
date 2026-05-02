@@ -4,6 +4,7 @@
 package config_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -47,4 +48,20 @@ func TestListConfigFiltersUnrecognisedKeys(t *testing.T) {
 	assert.Contains(t, outStr, "auth-url")
 	assert.Contains(t, outStr, "base-url")
 	assert.NotContains(t, outStr, "beta-enabled")
+}
+
+func TestListConfigOutputAppearsOnce(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("output", "table")
+
+	helper.ExecuteCommand("config list")
+
+	// "output" must appear exactly once as a global key — not duplicated as an aura-scoped key
+	outStr := helper.PrintOut()
+	assert.Equal(t, 1, strings.Count(outStr, "output"), "expected \"output\" to appear exactly once in list output")
+	// aura keys must appear without the "aura." prefix
+	assert.Contains(t, outStr, "default-tenant")
+	assert.NotContains(t, outStr, "aura.default-tenant")
 }
