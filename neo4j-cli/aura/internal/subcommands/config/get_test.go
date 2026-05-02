@@ -18,7 +18,7 @@ func TestGetConfig(t *testing.T) {
 
 	helper.ExecuteCommand("config get auth-url")
 
-	helper.AssertOutJson(`{"Key": "auth-url", "Value": "test"}`)
+	helper.AssertOutJson(`{"auth-url": "test"}`)
 }
 
 func TestGetConfigDefault(t *testing.T) {

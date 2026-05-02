@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var projectPrintFields = []string{"name", "organizationId", "projectId", "default"}
+var projectPrintFields = []string{"name", "organization-id", "project-id", "default"}
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{

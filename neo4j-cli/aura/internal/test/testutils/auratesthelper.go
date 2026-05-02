@@ -141,6 +141,15 @@ func (helper *AuraTestHelper) AssertOutJson(expected string) {
 	assert.Equal(helper.t, formattedExpected, string(out))
 }
 
+func (helper *AuraTestHelper) AssertOutContainsStrings(expected []string) {
+	out, err := io.ReadAll(helper.out)
+	assert.Nil(helper.t, err)
+
+	for _, exp := range expected {
+		assert.Contains(helper.t, string(out), exp)
+	}
+}
+
 func (helper *AuraTestHelper) AssertConfig(expected string) {
 	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
 	assert.Nil(helper.t, err)

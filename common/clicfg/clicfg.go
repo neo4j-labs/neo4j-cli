@@ -4,6 +4,7 @@
 package clicfg
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -109,6 +110,11 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		ValidConfigKeys: []string{"output"},
 	}
 
+	validAuraConfigKeys := []string{"auth-url", "base-url", "default-tenant"}
+	if scope == AuraScope {
+		validAuraConfigKeys = append(validAuraConfigKeys, globalConfig.ValidConfigKeys...)
+	}
+
 	return &Config{
 		Version: version,
 		Aura: &AuraConfig{
@@ -118,7 +124,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 				Interval:   20,
 			},
 			// TODO: just append global here if just aura scope?
-			ValidConfigKeys: []string{"auth-url", "base-url", "default-tenant"},
+			ValidConfigKeys: validAuraConfigKeys,
 			Projects:        projects,
 		},
 		Global:      globalConfig,
@@ -159,9 +165,36 @@ type PrintableConfigEntry struct {
 }
 
 func (e PrintableConfigEntry) AsArray() []map[string]any {
+	if e.Key == "aura-projects" {
+		valueMap := e.Value.(map[string]interface{})
+		defaultProject := valueMap["default"].(string)
+		projects := valueMap["projects"].(map[string]interface{})
+		res := make([]map[string]any, len(projects))
+		for projectName, projectData := range projects {
+			projectMap := projectData.(map[string]interface{})
+			res = append(res, map[string]any{
+				"name":            projectName,
+				"organization-id": projectMap["organization-id"],
+				"project-id":      projectMap["project-id"],
+				"default":         projectName == defaultProject,
+			})
+		}
+		return res
+	}
+
 	return []map[string]any{
 		{"key": e.Key, "value": e.Value},
 	}
+}
+
+func (e PrintableConfigEntry) MarshalJSON() ([]byte, error) {
+	if e.Key == "aura-projects" {
+		return json.Marshal(e.Value)
+	}
+
+	return json.Marshal(map[string]any{
+		e.Key: e.Value,
+	})
 }
 
 // PrintableConfigData is a slice of ConfigEntry that satisfies the ResponseData interface,
@@ -180,15 +213,15 @@ func (d PrintableConfigData) AsArray() []map[string]any {
 	return result
 }
 
-// // MarshalJSON renders ConfigData as a flat map {key: value, ...} so that
-// // PrintBodyMap JSON output is {"output": "json", ...} rather than an array.
-// func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
-// 	m := make(map[string]interface{}, len(d))
-// 	for _, e := range d {
-// 		m[e.Key] = e.Value
-// 	}
-// 	return json.Marshal(m)
-// }
+// MarshalJSON renders ConfigData as a flat map {key: value, ...} so that
+// PrintBodyMap JSON output is {"output": "json", ...} rather than an array.
+func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
+	m := make(map[string]interface{}, len(d))
+	for _, e := range d {
+		m[e.Key] = e.Value
+	}
+	return json.Marshal(m)
+}
 
 func bindEnvironmentVariables(Viper *viper.Viper) {
 	Viper.BindEnv("aura.base-url", "AURA_BASE_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
@@ -225,6 +258,10 @@ func (config *AuraConfig) Get(key string) interface{} {
 	// Bit of a hack for a global config key
 	// TODO: refactor this for global config keys to be properly namespaced (e.g. "output" vs "aura.output") and remove this special case
 	if key == "output" {
+		return config.viper.Get(key)
+	}
+	// TODO: also clean up this hack for aura-projects key
+	if key == "aura-projects" {
 		return config.viper.Get(key)
 	}
 	return config.viper.Get(fmt.Sprintf("aura.%s", key))

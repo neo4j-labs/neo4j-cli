@@ -13,7 +13,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:       "get <key>",
 		Short:     "Displays the specified configuration value",
-		ValidArgs: getValidConfigKeys(cfg),
+		ValidArgs: cfg.Aura.ValidConfigKeys,
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]

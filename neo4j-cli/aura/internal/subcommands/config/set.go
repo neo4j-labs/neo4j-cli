@@ -4,8 +4,6 @@
 package config
 
 import (
-	"slices"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
@@ -21,7 +19,7 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 			}
 
 			key := args[0]
-			if !slices.Contains(getValidConfigKeys(cfg), key) {
+			if !cfg.Aura.IsValidConfigKey(key) {
 				return clierr.NewUsageError("invalid config key specified: %s", key)
 			}
 
@@ -31,12 +29,12 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 			key := args[0]
 			value := args[1]
 
+			if cfg.Global.IsValidConfigKey(key) {
+				return cfg.Global.Set(key, value)
+			}
 			if cfg.Aura.IsValidConfigKey(key) {
 				cfg.Aura.Set(key, value)
 				return nil
-			}
-			if cfg.Global.IsValidConfigKey(key) {
-				return cfg.Global.Set(key, value)
 			}
 
 			// Should never get here due to validation in Args, but adding a safeguard just in case
