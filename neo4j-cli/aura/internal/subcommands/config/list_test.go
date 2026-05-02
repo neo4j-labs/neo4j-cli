@@ -19,7 +19,8 @@ func TestListConfig(t *testing.T) {
 
 	helper.ExecuteCommand("config list")
 
-	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
+	// standalone config list includes both global keys (output) and aura-scoped keys
+	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null,"output": "default"}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
 }
 
 func TestListConfigFiltersUnrecognisedKeys(t *testing.T) {
@@ -30,5 +31,6 @@ func TestListConfigFiltersUnrecognisedKeys(t *testing.T) {
 
 	helper.ExecuteCommand("config list")
 
-	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
+	// standalone config list includes both global keys (output) and aura-scoped keys; unrecognised keys are filtered out
+	helper.AssertOutJson(fmt.Sprintf(`{"auth-url": "%s","base-url": "%s","default-tenant": null,"output": "default"}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
 }

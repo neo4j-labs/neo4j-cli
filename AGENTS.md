@@ -159,6 +159,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Go's `internal` package rules prevent `neo4j-cli/internal/subcommands/config` from directly importing `neo4j-cli/aura/internal/subcommands/config` — bridge via a thin wrapper function in the non-internal `neo4j-cli/aura/` package (e.g. `NewAuraConfigCmd` in `aura/config.go`)
 - When moving a subcommand from one path to another (e.g. `neo4j aura config` → `neo4j config aura`), the `cmd.Use` field must be renamed to match the new path segment — set it on the returned command before mounting
 - If `NewStandaloneCmd` calls `NewCmd` and then adds extras, removing a subcommand from `NewCmd` also removes it from standalone; add it back directly in `NewStandaloneCmd` as a temporary hold until the standalone-specific version is implemented
+- The standalone aura-cli flat config command (`NewStandaloneConfigCmd`) routes key operations by checking `cfg.Global.IsValidConfigKey(key)` first, then `cfg.Aura.IsValidConfigKey(key)` — global keys take precedence; use `allStandaloneConfigKeys(cfg)` to combine both for `ValidArgs` on get subcommands
 
 ## Output Rendering Notes
 

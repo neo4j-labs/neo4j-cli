@@ -39,7 +39,8 @@ func TestSetConfigWithInvalidOutputValue(t *testing.T) {
 
 	helper.ExecuteCommand("config set output invalid")
 
-	helper.AssertErr("Error: invalid config key specified: output")
+	// output is now a valid global key; the error is about the invalid value, not the key
+	helper.AssertErr("Error: invalid value for 'output': invalid (valid values: default, json, table)")
 }
 
 func TestSetBetaEnabledConfig(t *testing.T) {

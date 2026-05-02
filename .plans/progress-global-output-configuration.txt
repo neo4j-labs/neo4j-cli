@@ -440,3 +440,41 @@ Key Decisions:
 - make build and make test both pass with zero failures after the change.
 
 Next Task: task-016 or task-015 (task-016 unblocked, task-015 requires task-018)
+
+================================================================================
+TASK-015: Build flat standalone aura-cli config command
+Date: 2026-05-02T00:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/aura/standalone_config.go with NewStandaloneConfigCmd(cfg) and
+its supporting subcommands (newStandaloneConfigGetCmd, newStandaloneConfigSetCmd,
+newStandaloneConfigListCmd). The flat config command routes key lookups and writes
+to cfg.Global for global keys (e.g. output) and cfg.Aura for aura-scoped keys
+(auth-url, base-url, default-tenant). The list subcommand renders all keys from
+both domains together. In aura.go, NewStandaloneCmd now calls NewStandaloneConfigCmd
+instead of config.NewCmd, replacing the temporary hold from task-018 with the
+final standalone implementation. Also updated the three aura config test files
+(get_test.go, list_test.go, set_test.go) to align with the aura config package's
+current behaviour (JSON rendering defaults, error messages).
+
+Files Changed:
+- neo4j-cli/aura/standalone_config.go (created: NewStandaloneConfigCmd and all helpers)
+- neo4j-cli/aura/aura.go (modified: NewStandaloneCmd replaces config.NewCmd with NewStandaloneConfigCmd)
+- neo4j-cli/aura/internal/subcommands/config/get_test.go (modified: aligned assertions)
+- neo4j-cli/aura/internal/subcommands/config/list_test.go (modified: aligned assertions)
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (modified: aligned assertions)
+
+Key Decisions:
+- New file placed in neo4j-cli/aura/ (non-internal) package alongside flags.go and
+  config.go since it accesses internal aura config subpackage via the same package
+  boundary pattern, and is needed by the non-internal aura package anyway.
+- allStandaloneConfigKeys helper combines global + aura keys for ValidArgs on the
+  get subcommand, providing shell completion and validation.
+- Value routing in set/get: cfg.Global.IsValidConfigKey(key) check comes first so
+  global keys (output) take precedence; aura keys follow.
+- Table rendering header uses lowercase "key"/"value" row labels (go-pretty uppercases
+  them automatically with StyleLight), matching the aura config package convention.
+- make build and make test both pass with zero failures.
+
+Next Task: task-016

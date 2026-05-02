@@ -303,7 +303,8 @@ tasks:
       The change applies ONLY to the standalone path (NewStandaloneCmd). NewCmd (used when
       mounted as neo4j aura) must not include this standalone config command — the neo4j super-CLI
       already has neo4j config and neo4j config aura for this purpose (see task-018).
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T00:00:00Z
     dependencies:
       - task-013
       - task-018
