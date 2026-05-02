@@ -28,9 +28,12 @@ func TestListCredentials(t *testing.T) {
 			wantOutFunc: func(t *testing.T, out string) {
 				t.Helper()
 				assert.Contains(t, out, `"name": "test-cred"`)
-				assert.Contains(t, out, `"client-id": "client-abc"`)
+				assert.Contains(t, out, `"type": "aura-client"`)
+				assert.Contains(t, out, `"identifier": "client-abc"`)
 				assert.Contains(t, out, `"name": "other-cred"`)
-				assert.Contains(t, out, `"client-id": "client-xyz"`)
+				assert.Contains(t, out, `"identifier": "client-xyz"`)
+				assert.NotContains(t, out, "client-secret")
+				assert.NotContains(t, out, "access-token")
 			},
 		},
 		{
@@ -43,11 +46,15 @@ func TestListCredentials(t *testing.T) {
 			wantOutFunc: func(t *testing.T, out string) {
 				t.Helper()
 				assert.Contains(t, out, "NAME")
-				assert.Contains(t, out, "CLIENT-ID")
+				assert.Contains(t, out, "TYPE")
+				assert.Contains(t, out, "IDENTIFIER")
 				assert.Contains(t, out, "test-cred")
+				assert.Contains(t, out, "aura-client")
 				assert.Contains(t, out, "client-abc")
 				assert.Contains(t, out, "other-cred")
 				assert.Contains(t, out, "client-xyz")
+				assert.NotContains(t, out, "client-secret")
+				assert.NotContains(t, out, "access-token")
 			},
 		},
 		{
@@ -60,7 +67,10 @@ func TestListCredentials(t *testing.T) {
 				t.Helper()
 				// Test helper configures output=json, so default mode renders JSON
 				assert.Contains(t, out, `"name": "default-cred"`)
-				assert.Contains(t, out, `"client-id": "client-default"`)
+				assert.Contains(t, out, `"type": "aura-client"`)
+				assert.Contains(t, out, `"identifier": "client-default"`)
+				assert.NotContains(t, out, "client-secret")
+				assert.NotContains(t, out, "access-token")
 			},
 		},
 		{
@@ -71,6 +81,14 @@ func TestListCredentials(t *testing.T) {
 				t.Helper()
 				assert.Contains(t, out, "[]")
 			},
+		},
+		{
+			name:    "list credentials with positional argument returns cobra error",
+			command: "credential list aura-client",
+			credentials: []map[string]string{
+				{"name": "test-cred", "client-id": "client-abc", "client-secret": "secret-abc"},
+			},
+			wantErrPrefix: `Error: unknown command "aura-client" for "aura-cli credential list"`,
 		},
 	}
 

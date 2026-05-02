@@ -84,7 +84,7 @@ func newCredentialListAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "aura-client",
 		Short: "Lists Aura client credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			output.PrintBodyMap(cmd, cfg, credentials.PrintableAuraCredentials(cfg.Credentials.Aura.Printable()), []string{"name", "client-id"})
+			output.PrintBodyMap(cmd, cfg, credentials.PrintableAuraCredentials(cfg.Credentials.Aura.Printable()), []string{"name", "type", "identifier"})
 			return nil
 		},
 	}

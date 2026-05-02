@@ -180,7 +180,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			name:         "lists all stored credentials as table (default)",
 			command:      "list aura-client",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			wantContains: []string{"NAME", "CLIENT-ID", "test", "testclientid"},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "test", "aura-client", "testclientid"},
 		},
 		{
 			name:         "lists all stored credentials as json",
@@ -188,8 +188,9 @@ func TestCredentialListAuraClient(t *testing.T) {
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantOut: `[
 	{
-		"client-id": "testclientid",
-		"name": "test"
+		"identifier": "testclientid",
+		"name": "test",
+		"type": "aura-client"
 	}
 ]`,
 		},
@@ -197,7 +198,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			name:         "lists empty credentials as table (default)",
 			command:      "list aura-client",
 			initialCreds: []map[string]string{},
-			wantContains: []string{"NAME", "CLIENT-ID"},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER"},
 		},
 		{
 			name:         "lists empty credentials as json",

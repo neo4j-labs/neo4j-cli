@@ -9,12 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var credentialFields = []string{"name", "client-id"}
+var credentialFields = []string{"name", "type", "identifier"}
 
 func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "list credentials",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), credentialFields)
 			return nil

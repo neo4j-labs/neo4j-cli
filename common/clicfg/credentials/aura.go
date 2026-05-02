@@ -127,14 +127,15 @@ func (c *AuraCredentials) credentialExists(name string) bool {
 // structural typing, so PrintBodyMap can render it as a table or JSON.
 type PrintableAuraCredentials []*AuraCredential
 
-// AsArray returns each credential as a {"name": ..., "client-id": ...} map for
-// table rendering. Sensitive fields (client-secret, access-token) are omitted.
+// AsArray returns each credential as a {"name": ..., "type": ..., "identifier": ...}
+// map for table rendering. Sensitive fields (client-secret, access-token) are omitted.
 func (d PrintableAuraCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d))
 	for i, cred := range d {
 		result[i] = map[string]any{
-			"name":      cred.Name,
-			"client-id": cred.ClientId,
+			"name":       cred.Name,
+			"type":       "aura-client",
+			"identifier": cred.ClientId,
 		}
 	}
 	return result
@@ -147,13 +148,14 @@ func (d PrintableAuraCredentials) GetSingleOrError() (map[string]any, error) {
 		return nil, fmt.Errorf("expected exactly 1 credential, got %d", len(d))
 	}
 	return map[string]any{
-		"name":      d[0].Name,
-		"client-id": d[0].ClientId,
+		"name":       d[0].Name,
+		"type":       "aura-client",
+		"identifier": d[0].ClientId,
 	}, nil
 }
 
-// MarshalJSON renders CredentialData as a JSON array of objects with name and
-// client-id fields, matching what the table renders.
+// MarshalJSON renders CredentialData as a JSON array of objects with name, type,
+// and identifier fields, matching what the table renders.
 func (d PrintableAuraCredentials) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.AsArray())
 }
