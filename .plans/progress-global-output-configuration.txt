@@ -512,3 +512,43 @@ Key Decisions:
 - make test passes with zero failures after the refactor.
 
 Next Task: task-017
+
+================================================================================
+TASK-017: Tests for standalone flat config and neo4j config aura
+Date: 2026-05-02T13:00:00Z
+================================================================================
+
+Summary:
+Added table-driven tests for two areas:
+1. Standalone aura-cli flat config command (NewStandaloneConfigCmd via AuraTestHelper):
+   - standalone_config_test.go in neo4j-cli/aura/internal/subcommands/config/
+   - Three test functions: TestStandaloneConfigGet, TestStandaloneConfigSet, TestStandaloneConfigList
+   - Covers all standalone acceptance criteria: set/get output (global key), set/get auth-url
+     (aura-routed key), config list includes both output and aura keys, invalid key errors,
+     invalid output value errors
+2. neo4j config aura path (using existing neo4jTestHelper wired to config.NewCmd):
+   - aura_test.go in neo4j-cli/internal/subcommands/config/
+   - Four test functions: TestConfigAuraGet, TestConfigAuraSet, TestConfigAuraList,
+     TestNeo4jAuraConfigNoLongerExists
+   - Covers: get/set auth-url, set output errors with invalid key, list shows aura keys only,
+     and "neo4j aura config list" no longer works (shows aura help instead)
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go (created: 3 table-driven test functions for standalone config)
+- neo4j-cli/internal/subcommands/config/aura_test.go (created: 4 table-driven test functions for neo4j config aura)
+
+Key Decisions:
+- Cobra's legacy-args behavior: child commands (those with parents) accept arbitrary args without
+  erroring on unknown subcommands, so "neo4j aura config list" shows the aura help instead of
+  returning "unknown command". TestNeo4jAuraConfigNoLongerExists tests for the help display
+  (containing "neo4j-cli aura") and the absence of "config" as an available command.
+- Standalone tests placed in the same package (config_test) as existing aura config tests;
+  using AuraTestHelper which is already wired to NewStandaloneCmd.
+- Neo4j config aura tests use the existing neo4jTestHelper from helpers_test.go which builds
+  a minimal root with config.NewCmd(cfg) — config includes aura.NewAuraConfigCmd so "config
+  aura" commands work; but no "aura" top-level command is added in the helper (except for the
+  TestNeo4jAuraConfigNoLongerExists test which uses an inline setup).
+- All tests use table-driven style per REQ-NF-006.
+- make test passes with zero failures across all packages.
+
+Next Task: All tasks complete

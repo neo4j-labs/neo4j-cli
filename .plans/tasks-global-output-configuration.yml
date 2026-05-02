@@ -369,7 +369,8 @@ tasks:
       - neo4j aura config list → errors (command no longer exists)
 
       All tests must use table-driven style per REQ-NF-006.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T13:00:00Z
     dependencies:
       - task-015
       - task-016
