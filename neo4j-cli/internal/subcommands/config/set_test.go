@@ -45,12 +45,35 @@ func TestConfigSet(t *testing.T) {
 		{
 			name:    "set unknown key returns error",
 			command: "config set unknown-key value",
-			wantErr: "Error: invalid config key specified: unknown-key",
+			wantErr: `Error: invalid config key: "unknown-key"`,
 		},
 		{
 			name:             "set with missing value returns error",
 			command:          "config set output",
 			wantErrSubstring: "Error",
+		},
+		// Dot-notation aura keys
+		{
+			name:            "set aura.base-url writes to aura.base-url",
+			command:         "config set aura.base-url https://example.com",
+			wantConfigKey:   "aura.base-url",
+			wantConfigValue: "https://example.com",
+		},
+		{
+			name:            "set aura.default-tenant writes to aura.default-tenant",
+			command:         "config set aura.default-tenant my-tenant",
+			wantConfigKey:   "aura.default-tenant",
+			wantConfigValue: "my-tenant",
+		},
+		{
+			name:    "set aura.output returns error (global-only key)",
+			command: "config set aura.output json",
+			wantErr: `Error: invalid config key: "aura.output" is a global key and cannot be addressed with the "aura." prefix`,
+		},
+		{
+			name:    "set aura.unknown returns error",
+			command: "config set aura.unknown value",
+			wantErr: `Error: invalid config key: "aura.unknown"`,
 		},
 	}
 
