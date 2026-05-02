@@ -409,3 +409,34 @@ Key Decisions:
   import changes while the real logic now lives in common/output.
 
 Next Task: task-015
+
+================================================================================
+TASK-018: Move neo4j aura config → neo4j config aura
+Date: 2026-05-02T11:00:00Z
+================================================================================
+
+Summary:
+Removed config.NewCmd(cfg) from aura.NewCmd() so that "neo4j aura config" no longer
+exists. Added it to NewStandaloneCmd() so the standalone aura-cli binary retains its
+config command (to be replaced by NewStandaloneConfigCmd in task-015). Created a thin
+wrapper function NewAuraConfigCmd in neo4j-cli/aura/config.go that wraps the internal
+aura config command with Use="aura" and an updated Short description, suitable for
+mounting as "neo4j config aura". Added this wrapper as a subcommand of the neo4j
+config command in neo4j-cli/internal/subcommands/config/config.go.
+
+Files Changed:
+- neo4j-cli/aura/aura.go (modified: removed config from NewCmd, added to NewStandaloneCmd)
+- neo4j-cli/aura/config.go (created: NewAuraConfigCmd wrapper with Use="aura")
+- neo4j-cli/internal/subcommands/config/config.go (modified: added aura.NewAuraConfigCmd subcommand)
+
+Key Decisions:
+- Created a thin wrapper in the non-internal aura package (config.go) to bridge from
+  neo4j-cli/internal/subcommands/config to neo4j-cli/aura/internal/subcommands/config,
+  respecting Go's internal package visibility rules.
+- NewStandaloneCmd retains config.NewCmd(cfg) temporarily so standalone aura-cli remains
+  functional; task-015 will replace it with NewStandaloneConfigCmd.
+- No import cycle: neo4j-cli/internal/subcommands/config imports neo4j-cli/aura, and
+  neo4j-cli/aura imports nothing from neo4j-cli/internal.
+- make build and make test both pass with zero failures after the change.
+
+Next Task: task-016 or task-015 (task-016 unblocked, task-015 requires task-018)

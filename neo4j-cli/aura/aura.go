@@ -25,7 +25,6 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: cfg.Version,
 	}
 
-	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(customermanagedkey.NewCmd(cfg))
 	cmd.AddCommand(instance.NewCmd(cfg))
 	cmd.AddCommand(tenant.NewCmd(cfg))
@@ -41,6 +40,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := NewCmd(cfg)
+	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCmd(cfg))
 	return cmd
 }

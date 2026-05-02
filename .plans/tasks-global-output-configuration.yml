@@ -396,7 +396,8 @@ tasks:
          aura ValidConfigKeys), and that neo4j config aura get auth-url returns the correct value.
       4. make build must succeed; grep for "aura config" in integration test output to confirm
          the old path is gone and the new path works.
-    status: todo
+    status: completed
+    completed_at: 2026-05-02T11:00:00Z
     dependencies:
       - task-013
     acceptance_criteria:
