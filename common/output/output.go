@@ -9,10 +9,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/neo4j/cli/common/clicfg"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
-
-	"github.com/neo4j/cli/common/clicfg"
 )
 
 // ResponseData is the interface that all API response types must satisfy to be
