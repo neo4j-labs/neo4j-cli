@@ -17,7 +17,10 @@ type AuraCredentials struct {
 }
 
 func (c *AuraCredentials) Printable() PrintableAuraCredentials {
-	return c.Credentials
+	return PrintableAuraCredentials{
+		credentials:       c.Credentials,
+		defaultCredential: c.DefaultCredential,
+	}
 }
 
 func (c *AuraCredentials) Add(name string, clientId string, clientSecret string) error {
@@ -124,17 +127,21 @@ func (c *AuraCredentials) credentialExists(name string) bool {
 // PrintableAuraCredentials wraps a slice of AuraCredential and satisfies the
 // common/output.ResponseData interface (AsArray) via
 // structural typing, so PrintBodyMap can render it as a table or JSON.
-type PrintableAuraCredentials []*AuraCredential
+type PrintableAuraCredentials struct {
+	credentials       []*AuraCredential
+	defaultCredential string
+}
 
 // AsArray returns each credential as a {"name": ..., "type": ..., "identifier": ...}
 // map for table rendering. Sensitive fields (client-secret, access-token) are omitted.
 func (d PrintableAuraCredentials) AsArray() []map[string]any {
-	result := make([]map[string]any, len(d))
-	for i, cred := range d {
+	result := make([]map[string]any, len(d.credentials))
+	for i, cred := range d.credentials {
 		result[i] = map[string]any{
 			"name":       cred.Name,
 			"type":       "aura-client",
 			"identifier": cred.ClientId,
+			"default":    cred.Name == d.defaultCredential,
 		}
 	}
 	return result

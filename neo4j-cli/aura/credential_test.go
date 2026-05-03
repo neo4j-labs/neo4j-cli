@@ -188,6 +188,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantOut: `[
 	{
+		"default": false,
 		"identifier": "testclientid",
 		"name": "test",
 		"type": "aura-client"
