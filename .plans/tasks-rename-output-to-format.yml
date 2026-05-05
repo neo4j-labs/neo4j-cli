@@ -99,7 +99,7 @@ tasks:
       (`SKILL.md` and `references/*.md` under both `neo4j-cli/internal/skill/bundle/` and
       `neo4j-cli/aura/internal/skill/bundle/`). Verify `make generate-check` exits 0,
       confirming the committed files match the generated output from the updated cobra tree.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -107,7 +107,7 @@ tasks:
       - "`make generate` exits 0"
       - "`make generate-check` exits 0 (no diff between committed bundles and freshly generated output)"
       - "Generated bundle files contain `--format` / `-f`, not `--output`"
-    completed_at: null
+    completed_at: "2026-05-05T00:00:00Z"
 
   - id: task-006
     title: "Final gate: make test, make fmt-check, make generate-check"

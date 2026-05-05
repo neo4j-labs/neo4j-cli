@@ -112,3 +112,26 @@ Key Decisions:
 - Ran `make test` and `make fmt-check` — all pass
 
 Next Task: task-005 (Update additions.md files and regenerate skill bundles)
+
+================================================================================
+TASK-005: Update additions.md files and regenerate skill bundles with make generate
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Skill bundle regeneration was completed as part of the task-004 iteration. The
+additions.md and description.txt source files for both skill bundles were updated
+to replace `--output` with `--format`/`-f`, and `make generate` was run to
+regenerate all committed bundle files. `make generate-check` exits 0 confirming
+the committed files match the freshly generated output.
+
+All acceptance criteria satisfied (completed in task-004 iteration):
+- neo4j-cli/internal/skill/additions.md: no --output references
+- neo4j-cli/aura/internal/skill/additions.md: no --output references
+- make generate exits 0
+- make generate-check exits 0
+- Generated bundle files contain --format / -f, not --output
+
+Status: APPROVED by hone-reviewer — no issues found.
+
+Next Task: task-006 (Final gate: make test, make fmt-check, make generate-check)
