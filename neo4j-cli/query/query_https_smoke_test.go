@@ -34,13 +34,13 @@ import (
 
 const (
 	httpsContainerName = "neo4j-https-test"
-	httpsImage         = "neo4j:5"
+	httpsImage         = "neo4j:latest"
 	httpsPassword      = "testtest"
 	httpsReadyTimeout  = 60 * time.Second
 )
 
 // TestHTTPS_Smoke is an env-gated pure-Go integration test. It boots a real
-// neo4j:5 container with HTTPS enabled (using a stdlib-generated self-signed
+// neo4j:latest container with HTTPS enabled (using a stdlib-generated self-signed
 // cert) and verifies the `--insecure` flag end-to-end. Skipped by default so
 // `go test ./...` is unaffected; opt in with NEO4J_HTTPS_TEST=1.
 //
@@ -173,7 +173,7 @@ func generateSelfSignedCert(t *testing.T, dir string) {
 	require.NoError(t, os.Chmod(dir, 0o755))
 }
 
-// bootNeo4jHTTPS starts the neo4j:5 container detached, with HTTPS enabled
+// bootNeo4jHTTPS starts the neo4j:latest container detached, with HTTPS enabled
 // and the cert dir bind-mounted read-only at /ssl. Same env vars as the
 // previous shell script.
 func bootNeo4jHTTPS(t *testing.T, certDir string, httpsPort, httpPort int) {
