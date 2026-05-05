@@ -1,0 +1,41 @@
+================================================================================
+TASK-001: Rewrite query_https_smoke_test.go as pure-Go integration test
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Replaced the bash-driven smoke test wrapper with a self-contained pure-Go
+test. The new TestHTTPS_Smoke generates a self-signed RSA-2048 cert via
+stdlib crypto/*, picks two random free TCP ports on 127.0.0.1, boots
+neo4j:5 via os/exec docker run, polls HTTPS readiness with
+InsecureSkipVerify, then drives the cobra `query` command in-process
+(NewCmd(cfg).Execute() with stdout/stderr buffers) for both positive
+(--insecure succeeds, stdout contains '1') and negative (default
+verification fails with TLS/x509/certificate error) assertions. Pre-clean
++ t.Cleanup both run `docker rm -f` for guaranteed teardown.
+
+Files Changed:
+- neo4j-cli/query/query_https_smoke_test.go (rewrote: ~230 lines pure Go,
+  replaces 49-line bash-script wrapper)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-001 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, created)
+
+Key Decisions:
+- Used os.OpenFile + explicit os.Chmod 0o644 on cert files to defeat
+  default umask (was an actual gotcha — the OpenFile mode bits are masked
+  on create).
+- Used MarshalPKCS8PrivateKey over PKCS1 for forward-compat; Neo4j reads
+  either.
+- Inlined a minimal stdout/stderr harness (runQueryCmd helper) rather
+  than reusing newRunHarness from run_test.go: the smoke test doesn't
+  need stdin/passwordReader seam overrides, and self-contained is
+  clearer.
+- Set 0755 on the t.TempDir() root so the in-container uid 7474 user can
+  traverse the read-only bind mount (TempDir defaults to 0700).
+- Added DNSNames=["localhost"] + IPAddresses=[127.0.0.1] to the cert SAN
+  even though tests use --insecure: harmless and makes the cert correct
+  if anyone ever flips on verification with a custom CA bundle.
+- Smoke test stays gated behind NEO4J_HTTPS_TEST=1; verified it skips
+  cleanly under `make test`.
+
+Next Task: task-002 (delete scripts/test-https.sh)

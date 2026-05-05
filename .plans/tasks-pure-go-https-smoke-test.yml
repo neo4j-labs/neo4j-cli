@@ -17,7 +17,7 @@ tasks:
       NEO4J_HTTPS_TEST=1 env-var skip gate. No new module dependencies.
       Drive the CLI in-process via NewCmd(cfg).Execute() with stdout/
       stderr buffers — same harness pattern as run_test.go:77-87.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "TestHTTPS_Smoke skips cleanly when NEO4J_HTTPS_TEST is not set to 1"
@@ -30,7 +30,7 @@ tasks:
       - "Negative assertion: same invocation without --insecure returns an error whose message matches (?i)tls|x509|certificate"
       - "NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/... passes locally; docker ps shows no neo4j-https-test after exit"
       - "go test ./... (no env var) is unaffected; make fmt-check and make lint are clean"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-002
     title: "Delete scripts/test-https.sh"
