@@ -114,7 +114,7 @@ func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("graph-analytics session list --output invalid")
+	helper.ExecuteCommand("graph-analytics session list --format invalid")
 
-	helper.AssertErr("Error: invalid output value specified: invalid")
+	helper.AssertErr("Error: invalid format value specified: invalid")
 }

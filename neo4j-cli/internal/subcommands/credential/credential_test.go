@@ -178,14 +178,14 @@ func TestCredentialListAuraClient(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			name:         "lists all stored credentials as table (explicit --output table)",
-			command:      "aura-client list --output table",
+			name:         "lists all stored credentials as table (explicit --format table)",
+			command:      "aura-client list --format table",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "test", "aura-client", "testclientid"},
 		},
 		{
-			name:         "lists all stored credentials as json (explicit --output json)",
-			command:      "aura-client list --output json",
+			name:         "lists all stored credentials as json (explicit --format json)",
+			command:      "aura-client list --format json",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantOut: `[
 	{
@@ -210,14 +210,14 @@ func TestCredentialListAuraClient(t *testing.T) {
 ]`,
 		},
 		{
-			name:         "lists empty credentials as table (explicit --output table)",
-			command:      "aura-client list --output table",
+			name:         "lists empty credentials as table (explicit --format table)",
+			command:      "aura-client list --format table",
 			initialCreds: []map[string]string{},
 			wantContains: []string{"NAME", "TYPE", "IDENTIFIER"},
 		},
 		{
-			name:         "lists empty credentials as json (explicit --output json)",
-			command:      "aura-client list --output json",
+			name:         "lists empty credentials as json (explicit --format json)",
+			command:      "aura-client list --format json",
 			initialCreds: []map[string]string{},
 			wantOut:      "[]",
 		},

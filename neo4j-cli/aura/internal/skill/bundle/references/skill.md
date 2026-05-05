@@ -10,7 +10,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
+| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ## aura-cli skill check
 

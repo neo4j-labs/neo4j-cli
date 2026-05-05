@@ -31,16 +31,16 @@ func TestSetConfigWithInvalidConfigKey(t *testing.T) {
 	helper.AssertErr("Error: invalid config key specified: invalid")
 }
 
-func TestSetConfigWithInvalidOutputValue(t *testing.T) {
+func TestSetConfigWithInvalidFormatValue(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config set output invalid")
+	helper.ExecuteCommand("config set format invalid")
 
-	// output is now a valid global key; the error is about the invalid value, not the key
-	helper.AssertErr("Error: invalid value for 'output': invalid (valid values: default, json, table)")
+	// format is a valid global key; the error is about the invalid value, not the key
+	helper.AssertErr("Error: invalid value for 'format': invalid (valid values: default, json, table)")
 }
 
 func TestSetBetaEnabledConfig(t *testing.T) {

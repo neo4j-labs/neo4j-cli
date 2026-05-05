@@ -20,43 +20,43 @@ func TestConfigGet(t *testing.T) {
 		wantOutFunc func(t *testing.T, outStr string)
 	}{
 		{
-			name:        "get output returns default when no config set",
+			name:        "get format returns default when no config set",
 			configSetup: func(h *neo4jTestHelper) {},
-			command:     "config get output",
+			command:     "config get format",
 			// "default" auto-detects: non-TTY test stdout → JSON rendering
 			wantOut: `{
-	"output": "default"
+	"format": "default"
 }`,
 		},
 		{
-			name: "get output returns JSON when output configured to json",
+			name: "get format returns JSON when format configured to json",
 			configSetup: func(h *neo4jTestHelper) {
-				h.setConfigValue("output", "json")
+				h.setConfigValue("format", "json")
 			},
-			command: "config get output",
-			// Output config is "json" so rendering format is JSON and value reported is "json"
+			command: "config get format",
+			// format config is "json" so rendering format is JSON and value reported is "json"
 			wantOut: `{
-	"output": "json"
+	"format": "json"
 }`,
 		},
 		{
-			name:    "get output with --output json flag renders JSON and reports json value",
-			command: "config get output --output json",
-			// --output json flag binds viper "output" to "json", so both the rendered
+			name:    "get format with --format json flag renders JSON and reports json value",
+			command: "config get format --format json",
+			// --format json flag binds viper "format" to "json", so both the rendered
 			// format and the reported value become "json".
 			wantOut: `{
-	"output": "json"
+	"format": "json"
 }`,
 		},
 		{
-			name:    "get output with --output table flag renders a table",
-			command: "config get output --output table",
-			// --output table overrides rendering; go-pretty renders header in uppercase with StyleLight.
-			// Flag binding also sets the viper "output" key to "table", so the displayed value is "table".
+			name:    "get format with --format table flag renders a table",
+			command: "config get format --format table",
+			// --format table overrides rendering; go-pretty renders header in uppercase with StyleLight.
+			// Flag binding also sets the viper "format" key to "table", so the displayed value is "table".
 			wantOutFunc: func(t *testing.T, outStr string) {
 				assert.Contains(t, outStr, "KEY")
 				assert.Contains(t, outStr, "VALUE")
-				assert.Contains(t, outStr, "output")
+				assert.Contains(t, outStr, "format")
 				assert.Contains(t, outStr, "table")
 			},
 		},
@@ -67,7 +67,7 @@ func TestConfigGet(t *testing.T) {
 		},
 		{
 			name:    "get aura.default-tenant returns default (null) value as JSON",
-			command: "config get aura.default-tenant --output json",
+			command: "config get aura.default-tenant --format json",
 			wantOut: `{
 	"aura.default-tenant": null
 }`,
@@ -77,14 +77,14 @@ func TestConfigGet(t *testing.T) {
 			configSetup: func(h *neo4jTestHelper) {
 				h.setConfigValue("aura.default-tenant", "my-tenant")
 			},
-			command: "config get aura.default-tenant --output json",
+			command: "config get aura.default-tenant --format json",
 			wantOut: `{
 	"aura.default-tenant": "my-tenant"
 }`,
 		},
 		{
 			name:    "get aura.default-tenant renders as table",
-			command: "config get aura.default-tenant --output table",
+			command: "config get aura.default-tenant --format table",
 			wantOutFunc: func(t *testing.T, outStr string) {
 				assert.Contains(t, outStr, "KEY")
 				assert.Contains(t, outStr, "VALUE")
@@ -92,13 +92,13 @@ func TestConfigGet(t *testing.T) {
 			},
 		},
 		{
-			name:    "get aura.output returns error (output is global-only)",
-			command: "config get aura.output",
-			wantErr: `Error: invalid argument "aura.output" for "neo4j-cli config get"`,
+			name:    "get aura.format returns error (format is global-only)",
+			command: "config get aura.format",
+			wantErr: `Error: invalid argument "aura.format" for "neo4j-cli config get"`,
 		},
 		{
 			name:    "get aura.base-url returns default value as JSON",
-			command: "config get aura.base-url --output json",
+			command: "config get aura.base-url --format json",
 			wantOut: `{
 	"aura.base-url": "https://api.neo4j.io"
 }`,

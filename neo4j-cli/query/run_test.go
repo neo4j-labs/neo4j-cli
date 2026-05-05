@@ -49,7 +49,7 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	stdinIsTTY = func() bool { return true }
 	stdinReader = func() io.Reader { return strings.NewReader("") }
 
-	cfgJSON := `{"output":"` + output + `"}`
+	cfgJSON := `{"format":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	return &runHarness{
@@ -77,7 +77,7 @@ func startServer(t *testing.T, status int, body []byte) *httptest.Server {
 func (h *runHarness) execute(t *testing.T, args ...string) error {
 	t.Helper()
 	// Use afero.NewMemMapFs for the cobra command itself; the harness's cfg
-	// owns the testfs filesystem, which is what cfg.Global.Output() reads.
+	// owns the testfs filesystem, which is what cfg.Global.Format() reads.
 	cmd := NewCmd(h.cfg)
 	cmd.SetOut(h.stdout)
 	cmd.SetErr(h.stderr)
@@ -232,7 +232,7 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 // TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray verifies the
 // rendered JSON literally contains `"xs": []` for an over-limit top-level
 // array — closes the gap where in-memory shape was tested but not the
-// actual `--output json` byte stream.
+// actual `--format json` byte stream.
 func TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray(t *testing.T) {
 	// 10-item array; --truncate-arrays-over=3 → emit empty array.
 	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
@@ -277,7 +277,7 @@ func TestRunQuery_TruncateArrays_NestedArray_JSONOutputContainsEmptyArray(t *tes
 		"output must NOT contain any placeholder string")
 }
 
-// TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray covers --output
+// TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray covers --format
 // table: the cell rendering for an over-limit array must be `[]` (the
 // JSON-stringified empty array), not the legacy placeholder string.
 func TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray(t *testing.T) {

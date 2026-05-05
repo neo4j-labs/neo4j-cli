@@ -20,44 +20,44 @@ func TestConfigList(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			name:    "list with default output auto-detects non-TTY and renders JSON",
+			name:    "list with default format auto-detects non-TTY and renders JSON",
 			command: "config list",
 			// "default" auto-detects: non-TTY test stdout → JSON rendering
 			wantOut: `{
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-tenant": null,
-	"output": "default"
+	"format": "default"
 }`,
 		},
 		{
-			name: "list with output set to json and --output json flag renders JSON",
+			name: "list with format set to json and --format json flag renders JSON",
 			configSetup: func(h *neo4jTestHelper) {
-				h.setConfigValue("output", "json")
+				h.setConfigValue("format", "json")
 			},
-			command: "config list --output json",
+			command: "config list --format json",
 			wantOut: `{
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-tenant": null,
-	"output": "json"
+	"format": "json"
 }`,
 		},
 		{
-			name:    "list with --output table flag renders a table",
-			command: "config list --output table",
+			name:    "list with --format table flag renders a table",
+			command: "config list --format table",
 			// go-pretty renders header row in uppercase with StyleLight.
-			wantContains: []string{"KEY", "VALUE", "output"},
+			wantContains: []string{"KEY", "VALUE", "format"},
 		},
 		{
-			name: "list when output config is table renders a table",
+			name: "list when format config is table renders a table",
 			configSetup: func(h *neo4jTestHelper) {
-				h.setConfigValue("output", "table")
+				h.setConfigValue("format", "table")
 			},
 			command: "config list",
-			// Table rendering when the stored output config is "table".
+			// Table rendering when the stored format config is "table".
 			// go-pretty renders header row in uppercase with StyleLight.
-			wantContains: []string{"KEY", "VALUE", "output", "table"},
+			wantContains: []string{"KEY", "VALUE", "format", "table"},
 		},
 	}
 

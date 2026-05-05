@@ -12,9 +12,9 @@ Flags:
 |------|------|---------|-------------|
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
+| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table] |
 | `--insecure` | bool | false | Skip TLS certificate verification [env: NEO4J_INSECURE] (development only) |
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 | `--param` | stringArray | [] | Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string |
 | `-p, --password` | string | - | Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset |
 | `--truncate-arrays-over` | int | 100 | Recursively truncate any array longer than N inside row values (0 = off); rendered as ["<truncated: K items>"] |

@@ -19,7 +19,7 @@ tasks:
       migrating `"output"` → `"format"` alongside the existing `"aura.output"` clause, and
       update the NOTE comment to describe the new key names. The block must stay commented out;
       do not restore the `gjson` import.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`ValidFormatValues` exists in `clicfg.go`; `ValidOutputValues` does not"
@@ -27,7 +27,7 @@ tasks:
       - "`GlobalConfig.BindFormat()` calls `viper.BindPFlag(\"format\", flag)`; `BindOutput()` does not exist"
       - "The migration block remains commented out and references `\"format\"` as the destination key, with both `\"aura.output\"` and `\"output\"` source clauses"
       - "`go build ./common/clicfg/...` succeeds"
-    completed_at: null
+    completed_at: "2026-05-05T16:30:00Z"
 
   - id: task-002
     title: "Rename flag to --format/-f in common/flags/flags.go; update all non-test callers"
@@ -40,7 +40,7 @@ tasks:
       `common/output/output.go::ResolveOutput` (replace `cfg.Global.Output()` with
       `cfg.Global.Format()`), `neo4j-cli/aura/internal/subcommands/import/job/get.go`, and
       `neo4j-cli/aura/internal/subcommands/tenant/get.go`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -48,7 +48,7 @@ tasks:
       - "`RegisterOutputFlag`'s `PersistentPreRunE` looks up `cmd.Flags().Lookup(\"format\")` and calls `cfg.Global.BindFormat`"
       - "All `cfg.Global.Output()` calls in non-test Go files are replaced with `cfg.Global.Format()`"
       - "`go build ./...` succeeds (no compilation errors)"
-    completed_at: null
+    completed_at: "2026-05-05T16:30:00Z"
 
   - id: task-003
     title: "Update all test files: --output → --format, config fixtures output → format"
@@ -61,7 +61,7 @@ tasks:
       Use grep to find all remaining occurrences after the mechanical substitution and verify
       none are missed. Tests for `config get output` / `config set output` become
       `config get format` / `config set format`.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -69,7 +69,7 @@ tasks:
       - "No test config fixture contains `{\"output\":` at the JSON root level"
       - "`config get format` and `config set format` are tested in config test files"
       - "`make test` passes for all packages"
-    completed_at: null
+    completed_at: "2026-05-05T16:30:00Z"
 
   - id: task-004
     title: "Update hand-authored docs: AGENTS.md, README, CONTRIBUTING, usage guides"

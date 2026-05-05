@@ -20,7 +20,7 @@ func TestListCredentials(t *testing.T) {
 	}{
 		{
 			name:    "list credentials as json",
-			command: "credential list --output json",
+			command: "credential list --format json",
 			credentials: []map[string]string{
 				{"name": "test-cred", "client-id": "client-abc", "client-secret": "secret-abc"},
 				{"name": "other-cred", "client-id": "client-xyz", "client-secret": "secret-xyz"},
@@ -38,7 +38,7 @@ func TestListCredentials(t *testing.T) {
 		},
 		{
 			name:    "list credentials as table",
-			command: "credential list --output table",
+			command: "credential list --format table",
 			credentials: []map[string]string{
 				{"name": "test-cred", "client-id": "client-abc", "client-secret": "secret-abc"},
 				{"name": "other-cred", "client-id": "client-xyz", "client-secret": "secret-xyz"},
@@ -75,7 +75,7 @@ func TestListCredentials(t *testing.T) {
 		},
 		{
 			name:        "list credentials with empty list",
-			command:     "credential list --output json",
+			command:     "credential list --format json",
 			credentials: []map[string]string{},
 			wantOutFunc: func(t *testing.T, out string) {
 				t.Helper()

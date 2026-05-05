@@ -20,27 +20,27 @@ func TestConfigSet(t *testing.T) {
 		wantErrSubstring string
 	}{
 		{
-			name:            "set output to json writes json at root",
-			command:         "config set output json",
-			wantConfigKey:   "output",
+			name:            "set format to json writes json at root",
+			command:         "config set format json",
+			wantConfigKey:   "format",
 			wantConfigValue: "json",
 		},
 		{
-			name:            "set output to table writes table at root",
-			command:         "config set output table",
-			wantConfigKey:   "output",
+			name:            "set format to table writes table at root",
+			command:         "config set format table",
+			wantConfigKey:   "format",
 			wantConfigValue: "table",
 		},
 		{
-			name:            "set output to default writes default at root",
-			command:         "config set output default",
-			wantConfigKey:   "output",
+			name:            "set format to default writes default at root",
+			command:         "config set format default",
+			wantConfigKey:   "format",
 			wantConfigValue: "default",
 		},
 		{
-			name:    "set output to invalid value returns error",
-			command: "config set output invalid",
-			wantErr: "Error: invalid value for 'output': invalid (valid values: default, json, table)",
+			name:    "set format to invalid value returns error",
+			command: "config set format invalid",
+			wantErr: "Error: invalid value for 'format': invalid (valid values: default, json, table)",
 		},
 		{
 			name:    "set unknown key returns error",
@@ -49,7 +49,7 @@ func TestConfigSet(t *testing.T) {
 		},
 		{
 			name:             "set with missing value returns error",
-			command:          "config set output",
+			command:          "config set format",
 			wantErrSubstring: "Error",
 		},
 		// Dot-notation aura keys
@@ -66,9 +66,9 @@ func TestConfigSet(t *testing.T) {
 			wantConfigValue: "my-tenant",
 		},
 		{
-			name:    "set aura.output returns error (global-only key)",
-			command: "config set aura.output json",
-			wantErr: `Error: invalid config key: "aura.output" is a global key and cannot be addressed with the "aura." prefix`,
+			name:    "set aura.format returns error (global-only key)",
+			command: "config set aura.format json",
+			wantErr: `Error: invalid config key: "aura.format" is a global key and cannot be addressed with the "aura." prefix`,
 		},
 		{
 			name:    "set aura.unknown returns error",

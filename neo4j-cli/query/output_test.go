@@ -29,11 +29,11 @@ type decodedResult struct {
 }
 
 // newRenderCmd returns a fresh cobra command with stdout captured into the
-// returned buffer. The output mode ("default", "json", or "table") is wired
-// through the persisted config so renderRows reads it via cfg.Global.Output().
+// returned buffer. The format mode ("default", "json", or "table") is wired
+// through the persisted config so renderRows reads it via cfg.Global.Format().
 func newRenderCmd(t *testing.T, output string) (*cobra.Command, *clicfg.Config, *bytes.Buffer) {
 	t.Helper()
-	cfgJSON := `{"output":"` + output + `"}`
+	cfgJSON := `{"format":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
@@ -281,11 +281,11 @@ func withStdoutIsTerminal(t *testing.T, isTTY bool) {
 
 // TestRenderRows_TTYAwareDefault covers the four explicit/auto branches of
 // ResolveOutput as exercised through renderRows: TTY+default→table,
-// non-TTY+default→json, non-TTY+--output table→table, TTY+--output json→json.
+// non-TTY+default→json, non-TTY+--format table→table, TTY+--format json→json.
 func TestRenderRows_TTYAwareDefault(t *testing.T) {
 	tests := []struct {
 		name        string
-		output      string // value persisted in cfg.Global.Output()
+		output      string // value persisted in cfg.Global.Format()
 		isTTY       bool
 		wantJSON    bool   // true if the JSON envelope should be present
 		wantInTable string // substring expected in table output (only when wantJSON=false)
@@ -304,14 +304,14 @@ func TestRenderRows_TTYAwareDefault(t *testing.T) {
 			wantJSON: true,
 		},
 		{
-			name:        "non-TTY + explicit --output table -> table",
+			name:        "non-TTY + explicit --format table -> table",
 			output:      "table",
 			isTTY:       false,
 			wantJSON:    false,
 			wantInTable: "42",
 		},
 		{
-			name:     "TTY + explicit --output json -> json",
+			name:     "TTY + explicit --format json -> json",
 			output:   "json",
 			isTTY:    true,
 			wantJSON: true,

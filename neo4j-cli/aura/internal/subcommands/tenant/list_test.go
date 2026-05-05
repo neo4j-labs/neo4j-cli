@@ -59,7 +59,7 @@ func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("tenant list --output invalid")
+	helper.ExecuteCommand("tenant list --format invalid")
 
-	helper.AssertErr("Error: invalid output value specified: invalid")
+	helper.AssertErr("Error: invalid format value specified: invalid")
 }

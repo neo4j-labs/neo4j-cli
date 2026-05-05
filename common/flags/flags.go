@@ -12,32 +12,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// RegisterOutputFlag adds a persistent --output flag to cmd and installs a
+// RegisterOutputFlag adds a persistent --format/-f flag to cmd and installs a
 // PersistentPreRunE hook that validates the value and binds it to cfg.Global.
 func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
-	cmd.PersistentFlags().String(
-		"output",
+	cmd.PersistentFlags().StringP(
+		"format",
+		"f",
 		"",
-		fmt.Sprintf("Format to print console output in, from a choice of [%s]", strings.Join(clicfg.ValidOutputValues[:], ", ")),
+		fmt.Sprintf("Format to print console output in, from a choice of [%s]", strings.Join(clicfg.ValidFormatValues[:], ", ")),
 	)
 
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		outputFlag := cmd.Flags().Lookup("output")
-		if outputFlag != nil && outputFlag.Value.String() != "" {
-			outputValue := outputFlag.Value.String()
+		formatFlag := cmd.Flags().Lookup("format")
+		if formatFlag != nil && formatFlag.Value.String() != "" {
+			formatValue := formatFlag.Value.String()
 			valid := false
-			for _, v := range clicfg.ValidOutputValues {
-				if v == outputValue {
+			for _, v := range clicfg.ValidFormatValues {
+				if v == formatValue {
 					valid = true
 					break
 				}
 			}
 			if !valid {
-				return clierr.NewUsageError("invalid output value specified: %s", outputValue)
+				return clierr.NewUsageError("invalid format value specified: %s", formatValue)
 			}
 		}
 
-		cfg.Global.BindOutput(cmd.Flags().Lookup("output"))
+		cfg.Global.BindFormat(cmd.Flags().Lookup("format"))
 
 		return nil
 	}

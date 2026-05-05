@@ -29,7 +29,7 @@ const (
 	DefaultAuraBetaEnabled = false
 )
 
-var ValidOutputValues = [3]string{"default", "json", "table"}
+var ValidFormatValues = [3]string{"default", "json", "table"}
 
 type ConfigScope string
 
@@ -80,24 +80,41 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	// NOTE: The migration block below is intentionally commented out.
 	// This experimental release has never shipped to users, so the migration
 	// has never run in the field. Users may switch between the stable CLI
-	// (which still uses "aura.output") and this experimental version; running
-	// the migration would corrupt stable-version config files.
+	// (which still uses "aura.output" or "output") and this experimental version;
+	// running the migration would corrupt stable-version config files.
 	// This code is preserved as reference for a future stable-release upgrade path.
+	// When re-enabled, it migrates both "aura.output" → "format" and "output" → "format".
 	//
 	// {
 	// 	data := fileutils.ReadFileSafe(fs, fullConfigPath)
-	// 	if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "output").Exists() {
+	// 	migrated := false
+	// 	if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "format").Exists() {
 	// 		oldValue := gjson.GetBytes(data, "aura.output").String()
-	// 		updated, err := sjson.Set(string(data), "output", oldValue)
+	// 		updated, err := sjson.Set(string(data), "format", oldValue)
 	// 		if err == nil {
 	// 			updated, err = sjson.Delete(updated, "aura.output")
 	// 			if err == nil {
-	// 				fileutils.WriteFile(fs, fullConfigPath, []byte(updated))
-	// 				if err := Viper.ReadInConfig(); err != nil {
-	// 					fmt.Println("Cannot re-read config file after migration.")
-	// 					panic(err)
-	// 				}
+	// 				data = []byte(updated)
+	// 				migrated = true
 	// 			}
+	// 		}
+	// 	}
+	// 	if gjson.GetBytes(data, "output").Exists() && !gjson.GetBytes(data, "format").Exists() {
+	// 		oldValue := gjson.GetBytes(data, "output").String()
+	// 		updated, err := sjson.Set(string(data), "format", oldValue)
+	// 		if err == nil {
+	// 			updated, err = sjson.Delete(updated, "output")
+	// 			if err == nil {
+	// 				data = []byte(updated)
+	// 				migrated = true
+	// 			}
+	// 		}
+	// 	}
+	// 	if migrated {
+	// 		fileutils.WriteFile(fs, fullConfigPath, data)
+	// 		if err := Viper.ReadInConfig(); err != nil {
+	// 			fmt.Println("Cannot re-read config file after migration.")
+	// 			panic(err)
 	// 		}
 	// 	}
 	// }
@@ -109,7 +126,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"output"},
+		ValidConfigKeys: []string{"format"},
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-tenant"}
@@ -219,7 +236,7 @@ func (d PrintableConfigData) AsArray() []map[string]any {
 }
 
 // MarshalJSON renders ConfigData as a flat map {key: value, ...} so that
-// PrintBodyMap JSON output is {"output": "json", ...} rather than an array.
+// PrintBodyMap JSON output is {"format": "json", ...} rather than an array.
 func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{}, len(d))
 	for _, e := range d {
@@ -236,7 +253,7 @@ func bindEnvironmentVariables(Viper *viper.Viper) {
 func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.base-url", DefaultAuraBaseUrl)
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
-	Viper.SetDefault("output", "default")
+	Viper.SetDefault("format", "default")
 	// TODO: should this become aura.projects?
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
@@ -261,8 +278,8 @@ func (config *AuraConfig) IsValidConfigKey(key string) bool {
 
 func (config *AuraConfig) Get(key string) interface{} {
 	// Bit of a hack for a global config key - it's fine with just the one value but if we're adding more we should refactor
-	// TODO: refactor this for global config keys to be properly namespaced (i.e. "output" vs "aura.output") and remove this special case
-	if key == "output" {
+	// TODO: refactor this for global config keys to be properly namespaced (i.e. "format" vs "aura.format") and remove this special case
+	if key == "format" {
 		return config.viper.Get(key)
 	}
 	// TODO: this hack should be fixed by renaming to aura.projects
@@ -392,16 +409,16 @@ func (config *GlobalConfig) GetPrintable(key string) PrintableConfigEntry {
 }
 
 func (config *GlobalConfig) Set(key string, value string) error {
-	if key == "output" {
+	if key == "format" {
 		valid := false
-		for _, v := range ValidOutputValues {
+		for _, v := range ValidFormatValues {
 			if v == value {
 				valid = true
 				break
 			}
 		}
 		if !valid {
-			return clierr.NewUsageError("invalid value for 'output': %s (valid values: %s)", value, strings.Join(ValidOutputValues[:], ", "))
+			return clierr.NewUsageError("invalid value for 'format': %s (valid values: %s)", value, strings.Join(ValidFormatValues[:], ", "))
 		}
 	}
 
@@ -416,12 +433,12 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	return nil
 }
 
-func (config *GlobalConfig) Output() string {
-	return config.viper.GetString("output")
+func (config *GlobalConfig) Format() string {
+	return config.viper.GetString("format")
 }
 
-func (config *GlobalConfig) BindOutput(flag *pflag.Flag) {
-	if err := config.viper.BindPFlag("output", flag); err != nil {
+func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {
+	if err := config.viper.BindPFlag("format", flag); err != nil {
 		panic(err)
 	}
 }
@@ -433,8 +450,8 @@ func (config *GlobalConfig) BindOutput(flag *pflag.Flag) {
 // Rules:
 //   - Keys prefixed with "aura." resolve to AuraScope; the prefix is stripped.
 //   - All other keys resolve to GlobalScope.
-//   - Keys that exist in GlobalScope (e.g. "output") can never be addressed via
-//     the "aura." prefix — "aura.output" is always rejected as invalid.
+//   - Keys that exist in GlobalScope (e.g. "format") can never be addressed via
+//     the "aura." prefix — "aura.format" is always rejected as invalid.
 //   - Unrecognised keys in either namespace return an error.
 func ResolveConfigKey(key string, cfg *Config) (ConfigScope, string, error) {
 	const auraPrefix = "aura."

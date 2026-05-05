@@ -24,25 +24,25 @@ func TestStandaloneConfigGet(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			name: "get output returns current global value",
+			name: "get format returns current global value",
 			configSetup: func(h *testutils.AuraTestHelper) {
-				h.SetConfigValue("output", "json")
+				h.SetConfigValue("format", "json")
 			},
-			command: "config get output",
-			// output is "json" so rendering is JSON
+			command: "config get format",
+			// format is "json" so rendering is JSON
 			wantOut: `{
-	"output": "json"
+	"format": "json"
 }`,
 		},
 		{
-			name:    "get output returns default when no config set",
-			command: "config get output",
+			name:    "get format returns default when no config set",
+			command: "config get format",
 			configSetup: func(h *testutils.AuraTestHelper) {
 				h.OverwriteConfig("{}")
 			},
 			// "default" auto-detects: non-TTY test stdout → JSON rendering
 			wantOut: `{
-	"output": "default"
+	"format": "default"
 }`,
 		},
 		{
@@ -51,7 +51,7 @@ func TestStandaloneConfigGet(t *testing.T) {
 				h.SetConfigValue("aura.auth-url", "https://example.com/oauth/token")
 			},
 			command: "config get auth-url",
-			// default output is "json" in test helper so JSON rendering
+			// default format is "json" in test helper so JSON rendering
 			wantOut: `{
 	"auth-url": "https://example.com/oauth/token"
 }`,
@@ -104,10 +104,10 @@ func TestStandaloneConfigSet(t *testing.T) {
 		wantErr         string
 	}{
 		{
-			name:            "set output json writes global key at JSON root",
+			name:            "set format json writes global key at JSON root",
 			configSetup:     func(h *testutils.AuraTestHelper) {},
-			command:         "config set output json",
-			wantConfigKey:   "output",
+			command:         "config set format json",
+			wantConfigKey:   "format",
 			wantConfigValue: "json",
 		},
 		{
@@ -124,10 +124,10 @@ func TestStandaloneConfigSet(t *testing.T) {
 			wantErr:     "Error: invalid config key specified: unknown-key",
 		},
 		{
-			name:        "set output to invalid value returns error",
+			name:        "set format to invalid value returns error",
 			configSetup: func(h *testutils.AuraTestHelper) {},
-			command:     "config set output invalid-value",
-			wantErr:     "Error: invalid value for 'output': invalid-value (valid values: default, json, table)",
+			command:     "config set format invalid-value",
+			wantErr:     "Error: invalid value for 'format': invalid-value (valid values: default, json, table)",
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestStandaloneConfigSet(t *testing.T) {
 }
 
 // TestStandaloneConfigList covers the flat standalone aura-cli "config list" command,
-// which should include both global keys (output) and aura-scoped keys.
+// which should include both global keys (format) and aura-scoped keys.
 func TestStandaloneConfigList(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -165,10 +165,10 @@ func TestStandaloneConfigList(t *testing.T) {
 		wantErr      string
 	}{
 		{
-			name: "list includes both output and aura keys",
+			name: "list includes both format and aura keys",
 			configSetup: func(h *testutils.AuraTestHelper) {
 				h.OverwriteConfig(fmt.Sprintf(`{
-					"output": "json",
+					"format": "json",
 					"aura": {
 						"auth-url": "%s",
 						"base-url": "%s"
@@ -176,21 +176,21 @@ func TestStandaloneConfigList(t *testing.T) {
 				}`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl))
 			},
 			command: "config list",
-			// output is "json" → JSON rendering showing all keys
+			// format is "json" → JSON rendering showing all keys
 			wantOut: fmt.Sprintf(`{
 	"auth-url": "%s",
 	"base-url": "%s",
 	"default-tenant": null,
-	"output": "json"
+	"format": "json"
 }`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl),
 		},
 		{
-			name: "list with table output renders all keys in table",
+			name: "list with table format renders all keys in table",
 			configSetup: func(h *testutils.AuraTestHelper) {
-				h.SetConfigValue("output", "table")
+				h.SetConfigValue("format", "table")
 			},
 			command:      "config list",
-			wantContains: []string{"KEY", "VALUE", "output", "auth-url", "base-url"},
+			wantContains: []string{"KEY", "VALUE", "format", "auth-url", "base-url"},
 		},
 	}
 

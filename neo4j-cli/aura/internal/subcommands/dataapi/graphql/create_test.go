@@ -148,7 +148,7 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 			expectedResponse:    expectedResponseJson,
 		}, "create with default auth provider and output as table": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("data-api graphql create --output table --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s ", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
+			executeCommand:      fmt.Sprintf("data-api graphql create --format table --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s ", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
 			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseTable,
 		},

@@ -204,16 +204,17 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 ## Config Architecture Notes
 
 - `Config.Global` (`*GlobalConfig`) holds top-level (non-namespaced) viper keys; `Config.Aura` holds `aura.*`-prefixed keys
-- The `output` setting lives at the top-level viper key `"output"`, not `"aura.output"` — always read/write via `cfg.Global.Output()` and `cfg.Global.BindOutput()`
-- Migration from old `aura.output` to `output` is **commented out** in `NewConfig` — this experimental release never shipped so the migration has never run; re-enable it (alongside the paired tests in `config_test.go`) for the first stable-release upgrade path
+- The `format` setting lives at the top-level viper key `"format"`, not `"aura.format"` — always read/write via `cfg.Global.Format()` and `cfg.Global.BindFormat()`
+- Migration from old `aura.output`/`output` to `format` is **commented out** in `NewConfig` — this experimental release never shipped so the migration has never run; re-enable it for the first stable-release upgrade path (two source clauses: `"aura.output"` and `"output"`)
 - When migration code is commented out, remove any imports it uniquely used (e.g. `gjson` was removed from `clicfg.go` when the migration block was commented out) to avoid unused-import compilation errors
 - `Viper.IsSet()` returns `true` for keys set via `SetDefault` — use `gjson.GetBytes(data, key).Exists()` to distinguish file-backed values from viper defaults when writing migration conditions
-- `cfg.Global.BindOutput(flag)` binds viper's `"output"` key to the pflag value; passing `--output json` overrides both the rendering format AND the config value returned by `cfg.Global.Get("output")` — they are the same viper key
+- `cfg.Global.BindFormat(flag)` binds viper's `"format"` key to the pflag value; passing `--format json` overrides both the rendering format AND the config value returned by `cfg.Global.Get("format")` — they are the same viper key
 - go-pretty renders table header rows in **uppercase** with `table.StyleLight` — assert for `"KEY"` and `"VALUE"` (not lowercase) in table output tests
-- Test helpers default to `"output": "json"` at the JSON root; set output overrides with `helper.SetConfigValue("output", "table")` (not `"aura.output"`)
+- Test helpers default to `"format": "json"` at the JSON root; set format overrides with `helper.SetConfigValue("format", "table")` (not `"aura.format"`)
 - Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
 - `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process; in test helpers set it once in the constructor (`NewAuraTestHelper`), not on each `ExecuteCommand` call
 - `pflag.AddFlagSet` silently ignores duplicate-named flags (the flag already present in the target set wins); child `PersistentFlags` shadow a parent's `PersistentFlags` with the same name — the root's `PersistentPreRunE` still finds the resolved flag via `cmd.Flags().Lookup()`
+- When renaming a flag that is used in many test files, complete clicfg core changes AND all callers AND all test fixtures in the same iteration — otherwise the build or test suite is broken between tasks and feedback loops cannot gate completion
 
 ## Command Tree Restructuring Notes
 

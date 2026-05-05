@@ -229,7 +229,7 @@ func waitForHTTPSReady(t *testing.T, httpsPort int) {
 // self-contained.
 func runQueryCmd(t *testing.T, args []string) (string, string, error) {
 	t.Helper()
-	fs, err := testfs.GetTestFs(`{"output":"table"}`, "{}")
+	fs, err := testfs.GetTestFs(`{"format":"table"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 

@@ -47,14 +47,14 @@ type fixture struct {
 }
 
 // newFixture wires up a cfg + skill command, populating agent detect dirs
-// for every name in agentNames. `output` becomes the `aura.output` config
+// for every name in agentNames. `output` becomes the `format` config
 // value ("default", "json", or "table"). The test HOME is set to homeDir.
 func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fixture {
 	t.Helper()
 	t.Setenv("HOME", homeDir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, "xdg"))
 
-	cfgJSON := `{"output":"` + output + `"}`
+	cfgJSON := `{"format":"` + output + `"}`
 	memFs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 

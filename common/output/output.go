@@ -32,13 +32,13 @@ var StdoutIsTerminal = func(w io.Writer) bool {
 }
 
 // ResolveOutput returns the effective output mode ("json" or "table") for the
-// current invocation. When cfg.Global.Output() is "json" or "table" that value
-// is returned unchanged — an explicit --output flag always wins. For any other
+// current invocation. When cfg.Global.Format() is "json" or "table" that value
+// is returned unchanged — an explicit --format flag always wins. For any other
 // value ("default", "", or an unknown value) the mode is auto-detected from
 // cmd.OutOrStdout(): a TTY stdout yields "table", a non-TTY (piped/redirected)
 // stdout yields "json".
 func ResolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
-	v := cfg.Global.Output()
+	v := cfg.Global.Format()
 	if v == "json" || v == "table" {
 		return v
 	}

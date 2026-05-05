@@ -32,11 +32,11 @@ func TestResolveConfigKey(t *testing.T) {
 		wantErr       string
 	}{
 		{
-			name:          "global key output resolves to global namespace",
-			key:           "output",
+			name:          "global key format resolves to global namespace",
+			key:           "format",
 			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.GlobalScope,
-			wantKey:       "output",
+			wantKey:       "format",
 		},
 		{
 			name:          "aura-prefixed key resolves to aura namespace with prefix stripped",
@@ -60,10 +60,10 @@ func TestResolveConfigKey(t *testing.T) {
 			wantKey:       "auth-url",
 		},
 		{
-			name:    "aura.output is rejected because output is a global-only key",
-			key:     "aura.output",
+			name:    "aura.format is rejected because format is a global-only key",
+			key:     "aura.format",
 			scope:   clicfg.GlobalScope,
-			wantErr: `invalid config key: "aura.output" is a global key and cannot be addressed with the "aura." prefix`,
+			wantErr: `invalid config key: "aura.format" is a global key and cannot be addressed with the "aura." prefix`,
 		},
 		{
 			name:    "aura.unknown is rejected as an unrecognised aura key",
@@ -102,7 +102,7 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 	server := httptest.NewServer(mux)
 
 	cfgStr := fmt.Sprintf(`{
-		"output": "json",
+		"format": "json",
 		"aura": {
 			"auth-url": "%s/oauth/token",
 			"base-url": "%s/v1"

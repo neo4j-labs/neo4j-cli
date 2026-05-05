@@ -80,7 +80,7 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 			}
 		}`)
 
-	helper.SetConfigValue("output", "table")
+	helper.SetConfigValue("format", "table")
 
 	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
 
@@ -118,7 +118,7 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 			}
 		}`)
 
-	helper.SetConfigValue("output", "table")
+	helper.SetConfigValue("format", "table")
 
 	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
 

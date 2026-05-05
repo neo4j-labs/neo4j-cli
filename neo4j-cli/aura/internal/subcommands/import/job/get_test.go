@@ -504,7 +504,7 @@ func TestGetImportJobById(t *testing.T) {
 			expectedResponse:      expectedResponseJsonWithoutProgress,
 		}, "query with table output format": {
 			mockResponse:          mockedResponseWithoutProgress,
-			executeCommand:        fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s --output=table", organizationId, projectId, jobId),
+			executeCommand:        fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s --format=table", organizationId, projectId, jobId),
 			expectedQueryParamKey: "progress",
 			expectedQueryParamVal: "false",
 			expectedResponse: `
@@ -527,7 +527,7 @@ func TestGetImportJobById(t *testing.T) {
 			expectedResponse:      expectedResponseJsonWithProgress,
 		}, "query includes progress with table output format": {
 			mockResponse:          mockedResponseWithProgress,
-			executeCommand:        fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s --progress --output=table", organizationId, projectId, jobId),
+			executeCommand:        fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s --progress --format=table", organizationId, projectId, jobId),
 			expectedQueryParamKey: "progress",
 			expectedQueryParamVal: "true",
 			expectedResponse: `
@@ -646,7 +646,7 @@ func TestGetImportJobByIdWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("import job get %s --output=table", jobId))
+	helper.ExecuteCommand(fmt.Sprintf("import job get %s --format=table", jobId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

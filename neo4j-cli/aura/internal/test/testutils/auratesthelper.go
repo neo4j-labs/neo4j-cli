@@ -266,7 +266,7 @@ func NewAuraTestHelper(t *testing.T) AuraTestHelper {
 					"default": "",
 					"projects": {}
 				},
-				"output": "json",
+				"format": "json",
 				"aura": {
 					"auth-url": "%s/oauth/token",
 					"base-url": "%s/v1"

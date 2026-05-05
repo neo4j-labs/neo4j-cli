@@ -26,11 +26,11 @@ func TestGetConfigDefault(t *testing.T) {
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config get output")
+	helper.ExecuteCommand("config get format")
 
-	// output is a global key; default value is "default"
+	// format is a global key; default value is "default"
 	// "default" auto-detects: non-TTY test stdout → JSON rendering
-	helper.AssertOutJson(`{"output": "default"}`)
+	helper.AssertOutJson(`{"format": "default"}`)
 }
 
 func TestGetConfigBetaEnabled(t *testing.T) {
