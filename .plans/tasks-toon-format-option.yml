@@ -82,7 +82,7 @@ tasks:
       distinct from the JSON output for the same input, and that the toon output contains
       the same top-level keys as the JSON equivalent. Follow the existing test patterns
       in the package (table-driven tests, use of `bytes.Buffer` as cmd output writer).
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -90,7 +90,7 @@ tasks:
       - "Test asserts toon output is non-empty and differs from json.MarshalIndent output"
       - "Test asserts toon output is not valid JSON (confirming it is actually toon-encoded)"
       - "`make test` passes with the new tests included"
-    completed_at: null
+    completed_at: "2026-05-05T04:00:00Z"
 
   - id: task-006
     title: "Add changelog entries for aura-cli and neo4j-cli"

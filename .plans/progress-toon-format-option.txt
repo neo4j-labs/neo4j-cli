@@ -99,3 +99,29 @@ Key Decisions:
 - go mod tidy promotes the dependency automatically once the import is present.
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Add tests for toon format rendering
+Date: 2026-05-05T04:00:00Z
+================================================================================
+
+Summary:
+Created common/output/output_test.go with table-driven tests for PrintBodyMap
+and ResolveOutput covering the "toon" format path. Tests verify: toon output is
+non-empty, differs from JSON output, is not valid JSON (confirming toon encoding),
+and contains the same top-level keys as the JSON envelope. Also tests that
+ResolveOutput returns "toon" regardless of TTY state when configured explicitly.
+
+Files Changed:
+- common/output/output_test.go (created: unit tests for toon rendering path)
+
+Key Decisions:
+- Used package `output` (not `output_test`) to access StdoutIsTerminal seam
+  directly, matching the pattern in neo4j-cli/query/output_test.go.
+- simpleData implements MarshalJSON wrapping rows in {"data": ...} to test the
+  json→any→toon round-trip honours custom MarshalJSON implementations.
+- The "toon output is not valid JSON" assertion confirms actual toon encoding,
+  as toon uses key: value syntax rather than JSON syntax.
+- Empty rows case included to verify toon.Marshal handles empty arrays gracefully.
+
+Next Task: task-006
