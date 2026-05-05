@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -53,7 +54,7 @@ func TestNeo4jAuraConfigNoLongerExists(t *testing.T) {
 			rootCmd := &cobra.Command{
 				Use: "neo4j-cli",
 			}
-			aura.RegisterOutputFlag(rootCmd, cfg)
+			flags.RegisterOutputFlag(rootCmd, cfg)
 
 			auraCmd := aura.NewCmd(cfg)
 			auraCmd.Use = "aura"
@@ -118,7 +119,7 @@ func TestNeo4jConfigAuraNoLongerExists(t *testing.T) {
 			rootCmd := &cobra.Command{
 				Use: "neo4j-cli",
 			}
-			aura.RegisterOutputFlag(rootCmd, cfg)
+			flags.RegisterOutputFlag(rootCmd, cfg)
 			rootCmd.AddCommand(config.NewCmd(cfg))
 
 			outBuf := bytes.NewBufferString("")
@@ -164,7 +165,7 @@ func TestNeo4jConfigProjectBetaGated(t *testing.T) {
 		rootCmd := &cobra.Command{
 			Use: "neo4j-cli",
 		}
-		aura.RegisterOutputFlag(rootCmd, cfg)
+		flags.RegisterOutputFlag(rootCmd, cfg)
 		rootCmd.AddCommand(config.NewCmd(cfg))
 
 		outBuf := bytes.NewBufferString("")

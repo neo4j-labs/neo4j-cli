@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/aura"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/neo4j/cli/test/utils/testjson"
@@ -66,7 +66,7 @@ func (h *credentialTestHelper) executeCommand(command string) {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
 	cmd := credential.NewCredentialCmd(cfg)
-	aura.RegisterOutputFlag(cmd, cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)

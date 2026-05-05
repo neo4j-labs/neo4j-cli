@@ -17,6 +17,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/projects"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
@@ -60,7 +61,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	}
 
 	cmd := aura.NewStandaloneCmd(cfg)
-	aura.RegisterOutputFlag(cmd, cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.SetArgs(args)
 

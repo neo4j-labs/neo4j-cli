@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -27,7 +28,7 @@ func main() {
 	cfg := clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.AuraScope)
 
 	cmd := aura.NewStandaloneCmd(cfg)
-	aura.RegisterOutputFlag(cmd, cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 

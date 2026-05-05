@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
@@ -24,7 +25,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: Version,
 	}
 
-	aura.RegisterOutputFlag(cmd, cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
