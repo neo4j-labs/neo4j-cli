@@ -41,7 +41,8 @@ tasks:
       `npm whoami` fails (script must not run on an unauthenticated session).
       Add an optional `make npm-bootstrap` target mirroring `make npm-publish-dry`
       for discoverability.
-    status: pending
+    status: completed
+    completed_at: 2026-05-05T12:20:00Z
     dependencies:
       - task-001
     acceptance_criteria:

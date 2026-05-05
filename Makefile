@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-aura build-neo4j snapshot test lint fmt fmt-check license-check run-aura run-neo4j clean changelog generate generate-check npm-publish-dry
+.PHONY: build build-aura build-neo4j snapshot test lint fmt fmt-check license-check run-aura run-neo4j clean changelog generate generate-check npm-publish-dry npm-bootstrap
 
 ## build: build both aura-cli and neo4j-cli into bin/
 build: build-aura build-neo4j
@@ -86,3 +86,11 @@ generate-check: generate
 ##           dist/ and is purely a template-rendering + publish-ordering sanity check.
 npm-publish-dry:
 	GORELEASER_CURRENT_TAG=v0.0.0-dry distribution/npm/publish.sh --dry-run
+
+## npm-bootstrap: one-time helper to claim the 9 @neo4j-labs/* package names on the registry
+## REQUIRES: `npm login --scope=@neo4j-labs` first; the script aborts on an unauthenticated
+##           session. Publishes 1-byte stubs at version 0.0.0-bootstrap.1 under dist-tag
+##           `bootstrap` so unqualified `npm i` never resolves to one of them. Idempotent —
+##           re-running after a partial failure skips already-published packages.
+npm-bootstrap:
+	bash distribution/npm/bootstrap-stubs.sh

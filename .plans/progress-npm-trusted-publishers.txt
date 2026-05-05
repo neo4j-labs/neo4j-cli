@@ -18,3 +18,38 @@ Key Decisions:
   __VERSION__) and all other metadata left intact.
 
 Next Task: task-002 (Add distribution/npm/bootstrap-stubs.sh + make npm-bootstrap)
+
+================================================================================
+TASK-002: Add distribution/npm/bootstrap-stubs.sh + make npm-bootstrap
+Date: 2026-05-05T12:20:00Z
+================================================================================
+
+Summary:
+Added a one-time bootstrap helper that claims the 9 @neo4j-labs/* package names
+on the npm registry so Trusted Publisher can be configured per package in the
+npm UI (npm has no pending-publisher flow). Mirrors publish.sh structure:
+reads platforms.tsv, renders both templates, stubs each binary with a 1-byte
+placeholder, publishes 8 platform packages first then the wrapper, idempotent
+via the same already_published check. Hardcodes VERSION=0.0.0-bootstrap.1 and
+--tag bootstrap so unqualified `npm i` never resolves to a stub. Refuses to
+run if `npm whoami` fails. Verified locally: script aborts cleanly on no-auth,
+make npm-publish-dry still passes (templates unchanged), fmt-check + license-check
+green.
+
+Files Changed:
+- distribution/npm/bootstrap-stubs.sh (created, +x, ~140 lines)
+- Makefile (added npm-bootstrap target + .PHONY entry)
+
+Key Decisions:
+- DIRNAME_TMPL field from platforms.tsv intentionally ignored (assigned to _) —
+  bootstrap doesn't read from dist/, only consumes NPM_OS / NPM_CPU / BIN_FILENAME.
+- No --dry-run flag: registry side effect is the goal; a dry-run would defeat
+  the purpose. publish.sh keeps its --dry-run for CI ordering checks.
+- Auth check is `npm whoami` up front rather than letting `npm publish` fail
+  partway — clearer error and faster fail.
+- WORK_ROOT is dist/.npm-bootstrap (separate from publish.sh's dist/.npm-build)
+  to avoid collision if someone runs both flows in the same checkout.
+- Copyright header added as comment block (sh files are not gated by addlicense
+  in this repo, but criteria requested it).
+
+Next Task: task-003 (Switch publish-npm.yml to OIDC, drop NPM_TOKEN)
