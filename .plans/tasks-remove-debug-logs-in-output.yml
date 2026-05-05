@@ -50,7 +50,7 @@ tasks:
       hand-authored format documented in AGENTS.md (single-quoted body,
       RFC3339 time) since `make changelog` is interactive. Filenames must
       match `<project>-Patch-<YYYYMMDD>-<HHMMSS>.yaml`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -59,7 +59,7 @@ tasks:
       - ".changes/unreleased/neo4j-cli-Patch-<timestamp>.yaml exists with the same shape but `project: neo4j-cli`."
       - "Both files parse as valid YAML."
       - "No other files under .changes/ are modified."
-    completed_at: null
+    completed_at: 2026-05-05T12:44:05Z
 
   - id: task-004
     title: "Verify build, runtime behaviour, and full test/lint/fmt gate"

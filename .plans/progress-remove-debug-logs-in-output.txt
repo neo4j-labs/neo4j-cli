@@ -39,3 +39,23 @@ Key Decisions:
   retained code.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Add Patch changie entries for aura-cli and neo4j-cli
+Date: 2026-05-05T12:44:05Z
+================================================================================
+
+Summary:
+Hand-authored two Patch changie YAML files under .changes/unreleased/ — one
+per project — announcing removal of leftover stdout debug log lines.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Patch-20260505-124405.yaml (new)
+- .changes/unreleased/neo4j-cli-Patch-20260505-124405.yaml (new)
+
+Key Decisions:
+- Used hand-authored format (single-quoted body, RFC3339 time) per AGENTS.md
+  since `make changelog` is interactive. Both files share the same timestamp
+  in filename and `time:` field for traceability.
+
+Next Task: task-004
