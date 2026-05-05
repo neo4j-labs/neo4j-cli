@@ -212,5 +212,3 @@ func (c *MockHTTPClientPostCall) DoAndReturn(f func(string, string, io.Reader) (
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
-
-
