@@ -52,3 +52,31 @@ Key Decisions:
 - PrintBodyMap "default" branch removed; callers only get "json" or "table" from ResolveOutput
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Migrate skill commands to PrintBodyMap with ResponseData types
+Date: 2026-05-05T12:00:00Z
+================================================================================
+
+Summary:
+Introduced ResponseData-implementing slice types (installResults, listResults, checkResults)
+for each skill leaf command. Each implements AsArray() for table rendering and MarshalJSON()
+using the slice-cast idiom to avoid infinite recursion. Replaced ad-hoc printJSON/table
+calls with common/output.PrintBodyMap. Replaced skill.go's custom PersistentPreRunE with
+flags.RegisterOutputFlag, removing the duplicate --output flag definition. Deleted printJSON
+from helpers.go (no remaining callers). All tests pass.
+
+Files Changed:
+- common/skill/skill.go (modified: replaced custom PersistentPreRunE + --output flag with flags.RegisterOutputFlag)
+- common/skill/install.go (modified: installResults type + PrintBodyMap)
+- common/skill/list.go (modified: listResults type + PrintBodyMap)
+- common/skill/check.go (modified: checkResults type + PrintBodyMap)
+- common/skill/helpers.go (modified: removed printJSON helper)
+- common/skill/install_test.go, list_test.go, check_test.go, remove_test.go (modified: test updates)
+
+Key Decisions:
+- MarshalJSON uses slice-cast (json.Marshal([]installResultRow(r))) to avoid infinite recursion
+- listResults.AsArray() returns "yes"/"no" strings for bool columns; MarshalJSON preserves bool — intentional for table readability
+- flags.RegisterOutputFlag replaces custom PersistentPreRunE — cleaner DRY approach
+
+Next Task: task-004

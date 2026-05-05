@@ -16,7 +16,7 @@ import (
 )
 
 func TestInstallCmd_Table(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code", "cursor")
+	f := newFixture(t, "/home/alice", "table", "claude-code", "cursor")
 
 	require.NoError(t, f.exec(t, "install"))
 
@@ -47,7 +47,7 @@ func TestInstallCmd_JSON(t *testing.T) {
 }
 
 func TestInstallCmd_SingleAgentArg(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code", "cursor")
+	f := newFixture(t, "/home/alice", "table", "claude-code", "cursor")
 
 	require.NoError(t, f.exec(t, "install", "Claude-Code")) // case-insensitive
 

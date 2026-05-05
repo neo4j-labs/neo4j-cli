@@ -13,7 +13,7 @@ import (
 )
 
 func TestListCmd_Table(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code")
+	f := newFixture(t, "/home/alice", "table", "claude-code")
 	require.NoError(t, f.exec(t, "install", "claude-code"))
 	f.resetBuffers()
 

@@ -58,7 +58,7 @@ tasks:
       `install.go`, `list.go`, and `check.go` with a single `common/output.PrintBodyMap(cmd,
       cfg, data, fields)` call per leaf. Update `common/skill/cmd_helpers_test.go` fixture JSON
       from `{"aura":{"output":"..."}}` to `{"output":"..."}` to match the refactored viper key.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -67,7 +67,7 @@ tasks:
       - "Each leaf uses a `ResponseData`-implementing type passed to `common/output.PrintBodyMap`"
       - "`cmd_helpers_test.go` fixture uses `{\"output\":\"...\"}` at the JSON root"
       - "`make test` passes for `common/skill/...`"
-    completed_at: null
+    completed_at: 2026-05-05T12:00:00Z
 
   - id: task-004
     title: "Migrate query command to PrintBodyMap with queryResult ResponseData type"
