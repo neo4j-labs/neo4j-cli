@@ -108,7 +108,7 @@ tasks:
       (set output explicitly or stub `common/output.StdoutIsTerminal`), stale imports left
       by removed functions, or gofmt drift. This task is the definitive done signal for the
       feature.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -118,4 +118,4 @@ tasks:
       - "No `cfg.Aura.Output()` calls remain in `common/skill/` or `neo4j-cli/query/`"
       - "No local `--output` persistent flag definitions remain in `skill.go` or `query.go`"
       - "No `{\"aura\":{\"output\":` config fixture strings remain in skill or query test files"
-    completed_at: null
+    completed_at: 2026-05-05T14:00:00Z

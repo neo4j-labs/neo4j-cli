@@ -114,3 +114,26 @@ Key Decisions:
 - schema.go updated to use commonoutput.ResolveOutput directly (no bridge function needed)
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Final gate: make test and make fmt-check across the full repo
+Date: 2026-05-05T14:00:00Z
+================================================================================
+
+Summary:
+Full-repo gate confirmed all tasks complete. make test passes (all packages green).
+make fmt-check passes (no output). Verified: no cfg.Aura.Output() calls remain in
+common/skill/ or neo4j-cli/query/, no local --output flag definitions in skill.go or
+query.go, no {"aura":{"output": config fixtures in skill/query test files.
+
+Reviewer noted: query JSON output changed from indented (\t) to compact — PrintBodyMap
+handles MarshalIndent, but renderResult.MarshalJSON() delegates to json.Marshal (compact),
+which PrintBodyMap then re-indents via MarshalIndent. Non-blocking.
+
+Files Changed:
+- .plans/tasks-unify-skill-query-output.yml (modified: task-005 status → completed)
+
+Key Decisions:
+- No code changes needed; all prior tasks left the repo clean
+
+Next Task: All tasks complete
