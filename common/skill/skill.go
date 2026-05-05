@@ -18,7 +18,7 @@ import (
 // (`<agentSkillsDir>/<skillName>/`) and the SKILL.md frontmatter `name:`.
 //
 // Each leaf renders results as a table by default and emits a JSON envelope
-// when `--output json` is passed (matching neo4j-cli/aura/internal/output
+// when `--format json` (or `-f json`) is passed (matching neo4j-cli/aura/internal/output
 // conventions).
 func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	cmd := &cobra.Command{

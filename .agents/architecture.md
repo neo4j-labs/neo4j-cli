@@ -42,7 +42,7 @@ common/
 - Structure: `<resource> <action>`, e.g. `instance list`
 - Only one positional argument max; extras become flags
 - The positional argument always refers to the nearest noun
-- `--output json|table` for read commands
+- `--format json|table` (shorthand `-f`) for read commands
 - `--await` flag for async operations
 
 ## Config & State

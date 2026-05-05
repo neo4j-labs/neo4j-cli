@@ -66,7 +66,7 @@ All Aura resource management is available under the `aura` subcommand. For examp
 
 ```text
 neo4j-cli aura credential add --name "my-credentials" --client-id <client-id> --client-secret <client-secret>
-neo4j-cli aura instance list --output table
+neo4j-cli aura instance list --format table
 neo4j-cli aura instance get <instance-id>
 ```
 
@@ -97,7 +97,7 @@ List supported agents along with their detected and installed state:
 
 ```text
 neo4j-cli skill list
-neo4j-cli skill list --output json
+neo4j-cli skill list --format json
 ```
 
 ### Check

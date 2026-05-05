@@ -264,9 +264,9 @@ func fetchDatabaseInfo(ctx context.Context, c *conn) *databaseInfo {
 }
 
 // renderSchema prints the schemaResult in JSON or table form based on
-// resolveOutput(cmd, cfg). When --output is "default" (the implicit value),
+// resolveOutput(cmd, cfg). When --format is "default" (the implicit value),
 // the renderer auto-detects: TTY stdout → 5 stacked tables, piped or
-// redirected stdout → JSON. Explicit --output table|json always wins. JSON
+// redirected stdout → JSON. Explicit --format table|json always wins. JSON
 // mode emits the full struct; table mode emits the five stacked sub-tables
 // separated by H2 markers in the canonical order.
 func renderSchema(cmd *cobra.Command, cfg *clicfg.Config, r schemaResult) {

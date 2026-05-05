@@ -79,7 +79,7 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 }
 
 // renderRows writes the query result to cmd's stdout via PrintBodyMap, which
-// delegates to ResolveOutput for TTY auto-detection. Explicit --output
+// delegates to ResolveOutput for TTY auto-detection. Explicit --format
 // table|json always wins; "default" or "" auto-detects: TTY → table, non-TTY
 // → JSON.
 func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows []map[string]any, truncated bool, arraysTruncated int) {

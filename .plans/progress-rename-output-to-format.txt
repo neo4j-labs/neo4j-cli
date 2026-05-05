@@ -71,3 +71,44 @@ Key Decisions:
 - The migration block was updated in comments to include both "aura.output" and "output" source clauses
 
 Next Task: task-004 (Update hand-authored docs)
+
+================================================================================
+TASK-004: Update hand-authored docs: AGENTS.md, README, CONTRIBUTING, usage guides
+Date: 2026-05-05T17:00:00Z
+================================================================================
+
+Summary:
+Replaced all `--output` flag references with `--format` (and added `-f` shorthand mentions
+where appropriate) in all hand-authored documentation files. Also updated the additions.md
+and description.txt source files for both skill bundles, which required running `make generate`
+to regenerate the committed bundle files.
+
+Files Changed:
+- README.md (modified — --output → --format in example and description)
+- AGENTS.md (modified — --output → --format, {"output": ...} → {"format": ...})
+- CONTRIBUTING.md (modified — --output → --format in two places)
+- .agents/architecture.md (modified — --output → --format)
+- .agents/repo-layout.md (modified — --output/BindOutput → --format/BindFormat)
+- docs/usageGuide/Neo4j CLI.md (modified — two --output → --format)
+- docs/usageGuide/A Guide To The New Aura CLI.md (modified — 9 --output → --format)
+- distribution/npm/cli/README.md (modified — --output → --format)
+- neo4j-cli/internal/skill/additions.md (modified — --output → --format/-f)
+- neo4j-cli/aura/internal/skill/additions.md (modified — --output → --format/-f)
+- neo4j-cli/internal/skill/description.txt (modified — --output → --format/-f)
+- neo4j-cli/aura/internal/skill/description.txt (modified — --output → --format/-f)
+- common/skill/skill.go (modified — Go comment: --output json → --format json)
+- neo4j-cli/query/schema.go (modified — Go comment: --output → --format)
+- neo4j-cli/query/output.go (modified — Go comment: --output → --format)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated via make generate)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated via make generate)
+
+Key Decisions:
+- Updated additions.md and description.txt source files (hand-authored), then ran `make generate`
+  to propagate changes into the committed bundle files — this is the correct flow per AGENTS.md
+- The render/testdata/SKILL.md golden file was intentionally left unchanged (it's a test
+  fixture for the renderer testing --output as a flag in a synthetic test CLI, not the real CLI)
+- Updated Go code comments in skill.go, schema.go, output.go for consistency even though they
+  are not .md files — they reference the flag name in user-visible documentation-style comments
+- Ran `make test` and `make fmt-check` — all pass
+
+Next Task: task-005 (Update additions.md files and regenerate skill bundles)

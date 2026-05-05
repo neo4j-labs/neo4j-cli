@@ -169,7 +169,7 @@ The Aura CLI aims to provide a consistent and reliable experience to the end use
 
 ### Parameters
 
-To avoid confusion, this guide uses the term **flags** to refer to any named argument, whether it has values or not (e.g. `-l`, `--output json`) and **arguments** exclusively for positional arguments (e.g. `list 1234`).
+To avoid confusion, this guide uses the term **flags** to refer to any named argument, whether it has values or not (e.g. `-l`, `--format json`) and **arguments** exclusively for positional arguments (e.g. `list 1234`).
 
 - Only one argument should be used, if more than one is needed, use flags instead. This is to avoid confusion when passing parameters without enough context
     - ✅ `aura-cli instance get <id>`
@@ -188,7 +188,7 @@ To avoid confusion, this guide uses the term **flags** to refer to any named arg
 
 #### Output
 
-- Read operations should support the following `--output` options:
+- Read operations should support the following `--format` options (shorthand `-f`):
     - `json`: Provides the raw JSON output of the API, formatted to be human-readable.
     - `table`: Provides a subset of the output, formatted to be human readable on a table. Try to keep the table output below 120 characters to avoid overflowing the screen.
 

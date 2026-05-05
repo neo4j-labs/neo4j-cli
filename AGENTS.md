@@ -98,7 +98,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
 - `<resource> <action>` form (`instance list`, not `list-instance`)
 - One positional argument max; extras become flags
-- `--output json|table` for all read commands
+- `--format json|table` (shorthand `-f`) for all read commands
 - `--await` flag for async operations
 - Follow CLI best practices from https://clig.dev/ — source at https://github.com/cli-guidelines/cli-guidelines/blob/main/content/_index.md (fetch the raw markdown for token-efficient reference)
 
@@ -231,7 +231,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - `api.ParseBody` stays in `aura/internal/api/response.go` since it is tightly coupled to the Aura HTTP response format
 - Adding a type alias (`type X = pkg.X`) in an existing package is the zero-change way to move an interface while keeping all callers compiling — prefer this over updating all call sites
 - `ConfigEntry` and `ConfigData` in `common/output` let config commands use `PrintBodyMap` without `ParseBody` — import `common/output` directly (not `aura/internal/output`) in config packages
-- `ConfigData.MarshalJSON()` returns a flat `{key: value}` map so JSON output is `{"output": "json"}` rather than `[{"key": "output", "value": "json"}]`; the `AsArray()` method returns the `[{"key":k, "value":v}]` form used only for table rendering
+- `ConfigData.MarshalJSON()` returns a flat `{key: value}` map so JSON output is `{"format": "json"}` rather than `[{"key": "format", "value": "json"}]`; the `AsArray()` method returns the `[{"key":k, "value":v}]` form used only for table rendering
 - `PrintBodyMap` routes both `"table"` and `"default"` to table rendering — config commands in default mode now render as tables, matching all other commands. Tests must assert for `"KEY"` / `"VALUE"` column headers for default-mode output cases
 - `cobra.NoArgs` on a leaf command with no subcommands produces a "unknown command" error (not "accepts 0 arg(s)") when a positional arg is passed — Cobra treats the arg as an unknown subcommand. The error format is `Error: unknown command "<arg>" for "<full-cmd-path>"`.
 - `PrintableAuraCredentials.AsArray()` in `common/clicfg/credentials/aura.go` is the single source of truth for credential output shape; changing field names there requires updating all callers (`neo4j-cli/aura/credential.go`, `neo4j-cli/aura/internal/subcommands/credential/list.go`) to use the new keys in their `fields []string` slice.
