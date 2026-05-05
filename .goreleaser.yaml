@@ -84,6 +84,29 @@ release:
     - glob: CHANGELOG-aura.md
     - glob: CHANGELOG-neo4j.md
 
+brews:
+  - name: neo4j-cli
+    ids:
+      - neo4j-cli-archive
+    repository:
+      owner: neo4j-labs
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    commit_author:
+      name: neo4j-cli-bot
+      email: noreply@neo4j.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/neo4j/cli"
+    description: "Command-line interface for Neo4j"
+    license: "Apache-2.0"
+    skip_upload: auto
+    install: |
+      bin.install "neo4j-cli"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/neo4j-cli --version")
+
 notarize:
   macos:
     - # Whether this configuration is enabled or not.

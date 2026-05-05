@@ -1,0 +1,26 @@
+================================================================================
+TASK-001: Add brews: block to .goreleaser.yaml
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Appended brews: entry to .goreleaser.yaml. Generates Formula/neo4j-cli.rb
+from neo4j-cli-archive only (aura excluded). skip_upload: auto skips prereleases.
+Verified locally via `goreleaser release --snapshot --skip=publish,sign,notarize`
+with stub HOMEBREW_TAP_GITHUB_TOKEN — formula written to
+dist/homebrew/Formula/neo4j-cli.rb with url+sha256 populated for darwin/linux x
+amd64/arm64.
+
+Files Changed:
+- .goreleaser.yaml (modified — added brews block)
+- .plans/tasks-homebrew-distribution.yml (modified — status flip)
+
+Key Decisions:
+- Followed PRD spec verbatim for brews block; ignored goreleaser deprecation
+  notice about brews -> homebrew_casks (PRD explicitly specifies brews).
+- Local snapshot verification used `goreleaser release --snapshot --skip=...`
+  rather than `make snapshot` (the latter runs `goreleaser build` which doesn't
+  exercise the brews step). The PRD acceptance criterion mentions make snapshot;
+  may need a Makefile tweak in a follow-up task to wire brews into snapshot.
+
+Next Task: task-002

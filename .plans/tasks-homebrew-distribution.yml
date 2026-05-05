@@ -13,7 +13,7 @@ tasks:
       `install` + `test` blocks required by `brew audit`. Point the repository at
       `neo4j-labs/homebrew-tap` with a token templated from `HOMEBREW_TAP_GITHUB_TOKEN`.
       Verify by running `make snapshot` and inspecting the generated formula.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.goreleaser.yaml` has a single `brews:` entry with `name: neo4j-cli` and `ids: [neo4j-cli-archive]` (aura archive excluded)"
@@ -21,7 +21,7 @@ tasks:
       - "`install` block runs `bin.install \"neo4j-cli\"`; `test` block asserts `neo4j-cli --version` matches the formula version"
       - "`homepage`, `description`, and `license: Apache-2.0` populated on the brew block"
       - "`make snapshot` produces `dist/homebrew/Formula/neo4j-cli.rb` with populated url + sha256 for the four *nix archs (darwin/linux × amd64/arm64)"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-002
     title: "Mint GitHub App token in release.yml for tap push"

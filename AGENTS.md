@@ -163,6 +163,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors when there are multiple archive blocks
 - Use `{{ .Binary }}` in `name_template` (not `{{ .ProjectName }}`) when building multiple binaries so archives are named per binary
 - `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. If you move Version from `package main` to e.g. `neo4j-cli/app`, update the ldflag to `-X "github.com/neo4j/cli/neo4j-cli/app.Version=..."` — a stale path silently no-ops and ships `dev`.
+- `make snapshot` runs `goreleaser build --snapshot --single-target` which does NOT exercise the `brews:` step. To verify brew formula generation locally use `goreleaser release --snapshot --clean --skip=publish,sign,notarize` with `HOMEBREW_TAP_GITHUB_TOKEN=<anything>` set (the env var is referenced via template; value can be a stub for snapshot since `--skip=publish` short-circuits the push). Output appears at `dist/homebrew/Formula/neo4j-cli.rb`.
+- GoReleaser v2.x emits a deprecation notice "brews is being phased out in favor of homebrew_casks" — informational only; `brews:` still works and is the documented path for non-cask formulas. Migration to `homebrew_casks:` is a separate decision.
 
 ## Repo Doc Notes
 
