@@ -54,7 +54,7 @@ func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fix
 	t.Setenv("HOME", homeDir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, "xdg"))
 
-	cfgJSON := `{"aura":{"output":"` + output + `"}}`
+	cfgJSON := `{"output":"` + output + `"}`
 	memFs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 

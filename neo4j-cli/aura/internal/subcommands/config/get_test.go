@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGetConfig(t *testing.T) {
@@ -29,13 +28,9 @@ func TestGetConfigDefault(t *testing.T) {
 
 	helper.ExecuteCommand("config get output")
 
-	// output is a global key exposed by the standalone config command; default value is "default"
-	// with no output setting in config, cfg.Global.Output() returns "default" which now renders as a table
-	outStr := helper.PrintOut()
-	assert.Contains(t, outStr, "KEY")
-	assert.Contains(t, outStr, "VALUE")
-	assert.Contains(t, outStr, "output")
-	assert.Contains(t, outStr, "default")
+	// output is a global key; default value is "default"
+	// "default" auto-detects: non-TTY test stdout → JSON rendering
+	helper.AssertOutJson(`{"output": "default"}`)
 }
 
 func TestGetConfigBetaEnabled(t *testing.T) {

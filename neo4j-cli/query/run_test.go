@@ -49,7 +49,7 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	stdinIsTTY = func() bool { return true }
 	stdinReader = func() io.Reader { return strings.NewReader("") }
 
-	cfgJSON := `{"aura":{"output":"` + output + `"}}`
+	cfgJSON := `{"output":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	return &runHarness{
@@ -77,7 +77,7 @@ func startServer(t *testing.T, status int, body []byte) *httptest.Server {
 func (h *runHarness) execute(t *testing.T, args ...string) error {
 	t.Helper()
 	// Use afero.NewMemMapFs for the cobra command itself; the harness's cfg
-	// owns the testfs filesystem, which is what cfg.Aura.Output() reads.
+	// owns the testfs filesystem, which is what cfg.Global.Output() reads.
 	cmd := NewCmd(h.cfg)
 	cmd.SetOut(h.stdout)
 	cmd.SetErr(h.stderr)

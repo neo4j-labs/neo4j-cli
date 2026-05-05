@@ -66,7 +66,7 @@ func renderInstallResult(cmd *cobra.Command, cfg *clicfg.Config, skillName, acti
 		})
 	}
 
-	if cfg.Aura.Output() == "json" {
+	if cfg.Global.Output() == "json" {
 		printJSON(cmd, rows)
 		return
 	}

@@ -40,8 +40,10 @@ func TestStandaloneConfigGet(t *testing.T) {
 			configSetup: func(h *testutils.AuraTestHelper) {
 				h.OverwriteConfig("{}")
 			},
-			// "default" output mode renders as a table via PrintBodyMap
-			wantContains: []string{"KEY", "VALUE", "output", "default"},
+			// "default" auto-detects: non-TTY test stdout → JSON rendering
+			wantOut: `{
+	"output": "default"
+}`,
 		},
 		{
 			name: "get auth-url returns aura value",

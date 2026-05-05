@@ -35,7 +35,7 @@ tasks:
       a non-TTY test environment. Fix each by either setting `"table"` explicitly in the config
       fixture or by overriding `common/output.StdoutIsTerminal` to return true for that test,
       restoring via `t.Cleanup`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -43,7 +43,7 @@ tasks:
       - "No existing test that was passing before this task is left failing"
       - "`make test` passes across all packages"
       - "`make fmt-check` passes"
-    completed_at: null
+    completed_at: 2026-05-05T11:00:00Z
 
   - id: task-003
     title: "Migrate skill commands to PrintBodyMap with ResponseData types"

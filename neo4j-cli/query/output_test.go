@@ -20,10 +20,10 @@ import (
 
 // newRenderCmd returns a fresh cobra command with stdout captured into the
 // returned buffer. The output mode ("default", "json", or "table") is wired
-// through the persisted aura config so renderRows reads it via cfg.Aura.Output().
+// through the persisted config so renderRows reads it via cfg.Global.Output().
 func newRenderCmd(t *testing.T, output string) (*cobra.Command, *clicfg.Config, *bytes.Buffer) {
 	t.Helper()
-	cfgJSON := `{"aura":{"output":"` + output + `"}}`
+	cfgJSON := `{"output":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)

@@ -53,7 +53,7 @@ func renderCheckResult(cmd *cobra.Command, cfg *clicfg.Config, rows []CheckRow) 
 		})
 	}
 
-	if cfg.Aura.Output() == "json" {
+	if cfg.Global.Output() == "json" {
 		printJSON(cmd, out)
 		return
 	}

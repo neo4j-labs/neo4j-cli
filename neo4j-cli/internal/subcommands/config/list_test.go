@@ -20,10 +20,15 @@ func TestConfigList(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			name:    "list with default output renders a table",
+			name:    "list with default output auto-detects non-TTY and renders JSON",
 			command: "config list",
-			// "default" output mode now renders as a table via PrintBodyMap
-			wantContains: []string{"KEY", "VALUE", "output", "default"},
+			// "default" auto-detects: non-TTY test stdout → JSON rendering
+			wantOut: `{
+	"aura.auth-url": "https://api.neo4j.io/oauth/token",
+	"aura.base-url": "https://api.neo4j.io",
+	"aura.default-tenant": null,
+	"output": "default"
+}`,
 		},
 		{
 			name: "list with output set to json and --output json flag renders JSON",

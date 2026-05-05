@@ -20,11 +20,9 @@ func TestListConfig(t *testing.T) {
 
 	helper.ExecuteCommand("config list")
 
-	// standalone config list with default output renders as a table via PrintBodyMap
+	// standalone config list with default output auto-detects non-TTY → JSON
 	// includes both global keys (output) and aura-scoped keys
 	outStr := helper.PrintOut()
-	assert.Contains(t, outStr, "KEY")
-	assert.Contains(t, outStr, "VALUE")
 	assert.Contains(t, outStr, "output")
 	assert.Contains(t, outStr, "auth-url")
 	assert.Contains(t, outStr, clicfg.DefaultAuraAuthUrl)
@@ -40,10 +38,8 @@ func TestListConfigFiltersUnrecognisedKeys(t *testing.T) {
 
 	helper.ExecuteCommand("config list")
 
-	// standalone config list with default output renders as a table; unrecognised keys are filtered out
+	// standalone config list with default output auto-detects non-TTY → JSON; unrecognised keys are filtered out
 	outStr := helper.PrintOut()
-	assert.Contains(t, outStr, "KEY")
-	assert.Contains(t, outStr, "VALUE")
 	assert.Contains(t, outStr, "output")
 	assert.Contains(t, outStr, "auth-url")
 	assert.Contains(t, outStr, "base-url")

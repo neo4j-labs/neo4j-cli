@@ -80,8 +80,7 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 			}
 		}`)
 
-	// TODO: Make a better way to override config
-	helper.SetConfigValue("output", "default")
+	helper.SetConfigValue("output", "table")
 
 	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
 
@@ -119,8 +118,7 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 			}
 		}`)
 
-	// TODO: Make a better way to override config
-	helper.SetConfigValue("output", "default")
+	helper.SetConfigValue("output", "table")
 
 	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
 

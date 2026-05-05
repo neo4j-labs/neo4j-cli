@@ -173,7 +173,7 @@ func TestGetDeploymentWithTableOutput(t *testing.T) {
 	}`)
 
 	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetConfigValue("output", "default")
+	helper.SetConfigValue("output", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)

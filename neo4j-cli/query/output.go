@@ -30,12 +30,12 @@ var stdoutIsTerminal = func(w io.Writer) bool {
 }
 
 // resolveOutput returns the effective output mode ("json" or "table") for the
-// current invocation. When cfg.Aura.Output() is "default" or "" the mode is
+// current invocation. When cfg.Global.Output() is "default" or "" the mode is
 // auto-detected from cmd.OutOrStdout(): TTY → "table", non-TTY → "json".
 // Any other configured value (e.g. "json", "table") passes through unchanged
 // — explicit --output always wins.
 func resolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
-	v := cfg.Aura.Output()
+	v := cfg.Global.Output()
 	if v != "default" && v != "" {
 		return v
 	}

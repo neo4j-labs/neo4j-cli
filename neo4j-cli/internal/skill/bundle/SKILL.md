@@ -8,11 +8,18 @@ version: {{VERSION}}
 
 Allows you to manage Neo4j resources
 
+## Global Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
+
 ## Subcommands
 
 | Command | Description |
 |---------|-------------|
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
+| [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
 | [`query`](references/query.md) | Run Cypher against a Neo4j database via the HTTP Query API |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |

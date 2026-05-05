@@ -2,10 +2,6 @@
 
 ## Contents
 
-- [neo4j-cli aura config](#neo4j-cli-aura-config)
-- [neo4j-cli aura config get](#neo4j-cli-aura-config-get)
-- [neo4j-cli aura config list](#neo4j-cli-aura-config-list)
-- [neo4j-cli aura config set](#neo4j-cli-aura-config-set)
 - [neo4j-cli aura customer-managed-key](#neo4j-cli-aura-customer-managed-key)
 - [neo4j-cli aura customer-managed-key create](#neo4j-cli-aura-customer-managed-key-create)
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
@@ -38,30 +34,6 @@ Allows you to programmatically provision and manage your Aura resources
 
 Usage: `neo4j-cli aura`
 
-## neo4j-cli aura config
-
-Manage and view configuration values
-
-Usage: `neo4j-cli aura config`
-
-### neo4j-cli aura config get
-
-Displays the specified configuration value
-
-Usage: `neo4j-cli aura config get <key>`
-
-### neo4j-cli aura config list
-
-Lists the current configuration of the Aura CLI subcommand
-
-Usage: `neo4j-cli aura config list`
-
-### neo4j-cli aura config set
-
-Sets the specified configuration value to the provided value
-
-Usage: `neo4j-cli aura config set <key> <value>`
-
 ## neo4j-cli aura customer-managed-key
 
 Relates to Customer Managed Keys
@@ -74,7 +46,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ### neo4j-cli aura customer-managed-key create
 
@@ -148,7 +119,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ### neo4j-cli aura graph-analytics session
 
@@ -162,7 +132,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 #### neo4j-cli aura graph-analytics session create
 
@@ -235,7 +204,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ### neo4j-cli aura instance create
 
@@ -440,7 +408,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ### neo4j-cli aura tenant get
 

@@ -54,23 +54,18 @@ type ResponseData interface {
 	AsArray() []map[string]any
 }
 
-// PrintBodyMap renders values to the command output in the format selected by
-// cfg.Global.Output().
+// PrintBodyMap renders values to the command output in the format resolved by
+// ResolveOutput (explicit "json"/"table" config wins; otherwise TTY-detected).
 func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, fields []string) {
-	outputType := cfg.Global.Output()
-
-	switch output := outputType; output {
+	switch ResolveOutput(cmd, cfg) {
 	case "json":
 		bytes, err := json.MarshalIndent(values, "", "\t")
 		if err != nil {
 			panic(err)
 		}
 		cmd.Println(string(bytes))
-	case "table", "default":
-		printTable(cmd, values, fields)
 	default:
-		// This is in case the value is unknown
-		cmd.Println(values)
+		printTable(cmd, values, fields)
 	}
 }
 
