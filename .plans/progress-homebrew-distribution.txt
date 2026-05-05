@@ -132,3 +132,24 @@ Key Decisions:
   bullet body.
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Add neo4j-cli changelog entry for Homebrew install path
+Date: 2026-05-05T14:16:57Z
+================================================================================
+
+Summary:
+Hand-authored .changes/unreleased/neo4j-cli-Minor-20260505-141657.yaml per the
+documented <project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml convention. Body mentions
+the brew install command so users see it in release notes. neo4j-cli only,
+no aura-cli entry (Homebrew is super-CLI-only). make test + make fmt-check pass.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260505-141657.yaml (new)
+- .plans/tasks-homebrew-distribution.yml (status flip + completed_at)
+
+Key Decisions:
+- Hand-authored YAML (changie not installed locally) per AGENTS.md fallback.
+- Single-quoted body to allow backticks safely in markdown rendering.
+
+Next Task: NONE — feature complete (6/6 tasks done)

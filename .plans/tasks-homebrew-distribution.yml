@@ -107,7 +107,7 @@ tasks:
       kind `Minor`, body covering the new `brew install neo4j-labs/tap/neo4j-cli`
       install path. Use `make changelog` if available, otherwise hand-author per the
       `<project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml` convention documented in CLAUDE.md.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -115,4 +115,4 @@ tasks:
       - "Body mentions the install command (`brew install neo4j-labs/tap/neo4j-cli`) so users see it in the release notes"
       - "No `aura-cli` entry created (Homebrew is a neo4j-cli-only channel)"
       - "Filename matches `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`"
-    completed_at: null
+    completed_at: 2026-05-05T14:16:57Z
