@@ -55,3 +55,23 @@ Key Decisions:
 - TestGenerator_RoundTrip is the gate that catches stale skill bundles.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Add toon case to ResolveOutput
+Date: 2026-05-05T02:00:00Z
+================================================================================
+
+Summary:
+Updated ResolveOutput in common/output/output.go to short-circuit on "toon"
+the same way it already does for "json" and "table". The one-line condition
+change prevents "toon" from falling through to TTY auto-detection. Updated
+the doc comment to list "toon" alongside the other explicit format values.
+
+Files Changed:
+- common/output/output.go (modified: added "toon" to ResolveOutput short-circuit condition and updated doc comment)
+
+Key Decisions:
+- Minimal change: added `|| v == "toon"` to the existing short-circuit condition.
+- No new callers or dispatch logic needed here; task-004 will add the PrintBodyMap case.
+
+Next Task: task-004

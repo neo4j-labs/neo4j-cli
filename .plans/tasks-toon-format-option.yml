@@ -45,14 +45,14 @@ tasks:
       explicit case that is returned as-is, so it never falls through to the `"table"`
       default. The function currently only short-circuits on `"json"` and `"table"`;
       adding `"toon"` ensures the caller receives the correct resolved format string.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "ResolveOutput returns \"toon\" when cfg.Global.Format() is \"toon\""
       - "ResolveOutput still returns \"json\" or \"table\" via TTY auto-detection when format is \"default\""
       - "No existing ResolveOutput tests are broken"
-    completed_at: null
+    completed_at: "2026-05-05T02:00:00Z"
 
   - id: task-004
     title: "Implement printToon and wire into PrintBodyMap"
