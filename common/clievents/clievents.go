@@ -30,7 +30,7 @@ type queryEventProperties struct {
 // args is expected to be os.Args[1:] so args[0] is the top-level command name.
 func Emit(events analytics.Service, args []string, state bool) {
 	flags := pflag.NewFlagSet("cliEvents", pflag.ContinueOnError)
-	flags.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
+	flags.ParseErrorsAllowlist = pflag.ParseErrorsAllowlist{UnknownFlags: true}
 	var help bool
 	var uri string
 

@@ -212,7 +212,7 @@ func (a *Analytics) logWarn(msg string, fields ...any) {
 	}
 }
 
-// logWarn logs at info level if a logger has been injected.
+//nolint:unused
 func (a *Analytics) logInfo(msg string, fields ...any) {
 	if a.log != nil {
 		a.log.Info(msg, fields...)
