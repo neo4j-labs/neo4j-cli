@@ -81,4 +81,36 @@ Key Decisions:
   pulled v2.12.1 (AGENTS.md notes v2.11.4 — newer is fine, lint passed
   with 0 issues).
 
+Next Task: task-005 (post-review course correction)
+
+================================================================================
+TASK-005: Re-add help/fail/success placeholder comments for future metrics hooks
+Date: 2026-05-05T15:30:00Z
+================================================================================
+
+Summary:
+Course correction after PR #21 was already green. Reviewer wanted to keep
+obvious hook points for the future telemetry work instead of fully deleting
+the help/fail/success log sites. Re-introduced the SetHelpFunc(c, args)
+wrapper (with `// add metrics callback for help here` plus origHelp) in
+both entrypoints, and inserted `// add metrics callback for fail here` /
+`// add metrics callback for success here` at the previously-deleted
+positions. No change to runtime stdout output vs the full-removal version
+(verified manually: --help, success, and bogus-cmd all clean).
+
+Files Changed:
+- neo4j-cli/main.go (modified — re-added SetHelpFunc wrapper + 3 comment placeholders)
+- neo4j-cli/aura/cmd/main.go (modified — same)
+- .plans/prd-remove-debug-logs-in-output.md (modified — added Addendum section)
+- .plans/tasks-remove-debug-logs-in-output.yml (modified — appended task-005)
+
+Key Decisions:
+- Kept the comment text uniform across both binaries: `// add metrics
+  callback for <help|fail|success> here` so a single grep finds all six
+  hook points when the metrics work starts.
+- No new changie entry — runtime behaviour vs task-004 is unchanged, and
+  the task-003 entries already cover the user-facing change.
+- Task-005 marked completed_at the same time as the commit to keep the
+  YAML consistent with the actual state of the branch.
+
 Next Task: none — feature complete
