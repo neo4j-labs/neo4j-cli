@@ -1,0 +1,22 @@
+================================================================================
+TASK-001: Add ResolveOutput and StdoutIsTerminal seam to common/output
+Date: 2026-05-05T10:00:00Z
+================================================================================
+
+Summary:
+Added `var StdoutIsTerminal` package-level test seam and `ResolveOutput(cmd, cfg)` function
+to `common/output/output.go`. The seam mirrors the pattern from `neo4j-cli/query/output.go`.
+`ResolveOutput` passes through explicit "json"/"table" values and auto-detects via TTY check
+otherwise. The `common/output` package builds and tests cleanly. Pre-existing build failures
+in `common/skill` and `neo4j-cli/query` (due to removed `cfg.Aura.Output()`) are addressed
+by tasks 003 and 004.
+
+Files Changed:
+- common/output/output.go (modified: added StdoutIsTerminal seam, ResolveOutput function, io/os/term imports)
+
+Key Decisions:
+- Placed StdoutIsTerminal in common/output (not common/flags) so PrintBodyMap can use it directly
+- ResolveOutput only returns "json" or "table" — callers never need to handle "default" or ""
+- golang.org/x/term import added alongside existing third-party imports
+
+Next Task: task-002

@@ -6,6 +6,8 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"strings"
 
@@ -13,7 +15,38 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+// StdoutIsTerminal is the package-level test seam for terminal detection.
+// Production initialisation checks whether the writer is an *os.File and, if
+// so, calls term.IsTerminal on its file descriptor. Non-*os.File writers (e.g.
+// a *bytes.Buffer in tests) always return false. Tests may replace this var and
+// restore it via t.Cleanup.
+var StdoutIsTerminal = func(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
+// ResolveOutput returns the effective output mode ("json" or "table") for the
+// current invocation. When cfg.Global.Output() is "json" or "table" that value
+// is returned unchanged — an explicit --output flag always wins. For any other
+// value ("default", "", or an unknown value) the mode is auto-detected from
+// cmd.OutOrStdout(): a TTY stdout yields "table", a non-TTY (piped/redirected)
+// stdout yields "json".
+func ResolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
+	v := cfg.Global.Output()
+	if v == "json" || v == "table" {
+		return v
+	}
+	if StdoutIsTerminal(cmd.OutOrStdout()) {
+		return "table"
+	}
+	return "json"
+}
 
 // ResponseData is the interface that all API response types must satisfy to be
 // rendered by PrintBodyMap.

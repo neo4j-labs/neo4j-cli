@@ -14,7 +14,7 @@ tasks:
       value when it is `"json"` or `"table"`, and otherwise auto-detects via `StdoutIsTerminal`
       on `cmd.OutOrStdout()` returning `"table"` for TTY and `"json"` for non-TTY. Add
       `golang.org/x/term` to the import if not already present.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`common/output.StdoutIsTerminal` is a package-level var seam, restored to the real `term.IsTerminal` check in production"
@@ -22,7 +22,7 @@ tasks:
       - "`ResolveOutput` returns `\"table\"` when `StdoutIsTerminal` is stubbed to return true and output is `\"\"` or `\"default\"`"
       - "`ResolveOutput` returns `\"json\"` when `StdoutIsTerminal` is stubbed to return false and output is `\"\"` or `\"default\"`"
       - "`make fmt-check` passes"
-    completed_at: null
+    completed_at: 2026-05-05T10:00:00Z
 
   - id: task-002
     title: "Update PrintBodyMap to use ResolveOutput; fix tests broken by TTY auto-detection"
