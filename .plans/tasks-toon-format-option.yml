@@ -100,7 +100,7 @@ tasks:
       `changie new --projects aura-cli --projects neo4j-cli --kind Minor --body "Add toon output format option (--format toon / -f toon)"`.
       If changie is not installed, hand-author the YAML files under `.changes/unreleased/`
       following the repo's naming convention.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -108,4 +108,4 @@ tasks:
       - "A .changes/unreleased/ entry exists with project: neo4j-cli and kind: Minor"
       - "`make license-check` still passes"
       - "`make test` and `make fmt-check` still pass as final gates"
-    completed_at: null
+    completed_at: "2026-05-05T17:00:00Z"

@@ -125,3 +125,24 @@ Key Decisions:
 - Empty rows case included to verify toon.Marshal handles empty arrays gracefully.
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Add changelog entries for aura-cli and neo4j-cli
+Date: 2026-05-05T17:00:00Z
+================================================================================
+
+Summary:
+Created two changie-format YAML entries under .changes/unreleased/ for the
+toon output format feature — one for aura-cli and one for neo4j-cli. Both
+entries are kind: Minor and describe the new --format toon / -f toon option.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Minor-20260505-154904.yaml (created)
+- .changes/unreleased/neo4j-cli-Minor-20260505-154904.yaml (created)
+
+Key Decisions:
+- Used changie new --projects aura-cli --projects neo4j-cli --kind Minor to
+  generate both entries in a single invocation, following the repo's
+  dual-project changelog convention documented in AGENTS.md.
+
+Next Task: All tasks complete
