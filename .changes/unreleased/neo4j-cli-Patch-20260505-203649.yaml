@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Emits startup event to help track usage
-time: 2026-05-05T20:36:49.425433+01:00
