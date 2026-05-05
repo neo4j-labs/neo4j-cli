@@ -117,7 +117,7 @@ tasks:
       (no unformatted files), and `make generate-check` (bundles match generated output).
       Fix any remaining `--output` references, stale imports, or formatting issues found.
       This task is the definitive done signal for the feature.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-005
@@ -127,4 +127,4 @@ tasks:
       - "`make generate-check` exits 0"
       - "`grep -r -- '--output' --include='*.go' .` returns no matches in source files"
       - "`grep -rn 'ValidOutputValues\\|BindOutput\\|func.*Output()' --include='*.go' .` returns no matches"
-    completed_at: null
+    completed_at: "2026-05-05T18:00:00Z"
