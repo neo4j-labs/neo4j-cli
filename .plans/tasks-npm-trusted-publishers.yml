@@ -16,7 +16,8 @@ tasks:
       this fix the first OIDC publish would be rejected. Lands first because
       task-002 (bootstrap-stubs.sh) consumes the same templates and we want
       the stub publish to claim the names with the correct metadata.
-    status: pending
+    status: completed
+    completed_at: 2026-05-05T10:30:00Z
     dependencies: []
     acceptance_criteria:
       - "distribution/npm/cli/package.json.tmpl: homepage is `https://github.com/neo4j-labs/neo4j-cli`, repository.url is `git+https://github.com/neo4j-labs/neo4j-cli.git`, bugs.url is `https://github.com/neo4j-labs/neo4j-cli/issues`. No other field changes."

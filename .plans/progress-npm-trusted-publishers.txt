@@ -1,0 +1,20 @@
+================================================================================
+TASK-001: Fix repository.url in both package.json templates
+Date: 2026-05-05T10:30:00Z
+================================================================================
+
+Summary:
+Updated homepage, repository.url, and bugs.url in both npm package templates
+from stale github.com/neo4j/cli to actual github.com/neo4j-labs/neo4j-cli.
+Required for npm Trusted Publisher provenance attestation to match the OIDC
+source-repo claim.
+
+Files Changed:
+- distribution/npm/cli/package.json.tmpl (modified: 3 URL fields updated)
+- distribution/npm/cli-platform/package.json.tmpl (modified: 3 URL fields updated)
+
+Key Decisions:
+- Only the three URL fields touched; placeholders (__OS__, __CPU__, __BIN_NAME__,
+  __VERSION__) and all other metadata left intact.
+
+Next Task: task-002 (Add distribution/npm/bootstrap-stubs.sh + make npm-bootstrap)
