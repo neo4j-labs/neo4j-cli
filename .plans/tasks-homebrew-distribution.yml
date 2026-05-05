@@ -53,14 +53,14 @@ tasks:
       dry-run flow via `make snapshot`, and manual recovery (hand-edit the formula
       in the tap; next release overwrites). Also list the prerequisite GitHub App
       + secrets so a future maintainer can rebuild the auth path.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "File `distribution/homebrew/README.md` exists with sections for: tap location, user install, release cadence (stable-only), local dry-run, manual recovery, auth prerequisites"
       - "Documents that prereleases don't push (skip_upload: auto) and links to npm @alpha for opt-in alpha access"
       - "Lists the `HOMEBREW_TAP_APP_ID` + `HOMEBREW_TAP_APP_PRIVATE_KEY` secrets and the App's required scope (`contents: write` on `neo4j-labs/homebrew-tap`)"
       - "Cross-links back to `RELEASING.md` and `.goreleaser.yaml` so readers can trace the wiring"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-004
     title: "Update RELEASING.md to reflect Homebrew shipping"

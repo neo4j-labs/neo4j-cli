@@ -51,3 +51,28 @@ Key Decisions:
   PRD); a `permissions:` block on the action would only narrow further.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Create distribution/homebrew/README.md
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Wrote distribution/homebrew/README.md mirroring the npm/README.md tone +
+section style. Covers tap location, brew install command, stable-only cadence
+(skip_upload: auto), npm @alpha link for prereleases, make snapshot dry-run,
+manual recovery via tap-repo hand-edit, and auth prereqs (App + 2 secrets).
+Cross-links RELEASING.md, .goreleaser.yaml, release.yml, npm/README.md.
+
+Files Changed:
+- distribution/homebrew/README.md (new)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Followed PRD verbatim — channel docs only, no publish.sh (GoReleaser native).
+- Style matches npm/README.md (h2 sections, callout tables) so the two
+  channel READMEs read consistently when added side-by-side.
+- Did not include a "What gets released" table — that lives in RELEASING.md
+  per task-004. Avoids duplication.
+
+Next Task: task-004
