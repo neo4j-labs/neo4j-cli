@@ -42,4 +42,4 @@ jobs:
 
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
-              run: bash scripts/test-https.sh
+              run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...

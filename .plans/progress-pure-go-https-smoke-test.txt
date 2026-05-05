@@ -69,3 +69,29 @@ Key Decisions:
   (bookkeeping; not user-facing).
 
 Next Task: task-003 (update .github/workflows/test.yml HTTPS step)
+
+================================================================================
+TASK-003: Update .github/workflows/test.yml HTTPS step to invoke go test
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Switched the CI HTTPS smoke step from `bash scripts/test-https.sh` to
+`NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`.
+Step name and `if: matrix.os == 'ubuntu-latest'` gate preserved. No other
+workflow changes. make test passes (smoke test gated off without env var),
+make fmt-check is clean, YAML parses.
+
+Files Changed:
+- .github/workflows/test.yml (one-line `run:` swap)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-003 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Inline env-var prefix (`NEO4J_HTTPS_TEST=1 go test ...`) over a step-
+  level `env:` block: matches the documented local invocation in AGENTS.md
+  one-for-one, easier to copy-paste between local and CI.
+- Kept the step's existing display name verbatim ("HTTPS smoke test
+  (--insecure against real Neo4j)") — purely a runner change.
+
+Next Task: task-004 (update AGENTS.md Local Verification Scripts subsection)

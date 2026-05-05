@@ -56,14 +56,14 @@ tasks:
       `run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`.
       Preserve the existing `if: matrix.os == 'ubuntu-latest'` gate and
       the step name. No other workflow changes.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "test.yml HTTPS smoke step invokes go test with NEO4J_HTTPS_TEST=1, not bash"
       - "Step retains `if: matrix.os == 'ubuntu-latest'` gate"
       - "yamllint / GitHub workflow syntax check passes (workflow file is valid YAML)"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-004
     title: "Update AGENTS.md Local Verification Scripts subsection"
