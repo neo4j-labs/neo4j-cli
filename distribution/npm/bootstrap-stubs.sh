@@ -22,8 +22,13 @@
 #
 # Usage (one-time, by a maintainer with publish access on the @neo4j-labs scope):
 #   npm login --scope=@neo4j-labs
-#   make npm-bootstrap         # or: bash distribution/npm/bootstrap-stubs.sh
+#   NPM_OTP=123456 make npm-bootstrap   # or: NPM_OTP=123456 bash distribution/npm/bootstrap-stubs.sh
 #   npm logout
+#
+# NPM_OTP is required if the npm account has 2FA on publishes (default for @neo4j-labs).
+# A single OTP code is reused across all 9 publishes, which works because npm's OTP window
+# is wide enough to cover the full run; if a code expires mid-run, re-invoke with a fresh
+# code — already-published packages skip via the idempotency check.
 #
 # After running this, configure Trusted Publisher in the npm UI for each of the 9 packages
 # (org `neo4j-labs`, repo `neo4j-cli`, workflow `publish-npm.yml`, environment blank).
@@ -40,6 +45,10 @@ WORK_ROOT="${REPO_ROOT}/dist/.npm-bootstrap"
 
 VERSION="0.0.0-bootstrap.1"
 TAG_FLAG="--tag bootstrap"
+OTP_FLAG=""
+if [ -n "${NPM_OTP:-}" ]; then
+  OTP_FLAG="--otp ${NPM_OTP}"
+fi
 
 echo "[bootstrap] version=${VERSION} tag=bootstrap"
 
@@ -93,8 +102,8 @@ publish_pkg() {
     return 0
   fi
   echo "[publish] ${pkg_name}@${VERSION}"
-  # shellcheck disable=SC2086 # we want word-splitting on TAG_FLAG
-  npm publish "$pkg_dir" --access public $TAG_FLAG
+  # shellcheck disable=SC2086 # we want word-splitting on TAG_FLAG and OTP_FLAG
+  npm publish "$pkg_dir" --access public $TAG_FLAG $OTP_FLAG
 }
 
 # --- Build + publish 8 platform packages first ---------------------------------------------
