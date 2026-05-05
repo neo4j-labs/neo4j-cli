@@ -25,7 +25,7 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -X "main.Version={{.Env.GORELEASER_CURRENT_TAG}}"
+      - -X "github.com/neo4j/cli/neo4j-cli/app.Version={{.Env.GORELEASER_CURRENT_TAG}}"
   - main: ./neo4j-cli/aura/cmd
     id: aura-cli
     binary: aura-cli

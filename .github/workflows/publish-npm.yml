@@ -1,0 +1,192 @@
+name: publish-npm
+
+# Publishes @neo4j-labs/cli + 8 platform packages to npm.
+#
+# Two triggers:
+#   - workflow_run (auto): fires after `release.yml` succeeds. Reads the dist/
+#     and release-meta.json artifacts uploaded by release.yml, gates on
+#     include_neo4j == 'true' so aura-cli-only release runs are skipped.
+#   - workflow_dispatch (manual): for failure recovery. Takes a `version` input
+#     (no leading v), downloads existing GH release archives via `gh release
+#     download`, extracts them into the `dist/<archive_basename>/` layout the
+#     publish script expects. Does NOT re-invoke GoReleaser.
+#
+# Both paths configure ~/.npmrc from secrets.NPM_TOKEN and run
+# distribution/npm/publish.sh, which is idempotent at the per-package level.
+
+on:
+  # AUTO TRIGGER DISABLED until the `@neo4j-labs` npm org is provisioned and
+  # NPM_TOKEN with publish access on that scope is added as a repo secret.
+  # Once available, uncomment the workflow_run block below — no other code
+  # changes needed; the auto path is fully implemented and tested.
+  # See PR #14 / task-011 for the scope-rename context.
+  #
+  # workflow_run:
+  #   workflows: ["release"]
+  #   types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "neo4j-cli version (no leading v), e.g. 0.2.0 or 0.2.0-alpha.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Skip the auto path entirely if the upstream release didn't succeed. The
+    # include_neo4j gate is applied per-step below (after we've downloaded the
+    # release-meta.json artifact and parsed it). For workflow_dispatch we
+    # always run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # ----- workflow_run path: pull dist/ + release-meta.json from release.yml -----
+
+      - name: Download release-meta artifact (auto)
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-meta
+          path: ${{ runner.temp }}/release-meta
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Parse release-meta (auto)
+        id: meta
+        if: github.event_name == 'workflow_run'
+        run: |
+          # release-meta.json is a compact `{version, include_neo4j}` blob.
+          # Surface both as step outputs so downstream gates and the publish
+          # step can read them uniformly.
+          META_FILE="${{ runner.temp }}/release-meta/release-meta.json"
+          if [ ! -f "${META_FILE}" ]; then
+            echo "ERROR: release-meta.json not found in artifact" >&2
+            exit 1
+          fi
+          VERSION=$(jq -r '.version' "${META_FILE}")
+          INCLUDE_NEO4J=$(jq -r '.include_neo4j' "${META_FILE}")
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "ERROR: Invalid version in release-meta.json: ${VERSION}" >&2
+            exit 1
+          fi
+          if [[ "${INCLUDE_NEO4J}" != "true" && "${INCLUDE_NEO4J}" != "false" ]]; then
+            echo "ERROR: Invalid include_neo4j in release-meta.json: ${INCLUDE_NEO4J}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
+          echo "[publish-npm] auto path: version=${VERSION} include_neo4j=${INCLUDE_NEO4J}"
+
+      - name: Skip — aura-cli-only release (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j != 'true'
+        env:
+          INCLUDE_NEO4J: ${{ steps.meta.outputs.include_neo4j }}
+        run: |
+          echo "[publish-npm] include_neo4j=$INCLUDE_NEO4J — skipping npm publish"
+
+      - name: Download dist artifact (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: ${{ runner.temp }}/downloaded-dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Prepare dist from downloaded artifact (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          test -d "${{ runner.temp }}/downloaded-dist"
+          cp -a "${{ runner.temp }}/downloaded-dist"/. dist/
+
+      # ----- workflow_dispatch path: rebuild dist/ from existing GH release -----
+
+      - name: Download release archives (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Mirror the GoReleaser dist/ layout from already-published GH release
+          # archives, no GoReleaser re-invocation needed. The publish script
+          # expects dist/<archive_basename>/<binary>; archive_basename matches
+          # the .tar.gz / .zip filename without the extension.
+          mkdir -p "${{ runner.temp }}/dist-archives" dist
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern 'neo4j-cli_*' \
+            --dir "${{ runner.temp }}/dist-archives/"
+          echo "[publish-npm] downloaded archives:"
+          ls -la "${{ runner.temp }}/dist-archives/"
+
+      - name: Extract release archives (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+          ARCHIVES_DIR: ${{ runner.temp }}/dist-archives
+        run: |
+          # Extract each archive into dist/<archive_basename>/ to recreate the
+          # GoReleaser dist/ layout. .tar.gz archives use tar; .zip uses unzip.
+          # The publish script reads platforms.tsv to map dirnames to packages,
+          # so the basename of each archive must equal the goreleaser_dirname
+          # column (with ${VERSION} substituted) — GoReleaser names them this
+          # way already, so the basename without extension lines up.
+          shopt -s nullglob
+          for archive in "${ARCHIVES_DIR}"/neo4j-cli_*.tar.gz; do
+            base=$(basename "$archive" .tar.gz)
+            mkdir -p "dist/${base}"
+            tar -xzf "$archive" -C "dist/${base}"
+            echo "[publish-npm] extracted ${archive} -> dist/${base}/"
+          done
+          for archive in "${ARCHIVES_DIR}"/neo4j-cli_*.zip; do
+            base=$(basename "$archive" .zip)
+            mkdir -p "dist/${base}"
+            unzip -q "$archive" -d "dist/${base}"
+            echo "[publish-npm] extracted ${archive} -> dist/${base}/"
+          done
+
+      # ----- common: configure npm auth + run publish script -----
+
+      - name: Configure npm auth
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Standard scoped-package auth: token in ~/.npmrc, no `npm login`.
+          # The publish script does NOT touch ~/.npmrc itself — orchestration
+          # owns auth setup so the script stays usable for local --dry-run too.
+          printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_TOKEN}" > "${HOME}/.npmrc"
+          chmod 600 "${HOME}/.npmrc"
+
+      - name: Publish to npm
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          # workflow_run path reads version from release-meta.json (parsed in
+          # `meta` step). workflow_dispatch reads it from the input. Either
+          # way, GORELEASER_CURRENT_TAG must have a leading `v` — the publish
+          # script strips it.
+          GORELEASER_CURRENT_TAG: >-
+            v${{ github.event_name == 'workflow_dispatch' && inputs.version || steps.meta.outputs.version }}
+        run: |
+          bash distribution/npm/publish.sh

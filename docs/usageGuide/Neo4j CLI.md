@@ -72,3 +72,47 @@ neo4j-cli aura instance get <instance-id>
 
 For the full Aura command reference, see [A Guide To The New Aura CLI](./A%20Guide%20To%20The%20New%20Aura%20CLI.md).
 Every `aura-cli` command in that guide can be run by replacing `aura-cli` with `neo4j-cli aura`.
+
+## Skill
+
+`neo4j-cli` embeds a `SKILL.md` bundle that documents its full command tree (overview, global flags, per-subcommand references, gotchas).
+The `skill` subcommand installs that bundle into the skill directories of supported AI coding agents (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie) so the agent picks up accurate, per-build instructions for driving the CLI.
+
+The `skill` subcommand is identical on `neo4j-cli` and `aura-cli`, but the bundle each binary installs reflects its own command surface. Run it from `neo4j-cli` to install the super-CLI's skill (covers `aura`, `credential`, and `skill` itself); run it from `aura-cli` for the standalone Aura surface.
+
+### Install
+
+Install into every detected agent on the machine, or pass an agent name to target one:
+
+```text
+neo4j-cli skill install
+neo4j-cli skill install claude-code
+```
+
+Agent name lookup is case-insensitive. Without an argument, `install` errors if no supported agent is detected.
+
+### List
+
+List supported agents along with their detected and installed state:
+
+```text
+neo4j-cli skill list
+neo4j-cli skill list --output json
+```
+
+### Check
+
+Compare each installed bundle's `version:` frontmatter against the running binary's version. Exits non-zero when any installed bundle is out of date.
+
+```text
+neo4j-cli skill check
+```
+
+### Remove
+
+Remove the installed bundle. Idempotent — running it again on a clean target succeeds with no change.
+
+```text
+neo4j-cli skill remove
+neo4j-cli skill remove claude-code
+```

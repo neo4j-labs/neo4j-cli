@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-aura build-neo4j snapshot test lint fmt license-check run-aura run-neo4j clean changelog
+.PHONY: build build-aura build-neo4j snapshot test lint fmt fmt-check license-check run-aura run-neo4j clean changelog generate generate-check npm-publish-dry
 
 ## build: build both aura-cli and neo4j-cli into bin/
 build: build-aura build-neo4j
@@ -33,6 +33,16 @@ lint:
 fmt:
 	go fmt ./...
 
+## fmt-check: fail if any Go source file needs gofmt (catches drift without rewriting)
+fmt-check:
+	@unformatted="$$(gofmt -l .)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "ERROR: the following files need gofmt:"; \
+		echo "$$unformatted"; \
+		echo "Run 'make fmt' to fix."; \
+		exit 1; \
+	fi
+
 ## license-check: verify all .go files carry the Neo4j copyright header
 ## NOTE: this target requires a Unix shell (bash/sh) and the `find` + `xargs` utilities.
 ##       It will not work on Windows without WSL or Git Bash.
@@ -55,3 +65,24 @@ clean:
 ## changelog: add a new changelog entry
 changelog:
 	changie new
+
+## generate: run all `go generate` directives (regenerates per-binary skill bundles)
+generate:
+	go generate ./...
+
+## generate-check: regenerate and fail if the working tree drifts (CI gate)
+generate-check: generate
+	@if ! git diff --exit-code; then \
+		echo ""; \
+		echo "ERROR: generated files are stale. Run 'make generate' and commit the result."; \
+		exit 1; \
+	fi
+
+## npm-publish-dry: dry-run the npm publish flow (renders templates, exercises ordering)
+## REQUIRES: `make snapshot` first if you want real binaries copied into the rendered packages.
+##           snapshot is NOT a prerequisite here — it is slow and re-running it on every
+##           dry-run would be painful. In --dry-run mode publish.sh tolerates missing binaries
+##           by stubbing them with a 1-byte placeholder, so this target works against an empty
+##           dist/ and is purely a template-rendering + publish-ordering sanity check.
+npm-publish-dry:
+	GORELEASER_CURRENT_TAG=v0.0.0-dry distribution/npm/publish.sh --dry-run

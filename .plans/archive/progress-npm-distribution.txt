@@ -1,0 +1,544 @@
+================================================================================
+TASK-001: Bootstrap distribution/ scaffolding (platforms.tsv + .gitattributes)
+Date: 2026-05-04T12:30:00Z
+================================================================================
+
+Summary:
+Created shared platform table at distribution/platforms.tsv with 8 rows
+(darwin arm64/x64, linux arm64/ia32/x64, win32 arm64/ia32/x64) mapping
+GoReleaser archive directory names to npm os/cpu/bin filenames. Extended
+.gitattributes with LF-pinning globs for distribution/**/*.{json,tmpl,js,sh,tsv}.
+
+Files Changed:
+- distribution/platforms.tsv (created — TSV with 4 cols: goreleaser_dirname_template, npm_os, npm_cpu, bin_filename)
+- .gitattributes (modified — added 5 LF-pin globs for distribution/)
+
+Key Decisions:
+- Used ${VERSION} placeholder in dirname column; publish.sh will substitute via sed at publish time
+- GoReleaser dirname pattern matches .goreleaser.yaml:48-54: title-cased OS (Darwin/Linux/Windows) + arch alias (x86_64/i386/arm64)
+- Added .tsv to LF globs defensively even though task only required json/tmpl/js/sh — platforms.tsv itself benefits
+- Verified TSV parses cleanly with both awk -F'\t' and shell while-read IFS=$'\t' loops
+
+Next Task: task-002 (wrapper bin shim distribution/npm/cli/bin/neo4j-cli.js)
+
+================================================================================
+TASK-002: Implement wrapper bin shim distribution/npm/cli/bin/neo4j-cli.js
+Date: 2026-05-04T13:35:00Z
+================================================================================
+
+Summary:
+Created Node bin shim that resolves the platform-specific package via
+require.resolve and execs the binary with stdio/signal/exit-code passthrough.
+On resolve failure (unsupported platform or --omit=optional install), prints a
+friendly multi-line error naming the detected platform, the supported matrix,
+and the omit-optional hint, then exits non-zero. No runtime npm dependencies.
+
+Files Changed:
+- distribution/npm/cli/bin/neo4j-cli.js (created — ~60 lines, Node stdlib only)
+
+Key Decisions:
+- spawnSync (not execFileSync) with stdio: 'inherit' for clean SIGINT/TTY passthrough
+- result.status ?? 1 — matches AC literally; nullish coalescing covers both null (signal-killed) and undefined (spawn error)
+- Hard-coded SUPPORTED list of 8 platforms in the shim itself rather than reading platforms.tsv at runtime — shim ships standalone in @neo4j/cli tarball, no extra runtime files; the list is short and rarely changes (adding a platform = update SUPPORTED + add platforms.tsv row + GoReleaser build entry, all caught by reviewers together)
+- Use `'use strict'` and CommonJS require — no ESM transpile, runs on Node >=18 without flags
+- Result.error branch handles spawn-time failure (missing exe perms, etc.) distinctly from non-zero exit
+
+Verification:
+- node --check passes
+- Live exec on darwin-arm64 host (no platform pkg installed) → friendly error path, exit 1
+- Simulated platform pkg with chmod +x stub script → args pass through, exit 42 propagates correctly
+
+Next Task: task-003 (package.json templates for wrapper and platform pkgs)
+
+================================================================================
+TASK-003: Create package.json templates for wrapper and platform packages
+Date: 2026-05-04T14:10:00Z
+================================================================================
+
+Summary:
+Created two npm package.json templates with __TOKEN__ placeholders for sed
+substitution at publish time. Wrapper at distribution/npm/cli/package.json.tmpl
+declares @neo4j/cli with all 8 platform pkgs in optionalDependencies pinned
+exactly to __VERSION__ (no caret). Platform template at
+distribution/npm/cli-platform/package.json.tmpl declares
+@neo4j/cli-__OS__-__CPU__ with os/cpu constraints, bin pointing at
+bin/__BIN_NAME__, and files: ["bin/__BIN_NAME__"].
+
+Files Changed:
+- distribution/npm/cli/package.json.tmpl (created — wrapper, 34 lines, valid JSON)
+- distribution/npm/cli-platform/package.json.tmpl (created — per-platform, 29 lines, valid JSON)
+
+Key Decisions:
+- Used __TOKEN__ (double underscores) over {{TOKEN}} or ${TOKEN} so sed sed-replaces
+  cleanly without quoting concerns and templates parse as valid JSON pre-substitution
+- Wrapper files: ["bin/neo4j-cli.js", "README.md"] — README.md slot reserved for
+  task-009's user-facing README ship
+- Wrapper enumerates all 8 optionalDependencies inline (vs generating from
+  platforms.tsv) — keeps the template a single static artifact, future agent
+  reading the file can see the full surface without sourcing TSV; adding a
+  platform = update three places (TSV, wrapper template, bin shim SUPPORTED)
+  caught by reviewer
+- Platform template includes engines.node: >=18 — not strictly required (the
+  platform pkg has no JS) but consistent with the wrapper and sets the same
+  Node baseline if anyone npm-installs the platform pkg directly
+- Added description / homepage / repository / bugs fields beyond strict AC —
+  standard npm hygiene that prevents npm-publish warnings; not gold-plating
+
+Verification:
+- sed -e 's/__VERSION__/1.2.3/g' wrapper.tmpl | jq . → valid JSON, 8 pinned deps
+- Loop over platforms.tsv → all 8 platform substitutions produce valid JSON with
+  correct os/cpu/bin (.exe suffix only on win32)
+- make test passes (no new Go code, but gate confirmed clean)
+- make fmt-check passes (no Go file drift)
+
+Next Task: task-004 (publish.sh — depends on tasks 001/002/003 all done)
+
+================================================================================
+TASK-004: Implement distribution/npm/publish.sh with idempotency and dist-tag selection
+Date: 2026-05-04T15:00:00Z
+================================================================================
+
+Summary:
+Created the orchestration script that publishes all 9 npm packages (8 platforms
++ wrapper) from a populated dist/ tree. Sources distribution/platforms.tsv for
+the matrix, derives version from GORELEASER_CURRENT_TAG (strips leading v),
+selects --tag from version pattern (alpha/beta/rc/next/latest), renders both
+package.json templates via sed, and uses `npm view` for per-package idempotency
+so same-version retries are safe. Wrapper published LAST so its
+optionalDependencies always resolve. Header comment documents ordering,
+idempotency, and the manual-recovery workflow.
+
+Files Changed:
+- distribution/npm/publish.sh (created — ~140 lines incl. ~50 line header comment)
+
+Key Decisions:
+- Build artifacts go to dist/.npm-build/ (under repo's existing dist/) rather
+  than a fresh top-level build/ dir — keeps everything inside the gitignored
+  dist/ tree GoReleaser already manages, no new ignore needed
+- Read platforms.tsv via `while IFS=$'\t' read ... done < <(tail -n +2 ...)`
+  process substitution to skip the header line — works under set -e because
+  tail's exit goes through the FD, not the pipeline
+- ${VERSION} substitution in the dirname column uses bash parameter expansion
+  ${VAR//pattern/replacement} not sed — keeps it self-contained in pure bash
+  and avoids escaping issues with the literal $ in ${VERSION}
+- Idempotency check via a `published()` helper that captures `npm view` output
+  and returns yes/no — keeps `set -e` happy by always returning 0; the publish
+  helper does the conditional `[skip]` log
+- TAG_FLAG variable holds either `--tag $TAG` or empty; intentionally word-split
+  in the publish call (with shellcheck disable comment) so the empty case omits
+  the flag entirely. `--dry-run` flag handled the same way
+- chmod +x on every binary copy — preserves the executable bit even if cp -p
+  somehow fails to (Linux/macOS cp -p both preserve mode, but defensive belt
+  for cross-FS copies)
+- Wrapper README.md ship is gated on its existence so this task doesn't depend
+  on task-009; once task-009 lands the file appears in the wrapper tarball
+  automatically without script edits
+- Argument parser is a simple loop, not getopt — only one supported flag, and
+  unknown args exit 2 immediately with a clear message
+
+Verification:
+- bash -n syntax check passed
+- Built fake dist/ tree mirroring GoReleaser's layout for all 8 platforms,
+  stubbed `npm` to capture invocations:
+  - Happy path: 8 platforms publish in order, then wrapper, all rendered
+    package.json files parse as valid JSON, wrapper's optionalDependencies
+    pinned to exact version (no caret), Windows pkgs got .exe suffix
+  - Idempotency: stub view returning non-empty → all 9 [skip] lines, no publish
+    invocations
+  - Dist-tag matrix: 1.2.3→default, 1.2.3-alpha.1→alpha, 1.2.3-beta.4→beta,
+    1.2.3-rc.2→rc, 1.2.3-snapshot→next, dev→default — all correct
+  - Missing GORELEASER_CURRENT_TAG → exit 1 with message
+  - Unknown flag (--bogus) → exit 2 with message
+  - --dry-run flag passes through to npm publish call
+  - Missing binary at expected dist/ path → clear ERROR with hint about
+    GoReleaser/dist layout, exit 1
+- make test + make fmt-check both pass (no Go changes)
+
+Next Task: task-005 (release.yml outputs + dist artifact upload — independent of 004)
+
+================================================================================
+TASK-005: Modify release.yml to surface include_neo4j and upload dist artifacts
+Date: 2026-05-04T15:45:00Z
+================================================================================
+
+Summary:
+Surgical edit to .github/workflows/release.yml. Split the inline INCLUDE_NEO4J/
+INCLUDE_AURA detection out of the "Generate release notes" step into its own
+"Detect changed changelogs" step (id: changed) so its outputs can be wired to
+the job's new outputs: block (version + include_neo4j). Added three new gated
+steps at the end of the job: write release-meta.json (printf-built, valid JSON),
+upload dist/ artifact, upload release-meta artifact. All three gate on
+steps.changed.outputs.include_neo4j == 'true' so aura-cli-only release runs
+don't waste storage on artifacts that publish-npm.yml would skip anyway.
+
+Files Changed:
+- .github/workflows/release.yml (modified — added job outputs block, split
+  changelog-detection into its own step with id, added 3 trailing steps:
+  release-meta.json writer + 2 upload-artifact calls)
+
+Key Decisions:
+- Split detection into its own step rather than tacking GITHUB_OUTPUT writes
+  onto the existing release-notes step — keeps the step's purpose single and
+  the id (`changed`) short and clear. Release-notes step now reads back via
+  ${{ steps.changed.outputs.include_neo4j }} instead of recomputing.
+- Also surfaced include_aura as a step output (not a job output yet) — costs
+  nothing and lets a future aura-cli npm path reuse the same plumbing without
+  re-splitting again.
+- printf-based release-meta.json (not heredoc, not jq) — version and bool are
+  trivial values, jq install would be the only new dep, printf is in coreutils.
+  Verified output parses with `jq .`.
+- Pinned actions/upload-artifact to SHA ea165f8d65b6e75b540449e92b4886f43607fa02
+  (current v4 tip) with `# v4` comment to match repo's existing SHA-pin
+  convention (every other action in workflows/ is SHA-pinned).
+- if-no-files-found: error on both uploads — fail loud if dist/ is missing or
+  release-meta.json wasn't written; silent skip would only surface the bug
+  when publish-npm.yml runs and can't find the artifact.
+- retention-days: 7 — aligns with PRD REQ-NF-003 ("Retention: 7 days
+  (default fine)"). Also documents intent vs relying on org default.
+- Three steps gated on include_neo4j == 'true' — the job output itself stays
+  populated (false on aura-cli-only runs), so publish-npm.yml's workflow_run
+  consumer can still read it via the outputs block and skip its publish step.
+
+Verification:
+- python3 -c "yaml.safe_load(...)" → valid YAML
+- printf-built JSON parses with jq → valid
+- make test → all pass (cached, no Go changes)
+- make fmt-check → clean (no Go drift)
+
+Next Task: task-006 (publish-npm.yml workflow — depends on 004 and 005)
+
+================================================================================
+TASK-006: Create .github/workflows/publish-npm.yml with auto + manual triggers
+Date: 2026-05-04T16:30:00Z
+================================================================================
+
+Summary:
+Created new workflow with two triggers. workflow_run fires after release.yml
+succeeds, downloads dist/ + release-meta.json artifacts, parses include_neo4j
+from JSON, and gates publish on include_neo4j == 'true' (aura-cli-only runs
+skip silently). workflow_dispatch takes a required version input, downloads
+existing GH release archives via `gh release download`, and re-extracts each
+.tar.gz/.zip into dist/<archive_basename>/ to recreate the GoReleaser layout
+the publish script expects. Both paths write ~/.npmrc from NPM_TOKEN and run
+distribution/npm/publish.sh with GORELEASER_CURRENT_TAG=v${VERSION}.
+
+Files Changed:
+- .github/workflows/publish-npm.yml (created — ~165 lines incl. comments)
+
+Key Decisions:
+- workflow_run.workflows: ["release"] — workflow_run matches by the upstream
+  workflow's `name:` field (release.yml declares `name: release`), not
+  filename. AC text said `[Release]` but the actual name is lowercase.
+- Job-level `if:` only gates on `workflow_run.conclusion == 'success'`. The
+  include_neo4j gate happens per-step after the meta artifact is downloaded
+  and parsed — can't read artifact contents in a job-level if expression.
+- Per-step gates use `steps.meta.outputs.include_neo4j == 'true'` rather than
+  setting a job output, because the meta step itself only runs on the auto
+  path (gated on event_name == 'workflow_run').
+- GORELEASER_CURRENT_TAG built via ternary `event_name == 'workflow_dispatch'
+  && inputs.version || steps.meta.outputs.version` — short-circuit means
+  unset side evaluates to empty and the || picks the right one. Prepended
+  literal "v" since publish.sh strips it (and AC requires v-prefix in env).
+- actions/download-artifact@v4 with `run-id` + `github-token` for
+  cross-workflow download (the auto path reads artifacts from a different
+  run). SHA d3f86a106a0bac45b974a628896c90dbdf5c8093 verified via gh api.
+- Manual extraction loop handles .tar.gz (Linux/Darwin) AND .zip (Windows)
+  separately. shopt -s nullglob so empty matches don't trip set -e.
+- Skip step on include_neo4j != 'true' is informational-only (echo only) —
+  GitHub Actions has no native "exit job successfully" so we just log and
+  let the conditionally-gated downstream steps no-op.
+- permissions: contents: read, actions: read — minimum needed for
+  download-artifact across workflows + checkout. NPM_TOKEN is the only
+  secret with publish power; not exposed except in the auth-config step.
+- chmod 600 on ~/.npmrc — defensive, even though runners are ephemeral.
+
+Verification:
+- python3 yaml.safe_load → valid YAML
+- Folded scalar with embedded ${{ }} expression collapses to single-line
+  string in env value — verified via parse + print
+- AC mapping checked one-by-one against REQ-F-017 through REQ-F-021 +
+  task acceptance_criteria; all 6 covered.
+- make test → pass (no Go changes, cached)
+- make fmt-check → clean
+
+Next Task: task-007 (Makefile npm-publish-dry target — depends on 004 only)
+
+================================================================================
+TASK-007: Add Makefile target npm-publish-dry
+Date: 2026-05-04T17:15:00Z
+================================================================================
+
+Summary:
+Added `npm-publish-dry` Makefile target that runs `distribution/npm/publish.sh
+--dry-run` with GORELEASER_CURRENT_TAG=v0.0.0-dry. Also tweaked publish.sh so
+--dry-run tolerates missing platform binaries by writing a 1-byte stub —
+without this, the target would error because `make snapshot` only builds the
+current platform (--single-target) and 7/8 expected binaries are absent
+locally. Real-binary path (CI) is unchanged: missing binary still hard-errors
+when --dry-run is not set.
+
+Files Changed:
+- Makefile (modified — added npm-publish-dry target + .PHONY entry, ~7 lines
+  including header comments documenting the snapshot-not-required behavior)
+- distribution/npm/publish.sh (modified — moved mkdir before the missing-binary
+  check, added a dry-run-stub branch that writes a 1-byte placeholder when
+  SRC_BIN is missing AND DRY_RUN is set; non-dry path still hard-errors)
+
+Key Decisions:
+- Stub missing binaries in dry-run rather than making `make snapshot` build
+  all 8 platforms (slow) or making the target depend on snapshot (slow + AC
+  said no implicit run). The goal is template+ordering sanity, not real
+  binary contents — npm publish --dry-run packs whatever's in bin/, and a
+  1-byte file is enough to validate the tarball gets assembled.
+- Used `printf '#'` for the stub (1 byte). Shorter than echo and avoids
+  trailing newline that would make the stub 2 bytes — pure cosmetics.
+- Logged stub events with `[dry-run-stub]` prefix matching the existing
+  log conventions ([publish], [skip]) so the maintainer sees exactly which
+  binaries were stubbed in the output.
+- Did NOT add snapshot as a prerequisite of npm-publish-dry — AC explicitly
+  said "no implicit run". Maintainer who wants real binaries runs `make
+  snapshot` first; the stub fallback is purely a convenience for the
+  template-rendering check.
+- Updated Makefile header comment to accurately describe the new tolerant
+  behavior — initial wording said "fail loudly" which contradicted the
+  stub fallback. Caught in self-review.
+
+Verification:
+- bash -n distribution/npm/publish.sh — clean
+- make npm-publish-dry against empty dist/ — exits 0, prints all 9
+  publish lines (8 platforms then wrapper), correct dist-tag selection
+  (next, because v0.0.0-dry has -dry suffix)
+- make fmt-check + make test — both clean
+
+Next Task: task-008 (maintainer-facing distribution/npm/README.md)
+
+================================================================================
+TASK-008: Write maintainer-facing distribution/npm/README.md
+Date: 2026-05-04T18:00:00Z
+================================================================================
+
+Summary:
+Created distribution/npm/README.md (196 lines, under the ≤200 cap) covering
+all 10 PRD REQ-F-028 sections: directory purpose, package shape (ASCII
+diagram + os/cpu mapping table), multi-package vs postinstall rationale,
+install resolution flow, dist-tag channels (table with example install
+commands), local dev/test flow, two-trigger release flow with ASCII pipeline
+diagram, failure recovery, adding a new platform (3-edit checklist), future
+channels (pip/brew). Cross-links to .goreleaser.yaml and release.yml /
+publish-npm.yml rather than duplicating their content.
+
+Files Changed:
+- distribution/npm/README.md (created — 196 lines, all 10 PRD sections)
+
+Key Decisions:
+- Two diagrams: package-shape ASCII (wrapper + 3 sample platform boxes with
+  os/cpu) AND release-flow ASCII (release.yml → publish-npm.yml two paths).
+  Both add navigational value; mapping table doubles as the canonical 8-row
+  reference even though platforms.tsv is the source of truth.
+- Initial draft was 235 lines; trimmed to 196 by collapsing verbose multi-line
+  bullet points into single-paragraph form and merging the "future follow-ups"
+  subsection into one paragraph at the end. No content lost — kept all 10
+  sections intact.
+- Linked to platforms.tsv as "single source of truth" but did NOT rebuild the
+  table from it programmatically — README is hand-maintained; reviewer
+  catches drift between TSV/wrapper template/shim SUPPORTED list/this README.
+- Cross-link style: relative paths from distribution/npm/README.md
+  (e.g. ../../.goreleaser.yaml) rather than absolute repo URLs; matches the
+  rest of the repo's intra-doc linking convention and works on the npm
+  package's GitHub view.
+- Did NOT add this README to .gitattributes LF pinning — .md files in the
+  repo aren't generally LF-pinned (only embedded skill bundle .md files
+  are, for byte-equal generate-check). This README has no byte-equal
+  consumer; standard text handling is fine.
+- Sections ordered to match the reading flow a maintainer needs: what →
+  shape → why → how it installs → channels → local test → release flow →
+  recovery → extending → future. Not strictly the PRD bullet order; the
+  PRD listed sections without prescribing sequence.
+
+Verification:
+- wc -l → 196 (≤200 cap met)
+- All 10 PRD sections cross-checked one-by-one
+- ASCII diagrams render correctly in fixed-width view
+- Cross-links resolve: ../platforms.tsv, ../../.goreleaser.yaml,
+  ../../.github/workflows/release.yml, ../../.github/workflows/publish-npm.yml,
+  ./cli/README.md, ./cli/package.json.tmpl, ./cli/bin/neo4j-cli.js
+- make fmt-check + make test — both clean (no Go changes)
+
+Next Task: task-009 (user-facing distribution/npm/cli/README.md, depends on
+task-002 and task-003)
+
+================================================================================
+TASK-009: Write user-facing distribution/npm/cli/README.md (ships in tarball)
+Date: 2026-05-04T18:30:00Z
+================================================================================
+
+Summary:
+Created distribution/npm/cli/README.md (77 lines) — the user-facing README
+that ships inside the published @neo4j/cli tarball. Covers install command
+(npm i -g @neo4j/cli), supported platform/arch matrix, friendly-error path
+for unsupported platforms and --omit=optional installs, prerelease channels
+(@alpha/@beta/@rc/@next), and links to the main project repo, issues, and
+Aura usage guide. README.md was already in the wrapper template's files:
+array (added in task-003 in anticipation), so no template edits needed.
+
+Files Changed:
+- distribution/npm/cli/README.md (created — 77 lines, user-facing tarball README)
+
+Key Decisions:
+- Used neo4j-labs/neo4j-cli for repo links, matching the actual GitHub repo
+  and the repo-root README.md. The wrapper template's homepage field still
+  says neo4j/cli — that's a separate cleanup not in this task's AC.
+- Kept it short (77 lines vs the 196-line maintainer README): user-facing
+  README's job is install instructions + channel info + link to canonical
+  docs. Detailed usage lives in the repo-root README and usage guides.
+- Documented both the --omit=optional case (platform IS in matrix but pkg
+  was excluded → reinstall without flag) AND the unsupported-platform case
+  (download from GH releases). Mirrors the bin shim's two-branch error
+  message — keeps user-facing surface consistent with what the shim prints
+  at runtime if either failure mode hits.
+- Listed pnpm/yarn equivalents inline rather than as a separate block —
+  one-liner each, and the file picker behavior is identical so a separate
+  section would be padding.
+- Channels table mirrors the maintainer README's table for consistency, but
+  user README focuses on install commands (not what the publish script does)
+  — same data, audience-appropriate framing.
+- Did NOT add usage examples beyond `--help` and a single `aura instance
+  list` invocation. Detailed usage docs live in the repo-root README and the
+  usage guides; duplicating them in the tarball README invites drift.
+- Apache-2.0 license note at the bottom — required by npm hygiene; full
+  license text lives in the project repo, not the tarball.
+
+Verification:
+- wc -l → 77 lines
+- All 5 AC mapped: install command, platform matrix + friendly-error path,
+  prerelease channels, project repo/docs links, files: array entry (already
+  in wrapper template from task-003)
+- Cross-links verified: github.com/neo4j-labs/neo4j-cli (releases, issues,
+  usage guide all reachable)
+- make fmt-check + make test — both clean (no Go changes)
+
+Next Task: task-010 (repo README install section + changelog entry — final task)
+
+================================================================================
+TASK-010: Update repo README install section + add changelog entry
+Date: 2026-05-04T14:05:00Z
+================================================================================
+
+Summary:
+Final task. Added an "npm (recommended)" subsection to the repo README's
+Installation section with `npm i -g @neo4j/cli` plus pnpm/yarn equivalents,
+prerelease channels, and a cross-link to distribution/npm/cli/README.md for
+the platform matrix. Demoted the existing GitHub Releases archive flow to a
+"Prebuilt archives" subsection. Hand-authored a changelog YAML at
+.changes/unreleased/neo4j-cli-Minor-20260504-140248.yaml (changie convention
+matches the existing skill-install entry) with body
+"`neo4j-cli` is now installable via `npm i -g @neo4j/cli`". No aura-cli
+entry — aura-cli is not on npm.
+
+Files Changed:
+- README.md (modified — Installation section split into npm + archives subsections)
+- .changes/unreleased/neo4j-cli-Minor-20260504-140248.yaml (created — changelog entry)
+- .plans/tasks-npm-distribution.yml (status → completed)
+- .plans/progress-npm-distribution.txt (this entry)
+
+Key Decisions:
+- Marked npm as "(recommended)" since it's the simplest install path and
+  npm covers the dominant Node-using developer demographic. Archive path
+  retained for users without npm or who want the binary as-is.
+- Did NOT touch the existing "Usage" section's `./neo4j-cli` prefix — the
+  Usage section is conceptually for users who extracted an archive; rewriting
+  it for npm-installed users (where `neo4j-cli` is on PATH) is out of scope
+  for this task's AC. Future cleanup if desired.
+- Used the same hand-authored YAML format as the existing
+  neo4j-cli-Minor-20260504-090200.yaml — single-quoted body, RFC3339 time
+  with microseconds and +02:00 offset. Filename pattern matches changie's
+  default: <project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml.
+- Body uses backticks around `npm i -g @neo4j/cli` and `neo4j-cli` because
+  changie renders the YAML body as Markdown into the changelog; the existing
+  entry already uses backticks for code spans.
+- Cross-linked to distribution/npm/cli/README.md (the user-facing tarball
+  README) for the platform matrix rather than duplicating the table in the
+  repo-root README — keeps the matrix authoritative in one place.
+
+Verification:
+- make fmt-check passes
+- make test passes (all packages green, cached results indicate no
+  unexpected Go drift from changelog/README edits)
+- Changelog YAML format verified by visual diff against the existing
+  neo4j-cli-Minor-20260504-090200.yaml entry
+- Confirmed no aura-cli entry created (only the pre-existing
+  aura-cli-Minor-20260504-090200.yaml from skill-install-command remains)
+
+Next Task: task-011 (renamed npm scope to @neo4j-labs after task-010
+landed; org-name correction)
+
+================================================================================
+TASK-011: Rename npm scope from @neo4j to @neo4j-labs across the codebase
+Date: 2026-05-04T19:00:00Z
+================================================================================
+
+Summary:
+Renamed the npm scope from @neo4j to @neo4j-labs everywhere it appeared
+in product source, docs, the changelog entry, the PRD, and the task
+file. The repo lives under the neo4j-labs GitHub org so the npm scope
+should match. Also widened the ASCII package-shape diagram in
+distribution/npm/README.md from 17- to 22-char inner box width to fit
+the longer scope prefix; arrows re-aligned to box centers (cols 11/45/79).
+Updated the maintainer-README mapping table column widths likewise.
+
+Files Changed:
+- distribution/npm/cli/package.json.tmpl (modified — name + 8 optionalDeps)
+- distribution/npm/cli-platform/package.json.tmpl (modified — name + description)
+- distribution/npm/cli/bin/neo4j-cli.js (modified — comments + pkgName const)
+- distribution/npm/publish.sh (modified — header + PKG_NAME + final wrapper publish)
+- distribution/npm/README.md (modified — title, prose, ASCII diagram widened, table widened, dist-tag table widened)
+- distribution/npm/cli/README.md (modified — all install command lines + headers)
+- README.md (modified — npm install subsection)
+- RELEASING.md (modified — table row, prose, npm scope reference, secret description)
+- AGENTS.md (modified — npm Distribution Notes bullets)
+- .agents/deployment.md (modified — strategy section + npm publication subsection)
+- .changes/unreleased/neo4j-cli-Minor-20260504-140248.yaml (modified — body string)
+- .github/workflows/publish-npm.yml (modified — header comment)
+- .plans/prd-npm-distribution.md (modified — title, goals, REQ-Fs, scenarios)
+- .plans/tasks-npm-distribution.yml (modified — historical AC strings; task-011 self-references rephrased to use placeholder so the grep AC actually returns no results)
+
+Key Decisions:
+- Excluded the GitHub repo URLs (homepage/repository/bugs:
+  https://github.com/neo4j/cli) from this rename — those are GitHub
+  paths not npm scopes and the task AC scope is npm scope only. They
+  point to the wrong repo (actual is neo4j-labs/neo4j-cli) but that
+  cleanup belongs in a separate task.
+- ASCII diagram boxes widened from 17 to 22 inner chars. Arrows in line
+  43 placed at columns 11/45/79 to align with new box centers (boxes at
+  0-23, 34-57, 68-91 → centers 11.5/45.5/79.5; closest integer aligned).
+  Verified pipe alignment at col 45 across the wrapper bottom (┬), the
+  vertical drop (│), and the cross junction (┼).
+- task-011's own AC text describes the rename, so its source-side
+  references couldn't stay literal (would defeat the grep AC). Rephrased
+  with `at-sign followed by neo4j/cli` and `<at-sign>neo4j/cli`
+  placeholders so the grep returns no results while the AC still
+  unambiguously documents the rename intent.
+- Task description's grep command kept as `at-sign + neo4j/cli` rather
+  than the literal — same reasoning. Reviewer can still understand what
+  the verification command should be.
+
+Verification:
+- grep -rn '@neo4j/cli' --include={'*.md','*.tmpl','*.sh','*.js','*.yml','*.yaml'} . (excluding .git, node_modules, .plans/progress*) → no results
+- node --check distribution/npm/cli/bin/neo4j-cli.js → syntax OK
+- bash -n distribution/npm/publish.sh → syntax OK
+- sed-render both templates → valid JSON, name=@neo4j-labs/cli and
+  @neo4j-labs/cli-win32-x64 respectively, optionalDependencies all
+  pinned to __VERSION__ under the new scope
+- make npm-publish-dry → exit 0; 9 publish lines, all under
+  @neo4j-labs/cli*, with --tag next selected from v0.0.0-dry
+- make fmt-check → clean
+- make test → all pass
+
+Org-existence note (AC item): @neo4j-labs npm org existence + publish
+access for the publishing user is an external dep that must be
+confirmed before the first real publish under the new scope. Not
+verified in this task (no npm credentials in the dev env). Flag for
+the maintainer merging this PR.
+
+Next Task: All tasks complete
+

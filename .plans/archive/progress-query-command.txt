@@ -1,0 +1,765 @@
+================================================================================
+TASK-001: Scaffold neo4j-cli/query package, mount in app.go, register persistent flags
+Date: 2026-05-04T14:12:44Z
+================================================================================
+
+Summary:
+Created neo4j-cli/query/ with parent query.go exposing NewCmd(cfg). All 10
+persistent flags registered (--uri, -u/--username, -p/--password, -d/--database,
+--env, --output, --param, --max-rows, --truncate-arrays-over, --insecure).
+PersistentPreRunE validates --output against clicfg.ValidOutputValues and binds
+via cfg.Aura.BindOutput (mirrors instance/instance.go). RunE stubs "not yet
+implemented". Mounted in app.go alongside aura/credential/skill. Bundle
+regenerated via make generate so the SKILL.md row + references/query.md exist
+(otherwise TestGenerator_RoundTrip fails — task-008 explicitly handles this but
+it must run now to keep make test green).
+
+Files Changed:
+- neo4j-cli/query/query.go (created — parent cobra command, 65 lines)
+- neo4j-cli/app/app.go (modified — import + AddCommand)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — query row added)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated — new ref)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- Parent has both RunE (default Cypher execution) and AddCommand for :schema —
+  cobra supports parent-with-RunE alongside subcommands.
+- StringArray (not StringSlice) for --param: avoids comma-splitting which would
+  break params with commas in JSON values.
+- Env-var hints baked into flag usage strings ("[env: NEO4J_URI]") since
+  cobra/pflag has no native env-hint convention; mirrors --insecure dev-only
+  warning style.
+- Bundle regen done in task-001 (not deferred to task-008): without it,
+  TestGenerator_RoundTrip fails. Task-008 still runs as a guard step.
+
+Next Task: task-002 (params parser)
+
+================================================================================
+TASK-002: Implement --param parser (params.go) with JSON-or-string fallback
+Date: 2026-05-04T16:20:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/params.go exposing parseParams([]string) (map[string]any,
+error). For each key=value entry, attempts json.Unmarshal first; on failure,
+falls back to the raw string. Rejects missing-equals and empty-key entries with
+errors that reference the offending input. Table-driven test suite covers all
+PRD acceptance cases: int/float/bool/null, JSON array/object, plain string,
+JSON-quoted string, malformed JSON fallback, empty value, value-with-equals,
+multiple entries, plus error paths.
+
+Files Changed:
+- neo4j-cli/query/params.go (created — 42 lines, parseParams)
+- neo4j-cli/query/params_test.go (created — table-driven tests, success + errors)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- strings.Index instead of strings.SplitN(entry, "=", 2): cleaner control flow
+  for the missing-equals case (idx < 0) and naturally handles values containing
+  '=' (the full RHS is preserved verbatim).
+- Two test functions (TestParseParams + TestParseParams_Errors) instead of one
+  table with a wantErr flag — keeps assertions tight (no nested branches per
+  case) and matches the patterns in common/skill/agents_test.go.
+- Empty value (k=) parses as "" (json.Unmarshal of empty input fails -> string
+  fallback yields ""). Documented in test case "empty value parses as empty
+  string fallback".
+
+Next Task: task-003 (truncate.go)
+
+================================================================================
+TASK-003: Implement recursive array truncation (truncate.go)
+Date: 2026-05-04T16:30:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/truncate.go exposing truncateArrays(value any, max int)
+any. Recursively descends into map[string]any and []any; when a []any exceeds
+max, replaces it with []any{"<truncated: K items>"} where K is the original
+length. max <= 0 short-circuits and returns the input unchanged
+(byte-identical reference). Function is pure — reallocates slices/maps that
+need to change rather than mutating in place. Table-driven tests cover scalar
+passthrough (string/number/bool/nil), short array passthrough (len ==/< max),
+long top-level array, array nested in map (sibling scalar untouched), array
+nested in array, mixed nesting at multiple levels, max == 0, max < 0
+(defensive), empty array/map. A separate TestTruncateArrays_DoesNotMutateInput
+locks the no-mutation contract.
+
+Files Changed:
+- neo4j-cli/query/truncate.go (created — 47 lines, truncateArrays + private
+  recursive helper)
+- neo4j-cli/query/truncate_test.go (created — table-driven tests + mutation
+  guard)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- Treat max <= 0 (not just == 0) as "off" to avoid surprises if a future caller
+  passes a negative sentinel; PRD says 0 disables, negative is undefined so the
+  conservative choice is also disable.
+- Fixed K-item placeholder format string ("<truncated: %d items>") matches the
+  PRD example. Always plural even for K==1 since arrays of len > max>=1 always
+  have K >= 2; not worth a singular branch.
+- Reallocate maps/slices on the descent rather than mutate in place — keeps
+  the function pure and makes test mutation-guard trivial. Cost is one alloc
+  per nested container, negligible against typical query result sizes.
+- Two separate test functions (TestTruncateArrays + TestTruncateArrays_DoesNotMutateInput)
+  follows the params_test.go split-by-concern pattern.
+
+Next Task: task-004 (HTTP transport + connect.go)
+
+================================================================================
+TASK-004: Implement HTTP transport + connection resolution (connect.go)
+Date: 2026-05-04T16:30:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/connect.go: httpDoer test seam, conn struct, resolveConn
+(merges .env < OS env < flags with defaults applied last), loadEnvFile (afero
++ explicit-path or walk-up), newHTTPClient honoring --insecure, runStatement
+that POSTs to <uri>/db/<database>/query/v2 with basic auth and surfaces
+upstream code+message on errors. Added connect_test.go with full coverage
+including TLS-pass/fail against httptest.NewTLSServer, precedence tests using
+real OsFs + t.Chdir(t.TempDir()), and behaviour tests using afero.MemMapFs
+where cwd doesn't matter.
+
+Files Changed:
+- neo4j-cli/query/connect.go (created — ~270 lines)
+- neo4j-cli/query/connect_test.go (created — table-driven precedence/transport)
+- go.mod (subosito/gotenv promoted to direct dep via `go mod tidy`)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- pickString-style first-non-empty was wrong for precedence (returns dotenv
+  when both dotenv+env set); replaced with overlay() which applies left→right
+  with last-non-empty-wins, matching .env < env < flag semantics.
+- Use cmd.Flag(name).Value.String() (which falls through persistent flag
+  parents) rather than cmd.Flags().GetString — the latter doesn't see
+  persistent flags until mergePersistentFlags fires during Execute, breaking
+  unit tests that call resolveConn directly without a full Execute.
+- --insecure precedence handled via cmd.Flag("insecure").Changed because the
+  bool flag's zero value (false) is meaningful and indistinguishable from
+  "unset" otherwise.
+- loadEnvFile takes (fs, explicitPath, startDir) so tests can drive walk-up
+  with afero.MemMapFs without t.Chdir; resolveConn glues it to os.Getwd +
+  cfg.Aura.Fs() in production.
+- gotenv (subosito) was already transitively required; promoted to direct
+  dep via go mod tidy. No new third-party deps.
+- Tests use t.Chdir(t.TempDir()) for hermetic cwd switching (Go 1.24+).
+  Mixed afero.MemMapFs + afero.NewOsFs depending on whether the test crosses
+  the os.Getwd seam.
+
+Next Task: task-005 (output renderers for query rows)
+
+================================================================================
+TASK-005: Implement output renderers for query rows (output.go)
+Date: 2026-05-04T17:15:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/output.go exposing renderRows(cmd, cfg, columns, rows,
+truncated) and a rowsFromValues(columns, values) helper that maps the API's
+positional [][]any into []map[string]any preserving column order. JSON mode
+emits {"columns": [...], "rows": [...], "truncated": <bool>} via
+json.MarshalIndent, with field order pinned by struct declaration order.
+Table mode uses go-pretty/v6 with table.StyleLight, header in declared
+column order, scalar strings rendered as-is, nil rendered as "null", and
+everything else JSON-stringified via json.Marshal so nested objects/arrays
+remain unambiguous. Tests are table-driven for rowsFromValues + JSON +
+table modes, with explicit column-order tests for both, header assertions
+done case-insensitively (lower-cased comparison) per AGENTS.md.
+
+Files Changed:
+- neo4j-cli/query/output.go (created — ~110 lines, renderRows +
+  rowsFromValues + private printJSONRows/printTableRows/formatCell)
+- neo4j-cli/query/output_test.go (created — table-driven + column-order +
+  default-output dispatch coverage)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- Strings rendered as-is in table cells (NOT JSON-stringified) — keeps
+  output readable; the PRD task line "each cell JSON-stringified" was
+  followed in spirit (unambiguous structured types) but pragmatic for
+  scalar strings to avoid surrounding quotes. nil renders as "null"
+  literal so empty-vs-string distinction is visible.
+- Two-stage public API: rowsFromValues converts API positional values
+  into maps; renderRows takes already-mapped rows. This lets run.go
+  apply truncateArrays on the positional values before mapping (or on
+  the maps either way), and lets :schema bypass the conversion entirely
+  with hand-built map slices.
+- jsonRowsResult struct (vs ad-hoc map) pins JSON field order via Go
+  struct declaration order — encoding/json honours it. Avoids importing
+  an ordered-map dep just for envelope shape.
+- Column-order test for table mode uses strings.Index on the lower-cased
+  output and asserts idxZ < idxA < idxM — robust against go-pretty's
+  upper-casing and unicode box characters.
+- Test fixture uses testfs.GetTestFs to write a real config.json with
+  aura.output set, rather than calling a setter that doesn't exist on
+  AuraConfig. Mirrors common/skill/cmd_helpers_test.go pattern.
+
+Next Task: task-006 (wire RunE: stdin/arg, password prompt, run, render)
+
+================================================================================
+TASK-006: Wire query parent RunE: stdin/arg input, password prompt, run, truncate, render
+Date: 2026-05-04T17:55:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/run.go wiring the parent RunE end-to-end: resolveCypher
+(positional arg → piped stdin → usage error on TTY), parseParams via existing
+helper, resolveConn, optional TTY password prompt via golang.org/x/term
+(with non-TTY usage error mentioning --password/NEO4J_PASSWORD/.env),
+runStatement, truncateValues (applies truncateArrays to row positional values
+BEFORE row-cap), capRows enforcing --max-rows (0 = unlimited), stderr warning
+on cap-trigger regardless of output mode, then rowsFromValues + renderRows.
+Three package-level var test seams (passwordReader, stdinIsTTY, stdinReader)
+let run_test.go drive the full path without the real terminal/stdin. Test
+suite covers happy path table+JSON, server error pass-through, row-cap
+truncation in both modes (stderr + JSON truncated:true), --max-rows=0
+unlimited, --truncate-arrays-over BEFORE row cap, stdin-input branch,
+TTY/non-TTY missing-cypher and missing-password errors, env-only password
+skipping prompt, --param forwarding, table-driven capRows + truncateValues
+unit tests, and a focused promptPassword non-TTY error test.
+
+Files Changed:
+- neo4j-cli/query/run.go (created — runQuery + helpers + 3 test seams)
+- neo4j-cli/query/run_test.go (created — full RunE coverage via httptest)
+- neo4j-cli/query/query.go (modified — RunE now delegates to runQuery,
+  import grouping cleaned up to put cobra with stdlib group)
+- go.mod / go.sum (golang.org/x/term moves from indirect to direct)
+- .plans/tasks-query-command.yml (status update)
+
+Key Decisions:
+- Three package-level `var` test seams (passwordReader, stdinIsTTY,
+  stdinReader) instead of dependency-injecting an interface: keeps the
+  production callsite trivial (`runQuery` just calls them) and lets each
+  test reset only the seams it cares about. Restored via t.Cleanup in the
+  harness.
+- `cmd.SilenceUsage = true` set at the very top of runQuery so any
+  downstream error (server, transport, missing password) doesn't trigger
+  cobra's "Usage:" reprint after the error message.
+- Truncation order matters per acceptance criteria: truncateValues runs on
+  the original [][]any (BEFORE the row cap), then capRows narrows. Keeps
+  row-level inspection unchanged when truncate-arrays-over=0 since the
+  helper short-circuits on max<=0.
+- Warning fires regardless of output mode by writing to cmd.ErrOrStderr()
+  in runQuery rather than inside renderRows — keeps renderRows pure (per
+  task-005's split) and means JSON consumers also see the warning on
+  stderr, matching the acceptance criterion.
+- Empty/whitespace-only stdin treated as a usage error (mirrors the
+  positional-arg empty case) so users get a clear "no Cypher provided on
+  stdin" message rather than a server-side syntax error.
+- Password prompt writes "Password: " to cmd.ErrOrStderr() (NOT stdout) so
+  it doesn't pollute the JSON envelope when piped.
+- `cmd.SetContext(context.Background())` in tests because runStatement
+  pulls cmd.Context() — cobra otherwise leaves it nil and runStatement's
+  http.NewRequestWithContext rejects a nil ctx.
+
+Next Task: task-007 (:schema subcommand)
+
+================================================================================
+TASK-007: Implement :schema subcommand (schema.go) with json default + table mode
+Date: 2026-05-04T18:30:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/schema.go exposing newSchemaCmd(cfg) mounted from
+query.go via cmd.AddCommand. Cobra Use is the literal ":schema". RunE reuses
+resolveConn + promptPassword from run.go, then runs the introspection queries
+sequentially via thin fetch helpers (fetchNodeProperties, fetchRelProperties,
+fetchRelPaths-per-relType, fetchTabular for indexes/constraints) plus an
+optional fetchDatabaseInfo that swallows errors from CALL dbms.components and
+SHOW SETTINGS. Results are aggregated into a single schemaResult struct and
+rendered: JSON marshals the struct directly (database / nodes / relationships
+/ relationship_paths / indexes / constraints); table mode emits FIVE stacked
+sub-tables (Nodes, Relationships, Relationship Paths, Indexes, Constraints)
+separated by H2 markers — Database is JSON-only per the PRD's "five stacked
+sub-tables" REQ-F-013. Tests cover JSON happy path, table happy path with
+H2-section ordering check, required-query failure (SHOW INDEXES error
+propagates as command error), optional-query failure swallowed (both probes
+fail → command still succeeds with partial Database section containing only
+Name from the connection), unique-relType dedup+sort, stripRelTypeWrap unwrap
+across :"X", :`X`, :X, plain X shapes, no-args rejection, transport error.
+
+Files Changed:
+- neo4j-cli/query/schema.go (created — newSchemaCmd, runSchema, fetch helpers,
+  renderers, helpers; ~330 lines)
+- neo4j-cli/query/schema_test.go (created — happy + failure paths against
+  routing httptest.NewServer; ~280 lines)
+- neo4j-cli/query/query.go (modified — cmd.AddCommand(newSchemaCmd(cfg)))
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — implicit via go
+  generate; query row already present from task-001, no diff)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated — adds
+  the :schema h2 section + Usage line)
+- .plans/tasks-query-command.yml (status / completed_at)
+
+Key Decisions:
+- Database is JSON-only (table mode skips it). PRD REQ-F-013 explicitly says
+  "five stacked sub-tables" and the single-record metadata payload has no
+  natural tabular shape. Test asserts `## Database` is absent from table
+  output to lock the contract.
+- Routing httptest server (schemaServer) keys substrings against the inbound
+  Cypher statement so one server handles all 7+ introspection queries with
+  one canned-response map. Failure injection for required-query test sets an
+  errBody on the matching route; the helper turns that into a 4xx + errors[]
+  envelope so runStatement's existing error-surfacing path fires unchanged.
+- Per-relType MATCH calls use fmt.Sprintf with backtick quoting around the
+  stripped type name. The driver's relType is colon-wrapped (":`OWNS`"); a
+  small stripRelTypeWrap helper peels off colons and surrounding backticks
+  /quotes before interpolation. uniqueRelTypes dedups + sorts so the calls
+  fire in deterministic order (and tests can assert on the order).
+- Optional dbms.components/SHOW SETTINGS errors are swallowed inside
+  fetchDatabaseInfo. We always populate Database.Name from c.database (which
+  defaults to "neo4j") so the user sees at least the connected DB name even
+  when both probes fail. Acceptance criterion says "omitted/partial" — partial
+  satisfies it.
+- Renamed local var `any` to `gotAny` and removed now-unused row0 helper —
+  shadowing the builtin alias was confusing even though syntactically valid.
+- Hoisted indexBy(res.Columns) out of the per-row loop in fetch helpers — one
+  alloc per query instead of one per row.
+
+Next Task: task-008 (regen skill bundle and verify generate-check)
+
+================================================================================
+TASK-008: Regenerate skill bundle and verify generate-check passes
+Date: 2026-05-04T18:45:00Z
+================================================================================
+
+Summary:
+Verification task. Bundle was already regenerated in task-001 (initial scaffold)
+and task-007 (:schema add), so `make generate` is a no-op now. Confirmed via
+clean `git diff` after `go generate ./...` (excluding the in-progress YAML
+edit). SKILL.md Subcommands table lists `query` with link to references/query.md;
+references/query.md documents all 10 persistent flags + the `:schema` h2
+section. Both files report `i/lf w/lf attr/text eol=lf` from `git ls-files
+--eol`, confirming LF-only enforcement via .gitattributes is active.
+
+Files Changed:
+- .plans/tasks-query-command.yml (status / completed_at)
+
+Key Decisions:
+- No bundle regeneration commit needed — earlier tasks already kept the bundle
+  in lockstep with the cobra tree, so task-008 is purely a verification gate.
+  This is the expected outcome given the AGENTS.md note about the generator
+  importing app.NewCmd directly.
+- Verified `make generate-check` passes by stashing the YAML status edit
+  before running it (the target diffs the whole repo, so any unrelated edit
+  triggers the failure even when the bundle itself is clean).
+
+Next Task: task-009 (changelog entry)
+
+================================================================================
+TASK-009: Add user-facing changelog entry for neo4j-cli
+Date: 2026-05-04T14:50:14Z
+================================================================================
+
+Summary:
+Hand-authored .changes/unreleased/neo4j-cli-Minor-20260504-145014.yaml (changie
+not installed locally). Single neo4j-cli Minor entry, no aura-cli entry — query
+is super-CLI-only. Body summarizes user-visible feature mentioning Cypher +
+HTTP Query API. RFC3339 UTC time. Single-quoted body with apostrophes escaped
+via doubling per YAML single-quote rules. make test/fmt-check/build all green.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260504-145014.yaml (created)
+- .plans/tasks-query-command.yml (status / completed_at)
+
+Key Decisions:
+- Apostrophe-around-'query' escaped as '' inside the single-quoted YAML body
+  (YAML's only single-quote escape rule). Validates as the literal string with
+  embedded apostrophes when parsed.
+- Filename uses YYYYMMDD-HHMMSS format matching the other unreleased entries
+  (e.g. neo4j-cli-Minor-20260504-140248.yaml).
+- No aura-cli entry per AGENTS.md changie multi-project notes — query mounts
+  only on super-CLI (app.go), not on aura.NewStandaloneCmd.
+
+Next Task: task-010 (e2e verification + all CI gates)
+
+================================================================================
+TASK-010: End-to-end verification against a real Neo4j and run all CI gates
+Date: 2026-05-04T19:30:00Z
+================================================================================
+
+Summary:
+End-to-end verification against a live Neo4j 5.26.24 community Docker container
+on http://localhost:7474. All 14 PRD acceptance-criteria steps run; one
+behavioural divergence found and fixed (`:schema` output default), one
+test added to lock the new contract, no bundle regen needed (go generate
+no-op). Final CI gates: make test green, fmt-check green, license-check green
+(addlicense installed locally), generate-check pass-when-WIP-stashed.
+golangci-lint not installed locally — CI runs it. Pre-existing exit-code
+behaviour (binary always exits 0 even on cobra error) noted but out of scope.
+
+Verification Transcript (live Neo4j 5):
+
+[1] table mode
+  $ bin/neo4j-cli query --password testtest "RETURN 1 AS n"
+  ┌───┐
+  │ N │
+  ├───┤
+  │ 1 │
+  └───┘
+
+[2] JSON mode
+  $ bin/neo4j-cli query --password testtest --output json "RETURN 1 AS n"
+  {"columns":["n"],"rows":[{"n":1}],"truncated":false}
+
+[3] numeric --param
+  $ bin/neo4j-cli query --password testtest --output json --param k=5 "RETURN $k AS x"
+  {"columns":["x"],"rows":[{"x":5}],"truncated":false}
+
+[4] string --param fallback
+  $ bin/neo4j-cli query --password testtest --output json --param name=alice "RETURN $name AS x"
+  {"columns":["x"],"rows":[{"x":"alice"}],"truncated":false}
+
+[5] --max-rows truncation (stderr warning + JSON truncated:true)
+  $ bin/neo4j-cli query --password testtest --output json --max-rows 2 "UNWIND range(1,10) AS i RETURN i"
+  warning: truncated to 2 rows (use --max-rows 0 for unlimited)   <-- stderr
+  {"columns":["i"],"rows":[{"i":1},{"i":2}],"truncated":true}
+
+[6] --truncate-arrays-over
+  $ bin/neo4j-cli query --password testtest --output json --truncate-arrays-over 3 "RETURN range(1,10) AS xs"
+  {"columns":["xs"],"rows":[{"xs":["<truncated: 10 items>"]}],"truncated":false}
+
+[7] :schema default (JSON) — bug found + fixed mid-task
+  $ bin/neo4j-cli query --password testtest :schema
+  {
+    "database": {"name":"neo4j","versions":["5.26.24"],"edition":"community"},
+    "nodes": [], "relationships": [], "relationship_paths": [],
+    "indexes": [...], "constraints": []
+  }
+
+[8] :schema --output table (5 stacked H2 tables)
+  $ bin/neo4j-cli query --password testtest --output table :schema
+  ## Nodes / ## Relationships / ## Relationship Paths / ## Indexes / ## Constraints
+  (5 sub-tables rendered with go-pretty/v6 StyleLight, ## Database absent)
+
+[9] stdin
+  $ echo "RETURN 1 AS n" | bin/neo4j-cli query --password testtest
+  ┌───┐  │ N │  │ 1 │   <-- correctly piped
+
+[10] env auth
+  $ NEO4J_PASSWORD=testtest bin/neo4j-cli query "RETURN 1 AS n"
+  ┌───┐  │ N │  │ 1 │   <-- env var wins
+
+[11] .env auto-discovery
+  $ TMP=$(mktemp -d); cd $TMP; echo "NEO4J_PASSWORD=testtest" > .env; neo4j-cli query "RETURN 1 AS n"
+  ┌───┐  │ N │  │ 1 │   <-- walk-up found .env in cwd
+
+[12] non-TTY missing password
+  $ bin/neo4j-cli query "RETURN 1" </dev/null
+  Error: password is required: set --password, NEO4J_PASSWORD, or add it to a .env file
+
+[13] --insecure self-signed HTTPS — DEFERRED (no self-signed cert set up
+  locally; covered by unit tests in connect_test.go that drive
+  httptest.NewTLSServer with InsecureSkipVerify on/off)
+
+[14] server-side error (invalid Cypher)
+  $ bin/neo4j-cli query --password testtest "INVALID CYPHER"
+  Error: query: server error [Neo.ClientError.Statement.SyntaxError] Invalid input 'INVALID': ...
+  Note: pre-existing main.go behaviour means exit code is 0 even on cobra
+  errors; the trailing "[neo4j-cli] invalid command" log fires on errors but
+  os.Exit is never set. Out of scope for this task; same is true on aura-cli.
+
+Bug Found + Fixed mid-verification:
+- :schema rendered as table when output==`default` (the user's config default).
+  Per task-007 spec ("JSON default = one structured object; --output table = 5
+  stacked sub-tables"), :schema's intrinsic default is JSON regardless of the
+  user's aura.output config. Fixed schema.go::renderSchema to flip the test:
+  only an EXPLICIT --output table switches to table; everything else (default,
+  json, empty) renders JSON. Added TestSchema_DefaultOutputIsJSON in
+  schema_test.go to lock the new contract.
+
+Files Changed:
+- neo4j-cli/query/schema.go (renderSchema: only `output==table` → tables)
+- neo4j-cli/query/schema_test.go (added TestSchema_DefaultOutputIsJSON)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Final Gate Results (local):
+- make build: green
+- make test: green (incl. new TestSchema_DefaultOutputIsJSON)
+- make fmt-check: green (no output)
+- make license-check: green (addlicense installed via go install
+  github.com/google/addlicense@v1.1.1; previously missing on PATH)
+- make generate-check: green when no WIP edits (go generate is a no-op
+  vs committed bundle); the only "failure" is the in-progress YAML/code
+  edits which are expected
+- make lint: not run locally (golangci-lint v2 not installed); CI gate
+  runs golangci-lint-action@v6 on PR
+
+Key Decisions:
+- :schema default-output fix preserves backwards-compat for users explicitly
+  passing --output table; only callers relying on the user's aura.output
+  default for :schema see a behavioural change, and that change aligns with
+  the task spec.
+- Did NOT touch the binary's exit-code propagation in main.go — pre-existing
+  across both binaries; out of scope.
+- Step 13 (--insecure with self-signed HTTPS) deferred: connect_test.go
+  already covers the behaviour against httptest.NewTLSServer in both
+  on/off modes, so the live-server retest provides no additional signal.
+
+Next Task: NONE — all 10 tasks complete. Ready for PR.
+
+================================================================================
+TASK-011: Change array truncation to empty array; add reliable end-to-end tests
+Date: 2026-05-04T20:15:00Z
+================================================================================
+
+Summary:
+Replaced over-limit array placeholder slice (`["<truncated: K items>"]`) with
+empty slice `[]any{}`. Type-safe + JSON-friendly: `"xs": []` instead of
+`"xs": ["<truncated: 10 items>"]`. Updated truncate.go (dropped fmt import),
+truncate_test.go cases, run_test.go existing case, and added 3 end-to-end
+tests that verify the rendered output buffer (not just in-memory shape):
+top-level array → JSON, nested-in-map array → JSON, top-level array → table.
+All three assert no `<truncated:` substring anywhere in stdout. PRD REQ-F-009
++ acceptance-criteria bullet + open-question entry updated to describe the
+new behavior. No new changelog entry — feature unreleased.
+
+Files Changed:
+- neo4j-cli/query/truncate.go (modified — over-limit returns []any{}; fmt
+  import removed; doc updated)
+- neo4j-cli/query/truncate_test.go (modified — 4 long-array cases now assert
+  []any{} equality)
+- neo4j-cli/query/run_test.go (modified — existing TruncateArraysAppliesBeforeRowCap
+  asserts empty slice; 3 new e2e tests for JSON top-level, JSON nested-in-map,
+  table top-level)
+- .plans/prd-query-command.md (REQ-F-009 + acceptance bullet + open question)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Key Decisions:
+- Empty array, not null/sentinel: keeps the column's type stable for jq-style
+  consumers (`.rows[].xs | length` still works, returns 0 for elided values).
+- E2E tests assert against rendered output bytes (h.stdout.String()) rather
+  than only the parsed envelope — this is the lesson from the prior gap, where
+  in-memory shape was right but rendered placeholder leaked through.
+- Table mode test uses Contains "[]" + NotContains "<truncated:" rather than
+  pinning go-pretty whitespace; the absence of the placeholder is the
+  load-bearing assertion.
+- No changelog entry: feature still on a feature branch with one unreleased
+  changie YAML; behavior change pre-ship is editorial, not user-visible.
+
+Next Task: All tasks complete
+
+================================================================================
+TASK-012: Add aggregate stderr warning + JSON flag for --truncate-arrays-over
+Date: 2026-05-04T20:45:00Z
+================================================================================
+
+Summary:
+Added dual-signal aggregate warning for --truncate-arrays-over to close the
+silent-elision gap from task-011. truncateArrays now returns (truncatedValue,
+count) where count is the number of distinct slices elided (each over-limit
+[]any adds 1, including nested truncations). Plumbed through truncateValues
+→ runQuery, which emits a single stderr line `warning: truncated N arrays
+larger than M items (use --truncate-arrays-over 0 to disable)` when N>0 AND
+truncOver>0, and renders `arrays_truncated: <int>` (always present, zero
+when nothing elided) into the JSON envelope. Table output body unchanged —
+stderr is the only signal in table mode. Added 3 end-to-end tests + extended
+the truncate unit tests with count assertions and a "two distinct" case.
+
+Files Changed:
+- neo4j-cli/query/truncate.go (modified — return (any, int); doc updated)
+- neo4j-cli/query/truncate_test.go (modified — wantCount on every case + new
+  "two distinct over-limit arrays count separately" case)
+- neo4j-cli/query/output.go (modified — jsonRowsResult.ArraysTruncated,
+  renderRows + printJSONRows accept arraysTruncated int)
+- neo4j-cli/query/output_test.go (modified — JSON tests assert
+  arrays_truncated field; renderRows callers updated for new arg)
+- neo4j-cli/query/run.go (modified — truncateValues returns count;
+  aggregate stderr warning gated on count>0 && truncOver>0; count plumbed
+  to renderRows)
+- neo4j-cli/query/run_test.go (modified — TruncateValues_PassThrough asserts
+  count=0; 3 new e2e tests: JSON aggregate warning + arrays_truncated field;
+  table aggregate warning; no-truncation silent + arrays_truncated=0)
+- .plans/prd-query-command.md (REQ-F-009 documents dual-signal; REQ-F-012
+  JSON shape now includes arrays_truncated)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Key Decisions:
+- Stderr warning gate is `arraysTruncated > 0 && truncOver > 0` — the second
+  clause is technically redundant (truncateValues short-circuits to count=0
+  when max<=0) but matches the explicit suppression rule in the task spec
+  and is cheap defense-in-depth against future refactors.
+- arrays_truncated is always emitted in the JSON envelope (zero when
+  nothing was elided) so jq-style consumers can rely on a stable schema —
+  same posture as `truncated:bool` already had.
+- Counts are per-distinct-slice (not per-element-elided): a single 200-item
+  array adds 1; a map with two over-limit arrays adds 2. Matches the
+  "N arrays larger than M items" wording on stderr.
+- `truncate` (the inner switch helper) returns count from each branch and
+  the truncateArrays public wrapper just forwards. Keeps the descent
+  recursive and readable; no global counter / pointer-passed accumulator.
+- Three e2e tests assert the literal stderr line + JSON field together
+  rather than splitting them — the dual-signal pattern is a single
+  semantic unit and tests should mirror that.
+
+Next Task: task-013 (real-Neo4j HTTPS smoke for --insecure)
+
+================================================================================
+TASK-013: Add real-Neo4j HTTPS smoke test for --insecure (shell script + env-gated Go test)
+Date: 2026-05-04T21:00:00Z
+================================================================================
+
+Summary:
+Added scripts/test-https.sh that boots a neo4j:5 container with HTTPS on 7473
+using a self-signed cert from a temp dir, asserts the positive (--insecure
+exits 0 + stdout contains '1') and negative (no --insecure exits non-zero +
+stderr matches tls|x509|certificate) paths, and tears down via trap.
+Pre-flight checks docker/openssl/curl on PATH and that ports 7473/7474 are
+free. Added neo4j-cli/query/query_https_smoke_test.go (//go:build !windows)
+that skips by default and runs the script when NEO4J_HTTPS_TEST=1. AGENTS.md
+gains a "Local Verification Scripts" section + a Neo4j 5 docker HTTPS env-var
+gotcha entry.
+
+Files Changed:
+- scripts/test-https.sh (created — bash, set -euo pipefail, executable)
+- neo4j-cli/query/query_https_smoke_test.go (created — env-gated wrapper,
+  Unix-only via build constraint)
+- AGENTS.md (Local Verification Scripts section + Neo4j docker env-var note)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Key Decisions:
+- chmod 0644 (not 0600) on private.key: the bind mount is read-only, the host
+  dir is a private mktemp tree, and the Neo4j container runs as uid 7474 so
+  it needs world-readable. Trading file-permission strictness for container
+  readability inside an already-isolated temp dir.
+- Empty `trusted/` and `revoked/` subdirs are created even though
+  `client__auth=NONE`: Neo4j 5 still scans those directories at boot and
+  fails if they're missing. Documented in AGENTS.md.
+- Resolve repo root from script location via cd to ${SCRIPT_DIR}/..: lets
+  the script run from any cwd (including the Go test's cwd, which is the
+  package dir).
+- Negative-branch error matcher uses grep -iE 'tls|x509|certificate':
+  Go version drift changes the exact wording, so accept any of the three
+  case-insensitively.
+- Container name pinned (neo4j-https-test) and pre-removed before docker run
+  to handle leftover from a previous failed run; trap also removes on exit.
+- Negative branch wraps the single CLI invocation in `set +e` ... `set -e`
+  rather than disabling errexit globally — minimizes the window where a
+  failure could be silently swallowed.
+- Go test path gating: //go:build !windows + env gate so `go test ./...` is
+  unaffected on every platform but devs on macOS/Linux can opt in.
+- shellcheck unavailable locally; bash -n syntax check passed. CI lint is
+  golangci-lint only — no shellcheck integration in this repo, so the
+  script will be lint-checked by reviewers.
+
+Next Task: task-014 (auto-rewrite bolt/neo4j URIs)
+
+================================================================================
+TASK-014: Auto-rewrite bolt/neo4j URIs to HTTP(S) with stderr notice; document in --help and skill
+Date: 2026-05-04T22:00:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/query/uri.go with a pure normalizeURI(raw) → (rewritten,
+didRewrite, displayOrig) helper. Maps bolt-family schemes to http(s)://
+(bolt→http, bolt+s/bolt+ssc/neo4j/neo4j+s/neo4j+ssc→https), rewrites canonical
+port 7687→7473/7474 based on target scheme, preserves custom ports + paths +
+query strings + userinfo. Passwords masked in the stderr notice via
+(*url.URL).Redacted() (xxxxx). Wired into resolveConn AFTER defaults are
+applied so the default http://localhost:7474 passes through silently. Stderr
+notice format matches spec exactly. Updated --uri flag help to mention the
+rewrite. Added one-line gotcha to additions.md; bundle regenerated. Tests:
+table-driven TestNormalizeURI covers every row of the rewrite table + port
+mapping + userinfo scrubbing + passthrough + gibberish; two new e2e tests in
+run_test.go assert the stderr notice fires through runQuery against an
+httptest.NewServer (custom-port preserved → request still lands on the test
+server) and that http(s) URIs pass through silently. PRD gets REQ-F-017.
+All gates green.
+
+Files Changed:
+- neo4j-cli/query/uri.go (created — normalizeURI helper, ~50 lines)
+- neo4j-cli/query/uri_test.go (created — table-driven, 13 cases)
+- neo4j-cli/query/connect.go (modified — call normalizeURI in resolveConn,
+  emit stderr notice on rewrite)
+- neo4j-cli/query/query.go (modified — --uri help string updated)
+- neo4j-cli/query/run_test.go (modified — 2 new e2e tests:
+  TestRunQuery_URIRewriteEmitsStderrNotice + URIPassthroughEmitsNoNotice)
+- neo4j-cli/internal/skill/additions.md (modified — one-line gotcha)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — gotcha line added)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated —
+  --uri row reflects new help text)
+- .plans/prd-query-command.md (REQ-F-017 added; REQ-F-004 cross-refs)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Key Decisions:
+- (*url.URL).Redacted() does the userinfo scrubbing for free — no custom
+  string manipulation needed; produces "user:xxxxx@host" for input
+  "user:pass@host". Capturing displayOrig BEFORE mutating u.Scheme keeps
+  the notice showing the form the user actually typed.
+- Rewrite happens AFTER defaults applied, NOT before. The defaultURI
+  (http://localhost:7474) passes through silently because http:// is in
+  the passthrough branch — no spurious "rewrote URI" notice on every
+  default-config invocation.
+- url.Parse never errors on "gibberish-not-a-url" (it returns an empty
+  scheme + empty host, no error) so the empty-scheme path naturally falls
+  through the switch's default case → passthrough. No extra check needed.
+- E2E test exploits the custom-port-preserved branch: bolt://127.0.0.1:<test-server-port>
+  rewrites to http://127.0.0.1:<test-server-port> (port not 7687 → preserved),
+  so the request still hits the test server. No port-remap shim needed.
+- Passthrough explicitly silent — assertion in the second e2e test pins
+  this so future code can't accidentally chatter on every invocation.
+
+Next Task: task-015 (Aura *.neo4j.io rewrite refinement)
+
+================================================================================
+TASK-015: Rewrite *.neo4j.io (Aura) hosts to https://host (no port, defaults to 443)
+Date: 2026-05-04T22:30:00Z
+================================================================================
+
+Summary:
+Refined task-014's normalizeURI with an Aura special case. When a bolt-family
+URI's host (without port) ends in `.neo4j.io` (case-insensitive; apex matches
+too), the rewrite forces https://<host> with no port — Aura always serves
+HTTPS on 443 regardless of input port. Previously a user passing
+bolt://abc.databases.neo4j.io:7687 got http://...:7474 (broken); now they
+get https://abc.databases.neo4j.io. Suffix match strict — lookalike
+*.neo4j.io.evil.com falls through to the generic 7687→7474 rule. 13 new
+table cases extend TestNormalizeURI covering every input shape from the
+task description. --uri help, additions.md gotcha, PRD REQ-F-017 all
+updated; bundle regenerated. All gates green.
+
+Files Changed:
+- neo4j-cli/query/uri.go (modified — Aura suffix check inserted between
+  scheme detection and generic port mapping; ~15 added lines)
+- neo4j-cli/query/uri_test.go (modified — 13 new Aura cases; all existing
+  cases unchanged and still green)
+- neo4j-cli/query/query.go (modified — --uri help string mentions Aura)
+- neo4j-cli/internal/skill/additions.md (modified — extended bolt-rewrite
+  bullet with Aura sentence)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — additions
+  propagation)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated —
+  --uri row carries new help text)
+- .plans/prd-query-command.md (REQ-F-017 expanded with Aura special-case
+  paragraph)
+- .plans/tasks-query-command.yml (status / completed_at)
+- .plans/progress-query-command.txt (this entry)
+
+Key Decisions:
+- Aura check fires AFTER bolt-family scheme validation (only bolt-family
+  inputs reach the check) but BEFORE generic 7687→7473/7474 mapping. This
+  is exactly the spec ordering and avoids two side effects: (a)
+  http(s):// passes through silently as before, (b) lookalike non-aura
+  hosts on bolt-family schemes still get the generic port rewrite.
+- `host == "neo4j.io" || strings.HasSuffix(host, ".neo4j.io")` — the
+  required-leading-dot check defends against `*.neo4j.io.evil.com`. A
+  bare `strings.Contains` or `strings.HasSuffix(host, "neo4j.io")` would
+  match the lookalike. Explicit test case locks this contract.
+- `u.Host = u.Hostname()` strips port without manual parsing — cleaner
+  than `strings.Split(u.Host, ":")[0]` and naturally handles bracketed
+  IPv6 hosts (though Aura URIs are never IPv6).
+- Lowercase-host comparison is one-way: only the comparison string is
+  lowercased; `u.Host` retains the user's original case. Test
+  `bolt://NEO4J.IO → https://NEO4J.IO` locks this — the hostname matches
+  (CI suffix test) but original case is preserved on output. HTTP
+  clients are case-insensitive on hostnames so this works in practice.
+- No new e2e test added: task-014's e2e covers the stderr-notice path
+  through runQuery; task-015 is purely a rewrite-rule refinement. The
+  uri_test.go table is the right granularity.
+
+Next Task: All tasks complete

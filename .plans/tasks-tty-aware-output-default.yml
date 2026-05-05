@@ -1,0 +1,67 @@
+feature: tty-aware-output-default
+prd: ./prd-tty-aware-output-default.md
+created_at: 2026-05-05T07:33:02Z
+updated_at: 2026-05-05T07:33:02Z
+
+tasks:
+  - id: task-001
+    title: "Add resolveOutput + stdoutIsTerminal seam, route renderRows through it"
+    description: |
+      Introduce the TTY-aware resolver and its package-level test seam in
+      neo4j-cli/query/output.go, wire renderRows through it, and add a
+      TestMain helper that defaults the seam to TTY=true so the existing
+      query-package test suite keeps asserting on table output without
+      per-test edits. Also add the new branch-coverage tests for
+      renderRows (TTY+default, non-TTY+default, explicit --output table on
+      non-TTY, explicit --output json on TTY).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/query/output.go declares `var stdoutIsTerminal = func(io.Writer) bool { ... }` mirroring the stdinIsTTY pattern at run.go:34; production impl asserts *os.File and calls term.IsTerminal on the fd, non-*os.File returns false."
+      - "neo4j-cli/query/output.go declares `func resolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string` returning json/table; values other than \"default\" / \"\" pass through unchanged."
+      - "renderRows reads from resolveOutput(cmd, cfg) instead of cfg.Aura.Output() directly; the JSON branch is taken iff resolveOutput returns \"json\"."
+      - "neo4j-cli/query/testseam_test.go (new) sets stdoutIsTerminal to return true via TestMain (or init) for the package, so existing renderRows/schema tests stay green without edits."
+      - "New table-driven test in output_test.go covers four cases: TTY+default→table, non-TTY+default→json, non-TTY+--output table→table, TTY+--output json→json. Each case toggles the seam locally and restores it."
+      - "make test passes; make fmt-check passes; make lint passes."
+      - "No file under neo4j-cli/aura/, common/clicfg/, or any other package outside neo4j-cli/query/ is modified."
+    completed_at: 2026-05-05T07:45:00Z
+
+  - id: task-002
+    title: "Route renderSchema through resolveOutput and update :schema tests"
+    description: |
+      Make :schema honor the same TTY-aware default. Today it always emits
+      JSON unless --output table is passed; after this task, an interactive
+      :schema invocation defaults to stacked tables and a piped/redirected
+      one stays JSON. Update renderSchema's doc comment to describe the new
+      behaviour, adjust the existing JSON-output schema test (which today
+      relies on "default" falling through to JSON), and add a new
+      TTY+default→tables case.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "renderSchema in neo4j-cli/query/schema.go (around line 270-276) calls resolveOutput(cmd, cfg); table branch fires iff the resolver returns \"table\"."
+      - "renderSchema's doc comment is updated to: default → table when stdout is a TTY, JSON when piped or redirected; explicit --output X overrides."
+      - "Existing :schema JSON-output test in schema_test.go is adjusted to either set --output json explicitly or flip stdoutIsTerminal locally to false; the test continues to assert on the JSON payload."
+      - "New :schema test asserts that with stdoutIsTerminal=true and no --output flag, renderSchema emits the five stacked tables (Nodes / Relationships / Relationship Paths / Indexes / Constraints) per printSchemaTables."
+      - "Existing :schema --output table test still passes without edits."
+      - "make test passes; make fmt-check passes; make lint passes."
+    completed_at: 2026-05-05T08:05:00Z
+
+  - id: task-003
+    title: "Document TTY-aware default in README and add changelog entry"
+    description: |
+      Add a one-line note to README.md's query section explaining the new
+      auto-detect behaviour, and create a Minor changelog entry for
+      neo4j-cli via changie. This is the final user-visible documentation
+      step.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "README.md query section contains a sentence equivalent to: \"When stdout is not a terminal (piped or redirected), --output defaults to json. Applies to both query and :schema.\""
+      - "A new file `.changes/unreleased/neo4j-cli-Minor-*.yaml` exists with project: neo4j-cli, kind: Minor, body covering the auto-detect behaviour for query and :schema. Created via `changie new --projects neo4j-cli --kind Minor --body \"query/:schema: auto-detect piped/redirected stdout and default --output to json\"` (or equivalent hand-authored YAML if changie isn't installed)."
+      - "make test still passes (no code changes needed)."
+      - "make fmt-check passes."
+    completed_at: 2026-05-05T08:25:00Z

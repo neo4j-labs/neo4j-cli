@@ -44,7 +44,7 @@ func main() {
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
 	if err := cmd.Execute(); err != nil {
 		fmt.Printf("[aura-cli] invalid command with args %s: %v\n", os.Args[1:], err) // TODO: remove this log in favour of real metrics in case of invalid command
-	} else {
-		fmt.Printf("[aura-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
+		os.Exit(1)
 	}
+	fmt.Printf("[aura-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
 }

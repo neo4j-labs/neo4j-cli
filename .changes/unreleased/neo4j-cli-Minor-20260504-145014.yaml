@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add ''query'' command to run Cypher against a Neo4j database via the HTTP Query API'
+time: 2026-05-04T14:50:14Z

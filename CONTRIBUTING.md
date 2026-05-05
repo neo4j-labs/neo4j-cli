@@ -42,6 +42,43 @@ To format all Go source files:
 make fmt
 ```
 
+### Generated content
+
+Each CLI binary embeds a generated agent-skill bundle (`<bin>/internal/skill/bundle/`) that documents its cobra tree. The bundles are committed and regenerated whenever the command surface changes.
+
+To regenerate every binary's bundle:
+
+```bash
+make generate
+```
+
+Under the hood this runs `go generate ./...`, which invokes each binary's `<bin>/internal/skill/gen/main.go` generator. The generator walks the binary's cobra tree and rewrites `bundle/SKILL.md` plus `bundle/references/*.md`.
+
+CI runs the following gate on every PR — it fails if the committed bundles are stale relative to the current cobra tree:
+
+```bash
+make generate-check
+```
+
+If this fails, run `make generate` locally and commit the resulting diff.
+
+#### Editing per-binary gotchas
+
+Each binary has a hand-written `<bin>/internal/skill/additions.md` that is inlined into the generated `SKILL.md` under "Gotchas". Edit `additions.md` (not the generated `bundle/SKILL.md`) and re-run `make generate`. The same applies to `description.txt`, which feeds the frontmatter `description` field.
+
+#### Adding a new standalone CLI
+
+To add agent-skill support to a new standalone binary:
+
+1. Expose `NewCmd(cfg)` from a `<newcli>/app/app.go` package the generator can import.
+2. Copy `neo4j-cli/internal/skill/` to `<newcli>/internal/skill/`, then edit `description.txt`, `additions.md`, and the import in `gen/main.go`.
+3. Mount the subcommand in the binary's entrypoint: `cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "<newcli>"))`.
+4. Run `go run ./<newcli>/internal/skill/gen` to bootstrap `bundle/`, then commit the result. No edits to `common/skill/` are needed.
+
+### Releasing
+
+The full release lifecycle (changelog → Release PR → GitHub Release → npm publish) is documented in [`RELEASING.md`](RELEASING.md). The short version: add a changelog entry on your PR, merge normally, and `changie` opens a separate Release PR — merging *that* is what ships binaries and npm packages.
+
 ### Pull requests
 
 As well as your code changes, pull requests need a changelog entry. These are added using the tool [`changie`](https://changie.dev/). You will need to install this using the following command:

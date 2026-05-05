@@ -1,0 +1,130 @@
+================================================================================
+TASK-001: Rewrite query_https_smoke_test.go as pure-Go integration test
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Replaced the bash-driven smoke test wrapper with a self-contained pure-Go
+test. The new TestHTTPS_Smoke generates a self-signed RSA-2048 cert via
+stdlib crypto/*, picks two random free TCP ports on 127.0.0.1, boots
+neo4j:5 via os/exec docker run, polls HTTPS readiness with
+InsecureSkipVerify, then drives the cobra `query` command in-process
+(NewCmd(cfg).Execute() with stdout/stderr buffers) for both positive
+(--insecure succeeds, stdout contains '1') and negative (default
+verification fails with TLS/x509/certificate error) assertions. Pre-clean
++ t.Cleanup both run `docker rm -f` for guaranteed teardown.
+
+Files Changed:
+- neo4j-cli/query/query_https_smoke_test.go (rewrote: ~230 lines pure Go,
+  replaces 49-line bash-script wrapper)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-001 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, created)
+
+Key Decisions:
+- Used os.OpenFile + explicit os.Chmod 0o644 on cert files to defeat
+  default umask (was an actual gotcha — the OpenFile mode bits are masked
+  on create).
+- Used MarshalPKCS8PrivateKey over PKCS1 for forward-compat; Neo4j reads
+  either.
+- Inlined a minimal stdout/stderr harness (runQueryCmd helper) rather
+  than reusing newRunHarness from run_test.go: the smoke test doesn't
+  need stdin/passwordReader seam overrides, and self-contained is
+  clearer.
+- Set 0755 on the t.TempDir() root so the in-container uid 7474 user can
+  traverse the read-only bind mount (TempDir defaults to 0700).
+- Added DNSNames=["localhost"] + IPAddresses=[127.0.0.1] to the cert SAN
+  even though tests use --insecure: harmless and makes the cert correct
+  if anyone ever flips on verification with a custom CA bundle.
+- Smoke test stays gated behind NEO4J_HTTPS_TEST=1; verified it skips
+  cleanly under `make test`.
+
+Next Task: task-002 (delete scripts/test-https.sh)
+
+================================================================================
+TASK-002: Delete scripts/test-https.sh
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Removed scripts/test-https.sh (171 lines of bash) now that
+neo4j-cli/query/query_https_smoke_test.go owns the full smoke flow in
+pure Go. The scripts/ directory was the script's only file, so the
+directory is gone too (git doesn't track empty dirs). Verified no
+references remain outside .plans/archive/, AGENTS.md (task-004), and
+.github/workflows/test.yml (task-003). make test passes; make fmt-check
+is clean.
+
+Files Changed:
+- scripts/test-https.sh (deleted)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-002 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Used `git rm` rather than plain `rm` so the deletion is staged in one
+  step.
+- Left AGENTS.md and .github/workflows/test.yml references for their
+  dedicated downstream tasks (004 and 003 respectively) instead of
+  scope-creeping this task.
+- .plans/{prd,tasks,progress}-* references retained as planning artifacts
+  (bookkeeping; not user-facing).
+
+Next Task: task-003 (update .github/workflows/test.yml HTTPS step)
+
+================================================================================
+TASK-003: Update .github/workflows/test.yml HTTPS step to invoke go test
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Switched the CI HTTPS smoke step from `bash scripts/test-https.sh` to
+`NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`.
+Step name and `if: matrix.os == 'ubuntu-latest'` gate preserved. No other
+workflow changes. make test passes (smoke test gated off without env var),
+make fmt-check is clean, YAML parses.
+
+Files Changed:
+- .github/workflows/test.yml (one-line `run:` swap)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-003 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Inline env-var prefix (`NEO4J_HTTPS_TEST=1 go test ...`) over a step-
+  level `env:` block: matches the documented local invocation in AGENTS.md
+  one-for-one, easier to copy-paste between local and CI.
+- Kept the step's existing display name verbatim ("HTTPS smoke test
+  (--insecure against real Neo4j)") — purely a runner change.
+
+Next Task: task-004 (update AGENTS.md Local Verification Scripts subsection)
+
+================================================================================
+TASK-004: Update AGENTS.md Local Verification Scripts subsection
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Refreshed the AGENTS.md "Local Verification Scripts" bullet to describe the
+new pure-Go HTTPS smoke test. Dropped scripts/test-https.sh, openssl, and
+curl. Pointed at TestHTTPS_Smoke in neo4j-cli/query/query_https_smoke_test.go
+with the run command `NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v
+./neo4j-cli/query/...`. Replaced the "ports 7473/7474 free" line with a note
+that the test binds two random free TCP ports on 127.0.0.1. Kept docker as
+the sole external requirement. The Neo4j 5 docker env-var bullet is
+unchanged. CLAUDE.md is a symlink so single edit propagates. make test +
+make fmt-check pass.
+
+Files Changed:
+- AGENTS.md (one bullet rewritten under "Local Verification Scripts")
+- .plans/tasks-pure-go-https-smoke-test.yml (task-004 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Led the bullet with the test name + file path (TestHTTPS_Smoke) rather
+  than the script path that no longer exists — orients readers at the Go
+  test, not at a removed file.
+- Kept "Pure Go: stdlib cert gen, boots neo4j:5 via os/exec" inline so
+  readers don't need to open the test to understand what it does.
+- No additional AGENTS.md learnings worth adding — the section update IS
+  the deliverable and the existing Hermetic Test Notes / Windows CI
+  Gotchas already cover the patterns the new test uses.
+
+Next Task: All tasks complete

@@ -1,0 +1,72 @@
+================================================================================
+TASK-001: Add resolveOutput + stdoutIsTerminal seam, route renderRows through it
+Date: 2026-05-05T07:45:00Z
+================================================================================
+
+Summary:
+Added TTY-aware output resolver in the query package. resolveOutput(cmd, cfg)
+returns "json"/"table"; "default"/"" auto-detect via stdoutIsTerminal seam
+(TTY -> table, non-TTY -> json). Explicit --output flag passes through.
+renderRows now routes through resolveOutput. TestMain seeds the seam to true
+so existing tests stay green without edits.
+
+Files Changed:
+- neo4j-cli/query/output.go (modified — added stdoutIsTerminal seam, resolveOutput helper, routed renderRows through it, updated doc comment)
+- neo4j-cli/query/output_test.go (modified — added withStdoutIsTerminal helper + TestRenderRows_TTYAwareDefault four-branch table-driven test)
+- neo4j-cli/query/testseam_test.go (created — TestMain sets stdoutIsTerminal=true for the package)
+- .plans/tasks-tty-aware-output-default.yml (status updated to completed)
+
+Key Decisions:
+- Detection asserts *os.File on cmd.OutOrStdout(); non-*os.File returns false (cobra abstraction kept intact)
+- TestMain default true keeps every existing assertion stable; tests opting into non-TTY use a t.Cleanup helper
+- "default" and "" both treated as auto-detect (tolerates empty-string accidents)
+- make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Route renderSchema through resolveOutput and update :schema tests
+Date: 2026-05-05T08:05:00Z
+================================================================================
+
+Summary:
+renderSchema now routes through resolveOutput(cmd, cfg) so :schema honors the
+TTY-aware default: TTY+default → 5 stacked tables, non-TTY+default → JSON,
+explicit --output wins. Updated the doc comment. Renamed the existing
+default-JSON schema test to TestSchema_DefaultOutputNonTTYIsJSON and made it
+flip the seam to non-TTY locally. Added TestSchema_DefaultOutputTTYIsTables
+which leans on TestMain's TTY=true default.
+
+Files Changed:
+- neo4j-cli/query/schema.go (modified — renderSchema uses resolveOutput; doc updated)
+- neo4j-cli/query/schema_test.go (modified — renamed JSON-default test + flipped seam; added TTY-default-tables test)
+- .plans/tasks-tty-aware-output-default.yml (status updated to completed)
+
+Key Decisions:
+- Reused withStdoutIsTerminal helper from output_test.go (same package) — no need to duplicate
+- New tables test does not set the seam explicitly; relies on TestMain default to keep symmetric with the existing --output table test
+- make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Document TTY-aware default in README and add changelog entry
+Date: 2026-05-05T08:25:00Z
+================================================================================
+
+Summary:
+README query section now documents the auto-detect behaviour ("When stdout is
+not a terminal (piped or redirected), --output defaults to json. Applies to
+both query and :schema."). Added hand-authored Minor changelog YAML for
+neo4j-cli under .changes/unreleased/.
+
+Files Changed:
+- README.md (modified — one sentence appended to the existing query output paragraph)
+- .changes/unreleased/neo4j-cli-Minor-20260505-080500.yaml (created)
+- .plans/tasks-tty-aware-output-default.yml (status -> completed)
+
+Key Decisions:
+- changie not installed locally → hand-authored YAML matching existing files' shape (single-quoted body, RFC3339 time)
+- README sentence inserted into the existing output paragraph rather than a new paragraph — keeps the section tight
+
+Next Task: none (feature complete)

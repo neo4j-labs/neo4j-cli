@@ -26,7 +26,10 @@ jobs:
 
             - name: Build
               run: make build
-            
+
+            - name: Generate check
+              run: make generate-check
+
             - name: Lint
               if: matrix.os == 'ubuntu-latest'
               uses: golangci/golangci-lint-action@v7
@@ -36,3 +39,7 @@ jobs:
 
             - name: Test
               run: make test
+
+            - name: HTTPS smoke test (--insecure against real Neo4j)
+              if: matrix.os == 'ubuntu-latest'
+              run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...

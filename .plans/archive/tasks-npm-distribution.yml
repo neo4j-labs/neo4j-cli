@@ -1,0 +1,220 @@
+feature: npm-distribution
+prd: ./prd-npm-distribution.md
+created_at: 2026-05-04T12:00:00Z
+updated_at: 2026-05-04T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Bootstrap distribution/ scaffolding (platforms.tsv + .gitattributes)"
+    description: |
+      Create the shared platform table at `distribution/platforms.tsv` listing all 8 npm-relevant
+      archs as `(goreleaser_dirname_template, npm_os, npm_cpu, bin_filename)` rows, and extend
+      `.gitattributes` with LF-pinning globs for `distribution/**/*.{json,tmpl,js,sh}`. This is the
+      foundation other tasks build on — `publish.sh` sources `platforms.tsv`, and committed
+      templates/scripts must stay LF on Windows checkouts.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`distribution/platforms.tsv` exists with 8 rows covering darwin arm64/x64, linux arm64/ia32/x64, win32 arm64/ia32/x64"
+      - "Each row maps to the GoReleaser archive directory naming pattern from `.goreleaser.yaml:48-54` (`neo4j-cli_<version>_<OS>_<arch>`)"
+      - "`.gitattributes` gains `distribution/**/*.json`, `*.tmpl`, `*.js`, `*.sh` entries pinned to `eol=lf`"
+      - "File uses tab-separated columns with a single header line so `awk -F'\\t'` and `read` both work"
+    completed_at: 2026-05-04T12:30:00Z
+
+  - id: task-002
+    title: "Implement wrapper bin shim distribution/npm/cli/bin/neo4j-cli.js"
+    description: |
+      Create the Node bin shim that resolves the platform-specific package via `require.resolve`
+      and execs the binary with full TTY/signal/exit-code passthrough. Per REQ-F-004 through
+      REQ-F-007: uses `spawnSync` (not `execFileSync`) with `stdio: 'inherit'`, propagates exit code,
+      handles win32 `.exe` suffix, and prints a friendly error naming detected platform/arch when
+      the platform pkg is missing (unsupported arch or `--omit=optional` install).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Resolves binary via `require.resolve('@neo4j-labs/cli-' + process.platform + '-' + process.arch + '/bin/neo4j-cli' + (win32 ? '.exe' : ''))`"
+      - "Uses `spawnSync(binary, process.argv.slice(2), { stdio: 'inherit' })` so SIGINT and TTY work"
+      - "Exits with `result.status ?? 1` to propagate child exit codes through `&&`-chains"
+      - "On `require.resolve` failure, prints message naming detected platform/arch, the supported list, and a hint about `--no-optional` / `--omit=optional`, then exits non-zero"
+      - "First line is `#!/usr/bin/env node` shebang"
+    completed_at: 2026-05-04T13:35:00Z
+
+  - id: task-003
+    title: "Create package.json templates for wrapper and platform packages"
+    description: |
+      Add `distribution/npm/cli/package.json.tmpl` (wrapper) and
+      `distribution/npm/cli-platform/package.json.tmpl` (per-platform). Templates use plain
+      placeholder tokens (`__VERSION__`, `__OS__`, `__CPU__`, `__BIN_NAME__`) substituted by `sed`
+      in publish.sh — no Node toolchain at publish time. Wrapper template lists all 8 platform
+      pkgs in `optionalDependencies` pinned to `__VERSION__` (never `^`). Platform template
+      declares `os`, `cpu`, `bin`, `files`, `license: Apache-2.0`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Wrapper template at `distribution/npm/cli/package.json.tmpl` declares `name: @neo4j-labs/cli`, `bin.neo4j-cli: bin/neo4j-cli.js`, all 8 optionalDependencies pinned to `__VERSION__`, `engines.node: >=18`, `license: Apache-2.0`"
+      - "Platform template at `distribution/npm/cli-platform/package.json.tmpl` declares `name: @neo4j-labs/cli-__OS__-__CPU__`, `os: [\"__OS__\"]`, `cpu: [\"__CPU__\"]`, `bin.neo4j-cli: bin/__BIN_NAME__`, `files: [\"bin/__BIN_NAME__\"]`, `license: Apache-2.0`"
+      - "Both templates use `__TOKEN__` placeholders (not `{{TOKEN}}` or `${TOKEN}`) to avoid clashes with shell/sed metachars"
+      - "Templates are valid JSON after a trivial sed substitution — verify with `sed ... | jq .`"
+    completed_at: 2026-05-04T14:10:00Z
+
+  - id: task-004
+    title: "Implement distribution/npm/publish.sh with idempotency and dist-tag selection"
+    description: |
+      The orchestration script that publishes all 9 packages from a populated `dist/` tree.
+      Sources `distribution/platforms.tsv` for the platform×arch matrix. Strips leading `v` from
+      `GORELEASER_CURRENT_TAG`. Selects `--tag` from version pattern (alpha/beta/rc/next/latest).
+      For each package: renders `package.json` from template via `sed`, copies binary into place,
+      runs `npm view <name>@<version>` to skip already-published entries, then `npm publish
+      --access public --tag <tag>`. Publishes 8 platforms first, wrapper last. Supports `--dry-run`.
+      Header comment documents idempotency, ordering, and recovery flow.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "Script reads `GORELEASER_CURRENT_TAG`, strips leading `v`, errors if unset"
+      - "Sources `distribution/platforms.tsv` and iterates the 8 platforms; copies binary from `dist/<dirname>/neo4j-cli[.exe]` into a per-package `build/` dir, then publishes"
+      - "Dist-tag selection: `case` on version → `*-alpha*` → alpha; `*-beta*` → beta; `*-rc*` → rc; `*-*` → next; `*` → (omit, default latest)"
+      - "Idempotency: `npm view <pkg>@<version> version 2>/dev/null` non-empty → log `[skip] <pkg>@<version> already published` and continue, do not error"
+      - "Wrapper published last after all 8 platforms succeed/skip; `--access public` on every publish; `--dry-run` flag passes through"
+      - "`set -euo pipefail` enabled; header comment documents ordering, idempotency, and the manual-recovery workflow"
+    completed_at: 2026-05-04T15:00:00Z
+
+  - id: task-005
+    title: "Modify release.yml to surface include_neo4j and upload dist artifacts"
+    description: |
+      Two surgical changes to `.github/workflows/release.yml`. First, expose the existing
+      `include_neo4j` boolean (computed at lines 53-57) as a job output via the job's `outputs:`
+      block. Second, add an upload-artifact step at the end of the job that uploads `dist/` and a
+      small `release-meta.json` (`{ version, include_neo4j }`) for the new `publish-npm.yml`
+      workflow's `workflow_run` consumer to read.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Release job's `outputs:` block exposes `include_neo4j` and `version` (the neo4j-cli version) for downstream workflow_run consumers"
+      - "End of release job uploads `dist/` directory as a workflow artifact (e.g. via actions/upload-artifact)"
+      - "End of release job also uploads `release-meta.json` containing `{ version: \"X.Y.Z\", include_neo4j: true|false }`"
+      - "Existing release behavior unchanged — same trigger, same goreleaser invocation, same gh release creation; only outputs and artifact uploads added"
+    completed_at: 2026-05-04T15:45:00Z
+
+  - id: task-006
+    title: "Create .github/workflows/publish-npm.yml with auto + manual triggers"
+    description: |
+      New workflow file with two triggers: `workflow_run` (auto, after `release.yml` success,
+      gated on `include_neo4j == true` and `conclusion == success`) and `workflow_dispatch`
+      (manual, with required `version` string input). The auto path downloads the `dist/` and
+      `release-meta.json` artifacts uploaded by `release.yml`. The manual path uses
+      `gh release download v${VERSION} --pattern 'neo4j-cli_*'` then extracts each archive into a
+      `dist/<archive_basename>/` layout matching what `publish.sh` expects. Both paths configure
+      `~/.npmrc` from `secrets.NPM_TOKEN` and run `distribution/npm/publish.sh`.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Triggers: `workflow_run` on `[Release]` workflow + `workflow_dispatch` with required string input `version`"
+      - "`workflow_run` path: skip job if `github.event.workflow_run.conclusion != 'success'` OR if `include_neo4j != true` (read from release-meta.json artifact)"
+      - "`workflow_run` path: downloads `dist/` artifact uploaded by `release.yml`"
+      - "`workflow_dispatch` path: runs `gh release download v${VERSION} --pattern 'neo4j-cli_*' --dir dist-archives/` then extracts each `.tar.gz`/`.zip` into `dist/<archive_basename>/`"
+      - "Both paths write `~/.npmrc` from `secrets.NPM_TOKEN`, then run `GORELEASER_CURRENT_TAG=v${VERSION} distribution/npm/publish.sh`"
+      - "Aura-cli-only release path is verified to skip via the include_neo4j gate"
+    completed_at: 2026-05-04T16:30:00Z
+
+  - id: task-007
+    title: "Add Makefile target npm-publish-dry"
+    description: |
+      Add a `npm-publish-dry` target that wires `distribution/npm/publish.sh --dry-run` against
+      the current `make snapshot` output. Lets a maintainer sanity-check template rendering and
+      publish ordering locally before pushing a release. Should depend on or document `make snapshot`
+      as the prerequisite (no implicit run — `make snapshot` is slow).
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Makefile target `npm-publish-dry` exists and runs `distribution/npm/publish.sh --dry-run`"
+      - "Sets a `GORELEASER_CURRENT_TAG=v0.0.0-dry` env var (or similar) so the script doesn't error on missing tag"
+      - "Target documented in Makefile comments (or via existing `help` target convention if present) as 'requires `make snapshot` first'"
+      - "Running `make npm-publish-dry` after `make snapshot` exits 0 and prints what would be published for all 9 packages"
+    completed_at: 2026-05-04T17:15:00Z
+
+  - id: task-008
+    title: "Write maintainer-facing distribution/npm/README.md"
+    description: |
+      The design + rationale doc maintainers and future agents read. ~200 lines max. Covers all
+      10 sections from the PRD's REQ-F-028: what the directory does, package shape diagram,
+      multi-package vs postinstall rationale, install resolution flow, dist-tag channels,
+      local dev/test flow, two-trigger release flow, failure recovery, adding a new platform,
+      future channels (pip/brew). Cross-links to `.goreleaser.yaml` and `release.yml` instead
+      of duplicating their content. NOT shipped to npm — this is repo-internal documentation.
+    status: completed
+    dependencies:
+      - task-004
+      - task-006
+    acceptance_criteria:
+      - "All 10 sections from PRD REQ-F-028 present"
+      - "Includes ASCII diagram of the wrapper + 8 platform pkgs and the os/cpu mapping table"
+      - "Includes the dist-tag selection table with example install commands per channel"
+      - "Cross-links to `.goreleaser.yaml` and `.github/workflows/release.yml` rather than duplicating"
+      - "Documents that adding a new platform = one row in `distribution/platforms.tsv` + matching GoReleaser output, no script edits"
+      - "≤200 lines"
+    completed_at: 2026-05-04T18:00:00Z
+
+  - id: task-009
+    title: "Write user-facing distribution/npm/cli/README.md (ships in tarball)"
+    description: |
+      Short user-facing README that ships inside the published `@neo4j-labs/cli` tarball (referenced
+      by the wrapper template's `files:` array). Covers: install (`npm i -g @neo4j-labs/cli`), basic
+      usage, link to the main project docs, and channel info — `npm i @neo4j-labs/cli@alpha` for
+      prereleases. Open question 4 from PRD: keep prerelease channel info present.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "Install section shows `npm i -g @neo4j-labs/cli` and notes that the right binary is picked automatically"
+      - "Documents the supported platform/arch matrix and the friendly-error path when an unsupported platform is detected"
+      - "Documents prerelease channels: `npm i @neo4j-labs/cli@alpha` etc."
+      - "Links to the main project repo / docs"
+      - "Listed in the wrapper template's `files:` array so it ends up in the published tarball"
+    completed_at: 2026-05-04T18:30:00Z
+
+  - id: task-010
+    title: "Update repo README install section + add changelog entry"
+    description: |
+      Two small repo-housekeeping items. Update repo-root `README.md` install section to mention
+      `npm i -g @neo4j-labs/cli`. Run `make changelog --projects neo4j-cli --kind Minor` (or
+      hand-author the YAML if changie is unavailable) with body "neo4j-cli is now installable via
+      `npm i -g @neo4j-labs/cli`". Aura-cli does NOT get a changelog entry — aura-cli is not on npm.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "Repo `README.md` install section documents `npm i -g @neo4j-labs/cli` alongside the existing GitHub Releases instructions"
+      - "A new file under `.changes/unreleased/` exists with `project: neo4j-cli`, `kind: Minor`, body referencing the npm install"
+      - "No corresponding aura-cli changelog entry is created"
+      - "`make fmt-check` and `make test` still pass"
+    completed_at: 2026-05-04T14:05:00Z
+
+  - id: task-011
+    title: "Rename npm scope from @neo4j to @neo4j-labs across the codebase"
+    description: |
+      The repo lives under the neo4j-labs org, so the npm scope should match: `@neo4j-labs/cli`
+      and `@neo4j-labs/cli-<os>-<cpu>` (8 platform pkgs). Replace the old `@neo4j` scope wherever
+      it appears in templates, scripts, docs, plans, and the existing changelog entry. Verify no
+      old-scope reference remains via `grep -rn 'at-sign + neo4j/cli' --include='*.md'
+      --include='*.tmpl' --include='*.sh' .` after the rename (run with the literal scope token).
+      Confirms `make npm-publish-dry` still renders 9 valid package.jsons with the new scope
+      before the first real publish under the new name.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "All occurrences of the old npm scope (literal: at-sign followed by `neo4j/cli` and `neo4j/cli-<arch>`) replaced with `@neo4j-labs/cli` / `@neo4j-labs/cli-<arch>` in: distribution/npm/cli/package.json.tmpl, distribution/npm/cli-platform/package.json.tmpl, distribution/npm/cli/bin/neo4j-cli.js, distribution/npm/publish.sh, distribution/npm/README.md, distribution/npm/cli/README.md, README.md, RELEASING.md, AGENTS.md, .agents/deployment.md, .changes/unreleased/neo4j-cli-Minor-*.yaml, .github/workflows/publish-npm.yml (any inline references), .plans/prd-npm-distribution.md, .plans/tasks-npm-distribution.yml"
+      - "`grep -rn '<at-sign>neo4j/cli' --include='*.md' --include='*.tmpl' --include='*.sh' --include='*.js' --include='*.yml' --include='*.yaml' .` (with `<at-sign>` replaced by the literal `@`) returns no results (excluding .git, node_modules, .plans/progress*)"
+      - "Wrapper template's optionalDependencies block lists 8 entries all under `@neo4j-labs/`"
+      - "Bin shim's `require.resolve` template string targets `@neo4j-labs/cli-` not the old scope prefix"
+      - "`make npm-publish-dry` exits 0 and prints 9 publish lines, all under `@neo4j-labs/cli*`"
+      - "`make fmt-check` and `make test` pass"
+      - "Confirm the `@neo4j-labs` npm org exists and the publishing user has publish access before merging — if not, this task blocks until the org is created"
+    completed_at: 2026-05-04T19:00:00Z

@@ -787,6 +787,50 @@ Set the default project for the Aura CLI to use:
 aura-cli config project use SETTING-NAME
 ```
 
+# Skill
+
+`aura-cli` embeds a `SKILL.md` bundle that documents its full command tree (overview, global flags, per-subcommand references, gotchas).
+The `skill` subcommand installs that bundle into the skill directories of supported AI coding agents (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie) so the agent picks up accurate, per-build instructions for driving the CLI.
+
+The `skill` subcommand is also available on the `neo4j-cli` super CLI, but the bundle each binary installs reflects its own command surface. Run it from `aura-cli` to install the standalone Aura surface (covers `instance`, `tenant`, `credential`, `config`, and the rest of the Aura tree); run it from `neo4j-cli` for the super-CLI surface.
+
+## Install
+
+Install into every detected agent on the machine, or pass an agent name to target one:
+
+```text
+aura-cli skill install
+aura-cli skill install claude-code
+```
+
+Agent name lookup is case-insensitive. Without an argument, `install` errors if no supported agent is detected.
+
+## List
+
+List supported agents along with their detected and installed state:
+
+```text
+aura-cli skill list
+aura-cli skill list --output json
+```
+
+## Check
+
+Compare each installed bundle's `version:` frontmatter against the running binary's version. Exits non-zero when any installed bundle is out of date.
+
+```text
+aura-cli skill check
+```
+
+## Remove
+
+Remove the installed bundle. Idempotent — running it again on a clean target succeeds with no change.
+
+```text
+aura-cli skill remove
+aura-cli skill remove claude-code
+```
+
 # Migrating to the new Aura CLI
 
 Aura CLI has evolved from a Neo4j Labs to a proper Neo4j product.

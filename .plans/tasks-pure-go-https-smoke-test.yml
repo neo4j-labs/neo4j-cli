@@ -1,0 +1,87 @@
+feature: pure-go-https-smoke-test
+prd: ./prd-pure-go-https-smoke-test.md
+created_at: 2026-05-05T00:00:00Z
+updated_at: 2026-05-05T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Rewrite query_https_smoke_test.go as pure-Go integration test"
+    description: |
+      Replace the contents of neo4j-cli/query/query_https_smoke_test.go
+      with a self-contained pure-Go test that performs the full HTTPS
+      smoke flow: stdlib cert generation, random free-port allocation,
+      docker container boot via os/exec, readiness wait, in-process
+      cobra invocation for both positive (--insecure succeeds) and
+      negative (default verification fails) assertions, and guaranteed
+      teardown via t.Cleanup. Keep //go:build !windows and the
+      NEO4J_HTTPS_TEST=1 env-var skip gate. No new module dependencies.
+      Drive the CLI in-process via NewCmd(cfg).Execute() with stdout/
+      stderr buffers — same harness pattern as run_test.go:77-87.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "TestHTTPS_Smoke skips cleanly when NEO4J_HTTPS_TEST is not set to 1"
+      - "Pre-flight checks docker via exec.LookPath and t.Fatals with a clear message when missing"
+      - "Self-signed RSA-2048 cert (CN=localhost, 30-day) generated with stdlib crypto/* into t.TempDir(); private.key/public.crt at 0644, trusted/ and revoked/ subdirs at 0755"
+      - "HTTPS and HTTP host ports picked via net.Listen('tcp', '127.0.0.1:0') — no hard-coded 7473/7474 on the host side"
+      - "Container booted with the same NEO4J_* env vars as the old script, bind-mounted at /ssl:ro; pre-clean and t.Cleanup both run docker rm -f neo4j-https-test"
+      - "Readiness loop polls https://127.0.0.1:<port> (InsecureSkipVerify) for up to 60s and dumps docker logs --tail 50 on timeout before t.Fatalf"
+      - "Positive assertion: in-process NewCmd(cfg).Execute() with --insecure returns nil err and stdout contains '1'"
+      - "Negative assertion: same invocation without --insecure returns an error whose message matches (?i)tls|x509|certificate"
+      - "NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/... passes locally; docker ps shows no neo4j-https-test after exit"
+      - "go test ./... (no env var) is unaffected; make fmt-check and make lint are clean"
+    completed_at: 2026-05-05T00:00:00Z
+
+  - id: task-002
+    title: "Delete scripts/test-https.sh"
+    description: |
+      Remove scripts/test-https.sh from the repository now that the
+      Go test owns the full smoke flow. The scripts/ directory is left
+      empty (git does not track empty dirs). Verify nothing else in
+      the working tree still references the script.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "scripts/test-https.sh no longer exists in the working tree"
+      - "grep -rn 'test-https.sh\\|scripts/test-https' . returns no matches outside .plans/archive/"
+      - "make test still passes after deletion"
+    completed_at: 2026-05-05T00:00:00Z
+
+  - id: task-003
+    title: "Update .github/workflows/test.yml HTTPS step to invoke go test"
+    description: |
+      Change the 'HTTPS smoke test' step in .github/workflows/test.yml
+      from `run: bash scripts/test-https.sh` to
+      `run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`.
+      Preserve the existing `if: matrix.os == 'ubuntu-latest'` gate and
+      the step name. No other workflow changes.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "test.yml HTTPS smoke step invokes go test with NEO4J_HTTPS_TEST=1, not bash"
+      - "Step retains `if: matrix.os == 'ubuntu-latest'` gate"
+      - "yamllint / GitHub workflow syntax check passes (workflow file is valid YAML)"
+    completed_at: 2026-05-05T00:00:00Z
+
+  - id: task-004
+    title: "Update AGENTS.md Local Verification Scripts subsection"
+    description: |
+      Edit AGENTS.md (around line 208, 'Local Verification Scripts'
+      subsection). Drop the scripts/test-https.sh bullet and replace it
+      with a one-line note pointing at the env-gated Go test. Drop
+      openssl and curl from the requirements list. Keep docker and the
+      port-conflict note (now self-resolving via random ports — adjust
+      wording accordingly). CLAUDE.md is a symlink to AGENTS.md, so a
+      single edit propagates.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "AGENTS.md no longer mentions scripts/test-https.sh, openssl, or curl"
+      - "AGENTS.md describes the smoke test as a Go test invoked via NEO4J_HTTPS_TEST=1 go test ..."
+      - "Port-conflict requirement is removed or updated to reflect random port selection"
+      - "CLAUDE.md (symlink) reflects the same content; no separate edit needed"
+    completed_at: 2026-05-05T00:00:00Z

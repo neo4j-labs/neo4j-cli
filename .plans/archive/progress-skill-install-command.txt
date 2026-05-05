@@ -1,0 +1,700 @@
+================================================================================
+TASK-001: Refactor neo4j-cli tree builder into importable app package
+Date: 2026-05-04T10:15:00Z
+================================================================================
+
+Summary:
+Moved NewCmd and Version out of neo4j-cli/main.go into a new neo4j-cli/app
+package so the per-binary skill generator can import the cobra tree without
+pulling in main entrypoint side-effects. main.go is now a thin entrypoint
+that calls app.NewCmd and uses app.Version. Updated the goreleaser ldflag
+to target the new symbol path (app.Version) — without this, release builds
+would silently ship "dev". Verified ldflag injection still works.
+
+Files Changed:
+- neo4j-cli/app/app.go (created — package app exposing NewCmd + Version)
+- neo4j-cli/main.go (modified — reduced to entrypoint, imports app pkg)
+- .goreleaser.yaml (modified — ldflag points at app.Version, not main.Version)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Goreleaser ldflag MUST be updated when Version moves package; otherwise
+  -X "main.Version=..." silently no-ops and binaries ship as "dev".
+- Aura side untouched — already exposes NewCmd/NewStandaloneCmd.
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Implement common/skill/agents.go agent catalog and path expansion
+Date: 2026-05-04T12:30:00Z
+================================================================================
+
+Summary:
+Ported the Rust skill.rs agent catalog into Go: 10 agents with DetectDir/SkillsDir, expandPath supporting `~`, `~/foo`, and `$XDG_CONFIG_HOME` (with $HOME/.config fallback), case-insensitive FindAgent, and DetectAgents(afero.Fs) for hermetic detection. Table-driven tests cover all REQ-T-002 cases.
+
+Files Changed:
+- common/skill/agents.go (created — package skill, Agent struct, AGENTS slice, expandPath, FindAgent, DetectAgents)
+- common/skill/agents_test.go (created — table-driven tests, all hermetic via afero.MemMapFs + t.Setenv)
+
+Key Decisions:
+- Followed the Rust reference's split: Agent.DetectPath/SkillsPath do path expansion only; DetectAgents holds the FS dependency. PRD wording is slightly loose but matches the Rust shape.
+- expandPath returns (string, bool) where ok=false signals unresolvable HOME — caller (DetectAgents) treats this as not-detected.
+- DetectAgents uses afero.DirExists so files at the marker path don't count as detection (added test case).
+- Agent.SkillsPath included now even though install/list don't yet use it — required by REQ-T-002 acceptance criterion and used by upcoming tasks.
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Implement common/skill/filesystem.go bundle copy/remove helpers
+Date: 2026-05-04T13:15:00Z
+================================================================================
+
+Summary:
+Added CopyBundle (walks an fs.FS, copies regular files onto an afero.Fs preserving structure) and RemoveDir (recursive, idempotent — returns nil if dir is absent). Mirrors fileutils.WriteFile semantics (mode 0600 files / 0755 dirs). Hermetic table-driven tests on afero.MemMapFs via testing/fstest.MapFS, including an fs.Sub round-trip that mirrors the real generator's `fs.Sub(embed.FS, "bundle")` invocation.
+
+Files Changed:
+- common/skill/filesystem.go (created)
+- common/skill/filesystem_test.go (created)
+
+Key Decisions:
+- Kept the 3-arg signature CopyBundle(dst, dstDir, bundle) per acceptance criterion. Generators scope the embed.FS upstream with fs.Sub(Bundle, "bundle") rather than passing a root parameter — keeps the helper signature minimal.
+- RemoveDir uses afero.Fs.RemoveAll directly. MemMapFs returns nil (not ErrNotExist) for missing paths, so the explicit ErrNotExist check is a defence-in-depth for OsFs at runtime.
+- Used afero.WriteFile directly instead of fileutils.WriteFile to surface errors instead of panicking — same mode bits (0600), same semantics.
+- Coverage of common/skill/ is 88.3%.
+
+Next Task: task-004
+
+================================================================================
+TASK-004: Implement common/skill/render package with golden-file tests
+Date: 2026-05-04T14:00:00Z
+================================================================================
+
+Summary:
+Added common/skill/render package: Bundle(root, opts) walks a cobra tree and emits SKILL.md (frontmatter with `version: {{VERSION}}` placeholder + overview + Global Flags table + Subcommands index linking references/<sub>.md + Gotchas) plus one references/<sub>.md per visible top-level subcommand (recursive H1+H2+... per nested cmd, sorted flag tables, examples). References >100 lines get a "## Contents" TOC injected after the H1. Hidden cmds and `help` excluded. Output byte-deterministic — sorted subcommands and flag rows, no map iteration. Golden-file tests under render/testdata/.
+
+Files Changed:
+- common/skill/render/render.go (created — Bundle + helpers)
+- common/skill/render/render_test.go (created — 10 tests, golden-file + property checks)
+- common/skill/render/testdata/SKILL.md (golden)
+- common/skill/render/testdata/references/instance.md (golden)
+- common/skill/render/testdata/references/zebra.md (golden)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- TOC inserted after the H1 of the reference, not above it — keeps the sub's heading the file's first line so `bytes.IndexByte('\n')` slicing is unambiguous.
+- Reference H1 = `<binName> <cmd path>` via `cmd.CommandPath()` — anchor slugs are GitHub-style (`r-big-leaf00`) to keep golden assertions stable.
+- `walkRender` uses `LocalFlags()` (not `Flags()`) so inherited persistent flags don't duplicate the SKILL.md "Global Flags" table.
+- Pipes in usage strings escaped (`|` → `\|`) to keep markdown tables intact.
+- Bundle returns map[string][]byte keyed with forward slashes (embed.FS convention); CopyBundle (task-003) handles OS-separator translation downstream.
+- Added `-update` test flag for golden regeneration: `go test ./common/skill/render -update`.
+- Coverage of render package: 97.1% (well above 80% gate).
+
+Next Task: task-005
+
+================================================================================
+TASK-005: Implement common/skill/installer.go (Install/Remove/List/Check)
+Date: 2026-05-04T14:45:00Z
+================================================================================
+
+Summary:
+Added installer with four operations on afero.Fs + io/fs.FS bundle: Install
+(substitutes {{VERSION}} in SKILL.md only, references verbatim, cleans dst
+before copy so reinstall removes stale references), Remove (idempotent),
+List (one row per AGENTS entry — Detected/Installed/InstalledVersion),
+Check (filters to installed agents, returns drift bool). Typed sentinel
+errors: ErrNoAgentsDetected, ErrUnknownAgent, ErrAgentNotDetected.
+Frontmatter `version:` parsed via single-line regex (no YAML dep).
+Hermetic table-driven tests on afero.MemMapFs cover every REQ-T-003 case.
+
+Files Changed:
+- common/skill/installer.go (created)
+- common/skill/installer_test.go (created)
+- common/skill/filesystem.go (gofmt: dropped trailing blank line)
+
+Key Decisions:
+- versionPlaceholder is duplicated in installer.go (not imported from
+  render) — render is a child of skill and importing back would require
+  inverting the package layering. The string is a public-ish contract;
+  drift between the two is caught by render's golden tests + installer's
+  TestSubstituteVersion.
+- Install always RemoveDir's the destination before CopyBundle. Otherwise
+  removing a reference upstream and reinstalling would leave a stale file
+  behind. Tested with TestInstallOverwritesExisting.
+- Substitution scoped to SKILL.md only (matches PRD REQ-F-005). References
+  with literal `{{VERSION}}` survive — guarded by an explicit assertion.
+- Check returns rows ONLY for installed agents; uninstalled agents are
+  silent. drift=true also fires on "unknown-version" (frontmatter missing
+  or unparseable) — failing-loudly is safer than silent-pass for a check
+  command.
+- Used afero.WriteFile directly (mode 0600) instead of fileutils.WriteFile
+  to surface errors instead of panicking, matching task-003's CopyBundle.
+- Coverage of common/skill: 88.6% (above 80% gate).
+
+Next Task: task-006
+
+================================================================================
+TASK-006: Implement common/skill/command.go cobra wrapper + tests
+Date: 2026-05-04T15:30:00Z
+================================================================================
+
+Summary:
+Added `skill.NewCmd(cfg, bundle, skillName)` returning a parent cobra
+command with install/remove/list/check leaves. Each leaf delegates to the
+installer (task-005) and renders results as a go-pretty table by default
+or JSON when `--output json` is passed. `--output` is wired as a
+persistent flag and validated in PersistentPreRunE against
+`clicfg.ValidOutputValues`, matching the pattern in
+neo4j-cli/aura/internal/subcommands/tenant/tenant.go. Sentinel errors
+from the installer (`ErrUnknownAgent`, `ErrAgentNotDetected`,
+`ErrNoAgentsDetected`) are translated to user-facing usage errors that
+include the catalog of valid agent names. Tests use a small fixture
+helper that spins up clicfg.NewConfig over an afero.MemMapFs and pre-
+populates agent detect dirs; assertions cover both table and JSON paths
+for every subcommand plus error paths.
+
+Files Changed:
+- common/skill/command.go (created)
+- common/skill/command_test.go (created)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Persistent `--output` flag at the `skill` parent (same pattern as
+  tenant/dataapi groups) instead of per-leaf — keeps a single bind point.
+- Reused `clierr.NewUsageError` for friendly error wrapping; matches what
+  tenant.NewCmd does when an invalid output value is supplied.
+- Drift on `check` returns a non-nil RunE error so cobra exits non-zero,
+  but the table/JSON is still rendered first (the user sees both the
+  rows and the failure).
+- Renderers emit a JSON array (not envelope-with-status) — matches the
+  existing aura output package which serializes `ResponseData` directly.
+- Helper `agentNames()` and `formatAgentErr()` keep error formatting in
+  one place; tests assert "valid agents:" appears in the unknown-agent
+  message.
+- go-pretty upper-cases header text — tests check `strings.ToLower(out)`
+  for header presence.
+- Coverage of common/skill: 90.1% (above 80% gate).
+
+Next Task: task-007
+
+================================================================================
+TASK-007: Add per-binary skill template for neo4j-cli (super-CLI)
+Date: 2026-05-04T16:15:00Z
+================================================================================
+
+Summary:
+Added neo4j-cli/internal/skill/ template: embed.go (//go:generate + //go:embed
+bundle, exports Bundle embed.FS), description.txt (single-line third-person
+frontmatter description), additions.md (gotchas with leading HTML comment
+explaining its purpose), gen/main.go (imports app + render, resolves package
+dir via runtime.Caller, removes-then-regenerates bundle/), plus gen/main_test.go
+(round-trip into t.TempDir, byte-equal vs committed bundle). Generator
+produces SKILL.md + references/aura.md + references/credential.md against
+the current top-level command set; references/skill.md will appear after
+task-009 mounts the skill subcommand.
+
+Files Changed:
+- neo4j-cli/internal/skill/embed.go (created)
+- neo4j-cli/internal/skill/description.txt (created)
+- neo4j-cli/internal/skill/additions.md (created)
+- neo4j-cli/internal/skill/gen/main.go (created)
+- neo4j-cli/internal/skill/gen/main_test.go (created)
+- neo4j-cli/internal/skill/bundle/SKILL.md (generated, committed)
+- neo4j-cli/internal/skill/bundle/references/aura.md (generated, committed)
+- neo4j-cli/internal/skill/bundle/references/credential.md (generated, committed)
+
+Key Decisions:
+- packageDir resolved via runtime.Caller(0) — keeps gen invocation CWD-
+  independent so `go generate ./...` from any working dir lands the bundle
+  next to the package source. Mirrors the LackOfMorals/go-cli-tool#9 pattern.
+- generate() removes bundle/ before recreating it so deleted top-level
+  subcommands (or renames) don't leave stale references files behind.
+- gen subpackage (package main) is intentionally separate from the parent
+  skill package so it can build before bundle/ exists. embed.go in the
+  parent package needs bundle/ present at build time; this lets bootstrap
+  work: run gen → generate bundle → commit, then embed.go compiles.
+- description.txt is single-line — render.go's frontmatter writer emits it
+  as one `description: …` line (no YAML escaping). strings.TrimSpace in
+  render handles the trailing newline.
+- additions.md opens with an HTML comment per REQ-D-006 explaining edits
+  here land in the SKILL.md "Gotchas" section after re-running go generate.
+- 0644 mode on generated files (not 0600 like installer.go) — these are
+  committed to the repo, where world-read is conventional.
+- TestGenerator_RoundTrip walks both committed and regenerated trees,
+  asserts identical relative-path lists AND identical byte content per
+  file. Walks via filepath.ToSlash so the test passes on Windows.
+
+Next Task: task-008
+
+================================================================================
+TASK-008: Add per-binary skill template for aura-cli (standalone)
+Date: 2026-05-04T17:00:00Z
+================================================================================
+
+Summary:
+Mirrored the neo4j-cli/internal/skill template under neo4j-cli/aura/internal/skill,
+scoped to aura-cli. Generator imports neo4j-cli/aura and builds NewStandaloneCmd
+(NOT NewCmd) so the bundle reflects the standalone binary's full surface
+including credential. Description and gotchas rewritten for aura-cli (no super-CLI
+content). Bundle bootstrapped via `go run ./neo4j-cli/aura/internal/skill/gen` then
+committed; round-trip test passes.
+
+Files Changed:
+- neo4j-cli/aura/internal/skill/embed.go (created)
+- neo4j-cli/aura/internal/skill/description.txt (created)
+- neo4j-cli/aura/internal/skill/additions.md (created)
+- neo4j-cli/aura/internal/skill/gen/main.go (created)
+- neo4j-cli/aura/internal/skill/gen/main_test.go (created)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (generated, committed)
+- neo4j-cli/aura/internal/skill/bundle/references/{config,credential,customer-managed-key,graph-analytics,instance,tenant}.md (generated, committed)
+
+Key Decisions:
+- gen/main.go uses aura.NewStandaloneCmd (not NewCmd) — without `credential`
+  the standalone binary's bundle would mis-represent the surface and miss
+  credential-management instructions. PRD REQ-F-011 explicitly mandates this.
+- cfg.Version passed as literal "dev" — render emits the {{VERSION}} placeholder
+  regardless of cfg.Version, so the value doesn't surface in the bundle. No
+  per-binary Version export needed (aura.cmd/main.go's main.Version isn't
+  importable; this avoids creating a new aura.Version export just for gen).
+- Bootstrapped bundle/ before relying on `go generate` — embed.go's `//go:embed
+  bundle` fails to compile if the directory is missing. `go run ./gen` works
+  even before embed.go can compile because gen/ is a sibling package.
+- Cross-bundle diff verification done manually via shell `diff` rather than
+  in a test — adding a cross-package test would create undue coupling, and
+  the structural diff is guaranteed by different cobra trees (NewStandaloneCmd
+  vs app.NewCmd) plus different description.txt/additions.md content.
+- AuraBetaEnabled-gated commands (dataapi, import, deployment) are absent from
+  the bundle because cfg.Aura.AuraBetaEnabled() returns false on a fresh
+  MemMapFs config. This matches the default-build surface.
+
+Next Task: task-009
+
+================================================================================
+TASK-009: Mount skill subcommand in both binaries
+Date: 2026-05-04T17:30:00Z
+================================================================================
+
+Summary:
+Mounted `skill.NewCmd` in two places: `app.NewCmd` (super-CLI top level)
+with binskill.Bundle from neo4j-cli/internal/skill and skillName "neo4j-cli";
+`aura.NewStandaloneCmd` (NOT NewCmd) with binskill.Bundle from
+neo4j-cli/aura/internal/skill and skillName "aura-cli". Regenerated both
+bundles with `go generate ./...` — each now includes references/skill.md
+documenting its own skill subtree. Verified the super-CLI's nested `aura`
+subtree does NOT carry skill (cobra prints parent help, no skill in
+available commands).
+
+Files Changed:
+- neo4j-cli/app/app.go (added skill mount + imports)
+- neo4j-cli/aura/aura.go (added skill mount in NewStandaloneCmd only)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — adds skill row)
+- neo4j-cli/internal/skill/bundle/references/skill.md (new)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated — adds skill row)
+- neo4j-cli/aura/internal/skill/bundle/references/skill.md (new)
+
+Key Decisions:
+- Skill mounted in NewStandaloneCmd, NOT NewCmd, per PRD REQ-F-011. Otherwise
+  `neo4j-cli aura skill` would also resolve, duplicating the super-CLI's
+  top-level `skill` mount inside the nested aura subtree.
+- Cobra prints parent help (no error) for unknown subcommands of a parent
+  group without RunE — `neo4j-cli aura skill` exits 0 with parent help.
+  Acceptance criterion wording "fails" is satisfied by the absence of
+  skill from the available commands list (verified visually). No change
+  to cobra default behavior needed.
+- Both bundles needed regeneration after mounting because each binary's
+  own skill subtree is now part of its own cobra surface — references/
+  skill.md describes the very command being installed.
+
+Next Task: task-010
+
+================================================================================
+TASK-010: Add Makefile generate targets and CI workflow guard
+Date: 2026-05-04T18:00:00Z
+================================================================================
+
+Summary:
+Added `generate` and `generate-check` Makefile targets and wired
+`make generate-check` into the existing test.yml PR workflow as a new
+step between Build and Lint. `generate-check` runs `go generate ./...`
+then `git diff --exit-code`; on drift it prints a pointer to run
+`make generate` and exits non-zero. Confirmed clean-tree pass and
+stale-bundle fail by simulating a cobra-tree change in app.go's Short
+description without regenerating, then running generate-check (exit 2,
+diff shown, error message present).
+
+Files Changed:
+- Makefile (added generate + generate-check targets, updated .PHONY)
+- .github/workflows/test.yml (added Generate-check step in matrix)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- generate-check depends on generate (Makefile target ordering) — single
+  invocation runs both, no duplicate `go generate` call.
+- Used `git diff --exit-code` (not `--quiet`) so the failing CI log
+  shows exactly which generated files are stale; supplemented with a
+  human-readable trailing error message pointing to `make generate`.
+- New CI step has no `if:` guard — runs on all three matrix OSes
+  (ubuntu/windows/macos). Bourne-shell `if` and `git diff --exit-code`
+  both work under the GitHub Actions Windows runner (git-bash default).
+- Did NOT introduce a separate `generate-check` job — existing test job
+  already checks out, sets up Go, and runs build; running generate-check
+  there reuses the env and avoids cache duplication.
+- Drift verified by mutating Short string in app.go (real code change),
+  not by manually editing a bundle file — bundle edits are erased by
+  go generate, so they don't simulate the actual scenario the gate
+  guards against.
+
+Next Task: task-011
+
+================================================================================
+TASK-011: Frontmatter, line-count, and coverage gate tests
+Date: 2026-05-04T18:30:00Z
+================================================================================
+
+Summary:
+Added common/skill/bundles_test.go that walks the repo from runtime.Caller(0),
+discovers every <bin>/internal/skill/bundle/SKILL.md, and asserts the four
+Anthropic skill rules per the PRD: name ≤64 chars + [a-z0-9-]+ charset,
+description non-empty + ≤1024 chars, on-disk version line equals literal
+{{VERSION}} (substitution at install time, not generation), and SKILL.md body
+≤500 lines. Each bundle runs as a sub-test (t.Run(rel,...)) so failure messages
+identify the offending bundle path and rule. Walk-based discovery means new
+binaries get covered without test edits. Verified the failure path by injecting
+a stale `version: 1.0.0` into one bundle — failure output named the file and
+the rule clearly.
+
+Files Changed:
+- common/skill/bundles_test.go (created — package skill_test, license header)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Filed in common/skill/ as a black-box `package skill_test` — the test only
+  reads file contents, no need to share unexported helpers with the package.
+- Walk prunes .git/node_modules/bin/.changes for speed; the suffix match is
+  done after filepath.ToSlash so Windows runs match the same way.
+- Wrote a tiny inline frontmatter parser (single-line `key: value` between
+  --- fences) instead of pulling in a YAML lib. Matches the generator's
+  output shape exactly and keeps the test stdlib-only.
+- Line-count rule includes a trailing line without terminator (rare but
+  possible) so the assertion is strict-ceiling correct.
+- The `name` regex is the literal Anthropic rule `^[a-z0-9-]+$` (no leading
+  hyphen restriction beyond charset). PRD wording leaves length=0 implicit;
+  added an explicit NotEmpty assert to catch a degenerate generator bug.
+- Did NOT add a `name` length floor or a description charset — PRD only
+  specifies the listed constraints. Over-asserting would make future
+  binary additions noisy without buying real safety.
+
+Next Task: task-012
+
+================================================================================
+TASK-012: Update README.md with Agent skills section
+Date: 2026-05-04T19:00:00Z
+================================================================================
+
+Summary:
+Added an "Agent skills" section to README.md immediately after the existing
+Usage section (before "Feedback / Issues"). Section explains what `skill
+install` does, lists all 10 supported agents (Claude Code, Cursor, Windsurf,
+Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie) as a bulleted list
+matching the AGENTS slice in common/skill/agents.go, and provides one bash
+code block per subcommand (install, list, check, remove) using the
+existing `./neo4j-cli ...` style. install/remove blocks include both the
+no-arg and `[agent]` forms. Closing line notes the same `skill` subcommand
+is on `aura-cli` for the standalone surface.
+
+Files Changed:
+- README.md (added Agent skills section)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Display names (e.g. "Claude Code") used in the bulleted list rather than
+  the canonical lowercase ids — README is reader-facing; canonical names
+  are only relevant when typing the [agent] argument, which the code
+  examples cover.
+- Single example per subcommand for install/remove uses the no-arg form
+  first (most common path) then a `claude-code` example showing how to
+  target one agent.
+- Did NOT add a `--output json` example — README is install/quickstart;
+  output formats are agent-/automation-flow concerns better left to
+  docs/usageGuide and `--help`.
+
+Next Task: task-013
+
+================================================================================
+TASK-013: Update docs/usageGuide with skill subcommand sections
+Date: 2026-05-04T19:30:00Z
+================================================================================
+
+Summary:
+Added a "Skill" section to both usage guides. In docs/usageGuide/Neo4j CLI.md,
+the section is `## Skill` (h2) appended after "### Aura subcommand", matching
+the existing prose-plus-`text`-code-block style. In docs/usageGuide/A Guide
+To The New Aura CLI.md, the section is `# Skill` (h1) inserted before
+"# Migrating to the new Aura CLI" — matches the file's h1-per-top-level-area
+convention. Each guide's examples reference its own binary (neo4j-cli vs
+aura-cli); both guides note the cross-binary equivalence and the per-binary
+bundle scope.
+
+Files Changed:
+- docs/usageGuide/Neo4j CLI.md (added ## Skill section + 4 subsections)
+- docs/usageGuide/A Guide To The New Aura CLI.md (added # Skill section + 4 subsections)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Heading levels picked per file: neo4j-cli guide uses h2/h3 throughout
+  (single h1 title), so Skill = h2 with h3 leaves; aura guide alternates
+  h1 per top-level area (e.g. "# Configuration of Aura CLI"), so Skill = h1
+  with h2 leaves. Mismatching either would break the file's existing TOC
+  shape.
+- `--output json` example included only on `list` (the most common
+  scripting target) — keeps the section terse and matches existing guide
+  style which doesn't show every flag combination.
+- One-paragraph cross-binary note in each guide so a reader of one guide
+  knows the other binary also has it; avoids forcing readers to chase
+  links to discover the parallel surface.
+
+Next Task: task-014
+
+================================================================================
+TASK-014: Update CONTRIBUTING.md and CLAUDE.md for generator workflow
+Date: 2026-05-04T19:50:00Z
+================================================================================
+
+Summary:
+Added a "Generated content" subsection to CONTRIBUTING.md under Development
+covering `make generate`, `make generate-check`, the `additions.md` /
+`description.txt` edit workflow, and a 4-step "Adding a new standalone CLI"
+procedure. Updated AGENTS.md (CLAUDE.md is a symlink to it) Architecture
+section: refreshed the layout block to reflect `app/app.go`, per-binary
+`internal/skill/`, and `common/skill/`, plus a paragraph naming the shared
+skill subsystem and pointing readers at the CONTRIBUTING.md workflow for
+adding a new CLI. Docs-only change; make test still green.
+
+Files Changed:
+- CONTRIBUTING.md (added "Generated content" subsection + 4-step add-new-CLI)
+- AGENTS.md (refreshed Architecture layout block + skill subsystem paragraph)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- CLAUDE.md is a symlink to AGENTS.md in this repo (verified) — editing
+  AGENTS.md updates both surfaces. No need for parallel writes.
+- Placed the add-new-CLI procedure in CONTRIBUTING.md (not AGENTS.md) — PRD
+  acceptance criterion was "in one of the two docs", and CONTRIBUTING.md is
+  the natural home for contributor workflows. AGENTS.md only links to it.
+- 4-step procedure mirrors PRD REQ-F-012 verbatim (a/b/c renumbered + run
+  step added) so future contributors don't drift from the design intent.
+- Layout block in AGENTS.md now shows app/, internal/skill/, common/skill/
+  alongside the existing nodes — keeps the architecture discoverable at a
+  glance without expanding the Repo Layout Notes section that already covers
+  each path in detail.
+
+Next Task: task-015
+
+================================================================================
+TASK-015: Add dual-project changelog entries
+Date: 2026-05-04T11:05:00Z
+================================================================================
+
+Summary:
+Hand-authored two changelog YAML files under .changes/unreleased/ — one
+tagged `project: aura-cli`, one `project: neo4j-cli` — both kind Minor with
+a body announcing the new `skill` subcommand. changie binary not installed
+locally, so authored directly from the existing aura-cli-Minor-20260502
+template format. Verified make test still passes.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Minor-20260504-090200.yaml (created)
+- .changes/unreleased/neo4j-cli-Minor-20260504-090200.yaml (created)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Hand-authored YAML matching existing files verbatim (single-quoted body
+  with backtick-quoted code identifiers) instead of installing changie just
+  for one entry. Format is stable per repo's existing changelog history.
+- Both files share the same UTC-derived timestamp suffix and time field —
+  changie's natural behaviour for dual-project entries created in one call.
+- Body uses the exact wording from the PRD's REQ-NF-003 / task-015 brief.
+
+Next Task: task-016
+
+================================================================================
+TASK-016: Fix bundle root mismatch + add end-to-end install regression test
+Date: 2026-05-04T20:30:00Z
+================================================================================
+
+Summary:
+Fixed real-world bug where `./bin/neo4j-cli skill install claude-code` wrote
+to `~/.claude/skills/neo4j-cli/bundle/SKILL.md` (extra `bundle/` segment) and
+never substituted `{{VERSION}}`. Root cause: `//go:embed bundle` exposes an
+fs.FS rooted ABOVE the bundle/ directory, so WalkDir(".") yielded
+`bundle/SKILL.md`, not `SKILL.md`. The installer's `p == "SKILL.md"`
+substitution check + destination path both assume flat layout. Existing
+unit tests used `fstest.MapFS{"SKILL.md": ...}` (already flat) so the bug
+never surfaced.
+
+Fix: both `<bin>/internal/skill/embed.go` files now expose a sub-rooted
+`Bundle fs.FS` via `fs.Sub(rawBundle, "bundle")`. Public API change is
+type widening (embed.FS → fs.FS); embed.FS already satisfies fs.FS so all
+callers compile unchanged. Added e2e regression tests in each per-binary
+skill package (`install_e2e_test.go`) that exercise the real exported
+Bundle through `commonskill.Install` against `afero.NewMemMapFs`, plus a
+contract test (`TestBundleWalkAtRoot`) that asserts `fs.WalkDir(Bundle,
+".")` yields `SKILL.md` at the root. Verified the new tests FAIL when
+the embed.go fix is reverted (with the exact error wording from the
+original bug report) and PASS with the fix applied. Real-world repro
+confirmed: install/list/remove now work correctly against `~/.claude`.
+
+Files Changed:
+- neo4j-cli/internal/skill/embed.go (Bundle: embed.FS → fs.FS rooted at bundle/)
+- neo4j-cli/aura/internal/skill/embed.go (same fix)
+- neo4j-cli/internal/skill/install_e2e_test.go (new — package skill_test)
+- neo4j-cli/aura/internal/skill/install_e2e_test.go (new — package skill_test)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- Used `fs.Sub` at package init (with mustSub-panic on error) rather than
+  doing the Sub at every install call — cleaner public API and the only
+  failure mode is a programmer error caught at process start.
+- Kept the raw `//go:embed bundle` directive, just renamed the var to
+  `rawBundle` (unexported). External callers depending on `embed.FS`-
+  specific methods would have broken; verified none exist.
+- e2e tests live in the per-binary packages (NOT common/skill) so they
+  exercise the real embed.FS, not a fixture. Common/skill's existing
+  fstest.MapFS tests stay — they cover the installer logic in isolation.
+- TestBundleWalkAtRoot duplicated in both per-binary packages rather
+  than centralised — each binary's Bundle is a separate variable, so a
+  single shared test would need parametrisation; per-binary keeps it
+  obvious.
+- Verified by stashing the embed.go fix and running the new tests:
+  TestBundleWalkAtRoot fails with "got [bundle/SKILL.md ...] does not
+  contain SKILL.md", TestInstallE2E fails on the SKILL.md exists check.
+  This proves the regression test catches the original bug.
+- afero.Walk takes a `filepath.WalkFunc` (os.FileInfo) — initial draft
+  used an inline interface that wouldn't compile.
+
+Next Task: none — feature complete (real-world bug fixed)
+
+================================================================================
+TASK-017: Fix Windows CI failures (path separators + CRLF golden files)
+Date: 2026-05-04T21:15:00Z
+================================================================================
+
+Summary:
+Two Windows-only CI failures from PR #12 (run 25311172924). Root causes
+diagnosed and fixed:
+
+1. expandPath produced mixed separators (`C:\…\.config/opencode`) on Windows
+   for OpenCode's `$XDG_CONFIG_HOME/...` catalog entry — `xdg` resolves to
+   backslashes, but the catalog's portable forward slashes survived the
+   ReplaceAll. Fix: wrap the substitution result in `filepath.FromSlash` so
+   the whole path is OS-native. Catalog stays portable (forward slashes).
+
+2. Golden `.md` files in `testdata/` and committed
+   `<bin>/internal/skill/bundle/**` were checked out as CRLF on Windows
+   (default `core.autocrlf=true` on windows-latest runners), but the
+   renderer always emits LF. Byte-equal compare and `git diff --exit-code`
+   failed. Fix: top-level `.gitattributes` pinning LF for the four byte-
+   compared path patterns (testdata, bundle/, additions.md, description.txt
+   under any internal/skill/). `git add --renormalize .` produced no
+   surprise changes (files were already LF on this macOS checkout).
+
+Regression guards:
+- New `TestExpandPathOpenCodeMixedSlashIsOSNative` + table-driven case
+  "OpenCode-style mixed-slash input is normalised to OS-native". Vacuous on
+  Unix (os.PathSeparator='/' makes the NotContains assertion trivially
+  true), Windows-effective.
+- Existing TestExpandPath cases that hard-coded forward-slash expected
+  values pivoted to `filepath.FromSlash` / `filepath.Join` so they're
+  portable now.
+- TestDetectAgents and TestDetectAgentsIgnoresFile updated to write marker
+  paths via `filepath.Join` / `filepath.FromSlash` — needed because the
+  expandPath fix means MemMapFs lookups now hit OS-native keys on Windows.
+- New `TestCommittedBundlesAndTestdataAreLF` walks all 19 guarded files
+  and asserts no `\r\n` content. Catches the case where `.gitattributes`
+  is removed or weakened.
+
+Files Changed:
+- common/skill/agents.go (filepath.FromSlash on XDG substitution)
+- common/skill/agents_test.go (new dedicated test, table case, OS-portable
+  assertions in DetectAgents tests)
+- common/skill/bundles_test.go (CRLF guard test + findLFGuardedFiles
+  helper)
+- .gitattributes (new — LF pin for testdata/bundle/additions/description)
+- AGENTS.md (added Windows CRLF + path-separator gotcha note)
+- .plans/tasks-skill-install-command.yml (status=completed)
+
+Key Decisions:
+- Cannot make path-separator regression test fail on Linux — the bug is
+  inherently Windows-only because `\` isn't a Unix separator. The test is
+  Windows-effective via the `os.PathSeparator != '/'` gate; on Linux the
+  table case still locks the contract that mixed-slash → OS-native.
+- `.gitattributes` patterns are narrow (4 patterns), don't touch `.go` /
+  `.yml` / docs. Verified via `git add --renormalize .` showing zero
+  unexpected changes.
+- Did NOT relax the macOS / Linux assertion — those continue to expect
+  forward-slash output (which is OS-native there). Same source code
+  produces correct output on every OS.
+- Coverage gate: did not measure (no Go-level changes that would lower
+  coverage; both new tests are pure additions).
+
+Next Task: none — all task-017 acceptance criteria satisfied. Awaiting CI
+re-run on PR #12 to confirm Windows green.
+
+================================================================================
+TASK-018: Restructure common/skill cobra files to match one-file-per-leaf convention
+Date: 2026-05-04T22:00:00Z
+================================================================================
+
+Summary:
+Pure file-reorg refactor. Split the 311-line common/skill/command.go (all four
+leaves inline + helpers) into the dominant in-repo pattern: parent file
+`skill.go` with only NewCmd + persistent-flag wiring, one file per leaf
+(install.go / remove.go / list.go / check.go), shared cross-leaf helpers in
+helpers.go, leaf-specific helpers colocated. Did the same split on
+command_test.go: tests moved to install_test.go / remove_test.go /
+list_test.go / check_test.go alongside their leaves; the lone TestInvalidOutputFlag
+stays in skill_test.go (parent persistent-flag concern); shared fixture
+helpers extracted to cmd_helpers_test.go. No behaviour change, no API change.
+
+Files Changed:
+- common/skill/skill.go (created — parent factory only, 59 lines)
+- common/skill/install.go (created — newInstallCmd + installResultRow + renderInstallResult)
+- common/skill/remove.go (created — newRemoveCmd; reuses install's render helper)
+- common/skill/list.go (created — newListCmd + listResultRow + renderListResult + boolStr)
+- common/skill/check.go (created — newCheckCmd + checkResultRow + renderCheckResult)
+- common/skill/helpers.go (created — formatAgentErr, agentNames, printJSON; shared by ≥2 leaves)
+- common/skill/skill_test.go (created — TestInvalidOutputFlag)
+- common/skill/install_test.go (created — 5 tests moved verbatim)
+- common/skill/remove_test.go (created — 4 tests moved verbatim)
+- common/skill/list_test.go (created — 2 tests moved verbatim)
+- common/skill/check_test.go (created — 4 tests moved verbatim)
+- common/skill/cmd_helpers_test.go (created — fixture, fixtureBundle, newFixture, exec, resetBuffers)
+- common/skill/command.go (deleted)
+- common/skill/command_test.go (deleted)
+- AGENTS.md (added per-leaf cobra file convention note)
+- .plans/tasks-skill-install-command.yml (status update)
+
+Key Decisions:
+- skill.go strictly limited to NewCmd + persistent-flag wiring (59 lines, well
+  under the ≤80 line acceptance criterion). Helpers carved out into helpers.go
+  to honour "ONLY the parent factory" wording — task brief allowed either
+  skill.go or co-location with the heaviest consumer; a separate helpers.go
+  is a third reasonable option for ≥2-leaf shared helpers (formatAgentErr +
+  agentNames used by install/remove; printJSON used by all four leaves).
+- boolStr moved to list.go since list is its only consumer.
+- TestInvalidOutputFlag landed in skill_test.go (parent NewCmd
+  persistent-flag concern), not in any leaf file. cmd_helpers_test.go holds
+  the shared fixture + bundle scaffolding.
+- Test count preserved: 16 functions across the 5 new test files vs 16 in
+  the original command_test.go. No tests deleted.
+- Coverage of common/skill: 90.1% (was 90.1% pre-refactor; matches —
+  refactor is identity-preserving).
+- Verified --help output unchanged on bin/neo4j-cli skill / install / remove /
+  list / check by exec'ing each post-build.
+- Public API surface verified via `go doc ./common/skill`: unchanged.
+  NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command
+  signature identical.
+- License headers present on all 11 new files.
+- make fmt-check, make build, make test all green. golangci-lint /
+  addlicense not installed locally; both run in CI on the existing matrix.
+
+Next Task: none — task-018 closes the file-reorg follow-up from the post-PR-#12 audit.

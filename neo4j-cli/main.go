@@ -12,11 +12,10 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
+	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
-
-var Version = "dev"
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
@@ -44,9 +43,9 @@ func main() {
 		}
 	}()
 
-	cfg := clicfg.NewConfig(afero.NewOsFs(), Version, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewOsFs(), app.Version, clicfg.GlobalScope)
 
-	cmd := NewCmd(cfg)
+	cmd := app.NewCmd(cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
@@ -62,7 +61,7 @@ func main() {
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
 	if err := cmd.Execute(); err != nil {
 		fmt.Printf("[neo4j-cli] invalid command with args %s: %v\n", os.Args[1:], err) // TODO: remove this log in favour of real metrics in case of invalid command
-	} else {
-		fmt.Printf("[neo4j-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
+		os.Exit(1)
 	}
+	fmt.Printf("[neo4j-cli] command executed successfully with args %s\n", os.Args[1:]) // TODO: remove this log in favour of real metrics on successful command execution
 }

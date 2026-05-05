@@ -1,0 +1,34 @@
+{
+  "name": "@neo4j-labs/cli",
+  "version": "__VERSION__",
+  "description": "Neo4j command-line tool (super-CLI). Installs the right prebuilt binary for your platform.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/neo4j/cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neo4j/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neo4j/cli/issues"
+  },
+  "bin": {
+    "neo4j-cli": "bin/neo4j-cli.js"
+  },
+  "files": [
+    "bin/neo4j-cli.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@neo4j-labs/cli-darwin-arm64": "__VERSION__",
+    "@neo4j-labs/cli-darwin-x64": "__VERSION__",
+    "@neo4j-labs/cli-linux-arm64": "__VERSION__",
+    "@neo4j-labs/cli-linux-ia32": "__VERSION__",
+    "@neo4j-labs/cli-linux-x64": "__VERSION__",
+    "@neo4j-labs/cli-win32-arm64": "__VERSION__",
+    "@neo4j-labs/cli-win32-ia32": "__VERSION__",
+    "@neo4j-labs/cli-win32-x64": "__VERSION__"
+  }
+}

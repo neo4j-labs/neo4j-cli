@@ -9,10 +9,23 @@ Learnings and patterns for future agents working on this project.
 TEST COMMANDS: [`make test`]
 BUILD COMMANDS: [`make build`, `make run-aura`, `make run-neo4j`]
 LINT COMMANDS: [`make lint`]
-FORMAT COMMANDS: [`make fmt`]
+FORMAT COMMANDS: [`make fmt-check`] — runs `gofmt -l .` and fails on any output. `make fmt` rewrites silently and is NOT a gate; use `make fmt-check` to verify. CI's golangci-lint v2 includes `gofmt` as a formatter and will fail the build on unformatted code.
 LICENSE CHECK: [`make license-check`]
 
-**Always run `make test` as the final gate before marking any task or plan complete.** All tests must pass — a build that compiles but has failing tests is not done.
+**Always run `make test` AND `make fmt-check` as final gates before marking any task or plan complete.** All tests must pass and no file may need gofmt — a build that compiles but has failing tests or unformatted code is not done. `make fmt-check` is the local equivalent of CI's gofmt linter, so drift fails before the push instead of after.
+
+## Cobra Command Layout
+
+The repo follows a strict one-file-per-leaf cobra layout. Every command tree under `neo4j-cli/aura/internal/subcommands/<resource>/` and `common/skill/` follows it. Mirror it for any new command tree:
+
+- **Parent file `<resource>.go`** — defines `NewCmd(cfg, ...) *cobra.Command`, registers persistent flags, calls `cmd.AddCommand(newXxxCmd(cfg, ...))` for each leaf. Keep it small (≤80 lines).
+- **One file per leaf action `<action>.go`** — defines a private constructor like `newInstallCmd(cfg, ...) *cobra.Command` containing the leaf's flags + `RunE`. No leaf bodies inlined into the parent.
+- **Colocated tests `<action>_test.go`** — tests for each leaf live next to its source.
+- **Shared test helpers** in `<resource>_helpers_test.go` (or similar) when needed.
+
+Examples: `neo4j-cli/aura/internal/subcommands/instance/{instance.go, list.go, list_test.go, get.go, delete.go, ...}` and `common/skill/{skill.go, install.go, remove.go, list.go, check.go, helpers.go}`.
+
+Don't inline multiple leaves in the parent. Don't name the parent `command.go` — name it after the resource so `grep <resource>.go` finds it. Adding a new leaf = new `<action>.go` + `<action>_test.go`, plus one `cmd.AddCommand(...)` line in the parent.
 
 ## Project Overview
 
@@ -29,6 +42,7 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 - Local build: `make build` (produces `bin/aura-cli` and `bin/neo4j-cli`)
 - Local run (no build): `make run-aura` / `make run-neo4j`
 - Release build (current platform, ldflags baked in): `make snapshot` (uses goreleaser, outputs to `bin/`)
+- npm publish dry-run (template + ordering check): `make npm-publish-dry`. Works against empty `dist/` because `publish.sh --dry-run` stubs missing platform binaries with a 1-byte placeholder; run `make snapshot` first if you want real binaries packed. Real-binary path (CI) still hard-errors on missing binaries — the stub is dry-run-only.
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
 - PRs require a changelog entry via `make changelog` **only for user-facing changes** (new features, bug fixes, behaviour changes visible to CLI users). Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries. Because `neo4j-cli` bundles all child CLIs, user-facing changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
 
@@ -57,7 +71,9 @@ Two binaries are produced:
 
 ```
 neo4j-cli/
-  main.go                  # neo4j-cli entrypoint; mounts aura subcommand as "aura"
+  app/app.go               # neo4j-cli cobra tree builder (NewCmd, Version) — importable
+  main.go                  # thin entrypoint; mounts aura subcommand as "aura"
+  internal/skill/          # per-binary skill template (bundle, description.txt, additions.md, gen/)
   aura/
     cmd/main.go            # aura-cli standalone entrypoint
     aura.go                # Root command, registers subcommands
@@ -65,6 +81,7 @@ neo4j-cli/
       api/                 # HTTP client for Neo4j Aura REST API
       flags/               # Custom reusable flag types
       output/              # JSON + table rendering
+      skill/               # per-binary skill template (mirrors neo4j-cli/internal/skill)
       subcommands/         # One directory per resource, one file per action
         instance/, tenant/, credential/, config/,
         deployment/, dataapi/graphql/, graphanalytics/,
@@ -72,7 +89,10 @@ neo4j-cli/
 common/
   clicfg/                  # Config, credentials, project state (OS-specific paths)
   clierr/                  # Shared error types
+  skill/                   # Shared agent-skill logic (catalog, render, installer, cobra wrapper)
 ```
+
+Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). Each binary has its own `<bin>/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`). Adding a new standalone CLI = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
 
 Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
@@ -98,6 +118,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 - `license-check` target uses `$(GOPATH)/bin/addlicense` (not bare `addlicense`) — GOPATH/bin may not be on PATH
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
+- `make generate` runs `go generate ./...`; `make generate-check` runs generate then `git diff --exit-code` (CI gate). Wired in `.github/workflows/test.yml` between Build and Lint, runs on full OS matrix.
+- Drift sim: editing a bundle file directly to test generate-check is futile — `go generate` overwrites it. Mutate a real cobra-tree input (e.g. a Short string in `app.go`) to simulate stale-bundle detection.
 
 ## Changie Multi-Project Notes
 
@@ -109,6 +131,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
 - `changie new --projects <a> --projects <b>` creates entries for multiple projects in one call; the interactive prompt (`make changelog`) also supports multi-select
 - This repo uses kind labels `Major`, `Minor`, `Patch` (not `added`/`feat`) — check `.changie.yaml` `kinds:` before using `--kind`
+- If changie isn't installed locally, hand-author YAML files under `.changes/unreleased/` named `<project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project / kind / body / time` (single-quoted body, RFC3339 time). Write one file per project for dual-project entries.
 
 ## Changie Workflow Notes
 
@@ -124,6 +147,13 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `AURA_CLI_VERSION` env var set in an earlier step must be re-referenced as `${{ env.AURA_CLI_VERSION }}` in the GoReleaser action's `env:` block — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
 - The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
 - Avoid heredoc indentation issues in `run: |` blocks: use `{ printf ...; } > file` instead of `cat > file << EOF ... EOF` when shell lines are indented under YAML
+- Job-level `outputs:` block surfaces step outputs to downstream `workflow_run` consumers. To expose a step output, the step needs an `id:` and must `echo "key=val" >> $GITHUB_OUTPUT` — then reference as `${{ steps.<id>.outputs.<key> }}` in the job `outputs:` block. Output is always populated (downstream gates on the value, not whether it was set).
+- All actions in `.github/workflows/` are SHA-pinned with a `# v<major>` trailing comment (e.g. `actions/upload-artifact@ea165f8d... # v4`) — match this convention for any new action; Renovate handles bumps.
+- `release.yml`'s `include_neo4j` / `include_aura` are computed by diffing `git diff HEAD~1 --name-only` against changelog filenames — split into its own step (id: `changed`) so the job's `outputs:` block can wire it cleanly to downstream `workflow_run` workflows like `publish-npm.yml`.
+- `workflow_run.workflows: ["<name>"]` matches by the upstream workflow's `name:` field, NOT the filename. `release.yml` declares `name: release` (lowercase) so the watcher uses `["release"]`. Mismatching never errors — it just silently never triggers.
+- Cross-workflow artifact download with `actions/download-artifact@v4` requires both `github-token: ${{ secrets.GITHUB_TOKEN }}` AND `run-id: ${{ github.event.workflow_run.id }}`. Without `run-id` it looks at the current run only and 404s.
+- `workflow_run` events do NOT have `inputs.*` populated; `workflow_dispatch` events do not have `github.event.workflow_run.*`. To pick a value cleanly across both triggers use the ternary pattern `${{ github.event_name == 'workflow_dispatch' && inputs.x || steps.<auto>.outputs.x }}` — short-circuit makes the unset side empty and `||` falls back.
+- A `workflow_run`-triggered workflow's job-level `if:` cannot read artifact contents (artifacts haven't been downloaded yet). Gate the JOB on `github.event.workflow_run.conclusion == 'success'`, then download the meta artifact, parse with `jq`, and apply per-step `if:` gates on the parsed value.
 
 ## GoReleaser Notes
 
@@ -131,6 +161,36 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - GoReleaser v2 deprecates `format_overrides.format` — use `format_overrides.formats`
 - Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors when there are multiple archive blocks
 - Use `{{ .Binary }}` in `name_template` (not `{{ .ProjectName }}`) when building multiple binaries so archives are named per binary
+- `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. If you move Version from `package main` to e.g. `neo4j-cli/app`, update the ldflag to `-X "github.com/neo4j/cli/neo4j-cli/app.Version=..."` — a stale path silently no-ops and ships `dev`.
+
+## Repo Doc Notes
+
+- `CLAUDE.md` is a symlink to `AGENTS.md` (`ls -la` confirms). Edit `AGENTS.md` once — both surfaces update. Don't write to `CLAUDE.md` directly.
+- Contributor-facing workflows (e.g. `make generate` / add-new-CLI procedure) live in `CONTRIBUTING.md` "Development" subsections. AGENTS.md Architecture orients readers and links to CONTRIBUTING.md for the procedure rather than duplicating it.
+
+## Repo Layout Notes
+
+See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill subsystem layout, embed roots, mount points, and bundle regen.
+
+## Hermetic Test Notes
+
+- For path-expansion tests using `~` / `$XDG_CONFIG_HOME`, use `t.Setenv("HOME", "...")` and `t.Setenv("XDG_CONFIG_HOME", "")` — Go's `os.Getenv` returns "" for both unset and set-to-empty, and `t.Setenv` auto-restores after the test.
+- Use `afero.DirExists` (not `Exists`) for "is the agent installed?" checks — files at the marker path shouldn't count as detected.
+- `go-pretty/v6/table` upper-cases header text by default — assertions on table output should compare against `strings.ToLower(...)` for header columns, exact case for body cells.
+- Lightweight cobra command tests can wire `clicfg.NewConfig(testfs.GetTestFs(...), version)` directly without the heavier `testutils.NewAuraTestHelper` — the latter pulls in API mocking and credential setup that `skill` doesn't need.
+- For repo-wide gate tests that must auto-discover content (e.g. `common/skill/bundles_test.go` walking every `<bin>/internal/skill/bundle/SKILL.md`), resolve repo root via `runtime.Caller(0)` then `filepath.Walk` from there. Suffix-match paths after `filepath.ToSlash` so Windows runs match. Prune `.git`, `node_modules`, `bin`, `.changes` to keep the walk fast.
+- `os.OpenFile(..., 0o644)` mode bits are masked by umask on create — if downstream readers (e.g. a docker container running as a different uid) need a specific perm, follow up with `os.Chmod` rather than relying on the OpenFile mode. Same applies to `t.TempDir()` which creates with 0700; a read-only bind mount into a container needs `os.Chmod(dir, 0o755)` for the in-container user to traverse.
+- Package-level test seams (e.g. `stdinIsTTY` at `neo4j-cli/query/run.go`, `stdoutIsTerminal` at `neo4j-cli/query/output.go`) are `var <name> = func(...) ...` declarations that production fills with the real impl. For TTY-related seams in the `query` package, `TestMain` in `testseam_test.go` seeds the seam to the most-common-existing-assertion value (e.g. TTY=true) so legacy tests stay green without per-test edits; tests that need the other branch use a small `withX(t, val)` helper that swaps the seam and registers `t.Cleanup` to restore it.
+
+## Windows CI Gotchas
+
+- Path-separator bugs in `expandPath`-style helpers are Windows-only. Catalog entries keep forward slashes (portable convention); helpers MUST wrap any post-substitution path through `filepath.FromSlash` (or build via `filepath.Join`) so the whole path is OS-native. A `ReplaceAll(path, "$XDG_CONFIG_HOME", xdg)` where `xdg` came from `os.Getenv` produces mixed separators on Windows (`C:\…\.config/opencode`) — fix at the helper, not the catalog.
+- Test expected values that hard-code separators bake in OS assumptions. Build expected values with `filepath.Join` / `filepath.FromSlash` rather than literals when asserting cross-OS path output. MemMapFs marker paths in detection tests must also be built OS-natively so they match what the (post-fix) helper looks up.
+- Committed `.md` / golden / bundle files MUST be pinned to LF via `.gitattributes` — Windows runners have `core.autocrlf=true` by default and will rewrite to CRLF on checkout. The renderer (`common/skill/render`) and `make generate-check` both assume LF; a CRLF checkout breaks byte-equal golden tests AND `git diff --exit-code`. The repo-root `.gitattributes` covers `common/skill/render/testdata/**`, `**/internal/skill/bundle/**`, `**/internal/skill/additions.md`, `**/internal/skill/description.txt`. `common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` is the assertion that catches a weakened/removed attribute.
+
+## npm Distribution Notes
+
+See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 ## golangci-lint Notes
 
@@ -174,6 +234,15 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `PrintBodyMap` routes both `"table"` and `"default"` to table rendering — config commands in default mode now render as tables, matching all other commands. Tests must assert for `"KEY"` / `"VALUE"` column headers for default-mode output cases
 - `cobra.NoArgs` on a leaf command with no subcommands produces a "unknown command" error (not "accepts 0 arg(s)") when a positional arg is passed — Cobra treats the arg as an unknown subcommand. The error format is `Error: unknown command "<arg>" for "<full-cmd-path>"`.
 - `PrintableAuraCredentials.AsArray()` in `common/clicfg/credentials/aura.go` is the single source of truth for credential output shape; changing field names there requires updating all callers (`neo4j-cli/aura/credential.go`, `neo4j-cli/aura/internal/subcommands/credential/list.go`) to use the new keys in their `fields []string` slice.
+## Cobra Flag Access Notes
+
+- `cmd.Flags().GetString("foo")` only sees LOCAL flags until `mergePersistentFlags()` runs (during `Execute` or `ParseFlags`). Calling it from a unit test that drives a function directly (without Execute) will fail with `flag accessed but not defined`. Use `cmd.Flag("foo").Value.String()` instead — `Flag()` falls through to persistent flags + parents' persistent flags via `persistentFlag()`/`updateParentsPflags()`. Same applies to GetBool — for bool defaults that overlap with "unset" (e.g. `--insecure` defaults false), gate on `cmd.Flag("name").Changed` to disambiguate.
+- For first-non-empty-wins precedence pass values to a helper that picks the FIRST non-empty. For lowest→highest precedence (`.env` < env < flag) use a `last-non-empty-wins` helper instead — easy to swap accidentally; query/connect.go calls this `overlay()`.
+
+## Local Verification Scripts
+
+- `TestHTTPS_Smoke` (`neo4j-cli/query/query_https_smoke_test.go`) — real-Neo4j HTTPS smoke for `query --insecure` (asserts positive + negative TLS paths). Pure Go: stdlib cert gen, boots `neo4j:latest` via `os/exec`, binds two random free TCP ports on 127.0.0.1. Gated by `NEO4J_HTTPS_TEST=1`; run via `NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`. Requires `docker`. Skipped by default in `go test ./...`.
+- Neo4j docker HTTPS env-vars use single-underscore for `.` and double for `_`: `NEO4J_server_https_enabled`, `NEO4J_dbms_ssl_policy_https_{enabled,base__directory,private__key,public__certificate,client__auth}`. Bind-mount cert dir at `<base_directory>` (e.g. `/ssl`) containing `private.key` + `public.crt` plus empty `trusted/` and `revoked/` subdirs (Neo4j requires both even when `client__auth=NONE`). Cert files must be world-readable (0644) — container user is uid 7474.
 
 ---
 
