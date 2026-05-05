@@ -39,3 +39,33 @@ Key Decisions:
   cleanly under `make test`.
 
 Next Task: task-002 (delete scripts/test-https.sh)
+
+================================================================================
+TASK-002: Delete scripts/test-https.sh
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Removed scripts/test-https.sh (171 lines of bash) now that
+neo4j-cli/query/query_https_smoke_test.go owns the full smoke flow in
+pure Go. The scripts/ directory was the script's only file, so the
+directory is gone too (git doesn't track empty dirs). Verified no
+references remain outside .plans/archive/, AGENTS.md (task-004), and
+.github/workflows/test.yml (task-003). make test passes; make fmt-check
+is clean.
+
+Files Changed:
+- scripts/test-https.sh (deleted)
+- .plans/tasks-pure-go-https-smoke-test.yml (task-002 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Used `git rm` rather than plain `rm` so the deletion is staged in one
+  step.
+- Left AGENTS.md and .github/workflows/test.yml references for their
+  dedicated downstream tasks (004 and 003 respectively) instead of
+  scope-creeping this task.
+- .plans/{prd,tasks,progress}-* references retained as planning artifacts
+  (bookkeeping; not user-facing).
+
+Next Task: task-003 (update .github/workflows/test.yml HTTPS step)

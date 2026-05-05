@@ -39,14 +39,14 @@ tasks:
       Go test owns the full smoke flow. The scripts/ directory is left
       empty (git does not track empty dirs). Verify nothing else in
       the working tree still references the script.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "scripts/test-https.sh no longer exists in the working tree"
       - "grep -rn 'test-https.sh\\|scripts/test-https' . returns no matches outside .plans/archive/"
       - "make test still passes after deletion"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-003
     title: "Update .github/workflows/test.yml HTTPS step to invoke go test"
