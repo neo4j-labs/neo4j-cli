@@ -53,14 +53,14 @@ jobs:
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project aura-cli --prerelease ${{ steps.prerelease.outputs.aura }}
+          args: batch v2.0.0 --project aura-cli --prerelease ${{ steps.prerelease.outputs.aura }}
 
       - name: Batch neo4j-cli changes
         if: steps.detect.outputs.has_neo4j == 'true'
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch auto --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
+          args: batch v0.1.0 --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
 
       - name: Merge changelogs
         if: steps.detect.outputs.has_aura == 'true' || steps.detect.outputs.has_neo4j == 'true'
