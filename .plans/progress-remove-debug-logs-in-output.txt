@@ -18,3 +18,24 @@ Key Decisions:
   + fmt.Printf in panic/recover + os.Args/Exit/Stdout/Stderr still used.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Remove debug logs from neo4j-cli/aura/cmd/main.go
+Date: 2026-05-05T14:50:00Z
+================================================================================
+
+Summary:
+Mirrored task-001 changes in standalone aura-cli entrypoint. Removed three
+[aura-cli] fmt.Printf debug calls (help displayed, invalid command with args,
+command executed successfully), the SetHelpFunc wrapper, and outdated 2-line
+comment above cmd.Execute(). Retained cobra.EnableTraverseRunHooks,
+flags.RegisterOutputFlag, panic/recover, os.Exit(1).
+
+Files Changed:
+- neo4j-cli/aura/cmd/main.go (modified — removed 10 lines of debug instrumentation)
+
+Key Decisions:
+- All imports (fmt, os, cobra, clicfg, flags, aura, afero) still used by
+  retained code.
+
+Next Task: task-003

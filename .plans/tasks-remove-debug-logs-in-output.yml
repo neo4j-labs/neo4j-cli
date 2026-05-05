@@ -31,7 +31,7 @@ tasks:
       wrapper, and the outdated comment above cmd.Execute(). Retain
       cobra.EnableTraverseRunHooks, panic/recover, flags.RegisterOutputFlag,
       and the os.Exit(1) on failure.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/aura/cmd/main.go no longer contains the strings 'help displayed', 'invalid command with args', or 'command executed successfully'."
@@ -40,7 +40,7 @@ tasks:
       - "`cobra.EnableTraverseRunHooks = true`, `flags.RegisterOutputFlag(cmd, cfg)`, the `panic`/`recover` block, and the `os.Exit(1)` on failure all remain."
       - "Copyright header at top of file is preserved."
       - "`go build ./neo4j-cli/aura/cmd/...` succeeds with no unused-import errors."
-    completed_at: null
+    completed_at: 2026-05-05T14:50:00Z
 
   - id: task-003
     title: "Add Patch changie entries for aura-cli and neo4j-cli"
