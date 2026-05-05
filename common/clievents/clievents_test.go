@@ -148,7 +148,7 @@ func TestEmit_SkillCommand_PropagatesFailure(t *testing.T) {
 
 func TestEmit_UnknownCommand_EmitsCommandUsed(t *testing.T) {
 	svc := newMockService(t)
-	svc.EXPECT().EmitEvent("COMMAND_USED", analytics.TrackEvent{
+	svc.EXPECT().EmitEvent("COMMAND", analytics.TrackEvent{
 		Properties: analytics.CommandEventProperties{
 			Command: "unknown sub",
 			Success: true,
