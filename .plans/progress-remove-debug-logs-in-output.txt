@@ -59,3 +59,26 @@ Key Decisions:
   in filename and `time:` field for traceability.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Verify build, runtime behaviour, and full test/lint/fmt gate
+Date: 2026-05-05T15:10:00Z
+================================================================================
+
+Summary:
+End-to-end verification gate. All 7 acceptance criteria pass: make build
+produces both binaries; neo4j-cli + aura-cli show clean cobra help with no
+debug line; successful commands emit no trailing success line; bogus
+commands exit 1 with cobra's own error; grep for the three debug strings
+across neo4j-cli/ returns zero matches; make test, make fmt-check, and
+make lint all green.
+
+Files Changed:
+- None (pure verification task; only task-yaml status flip)
+
+Key Decisions:
+- golangci-lint was not installed locally; brew install golangci-lint
+  pulled v2.12.1 (AGENTS.md notes v2.11.4 — newer is fine, lint passed
+  with 0 issues).
+
+Next Task: none — feature complete

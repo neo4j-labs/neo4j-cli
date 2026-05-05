@@ -68,7 +68,7 @@ tasks:
       the three debug lines are gone and cobra error/help/exit-code
       behaviour is unchanged, then run the full quality gate
       (`make test`, `make fmt-check`, `make lint`).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -80,4 +80,4 @@ tasks:
       - "Same three runtime checks pass against `./bin/aura-cli`."
       - "`grep -rn 'command executed successfully\\|help displayed\\|invalid command with args' neo4j-cli/` returns zero matches."
       - "`make test` passes; `make fmt-check` passes; `make lint` passes."
-    completed_at: null
+    completed_at: 2026-05-05T15:10:00Z
