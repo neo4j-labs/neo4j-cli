@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Fix: `--format` or `-f` was not working'
-time: 2026-05-05T17:52:35.88593+01:00
