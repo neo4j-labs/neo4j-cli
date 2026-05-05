@@ -1,0 +1,78 @@
+feature: query-tx-metadata-user-agent
+prd: ./prd-query-tx-metadata-user-agent.md
+created_at: 2026-05-05T11:00:00Z
+updated_at: 2026-05-05T11:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add userAgent + txType plumbing to runStatement and update all call sites"
+    description: |
+      Core code change. Add a userAgent field to the conn struct, populate it
+      from cfg.Version in resolveConn (with "neo4j-cli/vdev" fallback for
+      empty Version), extend runStatement's signature with a final txType
+      string parameter, and inside runStatement set the User-Agent header
+      and txMetadata body field. Update the single runStatement call in
+      run.go to pass "user-direct" and all six calls in schema.go to pass
+      "schema". Update every &conn{...} literal in connect_test.go and
+      schema_test.go to populate userAgent, and thread the new txType
+      argument through every existing runStatement call in tests so the
+      package builds and existing assertions stay green. No new test
+      coverage in this task — that lands in task-002.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/query/connect.go: conn struct has a `userAgent string` field; resolveConn sets it to `\"neo4j-cli/v\" + cfg.Version`, falling back to `\"neo4j-cli/vdev\"` when cfg.Version is empty."
+      - "neo4j-cli/query/connect.go: runStatement signature is `runStatement(ctx context.Context, c *conn, statement string, params map[string]any, txType string) (*queryResult, error)`. Body always includes `txMetadata: {app: \"neo4j-cli\", type: txType}`. After SetBasicAuth, the request gets `User-Agent: <c.userAgent>` (skipped only when userAgent is empty so Go's default UA is preserved)."
+      - "neo4j-cli/query/run.go:75 passes \"user-direct\" as the new argument. All six runStatement calls in neo4j-cli/query/schema.go (lines 158, 179, 210, 230, 244, 252) pass \"schema\"."
+      - "All existing &conn{...} literals (connect_test.go lines 196, 232, 246, 261, 275, 302, 320; schema_test.go line 371) populate userAgent; every runStatement call in tests passes an explicit txType so the package compiles."
+      - "No imports of github.com/neo4j/cli/neo4j-cli/app or github.com/neo4j/cli/neo4j-cli/aura from the query package — version flows via cfg.Version only."
+      - "make test passes; make fmt-check passes; make lint passes; make license-check passes."
+      - "No file under neo4j-cli/aura/, common/clicfg/, neo4j-cli/app/ or any other package outside neo4j-cli/query/ is modified."
+    completed_at: 2026-05-05T11:30:00Z
+
+  - id: task-002
+    title: "Add header + tx metadata assertions and resolveConn UA tests"
+    description: |
+      Add the new test coverage that locks in the contract introduced in
+      task-001. Extend TestRunStatement_HappyPath with assertions that the
+      request carries the expected User-Agent header and that the body
+      contains the txMetadata map for "user-direct". Add a new
+      TestRunStatement_SchemaTxType that asserts the body's
+      txMetadata.type is "schema" when runStatement is called with
+      "schema". Add a new table-driven TestResolveConn_UserAgent covering
+      a populated cfg.Version (e.g. "1.2.3" → "neo4j-cli/v1.2.3") and the
+      empty-version fallback ("" → "neo4j-cli/vdev").
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "TestRunStatement_HappyPath captures r.Header.Get(\"User-Agent\") and asserts it equals \"neo4j-cli/vtest\" (or the userAgent set on the test conn). It also asserts gotBody[\"txMetadata\"] equals map[string]any{\"app\": \"neo4j-cli\", \"type\": \"user-direct\"}."
+      - "New TestRunStatement_SchemaTxType in connect_test.go calls runStatement(..., \"schema\"), captures the request body, and asserts txMetadata.type == \"schema\" and txMetadata.app == \"neo4j-cli\"."
+      - "New TestResolveConn_UserAgent in connect_test.go is table-driven (per AGENTS.md preference) with at least these rows: cfg.Version=\"1.2.3\" → \"neo4j-cli/v1.2.3\"; cfg.Version=\"\" → \"neo4j-cli/vdev\". Uses clicfg.NewConfig with testfs.GetTestFs(...) per the existing pattern."
+      - "make test passes; make fmt-check passes; make lint passes."
+      - "No production code changes in this task — only test additions and the targeted assertion extension in TestRunStatement_HappyPath."
+    completed_at: 2026-05-05T12:00:00Z
+
+  - id: task-003
+    title: "Drop txMetadata, document min version, add User-Agent-only changelog"
+    description: |
+      Verification against real Neo4j 5.x and 2025.x revealed the v2 endpoint
+      rejects requests carrying a `txMetadata` body field with HTTP 400 — the
+      field is only accepted from Neo4j 2026.04 onward. To keep the CLI
+      compatible with current production servers, drop the txMetadata send
+      site (and the test assertions added in task-002 that pinned its shape),
+      leave a comment on runStatement explaining the deferral and minimum
+      server version, and ship a User-Agent-only changelog entry. The
+      User-Agent header is harmless on every server version, so it stays.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "neo4j-cli/query/connect.go: runStatement signature reverts to `runStatement(ctx, c, statement, params)` (no txType arg). Body no longer sets `txMetadata`. A comment on runStatement explains why and names the minimum server version (Neo4j 2026.04+) so a future re-enable lands with a server-version probe."
+      - "neo4j-cli/query/run.go and schema.go drop the `\"user-direct\"` / `\"schema\"` arguments threaded in task-001."
+      - "neo4j-cli/query/connect_test.go: TestRunStatement_HappyPath drops the txMetadata equality assertion and instead asserts the body does NOT contain `txMetadata` (locks in the deferral). TestRunStatement_SchemaTxType is removed. Other tests drop the txType arg from their runStatement calls."
+      - "TestResolveConn_UserAgent and the User-Agent header assertion stay — the header is shipping unchanged."
+      - "A new file at .changes/unreleased/neo4j-cli-Minor-*.yaml exists with project: neo4j-cli, kind: Minor, body equivalent to \"query/:schema: send User-Agent header so server logs identify the CLI\" (no mention of txMetadata)."
+      - "make test, make fmt-check, make license-check all green."
+    completed_at: 2026-05-05T13:00:00Z

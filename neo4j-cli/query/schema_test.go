@@ -369,11 +369,12 @@ func TestSchema_FetchHelpersCompose(t *testing.T) {
 	srv := schemaServer(t, happyRoutes())
 
 	c := &conn{
-		uri:      srv.URL,
-		username: "u",
-		password: "pw",
-		database: "neo4j",
-		doer:     newHTTPClient(false),
+		uri:       srv.URL,
+		username:  "u",
+		password:  "pw",
+		database:  "neo4j",
+		userAgent: "neo4j-cli/vtest",
+		doer:      newHTTPClient(false),
 	}
 	ctx := context.Background()
 

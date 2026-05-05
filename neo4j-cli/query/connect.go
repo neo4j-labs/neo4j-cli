@@ -47,12 +47,13 @@ type httpDoer interface {
 // reach the server. Tests construct conn directly with a stub doer; production
 // code goes through resolveConn.
 type conn struct {
-	uri      string
-	username string
-	password string
-	database string
-	insecure bool
-	doer     httpDoer
+	uri       string
+	username  string
+	password  string
+	database  string
+	insecure  bool
+	userAgent string
+	doer      httpDoer
 }
 
 // queryResult is the parsed body of a successful POST /query/v2 response.
@@ -136,13 +137,20 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		uri = rewritten
 	}
 
+	version := cfg.Version
+	if version == "" {
+		version = "dev"
+	}
+	userAgent := "neo4j-cli/v" + version
+
 	return &conn{
-		uri:      uri,
-		username: username,
-		password: password,
-		database: database,
-		insecure: insecure,
-		doer:     newHTTPClient(insecure),
+		uri:       uri,
+		username:  username,
+		password:  password,
+		database:  database,
+		insecure:  insecure,
+		userAgent: userAgent,
+		doer:      newHTTPClient(insecure),
 	}, nil
 }
 
@@ -250,6 +258,14 @@ func newHTTPClient(insecure bool) *http.Client {
 // runStatement POSTs a single Cypher statement to <uri>/db/<database>/query/v2
 // and parses the response into a queryResult. Non-2xx responses or non-empty
 // errors[] arrays produce a Go error containing the upstream code+message.
+//
+// Note: a `txMetadata` body field would let server logs (query.log /
+// SHOW TRANSACTIONS) tag CLI traffic as e.g. {app: "neo4j-cli", type:
+// "user-direct" | "schema"}. The field is only accepted on the v2 endpoint
+// from Neo4j 2026.04 onward — earlier servers (5.x, 2025.x) reject the
+// request with HTTP 400. Re-enable once that is the minimum supported
+// server, ideally gated by a server-version probe so older servers keep
+// working.
 func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
@@ -272,6 +288,9 @@ func runStatement(ctx context.Context, c *conn, statement string, params map[str
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.SetBasicAuth(c.username, c.password)
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
+	}
 
 	resp, err := c.doer.Do(req)
 	if err != nil {

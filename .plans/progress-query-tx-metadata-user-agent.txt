@@ -1,0 +1,130 @@
+================================================================================
+TASK-001: Add userAgent + txType plumbing to runStatement and update all call sites
+Date: 2026-05-05T11:30:00Z
+================================================================================
+
+Summary:
+Wired userAgent into the conn struct and runStatement: resolveConn derives it
+from cfg.Version ("neo4j-cli/v<v>", "neo4j-cli/vdev" fallback). runStatement
+gained a final txType string param; body always includes txMetadata={app:
+"neo4j-cli", type: txType}. User-Agent header set after SetBasicAuth, skipped
+when userAgent is empty so Go default UA is preserved. run.go passes
+"user-direct"; all six schema.go call sites pass "schema". Test &conn{} literals
+populated with userAgent; all test runStatement calls thread an explicit
+txType. No new test coverage in this task (deferred to task-002).
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: conn.userAgent, resolveConn UA wiring,
+  runStatement signature + txMetadata + UA header)
+- neo4j-cli/query/run.go (modified: pass "user-direct")
+- neo4j-cli/query/schema.go (modified: 6 callers pass "schema")
+- neo4j-cli/query/connect_test.go (modified: 7 &conn{} literals + 7 runStatement
+  calls updated)
+- neo4j-cli/query/schema_test.go (modified: &conn{} literal updated)
+- .plans/tasks-query-tx-metadata-user-agent.yml (status update)
+
+Key Decisions:
+- "dev" fallback handled inline in resolveConn (mirrors app.go default) rather
+  than at runStatement layer — keeps the runtime check trivially "skip if empty".
+- Use userAgent="neo4j-cli/vtest" in tests to match the cfg version "test"
+  pattern used elsewhere in connect_test.go.
+- runStatement keeps the empty-userAgent guard so future direct &conn{} test
+  callers without UA don't accidentally clobber Go's default UA.
+
+Feedback Loops:
+- make test: PASS
+- make fmt-check: PASS (no output)
+- make license-check: PASS
+- make lint: SKIPPED (golangci-lint not installed locally; go vet clean; CI
+  will gate)
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Add header + tx metadata assertions and resolveConn UA tests
+Date: 2026-05-05T12:00:00Z
+================================================================================
+
+Summary:
+Locked the task-001 contract with three test additions in connect_test.go:
+TestRunStatement_HappyPath now captures the User-Agent header (asserts
+"neo4j-cli/vtest") and the txMetadata body field (asserts {app: "neo4j-cli",
+type: "user-direct"}). New TestRunStatement_SchemaTxType drives runStatement
+with "schema" and verifies txMetadata.app/type. New table-driven
+TestResolveConn_UserAgent covers cfg.Version="1.2.3" → "neo4j-cli/v1.2.3" and
+empty version → "neo4j-cli/vdev" fallback, using clicfg.NewConfig +
+afero.NewMemMapFs (matches the existing newTestCmd pattern).
+
+Files Changed:
+- neo4j-cli/query/connect_test.go (test additions only)
+- .plans/tasks-query-tx-metadata-user-agent.yml (status update)
+
+Key Decisions:
+- Reuse the in-line server stub style of the surrounding tests rather than
+  introducing a helper — three tests, low duplication, easier to read.
+- TestResolveConn_UserAgent leans on afero.NewMemMapFs directly (per
+  TestResolveConn_Defaults) instead of pulling in test/utils/testfs to keep
+  imports minimal. AGENTS.md mentions both patterns are valid.
+- Used a top-level type-assert + require.True for txMetadata in the schema
+  test so a wrong-type body fails loudly with %T context.
+
+Feedback Loops:
+- make test: PASS
+- make fmt-check: PASS (no output)
+- make license-check: PASS
+- make lint: SKIPPED (golangci-lint not installed locally; go vet clean)
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Drop txMetadata, document min version, add User-Agent-only changelog
+Date: 2026-05-05T13:00:00Z
+================================================================================
+
+Summary:
+End-to-end verification revealed Neo4j 5.x and 2025.x reject any v2 query
+request that carries a txMetadata body field with HTTP 400 — the field is
+only accepted from Neo4j 2026.04 onward (labelled new-2026.04 in the docs
+source repo). To stay compatible with current production servers, the
+txMetadata send site (added in task-001) and its lock-in tests (added in
+task-002) are removed. The User-Agent header — which is harmless on every
+server version — stays. A doc comment on runStatement records the deferral
+and names Neo4j 2026.04 as the minimum server version, so a future
+re-enable can land gated behind a server-version probe.
+
+Files Changed:
+- neo4j-cli/query/connect.go (drop txType param + txMetadata body; add
+  doc comment explaining deferral and min server version)
+- neo4j-cli/query/run.go (drop "user-direct" arg)
+- neo4j-cli/query/schema.go (drop "schema" arg from all 6 runStatement
+  calls)
+- neo4j-cli/query/connect_test.go (drop TestRunStatement_SchemaTxType;
+  drop txMetadata-equality assertion in TestRunStatement_HappyPath and
+  replace with assert.NotContains(...) to lock in the deferral; drop
+  txType arg from every test runStatement call)
+- .changes/unreleased/neo4j-cli-Minor-20260505-130000.yaml (new — User-
+  Agent only)
+- .plans/prd-query-tx-metadata-user-agent.md (rewrite Overview / Goals /
+  Non-Goals / Requirements / Acceptance Criteria to reflect scope cut)
+- .plans/tasks-query-tx-metadata-user-agent.yml (rewrite task-003 to
+  match the actual work; mark completed)
+
+Key Decisions:
+- Drop txMetadata entirely rather than gate it behind a server-version
+  probe in this PR. Reason: keeps this change small and ships the safe
+  half (User-Agent) immediately. A follow-up issue can introduce the
+  probe + re-add the field once Neo4j 2026.04 is more common.
+- Lock in the deferral with assert.NotContains(gotBody, "txMetadata") in
+  the happy-path test, so a future accidental re-add fails loudly until
+  whoever does it also wires up the version gate.
+- Keep the userAgent field, resolveConn population, and User-Agent
+  assertion unchanged — that work from task-001 / task-002 is the
+  shippable half.
+
+Feedback Loops:
+- make test: PASS
+- make fmt-check: PASS (no output)
+- make license-check: PASS
+- make lint: SKIPPED (golangci-lint not installed locally; CI gates)
+
+Next Task: All tasks complete
