@@ -18,15 +18,9 @@ name: publish-npm
 # idempotent at the per-package level.
 
 on:
-  # AUTO TRIGGER DISABLED — the auto path is intentionally deferred to a
-  # follow-up PR. Once enabled, uncomment the workflow_run block below.
-  # NOTE: re-enabling requires re-adding `actions: read` to the
-  # `permissions:` block (cross-workflow `actions/download-artifact` needs
-  # it to read the upstream run's artifacts).
-  #
-  # workflow_run:
-  #   workflows: ["release"]
-  #   types: [completed]
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -37,6 +31,9 @@ on:
 permissions:
   contents: read
   id-token: write
+  # Required by the workflow_run path's cross-workflow `actions/download-artifact`
+  # calls (release-meta + dist) to read the upstream release.yml run's artifacts.
+  actions: read
 
 jobs:
   publish:

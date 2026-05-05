@@ -116,13 +116,19 @@ jobs:
 
       - name: Write release-meta.json
         if: steps.changed.outputs.include_neo4j == 'true'
+        env:
+          NEO4J_VERSION_TAG: ${{ steps.versions.outputs.neo4j }}
+          INCLUDE_NEO4J: ${{ steps.changed.outputs.include_neo4j }}
         run: |
           # Compact metadata blob consumed by publish-npm.yml's workflow_run path.
           # Only emitted when neo4j-cli was actually released in this run; the
           # downstream workflow also gates on the include_neo4j job output.
+          # Strip the leading `v` from the GoReleaser tag — publish-npm.yml expects
+          # bare semver (its regex rejects a leading v and it prepends v itself).
+          NEO4J_VERSION="${NEO4J_VERSION_TAG#v}"
           printf '{"version":"%s","include_neo4j":%s}\n' \
-            "${{ steps.versions.outputs.neo4j }}" \
-            "${{ steps.changed.outputs.include_neo4j }}" \
+            "${NEO4J_VERSION}" \
+            "${INCLUDE_NEO4J}" \
             > release-meta.json
 
       - name: Upload dist artifact
