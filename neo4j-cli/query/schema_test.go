@@ -149,11 +149,12 @@ func TestSchema_HappyPath_JSON(t *testing.T) {
 	assert.Equal(t, "uq_person_name", got.Constraints[0]["name"])
 }
 
-// TestSchema_DefaultOutputIsJSON locks the contract that `:schema` defaults
-// to JSON regardless of the user's `aura.output` config (which may be the
-// `default` sentinel that means "table" for normal cypher rows). Only an
-// explicit `--output table` switches the schema renderer to tables.
-func TestSchema_DefaultOutputIsJSON(t *testing.T) {
+// TestSchema_DefaultOutputNonTTYIsJSON locks the contract that with the
+// implicit `default` output and a non-TTY stdout (piped or redirected),
+// `:schema` emits JSON. The package-level TestMain seeds the seam to true;
+// this test flips it locally to simulate the piped case.
+func TestSchema_DefaultOutputNonTTYIsJSON(t *testing.T) {
+	withStdoutIsTerminal(t, false)
 	srv := schemaServer(t, happyRoutes())
 
 	h := newRunHarness(t, "default")
@@ -171,6 +172,34 @@ func TestSchema_DefaultOutputIsJSON(t *testing.T) {
 	assert.Equal(t, "neo4j", got.Database.Name)
 	// And NOT contain the H2 table markers.
 	assert.NotContains(t, h.stdout.String(), "## Nodes")
+}
+
+// TestSchema_DefaultOutputTTYIsTables locks the new TTY-aware default for
+// `:schema`: with `default` output and a TTY stdout, the renderer emits the
+// five canonical stacked tables (no JSON envelope). TestMain seeds the seam
+// to true so this test does not toggle it explicitly.
+func TestSchema_DefaultOutputTTYIsTables(t *testing.T) {
+	srv := schemaServer(t, happyRoutes())
+
+	h := newRunHarness(t, "default")
+	err := h.execute(t,
+		"--uri="+srv.URL,
+		"--password=pw",
+		":schema",
+	)
+	require.NoError(t, err)
+
+	out := h.stdout.String()
+	assertSectionsInOrder(t, out,
+		"## Nodes",
+		"## Relationships",
+		"## Relationship Paths",
+		"## Indexes",
+		"## Constraints",
+	)
+	// Should not be a JSON envelope.
+	assert.NotContains(t, out, `"nodes"`)
+	assert.NotContains(t, out, `"relationships"`)
 }
 
 func TestSchema_HappyPath_Table(t *testing.T) {

@@ -23,3 +23,28 @@ Key Decisions:
 - make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Route renderSchema through resolveOutput and update :schema tests
+Date: 2026-05-05T08:05:00Z
+================================================================================
+
+Summary:
+renderSchema now routes through resolveOutput(cmd, cfg) so :schema honors the
+TTY-aware default: TTY+default → 5 stacked tables, non-TTY+default → JSON,
+explicit --output wins. Updated the doc comment. Renamed the existing
+default-JSON schema test to TestSchema_DefaultOutputNonTTYIsJSON and made it
+flip the seam to non-TTY locally. Added TestSchema_DefaultOutputTTYIsTables
+which leans on TestMain's TTY=true default.
+
+Files Changed:
+- neo4j-cli/query/schema.go (modified — renderSchema uses resolveOutput; doc updated)
+- neo4j-cli/query/schema_test.go (modified — renamed JSON-default test + flipped seam; added TTY-default-tables test)
+- .plans/tasks-tty-aware-output-default.yml (status updated to completed)
+
+Key Decisions:
+- Reused withStdoutIsTerminal helper from output_test.go (same package) — no need to duplicate
+- New tables test does not set the seam explicitly; relies on TestMain default to keep symmetric with the existing --output table test
+- make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
+
+Next Task: task-003

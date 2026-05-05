@@ -36,7 +36,7 @@ tasks:
       behaviour, adjust the existing JSON-output schema test (which today
       relies on "default" falling through to JSON), and add a new
       TTY+default→tables case.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - "New :schema test asserts that with stdoutIsTerminal=true and no --output flag, renderSchema emits the five stacked tables (Nodes / Relationships / Relationship Paths / Indexes / Constraints) per printSchemaTables."
       - "Existing :schema --output table test still passes without edits."
       - "make test passes; make fmt-check passes; make lint passes."
-    completed_at: null
+    completed_at: 2026-05-05T08:05:00Z
 
   - id: task-003
     title: "Document TTY-aware default in README and add changelog entry"
