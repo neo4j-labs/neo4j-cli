@@ -121,6 +121,44 @@ To test the wrapper bin shim against a locally-built platform package: render
 `cli-platform/package.json.tmpl` with `sed`, drop the binary into `bin/`,
 `cd cli && npm link`, then `node bin/neo4j-cli.js --version`.
 
+## Bootstrap (one-time)
+
+npm Trusted Publishers must be configured per package in the npm UI, and
+unlike PyPI, npm has no pending-publisher flow — the package name has to
+exist on the registry before the OIDC binding can be set. So before the
+first OIDC publish, a maintainer claims all 9 `@neo4j-labs/*` names with a
+throwaway stub release:
+
+```sh
+npm login --scope=@neo4j-labs    # short-lived, only for the bootstrap
+make npm-bootstrap                # or: bash distribution/npm/bootstrap-stubs.sh
+npm logout                        # drop the local credential
+```
+
+`bootstrap-stubs.sh` hardcodes `VERSION=0.0.0-bootstrap.1` and always passes
+`--tag bootstrap`. The 1-byte stub binaries it ships are unrunnable by
+design — the dist-tag keeps them out of `latest`/`alpha`/`beta`/`rc`/`next`,
+so `npm i @neo4j-labs/cli` (and every qualified-channel install) keeps
+returning `no matching version` until a real release lands. Re-running the
+script is safe: each package's `npm view <name>@<version> version` check
+makes it print `[skip] <pkg>@0.0.0-bootstrap.1 already published` and exit 0.
+
+After the script finishes, configure Trusted Publishers in the npm UI for
+each of the 9 packages (`@neo4j-labs/cli` plus the 8 platform packages).
+For every package, the binding is the same:
+
+| Field          | Value             |
+| -------------- | ----------------- |
+| Organization   | `neo4j-labs`      |
+| Repository     | `neo4j-cli`       |
+| Workflow       | `publish-npm.yml` |
+| Environment    | (leave blank)     |
+
+The first real CI publish after the bindings are saved authenticates via
+OIDC — no token is ever issued or stored. The bootstrap stubs can be
+deprecated or `npm unpublish`d once a real version exists, but they are
+harmless if left in place.
+
 ## Release flow
 
 ```
@@ -192,7 +230,6 @@ ships standalone in the tarball with no runtime access to `platforms.tsv`.
   `distribution/homebrew/` for any wrapper formula assets that aren't
   auto-generated.
 
-Open follow-ups (not blocking the npm channel): npm provenance attestation
-(sigstore + GH OIDC, toggle via `--provenance` + `id-token: write`); Linux
-32-bit ARM (`linux-arm`, not built by GoReleaser today); auto-promotion of
-prerelease `dist-tag` to `latest`.
+Open follow-ups (not blocking the npm channel): Linux 32-bit ARM
+(`linux-arm`, not built by GoReleaser today); auto-promotion of prerelease
+`dist-tag` to `latest`.

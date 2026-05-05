@@ -78,7 +78,7 @@ Triggered by `workflow_run` after `release.yml` completes. The job:
 
 - Skips itself if `release.yml` did not succeed, or if `include_neo4j != true` (aura-cli-only release).
 - Downloads the `dist/` artifact from `release.yml`.
-- Writes `~/.npmrc` from the `NPM_TOKEN` secret.
+- Authenticates to the registry via npm Trusted Publishers (OIDC); no long-lived token in CI.
 - Runs `distribution/npm/publish.sh`:
   - Picks an npm dist-tag from the version: `*-alpha*` → `alpha`; `*-beta*` → `beta`; `*-rc*` → `rc`; any other prerelease → `next`; `X.Y.Z` (no suffix) → `latest`.
   - Publishes the 8 platform packages (`@neo4j-labs/cli-darwin-arm64`, …) first, then the wrapper `@neo4j-labs/cli` last.
@@ -93,7 +93,7 @@ For npm specifics — package shape, dist-tag rules, dry-run flow — see [`dist
 
 ## Manual recovery: `publish-npm.yml` workflow_dispatch
 
-If the npm publish fails partway (registry hiccup, missing token, transient 5xx), recover via the Actions UI without bumping the version or re-running GoReleaser:
+If the npm publish fails partway (registry hiccup, transient 5xx, OIDC binding hiccup), recover via the Actions UI without bumping the version or re-running GoReleaser:
 
 1. **Actions** → **Publish NPM** → **Run workflow**.
 2. Enter the version (e.g. `0.2.0-alpha.3` — no leading `v`).
@@ -102,7 +102,7 @@ If the npm publish fails partway (registry hiccup, missing token, transient 5xx)
    - Extracts each archive into the `dist/<name>/` layout `publish.sh` expects.
    - Re-runs `publish.sh` — already-published packages skip, the rest go through.
 
-This same flow handles: NPM_TOKEN was missing or expired and got rotated; `@neo4j-labs` org permission needed adjusting; you `npm unpublish`d a bad release and want to re-publish from clean state.
+This same flow handles: `@neo4j-labs` org permission needed adjusting; you `npm unpublish`d a bad release and want to re-publish from clean state.
 
 ## Pre-releases vs stable
 
@@ -126,7 +126,6 @@ Configured at the repo level. The user owns these.
 | `TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN` | `changie.yml`, `release.yml` | Opening Release PRs, creating GitHub Releases |
 | `MACOS_SIGN_P12`, `MACOS_SIGN_PASSWORD` | `release.yml` | macOS code-signing |
 | `MACOS_NOTARY_ISSUER_ID`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_KEY` | `release.yml` | macOS notarization |
-| `NPM_TOKEN` | `publish-npm.yml` | Publishing under `@neo4j-labs` scope |
 
 ## See also
 

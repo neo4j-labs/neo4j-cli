@@ -94,7 +94,8 @@ tasks:
       bootstrap-stubs.sh + `make npm-bootstrap` workflow, the
       `0.0.0-bootstrap.1` stub version + `bootstrap` dist-tag choice, and
       the post-bootstrap npm-UI Trusted Publisher configuration steps.
-    status: pending
+    status: completed
+    completed_at: 2026-05-05T14:30:00Z
     dependencies:
       - task-002
       - task-003

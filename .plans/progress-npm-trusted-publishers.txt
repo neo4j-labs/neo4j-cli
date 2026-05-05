@@ -81,3 +81,38 @@ Key Decisions:
   satisfy "no NPM_TOKEN reference remains" while still explaining the change.
 
 Next Task: task-004 (Update RELEASING.md and distribution/npm/README.md for OIDC)
+
+================================================================================
+TASK-004: Update RELEASING.md and distribution/npm/README.md for OIDC
+Date: 2026-05-05T14:30:00Z
+================================================================================
+
+Summary:
+Synced maintainer docs with the new OIDC auth model and the bootstrap flow.
+RELEASING.md drops NPM_TOKEN from Required-secrets table, rewords step 4's
+auth bullet to name Trusted Publishers/OIDC, and removes the NPM_TOKEN-rotation
+case from manual recovery (also reworded the "missing token" failure-scenario
+intro since there's no token anymore). distribution/npm/README.md drops the
+provenance-attestation Open follow-up (provenance is implicit with OIDC) and
+gains a "## Bootstrap (one-time)" subsection between Local dev/test flow and
+Release flow that explains why bootstrap exists (no pending-publisher flow),
+the maintainer command sequence, the 0.0.0-bootstrap.1 + --tag bootstrap
+design, and the npm-UI Trusted Publisher binding for each of the 9 packages.
+
+Files Changed:
+- RELEASING.md (modified: NPM_TOKEN row dropped from secrets table, step 4
+  auth bullet reworded, manual-recovery bullet/intro reworded)
+- distribution/npm/README.md (modified: provenance follow-up removed,
+  ## Bootstrap (one-time) section added)
+
+Key Decisions:
+- Also softened "missing token" in manual-recovery intro (replaced with
+  "OIDC binding hiccup") — leaving "missing token" alongside the dropped
+  NPM_TOKEN bullet would have been jarring even though only the bullet was
+  in scope.
+- Bootstrap section uses a small npm-UI binding table (Org/Repo/Workflow/
+  Environment) — easier for a maintainer to scan than prose.
+- No changelog entry: per AGENTS.md, internal CI/CD doc updates with no
+  user-visible change skip the .changes/unreleased/ entry.
+
+Next Task: All tasks complete
