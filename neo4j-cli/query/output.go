@@ -6,12 +6,44 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/neo4j/cli/common/clicfg"
 )
+
+// stdoutIsTerminal is the test seam for terminal detection on the writer the
+// renderer is about to print to. Production asserts the writer is *os.File and
+// calls term.IsTerminal on its fd; non-*os.File (e.g. a *bytes.Buffer in tests)
+// returns false. Tests substitute this seam to simulate either a TTY or a
+// piped/redirected stdout. Mirrors stdinIsTTY at run.go.
+var stdoutIsTerminal = func(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
+// resolveOutput returns the effective output mode ("json" or "table") for the
+// current invocation. When cfg.Aura.Output() is "default" or "" the mode is
+// auto-detected from cmd.OutOrStdout(): TTY → "table", non-TTY → "json".
+// Any other configured value (e.g. "json", "table") passes through unchanged
+// — explicit --output always wins.
+func resolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
+	v := cfg.Aura.Output()
+	if v != "default" && v != "" {
+		return v
+	}
+	if stdoutIsTerminal(cmd.OutOrStdout()) {
+		return "table"
+	}
+	return "json"
+}
 
 // jsonRowsResult is the JSON shape emitted in JSON output mode. Field order
 // (columns, rows, truncated, arrays_truncated) is fixed via struct field
@@ -26,18 +58,20 @@ type jsonRowsResult struct {
 }
 
 // renderRows writes the query result to cmd's stdout in either JSON or table
-// form, branching on cfg.Aura.Output(). Rows must already be shaped as
-// {column: value} maps — use rowsFromValues to convert raw positional API
-// values. The truncated flag is propagated to the JSON output but does not
-// itself emit a warning; the caller (runQuery) prints any stderr warning.
-// arraysTruncated is the aggregate count of slices elided by
-// --truncate-arrays-over and is always emitted in the JSON envelope.
+// form, branching on resolveOutput(cmd, cfg). When --output is "default" (the
+// implicit value), the renderer auto-detects: TTY stdout → table, piped or
+// redirected stdout → JSON. Explicit --output table|json always wins. Rows
+// must already be shaped as {column: value} maps — use rowsFromValues to
+// convert raw positional API values. The truncated flag is propagated to the
+// JSON output but does not itself emit a warning; the caller (runQuery)
+// prints any stderr warning. arraysTruncated is the aggregate count of slices
+// elided by --truncate-arrays-over and is always emitted in the JSON envelope.
 func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows []map[string]any, truncated bool, arraysTruncated int) {
 	if rows == nil {
 		rows = []map[string]any{}
 	}
 
-	if cfg.Aura.Output() == "json" {
+	if resolveOutput(cmd, cfg) == "json" {
 		printJSONRows(cmd, columns, rows, truncated, arraysTruncated)
 		return
 	}

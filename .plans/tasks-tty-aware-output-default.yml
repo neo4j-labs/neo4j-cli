@@ -14,7 +14,7 @@ tasks:
       per-test edits. Also add the new branch-coverage tests for
       renderRows (TTY+default, non-TTY+default, explicit --output table on
       non-TTY, explicit --output json on TTY).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/query/output.go declares `var stdoutIsTerminal = func(io.Writer) bool { ... }` mirroring the stdinIsTTY pattern at run.go:34; production impl asserts *os.File and calls term.IsTerminal on the fd, non-*os.File returns false."
@@ -24,7 +24,7 @@ tasks:
       - "New table-driven test in output_test.go covers four cases: TTY+default→table, non-TTY+default→json, non-TTY+--output table→table, TTY+--output json→json. Each case toggles the seam locally and restores it."
       - "make test passes; make fmt-check passes; make lint passes."
       - "No file under neo4j-cli/aura/, common/clicfg/, or any other package outside neo4j-cli/query/ is modified."
-    completed_at: null
+    completed_at: 2026-05-05T07:45:00Z
 
   - id: task-002
     title: "Route renderSchema through resolveOutput and update :schema tests"

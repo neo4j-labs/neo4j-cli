@@ -1,0 +1,25 @@
+================================================================================
+TASK-001: Add resolveOutput + stdoutIsTerminal seam, route renderRows through it
+Date: 2026-05-05T07:45:00Z
+================================================================================
+
+Summary:
+Added TTY-aware output resolver in the query package. resolveOutput(cmd, cfg)
+returns "json"/"table"; "default"/"" auto-detect via stdoutIsTerminal seam
+(TTY -> table, non-TTY -> json). Explicit --output flag passes through.
+renderRows now routes through resolveOutput. TestMain seeds the seam to true
+so existing tests stay green without edits.
+
+Files Changed:
+- neo4j-cli/query/output.go (modified — added stdoutIsTerminal seam, resolveOutput helper, routed renderRows through it, updated doc comment)
+- neo4j-cli/query/output_test.go (modified — added withStdoutIsTerminal helper + TestRenderRows_TTYAwareDefault four-branch table-driven test)
+- neo4j-cli/query/testseam_test.go (created — TestMain sets stdoutIsTerminal=true for the package)
+- .plans/tasks-tty-aware-output-default.yml (status updated to completed)
+
+Key Decisions:
+- Detection asserts *os.File on cmd.OutOrStdout(); non-*os.File returns false (cobra abstraction kept intact)
+- TestMain default true keeps every existing assertion stable; tests opting into non-TTY use a t.Cleanup helper
+- "default" and "" both treated as auto-detect (tolerates empty-string accidents)
+- make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
+
+Next Task: task-002

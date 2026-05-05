@@ -6,6 +6,7 @@ package query
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -244,7 +245,9 @@ func TestRenderRows_Table_PreservesColumnOrder(t *testing.T) {
 }
 
 func TestRenderRows_DefaultOutputRendersTable(t *testing.T) {
-	// "default" must dispatch to the table renderer (not JSON).
+	// "default" must dispatch to the table renderer (not JSON) when stdout is
+	// a TTY — TestMain seeds stdoutIsTerminal=true so this is the default for
+	// the package-level test run.
 	cmd, cfg, stdout := newRenderCmd(t, "default")
 	renderRows(cmd, cfg, []string{"n"}, []map[string]any{{"n": float64(42)}}, false, 0)
 
@@ -253,4 +256,78 @@ func TestRenderRows_DefaultOutputRendersTable(t *testing.T) {
 	// Table rendering should not produce a JSON envelope.
 	assert.NotContains(t, out, `"columns"`)
 	assert.NotContains(t, out, `"truncated"`)
+}
+
+// withStdoutIsTerminal locally overrides the package-level seam for one test,
+// auto-restoring the prior value via t.Cleanup. The package's TestMain seeds
+// the seam to true; tests that want to exercise the non-TTY branch (or
+// re-assert TTY explicitly) call this helper.
+func withStdoutIsTerminal(t *testing.T, isTTY bool) {
+	t.Helper()
+	prev := stdoutIsTerminal
+	stdoutIsTerminal = func(io.Writer) bool { return isTTY }
+	t.Cleanup(func() { stdoutIsTerminal = prev })
+}
+
+// TestRenderRows_TTYAwareDefault covers the four explicit/auto branches of
+// resolveOutput as exercised through renderRows: TTY+default→table,
+// non-TTY+default→json, non-TTY+--output table→table, TTY+--output json→json.
+func TestRenderRows_TTYAwareDefault(t *testing.T) {
+	tests := []struct {
+		name        string
+		output      string // value persisted in cfg.Aura.Output()
+		isTTY       bool
+		wantJSON    bool   // true if the JSON envelope should be present
+		wantInTable string // substring expected in table output (only when wantJSON=false)
+	}{
+		{
+			name:        "TTY + default -> table",
+			output:      "default",
+			isTTY:       true,
+			wantJSON:    false,
+			wantInTable: "42",
+		},
+		{
+			name:     "non-TTY + default -> json",
+			output:   "default",
+			isTTY:    false,
+			wantJSON: true,
+		},
+		{
+			name:        "non-TTY + explicit --output table -> table",
+			output:      "table",
+			isTTY:       false,
+			wantJSON:    false,
+			wantInTable: "42",
+		},
+		{
+			name:     "TTY + explicit --output json -> json",
+			output:   "json",
+			isTTY:    true,
+			wantJSON: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			withStdoutIsTerminal(t, tc.isTTY)
+			cmd, cfg, stdout := newRenderCmd(t, tc.output)
+			renderRows(cmd, cfg, []string{"n"}, []map[string]any{{"n": float64(42)}}, false, 0)
+
+			out := stdout.String()
+			if tc.wantJSON {
+				var got jsonRowsResult
+				require.NoError(t, json.Unmarshal([]byte(out), &got),
+					"output should be JSON envelope, got: %s", out)
+				assert.Equal(t, []string{"n"}, got.Columns)
+				assert.Len(t, got.Rows, 1)
+			} else {
+				assert.Contains(t, out, tc.wantInTable)
+				assert.NotContains(t, out, `"columns"`,
+					"table output should not contain JSON envelope keys")
+				assert.NotContains(t, out, `"truncated"`,
+					"table output should not contain JSON envelope keys")
+			}
+		})
+	}
 }
