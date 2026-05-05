@@ -99,3 +99,9 @@ These were placeholders for future telemetry but pollute stdout for end users â€
 ## Open Questions
 
 None. Changelog kind confirmed as `Patch` for both entries.
+
+## Addendum (post-review course correction)
+
+Mid-PR refinement: rather than fully delete the help/fail/success log sites, leave the structural placeholders in place with a `// add metrics callback for <help|fail|success> here` comment so the future telemetry work has obvious hook points and doesn't have to re-derive the wiring (notably `SetHelpFunc(... origHelp(c, args) ...)`). User-visible behaviour is identical to the full-removal version (no stdout noise); the diff against pre-change `main` is smaller.
+
+See task-005 for the implementation.

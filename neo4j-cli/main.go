@@ -28,9 +28,17 @@ func main() {
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
+	origHelp := cmd.HelpFunc()
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		// add metrics callback for help here
+		origHelp(c, args)
+	})
+
 	cobra.EnableTraverseRunHooks = true
 
 	if err := cmd.Execute(); err != nil {
+		// add metrics callback for fail here
 		os.Exit(1)
 	}
+	// add metrics callback for success here
 }
