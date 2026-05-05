@@ -17,10 +17,11 @@ For the why behind individual pieces, see `.agents/deployment.md` (architecture)
 | `aura-cli` binaries | GitHub Releases | `aura-cli` changelog | GoReleaser |
 | `neo4j-cli` binaries | GitHub Releases | `neo4j-cli` changelog | GoReleaser |
 | `@neo4j-labs/cli` (super-CLI) | npm | `neo4j-cli` changelog | `publish-npm.yml` |
+| `neo4j-cli` Homebrew formula | `neo4j-labs/homebrew-tap` (stable only) | `neo4j-cli` changelog | GoReleaser (`brews:`) |
 
-Aura-cli is **not** published to npm. An aura-cli-only release cycle ships GitHub binaries but skips the npm workflow. See `distribution/npm/README.md` for the gate.
+Aura-cli is **not** published to npm or Homebrew. An aura-cli-only release cycle ships GitHub binaries but skips both downstream channels. See `distribution/npm/README.md` and `distribution/homebrew/README.md` for the gates.
 
-Future channels (pip, Homebrew) will plug in alongside `publish-npm.yml` and follow the same gating rules.
+Future channels (pip) will plug in alongside `publish-npm.yml` and follow the same gating rules.
 
 ## Step 1 — Add a changelog entry on your PR
 
@@ -126,11 +127,13 @@ Configured at the repo level. The user owns these.
 | `TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN` | `changie.yml`, `release.yml` | Opening Release PRs, creating GitHub Releases |
 | `MACOS_SIGN_P12`, `MACOS_SIGN_PASSWORD` | `release.yml` | macOS code-signing |
 | `MACOS_NOTARY_ISSUER_ID`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_KEY` | `release.yml` | macOS notarization |
+| `HOMEBREW_TAP_APP_ID`, `HOMEBREW_TAP_APP_PRIVATE_KEY` | `release.yml` | Mint short-lived token for pushing the Homebrew formula to `neo4j-labs/homebrew-tap` |
 
 ## See also
 
 - `.agents/deployment.md` — release infrastructure architecture (agent reference)
 - `distribution/npm/README.md` — npm-specific maintainer view (package shape, dist-tag rules, dry-runs)
+- `distribution/homebrew/README.md` — Homebrew tap maintainer view (stable-only cadence, auth prereqs, recovery)
 - `CONTRIBUTING.md` — changelog entries, local builds, repo conventions
 - `.changie.yaml` — multi-project changelog config
 - `.goreleaser.yaml` — GoReleaser build matrix, archives, signing

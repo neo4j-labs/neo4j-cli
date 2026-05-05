@@ -71,7 +71,7 @@ tasks:
       GoReleaser, gated on stable). Add `HOMEBREW_TAP_APP_ID` and
       `HOMEBREW_TAP_APP_PRIVATE_KEY` to the "Required secrets" table with their
       consumer (`release.yml`) and purpose (mint tap-push token).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -81,7 +81,7 @@ tasks:
       - "`What gets released` table has a row for the `neo4j-cli` Homebrew formula → tap → GoReleaser"
       - "`Required secrets` table lists `HOMEBREW_TAP_APP_ID` and `HOMEBREW_TAP_APP_PRIVATE_KEY` with `release.yml` as the consumer"
       - "Cross-link to `distribution/homebrew/README.md` from the See also / channel section"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-005
     title: "Refresh Homebrew callout in distribution/npm/README.md"

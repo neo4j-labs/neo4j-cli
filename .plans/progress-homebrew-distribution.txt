@@ -76,3 +76,33 @@ Key Decisions:
   per task-004. Avoids duplication.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Update RELEASING.md to reflect Homebrew shipping
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Updated RELEASING.md: dropped Homebrew from "Future channels" line (only pip
+remains), added new row to "What gets released" table (neo4j-cli Homebrew
+formula → neo4j-labs/homebrew-tap stable-only → GoReleaser brews:), added
+HOMEBREW_TAP_APP_ID + HOMEBREW_TAP_APP_PRIVATE_KEY row to "Required secrets"
+(grouped pair, matches existing MACOS_SIGN_* row style), and cross-linked
+distribution/homebrew/README.md from "See also". Also rephrased the aura-cli
+exclusion sentence to cover both downstream channels (npm + Homebrew skipped
+on aura-only releases). make test + make fmt-check pass.
+
+Files Changed:
+- RELEASING.md (modified — table row, secrets row, future-channels line, see-also link)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Grouped the two Homebrew secrets into a single table row (comma-separated
+  in the Secret column) to match the MACOS_SIGN_P12, MACOS_SIGN_PASSWORD
+  precedent. Keeps the table compact and signals the secrets always go
+  together.
+- Updated the aura-cli exclusion paragraph from "not published to npm" to
+  "not published to npm or Homebrew" with both channel READMEs cross-linked
+  — the gating rule is identical for both downstream channels.
+
+Next Task: task-005 or task-006
