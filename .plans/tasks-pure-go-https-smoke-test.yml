@@ -75,7 +75,7 @@ tasks:
       port-conflict note (now self-resolving via random ports — adjust
       wording accordingly). CLAUDE.md is a symlink to AGENTS.md, so a
       single edit propagates.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -84,4 +84,4 @@ tasks:
       - "AGENTS.md describes the smoke test as a Go test invoked via NEO4J_HTTPS_TEST=1 go test ..."
       - "Port-conflict requirement is removed or updated to reflect random port selection"
       - "CLAUDE.md (symlink) reflects the same content; no separate edit needed"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z

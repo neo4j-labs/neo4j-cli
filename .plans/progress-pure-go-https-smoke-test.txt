@@ -95,3 +95,36 @@ Key Decisions:
   (--insecure against real Neo4j)") — purely a runner change.
 
 Next Task: task-004 (update AGENTS.md Local Verification Scripts subsection)
+
+================================================================================
+TASK-004: Update AGENTS.md Local Verification Scripts subsection
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Refreshed the AGENTS.md "Local Verification Scripts" bullet to describe the
+new pure-Go HTTPS smoke test. Dropped scripts/test-https.sh, openssl, and
+curl. Pointed at TestHTTPS_Smoke in neo4j-cli/query/query_https_smoke_test.go
+with the run command `NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v
+./neo4j-cli/query/...`. Replaced the "ports 7473/7474 free" line with a note
+that the test binds two random free TCP ports on 127.0.0.1. Kept docker as
+the sole external requirement. The Neo4j 5 docker env-var bullet is
+unchanged. CLAUDE.md is a symlink so single edit propagates. make test +
+make fmt-check pass.
+
+Files Changed:
+- AGENTS.md (one bullet rewritten under "Local Verification Scripts")
+- .plans/tasks-pure-go-https-smoke-test.yml (task-004 marked completed)
+- .plans/progress-pure-go-https-smoke-test.txt (this file, appended)
+
+Key Decisions:
+- Led the bullet with the test name + file path (TestHTTPS_Smoke) rather
+  than the script path that no longer exists — orients readers at the Go
+  test, not at a removed file.
+- Kept "Pure Go: stdlib cert gen, boots neo4j:5 via os/exec" inline so
+  readers don't need to open the test to understand what it does.
+- No additional AGENTS.md learnings worth adding — the section update IS
+  the deliverable and the existing Hermetic Test Notes / Windows CI
+  Gotchas already cover the patterns the new test uses.
+
+Next Task: All tasks complete
