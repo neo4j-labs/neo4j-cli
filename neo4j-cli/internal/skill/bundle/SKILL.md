@@ -12,7 +12,7 @@ Allows you to manage Neo4j resources
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table] |
+| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon] |
 
 ## Subcommands
 

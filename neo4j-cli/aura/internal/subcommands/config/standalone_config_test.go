@@ -127,7 +127,7 @@ func TestStandaloneConfigSet(t *testing.T) {
 			name:        "set format to invalid value returns error",
 			configSetup: func(h *testutils.AuraTestHelper) {},
 			command:     "config set format invalid-value",
-			wantErr:     "Error: invalid value for 'format': invalid-value (valid values: default, json, table)",
+			wantErr:     "Error: invalid value for 'format': invalid-value (valid values: default, json, table, toon)",
 		},
 	}
 

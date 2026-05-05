@@ -120,6 +120,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
 - `make generate` runs `go generate ./...`; `make generate-check` runs generate then `git diff --exit-code` (CI gate). Wired in `.github/workflows/test.yml` between Build and Lint, runs on full OS matrix.
 - Drift sim: editing a bundle file directly to test generate-check is futile — `go generate` overwrites it. Mutate a real cobra-tree input (e.g. a Short string in `app.go`) to simulate stale-bundle detection.
+- Changing `ValidFormatValues` in `common/clicfg/clicfg.go` affects the `--format` flag help text, which is embedded in skill bundle reference docs. Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` after any such change; `TestGenerator_RoundTrip` is the gate that catches stale bundles.
 
 ## Changie Multi-Project Notes
 

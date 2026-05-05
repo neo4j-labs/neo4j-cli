@@ -40,7 +40,7 @@ func TestSetConfigWithInvalidFormatValue(t *testing.T) {
 	helper.ExecuteCommand("config set format invalid")
 
 	// format is a valid global key; the error is about the invalid value, not the key
-	helper.AssertErr("Error: invalid value for 'format': invalid (valid values: default, json, table)")
+	helper.AssertErr("Error: invalid value for 'format': invalid (valid values: default, json, table, toon)")
 }
 
 func TestSetBetaEnabledConfig(t *testing.T) {

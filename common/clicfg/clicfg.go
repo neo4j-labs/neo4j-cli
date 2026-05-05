@@ -29,7 +29,7 @@ const (
 	DefaultAuraBetaEnabled = false
 )
 
-var ValidFormatValues = [3]string{"default", "json", "table"}
+var ValidFormatValues = [4]string{"default", "json", "table", "toon"}
 
 type ConfigScope string
 

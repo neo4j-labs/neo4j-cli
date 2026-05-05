@@ -12,7 +12,7 @@ Flags:
 |------|------|---------|-------------|
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
-| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table] |
+| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon] |
 | `--insecure` | bool | false | Skip TLS certificate verification [env: NEO4J_INSECURE] (development only) |
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |
 | `--param` | stringArray | [] | Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string |

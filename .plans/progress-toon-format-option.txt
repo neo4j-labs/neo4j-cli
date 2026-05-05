@@ -22,3 +22,36 @@ Key Decisions:
   for future task-004 implementation.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Extend ValidFormatValues to include toon
+Date: 2026-05-05T01:00:00Z
+================================================================================
+
+Summary:
+Extended ValidFormatValues in common/clicfg/clicfg.go from [3]string to [4]string
+adding "toon" as the fourth valid format value. The flag help string in flags.go
+auto-generates from ValidFormatValues so it updated automatically. Updated three
+test files that assert the exact error message when an invalid format value is set.
+Regenerated skill bundles for both neo4j-cli and aura-cli since the flag help text
+changed (the generator is gated by TestGenerator_RoundTrip).
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: [3]string → [4]string with "toon" added)
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (modified: updated error assertion)
+- neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go (modified: updated error assertion)
+- neo4j-cli/internal/subcommands/config/set_test.go (modified: updated error assertion)
+- neo4j-cli/aura/internal/skill/bundle/references/skill.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/SKILL.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/references/query.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/references/skill.md (generated: updated flag help text)
+
+Key Decisions:
+- The flag help string in flags.go is auto-generated from ValidFormatValues via
+  strings.Join, so no manual edit was needed there.
+- Skill bundles must be regenerated (go generate ./neo4j-cli/internal/skill/...
+  and go generate ./neo4j-cli/aura/internal/skill/...) whenever ValidFormatValues
+  changes, because the flag help text is embedded in bundle reference docs.
+- TestGenerator_RoundTrip is the gate that catches stale skill bundles.
+
+Next Task: task-003

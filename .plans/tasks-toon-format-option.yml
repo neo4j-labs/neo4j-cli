@@ -27,7 +27,7 @@ tasks:
       pre-run hook in `common/flags/flags.go` and the config `Set` method — iterate this
       array, so they will accept `toon` automatically once it is added. Update the flag
       help string in `common/flags/flags.go` to list `toon` alongside the existing values.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -36,7 +36,7 @@ tasks:
       - "`--format foo` still returns a usage error"
       - "Flag --format help text includes \"toon\""
       - "`aura-cli config set format toon` succeeds and persists the value"
-    completed_at: null
+    completed_at: "2026-05-05T01:00:00Z"
 
   - id: task-003
     title: "Add toon case to ResolveOutput"

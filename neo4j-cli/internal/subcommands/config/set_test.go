@@ -40,7 +40,7 @@ func TestConfigSet(t *testing.T) {
 		{
 			name:    "set format to invalid value returns error",
 			command: "config set format invalid",
-			wantErr: "Error: invalid value for 'format': invalid (valid values: default, json, table)",
+			wantErr: "Error: invalid value for 'format': invalid (valid values: default, json, table, toon)",
 		},
 		{
 			name:    "set unknown key returns error",
