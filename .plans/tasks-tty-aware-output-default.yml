@@ -55,7 +55,7 @@ tasks:
       auto-detect behaviour, and create a Minor changelog entry for
       neo4j-cli via changie. This is the final user-visible documentation
       step.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -64,4 +64,4 @@ tasks:
       - "A new file `.changes/unreleased/neo4j-cli-Minor-*.yaml` exists with project: neo4j-cli, kind: Minor, body covering the auto-detect behaviour for query and :schema. Created via `changie new --projects neo4j-cli --kind Minor --body \"query/:schema: auto-detect piped/redirected stdout and default --output to json\"` (or equivalent hand-authored YAML if changie isn't installed)."
       - "make test still passes (no code changes needed)."
       - "make fmt-check passes."
-    completed_at: null
+    completed_at: 2026-05-05T08:25:00Z

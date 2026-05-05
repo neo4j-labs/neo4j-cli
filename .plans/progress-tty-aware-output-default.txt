@@ -48,3 +48,25 @@ Key Decisions:
 - make lint not runnable locally (golangci-lint not installed); make test + make fmt-check + go vet all green
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Document TTY-aware default in README and add changelog entry
+Date: 2026-05-05T08:25:00Z
+================================================================================
+
+Summary:
+README query section now documents the auto-detect behaviour ("When stdout is
+not a terminal (piped or redirected), --output defaults to json. Applies to
+both query and :schema."). Added hand-authored Minor changelog YAML for
+neo4j-cli under .changes/unreleased/.
+
+Files Changed:
+- README.md (modified — one sentence appended to the existing query output paragraph)
+- .changes/unreleased/neo4j-cli-Minor-20260505-080500.yaml (created)
+- .plans/tasks-tty-aware-output-default.yml (status -> completed)
+
+Key Decisions:
+- changie not installed locally → hand-authored YAML matching existing files' shape (single-quoted body, RFC3339 time)
+- README sentence inserted into the existing output paragraph rather than a new paragraph — keeps the section tight
+
+Next Task: none (feature complete)

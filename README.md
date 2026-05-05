@@ -87,7 +87,7 @@ Pass parameters with `--param key=value` (repeatable). Values that parse as JSON
 echo 'MATCH (p:Person {name:$name}) RETURN p' | ./neo4j-cli query --param name=Alice
 ```
 
-Output is a table by default; pass `--output json` for a stable envelope (`columns`, `rows`, `truncated`, `arrays_truncated`). Large results are capped at 100 rows and arrays inside cells at 100 items — tune with `--max-rows` / `--truncate-arrays-over` (0 = unlimited).
+Output is a table by default; pass `--output json` for a stable envelope (`columns`, `rows`, `truncated`, `arrays_truncated`). When stdout is not a terminal (piped or redirected), `--output` defaults to `json`. Applies to both `query` and `:schema`. Large results are capped at 100 rows and arrays inside cells at 100 items — tune with `--max-rows` / `--truncate-arrays-over` (0 = unlimited).
 
 Schema introspection:
 
