@@ -24,3 +24,30 @@ Key Decisions:
   may need a Makefile tweak in a follow-up task to wire brews into snapshot.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Mint GitHub App token in release.yml for tap push
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Added `Mint Homebrew tap token` step (id: brew-token) before `Run GoReleaser` in
+release.yml. Uses SHA-pinned `actions/create-github-app-token@1b10c78c... # v3`
+(latest v3.1.1) with HOMEBREW_TAP_APP_ID + HOMEBREW_TAP_APP_PRIVATE_KEY secrets,
+owner=neo4j-labs, repositories=homebrew-tap. Plumbs token into GoReleaser env as
+HOMEBREW_TAP_GITHUB_TOKEN. YAML parses clean (yaml.safe_load), make test +
+make fmt-check pass.
+
+Files Changed:
+- .github/workflows/release.yml (modified — added token mint step + env wiring)
+- .plans/tasks-homebrew-distribution.yml (modified — status flip)
+
+Key Decisions:
+- Resolved v3.1.1 -> SHA via `gh api .../git/ref/tags/v3.1.1` (1b10c78c...).
+  Comment is `# v3` per AGENTS.md `# v<major>` convention; goreleaser-action
+  in the same file uses fuller `# v7.0.0` form but AC explicitly says v<major>.
+- No `permissions:` block on the mint step — the GitHub App is the source of
+  truth for what scopes the token gets (contents:write on homebrew-tap per
+  PRD); a `permissions:` block on the action would only narrow further.
+
+Next Task: task-003

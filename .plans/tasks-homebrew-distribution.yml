@@ -32,7 +32,7 @@ tasks:
       `Run GoReleaser` step as `HOMEBREW_TAP_GITHUB_TOKEN` env so the brews block can
       push the formula. The action must be SHA-pinned with a `# v<major>` trailing
       comment per repo convention.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "Inputs reference new secrets `HOMEBREW_TAP_APP_ID` and `HOMEBREW_TAP_APP_PRIVATE_KEY`"
       - "`Run GoReleaser` step env block exposes `HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.brew-token.outputs.token }}`"
       - "Workflow YAML still parses; existing macOS signing/notarization env vars on the GoReleaser step are untouched"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-003
     title: "Create distribution/homebrew/README.md"
