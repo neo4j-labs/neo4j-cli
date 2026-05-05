@@ -1,0 +1,20 @@
+================================================================================
+TASK-001: Remove debug logs from neo4j-cli/main.go
+Date: 2026-05-05T12:45:00Z
+================================================================================
+
+Summary:
+Stripped three TODO-tagged debug fmt.Printf calls (help displayed, invalid
+command with args, command executed successfully), the SetHelpFunc wrapper
+that wrapped origHelp, and the outdated 2-line comment above cmd.Execute().
+Retained cobra.EnableTraverseRunHooks, panic/recover, and os.Exit(1) on
+failure. All imports (fmt, os, cobra) still used by retained code.
+
+Files Changed:
+- neo4j-cli/main.go (modified — removed 10 lines of debug instrumentation)
+
+Key Decisions:
+- Kept all three imports (cobra, fmt, os) since cobra.EnableTraverseRunHooks
+  + fmt.Printf in panic/recover + os.Args/Exit/Stdout/Stderr still used.
+
+Next Task: task-002
