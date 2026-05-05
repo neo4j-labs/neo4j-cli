@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'analytics: simplify Service interface — removed EmitStartupEvent, EmitCommandEvent, EmitHelpEvent, Enable, and IsEnabled; EmitEvent now accepts an event suffix and always injects base properties at send time'
-time: 2026-05-05T14:00:00.000000Z

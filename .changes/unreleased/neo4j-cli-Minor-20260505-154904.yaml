@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add toon output format option (--format toon / -f toon)
-time: 2026-05-05T15:49:04.011648+01:00

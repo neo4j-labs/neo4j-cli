@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'analytics: emit command-specific events for aura (AURA), query (QUERY), and skill (SKILL) commands; query events record only the command name to prevent capturing query content or credentials that may contain PII, and include an is_aura flag derived from the --uri value'
-time: 2026-05-05T14:01:00.000000Z
