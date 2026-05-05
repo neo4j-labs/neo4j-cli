@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Remove leftover debug log lines (help displayed, invalid command with args, command executed successfully) that were printed to stdout from the CLI entrypoint'
-time: 2026-05-05T12:44:05Z
