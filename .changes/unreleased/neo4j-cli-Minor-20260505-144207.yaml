@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Renamed `--output` to `--format` and added `-f` as a shorthand
-time: 2026-05-05T14:42:07.955463+01:00

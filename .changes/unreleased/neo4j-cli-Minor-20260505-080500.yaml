@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'query/:schema: auto-detect piped/redirected stdout and default --output to json'
-time: 2026-05-05T08:05:00Z

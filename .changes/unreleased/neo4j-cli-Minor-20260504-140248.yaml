@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: '`neo4j-cli` is now installable via `npm i -g @neo4j-labs/cli`'
-time: 2026-05-04T14:02:48.000000+02:00
