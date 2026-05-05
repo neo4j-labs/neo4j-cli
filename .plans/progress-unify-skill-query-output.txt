@@ -80,3 +80,37 @@ Key Decisions:
 - flags.RegisterOutputFlag replaces custom PersistentPreRunE — cleaner DRY approach
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Migrate query command to PrintBodyMap with queryResult ResponseData type
+Date: 2026-05-05T13:00:00Z
+================================================================================
+
+Summary:
+Migrated neo4j-cli/query output rendering to use common/output.PrintBodyMap.
+Introduced renderResult (named renderResult instead of queryResult due to a
+pre-existing queryResult struct in connect.go). renderResult implements
+ResponseData with AsArray() pre-formatting cell values via formatCell (so that
+common/output.printTable's getNestedField handles them correctly) and
+MarshalJSON() emitting the consumer-facing {columns, rows, truncated,
+arrays_truncated} envelope. Removed local stdoutIsTerminal, resolveOutput,
+printJSONRows, printTableRows, and jsonRowsResult. Updated testseam_test.go to
+seed common/output.StdoutIsTerminal instead. Updated schema.go to use
+commonoutput.ResolveOutput. Replaced --output flag definition with
+flags.RegisterOutputFlag.
+
+Files Changed:
+- neo4j-cli/query/query.go (modified: removed --output flag, added flags.RegisterOutputFlag)
+- neo4j-cli/query/output.go (modified: replaced local seam+resolveOutput+jsonRowsResult with renderResult type + PrintBodyMap delegation)
+- neo4j-cli/query/schema.go (modified: resolveOutput → commonoutput.ResolveOutput)
+- neo4j-cli/query/testseam_test.go (modified: seeds commonoutput.StdoutIsTerminal instead of local seam)
+- neo4j-cli/query/output_test.go (modified: withStdoutIsTerminal uses commonoutput.StdoutIsTerminal; decodedResult replaces jsonRowsResult)
+- neo4j-cli/query/run_test.go (modified: jsonRowsResult → decodedResult)
+
+Key Decisions:
+- Named struct renderResult not queryResult (name conflict with connect.go's queryResult)
+- AsArray() pre-formats values via formatCell to strings — avoids behavioral mismatch between printTableRows (formatCell) and common/output.printTable (getNestedField)
+- MarshalJSON uses anonymous struct to preserve field order and emit raw typed values (not pre-formatted strings)
+- schema.go updated to use commonoutput.ResolveOutput directly (no bridge function needed)
+
+Next Task: task-005

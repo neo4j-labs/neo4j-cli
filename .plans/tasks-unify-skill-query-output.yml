@@ -86,7 +86,7 @@ tasks:
       needs to control TTY detection, overriding `common/output.StdoutIsTerminal` with
       `t.Cleanup` restoration. Update all query test fixtures from `{"aura":{"output":"..."}}`
       to `{"output":"..."}`.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -97,7 +97,7 @@ tasks:
       - "`testseam_test.go` no longer seeds `stdoutIsTerminal`"
       - "All query test fixtures use `{\"output\":\"...\"}` at the JSON root"
       - "`make test` passes for `neo4j-cli/query/...`"
-    completed_at: null
+    completed_at: 2026-05-05T13:00:00Z
 
   - id: task-005
     title: "Final gate: make test and make fmt-check across the full repo"

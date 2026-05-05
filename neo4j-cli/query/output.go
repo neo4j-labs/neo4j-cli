@@ -6,77 +6,90 @@ package query
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 )
 
-// stdoutIsTerminal is the test seam for terminal detection on the writer the
-// renderer is about to print to. Production asserts the writer is *os.File and
-// calls term.IsTerminal on its fd; non-*os.File (e.g. a *bytes.Buffer in tests)
-// returns false. Tests substitute this seam to simulate either a TTY or a
-// piped/redirected stdout. Mirrors stdinIsTTY at run.go.
-var stdoutIsTerminal = func(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
-	return term.IsTerminal(int(f.Fd()))
+// renderResult holds the columns, rows, and truncation metadata for a single
+// query execution. It implements commonoutput.ResponseData so it can be
+// rendered by PrintBodyMap in either table or JSON mode.
+//
+// MarshalJSON emits the consumer-facing envelope:
+//
+//	{"columns": [...], "rows": [...], "truncated": bool, "arrays_truncated": N}
+//
+// AsArray returns the rows as a slice of column-keyed maps, which PrintBodyMap
+// uses for table rendering (column order is preserved by the fields slice).
+type renderResult struct {
+	columns         []string
+	rows            []map[string]any
+	truncated       bool
+	arraysTruncated int
 }
 
-// resolveOutput returns the effective output mode ("json" or "table") for the
-// current invocation. When cfg.Global.Output() is "default" or "" the mode is
-// auto-detected from cmd.OutOrStdout(): TTY → "table", non-TTY → "json".
-// Any other configured value (e.g. "json", "table") passes through unchanged
-// — explicit --output always wins.
-func resolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
-	v := cfg.Global.Output()
-	if v != "default" && v != "" {
-		return v
+// AsArray implements commonoutput.ResponseData. Each row is returned as a
+// column-name → pre-formatted-string map so that common/output.printTable can
+// render them correctly. Each cell is formatted by formatCell: strings are
+// emitted as-is, nil as "null", and everything else as compact JSON. Column
+// ordering for table rendering is controlled by the fields slice passed to
+// PrintBodyMap.
+func (r renderResult) AsArray() []map[string]any {
+	if r.rows == nil {
+		return []map[string]any{}
 	}
-	if stdoutIsTerminal(cmd.OutOrStdout()) {
-		return "table"
+	out := make([]map[string]any, len(r.rows))
+	for i, row := range r.rows {
+		formatted := make(map[string]any, len(row))
+		for k, v := range row {
+			formatted[k] = formatCell(v)
+		}
+		out[i] = formatted
 	}
-	return "json"
+	return out
 }
 
-// jsonRowsResult is the JSON shape emitted in JSON output mode. Field order
-// (columns, rows, truncated, arrays_truncated) is fixed via struct field
-// order so encoding/json preserves it for downstream consumers. The
-// arrays_truncated field always emits (zero value when nothing was elided)
-// so the schema is stable for jq-style consumers.
-type jsonRowsResult struct {
-	Columns         []string         `json:"columns"`
-	Rows            []map[string]any `json:"rows"`
-	Truncated       bool             `json:"truncated"`
-	ArraysTruncated int              `json:"arrays_truncated"`
-}
-
-// renderRows writes the query result to cmd's stdout in either JSON or table
-// form, branching on resolveOutput(cmd, cfg). When --output is "default" (the
-// implicit value), the renderer auto-detects: TTY stdout → table, piped or
-// redirected stdout → JSON. Explicit --output table|json always wins. Rows
-// must already be shaped as {column: value} maps — use rowsFromValues to
-// convert raw positional API values. The truncated flag is propagated to the
-// JSON output but does not itself emit a warning; the caller (runQuery)
-// prints any stderr warning. arraysTruncated is the aggregate count of slices
-// elided by --truncate-arrays-over and is always emitted in the JSON envelope.
-func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows []map[string]any, truncated bool, arraysTruncated int) {
+// MarshalJSON preserves the existing consumer-facing JSON schema:
+//
+//	{columns, rows, truncated, arrays_truncated}
+//
+// Field order is fixed via struct field order so encoding/json preserves it.
+func (r renderResult) MarshalJSON() ([]byte, error) {
+	cols := r.columns
+	if cols == nil {
+		cols = []string{}
+	}
+	rows := r.rows
 	if rows == nil {
 		rows = []map[string]any{}
 	}
+	return json.Marshal(struct {
+		Columns         []string         `json:"columns"`
+		Rows            []map[string]any `json:"rows"`
+		Truncated       bool             `json:"truncated"`
+		ArraysTruncated int              `json:"arrays_truncated"`
+	}{
+		Columns:         cols,
+		Rows:            rows,
+		Truncated:       r.truncated,
+		ArraysTruncated: r.arraysTruncated,
+	})
+}
 
-	if resolveOutput(cmd, cfg) == "json" {
-		printJSONRows(cmd, columns, rows, truncated, arraysTruncated)
-		return
+// renderRows writes the query result to cmd's stdout via PrintBodyMap, which
+// delegates to ResolveOutput for TTY auto-detection. Explicit --output
+// table|json always wins; "default" or "" auto-detects: TTY → table, non-TTY
+// → JSON.
+func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows []map[string]any, truncated bool, arraysTruncated int) {
+	result := renderResult{
+		columns:         columns,
+		rows:            rows,
+		truncated:       truncated,
+		arraysTruncated: arraysTruncated,
 	}
-
-	printTableRows(cmd, columns, rows)
+	commonoutput.PrintBodyMap(cmd, cfg, result, columns)
 }
 
 // rowsFromValues converts the API's positional values (one []any per row, in
@@ -97,46 +110,6 @@ func rowsFromValues(columns []string, values [][]any) []map[string]any {
 		rows = append(rows, row)
 	}
 	return rows
-}
-
-func printJSONRows(cmd *cobra.Command, columns []string, rows []map[string]any, truncated bool, arraysTruncated int) {
-	if columns == nil {
-		columns = []string{}
-	}
-	out := jsonRowsResult{
-		Columns:         columns,
-		Rows:            rows,
-		Truncated:       truncated,
-		ArraysTruncated: arraysTruncated,
-	}
-	bytes, err := json.MarshalIndent(out, "", "\t")
-	if err != nil {
-		// Encoding our own struct cannot fail in practice; mirror the existing
-		// output package's posture (panic on impossible-state).
-		panic(err)
-	}
-	cmd.Println(string(bytes))
-}
-
-func printTableRows(cmd *cobra.Command, columns []string, rows []map[string]any) {
-	t := table.NewWriter()
-
-	header := make(table.Row, 0, len(columns))
-	for _, c := range columns {
-		header = append(header, c)
-	}
-	t.AppendHeader(header)
-
-	for _, r := range rows {
-		row := make(table.Row, 0, len(columns))
-		for _, c := range columns {
-			row = append(row, formatCell(r[c]))
-		}
-		t.AppendRow(row)
-	}
-
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
 }
 
 // formatCell renders a single cell value as text. Strings are emitted as-is

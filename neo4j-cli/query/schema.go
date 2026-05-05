@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 )
 
 // schemaResult is the structured introspection payload built from the
@@ -269,7 +270,7 @@ func fetchDatabaseInfo(ctx context.Context, c *conn) *databaseInfo {
 // mode emits the full struct; table mode emits the five stacked sub-tables
 // separated by H2 markers in the canonical order.
 func renderSchema(cmd *cobra.Command, cfg *clicfg.Config, r schemaResult) {
-	if resolveOutput(cmd, cfg) == "table" {
+	if commonoutput.ResolveOutput(cmd, cfg) == "table" {
 		printSchemaTables(cmd, r)
 		return
 	}

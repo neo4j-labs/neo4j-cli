@@ -115,7 +115,7 @@ func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 	assert.False(t, got.Truncated)
@@ -179,7 +179,7 @@ func TestRunQuery_RowLimitTruncates_JSONSetsTruncatedTrueAndPrintsWarning(t *tes
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.True(t, got.Truncated, "JSON envelope must report truncated:true")
 	assert.Len(t, got.Rows, 1)
@@ -200,7 +200,7 @@ func TestRunQuery_RowLimitZeroMeansUnlimited(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.False(t, got.Truncated)
 	assert.Len(t, got.Rows, 3)
@@ -221,7 +221,7 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	require.Len(t, got.Rows, 1)
 	xs, ok := got.Rows[0]["xs"].([]any)
@@ -313,7 +313,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 }
@@ -495,7 +495,7 @@ func TestRunQuery_TruncateArrays_JSON_AggregateWarningAndField(t *testing.T) {
 		"warning: truncated 1 arrays larger than 3 items (use --truncate-arrays-over 0 to disable)",
 		"stderr must contain the exact aggregate warning line")
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, 1, got.ArraysTruncated, "JSON envelope must report arrays_truncated=1")
 	assert.False(t, got.Truncated, "row-cap signal must remain false")
@@ -542,7 +542,7 @@ func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T
 	assert.NotContains(t, stderr, "arrays larger than",
 		"stderr must be silent for the array-truncation warning when nothing was elided")
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, 0, got.ArraysTruncated, "arrays_truncated must be 0 when nothing was elided")
 }
@@ -577,7 +577,7 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 		"stderr notice must include the explanation suffix")
 
 	// The request must have actually hit the test server (response parsed OK).
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 }
