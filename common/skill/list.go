@@ -4,10 +4,12 @@
 package skill
 
 import (
-	"github.com/jedib0t/go-pretty/v6/table"
+	"encoding/json"
+
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 )
 
 func newListCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
@@ -35,8 +37,32 @@ type listResultRow struct {
 	InstalledVersion string `json:"installed_version"`
 }
 
+// listResults implements common/output.ResponseData for list results.
+type listResults []listResultRow
+
+// AsArray returns each row as a column-keyed map for table rendering.
+func (r listResults) AsArray() []map[string]any {
+	out := make([]map[string]any, 0, len(r))
+	for _, row := range r {
+		out = append(out, map[string]any{
+			"agent":             row.Agent,
+			"display_name":      row.DisplayName,
+			"detected":          boolStr(row.Detected),
+			"installed":         boolStr(row.Installed),
+			"installed_version": row.InstalledVersion,
+		})
+	}
+	return out
+}
+
+// MarshalJSON delegates to default slice marshalling, preserving the
+// existing JSON array-of-objects shape.
+func (r listResults) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]listResultRow(r))
+}
+
 func renderListResult(cmd *cobra.Command, cfg *clicfg.Config, rows []AgentInstall) {
-	out := make([]listResultRow, 0, len(rows))
+	out := make(listResults, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, listResultRow{
 			Agent:            r.Agent.Name,
@@ -47,18 +73,7 @@ func renderListResult(cmd *cobra.Command, cfg *clicfg.Config, rows []AgentInstal
 		})
 	}
 
-	if cfg.Aura.Output() == "json" {
-		printJSON(cmd, out)
-		return
-	}
-
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"agent", "display", "detected", "installed", "installed-version"})
-	for _, r := range out {
-		t.AppendRow(table.Row{r.Agent, r.DisplayName, boolStr(r.Detected), boolStr(r.Installed), r.InstalledVersion})
-	}
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
+	commonoutput.PrintBodyMap(cmd, cfg, out, []string{"agent", "display_name", "detected", "installed", "installed_version"})
 }
 
 func boolStr(b bool) string {

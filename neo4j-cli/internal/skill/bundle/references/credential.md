@@ -4,17 +4,17 @@ Manage and view credential values
 
 Usage: `neo4j-cli credential`
 
-## neo4j-cli credential add
+## neo4j-cli credential aura-client
+
+Manage and view aura-client credential values
+
+Usage: `neo4j-cli credential aura-client`
+
+### neo4j-cli credential aura-client add
 
 Adds a credential
 
-Usage: `neo4j-cli credential add`
-
-### neo4j-cli credential add aura-client
-
-Adds an Aura client credential
-
-Usage: `neo4j-cli credential add aura-client [flags]`
+Usage: `neo4j-cli credential aura-client add [flags]`
 
 Flags:
 
@@ -24,39 +24,21 @@ Flags:
 | `--client-secret` | string | - | (required) Client secret |
 | `--name` | string | - | (required) Name |
 
-## neo4j-cli credential list
+### neo4j-cli credential aura-client list
 
 List credentials
 
-Usage: `neo4j-cli credential list`
+Usage: `neo4j-cli credential aura-client list`
 
-### neo4j-cli credential list aura-client
-
-Lists Aura client credentials
-
-Usage: `neo4j-cli credential list aura-client`
-
-## neo4j-cli credential remove
+### neo4j-cli credential aura-client remove
 
 Removes a credential
 
-Usage: `neo4j-cli credential remove`
+Usage: `neo4j-cli credential aura-client remove`
 
-### neo4j-cli credential remove aura-client
-
-Removes an Aura client credential
-
-Usage: `neo4j-cli credential remove aura-client <name>`
-
-## neo4j-cli credential use
+### neo4j-cli credential aura-client use
 
 Sets the default credential to be used
 
-Usage: `neo4j-cli credential use`
-
-### neo4j-cli credential use aura-client
-
-Sets the default Aura client credential to be used
-
-Usage: `neo4j-cli credential use aura-client <name>`
+Usage: `neo4j-cli credential aura-client use`
 

@@ -49,11 +49,11 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	stdinIsTTY = func() bool { return true }
 	stdinReader = func() io.Reader { return strings.NewReader("") }
 
-	cfgJSON := `{"aura":{"output":"` + output + `"}}`
+	cfgJSON := `{"format":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	return &runHarness{
-		cfg:    clicfg.NewConfig(fs, "test"),
+		cfg:    clicfg.NewConfig(fs, "test", clicfg.QueryScope),
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
@@ -77,7 +77,7 @@ func startServer(t *testing.T, status int, body []byte) *httptest.Server {
 func (h *runHarness) execute(t *testing.T, args ...string) error {
 	t.Helper()
 	// Use afero.NewMemMapFs for the cobra command itself; the harness's cfg
-	// owns the testfs filesystem, which is what cfg.Aura.Output() reads.
+	// owns the testfs filesystem, which is what cfg.Global.Format() reads.
 	cmd := NewCmd(h.cfg)
 	cmd.SetOut(h.stdout)
 	cmd.SetErr(h.stderr)
@@ -115,7 +115,7 @@ func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 	assert.False(t, got.Truncated)
@@ -179,7 +179,7 @@ func TestRunQuery_RowLimitTruncates_JSONSetsTruncatedTrueAndPrintsWarning(t *tes
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.True(t, got.Truncated, "JSON envelope must report truncated:true")
 	assert.Len(t, got.Rows, 1)
@@ -200,7 +200,7 @@ func TestRunQuery_RowLimitZeroMeansUnlimited(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.False(t, got.Truncated)
 	assert.Len(t, got.Rows, 3)
@@ -221,7 +221,7 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	require.Len(t, got.Rows, 1)
 	xs, ok := got.Rows[0]["xs"].([]any)
@@ -232,7 +232,7 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 // TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray verifies the
 // rendered JSON literally contains `"xs": []` for an over-limit top-level
 // array — closes the gap where in-memory shape was tested but not the
-// actual `--output json` byte stream.
+// actual `--format json` byte stream.
 func TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray(t *testing.T) {
 	// 10-item array; --truncate-arrays-over=3 → emit empty array.
 	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
@@ -277,7 +277,7 @@ func TestRunQuery_TruncateArrays_NestedArray_JSONOutputContainsEmptyArray(t *tes
 		"output must NOT contain any placeholder string")
 }
 
-// TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray covers --output
+// TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray covers --format
 // table: the cell rendering for an over-limit array must be `[]` (the
 // JSON-stringified empty array), not the legacy placeholder string.
 func TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray(t *testing.T) {
@@ -313,7 +313,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 }
@@ -495,7 +495,7 @@ func TestRunQuery_TruncateArrays_JSON_AggregateWarningAndField(t *testing.T) {
 		"warning: truncated 1 arrays larger than 3 items (use --truncate-arrays-over 0 to disable)",
 		"stderr must contain the exact aggregate warning line")
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, 1, got.ArraysTruncated, "JSON envelope must report arrays_truncated=1")
 	assert.False(t, got.Truncated, "row-cap signal must remain false")
@@ -542,7 +542,7 @@ func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T
 	assert.NotContains(t, stderr, "arrays larger than",
 		"stderr must be silent for the array-truncation warning when nothing was elided")
 
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, 0, got.ArraysTruncated, "arrays_truncated must be 0 when nothing was elided")
 }
@@ -577,7 +577,7 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 		"stderr notice must include the explanation suffix")
 
 	// The request must have actually hit the test server (response parsed OK).
-	var got jsonRowsResult
+	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
 }
@@ -605,7 +605,7 @@ func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	stdinIsTTY = func() bool { return false }
 
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})

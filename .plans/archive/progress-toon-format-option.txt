@@ -1,0 +1,148 @@
+================================================================================
+TASK-001: Add toon-go dependency to go.mod
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Added the github.com/toon-format/toon-go module (v0.0.0-20251202084852-7ca0e27c4e8c)
+to the Go module via `go get`. The module was available on the module proxy without
+needing a replace directive. The dependency is currently marked `// indirect` in go.mod
+since it is not imported yet; it will become a direct dependency in task-004 when
+`printToon` is implemented.
+
+Files Changed:
+- go.mod (modified: added toon-go require entry)
+- go.sum (modified: added toon-go hash entries)
+
+Key Decisions:
+- Used `go get github.com/toon-format/toon-go@latest` which resolved to the latest
+  pseudo-version v0.0.0-20251202084852-7ca0e27c4e8c.
+- No replace directive needed — module proxy served the package directly.
+- Confirmed `toon.Marshal(v, toon.WithLengthMarkers(true))` is the correct API call
+  for future task-004 implementation.
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Extend ValidFormatValues to include toon
+Date: 2026-05-05T01:00:00Z
+================================================================================
+
+Summary:
+Extended ValidFormatValues in common/clicfg/clicfg.go from [3]string to [4]string
+adding "toon" as the fourth valid format value. The flag help string in flags.go
+auto-generates from ValidFormatValues so it updated automatically. Updated three
+test files that assert the exact error message when an invalid format value is set.
+Regenerated skill bundles for both neo4j-cli and aura-cli since the flag help text
+changed (the generator is gated by TestGenerator_RoundTrip).
+
+Files Changed:
+- common/clicfg/clicfg.go (modified: [3]string → [4]string with "toon" added)
+- neo4j-cli/aura/internal/subcommands/config/set_test.go (modified: updated error assertion)
+- neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go (modified: updated error assertion)
+- neo4j-cli/internal/subcommands/config/set_test.go (modified: updated error assertion)
+- neo4j-cli/aura/internal/skill/bundle/references/skill.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/SKILL.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/references/query.md (generated: updated flag help text)
+- neo4j-cli/internal/skill/bundle/references/skill.md (generated: updated flag help text)
+
+Key Decisions:
+- The flag help string in flags.go is auto-generated from ValidFormatValues via
+  strings.Join, so no manual edit was needed there.
+- Skill bundles must be regenerated (go generate ./neo4j-cli/internal/skill/...
+  and go generate ./neo4j-cli/aura/internal/skill/...) whenever ValidFormatValues
+  changes, because the flag help text is embedded in bundle reference docs.
+- TestGenerator_RoundTrip is the gate that catches stale skill bundles.
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Add toon case to ResolveOutput
+Date: 2026-05-05T02:00:00Z
+================================================================================
+
+Summary:
+Updated ResolveOutput in common/output/output.go to short-circuit on "toon"
+the same way it already does for "json" and "table". The one-line condition
+change prevents "toon" from falling through to TTY auto-detection. Updated
+the doc comment to list "toon" alongside the other explicit format values.
+
+Files Changed:
+- common/output/output.go (modified: added "toon" to ResolveOutput short-circuit condition and updated doc comment)
+
+Key Decisions:
+- Minimal change: added `|| v == "toon"` to the existing short-circuit condition.
+- No new callers or dispatch logic needed here; task-004 will add the PrintBodyMap case.
+
+Next Task: task-004
+
+================================================================================
+TASK-004: Implement printToon and wire into PrintBodyMap
+Date: 2026-05-05T03:00:00Z
+================================================================================
+
+Summary:
+Added printToon helper to common/output/output.go that marshals a ResponseData
+value to canonical JSON, unmarshals to any, then encodes via toon.Marshal with
+WithLengthMarkers(true). Wired a "toon" case into PrintBodyMap's switch
+statement, keeping it symmetrical with the "json" case. Also ran go mod tidy to
+promote toon-go from // indirect to a direct dependency in go.mod.
+
+Files Changed:
+- common/output/output.go (modified: added toon import, printToon helper, "toon" case in PrintBodyMap)
+- go.mod (modified: toon-go promoted from indirect to direct dependency)
+
+Key Decisions:
+- printToon follows the json→any→toon round-trip to honour custom MarshalJSON
+  implementations on concrete ResponseData types (e.g. ConfigData.MarshalJSON).
+- Used `toon "github.com/toon-format/toon-go"` alias to keep call-sites readable.
+- go mod tidy promotes the dependency automatically once the import is present.
+
+Next Task: task-005
+
+================================================================================
+TASK-005: Add tests for toon format rendering
+Date: 2026-05-05T04:00:00Z
+================================================================================
+
+Summary:
+Created common/output/output_test.go with table-driven tests for PrintBodyMap
+and ResolveOutput covering the "toon" format path. Tests verify: toon output is
+non-empty, differs from JSON output, is not valid JSON (confirming toon encoding),
+and contains the same top-level keys as the JSON envelope. Also tests that
+ResolveOutput returns "toon" regardless of TTY state when configured explicitly.
+
+Files Changed:
+- common/output/output_test.go (created: unit tests for toon rendering path)
+
+Key Decisions:
+- Used package `output` (not `output_test`) to access StdoutIsTerminal seam
+  directly, matching the pattern in neo4j-cli/query/output_test.go.
+- simpleData implements MarshalJSON wrapping rows in {"data": ...} to test the
+  json→any→toon round-trip honours custom MarshalJSON implementations.
+- The "toon output is not valid JSON" assertion confirms actual toon encoding,
+  as toon uses key: value syntax rather than JSON syntax.
+- Empty rows case included to verify toon.Marshal handles empty arrays gracefully.
+
+Next Task: task-006
+
+================================================================================
+TASK-006: Add changelog entries for aura-cli and neo4j-cli
+Date: 2026-05-05T17:00:00Z
+================================================================================
+
+Summary:
+Created two changie-format YAML entries under .changes/unreleased/ for the
+toon output format feature — one for aura-cli and one for neo4j-cli. Both
+entries are kind: Minor and describe the new --format toon / -f toon option.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Minor-20260505-154904.yaml (created)
+- .changes/unreleased/neo4j-cli-Minor-20260505-154904.yaml (created)
+
+Key Decisions:
+- Used changie new --projects aura-cli --projects neo4j-cli --kind Minor to
+  generate both entries in a single invocation, following the repo's
+  dual-project changelog convention documented in AGENTS.md.
+
+Next Task: All tasks complete

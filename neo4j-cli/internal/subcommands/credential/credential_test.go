@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package aura_test
+package credential_test
 
 import (
 	"bytes"
@@ -12,10 +12,12 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/aura"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
+	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/neo4j/cli/test/utils/testjson"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -33,6 +35,7 @@ type credentialTestHelper struct {
 
 func newCredentialTestHelper(t *testing.T) credentialTestHelper {
 	t.Helper()
+	cobra.EnableTraverseRunHooks = true
 	return credentialTestHelper{
 		out: bytes.NewBufferString(""),
 		err: bytes.NewBufferString(""),
@@ -60,9 +63,10 @@ func (h *credentialTestHelper) executeCommand(command string) {
 	assert.Nil(h.t, err)
 	h.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
-	cmd := aura.NewCredentialCmd(cfg)
+	cmd := credential.NewCredentialCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
@@ -80,11 +84,11 @@ func (h *credentialTestHelper) assertCredentialsValue(key string, expected strin
 
 	actual := gjson.Get(string(out), key).String()
 
-	formattedExpected, err := testutils.FormatJson(expected, "\t")
+	formattedExpected, err := testjson.FormatJson(expected, "\t")
 	if err != nil {
 		formattedExpected = expected
 	}
-	formattedActual, err := testutils.FormatJson(actual, "\t")
+	formattedActual, err := testjson.FormatJson(actual, "\t")
 	if err != nil {
 		formattedActual = actual
 	}
@@ -120,7 +124,7 @@ func TestCredentialAddAuraClient(t *testing.T) {
 			name:            "first credential is stored and set as default",
 			initialCreds:    []map[string]string{},
 			initialDefault:  "",
-			command:         "add aura-client --name test --client-id testclientid --client-secret testclientsecret",
+			command:         "aura-client add --name test --client-id testclientid --client-secret testclientsecret",
 			wantCredentials: `[{"name":"test","client-id":"testclientid","client-secret":"testclientsecret","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "test",
 		},
@@ -128,14 +132,14 @@ func TestCredentialAddAuraClient(t *testing.T) {
 			name:           "duplicate name returns an error",
 			initialCreds:   []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault: "test",
-			command:        "add aura-client --name test --client-id testclientid --client-secret testclientsecret",
+			command:        "aura-client add --name test --client-id testclientid --client-secret testclientsecret",
 			wantErr:        "Error: already have credential with name test",
 		},
 		{
 			name:            "additional credential is stored without changing default",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault:  "test",
-			command:         "add aura-client --name test-new --client-id testclientid2 --client-secret testclientsecret2",
+			command:         "aura-client add --name test-new --client-id testclientid2 --client-secret testclientsecret2",
 			wantCredentials: `[{"name":"test","client-id":"testclientid","client-secret":"testclientsecret","access-token":"","token-expiry":0},{"name":"test-new","client-id":"testclientid2","client-secret":"testclientsecret2","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "test",
 		},
@@ -168,24 +172,52 @@ func TestCredentialAddAuraClient(t *testing.T) {
 func TestCredentialListAuraClient(t *testing.T) {
 	tests := []struct {
 		name         string
+		command      string
 		initialCreds []map[string]string
 		wantOut      string
+		wantContains []string
 	}{
 		{
-			name:         "lists all stored credentials",
+			name:         "lists all stored credentials as table (explicit --format table)",
+			command:      "aura-client list --format table",
+			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "test", "aura-client", "testclientid"},
+		},
+		{
+			name:         "lists all stored credentials as json (explicit --format json)",
+			command:      "aura-client list --format json",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			wantOut: `[
 	{
+		"default": false,
+		"identifier": "testclientid",
 		"name": "test",
-		"client-id": "testclientid",
-		"client-secret": "testclientsecret",
-		"access-token": "",
-		"token-expiry": 0
+		"type": "aura-client"
 	}
 ]`,
 		},
 		{
-			name:         "lists empty credentials",
+			name:         "lists all stored credentials as json (default auto-detects non-TTY)",
+			command:      "aura-client list",
+			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
+			wantOut: `[
+	{
+		"default": false,
+		"identifier": "testclientid",
+		"name": "test",
+		"type": "aura-client"
+	}
+]`,
+		},
+		{
+			name:         "lists empty credentials as table (explicit --format table)",
+			command:      "aura-client list --format table",
+			initialCreds: []map[string]string{},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER"},
+		},
+		{
+			name:         "lists empty credentials as json (explicit --format json)",
+			command:      "aura-client list --format json",
 			initialCreds: []map[string]string{},
 			wantOut:      "[]",
 		},
@@ -196,10 +228,20 @@ func TestCredentialListAuraClient(t *testing.T) {
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand("list aura-client")
+			h.executeCommand(tc.command)
 
 			h.assertErr("")
-			h.assertOut(tc.wantOut)
+			if tc.wantOut != "" {
+				h.assertOut(tc.wantOut)
+			}
+			if len(tc.wantContains) > 0 {
+				out, err := io.ReadAll(h.out)
+				assert.Nil(t, err)
+				outStr := string(out)
+				for _, want := range tc.wantContains {
+					assert.Contains(t, outStr, want)
+				}
+			}
 		})
 	}
 }
@@ -217,13 +259,13 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 		{
 			name:            "named credential is removed",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			command:         "remove aura-client test",
+			command:         "aura-client remove test",
 			wantCredentials: "[]",
 		},
 		{
 			name:         "missing credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "remove aura-client nonexistent",
+			command:      "aura-client remove nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent to remove",
 		},
 	}
@@ -261,13 +303,13 @@ func TestCredentialUseAuraClient(t *testing.T) {
 			name:            "named credential becomes the default",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault:  "",
-			command:         "use aura-client test",
+			command:         "aura-client use test",
 			wantDefaultCred: "test",
 		},
 		{
 			name:         "nonexistent credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "use aura-client nonexistent",
+			command:      "aura-client use nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent",
 		},
 	}

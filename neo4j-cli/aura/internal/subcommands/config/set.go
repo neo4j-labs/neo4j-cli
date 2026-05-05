@@ -18,29 +18,27 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 				return err
 			}
 
-			if !cfg.Aura.IsValidConfigKey(args[0]) {
-				return clierr.NewUsageError("invalid config key specified: %s", args[0])
-			}
-
-			if args[0] == "output" {
-				validOutputValue := false
-				for _, v := range clicfg.ValidOutputValues {
-					if v == args[1] {
-						validOutputValue = true
-						break
-					}
-				}
-				if !validOutputValue {
-					return clierr.NewUsageError("invalid output value specified: %s", args[1])
-				}
+			key := args[0]
+			if !cfg.Aura.IsValidConfigKey(key) {
+				return clierr.NewUsageError("invalid config key specified: %s", key)
 			}
 
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.Aura.Set(args[0], args[1])
+			key := args[0]
+			value := args[1]
 
-			return nil
+			if cfg.Global.IsValidConfigKey(key) {
+				return cfg.Global.Set(key, value)
+			}
+			if cfg.Aura.IsValidConfigKey(key) {
+				cfg.Aura.Set(key, value)
+				return nil
+			}
+
+			// Should never get here due to validation in Args, but adding a safeguard just in case
+			return clierr.NewUsageError("invalid config key specified: %s", key)
 		},
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/output"
 )
 
 type ErrorResponse struct {
@@ -265,7 +266,7 @@ var GraphAnalyticsSessionWaitingStatus = []string{
 }
 
 type ResponseData interface {
-	AsArray() []map[string]any
+	output.ResponseData
 	GetSingleOrError() (map[string]any, error)
 }
 

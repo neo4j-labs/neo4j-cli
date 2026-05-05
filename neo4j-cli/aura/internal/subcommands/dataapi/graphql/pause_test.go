@@ -28,7 +28,7 @@ func TestPauseGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql pause --output json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql pause --format json --instance-id %s %s", instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)

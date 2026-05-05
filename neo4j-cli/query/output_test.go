@@ -15,18 +15,28 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
+// decodedResult is the JSON decode target for queryResult output; it mirrors
+// the MarshalJSON envelope with exported fields so json.Unmarshal works.
+type decodedResult struct {
+	Columns         []string         `json:"columns"`
+	Rows            []map[string]any `json:"rows"`
+	Truncated       bool             `json:"truncated"`
+	ArraysTruncated int              `json:"arrays_truncated"`
+}
+
 // newRenderCmd returns a fresh cobra command with stdout captured into the
-// returned buffer. The output mode ("default", "json", or "table") is wired
-// through the persisted aura config so renderRows reads it via cfg.Aura.Output().
+// returned buffer. The format mode ("default", "json", or "table") is wired
+// through the persisted config so renderRows reads it via cfg.Global.Format().
 func newRenderCmd(t *testing.T, output string) (*cobra.Command, *clicfg.Config, *bytes.Buffer) {
 	t.Helper()
-	cfgJSON := `{"aura":{"output":"` + output + `"}}`
+	cfgJSON := `{"format":"` + output + `"}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 
 	cmd := &cobra.Command{}
 	stdout := &bytes.Buffer{}
@@ -141,7 +151,7 @@ func TestRenderRows_JSON(t *testing.T) {
 			cmd, cfg, stdout := newRenderCmd(t, "json")
 			renderRows(cmd, cfg, tc.columns, tc.rows, tc.truncated, tc.arraysTruncated)
 
-			var got jsonRowsResult
+			var got decodedResult
 			require.NoError(t, json.Unmarshal(stdout.Bytes(), &got))
 			assert.Equal(t, tc.columns, got.Columns)
 			assert.Equal(t, tc.wantTruncated, got.Truncated)
@@ -246,8 +256,8 @@ func TestRenderRows_Table_PreservesColumnOrder(t *testing.T) {
 
 func TestRenderRows_DefaultOutputRendersTable(t *testing.T) {
 	// "default" must dispatch to the table renderer (not JSON) when stdout is
-	// a TTY — TestMain seeds stdoutIsTerminal=true so this is the default for
-	// the package-level test run.
+	// a TTY — TestMain seeds commonoutput.StdoutIsTerminal=true so this is the
+	// default for the package-level test run.
 	cmd, cfg, stdout := newRenderCmd(t, "default")
 	renderRows(cmd, cfg, []string{"n"}, []map[string]any{{"n": float64(42)}}, false, 0)
 
@@ -258,24 +268,24 @@ func TestRenderRows_DefaultOutputRendersTable(t *testing.T) {
 	assert.NotContains(t, out, `"truncated"`)
 }
 
-// withStdoutIsTerminal locally overrides the package-level seam for one test,
-// auto-restoring the prior value via t.Cleanup. The package's TestMain seeds
-// the seam to true; tests that want to exercise the non-TTY branch (or
+// withStdoutIsTerminal locally overrides the common/output.StdoutIsTerminal
+// seam for one test, auto-restoring the prior value via t.Cleanup. TestMain
+// seeds the seam to true; tests that want to exercise the non-TTY branch (or
 // re-assert TTY explicitly) call this helper.
 func withStdoutIsTerminal(t *testing.T, isTTY bool) {
 	t.Helper()
-	prev := stdoutIsTerminal
-	stdoutIsTerminal = func(io.Writer) bool { return isTTY }
-	t.Cleanup(func() { stdoutIsTerminal = prev })
+	prev := commonoutput.StdoutIsTerminal
+	commonoutput.StdoutIsTerminal = func(io.Writer) bool { return isTTY }
+	t.Cleanup(func() { commonoutput.StdoutIsTerminal = prev })
 }
 
 // TestRenderRows_TTYAwareDefault covers the four explicit/auto branches of
-// resolveOutput as exercised through renderRows: TTY+default→table,
-// non-TTY+default→json, non-TTY+--output table→table, TTY+--output json→json.
+// ResolveOutput as exercised through renderRows: TTY+default→table,
+// non-TTY+default→json, non-TTY+--format table→table, TTY+--format json→json.
 func TestRenderRows_TTYAwareDefault(t *testing.T) {
 	tests := []struct {
 		name        string
-		output      string // value persisted in cfg.Aura.Output()
+		output      string // value persisted in cfg.Global.Format()
 		isTTY       bool
 		wantJSON    bool   // true if the JSON envelope should be present
 		wantInTable string // substring expected in table output (only when wantJSON=false)
@@ -294,14 +304,14 @@ func TestRenderRows_TTYAwareDefault(t *testing.T) {
 			wantJSON: true,
 		},
 		{
-			name:        "non-TTY + explicit --output table -> table",
+			name:        "non-TTY + explicit --format table -> table",
 			output:      "table",
 			isTTY:       false,
 			wantJSON:    false,
 			wantInTable: "42",
 		},
 		{
-			name:     "TTY + explicit --output json -> json",
+			name:     "TTY + explicit --format json -> json",
 			output:   "json",
 			isTTY:    true,
 			wantJSON: true,
@@ -316,7 +326,7 @@ func TestRenderRows_TTYAwareDefault(t *testing.T) {
 
 			out := stdout.String()
 			if tc.wantJSON {
-				var got jsonRowsResult
+				var got decodedResult
 				require.NoError(t, json.Unmarshal([]byte(out), &got),
 					"output should be JSON envelope, got: %s", out)
 				assert.Equal(t, []string{"n"}, got.Columns)

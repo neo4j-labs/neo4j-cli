@@ -1,0 +1,130 @@
+feature: rename-output-to-format
+prd: ./prd-rename-output-to-format.md
+created_at: 2026-05-05T15:00:00Z
+updated_at: 2026-05-05T15:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Rename viper key, methods, and array in common/clicfg/clicfg.go"
+    description: |
+      All output-related identifiers in `common/clicfg/clicfg.go` rename in this task.
+      Rename `ValidOutputValues` → `ValidFormatValues`. Rename the viper key from `"output"` to
+      `"format"` in `SetDefault`, `GetString`, `BindPFlag`, `ValidConfigKeys`, and both
+      special-case guards (`AuraConfig.Get()` at the `key == "output"` check, and
+      `GlobalConfig.Set()` at the `key == "output"` validation block). Rename
+      `GlobalConfig.Output()` → `GlobalConfig.Format()` and `GlobalConfig.BindOutput()` →
+      `GlobalConfig.BindFormat()`. Update the `ResolveConfigKey` docstring and rejection guard
+      from `"aura.output"` to `"aura.format"`. Finally, update the commented-out migration
+      block: change the destination key from `"output"` to `"format"`, add a second clause
+      migrating `"output"` → `"format"` alongside the existing `"aura.output"` clause, and
+      update the NOTE comment to describe the new key names. The block must stay commented out;
+      do not restore the `gjson` import.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ValidFormatValues` exists in `clicfg.go`; `ValidOutputValues` does not"
+      - "`GlobalConfig.Format()` returns `viper.GetString(\"format\")`; `Output()` does not exist"
+      - "`GlobalConfig.BindFormat()` calls `viper.BindPFlag(\"format\", flag)`; `BindOutput()` does not exist"
+      - "The migration block remains commented out and references `\"format\"` as the destination key, with both `\"aura.output\"` and `\"output\"` source clauses"
+      - "`go build ./common/clicfg/...` succeeds"
+    completed_at: "2026-05-05T16:30:00Z"
+
+  - id: task-002
+    title: "Rename flag to --format/-f in common/flags/flags.go; update all non-test callers"
+    description: |
+      Update `common/flags/flags.go` (`RegisterOutputFlag`): rename the registered pflag from
+      `"output"` to `"format"`, add shorthand `"f"`, update the flag lookup key in
+      `PersistentPreRunE` from `"output"` to `"format"`, update the `ValidOutputValues`
+      reference to `ValidFormatValues`, update the `BindOutput` call to `BindFormat`, and
+      update error messages. Then update every non-test caller of the renamed methods:
+      `common/output/output.go::ResolveOutput` (replace `cfg.Global.Output()` with
+      `cfg.Global.Format()`), `neo4j-cli/aura/internal/subcommands/import/job/get.go`, and
+      `neo4j-cli/aura/internal/subcommands/tenant/get.go`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`common/flags/flags.go` registers a `\"format\"` flag with shorthand `\"f\"`; no `\"output\"` flag registration remains"
+      - "`RegisterOutputFlag`'s `PersistentPreRunE` looks up `cmd.Flags().Lookup(\"format\")` and calls `cfg.Global.BindFormat`"
+      - "All `cfg.Global.Output()` calls in non-test Go files are replaced with `cfg.Global.Format()`"
+      - "`go build ./...` succeeds (no compilation errors)"
+    completed_at: "2026-05-05T16:30:00Z"
+
+  - id: task-003
+    title: "Update all test files: --output → --format, config fixtures output → format"
+    description: |
+      Update every test file that passes `"--output"` as a cobra command argument to pass
+      `"--format"` instead (or `"-f"` where shorthand is more natural). Update every test
+      config fixture JSON string that uses the `"output"` key at the root to use `"format"`
+      (e.g., `{"output":"json"}` → `{"format":"json"}`). There are approximately 62
+      `--output` occurrences across 26 test files and numerous `{"output":` fixture strings.
+      Use grep to find all remaining occurrences after the mechanical substitution and verify
+      none are missed. Tests for `config get output` / `config set output` become
+      `config get format` / `config set format`.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "No test file contains `\"--output\"` as a cobra argument string"
+      - "No test config fixture contains `{\"output\":` at the JSON root level"
+      - "`config get format` and `config set format` are tested in config test files"
+      - "`make test` passes for all packages"
+    completed_at: "2026-05-05T16:30:00Z"
+
+  - id: task-004
+    title: "Update hand-authored docs: AGENTS.md, README, CONTRIBUTING, usage guides"
+    description: |
+      Replace all `--output` flag references with `--format` (and add `-f` where shorthand is
+      shown) in hand-authored documentation files: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`,
+      `docs/usageGuide/Neo4j CLI.md`, `.agents/architecture.md`, `.agents/repo-layout.md`, and
+      any other `.md` files outside generated bundle directories. Also update occurrences of
+      `"output"` used as a config key name in prose (e.g., "config get output" → "config get
+      format"). Do not edit files under `neo4j-cli/*/skill/bundle/` — those are regenerated by
+      `make generate` in task-005.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`grep -r -- '--output' AGENTS.md CONTRIBUTING.md README.md docs/ .agents/` returns no matches"
+      - "All prose references to `config get/set output` are updated to `config get/set format`"
+      - "No bundle files under `neo4j-cli/*/skill/bundle/` were edited in this task"
+    completed_at: "2026-05-05T17:00:00Z"
+
+  - id: task-005
+    title: "Update additions.md files and regenerate skill bundles with make generate"
+    description: |
+      Check `neo4j-cli/internal/skill/additions.md` and
+      `neo4j-cli/aura/internal/skill/additions.md` for any `--output` mentions and update them
+      to `--format` / `-f`. Then run `make generate` to regenerate all committed bundle files
+      (`SKILL.md` and `references/*.md` under both `neo4j-cli/internal/skill/bundle/` and
+      `neo4j-cli/aura/internal/skill/bundle/`). Verify `make generate-check` exits 0,
+      confirming the committed files match the generated output from the updated cobra tree.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`neo4j-cli/internal/skill/additions.md` and `neo4j-cli/aura/internal/skill/additions.md` contain no `--output` references"
+      - "`make generate` exits 0"
+      - "`make generate-check` exits 0 (no diff between committed bundles and freshly generated output)"
+      - "Generated bundle files contain `--format` / `-f`, not `--output`"
+    completed_at: "2026-05-05T00:00:00Z"
+
+  - id: task-006
+    title: "Final gate: make test, make fmt-check, make generate-check"
+    description: |
+      Run the full set of CI-equivalent gates across the entire repo to confirm no package
+      was broken by the rename. Run `make test` (all packages must pass), `make fmt-check`
+      (no unformatted files), and `make generate-check` (bundles match generated output).
+      Fix any remaining `--output` references, stale imports, or formatting issues found.
+      This task is the definitive done signal for the feature.
+    status: completed
+    dependencies:
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "`make test` exits 0 with no failing tests"
+      - "`make fmt-check` exits 0 with no output"
+      - "`make generate-check` exits 0"
+      - "`grep -r -- '--output' --include='*.go' .` returns no matches in source files"
+      - "`grep -rn 'ValidOutputValues\\|BindOutput\\|func.*Output()' --include='*.go' .` returns no matches"
+    completed_at: "2026-05-05T18:00:00Z"

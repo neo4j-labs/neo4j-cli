@@ -17,7 +17,7 @@ After install, `neo4j-cli` is on your `PATH`:
 
 ```sh
 neo4j-cli --help
-neo4j-cli aura instance list --output table
+neo4j-cli aura instance list --format table
 ```
 
 `pnpm add -g @neo4j-labs/cli` and `yarn global add @neo4j-labs/cli` work the same way.

@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Add `skill` subcommand to install agent skills into supported AI agents (Claude Code, Cursor, Windsurf, etc.)'
-time: 2026-05-04T11:02:00.000000+02:00

@@ -30,7 +30,7 @@ func TestDeleteAuthProvider(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql auth-provider delete %s --output json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql auth-provider delete %s --format json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)

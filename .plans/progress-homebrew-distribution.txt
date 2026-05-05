@@ -1,0 +1,155 @@
+================================================================================
+TASK-001: Add brews: block to .goreleaser.yaml
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Appended brews: entry to .goreleaser.yaml. Generates Formula/neo4j-cli.rb
+from neo4j-cli-archive only (aura excluded). skip_upload: auto skips prereleases.
+Verified locally via `goreleaser release --snapshot --skip=publish,sign,notarize`
+with stub HOMEBREW_TAP_GITHUB_TOKEN — formula written to
+dist/homebrew/Formula/neo4j-cli.rb with url+sha256 populated for darwin/linux x
+amd64/arm64.
+
+Files Changed:
+- .goreleaser.yaml (modified — added brews block)
+- .plans/tasks-homebrew-distribution.yml (modified — status flip)
+
+Key Decisions:
+- Followed PRD spec verbatim for brews block; ignored goreleaser deprecation
+  notice about brews -> homebrew_casks (PRD explicitly specifies brews).
+- Local snapshot verification used `goreleaser release --snapshot --skip=...`
+  rather than `make snapshot` (the latter runs `goreleaser build` which doesn't
+  exercise the brews step). The PRD acceptance criterion mentions make snapshot;
+  may need a Makefile tweak in a follow-up task to wire brews into snapshot.
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Mint GitHub App token in release.yml for tap push
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Added `Mint Homebrew tap token` step (id: brew-token) before `Run GoReleaser` in
+release.yml. Uses SHA-pinned `actions/create-github-app-token@1b10c78c... # v3`
+(latest v3.1.1) with HOMEBREW_TAP_APP_ID + HOMEBREW_TAP_APP_PRIVATE_KEY secrets,
+owner=neo4j-labs, repositories=homebrew-tap. Plumbs token into GoReleaser env as
+HOMEBREW_TAP_GITHUB_TOKEN. YAML parses clean (yaml.safe_load), make test +
+make fmt-check pass.
+
+Files Changed:
+- .github/workflows/release.yml (modified — added token mint step + env wiring)
+- .plans/tasks-homebrew-distribution.yml (modified — status flip)
+
+Key Decisions:
+- Resolved v3.1.1 -> SHA via `gh api .../git/ref/tags/v3.1.1` (1b10c78c...).
+  Comment is `# v3` per AGENTS.md `# v<major>` convention; goreleaser-action
+  in the same file uses fuller `# v7.0.0` form but AC explicitly says v<major>.
+- No `permissions:` block on the mint step — the GitHub App is the source of
+  truth for what scopes the token gets (contents:write on homebrew-tap per
+  PRD); a `permissions:` block on the action would only narrow further.
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Create distribution/homebrew/README.md
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Wrote distribution/homebrew/README.md mirroring the npm/README.md tone +
+section style. Covers tap location, brew install command, stable-only cadence
+(skip_upload: auto), npm @alpha link for prereleases, make snapshot dry-run,
+manual recovery via tap-repo hand-edit, and auth prereqs (App + 2 secrets).
+Cross-links RELEASING.md, .goreleaser.yaml, release.yml, npm/README.md.
+
+Files Changed:
+- distribution/homebrew/README.md (new)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Followed PRD verbatim — channel docs only, no publish.sh (GoReleaser native).
+- Style matches npm/README.md (h2 sections, callout tables) so the two
+  channel READMEs read consistently when added side-by-side.
+- Did not include a "What gets released" table — that lives in RELEASING.md
+  per task-004. Avoids duplication.
+
+Next Task: task-004
+
+================================================================================
+TASK-004: Update RELEASING.md to reflect Homebrew shipping
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Updated RELEASING.md: dropped Homebrew from "Future channels" line (only pip
+remains), added new row to "What gets released" table (neo4j-cli Homebrew
+formula → neo4j-labs/homebrew-tap stable-only → GoReleaser brews:), added
+HOMEBREW_TAP_APP_ID + HOMEBREW_TAP_APP_PRIVATE_KEY row to "Required secrets"
+(grouped pair, matches existing MACOS_SIGN_* row style), and cross-linked
+distribution/homebrew/README.md from "See also". Also rephrased the aura-cli
+exclusion sentence to cover both downstream channels (npm + Homebrew skipped
+on aura-only releases). make test + make fmt-check pass.
+
+Files Changed:
+- RELEASING.md (modified — table row, secrets row, future-channels line, see-also link)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Grouped the two Homebrew secrets into a single table row (comma-separated
+  in the Secret column) to match the MACOS_SIGN_P12, MACOS_SIGN_PASSWORD
+  precedent. Keeps the table compact and signals the secrets always go
+  together.
+- Updated the aura-cli exclusion paragraph from "not published to npm" to
+  "not published to npm or Homebrew" with both channel READMEs cross-linked
+  — the gating rule is identical for both downstream channels.
+
+Next Task: task-005 or task-006
+
+================================================================================
+TASK-005: Refresh Homebrew callout in distribution/npm/README.md
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Updated lines 223-231 of distribution/npm/README.md. Renamed section
+"Future channels" -> "Other channels" since Homebrew is now shipping.
+Homebrew bullet promoted to top of list with `(shipping)` tag, brew install
+command, and link to ../homebrew/README.md. pip / PyPI bullet retained
+with `(future)` tag — content unchanged. make test + make fmt-check pass.
+
+Files Changed:
+- distribution/npm/README.md (modified — section rename + reordered bullets)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Renamed section header from "Future channels" to "Other channels" rather
+  than splitting into two sections — pip is still future, but mixing one
+  shipping + one future channel is clearer under a neutral header.
+- Homebrew bullet ordered first (most relevant to readers) with `(shipping)`
+  / `(future)` suffixes inline so the status is obvious without reading the
+  bullet body.
+
+Next Task: task-006
+
+================================================================================
+TASK-006: Add neo4j-cli changelog entry for Homebrew install path
+Date: 2026-05-05T14:16:57Z
+================================================================================
+
+Summary:
+Hand-authored .changes/unreleased/neo4j-cli-Minor-20260505-141657.yaml per the
+documented <project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml convention. Body mentions
+the brew install command so users see it in release notes. neo4j-cli only,
+no aura-cli entry (Homebrew is super-CLI-only). make test + make fmt-check pass.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260505-141657.yaml (new)
+- .plans/tasks-homebrew-distribution.yml (status flip + completed_at)
+
+Key Decisions:
+- Hand-authored YAML (changie not installed locally) per AGENTS.md fallback.
+- Single-quoted body to allow backticks safely in markdown rendering.
+
+Next Task: NONE — feature complete (6/6 tasks done)

@@ -208,7 +208,7 @@ func TestAddAllowedOriginWithOutputTable(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --output table", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --format table", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

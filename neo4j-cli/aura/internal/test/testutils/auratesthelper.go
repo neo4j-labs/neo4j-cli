@@ -17,9 +17,11 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/projects"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -49,7 +51,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 
 	helper.fs = fs
 
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
 	cfg.Aura.SetPollingConfig(5, 0)
 
@@ -59,6 +61,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	}
 
 	cmd := aura.NewStandaloneCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.SetArgs(args)
 
@@ -137,6 +140,15 @@ func (helper *AuraTestHelper) AssertOutJson(expected string) {
 	assert.Nil(helper.t, err)
 
 	assert.Equal(helper.t, formattedExpected, string(out))
+}
+
+func (helper *AuraTestHelper) AssertOutContainsStrings(expected []string) {
+	out, err := io.ReadAll(helper.out)
+	assert.Nil(helper.t, err)
+
+	for _, exp := range expected {
+		assert.Contains(helper.t, string(out), exp)
+	}
 }
 
 func (helper *AuraTestHelper) AssertConfig(expected string) {
@@ -232,6 +244,8 @@ func (helper *AuraTestHelper) NewRequestHandlerMock(path string, status int, bod
 }
 
 func NewAuraTestHelper(t *testing.T) AuraTestHelper {
+	cobra.EnableTraverseRunHooks = true
+
 	helper := AuraTestHelper{}
 
 	helper.t = t
@@ -252,10 +266,10 @@ func NewAuraTestHelper(t *testing.T) AuraTestHelper {
 					"default": "",
 					"projects": {}
 				},
+				"format": "json",
 				"aura": {
 					"auth-url": "%s/oauth/token",
-					"base-url": "%s/v1",
-					"output": "json"
+					"base-url": "%s/v1"
 					}
 				}`, server.URL, server.URL)
 	helper.credentials = `{

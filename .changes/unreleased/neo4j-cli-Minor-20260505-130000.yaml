@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'query/:schema: send a User-Agent header (neo4j-cli/v<version>) so server logs identify the CLI'
-time: 2026-05-05T13:00:00Z

@@ -1,0 +1,111 @@
+feature: toon-format-option
+prd: ./prd-toon-format-option.md
+created_at: 2026-05-05T00:00:00Z
+updated_at: 2026-05-05T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add toon-go dependency to go.mod"
+    description: |
+      Run `go get github.com/toon-format/toon-go@<latest-commit>` to add the official
+      toon-go library to the module. Verify the dependency appears in go.mod and go.sum.
+      If the module proxy does not serve the package, add a `replace` directive pointing
+      at the GitHub repo. Confirm `go build ./...` succeeds after the addition.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "go.mod contains a require entry for github.com/toon-format/toon-go"
+      - "go.sum contains the matching hash entry"
+      - "`go build ./...` completes without errors"
+    completed_at: "2026-05-05T00:00:00Z"
+
+  - id: task-002
+    title: "Extend ValidFormatValues to include toon"
+    description: |
+      In `common/clicfg/clicfg.go`, extend `ValidFormatValues` from `[3]string` to
+      `[4]string{"default", "json", "table", "toon"}`. Both validation sites — the flag
+      pre-run hook in `common/flags/flags.go` and the config `Set` method — iterate this
+      array, so they will accept `toon` automatically once it is added. Update the flag
+      help string in `common/flags/flags.go` to list `toon` alongside the existing values.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "ValidFormatValues is a [4]string containing \"toon\""
+      - "`--format toon` passes flag validation without error"
+      - "`--format foo` still returns a usage error"
+      - "Flag --format help text includes \"toon\""
+      - "`aura-cli config set format toon` succeeds and persists the value"
+    completed_at: "2026-05-05T01:00:00Z"
+
+  - id: task-003
+    title: "Add toon case to ResolveOutput"
+    description: |
+      In `common/output/output.go`, update `ResolveOutput` to handle `"toon"` as an
+      explicit case that is returned as-is, so it never falls through to the `"table"`
+      default. The function currently only short-circuits on `"json"` and `"table"`;
+      adding `"toon"` ensures the caller receives the correct resolved format string.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "ResolveOutput returns \"toon\" when cfg.Global.Format() is \"toon\""
+      - "ResolveOutput still returns \"json\" or \"table\" via TTY auto-detection when format is \"default\""
+      - "No existing ResolveOutput tests are broken"
+    completed_at: "2026-05-05T02:00:00Z"
+
+  - id: task-004
+    title: "Implement printToon and wire into PrintBodyMap"
+    description: |
+      In `common/output/output.go`, add a `printToon` helper that mirrors the JSON path:
+      call `json.Marshal(values)` to get canonical JSON bytes (honouring MarshalJSON on
+      the concrete type), decode to `any` via `json.Unmarshal`, then call
+      `toon.Marshal(v, toon.WithLengthMarkers(true))` and write the result to
+      `cmd.OutOrStdout()` via `cmd.Println`. Add a `"toon"` case in `PrintBodyMap` that
+      delegates to `printToon`, keeping the switch symmetrical with the `"json"` case.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "PrintBodyMap dispatches to printToon when ResolveOutput returns \"toon\""
+      - "printToon output is valid toon-encoded text (not raw JSON)"
+      - "printToon output encodes the same data structure as the json path (including outer {\"data\": ...} wrapper)"
+      - "WithLengthMarkers(true) is passed to toon.Marshal"
+      - "`make fmt-check` passes on the modified file"
+    completed_at: "2026-05-05T03:00:00Z"
+
+  - id: task-005
+    title: "Add tests for toon format rendering"
+    description: |
+      Add unit tests in `common/output/` covering the toon rendering path. Test that
+      `PrintBodyMap` with a toon-configured `cfg` produces non-empty output that is
+      distinct from the JSON output for the same input, and that the toon output contains
+      the same top-level keys as the JSON equivalent. Follow the existing test patterns
+      in the package (table-driven tests, use of `bytes.Buffer` as cmd output writer).
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "At least one table-driven test covers the toon case in PrintBodyMap"
+      - "Test asserts toon output is non-empty and differs from json.MarshalIndent output"
+      - "Test asserts toon output is not valid JSON (confirming it is actually toon-encoded)"
+      - "`make test` passes with the new tests included"
+    completed_at: "2026-05-05T04:00:00Z"
+
+  - id: task-006
+    title: "Add changelog entries for aura-cli and neo4j-cli"
+    description: |
+      Create changelog entries for both `aura-cli` and `neo4j-cli` using changie. This
+      is a user-facing feature addition so the kind should be `Minor`. Run
+      `changie new --projects aura-cli --projects neo4j-cli --kind Minor --body "Add toon output format option (--format toon / -f toon)"`.
+      If changie is not installed, hand-author the YAML files under `.changes/unreleased/`
+      following the repo's naming convention.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "A .changes/unreleased/ entry exists with project: aura-cli and kind: Minor"
+      - "A .changes/unreleased/ entry exists with project: neo4j-cli and kind: Minor"
+      - "`make license-check` still passes"
+      - "`make test` and `make fmt-check` still pass as final gates"
+    completed_at: "2026-05-05T17:00:00Z"

@@ -28,7 +28,7 @@ import (
 func newTestCmd(t *testing.T) (*cobra.Command, *clicfg.Config) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	return cmd, cfg
 }
@@ -112,7 +112,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 
 	// Real OS fs so resolveConn's os.Getwd + .env walk-up land on this dir.
 	fs := afero.NewOsFs()
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	require.NoError(t, cmd.ParseFlags([]string{
 		"--uri=http://from-flag:7474",
@@ -143,7 +143,7 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	t.Setenv(envInsecure, "")
 
 	fs := afero.NewOsFs()
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 
 	c, err := resolveConn(cmd, cfg)
@@ -245,7 +245,7 @@ func TestResolveConn_UserAgent(t *testing.T) {
 			t.Chdir(t.TempDir())
 
 			fs := afero.NewMemMapFs()
-			cfg := clicfg.NewConfig(fs, tc.version)
+			cfg := clicfg.NewConfig(fs, tc.version, clicfg.QueryScope)
 			cmd := NewCmd(cfg)
 
 			c, err := resolveConn(cmd, cfg)

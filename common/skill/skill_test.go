@@ -12,7 +12,7 @@ import (
 
 func TestInvalidOutputFlag(t *testing.T) {
 	f := newFixture(t, "/home/alice", "default", "claude-code")
-	err := f.exec(t, "list", "--output", "yaml")
+	err := f.exec(t, "list", "--format", "yaml")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid output value")
+	assert.Contains(t, err.Error(), "invalid format value")
 }

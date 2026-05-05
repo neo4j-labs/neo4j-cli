@@ -1,10 +1,11 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package aura
+package credential
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
 
@@ -12,6 +13,17 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "credential",
 		Short: "Manage and view credential values",
+	}
+
+	cmd.AddCommand(NewAuraClientCredentialCmd(cfg))
+
+	return cmd
+}
+
+func NewAuraClientCredentialCmd(cfg *clicfg.Config) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "aura-client",
+		Short: "Manage and view aura-client credential values",
 	}
 
 	cmd.AddCommand(newCredentialAddCmd(cfg))
@@ -23,17 +35,6 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 }
 
 func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Adds a credential",
-	}
-
-	cmd.AddCommand(newCredentialAddAuraClientCmd(cfg))
-
-	return cmd
-}
-
-func newCredentialAddAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		name         string
 		clientId     string
@@ -47,8 +48,8 @@ func newCredentialAddAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "aura-client",
-		Short: "Adds an Aura client credential",
+		Use:   "add",
+		Short: "Adds a credential",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
 		},
@@ -67,41 +68,20 @@ func newCredentialAddAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 }
 
 func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "list",
 		Short: "List credentials",
-	}
-
-	cmd.AddCommand(newCredentialListAuraClientCmd(cfg))
-
-	return cmd
-}
-
-func newCredentialListAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
-	return &cobra.Command{
-		Use:   "aura-client",
-		Short: "Lists Aura client credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Aura.Print(cmd.OutOrStdout())
+			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), []string{"name", "type", "identifier", "default"})
+			return nil
 		},
 	}
 }
 
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "remove",
 		Short: "Removes a credential",
-	}
-
-	cmd.AddCommand(newCredentialRemoveAuraClientCmd(cfg))
-
-	return cmd
-}
-
-func newCredentialRemoveAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
-	return &cobra.Command{
-		Use:   "aura-client <name>",
-		Short: "Removes an Aura client credential",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Remove(args[0])
@@ -110,20 +90,9 @@ func newCredentialRemoveAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
 }
 
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "use",
 		Short: "Sets the default credential to be used",
-	}
-
-	cmd.AddCommand(newCredentialUseAuraClientCmd(cfg))
-
-	return cmd
-}
-
-func newCredentialUseAuraClientCmd(cfg *clicfg.Config) *cobra.Command {
-	return &cobra.Command{
-		Use:   "aura-client <name>",
-		Short: "Sets the default Aura client credential to be used",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.SetDefault(args[0])

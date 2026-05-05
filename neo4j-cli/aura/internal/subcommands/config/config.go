@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var configPrintFields = []string{"key", "value"}
+
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",

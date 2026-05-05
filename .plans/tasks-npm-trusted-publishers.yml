@@ -1,0 +1,109 @@
+feature: npm-trusted-publishers
+prd: ./prd-npm-trusted-publishers.md
+created_at: 2026-05-05T10:10:11Z
+updated_at: 2026-05-05T10:10:11Z
+
+tasks:
+  - id: task-001
+    title: "Fix repository.url in both package.json templates"
+    description: |
+      Update homepage / repository.url / bugs.url in
+      distribution/npm/cli/package.json.tmpl and
+      distribution/npm/cli-platform/package.json.tmpl from the stale
+      github.com/neo4j/cli to the actual github.com/neo4j-labs/neo4j-cli.
+      Provenance attestation (auto-enabled by the OIDC switch in task-003)
+      requires repository.url to match the OIDC source-repo claim — without
+      this fix the first OIDC publish would be rejected. Lands first because
+      task-002 (bootstrap-stubs.sh) consumes the same templates and we want
+      the stub publish to claim the names with the correct metadata.
+    status: completed
+    completed_at: 2026-05-05T10:30:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "distribution/npm/cli/package.json.tmpl: homepage is `https://github.com/neo4j-labs/neo4j-cli`, repository.url is `git+https://github.com/neo4j-labs/neo4j-cli.git`, bugs.url is `https://github.com/neo4j-labs/neo4j-cli/issues`. No other field changes."
+      - "distribution/npm/cli-platform/package.json.tmpl: same three fields updated to the same values; __OS__/__CPU__/__BIN_NAME__/__VERSION__ placeholders untouched."
+      - "make npm-publish-dry passes — confirms sed substitution still renders valid JSON for all 9 packages with the new URL strings."
+      - "make fmt-check, make lint, make license-check all green."
+      - "No other files are modified by this task."
+
+  - id: task-002
+    title: "Add distribution/npm/bootstrap-stubs.sh + make npm-bootstrap"
+    description: |
+      New one-time, local-run helper that claims the 9 @neo4j-labs/* package
+      names on the registry so Trusted Publisher can be configured per
+      package in the npm UI (npm has no pending-publisher flow). Mirrors
+      publish.sh's structure: reads distribution/platforms.tsv, renders both
+      templates, stubs every binary with a 1-byte placeholder, runs
+      `npm publish --tag bootstrap --access public` for the 8 platform
+      packages first then the wrapper, idempotent via the same
+      `already_published` check pattern. Hardcodes VERSION=0.0.0-bootstrap.1
+      so unqualified `npm i` never resolves to a stub. Errors out if
+      `npm whoami` fails (script must not run on an unauthenticated session).
+      Add an optional `make npm-bootstrap` target mirroring `make npm-publish-dry`
+      for discoverability.
+    status: completed
+    completed_at: 2026-05-05T12:20:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "distribution/npm/bootstrap-stubs.sh exists, is executable (chmod +x), starts with `#!/usr/bin/env bash` and `set -euo pipefail`, and carries a copyright header per the addlicense convention."
+      - "Script hardcodes `VERSION=0.0.0-bootstrap.1` and always passes `--tag bootstrap` (no version/tag flags exposed). Reads platforms from distribution/platforms.tsv exactly like publish.sh (skip header, ${VERSION} substitution in dirname template ignored — stubs always live under a dedicated work dir)."
+      - "Script runs `npm whoami` up front and exits 1 with a clear `[bootstrap] not logged in — run \"npm login --scope=@neo4j-labs\" first` message if unauthenticated."
+      - "For each of the 9 packages: renders the package.json.tmpl, writes a 1-byte (`printf '#'`) stub at the configured bin path, runs the same `already_published` check as publish.sh, and runs `npm publish <pkgdir> --access public --tag bootstrap` only if not already published. Same ordering: 8 platform packages first, wrapper last."
+      - "Idempotent re-run: a second invocation against the same registry state prints `[skip] <pkg>@0.0.0-bootstrap.1 already published` for every package and exits 0."
+      - "Makefile: new `npm-bootstrap` target invokes `bash distribution/npm/bootstrap-stubs.sh`, with a leading comment block matching the style of `npm-publish-dry`. The target does NOT depend on `make snapshot` (no real binaries needed)."
+      - "make fmt-check, make lint, make license-check all green. No changes to publish.sh, no changes to package.json templates, no changes to platforms.tsv."
+
+  - id: task-003
+    title: "Switch publish-npm.yml to OIDC, drop NPM_TOKEN"
+    description: |
+      Edit .github/workflows/publish-npm.yml to authenticate via npm Trusted
+      Publishers (OIDC) instead of a long-lived NPM_TOKEN. Replace the
+      manual `~/.npmrc` write step with an `actions/setup-node` step (Node 24
+      → npm 11.x, satisfies the npm ≥ 11.5.1 OIDC requirement) configured
+      with registry-url. Tighten the permissions block (`contents: read`,
+      `id-token: write` only — drop `actions: read` since only the disabled
+      workflow_run path needed it). Update header comments and add a one-line
+      note near the commented-out workflow_run block reminding a future
+      re-enabler to add `actions: read` back. publish.sh is not modified —
+      it stays auth-agnostic; setup-node now satisfies its `~/.npmrc` contract.
+    status: completed
+    completed_at: 2026-05-05T13:30:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - ".github/workflows/publish-npm.yml `permissions:` block has exactly two entries: `contents: read` and `id-token: write`. No `actions: read`."
+      - "The commented-out `workflow_run` block at the top has a one-line comment immediately above or below it stating that re-enabling requires re-adding `actions: read` to the `permissions:` block (cross-workflow `actions/download-artifact` requirement)."
+      - "Header comment block above `on:` no longer says `Both paths configure ~/.npmrc from secrets.NPM_TOKEN`. Replacement wording names Trusted Publishers / OIDC. The `# AUTO TRIGGER DISABLED until the @neo4j-labs npm org is provisioned and NPM_TOKEN with publish access on that scope is added as a repo secret.` comment is rewritten to reflect that NPM_TOKEN is no longer the blocker (the auto-trigger is intentionally deferred to a follow-up PR)."
+      - "A new step `Setup Node` using `actions/setup-node@<sha> # v6` (latest v6 SHA, pinned per repo convention) with `node-version: '24'` and `registry-url: 'https://registry.npmjs.org'` runs before the `Publish to npm` step. It carries the same `if:` gate as the publish step (`workflow_dispatch || steps.meta.outputs.include_neo4j == 'true'`)."
+      - "The `Configure npm auth` step is removed entirely. No reference to `secrets.NPM_TOKEN`, `NPM_TOKEN`, `_authToken`, or manual `.npmrc` writes remains in the file."
+      - "`Publish to npm` step body still runs `bash distribution/npm/publish.sh` with `GORELEASER_CURRENT_TAG` derived as today (workflow_dispatch input vs steps.meta.outputs.version). No env additions."
+      - "distribution/npm/publish.sh is untouched (verify with `git diff distribution/npm/publish.sh` showing no changes)."
+      - "make fmt-check, make lint, make license-check all green. `actionlint` (if installed locally) reports no errors against the workflow file."
+
+  - id: task-004
+    title: "Update RELEASING.md and distribution/npm/README.md for OIDC"
+    description: |
+      Sync the maintainer docs with the new auth model and the bootstrap
+      flow. RELEASING.md drops NPM_TOKEN from the Required-secrets table,
+      rewords step 4's auth description, and removes the NPM_TOKEN-rotation
+      case from manual recovery. distribution/npm/README.md drops the
+      "npm provenance attestation" bullet from Open follow-ups (provenance
+      becomes implicit/always-on with this change) and adds a Bootstrap
+      subsection documenting the rationale (no pending-publisher flow), the
+      bootstrap-stubs.sh + `make npm-bootstrap` workflow, the
+      `0.0.0-bootstrap.1` stub version + `bootstrap` dist-tag choice, and
+      the post-bootstrap npm-UI Trusted Publisher configuration steps.
+    status: completed
+    completed_at: 2026-05-05T14:30:00Z
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "RELEASING.md `Required secrets` table no longer contains the NPM_TOKEN row. The remaining four rows (TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN, MACOS_SIGN_*, MACOS_NOTARY_*) are unchanged."
+      - "RELEASING.md `Step 4 — publish-npm.yml` bullet list: the `Writes ~/.npmrc from the NPM_TOKEN secret` line is replaced with a line naming Trusted Publishers / OIDC (e.g. `Authenticates to the registry via npm Trusted Publishers (OIDC); no long-lived token in CI`). Other bullets in step 4 unchanged."
+      - "RELEASING.md `Manual recovery` section: the bullet `NPM_TOKEN was missing or expired and got rotated` is removed. The `@neo4j-labs org permission needed adjusting` and `npm unpublish`/republish bullets stay."
+      - "distribution/npm/README.md `Open follow-ups` paragraph no longer mentions `npm provenance attestation (sigstore + GH OIDC, toggle via --provenance + id-token: write)`. The remaining follow-ups (Linux 32-bit ARM, auto-promotion of prerelease dist-tag) stay."
+      - "distribution/npm/README.md gains a `## Bootstrap (one-time)` subsection (placement: between `## Local dev / test flow` and `## Release flow`) that explains: (a) npm has no pending-publisher flow so package names must be claimed before Trusted Publisher can be configured; (b) the maintainer command sequence (`npm login --scope=@neo4j-labs`, `make npm-bootstrap` or `bash distribution/npm/bootstrap-stubs.sh`, `npm logout`); (c) the `0.0.0-bootstrap.1` + `--tag bootstrap` design and why unqualified installs never see it; (d) the npm-UI configuration steps (org `neo4j-labs`, repo `neo4j-cli`, workflow `publish-npm.yml`, environment blank) for each of the 9 packages."
+      - "No changelog entry under .changes/unreleased/ is added — this is an internal CI/CD change with no user-visible behaviour change (per AGENTS.md guidance)."
+      - "make fmt-check, make lint, make license-check all green."

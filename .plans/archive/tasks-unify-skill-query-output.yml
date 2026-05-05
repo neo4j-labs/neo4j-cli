@@ -1,0 +1,121 @@
+feature: unify-skill-query-output
+prd: ./prd-unify-skill-query-output.md
+created_at: 2026-05-05T00:00:00Z
+updated_at: 2026-05-05T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add ResolveOutput and StdoutIsTerminal seam to common/output"
+    description: |
+      Add `var StdoutIsTerminal = func(w io.Writer) bool { ... }` as a package-level test seam
+      in `common/output/output.go`, production-initialized to check `term.IsTerminal` on the
+      writer's file descriptor (non-*os.File writers return false). Add a `ResolveOutput(cmd
+      *cobra.Command, cfg *clicfg.Config) string` function that returns the explicitly configured
+      value when it is `"json"` or `"table"`, and otherwise auto-detects via `StdoutIsTerminal`
+      on `cmd.OutOrStdout()` returning `"table"` for TTY and `"json"` for non-TTY. Add
+      `golang.org/x/term` to the import if not already present.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`common/output.StdoutIsTerminal` is a package-level var seam, restored to the real `term.IsTerminal` check in production"
+      - "`common/output.ResolveOutput(cmd, cfg)` returns `\"json\"` or `\"table\"` when those are explicitly configured, and auto-detects TTY otherwise"
+      - "`ResolveOutput` returns `\"table\"` when `StdoutIsTerminal` is stubbed to return true and output is `\"\"` or `\"default\"`"
+      - "`ResolveOutput` returns `\"json\"` when `StdoutIsTerminal` is stubbed to return false and output is `\"\"` or `\"default\"`"
+      - "`make fmt-check` passes"
+    completed_at: 2026-05-05T10:00:00Z
+
+  - id: task-002
+    title: "Update PrintBodyMap to use ResolveOutput; fix tests broken by TTY auto-detection"
+    description: |
+      Update `common/output.PrintBodyMap` to call `ResolveOutput(cmd, cfg)` and switch on its
+      result (`"json"` or `"table"`) rather than reading `cfg.Global.Output()` directly and
+      treating `"default"` as table. Remove the existing `"default"` branch from the switch —
+      `ResolveOutput` now handles it. Then grep for tests across the repo that configure
+      `output = "default"` (or `""`) and assert table output; these will now receive `"json"` in
+      a non-TTY test environment. Fix each by either setting `"table"` explicitly in the config
+      fixture or by overriding `common/output.StdoutIsTerminal` to return true for that test,
+      restoring via `t.Cleanup`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`PrintBodyMap` switch no longer has a `\"default\"` case; it delegates to `ResolveOutput` and branches only on `\"json\"` / `\"table\"`"
+      - "No existing test that was passing before this task is left failing"
+      - "`make test` passes across all packages"
+      - "`make fmt-check` passes"
+    completed_at: 2026-05-05T11:00:00Z
+
+  - id: task-003
+    title: "Migrate skill commands to PrintBodyMap with ResponseData types"
+    description: |
+      Remove the `--output` persistent flag definition from `common/skill/skill.go` (the root
+      command's `RegisterOutputFlag` already registers one that cascades via cobra persistent
+      flags). For each leaf command introduce a slice `ResponseData` type — `installResults`,
+      `listResults`, `checkResults` — each implementing `AsArray() []map[string]any` (returns
+      the rows as column-keyed maps for table rendering) and `MarshalJSON()` (delegates to
+      default slice marshaling, preserving the existing JSON array-of-objects shape). Replace
+      the ad-hoc `printJSON`/`printTableRows` calls and `cfg.Aura.Output()` checks in
+      `install.go`, `list.go`, and `check.go` with a single `common/output.PrintBodyMap(cmd,
+      cfg, data, fields)` call per leaf. Update `common/skill/cmd_helpers_test.go` fixture JSON
+      from `{"aura":{"output":"..."}}` to `{"output":"..."}` to match the refactored viper key.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`common/skill/skill.go` has no `PersistentFlags().String(\"output\", ...)` call"
+      - "`install.go`, `list.go`, `check.go` contain no `cfg.Aura.Output()` calls and no local JSON/table rendering logic"
+      - "Each leaf uses a `ResponseData`-implementing type passed to `common/output.PrintBodyMap`"
+      - "`cmd_helpers_test.go` fixture uses `{\"output\":\"...\"}` at the JSON root"
+      - "`make test` passes for `common/skill/...`"
+    completed_at: 2026-05-05T12:00:00Z
+
+  - id: task-004
+    title: "Migrate query command to PrintBodyMap with queryResult ResponseData type"
+    description: |
+      Remove the `--output` persistent flag definition from `neo4j-cli/query/query.go`. In
+      `neo4j-cli/query/output.go`, introduce a `queryResult` struct holding `columns`,
+      `rows`, `truncated`, and `arraysTruncated`. Implement `AsArray() []map[string]any`
+      returning rows as column-keyed maps (for table rendering via `PrintBodyMap`). Implement
+      `MarshalJSON()` emitting the existing `{columns, rows, truncated, arrays_truncated}`
+      envelope (preserving the consumer-facing JSON schema). Replace `renderRows`,
+      `printJSONRows`, and `printTableRows` with a single `common/output.PrintBodyMap(cmd, cfg,
+      result, result.columns)` call. Delete the local `resolveOutput()` function and the local
+      `stdoutIsTerminal` seam — TTY detection now flows through `common/output.ResolveOutput`
+      inside `PrintBodyMap`. Remove the `stdoutIsTerminal` seed from
+      `neo4j-cli/query/testseam_test.go`; add a `withStdoutTTY(t, val)` helper if any test
+      needs to control TTY detection, overriding `common/output.StdoutIsTerminal` with
+      `t.Cleanup` restoration. Update all query test fixtures from `{"aura":{"output":"..."}}`
+      to `{"output":"..."}`.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`neo4j-cli/query/query.go` has no `PersistentFlags().String(\"output\", ...)` call"
+      - "`queryResult` implements `ResponseData`: `AsArray()` returns column-keyed row maps, `MarshalJSON()` emits the custom envelope"
+      - "`renderRows` is replaced by a `common/output.PrintBodyMap` call; `printJSONRows` and `printTableRows` are removed"
+      - "`neo4j-cli/query/output.go` has no local `resolveOutput` function or `stdoutIsTerminal` var"
+      - "`testseam_test.go` no longer seeds `stdoutIsTerminal`"
+      - "All query test fixtures use `{\"output\":\"...\"}` at the JSON root"
+      - "`make test` passes for `neo4j-cli/query/...`"
+    completed_at: 2026-05-05T13:00:00Z
+
+  - id: task-005
+    title: "Final gate: make test and make fmt-check across the full repo"
+    description: |
+      Run `make test` across the entire repo to confirm no package was broken by the
+      migration. Run `make fmt-check` to confirm all modified files are properly formatted.
+      Fix any remaining failures: broken tests from the TTY auto-detection behavioral change
+      (set output explicitly or stub `common/output.StdoutIsTerminal`), stale imports left
+      by removed functions, or gofmt drift. This task is the definitive done signal for the
+      feature.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make test` exits 0 with no failing tests across all packages"
+      - "`make fmt-check` exits 0 with no output"
+      - "No `cfg.Aura.Output()` calls remain in `common/skill/` or `neo4j-cli/query/`"
+      - "No local `--output` persistent flag definitions remain in `skill.go` or `query.go`"
+      - "No `{\"aura\":{\"output\":` config fixture strings remain in skill or query test files"
+    completed_at: 2026-05-05T14:00:00Z

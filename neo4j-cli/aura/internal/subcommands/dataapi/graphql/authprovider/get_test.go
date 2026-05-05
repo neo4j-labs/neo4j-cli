@@ -30,7 +30,7 @@ func TestGetAuthProvider(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql auth-provider get %s --output json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql auth-provider get %s --format json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

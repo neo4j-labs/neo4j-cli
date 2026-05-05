@@ -1,0 +1,116 @@
+================================================================================
+TASK-001: Remove debug logs from neo4j-cli/main.go
+Date: 2026-05-05T12:45:00Z
+================================================================================
+
+Summary:
+Stripped three TODO-tagged debug fmt.Printf calls (help displayed, invalid
+command with args, command executed successfully), the SetHelpFunc wrapper
+that wrapped origHelp, and the outdated 2-line comment above cmd.Execute().
+Retained cobra.EnableTraverseRunHooks, panic/recover, and os.Exit(1) on
+failure. All imports (fmt, os, cobra) still used by retained code.
+
+Files Changed:
+- neo4j-cli/main.go (modified — removed 10 lines of debug instrumentation)
+
+Key Decisions:
+- Kept all three imports (cobra, fmt, os) since cobra.EnableTraverseRunHooks
+  + fmt.Printf in panic/recover + os.Args/Exit/Stdout/Stderr still used.
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Remove debug logs from neo4j-cli/aura/cmd/main.go
+Date: 2026-05-05T14:50:00Z
+================================================================================
+
+Summary:
+Mirrored task-001 changes in standalone aura-cli entrypoint. Removed three
+[aura-cli] fmt.Printf debug calls (help displayed, invalid command with args,
+command executed successfully), the SetHelpFunc wrapper, and outdated 2-line
+comment above cmd.Execute(). Retained cobra.EnableTraverseRunHooks,
+flags.RegisterOutputFlag, panic/recover, os.Exit(1).
+
+Files Changed:
+- neo4j-cli/aura/cmd/main.go (modified — removed 10 lines of debug instrumentation)
+
+Key Decisions:
+- All imports (fmt, os, cobra, clicfg, flags, aura, afero) still used by
+  retained code.
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Add Patch changie entries for aura-cli and neo4j-cli
+Date: 2026-05-05T12:44:05Z
+================================================================================
+
+Summary:
+Hand-authored two Patch changie YAML files under .changes/unreleased/ — one
+per project — announcing removal of leftover stdout debug log lines.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Patch-20260505-124405.yaml (new)
+- .changes/unreleased/neo4j-cli-Patch-20260505-124405.yaml (new)
+
+Key Decisions:
+- Used hand-authored format (single-quoted body, RFC3339 time) per AGENTS.md
+  since `make changelog` is interactive. Both files share the same timestamp
+  in filename and `time:` field for traceability.
+
+Next Task: task-004
+
+================================================================================
+TASK-004: Verify build, runtime behaviour, and full test/lint/fmt gate
+Date: 2026-05-05T15:10:00Z
+================================================================================
+
+Summary:
+End-to-end verification gate. All 7 acceptance criteria pass: make build
+produces both binaries; neo4j-cli + aura-cli show clean cobra help with no
+debug line; successful commands emit no trailing success line; bogus
+commands exit 1 with cobra's own error; grep for the three debug strings
+across neo4j-cli/ returns zero matches; make test, make fmt-check, and
+make lint all green.
+
+Files Changed:
+- None (pure verification task; only task-yaml status flip)
+
+Key Decisions:
+- golangci-lint was not installed locally; brew install golangci-lint
+  pulled v2.12.1 (AGENTS.md notes v2.11.4 — newer is fine, lint passed
+  with 0 issues).
+
+Next Task: task-005 (post-review course correction)
+
+================================================================================
+TASK-005: Re-add help/fail/success placeholder comments for future metrics hooks
+Date: 2026-05-05T15:30:00Z
+================================================================================
+
+Summary:
+Course correction after PR #21 was already green. Reviewer wanted to keep
+obvious hook points for the future telemetry work instead of fully deleting
+the help/fail/success log sites. Re-introduced the SetHelpFunc(c, args)
+wrapper (with `// add metrics callback for help here` plus origHelp) in
+both entrypoints, and inserted `// add metrics callback for fail here` /
+`// add metrics callback for success here` at the previously-deleted
+positions. No change to runtime stdout output vs the full-removal version
+(verified manually: --help, success, and bogus-cmd all clean).
+
+Files Changed:
+- neo4j-cli/main.go (modified — re-added SetHelpFunc wrapper + 3 comment placeholders)
+- neo4j-cli/aura/cmd/main.go (modified — same)
+- .plans/prd-remove-debug-logs-in-output.md (modified — added Addendum section)
+- .plans/tasks-remove-debug-logs-in-output.yml (modified — appended task-005)
+
+Key Decisions:
+- Kept the comment text uniform across both binaries: `// add metrics
+  callback for <help|fail|success> here` so a single grep finds all six
+  hook points when the metrics work starts.
+- No new changie entry — runtime behaviour vs task-004 is unchanged, and
+  the task-003 entries already cover the user-facing change.
+- Task-005 marked completed_at the same time as the commit to keep the
+  YAML consistent with the actual state of the branch.
+
+Next Task: none — feature complete

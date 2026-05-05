@@ -22,7 +22,7 @@ func main() {
 		}
 	}()
 
-	cfg := clicfg.NewConfig(afero.NewOsFs(), app.Version)
+	cfg := clicfg.NewConfig(afero.NewOsFs(), app.Version, clicfg.GlobalScope)
 
 	cmd := app.NewCmd(cfg)
 	cmd.SetOut(os.Stdout)

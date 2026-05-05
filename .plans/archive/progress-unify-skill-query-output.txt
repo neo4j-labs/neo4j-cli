@@ -1,0 +1,139 @@
+================================================================================
+TASK-001: Add ResolveOutput and StdoutIsTerminal seam to common/output
+Date: 2026-05-05T10:00:00Z
+================================================================================
+
+Summary:
+Added `var StdoutIsTerminal` package-level test seam and `ResolveOutput(cmd, cfg)` function
+to `common/output/output.go`. The seam mirrors the pattern from `neo4j-cli/query/output.go`.
+`ResolveOutput` passes through explicit "json"/"table" values and auto-detects via TTY check
+otherwise. The `common/output` package builds and tests cleanly. Pre-existing build failures
+in `common/skill` and `neo4j-cli/query` (due to removed `cfg.Aura.Output()`) are addressed
+by tasks 003 and 004.
+
+Files Changed:
+- common/output/output.go (modified: added StdoutIsTerminal seam, ResolveOutput function, io/os/term imports)
+
+Key Decisions:
+- Placed StdoutIsTerminal in common/output (not common/flags) so PrintBodyMap can use it directly
+- ResolveOutput only returns "json" or "table" — callers never need to handle "default" or ""
+- golang.org/x/term import added alongside existing third-party imports
+
+Next Task: task-002
+
+================================================================================
+TASK-002: Update PrintBodyMap to use ResolveOutput; fix tests broken by TTY auto-detection
+Date: 2026-05-05T11:00:00Z
+================================================================================
+
+Summary:
+Updated PrintBodyMap to call ResolveOutput(cmd, cfg) and branch only on "json"/"table" —
+the "default" case is now handled by TTY auto-detection inside ResolveOutput. Fixed aura
+subcommand tests that asserted table output for output="default" by setting output="table"
+explicitly. Also partially addressed task-003 territory: migrated cfg.Aura.Output() calls
+in skill leaf commands (install, list, check) to cfg.Global.Output(), and added a
+PersistentPreRunE in skill.go to validate/bind the local --output flag. Query test fixtures
+updated; bundle files regenerated.
+
+Files Changed:
+- common/output/output.go (modified: PrintBodyMap now uses ResolveOutput; "default" case removed)
+- common/skill/skill.go (modified: added PersistentPreRunE for output validation/binding)
+- common/skill/install.go, list.go, check.go (modified: cfg.Aura.Output() → cfg.Global.Output())
+- common/skill/cmd_helpers_test.go (modified: fixture JSON format updated)
+- neo4j-cli/aura/internal/subcommands/{config,deployment,instance}/*_test.go (modified: explicit output="table" for default-mode tests)
+- neo4j-cli/aura/internal/skill/bundle/references/*.md (modified: regenerated)
+- neo4j-cli/internal/skill/bundle/*.md (modified: regenerated)
+- neo4j-cli/internal/subcommands/{config,credential}/*_test.go (modified: test fixes)
+- neo4j-cli/query/output.go, output_test.go, run_test.go, query_https_smoke_test.go (modified: partial query migration)
+
+Key Decisions:
+- skill.go keeps its own --output flag + PersistentPreRunE temporarily to fix TestInvalidOutputFlag; task-003 will remove it once full PrintBodyMap migration is done
+- Skill leaf commands use cfg.Global.Output() directly (not ResolveOutput) as interim; task-003 completes the migration to PrintBodyMap
+- PrintBodyMap "default" branch removed; callers only get "json" or "table" from ResolveOutput
+
+Next Task: task-003
+
+================================================================================
+TASK-003: Migrate skill commands to PrintBodyMap with ResponseData types
+Date: 2026-05-05T12:00:00Z
+================================================================================
+
+Summary:
+Introduced ResponseData-implementing slice types (installResults, listResults, checkResults)
+for each skill leaf command. Each implements AsArray() for table rendering and MarshalJSON()
+using the slice-cast idiom to avoid infinite recursion. Replaced ad-hoc printJSON/table
+calls with common/output.PrintBodyMap. Replaced skill.go's custom PersistentPreRunE with
+flags.RegisterOutputFlag, removing the duplicate --output flag definition. Deleted printJSON
+from helpers.go (no remaining callers). All tests pass.
+
+Files Changed:
+- common/skill/skill.go (modified: replaced custom PersistentPreRunE + --output flag with flags.RegisterOutputFlag)
+- common/skill/install.go (modified: installResults type + PrintBodyMap)
+- common/skill/list.go (modified: listResults type + PrintBodyMap)
+- common/skill/check.go (modified: checkResults type + PrintBodyMap)
+- common/skill/helpers.go (modified: removed printJSON helper)
+- common/skill/install_test.go, list_test.go, check_test.go, remove_test.go (modified: test updates)
+
+Key Decisions:
+- MarshalJSON uses slice-cast (json.Marshal([]installResultRow(r))) to avoid infinite recursion
+- listResults.AsArray() returns "yes"/"no" strings for bool columns; MarshalJSON preserves bool — intentional for table readability
+- flags.RegisterOutputFlag replaces custom PersistentPreRunE — cleaner DRY approach
+
+Next Task: task-004
+
+================================================================================
+TASK-004: Migrate query command to PrintBodyMap with queryResult ResponseData type
+Date: 2026-05-05T13:00:00Z
+================================================================================
+
+Summary:
+Migrated neo4j-cli/query output rendering to use common/output.PrintBodyMap.
+Introduced renderResult (named renderResult instead of queryResult due to a
+pre-existing queryResult struct in connect.go). renderResult implements
+ResponseData with AsArray() pre-formatting cell values via formatCell (so that
+common/output.printTable's getNestedField handles them correctly) and
+MarshalJSON() emitting the consumer-facing {columns, rows, truncated,
+arrays_truncated} envelope. Removed local stdoutIsTerminal, resolveOutput,
+printJSONRows, printTableRows, and jsonRowsResult. Updated testseam_test.go to
+seed common/output.StdoutIsTerminal instead. Updated schema.go to use
+commonoutput.ResolveOutput. Replaced --output flag definition with
+flags.RegisterOutputFlag.
+
+Files Changed:
+- neo4j-cli/query/query.go (modified: removed --output flag, added flags.RegisterOutputFlag)
+- neo4j-cli/query/output.go (modified: replaced local seam+resolveOutput+jsonRowsResult with renderResult type + PrintBodyMap delegation)
+- neo4j-cli/query/schema.go (modified: resolveOutput → commonoutput.ResolveOutput)
+- neo4j-cli/query/testseam_test.go (modified: seeds commonoutput.StdoutIsTerminal instead of local seam)
+- neo4j-cli/query/output_test.go (modified: withStdoutIsTerminal uses commonoutput.StdoutIsTerminal; decodedResult replaces jsonRowsResult)
+- neo4j-cli/query/run_test.go (modified: jsonRowsResult → decodedResult)
+
+Key Decisions:
+- Named struct renderResult not queryResult (name conflict with connect.go's queryResult)
+- AsArray() pre-formats values via formatCell to strings — avoids behavioral mismatch between printTableRows (formatCell) and common/output.printTable (getNestedField)
+- MarshalJSON uses anonymous struct to preserve field order and emit raw typed values (not pre-formatted strings)
+- schema.go updated to use commonoutput.ResolveOutput directly (no bridge function needed)
+
+Next Task: task-005
+
+================================================================================
+TASK-005: Final gate: make test and make fmt-check across the full repo
+Date: 2026-05-05T14:00:00Z
+================================================================================
+
+Summary:
+Full-repo gate confirmed all tasks complete. make test passes (all packages green).
+make fmt-check passes (no output). Verified: no cfg.Aura.Output() calls remain in
+common/skill/ or neo4j-cli/query/, no local --output flag definitions in skill.go or
+query.go, no {"aura":{"output": config fixtures in skill/query test files.
+
+Reviewer noted: query JSON output changed from indented (\t) to compact — PrintBodyMap
+handles MarshalIndent, but renderResult.MarshalJSON() delegates to json.Marshal (compact),
+which PrintBodyMap then re-indents via MarshalIndent. Non-blocking.
+
+Files Changed:
+- .plans/tasks-unify-skill-query-output.yml (modified: task-005 status → completed)
+
+Key Decisions:
+- No code changes needed; all prior tasks left the repo clean
+
+Next Task: All tasks complete

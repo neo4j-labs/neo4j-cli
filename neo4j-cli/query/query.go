@@ -6,13 +6,10 @@
 package query
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 )
 
 // NewCmd returns the `query` parent cobra command, with all persistent flags
@@ -26,26 +23,6 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"Query API. Cypher is taken from the positional argument, or from " +
 			"stdin when no argument is provided and stdin is piped.",
 		Args: cobra.MaximumNArgs(1),
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			outputFlag := cmd.Flags().Lookup("output")
-			if outputFlag != nil {
-				outputValue := outputFlag.Value.String()
-				if outputValue != "" {
-					valid := false
-					for _, v := range clicfg.ValidOutputValues {
-						if v == outputValue {
-							valid = true
-							break
-						}
-					}
-					if !valid {
-						return clierr.NewUsageError("invalid output value specified: %s", outputValue)
-					}
-				}
-				cfg.Aura.BindOutput(outputFlag)
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)
 		},
@@ -56,11 +33,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset")
 	cmd.PersistentFlags().StringP("database", "d", "", "Target database name [env: NEO4J_DATABASE] (default \"neo4j\")")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
-	cmd.PersistentFlags().String("output", "", fmt.Sprintf("Format to print console output in, from a choice of [%s]", strings.Join(clicfg.ValidOutputValues[:], ", ")))
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().Bool("insecure", false, "Skip TLS certificate verification [env: NEO4J_INSECURE] (development only)")
+
+	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newSchemaCmd(cfg))
 

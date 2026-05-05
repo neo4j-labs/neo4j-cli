@@ -74,7 +74,7 @@ func generate(pkgDir string) error {
 		return fmt.Errorf("read additions.md: %w", err)
 	}
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), app.Version)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), app.Version, clicfg.GlobalScope)
 	root := app.NewCmd(cfg)
 
 	files, err := render.Bundle(root, render.Options{

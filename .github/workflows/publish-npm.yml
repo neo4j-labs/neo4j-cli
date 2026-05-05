@@ -11,19 +11,16 @@ name: publish-npm
 #     download`, extracts them into the `dist/<archive_basename>/` layout the
 #     publish script expects. Does NOT re-invoke GoReleaser.
 #
-# Both paths configure ~/.npmrc from secrets.NPM_TOKEN and run
-# distribution/npm/publish.sh, which is idempotent at the per-package level.
+# Both paths authenticate to the npm registry via npm Trusted Publishers
+# (OIDC) — no long-lived publish token lives in CI. `actions/setup-node`
+# writes a placeholder ~/.npmrc; npm ≥ 11.5.1 swaps in a short-lived OIDC
+# token at publish time. Then runs distribution/npm/publish.sh, which is
+# idempotent at the per-package level.
 
 on:
-  # AUTO TRIGGER DISABLED until the `@neo4j-labs` npm org is provisioned and
-  # NPM_TOKEN with publish access on that scope is added as a repo secret.
-  # Once available, uncomment the workflow_run block below — no other code
-  # changes needed; the auto path is fully implemented and tested.
-  # See PR #14 / task-011 for the scope-rename context.
-  #
-  # workflow_run:
-  #   workflows: ["release"]
-  #   types: [completed]
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -33,6 +30,9 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  # Required by the workflow_run path's cross-workflow `actions/download-artifact`
+  # calls (release-meta + dist) to read the upstream release.yml run's artifacts.
   actions: read
 
 jobs:
@@ -111,10 +111,28 @@ jobs:
           github.event_name == 'workflow_run' &&
           steps.meta.outputs.include_neo4j == 'true'
         run: |
+          # The dist artifact carries GoReleaser's full working dir: archives
+          # (.tar.gz / .zip) + raw build dirs + metadata. publish.sh reads from
+          # dist/<archive_basename>/<binary>, which only exists once the
+          # archives are extracted — so unpack them here, matching the layout
+          # the workflow_dispatch path produces via `gh release download`.
           rm -rf dist
           mkdir -p dist
           test -d "${{ runner.temp }}/downloaded-dist"
           cp -a "${{ runner.temp }}/downloaded-dist"/. dist/
+          shopt -s nullglob
+          for archive in dist/neo4j-cli_*.tar.gz; do
+            base=$(basename "$archive" .tar.gz)
+            mkdir -p "dist/${base}"
+            tar -xzf "$archive" -C "dist/${base}"
+            echo "[publish-npm] extracted ${archive} -> dist/${base}/"
+          done
+          for archive in dist/neo4j-cli_*.zip; do
+            base=$(basename "$archive" .zip)
+            mkdir -p "dist/${base}"
+            unzip -q "$archive" -d "dist/${base}"
+            echo "[publish-npm] extracted ${archive} -> dist/${base}/"
+          done
 
       # ----- workflow_dispatch path: rebuild dist/ from existing GH release -----
 
@@ -162,20 +180,16 @@ jobs:
             echo "[publish-npm] extracted ${archive} -> dist/${base}/"
           done
 
-      # ----- common: configure npm auth + run publish script -----
+      # ----- common: setup Node + run publish script -----
 
-      - name: Configure npm auth
+      - name: Setup Node
         if: >-
           github.event_name == 'workflow_dispatch' ||
           steps.meta.outputs.include_neo4j == 'true'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          # Standard scoped-package auth: token in ~/.npmrc, no `npm login`.
-          # The publish script does NOT touch ~/.npmrc itself — orchestration
-          # owns auth setup so the script stays usable for local --dry-run too.
-          printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_TOKEN}" > "${HOME}/.npmrc"
-          chmod 600 "${HOME}/.npmrc"
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
         if: >-

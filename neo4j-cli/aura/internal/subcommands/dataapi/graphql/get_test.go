@@ -32,7 +32,7 @@ func TestGetGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql get --output json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql get --format json --instance-id %s %s", instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -82,7 +82,7 @@ func TestGetGraphQLDataApiIncludingGraphQLServerErrors(t *testing.T) {
 			]
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql get --output json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql get --format json --instance-id %s %s", instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

@@ -17,7 +17,7 @@ import (
 )
 
 func TestCheckCmd_NoDrift(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code")
+	f := newFixture(t, "/home/alice", "table", "claude-code")
 	require.NoError(t, f.exec(t, "install", "claude-code"))
 	f.resetBuffers()
 
@@ -28,7 +28,7 @@ func TestCheckCmd_NoDrift(t *testing.T) {
 }
 
 func TestCheckCmd_Drift(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code")
+	f := newFixture(t, "/home/alice", "table", "claude-code")
 	require.NoError(t, f.exec(t, "install", "claude-code"))
 
 	// Mutate the installed SKILL.md to a stale version.
@@ -62,7 +62,7 @@ func TestCheckCmd_JSON(t *testing.T) {
 }
 
 func TestCheckCmd_NoneInstalled(t *testing.T) {
-	f := newFixture(t, "/home/alice", "default", "claude-code")
+	f := newFixture(t, "/home/alice", "table", "claude-code")
 	// Never installed — Check returns no rows, drift=false, exits 0.
 	require.NoError(t, f.exec(t, "check"))
 	out := f.stdout.String()

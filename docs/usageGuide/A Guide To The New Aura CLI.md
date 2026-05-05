@@ -11,13 +11,13 @@ In addition to the standalone `aura-cli` binary, Neo4j ships a super CLI called 
 All Aura commands are available under the `neo4j-cli aura` prefix, so every `aura-cli` command in this guide can be run with `neo4j-cli aura` instead. For example:
 
 ```text
-neo4j-cli aura instance list --output table
+neo4j-cli aura instance list --format table
 ```
 
 is equivalent to:
 
 ```text
-aura-cli instance list --output table
+aura-cli instance list --format table
 ```
 
 You can use whichever binary suits your workflow. The rest of this guide uses `aura-cli` for brevity, but every example works identically with `neo4j-cli aura`.
@@ -155,7 +155,7 @@ You can have several sets of credentials and choose which one to use.
 2. To confirm the credentials are working, list your Aura instances:
 
    ```text
-   aura-cli instance list --output table
+   aura-cli instance list --format table
    ```
 
 # Working with AuraDB tenants
@@ -245,7 +245,7 @@ aura-cli instance list
 Use the table format output option to improve readability:
 
 ```text
-aura-cli instance list --output table
+aura-cli instance list --format table
 ```
 
 From the list, you can then use the ID for an AuraDB instance to get detailed information about it, including the URL to use for metrics:
@@ -340,7 +340,7 @@ In both cases, the destination AuraDB instance must be running.
 1. Obtain the ID of the AuraDB instance that has the desired snapshot you wish to use, referred to as the "source instance.
 
    ```text
-   aura-cli instance list --output table 
+   aura-cli instance list --format table 
    ```
 
 2. Decide which of its snapshots to use and note the snapshot ID, referred to as source snapshot:
@@ -352,7 +352,7 @@ In both cases, the destination AuraDB instance must be running.
 3. Locate the destination AuraDB instance and obtain its ID, referred to as the destination instance:
 
    ```text
-   aura-cli instance list --output table
+   aura-cli instance list --format table
    ```
 
 4. Perform the overwrite:
@@ -382,7 +382,7 @@ When the status is "Running" the overwrite is completed.
 1. Locate the destination AuraDB instance and obtain its ID, referred to as the destination instance:
 
    ```text
-   aura-cli instance list --output table
+   aura-cli instance list --format table
    ```
 
 2. Perform the overwrite:
@@ -435,7 +435,7 @@ aura-cli customer-managed-key delete YOUR\_AURA\_CMEK\_ID
 List all configured CMEKs:
 
 ```text
-aura-cli customer-managed-key list --tenant-id YOUR\_TENANT\_ID --output table
+aura-cli customer-managed-key list --tenant-id YOUR\_TENANT\_ID --format table
 ```
 
 ### Get
@@ -811,7 +811,7 @@ List supported agents along with their detected and installed state:
 
 ```text
 aura-cli skill list
-aura-cli skill list --output json
+aura-cli skill list --format json
 ```
 
 ## Check

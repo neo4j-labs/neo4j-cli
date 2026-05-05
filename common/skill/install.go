@@ -4,13 +4,14 @@
 package skill
 
 import (
+	"encoding/json"
 	"io/fs"
 	"strings"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 )
 
 func newInstallCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
@@ -46,6 +47,32 @@ type installResultRow struct {
 	Action      string `json:"action"`
 }
 
+// installResults implements common/output.ResponseData for install/remove results.
+type installResults struct {
+	rows   []installResultRow
+	action string
+}
+
+// AsArray returns each row as a column-keyed map for table rendering.
+func (r installResults) AsArray() []map[string]any {
+	out := make([]map[string]any, 0, len(r.rows))
+	for _, row := range r.rows {
+		out = append(out, map[string]any{
+			"agent":        row.Agent,
+			"display_name": row.DisplayName,
+			"skills_path":  row.SkillsPath,
+			"action":       row.Action,
+		})
+	}
+	return out
+}
+
+// MarshalJSON delegates to default slice marshalling, preserving the
+// existing JSON array-of-objects shape.
+func (r installResults) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.rows)
+}
+
 // renderInstallResult prints the install/remove outcome as a table or
 // JSON. `action` is "installed" or "removed" — printed in the Action
 // column / JSON field. Empty target list emits a friendly note in table
@@ -66,21 +93,12 @@ func renderInstallResult(cmd *cobra.Command, cfg *clicfg.Config, skillName, acti
 		})
 	}
 
-	if cfg.Aura.Output() == "json" {
-		printJSON(cmd, rows)
-		return
-	}
+	data := installResults{rows: rows, action: action}
 
-	if len(rows) == 0 {
+	if len(rows) == 0 && commonoutput.ResolveOutput(cmd, cfg) != "json" {
 		cmd.Printf("No agents to %s.\n", strings.TrimSuffix(action, "ed"))
 		return
 	}
 
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"agent", "display", "path", "action"})
-	for _, r := range rows {
-		t.AppendRow(table.Row{r.Agent, r.DisplayName, r.SkillsPath, r.Action})
-	}
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
+	commonoutput.PrintBodyMap(cmd, cfg, data, []string{"agent", "display_name", "skills_path", "action"})
 }

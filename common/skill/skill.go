@@ -4,14 +4,12 @@
 package skill
 
 import (
-	"fmt"
 	"io/fs"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 )
 
 // NewCmd builds the per-binary `skill` cobra command tree. `bundle` is the
@@ -20,7 +18,7 @@ import (
 // (`<agentSkillsDir>/<skillName>/`) and the SKILL.md frontmatter `name:`.
 //
 // Each leaf renders results as a table by default and emits a JSON envelope
-// when `--output json` is passed (matching neo4j-cli/aura/internal/output
+// when `--format json` (or `-f json`) is passed (matching neo4j-cli/aura/internal/output
 // conventions).
 func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,26 +27,9 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 		Long: "Install, remove, list, and check the per-binary agent-skill " +
 			"bundle. The bundle teaches AI agents (Claude Code, Cursor, " +
 			"Windsurf, etc.) how to drive this CLI.",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			outputValue := cmd.Flags().Lookup("output").Value.String()
-			if outputValue != "" {
-				valid := false
-				for _, v := range clicfg.ValidOutputValues {
-					if v == outputValue {
-						valid = true
-						break
-					}
-				}
-				if !valid {
-					return clierr.NewUsageError("invalid output value specified: %s", outputValue)
-				}
-			}
-			cfg.Aura.BindOutput(cmd.Flags().Lookup("output"))
-			return nil
-		},
 	}
 
-	cmd.PersistentFlags().String("output", "", fmt.Sprintf("Format to print console output in, from a choice of [%s]", strings.Join(clicfg.ValidOutputValues[:], ", ")))
+	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newInstallCmd(cfg, bundle, skillName))
 	cmd.AddCommand(newRemoveCmd(cfg, skillName))

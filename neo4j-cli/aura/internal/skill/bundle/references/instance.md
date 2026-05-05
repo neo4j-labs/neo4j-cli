@@ -25,7 +25,6 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `--output` | string | - | Format to print console output in, from a choice of [default, json, table] |
 
 ## aura-cli instance create
 

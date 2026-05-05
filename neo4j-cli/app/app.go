@@ -10,9 +10,12 @@ package app
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/query"
 	"github.com/spf13/cobra"
 )
@@ -29,10 +32,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: Version,
 	}
 
+	flags.RegisterOutputFlag(cmd, cfg)
+
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
 	cmd.AddCommand(auraCmd)
-	cmd.AddCommand(aura.NewCredentialCmd(cfg))
+	cmd.AddCommand(credential.NewCredentialCmd(cfg))
+	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	return cmd

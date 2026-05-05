@@ -1,0 +1,109 @@
+feature: remove-debug-logs-in-output
+prd: ./prd-remove-debug-logs-in-output.md
+created_at: 2026-05-05T12:37:55Z
+updated_at: 2026-05-05T15:25:00Z
+
+tasks:
+  - id: task-001
+    title: "Remove debug logs from neo4j-cli/main.go"
+    description: |
+      Strip the three TODO-tagged debug fmt.Printf calls and the now-dead
+      SetHelpFunc wrapper from neo4j-cli/main.go. Keep
+      cobra.EnableTraverseRunHooks, the panic/recover block, cobra error
+      rendering, and the os.Exit(1) on failure. Imports `cobra`, `fmt`,
+      `os` all stay (still used by retained code).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/main.go no longer contains the strings 'help displayed', 'invalid command with args', or 'command executed successfully'."
+      - "The `origHelp := cmd.HelpFunc(); cmd.SetHelpFunc(...)` block is removed; default cobra help is used."
+      - "The 2-line `// cobra prints the error itself ...` comment above cmd.Execute() is removed."
+      - "`cobra.EnableTraverseRunHooks = true` remains; `panic`/`recover` block remains; `if err := cmd.Execute(); err != nil { os.Exit(1) }` remains."
+      - "Copyright header at top of file is preserved."
+      - "`go build ./neo4j-cli/...` succeeds with no unused-import errors."
+    completed_at: 2026-05-05T12:45:00Z
+
+  - id: task-002
+    title: "Remove debug logs from neo4j-cli/aura/cmd/main.go"
+    description: |
+      Mirror the task-001 changes in the standalone aura-cli entrypoint:
+      remove the three [aura-cli] fmt.Printf lines, the SetHelpFunc
+      wrapper, and the outdated comment above cmd.Execute(). Retain
+      cobra.EnableTraverseRunHooks, panic/recover, flags.RegisterOutputFlag,
+      and the os.Exit(1) on failure.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/cmd/main.go no longer contains the strings 'help displayed', 'invalid command with args', or 'command executed successfully'."
+      - "The `origHelp := cmd.HelpFunc(); cmd.SetHelpFunc(...)` block is removed."
+      - "The 2-line `// cobra prints the error itself ...` comment above cmd.Execute() is removed."
+      - "`cobra.EnableTraverseRunHooks = true`, `flags.RegisterOutputFlag(cmd, cfg)`, the `panic`/`recover` block, and the `os.Exit(1)` on failure all remain."
+      - "Copyright header at top of file is preserved."
+      - "`go build ./neo4j-cli/aura/cmd/...` succeeds with no unused-import errors."
+    completed_at: 2026-05-05T14:50:00Z
+
+  - id: task-003
+    title: "Add Patch changie entries for aura-cli and neo4j-cli"
+    description: |
+      Add two YAML files under .changes/unreleased/ — one per project —
+      announcing the debug-log removal as a Patch change. Use the
+      hand-authored format documented in AGENTS.md (single-quoted body,
+      RFC3339 time) since `make changelog` is interactive. Filenames must
+      match `<project>-Patch-<YYYYMMDD>-<HHMMSS>.yaml`.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - ".changes/unreleased/aura-cli-Patch-<timestamp>.yaml exists with `project: aura-cli`, `kind: Patch`, single-quoted `body:` describing removal of stdout debug logs, RFC3339 `time:`."
+      - ".changes/unreleased/neo4j-cli-Patch-<timestamp>.yaml exists with the same shape but `project: neo4j-cli`."
+      - "Both files parse as valid YAML."
+      - "No other files under .changes/ are modified."
+    completed_at: 2026-05-05T12:44:05Z
+
+  - id: task-004
+    title: "Verify build, runtime behaviour, and full test/lint/fmt gate"
+    description: |
+      End-to-end gate. Run `make build`, exercise both binaries to confirm
+      the three debug lines are gone and cobra error/help/exit-code
+      behaviour is unchanged, then run the full quality gate
+      (`make test`, `make fmt-check`, `make lint`).
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`make build` succeeds; `bin/neo4j-cli` and `bin/aura-cli` are produced."
+      - "`./bin/neo4j-cli --help` shows normal cobra help with NO `[neo4j-cli] help displayed` line."
+      - "`./bin/neo4j-cli aura instance list 2>/dev/null` (or any successful command) does NOT emit a trailing `command executed successfully` line."
+      - "`./bin/neo4j-cli bogus-cmd; echo $?` exits 1, prints cobra's own error, no `[neo4j-cli] invalid command` line."
+      - "Same three runtime checks pass against `./bin/aura-cli`."
+      - "`grep -rn 'command executed successfully\\|help displayed\\|invalid command with args' neo4j-cli/` returns zero matches."
+      - "`make test` passes; `make fmt-check` passes; `make lint` passes."
+    completed_at: 2026-05-05T15:10:00Z
+
+  - id: task-005
+    title: "Re-add help/fail/success placeholder comments for future metrics hooks"
+    description: |
+      Course correction on top of task-001/002. Instead of fully deleting
+      the help/fail/success log sites, leave structural placeholders so
+      the future telemetry work has obvious hook points. Re-introduce the
+      SetHelpFunc wrapper (calls origHelp) with `// add metrics callback
+      for help here` inside, and add `// add metrics callback for fail
+      here` / `// add metrics callback for success here` at the
+      previously-deleted positions. No runtime output change vs the
+      full-removal version. Apply to both entrypoints.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-004
+    acceptance_criteria:
+      - "neo4j-cli/main.go has a `cmd.SetHelpFunc(...)` wrapper whose body is `// add metrics callback for help here` followed by `origHelp(c, args)` — no fmt.Printf inside."
+      - "neo4j-cli/main.go has `// add metrics callback for fail here` immediately above `os.Exit(1)` inside the `if err := cmd.Execute(); err != nil` branch."
+      - "neo4j-cli/main.go has `// add metrics callback for success here` as the final statement of `main()` (after the `if err` block)."
+      - "neo4j-cli/aura/cmd/main.go mirrors all three placeholder sites exactly."
+      - "grep for the original strings ('help displayed', 'invalid command with args', 'command executed successfully') still returns zero matches under neo4j-cli/."
+      - "`make build`, `make test`, `make fmt-check`, `make lint` all pass."
+      - "Both binaries' --help / success / failure runtime behaviour is unchanged from the full-removal version (no stdout noise)."
+    completed_at: 2026-05-05T15:30:00Z

@@ -4,12 +4,13 @@
 package skill
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonoutput "github.com/neo4j/cli/common/output"
 )
 
 func newCheckCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
@@ -42,8 +43,31 @@ type checkResultRow struct {
 	Status           string `json:"status"`
 }
 
+// checkResults implements common/output.ResponseData for check results.
+type checkResults []checkResultRow
+
+// AsArray returns each row as a column-keyed map for table rendering.
+func (r checkResults) AsArray() []map[string]any {
+	out := make([]map[string]any, 0, len(r))
+	for _, row := range r {
+		out = append(out, map[string]any{
+			"agent":             row.Agent,
+			"installed_version": row.InstalledVersion,
+			"current_version":   row.CurrentVersion,
+			"status":            row.Status,
+		})
+	}
+	return out
+}
+
+// MarshalJSON delegates to default slice marshalling, preserving the
+// existing JSON array-of-objects shape.
+func (r checkResults) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]checkResultRow(r))
+}
+
 func renderCheckResult(cmd *cobra.Command, cfg *clicfg.Config, rows []CheckRow) {
-	out := make([]checkResultRow, 0, len(rows))
+	out := make(checkResults, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, checkResultRow{
 			Agent:            r.Agent.Name,
@@ -53,21 +77,10 @@ func renderCheckResult(cmd *cobra.Command, cfg *clicfg.Config, rows []CheckRow) 
 		})
 	}
 
-	if cfg.Aura.Output() == "json" {
-		printJSON(cmd, out)
-		return
-	}
-
-	if len(out) == 0 {
+	if len(out) == 0 && commonoutput.ResolveOutput(cmd, cfg) != "json" {
 		cmd.Println("No installed skills found.")
 		return
 	}
 
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"agent", "installed-version", "current-version", "status"})
-	for _, r := range out {
-		t.AppendRow(table.Row{r.Agent, r.InstalledVersion, r.CurrentVersion, r.Status})
-	}
-	t.SetStyle(table.StyleLight)
-	cmd.Println(t.Render())
+	commonoutput.PrintBodyMap(cmd, cfg, out, []string{"agent", "installed_version", "current_version", "status"})
 }
