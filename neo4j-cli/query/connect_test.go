@@ -245,7 +245,7 @@ func TestResolveConn_UserAgent(t *testing.T) {
 			t.Chdir(t.TempDir())
 
 			fs := afero.NewMemMapFs()
-			cfg := clicfg.NewConfig(fs, tc.version)
+			cfg := clicfg.NewConfig(fs, tc.version, clicfg.QueryScope)
 			cmd := NewCmd(cfg)
 
 			c, err := resolveConn(cmd, cfg)
