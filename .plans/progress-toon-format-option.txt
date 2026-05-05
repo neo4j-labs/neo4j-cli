@@ -1,0 +1,24 @@
+================================================================================
+TASK-001: Add toon-go dependency to go.mod
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Added the github.com/toon-format/toon-go module (v0.0.0-20251202084852-7ca0e27c4e8c)
+to the Go module via `go get`. The module was available on the module proxy without
+needing a replace directive. The dependency is currently marked `// indirect` in go.mod
+since it is not imported yet; it will become a direct dependency in task-004 when
+`printToon` is implemented.
+
+Files Changed:
+- go.mod (modified: added toon-go require entry)
+- go.sum (modified: added toon-go hash entries)
+
+Key Decisions:
+- Used `go get github.com/toon-format/toon-go@latest` which resolved to the latest
+  pseudo-version v0.0.0-20251202084852-7ca0e27c4e8c.
+- No replace directive needed — module proxy served the package directly.
+- Confirmed `toon.Marshal(v, toon.WithLengthMarkers(true))` is the correct API call
+  for future task-004 implementation.
+
+Next Task: task-002

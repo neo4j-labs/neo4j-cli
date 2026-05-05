@@ -11,13 +11,13 @@ tasks:
       toon-go library to the module. Verify the dependency appears in go.mod and go.sum.
       If the module proxy does not serve the package, add a `replace` directive pointing
       at the GitHub repo. Confirm `go build ./...` succeeds after the addition.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "go.mod contains a require entry for github.com/toon-format/toon-go"
       - "go.sum contains the matching hash entry"
       - "`go build ./...` completes without errors"
-    completed_at: null
+    completed_at: "2026-05-05T00:00:00Z"
 
   - id: task-002
     title: "Extend ValidFormatValues to include toon"

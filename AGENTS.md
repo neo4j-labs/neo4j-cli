@@ -243,6 +243,12 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - `cmd.Flags().GetString("foo")` only sees LOCAL flags until `mergePersistentFlags()` runs (during `Execute` or `ParseFlags`). Calling it from a unit test that drives a function directly (without Execute) will fail with `flag accessed but not defined`. Use `cmd.Flag("foo").Value.String()` instead — `Flag()` falls through to persistent flags + parents' persistent flags via `persistentFlag()`/`updateParentsPflags()`. Same applies to GetBool — for bool defaults that overlap with "unset" (e.g. `--insecure` defaults false), gate on `cmd.Flag("name").Changed` to disambiguate.
 - For first-non-empty-wins precedence pass values to a helper that picks the FIRST non-empty. For lowest→highest precedence (`.env` < env < flag) use a `last-non-empty-wins` helper instead — easy to swap accidentally; query/connect.go calls this `overlay()`.
 
+## toon-go Notes
+
+- Module: `github.com/toon-format/toon-go` — imported as `toon` in Go source
+- Key API: `toon.Marshal(v any, opts ...toon.EncoderOption) ([]byte, error)` and `toon.WithLengthMarkers(bool) toon.EncoderOption`
+- `toon-go` is currently `// indirect` in go.mod until the first direct import is added in `common/output/output.go` (task-004); `go mod tidy` after adding the import will promote it to a direct dependency
+
 ## Local Verification Scripts
 
 - `TestHTTPS_Smoke` (`neo4j-cli/query/query_https_smoke_test.go`) — real-Neo4j HTTPS smoke for `query --insecure` (asserts positive + negative TLS paths). Pure Go: stdlib cert gen, boots `neo4j:latest` via `os/exec`, binds two random free TCP ports on 127.0.0.1. Gated by `NEO4J_HTTPS_TEST=1`; run via `NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...`. Requires `docker`. Skipped by default in `go test ./...`.
