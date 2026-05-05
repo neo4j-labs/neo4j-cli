@@ -67,7 +67,8 @@ tasks:
       note near the commented-out workflow_run block reminding a future
       re-enabler to add `actions: read` back. publish.sh is not modified —
       it stays auth-agnostic; setup-node now satisfies its `~/.npmrc` contract.
-    status: pending
+    status: completed
+    completed_at: 2026-05-05T13:30:00Z
     dependencies:
       - task-001
     acceptance_criteria:

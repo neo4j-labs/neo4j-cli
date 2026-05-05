@@ -153,6 +153,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Cross-workflow artifact download with `actions/download-artifact@v4` requires both `github-token: ${{ secrets.GITHUB_TOKEN }}` AND `run-id: ${{ github.event.workflow_run.id }}`. Without `run-id` it looks at the current run only and 404s.
 - `workflow_run` events do NOT have `inputs.*` populated; `workflow_dispatch` events do not have `github.event.workflow_run.*`. To pick a value cleanly across both triggers use the ternary pattern `${{ github.event_name == 'workflow_dispatch' && inputs.x || steps.<auto>.outputs.x }}` — short-circuit makes the unset side empty and `||` falls back.
 - A `workflow_run`-triggered workflow's job-level `if:` cannot read artifact contents (artifacts haven't been downloaded yet). Gate the JOB on `github.event.workflow_run.conclusion == 'success'`, then download the meta artifact, parse with `jq`, and apply per-step `if:` gates on the parsed value.
+- npm Trusted Publishers (OIDC) auth in `publish-npm.yml`: requires `permissions: id-token: write`, `actions/setup-node` with `registry-url`, and Node ≥ 20 (npm ≥ 11.5.1). setup-node writes a placeholder `~/.npmrc`; npm swaps in a short-lived OIDC token at publish time — no NPM_TOKEN secret needed. publish.sh stays auth-agnostic. Re-enabling the disabled `workflow_run` trigger requires re-adding `actions: read` to `permissions:` for cross-workflow `actions/download-artifact`.
 
 ## GoReleaser Notes
 
