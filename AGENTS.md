@@ -246,9 +246,10 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 ## toon-go Notes
 
-- Module: `github.com/toon-format/toon-go` — imported as `toon` in Go source
+- Module: `github.com/toon-format/toon-go` — imported as `toon "github.com/toon-format/toon-go"` in Go source
 - Key API: `toon.Marshal(v any, opts ...toon.EncoderOption) ([]byte, error)` and `toon.WithLengthMarkers(bool) toon.EncoderOption`
-- `toon-go` is currently `// indirect` in go.mod until the first direct import is added in `common/output/output.go` (task-004); `go mod tidy` after adding the import will promote it to a direct dependency
+- `printToon` in `common/output/output.go` uses a JSON round-trip (marshal → unmarshal to `any` → toon.Marshal) to honour custom MarshalJSON implementations on concrete ResponseData types before encoding to TOON
+- `go mod tidy` promotes toon-go from `// indirect` to a direct dependency automatically once the import is added
 
 ## Local Verification Scripts
 

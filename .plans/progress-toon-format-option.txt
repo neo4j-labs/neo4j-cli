@@ -75,3 +75,27 @@ Key Decisions:
 - No new callers or dispatch logic needed here; task-004 will add the PrintBodyMap case.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Implement printToon and wire into PrintBodyMap
+Date: 2026-05-05T03:00:00Z
+================================================================================
+
+Summary:
+Added printToon helper to common/output/output.go that marshals a ResponseData
+value to canonical JSON, unmarshals to any, then encodes via toon.Marshal with
+WithLengthMarkers(true). Wired a "toon" case into PrintBodyMap's switch
+statement, keeping it symmetrical with the "json" case. Also ran go mod tidy to
+promote toon-go from // indirect to a direct dependency in go.mod.
+
+Files Changed:
+- common/output/output.go (modified: added toon import, printToon helper, "toon" case in PrintBodyMap)
+- go.mod (modified: toon-go promoted from indirect to direct dependency)
+
+Key Decisions:
+- printToon follows the json→any→toon round-trip to honour custom MarshalJSON
+  implementations on concrete ResponseData types (e.g. ConfigData.MarshalJSON).
+- Used `toon "github.com/toon-format/toon-go"` alias to keep call-sites readable.
+- go mod tidy promotes the dependency automatically once the import is present.
+
+Next Task: task-005

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	toon "github.com/toon-format/toon-go"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ type ResponseData interface {
 }
 
 // PrintBodyMap renders values to the command output in the format resolved by
-// ResolveOutput (explicit "json"/"table" config wins; otherwise TTY-detected).
+// ResolveOutput (explicit "json"/"table"/"toon" config wins; otherwise TTY-detected).
 func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, fields []string) {
 	switch ResolveOutput(cmd, cfg) {
 	case "json":
@@ -64,9 +65,30 @@ func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, f
 			panic(err)
 		}
 		cmd.Println(string(bytes))
+	case "toon":
+		printToon(cmd, values)
 	default:
 		printTable(cmd, values, fields)
 	}
+}
+
+// printToon renders values as a TOON document. It first marshals values to
+// canonical JSON (honouring any MarshalJSON implementations), unmarshals to
+// any to obtain a plain Go value, then encodes with toon.Marshal.
+func printToon(cmd *cobra.Command, values ResponseData) {
+	jsonBytes, err := json.Marshal(values)
+	if err != nil {
+		panic(err)
+	}
+	var v any
+	if err := json.Unmarshal(jsonBytes, &v); err != nil {
+		panic(err)
+	}
+	toonBytes, err := toon.Marshal(v, toon.WithLengthMarkers(true))
+	if err != nil {
+		panic(err)
+	}
+	cmd.Println(string(toonBytes))
 }
 
 func getNestedField(v map[string]any, subFields []string) string {

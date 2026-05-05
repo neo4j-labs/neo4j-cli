@@ -63,7 +63,7 @@ tasks:
       `toon.Marshal(v, toon.WithLengthMarkers(true))` and write the result to
       `cmd.OutOrStdout()` via `cmd.Println`. Add a `"toon"` case in `PrintBodyMap` that
       delegates to `printToon`, keeping the switch symmetrical with the `"json"` case.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -72,7 +72,7 @@ tasks:
       - "printToon output encodes the same data structure as the json path (including outer {\"data\": ...} wrapper)"
       - "WithLengthMarkers(true) is passed to toon.Marshal"
       - "`make fmt-check` passes on the modified file"
-    completed_at: null
+    completed_at: "2026-05-05T03:00:00Z"
 
   - id: task-005
     title: "Add tests for toon format rendering"
