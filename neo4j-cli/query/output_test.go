@@ -26,7 +26,7 @@ func newRenderCmd(t *testing.T, output string) (*cobra.Command, *clicfg.Config, 
 	cfgJSON := `{"aura":{"output":"` + output + `"}}`
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 
 	cmd := &cobra.Command{}
 	stdout := &bytes.Buffer{}

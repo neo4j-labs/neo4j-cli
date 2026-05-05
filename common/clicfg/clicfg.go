@@ -36,6 +36,8 @@ type ConfigScope string
 const (
 	GlobalScope ConfigScope = "global"
 	AuraScope   ConfigScope = "aura"
+	SkillsScope ConfigScope = "skills"
+	QueryScope  ConfigScope = "query"
 )
 
 type Config struct {

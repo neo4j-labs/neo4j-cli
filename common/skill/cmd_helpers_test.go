@@ -66,7 +66,7 @@ func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fix
 		require.NoError(t, memFs.MkdirAll(dp, 0755))
 	}
 
-	cfg := clicfg.NewConfig(memFs, "1.7.0")
+	cfg := clicfg.NewConfig(memFs, "1.7.0", clicfg.SkillsScope)
 	cmd := skill.NewCmd(cfg, fixtureBundle(), testSkillName)
 
 	stdout := &bytes.Buffer{}

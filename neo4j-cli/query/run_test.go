@@ -53,7 +53,7 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	return &runHarness{
-		cfg:    clicfg.NewConfig(fs, "test"),
+		cfg:    clicfg.NewConfig(fs, "test", clicfg.QueryScope),
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
@@ -605,7 +605,7 @@ func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	stdinIsTTY = func() bool { return false }
 
 	fs := afero.NewMemMapFs()
-	cfg := clicfg.NewConfig(fs, "test")
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})

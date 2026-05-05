@@ -8,31 +8,10 @@ import (
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/neo4j-cli/aura"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
-
-func NewCmd(cfg *clicfg.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "neo4j-cli",
-		Short:   "Allows you to manage Neo4j resources",
-		Version: Version,
-	}
-
-	flags.RegisterOutputFlag(cmd, cfg)
-
-	auraCmd := aura.NewCmd(cfg)
-	auraCmd.Use = "aura"
-	cmd.AddCommand(auraCmd)
-	cmd.AddCommand(credential.NewCredentialCmd(cfg))
-	cmd.AddCommand(config.NewCmd(cfg))
-	return cmd
-}
 
 func main() {
 	defer func() {

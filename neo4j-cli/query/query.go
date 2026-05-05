@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
 )
 
 // NewCmd returns the `query` parent cobra command, with all persistent flags
@@ -26,26 +25,6 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"Query API. Cypher is taken from the positional argument, or from " +
 			"stdin when no argument is provided and stdin is piped.",
 		Args: cobra.MaximumNArgs(1),
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			outputFlag := cmd.Flags().Lookup("output")
-			if outputFlag != nil {
-				outputValue := outputFlag.Value.String()
-				if outputValue != "" {
-					valid := false
-					for _, v := range clicfg.ValidOutputValues {
-						if v == outputValue {
-							valid = true
-							break
-						}
-					}
-					if !valid {
-						return clierr.NewUsageError("invalid output value specified: %s", outputValue)
-					}
-				}
-				cfg.Aura.BindOutput(outputFlag)
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)
 		},
