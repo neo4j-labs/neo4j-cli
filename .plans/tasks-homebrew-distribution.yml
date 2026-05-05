@@ -90,14 +90,14 @@ tasks:
       as a future channel that should use GoReleaser's `brews:` block) to reflect
       that Homebrew is now shipping. Replace the placeholder with a one-liner
       pointing at `distribution/homebrew/README.md`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "Lines 228–231 (or their post-edit equivalent) no longer say Homebrew is future / not implemented"
       - "Callout links to `distribution/homebrew/README.md`"
       - "No other distribution-channel content in the npm README is altered (scoped diff)"
-    completed_at: null
+    completed_at: 2026-05-05T00:00:00Z
 
   - id: task-006
     title: "Add neo4j-cli changelog entry for Homebrew install path"

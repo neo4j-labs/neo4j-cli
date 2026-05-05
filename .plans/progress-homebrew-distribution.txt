@@ -106,3 +106,29 @@ Key Decisions:
   — the gating rule is identical for both downstream channels.
 
 Next Task: task-005 or task-006
+
+================================================================================
+TASK-005: Refresh Homebrew callout in distribution/npm/README.md
+Date: 2026-05-05T00:00:00Z
+================================================================================
+
+Summary:
+Updated lines 223-231 of distribution/npm/README.md. Renamed section
+"Future channels" -> "Other channels" since Homebrew is now shipping.
+Homebrew bullet promoted to top of list with `(shipping)` tag, brew install
+command, and link to ../homebrew/README.md. pip / PyPI bullet retained
+with `(future)` tag — content unchanged. make test + make fmt-check pass.
+
+Files Changed:
+- distribution/npm/README.md (modified — section rename + reordered bullets)
+- .plans/tasks-homebrew-distribution.yml (status flip)
+
+Key Decisions:
+- Renamed section header from "Future channels" to "Other channels" rather
+  than splitting into two sections — pip is still future, but mixing one
+  shipping + one future channel is clearer under a neutral header.
+- Homebrew bullet ordered first (most relevant to readers) with `(shipping)`
+  / `(future)` suffixes inline so the status is obvious without reading the
+  bullet body.
+
+Next Task: task-006

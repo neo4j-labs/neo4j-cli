@@ -220,15 +220,14 @@ Three coordinated edits, no script changes:
 Reviewer catches the three-place edit; tests don't enforce it because the shim
 ships standalone in the tarball with no runtime access to `platforms.tsv`.
 
-## Future channels
+## Other channels
 
-- **pip / PyPI**: create `distribution/pypi/{publish.sh, wheel templates}` +
+- **Homebrew** (shipping): `brew install neo4j-labs/tap/neo4j-cli`. Driven by
+  GoReleaser's `brews:` block on stable tags. See
+  [`../homebrew/README.md`](../homebrew/README.md).
+- **pip / PyPI** (future): create `distribution/pypi/{publish.sh, wheel templates}` +
   `.github/workflows/publish-pip.yml` mirroring `publish-npm.yml`'s two-trigger
   shape. Source the same `distribution/platforms.tsv`. No edits to the npm side.
-- **Homebrew**: GoReleaser has a built-in `brews:` config block — configure
-  there rather than write a parallel publish script. Reserve
-  `distribution/homebrew/` for any wrapper formula assets that aren't
-  auto-generated.
 
 Open follow-ups (not blocking the npm channel): Linux 32-bit ARM
 (`linux-arm`, not built by GoReleaser today); auto-promotion of prerelease
