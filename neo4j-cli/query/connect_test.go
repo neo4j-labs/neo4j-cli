@@ -554,144 +554,115 @@ func namedCredJSON(name, uri, username, password, dbName string, insecure bool) 
 		`","insecure":` + insecureStr + `}]}}`
 }
 
-func TestResolveConn_CredentialFlag_ResolvesNamedCredential(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	credsJSON := namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb"}))
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-
-	assert.Equal(t, "http://named:7474", c.uri)
-	assert.Equal(t, "namedUser", c.username)
-	assert.Equal(t, "namedPass", c.password)
-	assert.Equal(t, "namedDB", c.database)
-	assert.False(t, c.insecure)
-	assert.NotNil(t, c.doer)
-}
-
-func TestResolveConn_CredentialFlag_ConflictsWithUsername(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	credsJSON := namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb", "--username=other"}))
-
-	_, err := resolveConn(cmd, cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--credential")
-	assert.Contains(t, err.Error(), "--username")
-}
-
-func TestResolveConn_CredentialFlag_UnknownCredentialErrors(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// No credentials stored.
-	cmd, cfg := newTestCmdWithCreds(t, "{}")
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=unknown"}))
-
-	_, err := resolveConn(cmd, cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown")
-	assert.Contains(t, err.Error(), "credential database list")
-}
-
-func TestResolveConn_CredentialFlag_InsecureFlagOverridesCredential(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// Stored credential has insecure=true, but --insecure=false is passed.
-	credsJSON := namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb", "--insecure=false"}))
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-	assert.False(t, c.insecure, "--insecure=false must override credential's insecure:true")
-}
-
-func TestResolveConn_CredentialFlag_Insecure_AppliedFromCredential(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// Stored credential has insecure=true; no --insecure flag is passed.
-	credsJSON := namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb"}))
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-	assert.True(t, c.insecure, "credential's insecure:true must be used when --insecure is not set")
-}
-
-func TestResolveConn_NoCredentialFlag_ExistingBehaviourUnchanged(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// Credential exists in store but --credential is NOT passed — default
-	// auto-detect behaviour should still apply.
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	// Do not pass --credential.
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-
-	// Should use the default stored credential (unchanged behaviour).
-	assert.Equal(t, "http://stored:7474", c.uri)
-	assert.Equal(t, "storedUser", c.username)
-}
-
-func TestResolveConn_CredentialFlag_OverridesDefaultCredential(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// Two credentials: "default-cred" is the stored default, "other-cred" is not.
-	credsJSON := `{"database":{"default-credential":"default-cred","credentials":[` +
+func TestResolveConn_CredentialFlag(t *testing.T) {
+	twoCredsJSON := `{"database":{"default-credential":"default-cred","credentials":[` +
 		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474","insecure":false},` +
 		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474","insecure":false}` +
 		`]}}`
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--credential=other-cred"}))
 
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
+	tests := []struct {
+		name            string
+		credsJSON       string
+		flags           []string
+		wantErrContains []string
+		wantURI         string
+		wantUsername    string
+		wantPassword    string
+		wantDatabase    string
+		wantInsecure    bool
+	}{
+		{
+			name:         "resolves named credential",
+			credsJSON:    namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false),
+			flags:        []string{"--credential=mydb"},
+			wantURI:      "http://named:7474",
+			wantUsername: "namedUser",
+			wantPassword: "namedPass",
+			wantDatabase: "namedDB",
+			wantInsecure: false,
+		},
+		{
+			name:            "conflicts with --username",
+			credsJSON:       namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false),
+			flags:           []string{"--credential=mydb", "--username=other"},
+			wantErrContains: []string{"--credential", "--username"},
+		},
+		{
+			name:            "unknown credential errors with helpful message",
+			credsJSON:       "{}",
+			flags:           []string{"--credential=unknown"},
+			wantErrContains: []string{"unknown", "credential database list"},
+		},
+		{
+			name:         "--insecure=false overrides credential's insecure:true",
+			credsJSON:    namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true),
+			flags:        []string{"--credential=mydb", "--insecure=false"},
+			wantURI:      "http://named:7474",
+			wantUsername: "u",
+			wantPassword: "p",
+			wantDatabase: "neo4j",
+			wantInsecure: false,
+		},
+		{
+			name:         "credential's insecure:true applied when --insecure not set",
+			credsJSON:    namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true),
+			flags:        []string{"--credential=mydb"},
+			wantURI:      "http://named:7474",
+			wantUsername: "u",
+			wantPassword: "p",
+			wantDatabase: "neo4j",
+			wantInsecure: true,
+		},
+		{
+			name:         "no --credential flag uses stored default (existing behaviour unchanged)",
+			credsJSON:    storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false),
+			flags:        []string{},
+			wantURI:      "http://stored:7474",
+			wantUsername: "storedUser",
+			wantPassword: "storedPass",
+			wantDatabase: "storedDB",
+			wantInsecure: false,
+		},
+		{
+			name:         "overrides stored default credential",
+			credsJSON:    twoCredsJSON,
+			flags:        []string{"--credential=other-cred"},
+			wantURI:      "http://other:7474",
+			wantUsername: "otherUser",
+			wantPassword: "otherPass",
+			wantDatabase: "otherDB",
+			wantInsecure: false,
+		},
+	}
 
-	assert.Equal(t, "http://other:7474", c.uri, "--credential should override the stored default")
-	assert.Equal(t, "otherUser", c.username)
-	assert.Equal(t, "otherPass", c.password)
-	assert.Equal(t, "otherDB", c.database)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envURI, "")
+			t.Setenv(envUsername, "")
+			t.Setenv(envPassword, "")
+			t.Setenv(envDatabase, "")
+			t.Setenv(envInsecure, "")
+			t.Chdir(t.TempDir())
+
+			cmd, cfg := newTestCmdWithCreds(t, tc.credsJSON)
+			require.NoError(t, cmd.ParseFlags(tc.flags))
+
+			c, err := resolveConn(cmd, cfg)
+
+			if len(tc.wantErrContains) > 0 {
+				require.Error(t, err)
+				for _, s := range tc.wantErrContains {
+					assert.Contains(t, err.Error(), s)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantURI, c.uri)
+			assert.Equal(t, tc.wantUsername, c.username)
+			assert.Equal(t, tc.wantPassword, c.password)
+			assert.Equal(t, tc.wantDatabase, c.database)
+			assert.Equal(t, tc.wantInsecure, c.insecure)
+		})
+	}
 }
