@@ -58,7 +58,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details.
 - `neo4j-cli/` (the super-CLI package) has no test files; this is a pre-existing gap
 - **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 - **Name test files per command**, not per package — use `get_test.go`, `set_test.go`, `list_test.go` mirroring the source files; put shared helpers in `helpers_test.go`. Avoid aggregating all tests in a single `config_test.go`.
-- **Never use `afero.NewOsFs()` in query package tests** — the dev machine has real credentials at `~/Library/Preferences/neo4j/cli/credentials.json`. Tests using a real FS will fail if any database credential is stored. Always use `testfs.GetTestFs(`{"format":"json"}`, "{}")` (empty credentials) even when testing dotenv walk-up; write the dotenv into the memFs at `filepath.Join(t.TempDir(), ".env")` and `t.Chdir(tmp)` so `os.Getwd()`+`cfg.Aura.Fs()` finds it.
+- **Never use `afero.NewOsFs()` in query package tests** — the dev machine has real credentials at `~/Library/Preferences/neo4j/cli/credentials.json`. Tests using a real FS will fail if any dbms credential is stored. Always use `testfs.GetTestFs(`{"format":"json"}`, "{}")` (empty credentials) even when testing dotenv walk-up; write the dotenv into the memFs at `filepath.Join(t.TempDir(), ".env")` and `t.Chdir(tmp)` so `os.Getwd()`+`cfg.Aura.Fs()` finds it.
 
 ## Architecture
 
@@ -267,7 +267,6 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Dbms` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
 - `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies.
 - `PrintableDbmsCredentials.AsArray()` and `MarshalJSON()` intentionally omit `password` — any future credential type that has sensitive fields must also exclude them from both methods.
-- The `Dbms` field in `CredentialsFile` uses JSON tag `"dbms"` — existing `credentials.json` files with the old `"database"` key will not auto-migrate (intentional; migration is a separate concern).
 
 ## common/output Testing Notes
 
