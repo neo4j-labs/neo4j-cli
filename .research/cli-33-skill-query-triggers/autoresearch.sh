@@ -21,7 +21,7 @@ RESULT_FILE="$DIR/last_run.json"
 BIN="$REPO/bin/neo4j-cli"
 
 WORKERS="${WORKERS:-8}"
-RUNS_PER_QUERY="${RUNS_PER_QUERY:-2}"
+RUNS_PER_QUERY="${RUNS_PER_QUERY:-3}"
 TIMEOUT="${TIMEOUT:-90}"
 MODEL="${MODEL:-claude-sonnet-4-6}"
 
