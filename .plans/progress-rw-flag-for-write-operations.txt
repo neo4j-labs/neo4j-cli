@@ -459,3 +459,24 @@ Key Decisions:
 - Bundle regen folded into this task because the query Short/help text changed; the generated docs would otherwise drift and fail TestGenerator_RoundTrip.
 
 Next Task: task-021
+
+================================================================================
+TASK-021: Delete HTTPS smoke test; add Bolt smoke test
+Date: 2026-05-06T21:00:00Z
+================================================================================
+
+Summary:
+Deleted neo4j-cli/query/query_https_smoke_test.go (cert gen, HTTPS container boot, postQueryV2, runQueryCmd, testExplainResponseShape). Added neo4j-cli/query/query_bolt_smoke_test.go gated on NEO4J_BOLT_TEST=1 with //go:build !windows. The new test boots neo4j:latest with the Bolt port (7687) mapped to a random free host port, opens a real driver via openDriver, polls VerifyConnectivity until ready, then runs three EXPLAIN cases through runStatementResponse (readOnly=true) asserting summary.QueryType() returns QueryTypeReadOnly / QueryTypeReadWrite / QueryTypeSchemaWrite for read / write / schema cypher respectively.
+
+Files Changed:
+- neo4j-cli/query/query_https_smoke_test.go (deleted: HTTP-era smoke + cert gen helpers)
+- neo4j-cli/query/query_bolt_smoke_test.go (created: Bolt-backed env-gated smoke with three classifier cases)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-021 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Reused conn + runStatementResponse + openDriver instead of building a parallel driver harness, so the smoke exercises the same code path the CLI uses in production.
+- Used VerifyConnectivity polling (5s per probe, 60s overall) rather than HTTP readiness probing — there is no HTTP endpoint mapped in this test.
+- Asserted directly on resp.QueryType (the field rejectWriteCypher reads) so the smoke locks in classifier behaviour at the seam the CLI consumes.
+
+Next Task: task-022

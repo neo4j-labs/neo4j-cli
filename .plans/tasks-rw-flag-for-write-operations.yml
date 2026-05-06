@@ -283,7 +283,7 @@ tasks:
     title: "Delete HTTPS smoke test; add Bolt smoke test"
     description: |
       Delete neo4j-cli/query/query_https_smoke_test.go entirely (cert gen, container boot, HTTPS poll, testExplainResponseShape, runQueryCmd, postQueryV2). Replace with neo4j-cli/query/query_bolt_smoke_test.go gated on NEO4J_BOLT_TEST=1. The new test boots neo4j:latest with bolt port mapped to a random free port, then asserts: read EXPLAIN → ReadOnly, write EXPLAIN (CREATE) → ReadWrite, schema EXPLAIN (CREATE INDEX) → SchemaWrite. Build constraint: //go:build !windows.
-    status: pending
+    status: completed
     dependencies:
       - task-018
       - task-019
@@ -291,6 +291,7 @@ tasks:
       - "query_https_smoke_test.go is gone"
       - "Bolt smoke test exists with env gate and the three classifier cases"
       - "Default go test ./... is unaffected (env gate respected)"
+    completed_at: 2026-05-06T21:00:00Z
 
   - id: task-022
     title: "Rewrite query unit tests for the driver path"
