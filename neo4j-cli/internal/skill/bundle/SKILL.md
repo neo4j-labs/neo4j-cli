@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI. Use when the user wants to execute Cypher, introspect a Neo4j schema, manage Aura instances/tenants/credentials, or install/remove the neo4j-cli skill in an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
+description: Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, introspect a schema, list/create/get/delete/provision/resize Aura instances or tenants, set up/add/remove Aura API credentials, or install/remove the neo4j-cli skill in an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
