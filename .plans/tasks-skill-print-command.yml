@@ -14,7 +14,8 @@ tasks:
       and writes raw bytes (no {{VERSION}} substitution) to cmd.OutOrStdout via cmd.Print.
       Mirror the layout/style of common/skill/list.go and common/skill/check.go.
       Include the Neo4j copyright header.
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T08:35:00Z
     dependencies: []
     acceptance_criteria:
       - "common/skill/print.go exists with Neo4j copyright header at top"

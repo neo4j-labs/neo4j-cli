@@ -1,0 +1,22 @@
+================================================================================
+TASK-001: Add common/skill/print.go leaf command
+Date: 2026-05-06T08:35:00Z
+================================================================================
+
+Summary:
+Created common/skill/print.go defining newPrintCmd that returns a cobra leaf
+with Use:"print", cobra.NoArgs, and a RunE that reads SKILL.md from the
+embedded bundle via fs.ReadFile and writes raw bytes (no {{VERSION}}
+substitution) to cmd.OutOrStdout. Not yet mounted in skill.go (task-002).
+
+Files Changed:
+- common/skill/print.go (created — new leaf command)
+- .plans/tasks-skill-print-command.yml (status pending -> completed)
+
+Key Decisions:
+- Used `_` for unused cfg/skillName params; signature externally matches
+  (cfg, bundle, skillName) per acceptance criteria. Idiomatic Go.
+- `cmd.Print(string(data))` writes the SKILL.md verbatim to OutOrStdout.
+- Long description notes that {{VERSION}} stays literal.
+
+Next Task: task-002 (mount print leaf in NewCmd)
