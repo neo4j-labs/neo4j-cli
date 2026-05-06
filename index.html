@@ -106,7 +106,7 @@
   [data-theme="dark"] {
     --bg: #0B0E12;
     --bg-alt: #11161C;
-    --bg-code: #060A0E;
+    --bg-code: #161B22;
     --fg: #ECEFF3;
     --fg-muted: #9AA8B4;
     --fg-faint: #6B7A88;
@@ -124,7 +124,7 @@
     :root:not([data-theme="light"]) {
       --bg: #0B0E12;
       --bg-alt: #11161C;
-      --bg-code: #060A0E;
+      --bg-code: #161B22;
       --fg: #ECEFF3;
       --fg-muted: #9AA8B4;
       --fg-faint: #6B7A88;
@@ -203,7 +203,7 @@
   .brand-tag {
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--fg-faint);
+    color: var(--fg-muted);
     padding: 2px 8px;
     border-radius: 4px;
     background: var(--bg-alt);
@@ -656,6 +656,7 @@
     color: var(--fg-muted);
     line-height: 1.55;
   }
+  .step p a { text-decoration: underline; }
   .step .step-cmd {
     display: flex;
     align-items: center;
@@ -707,7 +708,8 @@
   footer a { color: var(--fg-muted); text-decoration: none; transition: color 0.1s; }
   footer a:hover { color: var(--fg); }
   footer .links { display: flex; gap: 20px; flex-wrap: wrap; }
-  footer .meta { font-family: var(--font-mono); font-size: 12px; }
+  footer .meta { font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); }
+  footer .meta a { text-decoration: underline; }
 
   /* ---------- Cursor ---------- */
   .cursor {
@@ -775,6 +777,9 @@
     </button>
   </div>
 </header>
+
+<!-- ============== MAIN ============== -->
+<main>
 
 <!-- ============== HERO ============== -->
 <section class="hero">
@@ -1081,6 +1086,8 @@
     </div>
   </div>
 </section>
+
+</main>
 
 <!-- ============== FOOTER ============== -->
 <footer>
