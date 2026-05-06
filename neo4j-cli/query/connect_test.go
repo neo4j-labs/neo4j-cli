@@ -96,13 +96,6 @@ func TestResolveConn_Defaults(t *testing.T) {
 
 func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	tmp := t.TempDir()
-	require.NoError(t, afero.WriteFile(afero.NewOsFs(), filepath.Join(tmp, ".env"),
-		[]byte(strings.Join([]string{
-			"NEO4J_URI=http://from-dotenv:7474",
-			"NEO4J_USERNAME=fromdotenv",
-			"NEO4J_PASSWORD=dotenv-pw",
-			"NEO4J_DATABASE=dotenvdb",
-		}, "\n")+"\n"), 0644))
 	t.Chdir(tmp)
 
 	t.Setenv(envURI, "http://from-env:7474")
@@ -111,8 +104,18 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	t.Setenv(envDatabase, "envdb")
 	t.Setenv(envInsecure, "")
 
-	// Real OS fs so resolveConn's os.Getwd + .env walk-up land on this dir.
-	fs := afero.NewOsFs()
+	// Use a mem FS so the test is hermetic regardless of real credentials or
+	// dotenv files on the machine. Write the dotenv at the temp cwd path so
+	// the walk-up logic finds it via cfg.Aura.Fs().
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+		[]byte(strings.Join([]string{
+			"NEO4J_URI=http://from-dotenv:7474",
+			"NEO4J_USERNAME=fromdotenv",
+			"NEO4J_PASSWORD=dotenv-pw",
+			"NEO4J_DATABASE=dotenvdb",
+		}, "\n")+"\n"), 0644))
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	require.NoError(t, cmd.ParseFlags([]string{
@@ -133,8 +136,6 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 
 func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	tmp := t.TempDir()
-	require.NoError(t, afero.WriteFile(afero.NewOsFs(), filepath.Join(tmp, ".env"),
-		[]byte("NEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
 	t.Chdir(tmp)
 
 	t.Setenv(envURI, "")
@@ -143,7 +144,13 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	t.Setenv(envDatabase, "")
 	t.Setenv(envInsecure, "")
 
-	fs := afero.NewOsFs()
+	// Use a mem FS so the test is hermetic regardless of real credentials on the
+	// machine. Write the dotenv at the temp cwd path so the walk-up logic finds
+	// it via cfg.Aura.Fs().
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+		[]byte("NEO4J_USERNAME=onlydotenv\nNEO4J_PASSWORD=onlydotenvpw\n"), 0644))
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 
@@ -532,4 +539,134 @@ func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
 	assert.Equal(t, "", c.password)
 	assert.Equal(t, defaultDatabase, c.database)
 	assert.False(t, c.insecure)
+}
+
+// namedCredJSON returns a credentials.json body with one named credential
+// (not necessarily set as the default).
+func namedCredJSON(name, uri, username, password, dbName string, insecure bool) string {
+	insecureStr := "false"
+	if insecure {
+		insecureStr = "true"
+	}
+	return `{"database":{"default-credential":"","credentials":[{"name":"` + name +
+		`","username":"` + username + `","password":"` + password +
+		`","database-name":"` + dbName + `","uri":"` + uri +
+		`","insecure":` + insecureStr + `}]}}`
+}
+
+func TestResolveConn_CredentialFlag_ResolvesNamedCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb"}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "http://named:7474", c.uri)
+	assert.Equal(t, "namedUser", c.username)
+	assert.Equal(t, "namedPass", c.password)
+	assert.Equal(t, "namedDB", c.database)
+	assert.False(t, c.insecure)
+	assert.NotNil(t, c.doer)
+}
+
+func TestResolveConn_CredentialFlag_ConflictsWithUsername(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb", "--username=other"}))
+
+	_, err := resolveConn(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--credential")
+	assert.Contains(t, err.Error(), "--username")
+}
+
+func TestResolveConn_CredentialFlag_UnknownCredentialErrors(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// No credentials stored.
+	cmd, cfg := newTestCmdWithCreds(t, "{}")
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=unknown"}))
+
+	_, err := resolveConn(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown")
+	assert.Contains(t, err.Error(), "credential database list")
+}
+
+func TestResolveConn_CredentialFlag_InsecureFlagOverridesCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Stored credential has insecure=true, but --insecure=false is passed.
+	credsJSON := namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb", "--insecure=false"}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+	assert.False(t, c.insecure, "--insecure=false must override credential's insecure:true")
+}
+
+func TestResolveConn_CredentialFlag_Insecure_AppliedFromCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Stored credential has insecure=true; no --insecure flag is passed.
+	credsJSON := namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb"}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+	assert.True(t, c.insecure, "credential's insecure:true must be used when --insecure is not set")
+}
+
+func TestResolveConn_NoCredentialFlag_ExistingBehaviourUnchanged(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Credential exists in store but --credential is NOT passed — default
+	// auto-detect behaviour should still apply.
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	// Do not pass --credential.
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	// Should use the default stored credential (unchanged behaviour).
+	assert.Equal(t, "http://stored:7474", c.uri)
+	assert.Equal(t, "storedUser", c.username)
 }

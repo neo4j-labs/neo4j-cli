@@ -37,6 +37,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().Bool("insecure", false, "Skip TLS certificate verification [env: NEO4J_INSECURE] (development only)")
+	cmd.PersistentFlags().String("credential", "", "Name of a stored database credential to use for the connection (see 'credential database list')")
 
 	flags.RegisterOutputFlag(cmd, cfg)
 

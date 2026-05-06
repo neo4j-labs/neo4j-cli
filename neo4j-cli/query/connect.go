@@ -79,19 +79,80 @@ type queryError struct {
 }
 
 // resolveConn merges connection settings from .env, OS environment, and
-// command-line flags (lowest → highest precedence). When none of the four
-// connection params (uri, username, password, database) are explicitly
+// command-line flags (lowest → highest precedence). When --credential is set,
+// the named stored credential is used directly; passing any of --uri/--username/
+// --password/--database alongside --credential is an error. When none of the
+// four connection params (uri, username, password, database) are explicitly
 // provided, the stored default database credential (if any) is used instead.
 // Partial explicit overrides (some but not all of the four params) are
 // rejected with a descriptive error. The returned conn carries an *http.Client
 // honouring --insecure or the insecure flag stored in the credential.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
+	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
+
+	// --credential: when set, look up the named credential and use it directly.
+	// Dotenv / env vars are skipped entirely; only --insecure may be combined.
+	// None of --uri/--username/--password/--database may be set alongside it.
+	if f := cmd.Flag("credential"); f != nil && f.Changed {
+		credName := f.Value.String()
+
+		// Conflict check: --credential is mutually exclusive with the four
+		// individual connection params.
+		conflicting := []string{}
+		for _, name := range []string{"uri", "username", "password", "database"} {
+			if cf := cmd.Flag(name); cf != nil && cf.Changed {
+				conflicting = append(conflicting, "--"+name)
+			}
+		}
+		if len(conflicting) > 0 {
+			return nil, fmt.Errorf(
+				"query: --credential cannot be used together with %s; use one or the other",
+				strings.Join(conflicting, ", "))
+		}
+
+		cred, err := cfg.Credentials.Database.Get(credName)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"query: credential %q not found; run 'neo4j-cli credential database list' to see available credentials",
+				credName)
+		}
+
+		insecure := cred.Insecure
+		if insecureExplicit {
+			if b, perr := strconv.ParseBool(cmd.Flag("insecure").Value.String()); perr == nil {
+				insecure = b
+			}
+		}
+
+		uri := cred.URI
+		if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+				"info: rewrote URI '%s' to '%s' (the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence)\n",
+				displayOrig, rewritten)
+			uri = rewritten
+		}
+
+		version := cfg.Version
+		if version == "" {
+			version = "dev"
+		}
+		return &conn{
+			uri:       uri,
+			username:  cred.Username,
+			password:  cred.Password,
+			database:  cred.DatabaseName,
+			insecure:  insecure,
+			userAgent: "neo4j-cli/v" + version,
+			doer:      newHTTPClient(insecure),
+		}, nil
+	}
+
+	// --credential not set: load dotenv and use the standard resolution path.
 	envFlag := flagString(cmd, "env")
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("query: cannot determine current directory: %w", err)
 	}
-
 	dotenv, err := loadEnvFile(cfg.Aura.Fs(), envFlag, cwd)
 	if err != nil {
 		return nil, err
@@ -124,7 +185,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			insecure = b
 		}
 	}
-	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
 
 	// Determine how many of the four connection params were explicitly provided
 	// (non-empty after merging dotenv + OS env + flags).

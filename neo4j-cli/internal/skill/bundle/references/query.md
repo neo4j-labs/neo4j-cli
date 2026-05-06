@@ -10,6 +10,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--credential` | string | - | Name of a stored database credential to use for the connection (see 'credential database list') |
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
 | `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon] |
