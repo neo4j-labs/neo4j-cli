@@ -26,17 +26,6 @@ builds:
       - darwin
     ldflags:
       - -X "github.com/neo4j/cli/neo4j-cli/app.Version={{.Env.GORELEASER_CURRENT_TAG}}"
-  - main: ./neo4j-cli/aura/cmd
-    id: aura-cli
-    binary: aura-cli
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-    ldflags:
-      - -X "main.Version={{.Env.AURA_CLI_VERSION}}"
 
 archives:
   - id: neo4j-cli-archive
@@ -58,30 +47,10 @@ archives:
       - goos: windows
         formats:
           - zip
-  - id: aura-cli-archive
-    ids:
-      - aura-cli
-    formats:
-      - tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
-    name_template: >-
-      {{ .Binary }}_
-      {{- .Version }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
 
 release:
   prerelease: true
   extra_files:
-    - glob: CHANGELOG-aura.md
     - glob: CHANGELOG-neo4j.md
 
 brews:
@@ -119,7 +88,6 @@ notarize:
       #
       # Default: the project name.
       ids:
-        - aura-cli
         - neo4j-cli
 
       sign:

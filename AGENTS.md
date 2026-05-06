@@ -7,7 +7,7 @@ Learnings and patterns for future agents working on this project.
 ## Feedback Instructions
 
 TEST COMMANDS: [`make test`]
-BUILD COMMANDS: [`make build`, `make run-aura`, `make run-neo4j`]
+BUILD COMMANDS: [`make build`, `make run-neo4j`]
 LINT COMMANDS: [`make lint`]
 FORMAT COMMANDS: [`make fmt-check`] — runs `gofmt -l .` and fails on any output. `make fmt` rewrites silently and is NOT a gate; use `make fmt-check` to verify. CI's golangci-lint v2 includes `gofmt` as a formatter and will fail the build on unformatted code.
 LICENSE CHECK: [`make license-check`]
@@ -39,12 +39,12 @@ BUILD SYSTEMS: [Go toolchain, Makefile, golangci-lint, GoReleaser, changie]
 
 See [`.agents/build.md`](.agents/build.md) for full details.
 
-- Local build: `make build` (produces `bin/aura-cli` and `bin/neo4j-cli`)
-- Local run (no build): `make run-aura` / `make run-neo4j`
+- Local build: `make build` (produces `bin/neo4j-cli`)
+- Local run (no build): `make run-neo4j`
 - Release build (current platform, ldflags baked in): `make snapshot` (uses goreleaser, outputs to `bin/`)
 - npm publish dry-run (template + ordering check): `make npm-publish-dry`. Works against empty `dist/` because `publish.sh --dry-run` stubs missing platform binaries with a 1-byte placeholder; run `make snapshot` first if you want real binaries packed. Real-binary path (CI) still hard-errors on missing binaries — the stub is dry-run-only.
 - All `.go` files must start with the Neo4j copyright header (enforced in CI via `addlicense`)
-- PRs require a changelog entry via `make changelog` **only for user-facing changes** (new features, bug fixes, behaviour changes visible to CLI users). Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries. Because `neo4j-cli` bundles all child CLIs, user-facing changes to a child require entries for both — use `changie new --projects <child> --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use
+- PRs require a changelog entry via `make changelog` **only for user-facing changes** (new features, bug fixes, behaviour changes visible to CLI users). Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries. Use `changie new --projects neo4j-cli --kind <kind> --body <body>` for non-interactive use.
 
 ## Testing Framework
 
@@ -66,9 +66,8 @@ ARCHITECTURE PATTERN: Cobra command tree — one file per leaf command, director
 
 See [`.agents/architecture.md`](.agents/architecture.md) for full details.
 
-Two binaries are produced:
-- **`neo4j-cli`** — super-CLI entrypoint (`neo4j-cli/main.go`); wraps `aura-cli` under the `aura` subcommand
-- **`aura-cli`** — standalone Aura CLI (`neo4j-cli/aura/cmd/main.go`)
+One binary is produced:
+- **`neo4j-cli`** — single CLI entrypoint (`neo4j-cli/main.go`); the Aura command tree lives under the `aura` subcommand. The `neo4j-cli/aura/cmd/main.go` standalone entrypoint stays in the tree (still compiles via `go test ./...`) but is no longer built or shipped.
 
 ```
 neo4j-cli/
@@ -76,7 +75,7 @@ neo4j-cli/
   main.go                  # thin entrypoint; mounts aura subcommand as "aura"
   internal/skill/          # per-binary skill template (bundle, description.txt, additions.md, gen/)
   aura/
-    cmd/main.go            # aura-cli standalone entrypoint
+    cmd/main.go            # historical standalone entrypoint (compiled but not built/shipped)
     aura.go                # Root command, registers subcommands
     internal/
       api/                 # HTTP client for Neo4j Aura REST API
@@ -93,7 +92,7 @@ common/
   skill/                   # Shared agent-skill logic (catalog, render, installer, cobra wrapper)
 ```
 
-Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). Each binary has its own `<bin>/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`). Adding a new standalone CLI = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
+Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). The neo4j-cli binary has its own `neo4j-cli/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`); the historical `neo4j-cli/aura/internal/skill/` template still exists and regenerates cleanly even though no Make target builds the standalone aura-cli binary. Adding a new standalone CLI in the future = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
 
 Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
@@ -109,11 +108,11 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG-neo
 
 See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
-- `changie` batches changelog entries and opens release PRs automatically (dual-project: `aura-cli` + `neo4j-cli`)
+- `changie` batches changelog entries and opens a release PR automatically (single project: `neo4j-cli`)
 - Merging a release PR triggers GoReleaser to publish binaries for linux/windows/darwin (amd64 + arm64)
 - macOS binaries are code-signed and notarized
-- Each binary gets its own version: `AURA_CLI_VERSION` for `aura-cli`, `GORELEASER_CURRENT_TAG` for `neo4j-cli`
-- Combined `release-notes.md` is generated with `## Versions` and `## Changes` sections before GoReleaser runs
+- The release version comes from `GORELEASER_CURRENT_TAG` (set by the GoReleaser action)
+- `release-notes.md` is generated with a `## Changes` section (neo4j-cli changelog body) before GoReleaser runs
 
 ## Makefile Notes
 
@@ -124,22 +123,20 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - Changing `ValidFormatValues` in `common/clicfg/clicfg.go` affects the `--format` flag help text, which is embedded in skill bundle reference docs. Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` after any such change; `TestGenerator_RoundTrip` is the gate that catches stale bundles.
 - Adding any new command to the neo4j-cli command tree (including sub-sub-packages like `credential/dbms/`) also requires `go generate ./neo4j-cli/internal/skill/...` — otherwise `TestGenerator_RoundTrip` fails with a "references/credential.md differs" message. Run this immediately after any command-tree change before the test gate.
 
-## Changie Multi-Project Notes
+## Changie Notes
 
-- `ProjectConfig` in changie does NOT support `changesDir` or `changelogPath` fields — only `label`, `key`, `changelog`, and `replacements`
-- Version files live at `changesDir/<key>/v*.md` (e.g., `.changes/aura-cli/v1.7.0.md`) — changie appends the project key to `changesDir` automatically
-- All projects share a single unreleased directory at `changesDir/unreleasedDir/` (e.g., `.changes/unreleased/`) — change files are tagged with `project:` field inside the YAML, not by directory
-- `changie latest --project aura-cli` outputs `aura-cliv1.7.0` (project key prepended with no separator by default) — use `--remove-prefix` to strip `v` but key is always prepended; shell workflows must strip `aura-cli` prefix (e.g., `sed 's/^aura-cli//'`)
-- `ProjectsVersionSeparator` in `.changie.yaml` can be set to `-` to get `aura-cli-v1.7.0` instead of `aura-cliv1.7.0`; leave unset (empty) for `aura-cliv1.7.0`
-- `changie merge` (no flags) automatically iterates all `projects:` in config and writes each to its own `changelog:` path — confirmed from source (`cmd/merge.go`). Calling `changie merge --project` is not supported by changie's CLI.
-- `changie new --projects <a> --projects <b>` creates entries for multiple projects in one call; the interactive prompt (`make changelog`) also supports multi-select
-- This repo uses kind labels `Major`, `Minor`, `Patch` (not `added`/`feat`) — check `.changie.yaml` `kinds:` before using `--kind`
-- If changie isn't installed locally, hand-author YAML files under `.changes/unreleased/` named `<project>-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project / kind / body / time` (single-quoted body, RFC3339 time). Write one file per project for dual-project entries.
+- The repo uses changie's `projects:` mechanism even though only one project (`neo4j-cli`) is configured — version files live at `changesDir/<key>/v*.md` (e.g., `.changes/neo4j-cli/v1.7.0.md`) because changie appends the project key to `changesDir` automatically.
+- All change files share the unreleased directory at `.changes/unreleased/` and are tagged with a `project:` field inside the YAML.
+- `changie latest --project neo4j-cli` outputs `neo4j-cliv1.7.0` (project key prepended with no separator by default) — shell workflows must strip the `neo4j-cli` prefix (e.g., `sed 's/^neo4j-cli//'`).
+- `ProjectsVersionSeparator` in `.changie.yaml` controls whether the prefix has a separator (`neo4j-cli-v1.7.0` if set to `-`); leave unset for the current `neo4j-cliv1.7.0` shape.
+- This repo uses kind labels `Major`, `Minor`, `Patch` (not `added`/`feat`) — check `.changie.yaml` `kinds:` before using `--kind`.
+- Historical context: the `aura-cli` project was removed from `.changie.yaml` when the standalone aura-cli build was retired. `.changes/aura-cli/v*.md` files and `CHANGELOG-aura.md` are preserved as frozen history but no new entries are authored against that project key.
+- If changie isn't installed locally, hand-author YAML files under `.changes/unreleased/` named `neo4j-cli-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project / kind / body / time` (single-quoted body, RFC3339 time).
 
 ## Changie Workflow Notes
 
-- To detect whether `.changes/unreleased/` contains entries for a given project, use `grep -rl 'project: <key>' .changes/unreleased/ 2>/dev/null | grep -q .` — the `2>/dev/null` handles an absent/empty directory and `grep -q .` converts the file list to a boolean exit code
-- Write boolean outputs to `GITHUB_OUTPUT` with `echo "has_<project>=true" >> $GITHUB_OUTPUT` / `false` in an if/else so downstream steps can use `if: steps.<id>.outputs.has_<project> == 'true'`
+- To detect whether `.changes/unreleased/` contains entries for the project, use `grep -rl 'project: neo4j-cli' .changes/unreleased/ 2>/dev/null | grep -q .` — the `2>/dev/null` handles an absent/empty directory and `grep -q .` converts the file list to a boolean exit code
+- Write boolean outputs to `GITHUB_OUTPUT` with `echo "has_neo4j=true" >> $GITHUB_OUTPUT` / `false` in an if/else so downstream steps can use `if: steps.<id>.outputs.has_neo4j == 'true'`
 - Always gate terminal steps (e.g. `create-pull-request`) on the same detection outputs — skipped upstream steps produce empty outputs, not skipped downstream steps; without a guard the terminal step runs with blank inputs and creates a malformed artifact
 - For multiline GitHub Actions outputs, use the heredoc form: `{ echo "key<<EOF"; echo "${VALUE}"; echo "EOF"; } >> $GITHUB_OUTPUT` — this avoids issues with inline `|` syntax
 - When building multiline strings in `run: |` shell blocks, use `printf '...\n...'` instead of multi-line string assignment — the YAML indentation level (e.g. 10 spaces) carries into continuation lines as literal whitespace
@@ -147,12 +144,12 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 ## Release Workflow Notes
 
 - Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)
-- `AURA_CLI_VERSION` env var set in an earlier step must be re-referenced as `${{ env.AURA_CLI_VERSION }}` in the GoReleaser action's `env:` block — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
+- Env vars set in an earlier step that need to flow into the GoReleaser action's `env:` block must be re-referenced as `${{ env.<NAME> }}` — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
 - The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
 - Avoid heredoc indentation issues in `run: |` blocks: use `{ printf ...; } > file` instead of `cat > file << EOF ... EOF` when shell lines are indented under YAML
 - Job-level `outputs:` block surfaces step outputs to downstream `workflow_run` consumers. To expose a step output, the step needs an `id:` and must `echo "key=val" >> $GITHUB_OUTPUT` — then reference as `${{ steps.<id>.outputs.<key> }}` in the job `outputs:` block. Output is always populated (downstream gates on the value, not whether it was set).
 - All actions in `.github/workflows/` are SHA-pinned with a `# v<major>` trailing comment (e.g. `actions/upload-artifact@ea165f8d... # v4`) — match this convention for any new action; Renovate handles bumps.
-- `release.yml`'s `include_neo4j` / `include_aura` are computed by diffing `git diff HEAD~1 --name-only` against changelog filenames — split into its own step (id: `changed`) so the job's `outputs:` block can wire it cleanly to downstream `workflow_run` workflows like `publish-npm.yml`.
+- `release.yml`'s `include_neo4j` is computed by diffing `git diff HEAD~1 --name-only` against `CHANGELOG-neo4j.md` — kept in its own step (id: `changed`) so the job's `outputs:` block can wire it cleanly to downstream `workflow_run` workflows like `publish-npm.yml`. The trigger now only fires on `CHANGELOG-neo4j.md`, so `include_neo4j` is effectively always `true`; the gate is retained defensively.
 - `workflow_run.workflows: ["<name>"]` matches by the upstream workflow's `name:` field, NOT the filename. `release.yml` declares `name: release` (lowercase) so the watcher uses `["release"]`. Mismatching never errors — it just silently never triggers.
 - Cross-workflow artifact download with `actions/download-artifact@v4` requires both `github-token: ${{ secrets.GITHUB_TOKEN }}` AND `run-id: ${{ github.event.workflow_run.id }}`. Without `run-id` it looks at the current run only and 404s.
 - `workflow_run` events do NOT have `inputs.*` populated; `workflow_dispatch` events do not have `github.event.workflow_run.*`. To pick a value cleanly across both triggers use the ternary pattern `${{ github.event_name == 'workflow_dispatch' && inputs.x || steps.<auto>.outputs.x }}` — short-circuit makes the unset side empty and `||` falls back.
@@ -164,10 +161,10 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 - GoReleaser v2 deprecates `archives.format` (string) — use `archives.formats` (list)
 - GoReleaser v2 deprecates `format_overrides.format` — use `format_overrides.formats`
-- Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors when there are multiple archive blocks
-- Use `{{ .Binary }}` in `name_template` (not `{{ .ProjectName }}`) when building multiple binaries so archives are named per binary
-- `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. If you move Version from `package main` to e.g. `neo4j-cli/app`, update the ldflag to `-X "github.com/neo4j/cli/neo4j-cli/app.Version=..."` — a stale path silently no-ops and ships `dev`.
+- Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors if a second archive block is ever added. The current config has one `neo4j-cli` archive entry; adding another (e.g., a future second binary) requires giving each a unique `id` and `ids:` filter.
+- `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. The current ldflag points at `github.com/neo4j/cli/neo4j-cli/app.Version` — if you move Version to a different package, update the ldflag to match; a stale path silently no-ops and ships `dev`.
 - `make snapshot` runs `goreleaser build --snapshot --single-target` which does NOT exercise the `brews:` step. To verify brew formula generation locally use `goreleaser release --snapshot --clean --skip=publish,sign,notarize` with `HOMEBREW_TAP_GITHUB_TOKEN=<anything>` set (the env var is referenced via template; value can be a stub for snapshot since `--skip=publish` short-circuits the push). Output appears at `dist/homebrew/Formula/neo4j-cli.rb`.
+- `goreleaser release --snapshot` (unlike `goreleaser build --snapshot`) still resolves `{{.Env.GORELEASER_CURRENT_TAG}}` in the build's ldflags, so a local invocation must export `GORELEASER_CURRENT_TAG=dev` (or any value) in addition to `HOMEBREW_TAP_GITHUB_TOKEN`. Without it the run fails at build time with `map has no entry for key "GORELEASER_CURRENT_TAG"`. The `make snapshot` recipe wires this implicitly (`GORELEASER_CURRENT_TAG=dev goreleaser build ...`); a manual `goreleaser release` call must set it explicitly. CI sets it via `${{ github.ref_name }}` and is unaffected.
 - GoReleaser v2.x emits a deprecation notice "brews is being phased out in favor of homebrew_casks" — informational only; `brews:` still works and is the documented path for non-cask formulas. Migration to `homebrew_casks:` is a separate decision.
 
 ## Repo Doc Notes
@@ -228,7 +225,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Go's `internal` package rules prevent `neo4j-cli/internal/subcommands/config` from directly importing `neo4j-cli/aura/internal/subcommands/config` — bridge via a thin wrapper function in the non-internal `neo4j-cli/aura/` package (e.g. `NewAuraConfigCmd` in `aura/config.go`)
 - When moving a subcommand from one path to another (e.g. `neo4j aura config` → `neo4j config aura`), the `cmd.Use` field must be renamed to match the new path segment — set it on the returned command before mounting
 - If `NewStandaloneCmd` calls `NewCmd` and then adds extras, removing a subcommand from `NewCmd` also removes it from standalone; add it back directly in `NewStandaloneCmd` as a temporary hold until the standalone-specific version is implemented
-- The standalone aura-cli flat config command (`NewStandaloneConfigCmd`) routes key operations by checking `cfg.Global.IsValidConfigKey(key)` first, then `cfg.Aura.IsValidConfigKey(key)` — global keys take precedence; use `allStandaloneConfigKeys(cfg)` to combine both for `ValidArgs` on get subcommands
+- The standalone-aura flat config command (mounted via `aura.NewStandaloneCmd` — kept in source for `go test ./...` even though no Make target builds it) routes key operations by checking `cfg.Global.IsValidConfigKey(key)` first, then `cfg.Aura.IsValidConfigKey(key)` — global keys take precedence; use `allStandaloneConfigKeys(cfg)` to combine both for `ValidArgs` on get subcommands
 - Cobra's `legacyArgs` behavior: child commands (those with a parent) accept arbitrary positional args by default — only root commands with subcommands produce "unknown command" errors via `legacyArgs`. This means `neo4j aura config list` (where `config` doesn't exist under `aura`) shows the `aura` help and exits 0 rather than erroring. Test for help display and absence of "config" in the help output instead of asserting an error string.
 
 ## Output Rendering Notes

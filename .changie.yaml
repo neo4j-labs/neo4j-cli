@@ -19,9 +19,6 @@ newlines:
     endOfVersion: 1
 envPrefix: CHANGIE_
 projects:
-    - label: aura-cli
-      key: aura-cli
-      changelog: CHANGELOG-aura.md
     - label: neo4j-cli
       key: neo4j-cli
       changelog: CHANGELOG-neo4j.md

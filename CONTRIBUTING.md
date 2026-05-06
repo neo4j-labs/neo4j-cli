@@ -16,13 +16,7 @@ make test
 
 ### Local running
 
-The CLI can be run locally without building a binary. To run the standalone `aura-cli`:
-
-```bash
-make run-aura
-```
-
-To run the `neo4j-cli` super CLI:
+The CLI can be run locally without building a binary:
 
 ```bash
 make run-neo4j
@@ -89,21 +83,13 @@ go install github.com/miniscruff/changie@latest
 
 If changie is not available, you may need to add `/go/bin` to your path: `export PATH="$HOME/go/bin:$PATH"`
 
-This repository uses a **multi-project** changie setup with two projects: `aura-cli` and `neo4j-cli`.
+Run `make changelog` and follow the prompts. Changie will ask you to select a change kind, then generate a YAML file in `.changes/unreleased/`. Commit it alongside your code changes.
 
-Run `make changelog` and follow the prompts. Changie will ask you to select one or more projects and a change kind, then generate a YAML file per project in `.changes/unreleased/`. Commit those files alongside your code changes.
-
-#### Changes affecting multiple projects
-
-Because `neo4j-cli` bundles its child CLIs, any change to a child CLI also affects `neo4j-cli`. Select both projects when prompted — `make changelog` supports multi-select in interactive mode.
-
-For non-interactive use (e.g. scripts or agents), pass `--projects` multiple times:
+For non-interactive use (e.g. scripts or agents):
 
 ```bash
-changie new --projects aura-cli --projects neo4j-cli --kind Patch --body "your change description"
+changie new --projects neo4j-cli --kind Patch --body "your change description"
 ```
-
-Only changes specific to the `neo4j-cli` wrapper itself need a single `neo4j-cli` entry.
 
 ### License
 
@@ -126,17 +112,10 @@ make license-check
 
 Builds for releases are handled in GitHub Actions. If you want to create local builds, there are a couple of approaches.
 
-To build both `aura-cli` and `neo4j-cli` into the `bin/` directory:
+To build `neo4j-cli` into the `bin/` directory:
 
 ```bash
 make build
-```
-
-You can also build each binary individually:
-
-```bash
-make build-aura   # produces bin/aura-cli
-make build-neo4j  # produces bin/neo4j-cli
 ```
 
 To remove build artifacts:
@@ -155,34 +134,34 @@ In the above command, `GORELEASER_CURRENT_TAG` can be substituted for any versio
 
 ## CLI Guidelines
 
-The Aura CLI aims to provide a consistent and reliable experience to the end user. Any change made to the CLI must comform to the following guidelines.
+The CLI aims to provide a consistent and reliable experience to the end user. Any change made to the CLI must comform to the following guidelines.
 
 ### Commands
 
 - All commands must be singular
-    - ✅ `aura-cli instance`
-    - ❌ `aura-cli instances`
+    - ✅ `neo4j-cli aura instance`
+    - ❌ `neo4j-cli aura instances`
 - Verbs and nouns should be separate, with the action at the end
-    - ✅ `aura-cli instance list`
-    - ❌ `aura-cli list-instance`
-    - ❌ `aura-cli list instance`
+    - ✅ `neo4j-cli aura instance list`
+    - ❌ `neo4j-cli aura list-instance`
+    - ❌ `neo4j-cli aura list instance`
 
 ### Parameters
 
 To avoid confusion, this guide uses the term **flags** to refer to any named argument, whether it has values or not (e.g. `-l`, `--format json`) and **arguments** exclusively for positional arguments (e.g. `list 1234`).
 
 - Only one argument should be used, if more than one is needed, use flags instead. This is to avoid confusion when passing parameters without enough context
-    - ✅ `aura-cli instance get <id>`
-    - ❌ `aura-cli instance get <id> <deployment-id>`
-    - ✅ `aura-cli instance get <id> --deployment-id <deployment-id>`
-    - ⚠️ `aura-cli instance get --instance-id <id> --deployment-id <deployment-id>`  
+    - ✅ `neo4j-cli aura instance get <id>`
+    - ❌ `neo4j-cli aura instance get <id> <deployment-id>`
+    - ✅ `neo4j-cli aura instance get <id> --deployment-id <deployment-id>`
+    - ⚠️ `neo4j-cli aura instance get --instance-id <id> --deployment-id <deployment-id>`  
       This valid, but the option above is preferred as it is more concise
 - The argument must always refer to the closest noun
-    - ❌ `aura-cli instance snapshot list <instance-id>`
-    - ✅ `aura-cli instance snapshot list --instance-id <instance-id>`
+    - ❌ `neo4j-cli aura instance snapshot list <instance-id>`
+    - ✅ `neo4j-cli aura instance snapshot list --instance-id <instance-id>`
 - No arguments between commands
-    - ❌ `aura-cli tenant <tenant-id> instance get <id>`
-    - ✅ `aura-cli instance get <id> --tenant-id <tenant-id>`
+    - ❌ `neo4j-cli aura tenant <tenant-id> instance get <id>`
+    - ✅ `neo4j-cli aura instance get <id> --tenant-id <tenant-id>`
 - Flags, if set, take precedence over global configuration or default values
 - Flags should have descriptions, if the flag is expected to be always set. The description must start with `(required)`
 

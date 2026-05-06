@@ -140,8 +140,6 @@ Remove the installed bundle (idempotent):
 ./neo4j-cli skill remove claude-code
 ```
 
-The same `skill` subcommand is available on `aura-cli`, scoped to the standalone Aura surface.
-
 Beta features (commands gated by `AuraBetaEnabled`, e.g. `dataapi`, `import`, `deployment`) are not included in the generated bundle — the bundle reflects the default-config command surface.
 
 ## Feedback / Issues
@@ -156,11 +154,10 @@ Clone the repository and run:
 make build
 ```
 
-This produces `bin/aura-cli` and `bin/neo4j-cli`. To run without building:
+This produces `bin/neo4j-cli`. To run without building:
 
 ```bash
-make run-aura   # standalone aura-cli
-make run-neo4j  # neo4j-cli super CLI
+make run-neo4j
 ```
 
 ## Developing and contributing

@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Stop building and releasing the standalone aura-cli binary; the `neo4j-cli aura` subcommand is the replacement'
+time: 2026-05-06T08:00:00+00:00

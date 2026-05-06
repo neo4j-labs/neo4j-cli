@@ -3,7 +3,7 @@ name: release
 on:
   push:
     branches: ["main"]
-    paths: ["CHANGELOG-neo4j.md", "CHANGELOG-aura.md"]
+    paths: ["CHANGELOG-neo4j.md"]
 
 jobs:
   release:
@@ -21,13 +21,6 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Get aura-cli latest version
-        id: latest-aura
-        uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
-        with:
-          version: latest
-          args: latest --project aura-cli
-
       - name: Get neo4j-cli latest version
         id: latest-neo4j
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
@@ -38,9 +31,7 @@ jobs:
       - name: Extract version numbers
         id: versions
         run: |
-          AURA_VERSION=$(echo "${{ steps.latest-aura.outputs.output }}" | sed 's/^aura-cli//')
           NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
-          echo "aura=$AURA_VERSION" >> $GITHUB_OUTPUT
           echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
 
       - name: Detect changed changelogs
@@ -51,54 +42,36 @@ jobs:
           # whether neo4j-cli was actually released in this run.
           CHANGED_FILES=$(git diff HEAD~1 --name-only)
           INCLUDE_NEO4J="false"
-          INCLUDE_AURA="false"
           if echo "$CHANGED_FILES" | grep -q "CHANGELOG-neo4j.md"; then
             INCLUDE_NEO4J="true"
           fi
-          if echo "$CHANGED_FILES" | grep -q "CHANGELOG-aura.md"; then
-            INCLUDE_AURA="true"
-          fi
           echo "include_neo4j=$INCLUDE_NEO4J" >> $GITHUB_OUTPUT
-          echo "include_aura=$INCLUDE_AURA" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         run: |
           NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
-          AURA_VERSION="${{ steps.versions.outputs.aura }}"
           NEO4J_CHANGES_FILE=".changes/neo4j-cli/${NEO4J_VERSION}.md"
-          AURA_CHANGES_FILE=".changes/aura-cli/${AURA_VERSION}.md"
           INCLUDE_NEO4J="${{ steps.changed.outputs.include_neo4j }}"
-          INCLUDE_AURA="${{ steps.changed.outputs.include_aura }}"
           # Extract the changelog body: skip the first line (## vX.Y.Z - DATE header)
           # Guard: only read the file if it exists
           NEO4J_BODY=""
           if test -f "$NEO4J_CHANGES_FILE"; then
             NEO4J_BODY=$(tail -n +2 "$NEO4J_CHANGES_FILE")
           fi
-          AURA_BODY=""
-          if test -f "$AURA_CHANGES_FILE"; then
-            AURA_BODY=$(tail -n +2 "$AURA_CHANGES_FILE")
-          fi
           {
             printf '## Versions\n\n'
             printf -- '- neo4j-cli: %s\n' "${NEO4J_VERSION}"
-            printf -- '- aura-cli: %s\n' "${AURA_VERSION}"
             printf '\n## Changes\n\n'
             if [ "$INCLUDE_NEO4J" = "true" ]; then
               printf '### neo4j-cli\n\n'
               printf '%s\n' "${NEO4J_BODY}"
               printf '\n'
             fi
-            if [ "$INCLUDE_AURA" = "true" ]; then
-              printf '### aura-cli\n\n'
-              printf '%s\n' "${AURA_BODY}"
-            fi
           } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Add env vars
         run: |
           echo "GORELEASER_CURRENT_TAG=${{ steps.versions.outputs.neo4j }}" >> $GITHUB_ENV
-          echo "AURA_CLI_VERSION=${{ steps.versions.outputs.aura }}" >> $GITHUB_ENV
 
       - name: Mint Homebrew tap token
         id: brew-token
@@ -116,7 +89,6 @@ jobs:
           args: --clean --release-notes=release-notes.md --skip=validate --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}
-          AURA_CLI_VERSION: ${{ env.AURA_CLI_VERSION }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.brew-token.outputs.token }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
