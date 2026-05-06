@@ -206,12 +206,13 @@ tasks:
     title: "Add neo4j-go-driver/v6 dep to go.mod"
     description: |
       Add github.com/neo4j/neo4j-go-driver/v6 (v6.0.0 or latest v6.x at impl time) to go.mod as a direct dependency. Run go mod tidy and commit go.sum changes. Verify the existing build still compiles before any code changes.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "go.mod lists github.com/neo4j/neo4j-go-driver/v6 in require()"
       - "go.sum updated; make build succeeds"
       - "No other deps shifted unexpectedly"
+    completed_at: 2026-05-06T18:00:00Z
 
   - id: task-016
     title: "Replace HTTP transport in query/connect.go with Bolt driver"

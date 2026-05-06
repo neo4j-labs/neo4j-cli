@@ -302,3 +302,24 @@ Key Decisions:
 - Treated the task as verification-only: no source diff was needed because all gates already pass on this branch.
 
 Next Task: task-015 (Bolt migration phase begins)
+
+================================================================================
+TASK-015: Add neo4j-go-driver/v6 dep to go.mod
+Date: 2026-05-06T18:00:00Z
+================================================================================
+
+Summary:
+Added github.com/neo4j/neo4j-go-driver/v6 v6.0.0 to go.mod and go.sum via `go get` so subsequent Bolt-migration tasks can import it. Build, test, lint, fmt-check, and license-check all pass.
+
+Files Changed:
+- go.mod (modified: adds neo4j-go-driver/v6 v6.0.0 in require block)
+- go.sum (modified: adds checksum entries for the new dep)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-015 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Skipped `go mod tidy` because no Go file imports the dep yet — tidy would strip it. The `// indirect` marker is correct for now and will be promoted to direct in task-016 when connect.go imports the driver.
+- Used v6.0.0 (the latest stable v6 release at impl time).
+
+Next Task: task-016
+
