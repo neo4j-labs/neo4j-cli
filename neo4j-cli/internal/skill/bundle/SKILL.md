@@ -39,3 +39,4 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 - The `version:` line in an installed SKILL.md reflects the binary that wrote it. Run `neo4j-cli skill check` after upgrading to detect drift; v1 reports drift only — re-run `skill install` to refresh.
 - If you pass an HTTP-style URI (e.g. `http://host:7474`) to `query` it is auto-rewritten to `neo4j://host:7687` (and `https://` to `neo4j+s://host:7687`); this command speaks the Bolt protocol. Use `neo4j+ssc://` for self-signed certs.
 - Write operations require `--rw`. `neo4j-cli query run` runs `EXPLAIN` over Bolt to detect write cypher when `--rw` is not set and blocks statements classified as writes before execution.
+- Do NOT add `--rw` unless the user explicitly asked to write/modify/delete. Run commands without it by default. If a command fails because `--rw` is missing, surface the error and ask the user for permission to retry with `--rw` — do not add it on your own.
