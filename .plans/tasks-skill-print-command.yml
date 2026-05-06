@@ -105,7 +105,8 @@ tasks:
       end-to-end smoke checks from the PRD: build, invoke `skill print` on
       each binary, verify {{VERSION}} placeholder is in the output, verify
       --help renders, verify positional args are rejected.
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T09:35:00Z
     dependencies:
       - task-003
       - task-004

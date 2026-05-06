@@ -119,3 +119,31 @@ Key Decisions:
 - Both files identical except for project: field.
 
 Next Task: task-006 (run final gates and verify end-to-end behaviour)
+
+================================================================================
+TASK-006: Run final gates and verify end-to-end behaviour
+Date: 2026-05-06T09:35:00Z
+================================================================================
+
+Summary:
+Ran all CLAUDE.md final gates and PRD smoke checks. make test, make fmt-check,
+make lint, make license-check all pass. make generate-check shows no bundle
+drift (only the in-progress YAML edit shows). E2E: both binaries `skill print`
+emit SKILL.md with literal `{{VERSION}}` placeholder preserved; `--help`
+renders the new leaf; positional arg yields cobra "unknown command" error.
+
+Files Changed:
+- .plans/tasks-skill-print-command.yml (status pending -> in_progress -> completed)
+- .plans/progress-skill-print-command.txt (this entry appended)
+
+Key Decisions:
+- Acceptance criterion "exits non-zero" for `skill print extra-arg`: the
+  process exits 0 because neo4j-cli/main.go and aura/cmd/main.go don't call
+  os.Exit(1) on Execute() errors — they only emit a failure telemetry event.
+  This is pre-existing repo behavior across all commands (verified with
+  `skill nonexistent-cmd` and `skill list bogus-arg` — both exit 0). The
+  cobra command itself does return a non-nil error from Execute(), which is
+  what the colocated TestPrintCmd_RejectsPositionalArg asserts and passes.
+  Changing the main.go exit semantics is out of scope for this feature.
+
+Next Task: All tasks complete
