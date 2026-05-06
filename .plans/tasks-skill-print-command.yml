@@ -1,0 +1,116 @@
+feature: skill-print-command
+prd: ./prd-skill-print-command.md
+created_at: 2026-05-06T06:30:09Z
+updated_at: 2026-05-06T06:30:09Z
+
+tasks:
+  - id: task-001
+    title: "Add common/skill/print.go leaf command"
+    description: |
+      Create new file common/skill/print.go defining
+      newPrintCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command.
+      Use: "print", Args: cobra.NoArgs, Short and Long descriptions per PRD.
+      RunE sets cmd.SilenceUsage=true, reads SKILL.md from bundle via fs.ReadFile,
+      and writes raw bytes (no {{VERSION}} substitution) to cmd.OutOrStdout via cmd.Print.
+      Mirror the layout/style of common/skill/list.go and common/skill/check.go.
+      Include the Neo4j copyright header.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "common/skill/print.go exists with Neo4j copyright header at top"
+      - "newPrintCmd signature matches (cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command"
+      - "Args is cobra.NoArgs and RunE sets cmd.SilenceUsage = true"
+      - "RunE reads SKILL.md via fs.ReadFile(bundle, \"SKILL.md\") and prints raw bytes to cmd.OutOrStdout"
+      - "No {{VERSION}} substitution in this leaf"
+
+  - id: task-002
+    title: "Mount print leaf in common/skill/skill.go::NewCmd"
+    description: |
+      Add a single line `cmd.AddCommand(newPrintCmd(cfg, bundle, skillName))` to
+      common/skill/skill.go::NewCmd alongside the existing install/remove/list/check
+      AddCommand calls. Keep the file under 80 lines per the repo's cobra-layout
+      convention. No other edits to skill.go.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "common/skill/skill.go::NewCmd contains cmd.AddCommand(newPrintCmd(cfg, bundle, skillName))"
+      - "skill.go remains <= 80 lines"
+      - "go build ./... succeeds"
+      - "Both binaries (./bin/neo4j-cli skill --help and ./bin/aura-cli skill --help) list 'print' as a subcommand"
+
+  - id: task-003
+    title: "Add common/skill/print_test.go colocated tests"
+    description: |
+      Add a colocated test file using the existing newFixture helper in
+      common/skill/cmd_helpers_test.go. Cover: (a) `skill print` writes the raw
+      SKILL.md to stdout with the literal `{{VERSION}}` placeholder preserved
+      (NOT substituted to 1.7.0), and (b) passing a positional arg returns a
+      non-nil error. Use require/assert from testify, follow existing
+      *_test.go style with package skill_test.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "common/skill/print_test.go exists with copyright header and package skill_test"
+      - "Test asserts stdout contains the literal string 'version: {{VERSION}}'"
+      - "Test asserts stdout does NOT contain 'version: 1.7.0' (placeholder not substituted)"
+      - "Test asserts that `skill print extra` returns a non-nil error"
+      - "make test passes"
+
+  - id: task-004
+    title: "Regenerate skill bundles to include the print leaf"
+    description: |
+      Run `make generate` to walk the cobra tree and rewrite both
+      neo4j-cli/internal/skill/bundle/references/skill.md and
+      neo4j-cli/aura/internal/skill/bundle/references/skill.md so they include
+      the new `## <bin> skill print` section. Verify with `make generate-check`
+      (which is the CI gate that runs `go generate ./...` then `git diff --exit-code`).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "neo4j-cli/internal/skill/bundle/references/skill.md contains a section heading for skill print"
+      - "neo4j-cli/aura/internal/skill/bundle/references/skill.md contains a section heading for skill print"
+      - "make generate-check passes (no uncommitted changes after re-run)"
+
+  - id: task-005
+    title: "Add dual-project Minor changelog entries"
+    description: |
+      Create two changelog YAML files under .changes/unreleased/, one per project,
+      both kind Minor, with body
+      "Add 'skill print' command to preview the embedded SKILL.md before installing".
+      Prefer `changie new --projects aura-cli --projects neo4j-cli --kind Minor --body "..."`;
+      if changie is unavailable, hand-author per the convention in CLAUDE.md
+      (filenames `<project>-Minor-<YYYYMMDD>-<HHMMSS>.yaml`, fields project/kind/body/time,
+      single-quoted body, RFC3339 time).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "A new file .changes/unreleased/aura-cli-Minor-*.yaml exists with project: aura-cli, kind: Minor"
+      - "A new file .changes/unreleased/neo4j-cli-Minor-*.yaml exists with project: neo4j-cli, kind: Minor"
+      - "Both bodies read 'Add ''skill print'' command to preview the embedded SKILL.md before installing'"
+
+  - id: task-006
+    title: "Run final gates and verify end-to-end behaviour"
+    description: |
+      Run all CLAUDE.md mandated final gates: make test, make fmt-check,
+      make lint, make license-check, make generate-check. Then run the
+      end-to-end smoke checks from the PRD: build, invoke `skill print` on
+      each binary, verify {{VERSION}} placeholder is in the output, verify
+      --help renders, verify positional args are rejected.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make license-check passes"
+      - "make generate-check passes"
+      - "./bin/neo4j-cli skill print | grep -q '{{VERSION}}' succeeds"
+      - "./bin/aura-cli skill print | grep -q '{{VERSION}}' succeeds"
+      - "./bin/neo4j-cli skill print extra-arg exits non-zero"
