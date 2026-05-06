@@ -71,6 +71,12 @@ Lists database credentials
 
 Usage: `neo4j-cli credential database list`
 
+### neo4j-cli credential database remove
+
+Removes a database credential
+
+Usage: `neo4j-cli credential database remove <name>`
+
 ### neo4j-cli credential database use
 
 Sets the default database credential to be used
