@@ -110,10 +110,10 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 				strings.Join(conflicting, ", "))
 		}
 
-		cred, err := cfg.Credentials.Database.Get(credName)
+		cred, err := cfg.Credentials.Dbms.Get(credName)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"query: credential %q not found; run 'neo4j-cli credential database list' to see available credentials",
+				"query: credential %q not found; run 'neo4j-cli credential dbms list' to see available credentials",
 				credName)
 		}
 
@@ -203,7 +203,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	}
 
 	// Try to load the stored default database credential.
-	storedCred, _ := cfg.Credentials.Database.GetDefault()
+	storedCred, _ := cfg.Credentials.Dbms.GetDefault()
 	hasStoredCred := storedCred != nil
 
 	switch {

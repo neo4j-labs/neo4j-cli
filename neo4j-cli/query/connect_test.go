@@ -403,14 +403,14 @@ func newTestCmdWithCreds(t *testing.T, credsJSON string) (*cobra.Command, *clicf
 	return cmd, cfg
 }
 
-// storedCredJSON returns a credentials.json body with one database credential
+// storedCredJSON returns a credentials.json body with one dbms credential
 // set as the default.
 func storedCredJSON(uri, username, password, dbName string, insecure bool) string {
 	insecureStr := "false"
 	if insecure {
 		insecureStr = "true"
 	}
-	return `{"database":{"default-credential":"mydb","credentials":[{"name":"mydb","username":"` +
+	return `{"dbms":{"default-credential":"mydb","credentials":[{"name":"mydb","username":"` +
 		username + `","password":"` + password + `","database-name":"` + dbName +
 		`","uri":"` + uri + `","insecure":` + insecureStr + `}]}}`
 }
@@ -548,14 +548,14 @@ func namedCredJSON(name, uri, username, password, dbName string, insecure bool) 
 	if insecure {
 		insecureStr = "true"
 	}
-	return `{"database":{"default-credential":"","credentials":[{"name":"` + name +
+	return `{"dbms":{"default-credential":"","credentials":[{"name":"` + name +
 		`","username":"` + username + `","password":"` + password +
 		`","database-name":"` + dbName + `","uri":"` + uri +
 		`","insecure":` + insecureStr + `}]}}`
 }
 
 func TestResolveConn_CredentialFlag(t *testing.T) {
-	twoCredsJSON := `{"database":{"default-credential":"default-cred","credentials":[` +
+	twoCredsJSON := `{"dbms":{"default-credential":"default-cred","credentials":[` +
 		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474","insecure":false},` +
 		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474","insecure":false}` +
 		`]}}`
@@ -591,7 +591,7 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			name:            "unknown credential errors with helpful message",
 			credsJSON:       "{}",
 			flags:           []string{"--credential=unknown"},
-			wantErrContains: []string{"unknown", "credential database list"},
+			wantErrContains: []string{"unknown", "credential dbms list"},
 		},
 		{
 			name:         "--insecure=false overrides credential's insecure:true",
