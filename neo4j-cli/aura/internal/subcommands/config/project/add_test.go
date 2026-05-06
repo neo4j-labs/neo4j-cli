@@ -16,7 +16,7 @@ func TestAddFirstProject(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 
-	helper.ExecuteCommand("config project add --name test --organization-id testorganizationid --project-id testprojectid")
+	helper.ExecuteCommand("config project add --name test --organization-id testorganizationid --project-id testprojectid --rw")
 
 	helper.AssertConfigValue("aura-projects.projects", `
 	{
@@ -35,7 +35,7 @@ func TestAddProjectIfAlreadyExists(t *testing.T) {
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("aura-projects.projects", map[string]*projects.AuraProject{"test": {OrganizationId: "testorganizationid", ProjectId: "testprojectid"}})
 
-	helper.ExecuteCommand("config project add --name test --organization-id testorganizationid --project-id testprojectid")
+	helper.ExecuteCommand("config project add --name test --organization-id testorganizationid --project-id testprojectid --rw")
 
 	helper.AssertErr("Error: already have a project with the name test")
 }
@@ -47,7 +47,7 @@ func TestAddAditionalProjects(t *testing.T) {
 	helper.SetConfigValue("aura-projects.projects", map[string]*projects.AuraProject{"test": {OrganizationId: "testorganizationid", ProjectId: "testprojectid"}})
 	helper.SetConfigValue("aura-projects.default", "test")
 
-	helper.ExecuteCommand("config project add --name test-new --organization-id newtestorganizationid --project-id newtestprojectid")
+	helper.ExecuteCommand("config project add --name test-new --organization-id newtestorganizationid --project-id newtestprojectid --rw")
 
 	helper.AssertConfigValue("aura-projects.projects", `
 	{

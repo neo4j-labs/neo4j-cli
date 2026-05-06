@@ -87,3 +87,36 @@ Key Decisions:
 - Treat known mutating plan operators as writes and recurse the full queryPlan tree.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Annotate all write leaves with Annotations['write']='true'
+Date: 2026-05-06T14:31:41Z
+================================================================================
+
+Summary:
+Annotated every planned mutating leaf with write metadata so the root --rw gate applies consistently across Aura API writes, local config and credential writes, and skill install/remove commands. Updated affected command tests to pass --rw where they intentionally exercise write paths.
+
+Files Changed:
+- common/skill/install.go (modified: marks skill install as write)
+- common/skill/remove.go (modified: marks skill remove as write)
+- neo4j-cli/aura/internal/subcommands/config/project/*.go (modified: marks project add/remove/use as writes)
+- neo4j-cli/aura/internal/subcommands/config/set.go (modified: marks aura config set as write)
+- neo4j-cli/aura/internal/subcommands/credential/*.go (modified: marks aura credential add/remove/use as writes)
+- neo4j-cli/aura/internal/subcommands/customermanagedkey/*.go (modified: marks create/delete as writes)
+- neo4j-cli/aura/internal/subcommands/dataapi/graphql/**/*.go (modified: marks create/update/delete/pause/resume and nested write leaves)
+- neo4j-cli/aura/internal/subcommands/deployment/**/*.go (modified: marks deployment and token writes)
+- neo4j-cli/aura/internal/subcommands/graphanalytics/session/*.go (modified: marks session create/delete as writes)
+- neo4j-cli/aura/internal/subcommands/import/job/*.go (modified: marks job create/cancel as writes)
+- neo4j-cli/aura/internal/subcommands/instance/**/*.go (modified: marks instance and snapshot writes)
+- neo4j-cli/internal/subcommands/config/set.go (modified: marks neo4j config set as write)
+- neo4j-cli/internal/subcommands/credential/credential.go (modified: marks aura-client credential add/remove/use as writes)
+- neo4j-cli/internal/subcommands/credential/database/*.go (modified: marks database credential add/remove/use as writes)
+- multiple *_test.go files under affected command packages (modified: pass --rw in write-path tests)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept task-003 mechanical: only add write annotations and the minimal test arg updates needed to preserve existing write-path assertions.
+- Reused the existing root gate rather than adding per-command branching or bespoke test hooks.
+
+Next Task: task-006

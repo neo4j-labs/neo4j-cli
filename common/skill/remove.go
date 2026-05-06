@@ -11,8 +11,9 @@ import (
 
 func newRemoveCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove [agent]",
-		Short: "Remove the installed skill bundle",
+		Use:         "remove [agent]",
+		Short:       "Remove the installed skill bundle",
+		Annotations: map[string]string{"write": "true"},
 		Long: "Without an argument, removes from every detected agent. " +
 			"With an [agent] argument (case-insensitive), removes from that " +
 			"single agent. Idempotent: a second run on a clean target is a " +

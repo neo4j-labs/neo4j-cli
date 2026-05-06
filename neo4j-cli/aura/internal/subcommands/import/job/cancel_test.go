@@ -27,7 +27,7 @@ func TestCancelImportJob(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 
-	helper.ExecuteCommand(fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s", organizationId, projectId, jobId))
+	helper.ExecuteCommand(fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --rw", organizationId, projectId, jobId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -56,7 +56,7 @@ func TestCancelImportJobWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("import job cancel %s", jobId))
+	helper.ExecuteCommand(fmt.Sprintf("import job cancel %s --rw", jobId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -82,7 +82,7 @@ func TestCancelImportJobError(t *testing.T) {
 		returnBody          string
 	}{
 		"correct command with error response 1": {
-			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s", organizationId, projectId, jobId),
+			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --rw", organizationId, projectId, jobId),
 			statusCode:          http.StatusBadRequest,
 			expectedCalledTimes: 1,
 			expectedError:       "Error: [The job 87d485b4-73fc-4a7f-bb03-720f4672947e has requested to cancel]",
@@ -96,7 +96,7 @@ func TestCancelImportJobError(t *testing.T) {
 			}`,
 		},
 		"correct command with error response 2": {
-			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s", organizationId, projectId, jobId),
+			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --rw", organizationId, projectId, jobId),
 			statusCode:          http.StatusMethodNotAllowed,
 			expectedCalledTimes: 1,
 			expectedError:       "Error: [string]",
@@ -111,21 +111,21 @@ func TestCancelImportJobError(t *testing.T) {
 			}`,
 		},
 		"incorrect command with missing organization id": {
-			executeCommand:      fmt.Sprintf("import job cancel --project-id=%s %s", projectId, jobId),
+			executeCommand:      fmt.Sprintf("import job cancel --project-id=%s %s --rw", projectId, jobId),
 			statusCode:          http.StatusBadRequest,
 			expectedCalledTimes: 0,
 			expectedError:       "Error: required flag(s) \"organization-id\" not set",
 			returnBody:          ``,
 		},
 		"incorrect command with missing project id": {
-			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s %s", organizationId, jobId),
+			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s %s --rw", organizationId, jobId),
 			statusCode:          http.StatusBadRequest,
 			expectedCalledTimes: 0,
 			expectedError:       "Error: required flag(s) \"project-id\" not set",
 			returnBody:          ``,
 		},
 		"incorrect command with missing job id": {
-			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s", organizationId, projectId),
+			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s --rw", organizationId, projectId),
 			statusCode:          http.StatusBadRequest,
 			expectedCalledTimes: 0,
 			expectedError:       "Error: accepts 1 arg(s), received 0",

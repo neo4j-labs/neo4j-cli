@@ -20,10 +20,11 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "delete <id>",
-		Short: "Delete a GraphQL Data API authentication provider",
-		Long:  "Deletes a GraphQL Data API authentication provider. This action can not be undone.",
-		Args:  cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "delete <id>",
+		Short:       "Delete a GraphQL Data API authentication provider",
+		Long:        "Deletes a GraphQL Data API authentication provider. This action can not be undone.",
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, args[0])

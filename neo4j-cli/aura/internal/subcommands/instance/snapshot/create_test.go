@@ -21,7 +21,7 @@ func TestCreateSnapshot(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s --rw", instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -60,7 +60,7 @@ func TestCreateSnapshotWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s --await", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s --await --rw", instanceId))
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)

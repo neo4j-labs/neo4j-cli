@@ -10,9 +10,10 @@ import (
 
 func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:       "set <key> <value>",
-		Short:     "Sets the specified configuration value to the provided value",
-		ValidArgs: validSetArgs(cfg),
+		Use:         "set <key> <value>",
+		Short:       "Sets the specified configuration value to the provided value",
+		Annotations: map[string]string{"write": "true"},
+		ValidArgs:   validSetArgs(cfg),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.ExactArgs(2)(cmd, args); err != nil {
 				return err

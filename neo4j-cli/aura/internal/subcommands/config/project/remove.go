@@ -10,9 +10,10 @@ import (
 
 func NewRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Removes a project",
-		Args:  cobra.ExactArgs(1),
+		Use:         "remove <name>",
+		Short:       "Removes a project",
+		Annotations: map[string]string{"write": "true"},
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Aura.Projects.Remove(args[0])
 		},

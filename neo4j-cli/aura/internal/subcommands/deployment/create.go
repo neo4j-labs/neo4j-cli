@@ -31,10 +31,11 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a new deployment",
-		Long:  "Creates a new unmonitored Fleet Manager deployment.",
-		Args:  cobra.ExactArgs(0),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Create a new deployment",
+		Long:        "Creates a new unmonitored Fleet Manager deployment.",
+		Args:        cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

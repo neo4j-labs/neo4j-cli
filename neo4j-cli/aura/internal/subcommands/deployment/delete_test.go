@@ -23,7 +23,7 @@ func TestDeleteDeployment(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -44,7 +44,7 @@ func TestDeleteDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s", deploymentId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --rw", deploymentId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -66,7 +66,7 @@ func TestDeleteDeploymentWhenDeploymentDoesNotExist(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id=%s --project-id=%s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)

@@ -33,7 +33,7 @@ tasks:
     title: "Annotate all write leaves with Annotations['write']='true'"
     description: |
       For every state-mutating leaf listed in the PRD, set cmd.Annotations["write"] = "true" in its constructor. This includes Aura API writes, local config/credential writes, and skill install/remove leaves. Keep the change mechanical; do not alter command behavior beyond annotation.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -41,7 +41,7 @@ tasks:
       - "Each listed write leaf sets Annotations['write'] to 'true'"
       - "Spot check: at least one leaf per category confirmed annotated in code review"
       - "Help/usage output for those leaves unchanged except for gate behavior"
-    completed_at: null
+    completed_at: 2026-05-06T14:31:41Z
 
   - id: task-004
     title: "Confirm EXPLAIN response JSON path for queryType via docker"

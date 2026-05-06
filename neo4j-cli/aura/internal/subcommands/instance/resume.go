@@ -24,8 +24,9 @@ func NewResumeCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "resume <id>",
-		Short: "Resumes an instance",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "resume <id>",
+		Short:       "Resumes an instance",
 		Long: `Starts the resume process of an Aura instance.
 
 Resuming an instance is an asynchronous operation. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand.

@@ -31,35 +31,35 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 		expectedError   string
 	}{
 		"missing almost all flags": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --type-definitions %s", instanceId, typeDefs),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --type-definitions %s --rw", instanceId, typeDefs),
 			expectedError:   "Error: required flag(s) \"instance-password\", \"instance-username\", \"name\" not set",
 		},
 		"missing any type defs flag": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s ", instanceId, instanceUsername, instancePassword, name),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --rw", instanceId, instanceUsername, instancePassword, name),
 			expectedError:   "Error: at least one of the flags in the group [type-definitions type-definitions-file] is required",
 		},
 		"only one type defs flag can be provided": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --type-definitions-file %s", instanceId, instanceUsername, instancePassword, name, typeDefs, typeDefsFile),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --type-definitions-file %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefs, typeDefsFile),
 			expectedError:   "Error: if any flags in the group [type-definitions type-definitions-file] are set none of the others can be; [type-definitions type-definitions-file] were all set",
 		},
 		"missing instance password flag": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --name %s --type-definitions %s", instanceId, instanceUsername, name, typeDefs),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, name, typeDefs),
 			expectedError:   "Error: required flag(s) \"instance-password\" not set",
 		},
 		"missing instance username flag": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-password %s --name %s --type-definitions %s", instanceId, instancePassword, name, typeDefs),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instancePassword, name, typeDefs),
 			expectedError:   "Error: required flag(s) \"instance-username\" not set",
 		},
 		"missing name flag": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --type-definitions %s", instanceId, instanceUsername, instancePassword, typeDefs),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, typeDefs),
 			expectedError:   "Error: required flag(s) \"name\" not set",
 		},
 		"invalid base64 for type defs": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s", instanceId, instanceUsername, instancePassword, name, invalidBase64TypeDefs),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, invalidBase64TypeDefs),
 			expectedError:   "Error: provided type definitions are not valid base64",
 		},
 		"invalid type defs file": {
-			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions-file %s", instanceId, instanceUsername, instancePassword, name, invalidTypeDefsFile),
+			executedCommand: fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions-file %s --rw", instanceId, instanceUsername, instancePassword, name, invalidTypeDefsFile),
 			expectedError:   "Error: type definitions file '../invalid/typeDefs.graphql' does not exist",
 		},
 	}
@@ -143,12 +143,12 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 	}{
 		"create with default auth provider": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
+			executeCommand:      fmt.Sprintf("data-api graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
 			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseJson,
 		}, "create with default auth provider and output as table": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("data-api graphql create --format table --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s ", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
+			executeCommand:      fmt.Sprintf("data-api graphql create --format table --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
 			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseTable,
 		},

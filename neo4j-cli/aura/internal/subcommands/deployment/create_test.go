@@ -27,7 +27,7 @@ func TestCreateDeployment(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --organization-id %s --project-id %s", name, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --organization-id %s --project-id %s --rw", name, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -57,7 +57,7 @@ func TestCreateDeploymentWithOrganizationAndProjectIdFromDefaultProject(t *testi
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\"", name))
+	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --rw", name))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -86,7 +86,7 @@ func TestCreateDeploymentWithConnectionUrl(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --connection-url \"http://localhost:7876\" --organization-id %s --project-id %s", name, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --connection-url \"http://localhost:7876\" --organization-id %s --project-id %s --rw", name, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -112,7 +112,7 @@ func TestCreateDeploymentWithMissingName(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment create --organization-id=%s --project-id=%s", organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment create --organization-id=%s --project-id=%s --rw", organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -133,7 +133,7 @@ func TestCreateDeploymentWithTooLongName(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment create --name=\"%s\" --organization-id=%s --project-id=%s", name, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment create --name=\"%s\" --organization-id=%s --project-id=%s --rw", name, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)

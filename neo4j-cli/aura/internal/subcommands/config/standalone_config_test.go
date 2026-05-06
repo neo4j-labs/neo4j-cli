@@ -106,27 +106,27 @@ func TestStandaloneConfigSet(t *testing.T) {
 		{
 			name:            "set format json writes global key at JSON root",
 			configSetup:     func(h *testutils.AuraTestHelper) {},
-			command:         "config set format json",
+			command:         "config set format json --rw",
 			wantConfigKey:   "format",
 			wantConfigValue: "json",
 		},
 		{
 			name:            "set auth-url routes to aura config",
 			configSetup:     func(h *testutils.AuraTestHelper) {},
-			command:         "config set auth-url https://custom.example.com/oauth/token",
+			command:         "config set auth-url https://custom.example.com/oauth/token --rw",
 			wantConfigKey:   "aura.auth-url",
 			wantConfigValue: "https://custom.example.com/oauth/token",
 		},
 		{
 			name:        "set unknown key returns error",
 			configSetup: func(h *testutils.AuraTestHelper) {},
-			command:     "config set unknown-key value",
+			command:     "config set unknown-key value --rw",
 			wantErr:     "Error: invalid config key specified: unknown-key",
 		},
 		{
 			name:        "set format to invalid value returns error",
 			configSetup: func(h *testutils.AuraTestHelper) {},
-			command:     "config set format invalid-value",
+			command:     "config set format invalid-value --rw",
 			wantErr:     "Error: invalid value for 'format': invalid-value (valid values: default, json, table, toon)",
 		},
 	}

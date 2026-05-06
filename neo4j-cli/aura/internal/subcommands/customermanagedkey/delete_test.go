@@ -23,7 +23,7 @@ func TestDeleteCustomerManagedKey(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusNoContent, "")
 
-			helper.ExecuteCommand(fmt.Sprintf("%s delete %s", command, cmkId))
+			helper.ExecuteCommand(fmt.Sprintf("%s delete %s --rw", command, cmkId))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -74,7 +74,7 @@ func TestDeleteCustomerManagedKeyError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s", cmkId))
+			helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --rw", cmkId))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)

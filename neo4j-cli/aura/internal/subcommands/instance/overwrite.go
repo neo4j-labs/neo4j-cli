@@ -26,8 +26,9 @@ func NewOverwriteCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "overwrite <id>",
-		Short: "Starts the process of overwriting the specified instance with data from the source instance provided",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "overwrite <id>",
+		Short:       "Starts the process of overwriting the specified instance with data from the source instance provided",
 		Long: `Starts the process of overwriting the specified instance with data from the source instance provided.
 
 The overwrite process mimics the 'Clone to existing' functionality of the Aura Console.

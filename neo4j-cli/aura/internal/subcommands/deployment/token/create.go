@@ -29,10 +29,11 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a deployment token",
-		Long:  "Create a new auto rotating Fleet Manager deployment token with a three month rotation interval. Register the deployment with Fleet Manager using the `call fleetManagement.registerToken('$token');` database procedure.",
-		Args:  cobra.ExactArgs(0),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Create a deployment token",
+		Long:        "Create a new auto rotating Fleet Manager deployment token with a three month rotation interval. Register the deployment with Fleet Manager using the `call fleetManagement.registerToken('$token');` database procedure.",
+		Args:        cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

@@ -27,7 +27,7 @@ func TestCreateDeploymentToken(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -57,7 +57,7 @@ func TestCreateDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s", deploymentId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --rw", deploymentId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -84,7 +84,7 @@ func TestCreateDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -107,7 +107,7 @@ func TestCreateDeploymentTokenWhenDeploymentAlreadyHasAToken(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)

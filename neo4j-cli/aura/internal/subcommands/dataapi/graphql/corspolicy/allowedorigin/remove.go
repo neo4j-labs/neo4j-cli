@@ -29,8 +29,9 @@ func NewRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "remove <origin>",
-		Short: "Removes an allowed origin from the CORS policy",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "remove <origin>",
+		Short:       "Removes an allowed origin from the CORS policy",
 		Long: `This command removes an allowed origin from the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
 
 Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.

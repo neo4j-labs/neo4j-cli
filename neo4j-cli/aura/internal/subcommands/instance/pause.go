@@ -15,8 +15,9 @@ import (
 
 func NewPauseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "pause <id>",
-		Short: "Pauses an instance",
+		Use:         "pause <id>",
+		Short:       "Pauses an instance",
+		Annotations: map[string]string{"write": "true"},
 		Long: `Starts the pause process of an Aura instance.
 
 Pausing an instance is an asynchronous operation. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand.

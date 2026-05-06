@@ -28,7 +28,7 @@ func TestCreateCustomerManagedKeys(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --tenant-id dontpanic --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab`)
+	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --tenant-id dontpanic --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab --rw`)
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -76,7 +76,7 @@ func TestCreateCustomerManagedKeysWithTenantIDInConfig(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab`)
+	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab --rw`)
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -122,7 +122,7 @@ func TestCreateCustomerManagedKeysWithoutTenantID(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab`)
+	helper.ExecuteCommand(`customer-managed-key create --region us-west-2 --name "Production Key" --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab --rw`)
 
 	mockHandler.AssertCalledTimes(0)
 

@@ -10,9 +10,10 @@ import (
 
 func NewUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "use <name>",
-		Short: "Sets the default credential to be used",
-		Args:  cobra.ExactArgs(1),
+		Use:         "use <name>",
+		Short:       "Sets the default credential to be used",
+		Annotations: map[string]string{"write": "true"},
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.SetDefault(args[0])
 		},

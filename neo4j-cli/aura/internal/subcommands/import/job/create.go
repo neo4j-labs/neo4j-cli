@@ -37,8 +37,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		importTypeFlag     = "import-type"
 	)
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Allows you to create a new import job",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Allows you to create a new import job",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

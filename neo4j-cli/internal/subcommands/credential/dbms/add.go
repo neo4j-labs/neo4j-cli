@@ -28,8 +28,9 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Adds a dbms credential",
+		Use:         "add",
+		Short:       "Adds a dbms credential",
+		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Dbms.Add(name, username, password, databaseName, uri, insecure)
 		},

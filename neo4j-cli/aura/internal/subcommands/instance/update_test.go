@@ -31,7 +31,7 @@ func TestUpdateMemory(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --rw", instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
@@ -72,7 +72,7 @@ func TestUpdateName(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name"`, instanceId))
+	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --rw`, instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
@@ -113,7 +113,7 @@ func TestUpdateMemoryAndName(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB`, instanceId))
+	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --rw`, instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
@@ -142,7 +142,7 @@ func TestUpdateErrorsWithNoFlags(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusAccepted, "")
 
-	helper.ExecuteCommand(fmt.Sprintf(`instance update %s`, instanceId))
+	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --rw`, instanceId))
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -191,7 +191,7 @@ func TestUpdateInstanceError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB`, instanceId))
+			helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --rw`, instanceId))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodPatch)

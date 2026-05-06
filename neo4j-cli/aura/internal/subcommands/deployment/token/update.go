@@ -29,10 +29,11 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "update",
-		Short: "Update the deployment token incase it needs to be rotated manually.",
-		Long:  "Creates a new auto rotating Fleet Manager deployment token with a three month rotation interval. The token should be registered to the database again using `call fleetManagement.registerToken('$token');`",
-		Args:  cobra.ExactArgs(0),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "update",
+		Short:       "Update the deployment token incase it needs to be rotated manually.",
+		Long:        "Creates a new auto rotating Fleet Manager deployment token with a three month rotation interval. The token should be registered to the database again using `call fleetManagement.registerToken('$token');`",
+		Args:        cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
