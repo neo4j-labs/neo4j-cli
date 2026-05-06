@@ -20,6 +20,16 @@ MODEL="${MODEL:-claude-sonnet-4-6}"
 
 cd "$DIR"
 rm -f "$RESULT_FILE" "$RESULT_FILE.tmp"
+
+# Make sure the real skill is installed; the eval patches its SKILL.md.
+SKILL_MD="$HOME/.claude/skills/neo4j-cli/SKILL.md"
+if [ ! -f "$SKILL_MD" ]; then
+  if [ -x /tmp/neo4j-cli ]; then
+    /tmp/neo4j-cli skill install claude-code >/dev/null
+  else
+    (cd "$REPO" && go run ./neo4j-cli skill install claude-code) >/dev/null
+  fi
+fi
 PYTHONPATH="$DIR" python3 -m scripts.run_eval_real \
   --eval-set "$EVAL_SET" \
   --description-file "$DESC_FILE" \
