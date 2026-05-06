@@ -1,0 +1,97 @@
+feature: firmer-toon-format-guidance
+prd: ./prd-firmer-toon-format-guidance.md
+created_at: 2026-05-06T19:40:47Z
+updated_at: 2026-05-06T19:40:47Z
+
+tasks:
+  - id: task-001
+    title: "Append agents-prefer-toon nudge to --format flag description"
+    description: |
+      Edit common/flags/flags.go RegisterOutputFlag (line ~23) so the --format flag's
+      help string ends with " (agents: prefer toon)". This is the single source of
+      truth for the flag description; the change propagates to live --help output
+      and to every generated reference page that lists the flag. No literal % is
+      added so no Sprintf escaping is needed.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "common/flags/flags.go line ~23 ends with '. (agents: prefer toon)' after the choices list"
+      - "go build ./... succeeds"
+      - "running any read command with --help shows the new nudge in the --format flag description"
+      - "no other strings in common/flags/flags.go are modified"
+    completed_at: null
+
+  - id: task-002
+    title: "Add directive toon bullet to both skill additions.md files"
+    description: |
+      In neo4j-cli/internal/skill/additions.md and neo4j-cli/aura/internal/skill/additions.md,
+      keep the existing factual bullet ("All read commands accept --format json|table|toon
+      (shorthand -f). Write commands print confirmation text only; pipe-friendly output
+      requires explicit --format json where supported.") and replace the soft "Prefer
+      --format toon ..." bullet with a directive bullet immediately after it. Wording per
+      REQ-F-002. Apply the identical wording to both files so they stay in sync.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/internal/skill/additions.md contains the factual bullet followed immediately by the directive bullet"
+      - "neo4j-cli/aura/internal/skill/additions.md contains the same factual + directive bullet pair"
+      - "the directive bullet starts with '**Always pass `--format toon` (`-f toon`) on read commands**'"
+      - "the soft 'Prefer `--format toon`...' bullet is removed from both files"
+      - "no other bullets in either file are modified"
+    completed_at: null
+
+  - id: task-003
+    title: "Regenerate skill bundles and reference pages"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`
+      so committed bundles pick up the new flag description (from task-001) and the new
+      gotcha bullets (from task-002). Both bundle/SKILL.md files and every references/*.md
+      under both skill trees should regenerate. Verify with `make generate-check`.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`make generate-check` exits clean (no diff after regenerate)"
+      - "neo4j-cli/internal/skill/bundle/SKILL.md Global Flags table shows the updated --format description"
+      - "neo4j-cli/aura/internal/skill/bundle/SKILL.md Global Flags table shows the updated --format description"
+      - "both bundle/SKILL.md Gotchas sections show the factual + directive bullet pair in order"
+      - "at least one references/*.md per binary (e.g. references/query.md, references/skill.md) shows the updated --format description"
+    completed_at: null
+
+  - id: task-004
+    title: "Add changie Patch entry for the toon nudge"
+    description: |
+      Per CLAUDE.md, user-facing changes (this updates --help text and skill bundle
+      content) require a changie entry. Add one under .changes/unreleased/ for project
+      neo4j-cli, kind Patch, body something like "Nudge agents toward `--format toon`
+      in help text and skill bundles." Use the non-interactive form
+      `changie new --projects neo4j-cli --kind Patch --body "<body>"` if available;
+      otherwise hand-author the YAML per the documented schema.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "exactly one new file appears under .changes/unreleased/ matching neo4j-cli-Patch-*.yaml"
+      - "the YAML's project field is 'neo4j-cli' and kind is 'Patch'"
+      - "the body single-line-mentions both 'toon' and the surfaces affected (help text + skill bundles)"
+      - "RFC3339 time field is populated"
+    completed_at: null
+
+  - id: task-005
+    title: "Run final gates: make test, fmt-check, lint"
+    description: |
+      Run the repo's final gates per CLAUDE.md before declaring the feature done.
+      `make test` must pass (TestGenerator_RoundTrip is the bundle-equivalence gate),
+      `make fmt-check` must report no files needing gofmt, and `make lint` must be
+      clean. Also confirm `git diff --stat` is bounded to the expected set of files
+      from the PRD acceptance criteria (no stray edits).
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make test` exits 0"
+      - "`make fmt-check` exits 0"
+      - "`make lint` exits 0"
+      - "`git diff --stat` lists only: common/flags/flags.go, both additions.md files, regenerated bundle/SKILL.md and references/*.md under both skill trees, and one new .changes/unreleased/*.yaml"
+    completed_at: null
