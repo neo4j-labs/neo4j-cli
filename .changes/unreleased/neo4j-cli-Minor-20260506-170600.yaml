@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: 'Require --rw flag for any write operation; query run uses EXPLAIN to detect write cypher'
+body: 'Require --rw flag for any write operation; query run now uses the Neo4j Bolt driver (--insecure is removed; use neo4j+ssc:// for self-signed certs)'
 time: 2026-05-06T17:06:00+00:00

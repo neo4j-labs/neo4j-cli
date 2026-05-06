@@ -498,3 +498,22 @@ Key Decisions:
 - Confirmed the seam pattern (runStatementResponseFn + driverOpener + noopDriver) is the chosen "interface seam over the bits of the driver runQuery touches" and satisfies the spec's seam-or-DriverWithContext alternatives.
 
 Next Task: task-023
+
+================================================================================
+TASK-023: Update changie entry body for Bolt migration
+Date: 2026-05-06T21:45:00Z
+================================================================================
+
+Summary:
+Updated the existing neo4j-cli unreleased changie YAML body to reflect both the --rw write gate and the Bolt migration (with --insecure removed and neo4j+ssc:// guidance for self-signed certs). aura-cli entry left untouched. No new YAML slot needed; reused the existing 20260506-170600 file.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260506-170600.yaml (modified: body rewritten to PRD wording)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-023 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Reused the existing unreleased YAML rather than creating a new timestamp slot; the body field is the only thing that needed to change.
+- Kept aura-cli body untouched because the Bolt migration only affects the neo4j-cli super-CLI's query path.
+
+Next Task: task-024

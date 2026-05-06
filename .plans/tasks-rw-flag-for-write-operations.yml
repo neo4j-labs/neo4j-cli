@@ -312,7 +312,7 @@ tasks:
     title: "Update changie entry body for Bolt migration"
     description: |
       Edit the existing .changes/unreleased/neo4j-cli-Minor-*.yaml so the body becomes: "Require --rw flag for any write operation; query run now uses the Neo4j Bolt driver (--insecure is removed; use neo4j+ssc:// for self-signed certs)". The aura-cli entry stays as it is. If the file shape needs a new timestamp slot, follow repo convention.
-    status: pending
+    status: completed
     dependencies:
       - task-018
       - task-019
@@ -320,6 +320,7 @@ tasks:
       - "neo4j-cli changie body reflects both --rw and Bolt migration"
       - "aura-cli body unchanged"
       - "changie merge produces the expected combined CHANGELOG section"
+    completed_at: 2026-05-06T21:45:00Z
 
   - id: task-024
     title: "Update skill additions.md and regenerate bundles"
