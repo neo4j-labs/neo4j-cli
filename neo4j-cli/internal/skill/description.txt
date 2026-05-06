@@ -1,1 +1,7 @@
-Use this skill when the user asks to manage Neo4j resources from the command line via neo4j-cli — provisioning Aura instances, listing tenants, creating credentials, working with deployments, or installing agent skills. neo4j-cli is the super-CLI that bundles aura-cli (under the `aura` subcommand) plus a top-level `credential` group and a `skill` group for installing/removing/listing/checking the embedded agent-skill bundle. Commands follow `<resource> <action>` form (e.g. `aura instance list`), take at most one positional argument, and support `--format json|table|toon` (shorthand `-f`) on read commands.
+Use this skill when the user wants to interact with Neo4j via the neo4j-cli command-line tool.
+
+TRIGGER when: run or execute Cypher from a terminal/shell/CLI against Neo4j; pipe a Cypher script into neo4j-cli; fetch schema, labels, indexes, constraints, or relationship types via CLI; provision, list, delete, or resize Aura instances or tenants; manage Aura API credentials from the CLI; install, remove, or list the neo4j-cli agent skill; user mentions neo4j-cli, aura-cli, `neo4j query`, `aura instance`, `neo4j credential`, or similar CLI commands.
+
+SKIP: Cypher language questions (syntax, MATCH, LIMIT, etc.); graph data modeling; Neo4j driver code (Python/Java/JS/Go); Docker or Kubernetes setup; other databases (Postgres, Redis); unrelated shell tasks.
+
+CLI surfaces: `query` (run Cypher via HTTP Query API, supports stdin pipe), `aura` (instance/tenant/deployment management), `credential` (Aura API keys), `skill` (agent-skill install/remove/list/check).

@@ -32,6 +32,16 @@ def find_project_root() -> Path:
     return current
 
 
+def _skill_matched(accumulated_json: str, skill_name: str, clean_name: str) -> bool:
+    """Return True if the accumulated tool-call JSON refers to the target skill.
+
+    Matches either the UUID-suffixed temp command (clean_name) or the installed
+    skill (skill_name as an exact JSON string value).  The exact-string check
+    uses the quoted form so "neo4j-cli" doesn't falsely match "neo4j-cli-eval-test".
+    """
+    return clean_name in accumulated_json or f'"{skill_name}"' in accumulated_json
+
+
 def run_single_query(
     query: str,
     skill_name: str,
@@ -144,12 +154,12 @@ def run_single_query(
                             delta = se.get("delta", {})
                             if delta.get("type") == "input_json_delta":
                                 accumulated_json += delta.get("partial_json", "")
-                                if clean_name in accumulated_json:
+                                if _skill_matched(accumulated_json, skill_name, clean_name):
                                     return True
 
                         elif se_type in ("content_block_stop", "message_stop"):
                             if pending_tool_name:
-                                return clean_name in accumulated_json
+                                return _skill_matched(accumulated_json, skill_name, clean_name)
                             if se_type == "message_stop":
                                 return False
 
@@ -161,7 +171,10 @@ def run_single_query(
                                 continue
                             tool_name = content_item.get("name", "")
                             tool_input = content_item.get("input", {})
-                            if tool_name == "Skill" and clean_name in tool_input.get("skill", ""):
+                            if tool_name == "Skill" and (
+                                clean_name in tool_input.get("skill", "") or
+                                tool_input.get("skill", "") == skill_name
+                            ):
                                 triggered = True
                             elif tool_name == "Read" and clean_name in tool_input.get("file_path", ""):
                                 triggered = True

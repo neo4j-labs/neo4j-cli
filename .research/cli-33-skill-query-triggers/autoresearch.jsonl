@@ -1,1 +1,2 @@
 {"type":"config","name":"cli-33-skill-query-triggers","metric_name":"f1","metric_unit":"f1","direction":"higher","maxIterations":null,"segment":0,"timestamp":1778052110}
+{"type": "result", "metric": 0.9524, "metrics": {"f1": 0.9524, "precision": 1.0, "recall": 0.9091, "accuracy": 0.9524, "fp": 0, "fn": 2}, "status": "keep", "description": "baseline: TRIGGER/SKIP/CLI-surfaces description (user-authored)", "commit": "a98f880", "segment": 0, "timestamp": 1778053975}
