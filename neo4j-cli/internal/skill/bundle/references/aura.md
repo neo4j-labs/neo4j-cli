@@ -46,7 +46,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential). Find available credentials with `neo4j-cli credential aura client list`. |
 
 ### neo4j-cli aura customer-managed-key create
 
@@ -120,7 +120,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential). Find available credentials with `neo4j-cli credential aura client list`. |
 
 ### neo4j-cli aura graph-analytics session
 
@@ -206,7 +206,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential). Find available credentials with `neo4j-cli credential aura client list`. |
 
 ### neo4j-cli aura instance create
 
@@ -411,7 +411,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential). Find available credentials with `neo4j-cli credential aura client list`. |
 
 ### neo4j-cli aura tenant get
 
