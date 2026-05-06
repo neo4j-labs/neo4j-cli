@@ -88,7 +88,8 @@ tasks:
       if changie is unavailable, hand-author per the convention in CLAUDE.md
       (filenames `<project>-Minor-<YYYYMMDD>-<HHMMSS>.yaml`, fields project/kind/body/time,
       single-quoted body, RFC3339 time).
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T06:40:00Z
     dependencies:
       - task-002
     acceptance_criteria:

@@ -94,3 +94,28 @@ Key Decisions:
   one commit, the CI gate will pass on the next checkout.
 
 Next Task: task-005 (add dual-project Minor changelog entries)
+
+================================================================================
+TASK-005: Add dual-project Minor changelog entries
+Date: 2026-05-06T06:40:00Z
+================================================================================
+
+Summary:
+Hand-authored two changelog YAML files under .changes/unreleased/, one per
+project (aura-cli + neo4j-cli), kind Minor, body
+"Add 'skill print' command to preview the embedded SKILL.md before installing".
+changie is not installed locally so used the convention from CLAUDE.md.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Minor-20260506-064000.yaml (created)
+- .changes/unreleased/neo4j-cli-Minor-20260506-064000.yaml (created)
+- .plans/tasks-skill-print-command.yml (status pending -> completed)
+
+Key Decisions:
+- Single-quoted body with doubled apostrophes ('skill print') per YAML spec
+  to escape the embedded single quotes — mirrors how a future stable-release
+  changelog entry will render.
+- RFC3339 time with +00:00 UTC offset; filename timestamp matches.
+- Both files identical except for project: field.
+
+Next Task: task-006 (run final gates and verify end-to-end behaviour)
