@@ -21,6 +21,22 @@ Use cobra `Annotations["write"] = "true"` on every write leaf and a
 single root `PersistentPreRunE` that walks the annotation and rejects
 the call when the flag is unset. No per-leaf branching.
 
+**Bolt migration (extension).** The HTTP Query API has no `queryType`
+field on EXPLAIN responses (verified against `neo4j:5.26` and
+`neo4j:2026.04` — only `data` / `queryPlan` / `bookmarks`). The
+official Neo4j Go driver v6 returns `ResultSummary.StatementType()`
+(`r` / `rw` / `w` / `s`) but is Bolt-only. To get a single-field
+classifier instead of an operator-tree walk, the `query` package
+switches transport to Bolt via `github.com/neo4j/neo4j-go-driver/v6`.
+HTTP transport, the `--insecure` flag, and the operator-tree
+classifier are removed. Query execution uses the driver's
+auto-managed transaction wrappers `session.ExecuteRead` /
+`session.ExecuteWrite` — no manual `BeginTransaction`, no commit/
+rollback bookkeeping. The EXPLAIN preflight runs inside
+`ExecuteRead` (it never mutates), the real query runs inside
+`ExecuteRead` when classified read-only and `ExecuteWrite`
+otherwise.
+
 ## Goals
 
 - Block accidental mutations across the Aura API, local config,
@@ -33,6 +49,10 @@ the call when the flag is unset. No per-leaf branching.
   (auto-generated), the `additions.md` gotchas, the README, and the
   npm user-facing README.
 - Ship as a dual-project `Minor` changie entry (aura-cli + neo4j-cli).
+- Replace the bespoke HTTP transport with the official Neo4j Go
+  driver v6 so write detection collapses to a single field
+  (`summary.StatementType()`) and `query run` becomes idiomatic
+  driver code.
 
 ## Non-Goals
 
@@ -47,6 +67,16 @@ the call when the flag is unset. No per-leaf branching.
 - No interactive confirmation prompt. The flag is the confirmation.
 - No allowlist exception for "harmless" local writes like
   `aura config set format json` — gated for consistency.
+- No manual transaction management. The driver's auto-managed
+  `session.ExecuteRead` / `session.ExecuteWrite` are the only
+  paths; no explicit `BeginTransaction`, no manual commit/
+  rollback. (The wrappers are simpler than `session.Run` for our
+  use case: they handle retries on transient errors and close
+  the tx automatically on success or failure.)
+- No backwards-compat handling for credentials stored with `http://`
+  URIs. The release is experimental; nobody has stored creds yet.
+- No driver tuning (pool size, routing tweaks, custom resolvers).
+  Driver defaults only.
 
 ## Requirements
 
@@ -163,6 +193,120 @@ the call when the flag is unset. No per-leaf branching.
 - REQ-F-019: All new `.go` files MUST begin with the Neo4j copyright
   header (enforced by `make license-check`).
 
+### Functional Requirements — Bolt Migration
+
+These requirements supersede the HTTP-transport pieces of REQ-F-007
+through REQ-F-011 once implemented; the surface contract (writes
+require `--rw`, reads frictionless, EXPLAIN preflight) is unchanged.
+
+- REQ-F-020: `go.mod` MUST gain a direct dependency on
+  `github.com/neo4j/neo4j-go-driver/v6` at `v6.0.0` (or the latest
+  `v6.x` at implementation time). This is the ONLY new dependency
+  permitted; supersedes REQ-NF-006.
+- REQ-F-021: `neo4j-cli/query/connect.go` MUST replace the entire
+  HTTP transport (`httpDoer`, `runStatement`,
+  `runStatementResponse`, `newHTTPClient`, `parseBool`, the
+  `queryResponse` / `queryPlan` / `queryError` structs, the
+  `application/json` request building, and the `/db/<db>/query/v2`
+  URL composition) with a single `neo4j.DriverWithContext`
+  constructed via `neo4j.NewDriverWithContext(uri,
+  neo4j.BasicAuth(username, password, ""))`. The `conn` struct
+  retains only the fields needed by callers: `uri`, `database`,
+  `userAgent`, and the driver handle. The driver is closed by the
+  caller (defer `driver.Close(ctx)` at the leaf RunE level).
+- REQ-F-022: The `--insecure` flag and the `NEO4J_INSECURE` env var
+  MUST be removed entirely. Targets: the flag registration in
+  `neo4j-cli/query/query.go`, every reference in
+  `neo4j-cli/query/connect.go`, the `Insecure bool` field on
+  `DbmsCredentials`, its inclusion in
+  `PrintableDbmsCredentials.AsArray()` / `MarshalJSON()` and the
+  add/use commands that set it, every test that exercises
+  `--insecure` or `NEO4J_INSECURE`, and every doc/skill/README
+  mention. TLS is selected by URI scheme only
+  (`neo4j+s://` for verified TLS, `neo4j+ssc://` for self-signed).
+- REQ-F-023: URI rewrite — when the resolved URI begins with
+  `http://<host>[:<port>][/...]`, rewrite to
+  `neo4j://<host>:7687`. When `https://<host>[:<port>][/...]`,
+  rewrite to `neo4j+s://<host>:7687`. The host segment is
+  preserved; any path/query is stripped; the port is forced to
+  7687. The existing one-line `info: rewrote URI ...` notice on
+  stderr stays so the user sees the change. Default URI when
+  none is supplied: `neo4j://localhost:7687`. The default
+  database stays `neo4j`. The default username stays `neo4j`.
+- REQ-F-024: Query execution MUST use the driver's auto-managed
+  transaction wrappers — `session.ExecuteRead(ctx, work)` for
+  read-only cypher (and the EXPLAIN preflight) and
+  `session.ExecuteWrite(ctx, work)` for cypher classified as
+  write/schema. Inside the work function, the body is the
+  simplest possible:
+  ```go
+  res, err := tx.Run(ctx, cypher, params)
+  if err != nil { return nil, err }
+  records, err := res.Collect(ctx)        // for execution
+  // or
+  summary, err := res.Consume(ctx)        // for EXPLAIN preflight
+  ```
+  No manual `BeginTransaction`, no commit/rollback. The session
+  is created with `driver.NewSession(ctx, neo4j.SessionConfig{
+  DatabaseName: c.database})` and closed via
+  `defer session.Close(ctx)`.
+- REQ-F-025: The `--rw` write classifier MUST read
+  `summary.StatementType()` from the EXPLAIN preflight (the
+  preflight runs inside `session.ExecuteRead` since EXPLAIN never
+  mutates state). When the value is `neo4j.StatementTypeReadOnly`,
+  proceed by running the real cypher inside `ExecuteRead`. Anything
+  else (`StatementTypeReadWrite`, `StatementTypeWriteOnly`,
+  `StatementTypeSchemaWrite`, `StatementTypeUnknown`) returns the
+  existing `clierr.NewUsageError("this command writes; pass --rw
+  to allow it")` before any execution. When `--rw` is set the
+  preflight is skipped and the real cypher runs inside
+  `ExecuteWrite`. No operator-tree walking.
+- REQ-F-026: Drop the `queryPlan` struct and any code path that
+  inspected operator types from EXPLAIN. Detection is single
+  source: `summary.StatementType()`.
+- REQ-F-027: Delete `neo4j-cli/query/query_https_smoke_test.go`
+  entirely (cert generation, container boot, HTTPS readiness
+  poller, `testExplainResponseShape`, `runQueryCmd`,
+  `postQueryV2`, etc.). Replace with one env-gated Bolt smoke
+  test at `neo4j-cli/query/query_bolt_smoke_test.go` that boots
+  `neo4j:latest`, exposes the Bolt port on a random local port,
+  and asserts: read EXPLAIN → `StatementTypeReadOnly`; write
+  EXPLAIN (`CREATE (n:T)`) → `StatementTypeReadWrite`; schema
+  EXPLAIN (`CREATE INDEX ...`) → `StatementTypeSchemaWrite`. The
+  test stays Unix-only (`//go:build !windows`) and gated on
+  `NEO4J_BOLT_TEST=1`.
+- REQ-F-028: Update existing query unit tests
+  (`neo4j-cli/query/run_test.go`, `connect_test.go`, etc.) to
+  swap the HTTP fake (`httpDoer` / `httptest.Server`) for a
+  driver-level fake. Keep coverage parity for the existing
+  cases: read with no `--rw` succeeds (preflight returns
+  ReadOnly), write with no `--rw` errors before the real call,
+  write with `--rw` skips preflight and runs once, EXPLAIN
+  syntax errors surface verbatim, partial-credential resolution
+  rules unchanged.
+- REQ-F-029: Update changie entry bodies (REQ-F-018 already
+  landed) — replace the existing two `.changes/unreleased/`
+  YAMLs with bodies that reflect both changes:
+  - `project: aura-cli` body: `Require --rw flag for any write
+    operation (instance create/delete/update, config set,
+    credential add/remove/use, etc.)` (unchanged for aura-cli).
+  - `project: neo4j-cli` body: `Require --rw flag for any write
+    operation; query run now uses the Neo4j Bolt driver
+    (--insecure is removed; use neo4j+ssc:// for self-signed
+    certs)`.
+- REQ-F-030: Update `neo4j-cli/internal/skill/additions.md` (and
+  the aura one if applicable) and the regenerated `bundle/`
+  files: drop every mention of `--insecure` and the HTTP Query
+  API; the "Write operations" gotcha block stays, with the
+  description updated to "the CLI runs EXPLAIN over Bolt to
+  detect write cypher". Run `make generate` after the edit so
+  the bundle diff is part of the PR.
+- REQ-F-031: Update `README.md` and
+  `distribution/npm/cli/README.md` to drop every `--insecure`
+  reference. URI examples MUST use `neo4j://` form
+  (`http://...` examples are auto-rewritten at runtime, but the
+  documented form is the native scheme).
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: `make test` passes on linux, windows, macos.
@@ -171,10 +315,16 @@ the call when the flag is unset. No per-leaf branching.
 - REQ-NF-004: `make license-check` passes.
 - REQ-NF-005: `make generate-check` passes (CI gate; the bundle diff
   catches stale generated output).
-- REQ-NF-006: No new dependencies in `go.mod`.
+- REQ-NF-006: ~~No new dependencies in `go.mod`.~~ Superseded by
+  REQ-F-020: `github.com/neo4j/neo4j-go-driver/v6` is the single
+  permitted addition.
 - REQ-NF-007: For read-only `query run` invocations the preflight
-  costs exactly one extra HTTP round trip. Acceptable; EXPLAIN is
+  costs exactly one extra Bolt round trip. Acceptable; EXPLAIN is
   cheap and the cost vanishes as soon as the user passes `--rw`.
+- REQ-NF-008: The Bolt smoke test
+  (`neo4j-cli/query/query_bolt_smoke_test.go`) is gated on
+  `NEO4J_BOLT_TEST=1` so `go test ./...` and CI default runs
+  remain docker-free.
 
 ## Technical Considerations
 
@@ -219,14 +369,74 @@ through the parent chain even when only the local flagset has been
 merged. Convert with `strconv.ParseBool`. This pattern is documented
 in `CLAUDE.md` under "Cobra Flag Access Notes".
 
-**EXPLAIN response shape.** The Neo4j HTTP Query API v2 response
-likely includes a `summary` or sibling field with a query-type marker
-(`r`/`rw`/`w`/`s` or similar enum). The exact JSON path is unknown
-and MUST be confirmed by booting docker `neo4j:latest` (mirror
-`neo4j-cli/query/query_https_smoke_test.go:* :: TestHTTPS_Smoke` —
-already does the cert+container dance) and dumping the response body
-for `EXPLAIN MATCH (n) RETURN n` and `EXPLAIN CREATE (n)`. Add the
-struct field after observation. Tests then mock the observed JSON.
+**EXPLAIN response shape — empirical findings (2026-05-06).**
+Verified live against `neo4j:5.26` and `neo4j:2026.04`:
+
+| | HTTP Query API v2 | Bolt (Go driver v5.28 / v6.0.0) |
+|---|---|---|
+| Top-level fields | `data`, `queryPlan`, `bookmarks` | summary exposes `StatementType()` |
+| Single-field classifier | absent (no `summary.queryType`) | present — `r`/`rw`/`w`/`s` |
+| Read EXPLAIN | operator tree only | `StatementTypeReadOnly` |
+| Write EXPLAIN | operator tree only | `StatementTypeReadWrite` |
+| Schema EXPLAIN | operator tree only | `StatementTypeSchemaWrite` |
+| Driver scheme support | n/a | bolt-only — `http://`/`https://` rejected |
+
+This is the empirical basis for the migration: HTTP cannot give us a
+single-field classifier without walking the operator tree, while Bolt
+does it natively. The driver itself does not support HTTP transport
+(verified against v5.28 and v6.0.0; allow-list is `bolt`,
+`bolt+unix`, `bolt+s`, `bolt+ssc`, `neo4j`, `neo4j+s`, `neo4j+ssc`).
+
+**Bolt migration plan.**
+
+1. Replace `httpDoer`-based `runStatement` with a thin helper that
+   takes `(ctx, *conn, statement, params)`, opens a session via
+   `driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName:
+   c.database})`, runs the work inside `session.ExecuteRead` /
+   `ExecuteWrite`, and returns `(records, summary, err)`.
+2. `runQuery` (in `run.go`) chooses the wrapper:
+   - When `--rw` is unset: `ExecuteRead` for the EXPLAIN preflight,
+     read `summary.StatementType()`. If `ReadOnly`, run the real
+     cypher inside `ExecuteRead`. Otherwise return the usage error.
+   - When `--rw` is set: skip preflight, run the real cypher inside
+     `ExecuteWrite`.
+3. Convert `[]*neo4j.Record` to the existing `queryResult` shape:
+   `Columns = records[0].Keys` (or the result's `Keys()` when no
+   records returned), `Rows[i] = records[i].Values`. Output
+   rendering stays identical.
+
+**`ExecuteRead`/`ExecuteWrite` over `session.Run`.** The managed
+wrappers handle transient-error retries, automatic commit on
+callback success, and rollback on failure. The body inside the
+callback is one `tx.Run` + one `Collect` (or `Consume`) — no more
+verbose than `session.Run` and substantially less error-prone.
+
+**Files touched (Bolt-migration delta).**
+
+- `go.mod` / `go.sum` — add `github.com/neo4j/neo4j-go-driver/v6`.
+- `neo4j-cli/query/connect.go` — replace HTTP transport, drop
+  `httpDoer`, `runStatement*`, `newHTTPClient`, `parseBool`, the
+  `queryResponse` / `queryPlan` / `queryError` structs, and any
+  `--insecure` references.
+- `neo4j-cli/query/run.go` — switch preflight + execution to the
+  driver wrappers; classifier reads `summary.StatementType()`.
+- `neo4j-cli/query/query.go` — drop the `--insecure` flag
+  registration.
+- `neo4j-cli/query/uri.go` (and tests) — replace HTTP↔Bolt URL
+  rewrite with `http://X[:Y]/...` → `neo4j://X:7687`, `https://`
+  → `neo4j+s://X:7687`. Default `neo4j://localhost:7687`.
+- `neo4j-cli/query/connect_test.go` / `run_test.go` — rewrite
+  fakes against the driver. Drop `--insecure` cases.
+- `neo4j-cli/query/query_https_smoke_test.go` — delete.
+- `neo4j-cli/query/query_bolt_smoke_test.go` — new, env-gated.
+- `common/clicfg/credentials/dbms.go` and `aura.go`-shaped
+  printable types — drop `Insecure bool` from `DbmsCredentials`,
+  remove from `AsArray()`/`MarshalJSON()`, drop the add/use
+  flag that sets it.
+- `neo4j-cli/internal/skill/additions.md` and bundle regen.
+- `README.md`, `distribution/npm/cli/README.md` — drop
+  `--insecure`, update URI examples to `neo4j://`.
+- `.changes/unreleased/neo4j-cli-Minor-*.yaml` — replace body.
 
 **Preflight reuses connection.** The existing `conn` struct
 (`neo4j-cli/query/connect.go:49-57`) holds uri, basic auth, database,
@@ -305,7 +515,7 @@ CI gate (`TestGenerator_RoundTrip` and `make generate-check`). Run
       `"this command writes; pass --rw to allow it"` BEFORE any
       mutation reaches the database.
 - [ ] `bin/neo4j-cli query run "CREATE (n:Test)" --rw` succeeds and
-      skips the preflight (single HTTP call, not two).
+      skips the preflight (single Bolt round trip, not two).
 - [ ] EXPLAIN failure (e.g. cypher syntax error) surfaces the original
       error, not a generic preflight wrapper.
 - [ ] Standalone `bin/aura-cli` repeats all the above for its scope.
@@ -323,6 +533,33 @@ CI gate (`TestGenerator_RoundTrip` and `make generate-check`). Run
       `aura-cli` and `neo4j-cli`, kind `Minor`, body per REQ-F-018.
 - [ ] `make test`, `make fmt-check`, `make lint`, `make
       license-check`, `make generate-check` all pass.
+
+### Acceptance Criteria — Bolt Migration
+
+- [ ] `go.mod` contains exactly one new direct dep:
+      `github.com/neo4j/neo4j-go-driver/v6` (REQ-F-020).
+- [ ] No `httpDoer`, `runStatement`, `runStatementResponse`,
+      `newHTTPClient`, `parseBool`, `queryResponse`, `queryPlan`,
+      or `queryError` symbols remain in the `query` package.
+- [ ] `--insecure` is gone: no flag registration, no `NEO4J_INSECURE`
+      env-var read, no `Insecure` field on `DbmsCredentials`, no
+      mention in any test, doc, README, skill, or bundle.
+- [ ] `bin/neo4j-cli query run "RETURN 1"` against a Bolt-only
+      Neo4j instance (`neo4j:latest` in docker) succeeds with the
+      default URI.
+- [ ] `bin/neo4j-cli query run "RETURN 1" --uri http://example:7474`
+      logs the rewrite line and connects to `neo4j://example:7687`.
+- [ ] Same with `--uri https://example:7473` rewriting to
+      `neo4j+s://example:7687`.
+- [ ] `query_https_smoke_test.go` is deleted; a Bolt smoke test
+      exists, env-gated on `NEO4J_BOLT_TEST=1`, asserting the
+      three statement-type cases (read / write / schema).
+- [ ] EXPLAIN preflight runs inside `session.ExecuteRead`; the
+      real query runs inside `ExecuteRead` (read-only) or
+      `ExecuteWrite` (when `--rw` was passed). No code path opens
+      a manual `BeginTransaction`.
+- [ ] `summary.StatementType()` is the sole classifier; no
+      operator-tree walking remains.
 
 ## Out of Scope
 
