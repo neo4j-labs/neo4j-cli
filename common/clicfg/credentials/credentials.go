@@ -12,12 +12,14 @@ import (
 )
 
 type CredentialsFile struct {
-	Aura *AuraCredentials `json:"aura"`
+	Aura     *AuraCredentials     `json:"aura"`
+	Database *DatabaseCredentials `json:"database,omitempty"`
 }
 
 type Credentials struct {
 	fs       afero.Fs
 	Aura     *AuraCredentials
+	Database *DatabaseCredentials
 	filePath string
 }
 
@@ -40,6 +42,10 @@ func (c *Credentials) load() {
 			Credentials: []*AuraCredential{},
 			onUpdate:    c.save,
 		},
+		Database: &DatabaseCredentials{
+			Credentials: []*DatabaseCredential{},
+			onUpdate:    c.save,
+		},
 	}
 	if fileHasData {
 		if err := json.Unmarshal(data, &credentials); err != nil {
@@ -48,6 +54,15 @@ func (c *Credentials) load() {
 	}
 
 	c.Aura = credentials.Aura
+	c.Database = credentials.Database
+
+	// Ensure onUpdate callbacks are wired even when loaded from file
+	if c.Aura != nil {
+		c.Aura.onUpdate = c.save
+	}
+	if c.Database != nil {
+		c.Database.onUpdate = c.save
+	}
 
 	if !fileHasData {
 		c.save()
@@ -56,7 +71,8 @@ func (c *Credentials) load() {
 
 func (c *Credentials) save() {
 	data, err := json.Marshal(CredentialsFile{
-		Aura: c.Aura,
+		Aura:     c.Aura,
+		Database: c.Database,
 	})
 	if err != nil {
 		panic(err)
