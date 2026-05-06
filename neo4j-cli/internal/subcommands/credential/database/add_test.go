@@ -94,12 +94,6 @@ func (h *databaseTestHelper) assertCredentialsValue(key string, expected string)
 	assert.Equal(h.t, formattedExpected, formattedActual)
 }
 
-func (h *databaseTestHelper) assertOut(expected string) {
-	out, err := io.ReadAll(h.out)
-	assert.Nil(h.t, err)
-	assert.Equal(h.t, expected, string(out))
-}
-
 func (h *databaseTestHelper) assertErr(expected string) {
 	out, err := io.ReadAll(h.err)
 	assert.Nil(h.t, err)
