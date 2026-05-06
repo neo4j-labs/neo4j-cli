@@ -8,13 +8,13 @@ tasks:
     title: "Add RegisterRwFlag and compose root PersistentPreRunE"
     description: |
       In common/flags/flags.go, add RegisterRwFlag to register a persistent --rw bool flag and refactor the existing format binding into a callable helper. Create a single composed PersistentPreRunE on the root that first binds/validates format, then enforces the write gate. Do not leave two competing PersistentPreRunE setters.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "--rw appears in root --help with correct help text"
       - "Root sets exactly one PersistentPreRunE composing format + write-gate"
       - "Unit coverage exists for the write-gate helper (true/false, annotated/non-annotated)"
-    completed_at: null
+    completed_at: 2026-05-06T13:24:16Z
 
   - id: task-002
     title: "Mount --rw flag on neo4j-cli and aura-cli roots"

@@ -33,6 +33,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"

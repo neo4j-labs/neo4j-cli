@@ -218,6 +218,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
 - `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process; in test helpers set it once in the constructor (`NewAuraTestHelper`), not on each `ExecuteCommand` call
 - `pflag.AddFlagSet` silently ignores duplicate-named flags (the flag already present in the target set wins); child `PersistentFlags` shadow a parent's `PersistentFlags` with the same name — the root's `PersistentPreRunE` still finds the resolved flag via `cmd.Flags().Lookup()`
+- `flags.RegisterOutputFlag` still installs a format-only `PersistentPreRunE` for legacy callers; roots that also need write gating should replace it with `flags.ComposeRootPersistentPreRunE(cfg)` after registering needed persistent flags.
 - When renaming a flag that is used in many test files, complete clicfg core changes AND all callers AND all test fixtures in the same iteration — otherwise the build or test suite is broken between tasks and feedback loops cannot gate completion
 
 ## Command Tree Restructuring Notes

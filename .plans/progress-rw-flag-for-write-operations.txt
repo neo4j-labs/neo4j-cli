@@ -1,0 +1,20 @@
+================================================================================
+TASK-001: Add RegisterRwFlag and compose root PersistentPreRunE
+Date: 2026-05-06T13:24:16Z
+================================================================================
+
+Summary:
+Added reusable --rw flag registration, format binding helper, write gate helper, and composed root pre-run hook. Wired neo4j root to use the composed hook. Added unit tests for --rw help and gate behavior.
+
+Files Changed:
+- common/flags/flags.go (modified: added --rw helpers and composed hook)
+- common/flags/flags_test.go (created: write-gate and help coverage)
+- neo4j-cli/app/app.go (modified: uses composed root hook)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (created: progress log)
+
+Key Decisions:
+- Kept RegisterOutputFlag backwards-compatible by still installing format-only hook.
+- Added ComposeRootPersistentPreRunE for roots that need format + write gate.
+
+Next Task: task-004
