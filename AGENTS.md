@@ -264,9 +264,10 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 ## Credentials Storage Notes
 
-- `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Database` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
-- `DatabaseCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies.
-- `PrintableDatabaseCredentials.AsArray()` and `MarshalJSON()` intentionally omit `password` — any future credential type that has sensitive fields must also exclude them from both methods.
+- `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Dbms` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
+- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies.
+- `PrintableDbmsCredentials.AsArray()` and `MarshalJSON()` intentionally omit `password` — any future credential type that has sensitive fields must also exclude them from both methods.
+- The `Dbms` field in `CredentialsFile` uses JSON tag `"dbms"` — existing `credentials.json` files with the old `"database"` key will not auto-migrate (intentional; migration is a separate concern).
 
 ## common/output Testing Notes
 

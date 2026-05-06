@@ -9,27 +9,27 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 )
 
-type DatabaseCredentials struct {
-	DefaultCredential string                `json:"default-credential"`
-	Credentials       []*DatabaseCredential `json:"credentials"`
+type DbmsCredentials struct {
+	DefaultCredential string            `json:"default-credential"`
+	Credentials       []*DbmsCredential `json:"credentials"`
 	onUpdate          func()
 }
 
-func (c *DatabaseCredentials) Printable() PrintableDatabaseCredentials {
-	return PrintableDatabaseCredentials{
+func (c *DbmsCredentials) Printable() PrintableDbmsCredentials {
+	return PrintableDbmsCredentials{
 		credentials:       c.Credentials,
 		defaultCredential: c.DefaultCredential,
 	}
 }
 
-func (c *DatabaseCredentials) Add(name, username, password, databaseName, uri string, insecure bool) error {
+func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string, insecure bool) error {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)
 		}
 	}
 
-	c.Credentials = append(c.Credentials, &DatabaseCredential{
+	c.Credentials = append(c.Credentials, &DbmsCredential{
 		Name:         name,
 		Username:     username,
 		Password:     password,
@@ -44,7 +44,7 @@ func (c *DatabaseCredentials) Add(name, username, password, databaseName, uri st
 	return nil
 }
 
-func (c *DatabaseCredentials) Remove(name string) error {
+func (c *DbmsCredentials) Remove(name string) error {
 	indexToRemove := -1
 
 	for i, credential := range c.Credentials {
@@ -67,7 +67,7 @@ func (c *DatabaseCredentials) Remove(name string) error {
 	return nil
 }
 
-func (c *DatabaseCredentials) SetDefault(name string) error {
+func (c *DbmsCredentials) SetDefault(name string) error {
 	if !c.credentialExists(name) {
 		return clierr.NewUsageError("could not find credential with name %s", name)
 	}
@@ -77,14 +77,14 @@ func (c *DatabaseCredentials) SetDefault(name string) error {
 	return nil
 }
 
-func (c *DatabaseCredentials) GetDefault() (*DatabaseCredential, error) {
+func (c *DbmsCredentials) GetDefault() (*DbmsCredential, error) {
 	if c.DefaultCredential == "" {
 		return nil, nil
 	}
 	return c.Get(c.DefaultCredential)
 }
 
-func (c *DatabaseCredentials) Get(name string) (*DatabaseCredential, error) {
+func (c *DbmsCredentials) Get(name string) (*DbmsCredential, error) {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return credential, nil
@@ -93,11 +93,11 @@ func (c *DatabaseCredentials) Get(name string) (*DatabaseCredential, error) {
 	return nil, clierr.NewUsageError("could not find credential with name %s", name)
 }
 
-func (c *DatabaseCredentials) List() []*DatabaseCredential {
+func (c *DbmsCredentials) List() []*DbmsCredential {
 	return c.Credentials
 }
 
-func (c *DatabaseCredentials) credentialExists(name string) bool {
+func (c *DbmsCredentials) credentialExists(name string) bool {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return true
@@ -106,17 +106,17 @@ func (c *DatabaseCredentials) credentialExists(name string) bool {
 	return false
 }
 
-// PrintableDatabaseCredentials wraps a slice of DatabaseCredential and satisfies the
+// PrintableDbmsCredentials wraps a slice of DbmsCredential and satisfies the
 // common/output.ResponseData interface (AsArray) via structural typing, so PrintBodyMap
 // can render it as a table or JSON.
-type PrintableDatabaseCredentials struct {
-	credentials       []*DatabaseCredential
+type PrintableDbmsCredentials struct {
+	credentials       []*DbmsCredential
 	defaultCredential string
 }
 
 // AsArray returns each credential as a map for table rendering.
 // Password is intentionally omitted.
-func (d PrintableDatabaseCredentials) AsArray() []map[string]any {
+func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
 		result[i] = map[string]any{
@@ -131,13 +131,13 @@ func (d PrintableDatabaseCredentials) AsArray() []map[string]any {
 	return result
 }
 
-// MarshalJSON renders PrintableDatabaseCredentials as a JSON array of objects,
+// MarshalJSON renders PrintableDbmsCredentials as a JSON array of objects,
 // matching what the table renders. Password is intentionally omitted.
-func (d PrintableDatabaseCredentials) MarshalJSON() ([]byte, error) {
+func (d PrintableDbmsCredentials) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.AsArray())
 }
 
-type DatabaseCredential struct {
+type DbmsCredential struct {
 	Name         string `json:"name"`
 	Username     string `json:"username"`
 	Password     string `json:"password"`

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestDatabaseCredentials(t *testing.T, credentialsJSON string) (*credentials.Credentials, afero.Fs) {
+func newTestDbmsCredentials(t *testing.T, credentialsJSON string) (*credentials.Credentials, afero.Fs) {
 	t.Helper()
 	fs, err := testfs.GetTestFs("{}", credentialsJSON)
 	require.NoError(t, err)
@@ -23,7 +23,7 @@ func newTestDatabaseCredentials(t *testing.T, credentialsJSON string) (*credenti
 	return cfg, fs
 }
 
-func TestDatabaseCredentials_Add(t *testing.T) {
+func TestDbmsCredentials_Add(t *testing.T) {
 	tests := []struct {
 		name          string
 		initialJSON   string
@@ -52,7 +52,7 @@ func TestDatabaseCredentials_Add(t *testing.T) {
 		},
 		{
 			name:          "add second credential does not change default",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			addName:       "second",
 			addUsername:   "u2",
 			addPassword:   "p2",
@@ -65,7 +65,7 @@ func TestDatabaseCredentials_Add(t *testing.T) {
 		},
 		{
 			name:          "duplicate name returns error",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			addName:       "local",
 			addUsername:   "u",
 			addPassword:   "p",
@@ -80,21 +80,21 @@ func TestDatabaseCredentials_Add(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			err := creds.Database.Add(tc.addName, tc.addUsername, tc.addPassword, tc.addDBName, tc.addURI, tc.addInsecure)
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			err := creds.Dbms.Add(tc.addName, tc.addUsername, tc.addPassword, tc.addDBName, tc.addURI, tc.addInsecure)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tc.wantDefault, creds.Database.DefaultCredential)
-			assert.Len(t, creds.Database.Credentials, tc.wantCredCount)
+			assert.Equal(t, tc.wantDefault, creds.Dbms.DefaultCredential)
+			assert.Len(t, creds.Dbms.Credentials, tc.wantCredCount)
 		})
 	}
 }
 
-func TestDatabaseCredentials_Remove(t *testing.T) {
+func TestDbmsCredentials_Remove(t *testing.T) {
 	tests := []struct {
 		name          string
 		initialJSON   string
@@ -105,7 +105,7 @@ func TestDatabaseCredentials_Remove(t *testing.T) {
 	}{
 		{
 			name:          "remove existing non-default credential",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
 			removeName:    "second",
 			wantErr:       "",
 			wantDefault:   "first",
@@ -113,7 +113,7 @@ func TestDatabaseCredentials_Remove(t *testing.T) {
 		},
 		{
 			name:          "remove default credential clears default",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
 			removeName:    "first",
 			wantErr:       "",
 			wantDefault:   "",
@@ -121,7 +121,7 @@ func TestDatabaseCredentials_Remove(t *testing.T) {
 		},
 		{
 			name:          "remove unknown credential returns error",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			removeName:    "nonexistent",
 			wantErr:       "could not find credential with name nonexistent to remove",
 			wantDefault:   "first",
@@ -131,21 +131,21 @@ func TestDatabaseCredentials_Remove(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			err := creds.Database.Remove(tc.removeName)
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			err := creds.Dbms.Remove(tc.removeName)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tc.wantDefault, creds.Database.DefaultCredential)
-			assert.Len(t, creds.Database.Credentials, tc.wantCredCount)
+			assert.Equal(t, tc.wantDefault, creds.Dbms.DefaultCredential)
+			assert.Len(t, creds.Dbms.Credentials, tc.wantCredCount)
 		})
 	}
 }
 
-func TestDatabaseCredentials_SetDefault(t *testing.T) {
+func TestDbmsCredentials_SetDefault(t *testing.T) {
 	tests := []struct {
 		name        string
 		initialJSON string
@@ -155,14 +155,14 @@ func TestDatabaseCredentials_SetDefault(t *testing.T) {
 	}{
 		{
 			name:        "set default to existing credential",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":false}]}}`,
 			setName:     "second",
 			wantErr:     "",
 			wantDefault: "second",
 		},
 		{
 			name:        "set default to unknown credential returns error",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			setName:     "nonexistent",
 			wantErr:     "could not find credential with name nonexistent",
 			wantDefault: "first",
@@ -171,20 +171,20 @@ func TestDatabaseCredentials_SetDefault(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			err := creds.Database.SetDefault(tc.setName)
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			err := creds.Dbms.SetDefault(tc.setName)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tc.wantDefault, creds.Database.DefaultCredential)
+			assert.Equal(t, tc.wantDefault, creds.Dbms.DefaultCredential)
 		})
 	}
 }
 
-func TestDatabaseCredentials_GetDefault(t *testing.T) {
+func TestDbmsCredentials_GetDefault(t *testing.T) {
 	tests := []struct {
 		name        string
 		initialJSON string
@@ -193,12 +193,12 @@ func TestDatabaseCredentials_GetDefault(t *testing.T) {
 	}{
 		{
 			name:        "returns nil when no default set",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"credentials":[]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"credentials":[]}}`,
 			wantNil:     true,
 		},
 		{
 			name:        "returns default credential when set",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			wantNil:     false,
 			wantName:    "local",
 		},
@@ -206,8 +206,8 @@ func TestDatabaseCredentials_GetDefault(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			cred, err := creds.Database.GetDefault()
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			cred, err := creds.Dbms.GetDefault()
 			require.NoError(t, err)
 			if tc.wantNil {
 				assert.Nil(t, cred)
@@ -219,7 +219,7 @@ func TestDatabaseCredentials_GetDefault(t *testing.T) {
 	}
 }
 
-func TestDatabaseCredentials_Get(t *testing.T) {
+func TestDbmsCredentials_Get(t *testing.T) {
 	tests := []struct {
 		name        string
 		initialJSON string
@@ -229,14 +229,14 @@ func TestDatabaseCredentials_Get(t *testing.T) {
 	}{
 		{
 			name:        "get existing credential returns it",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"default-credential":"local","credentials":[{"name":"local","username":"user1","password":"pass1","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"user1","password":"pass1","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			getName:     "local",
 			wantErr:     "",
 			wantName:    "local",
 		},
 		{
 			name:        "get unknown credential returns error",
-			initialJSON: `{"aura":{"credentials":[]},"database":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`,
 			getName:     "nonexistent",
 			wantErr:     "could not find credential with name nonexistent",
 		},
@@ -244,8 +244,8 @@ func TestDatabaseCredentials_Get(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			cred, err := creds.Database.Get(tc.getName)
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			cred, err := creds.Dbms.Get(tc.getName)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -259,7 +259,7 @@ func TestDatabaseCredentials_Get(t *testing.T) {
 	}
 }
 
-func TestDatabaseCredentials_List(t *testing.T) {
+func TestDbmsCredentials_List(t *testing.T) {
 	tests := []struct {
 		name          string
 		initialJSON   string
@@ -272,39 +272,39 @@ func TestDatabaseCredentials_List(t *testing.T) {
 		},
 		{
 			name:          "list returns all credentials",
-			initialJSON:   `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":true}]}}`,
+			initialJSON:   `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","insecure":true}]}}`,
 			wantCredCount: 2,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			creds, _ := newTestDatabaseCredentials(t, tc.initialJSON)
-			list := creds.Database.List()
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			list := creds.Dbms.List()
 			assert.Len(t, list, tc.wantCredCount)
 		})
 	}
 }
 
-func TestDatabaseCredentials_Persist(t *testing.T) {
+func TestDbmsCredentials_Persist(t *testing.T) {
 	// Verify that mutations persist to the file via onUpdate callback
 	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[]}}`)
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.Database.Add("local", "neo4j", "secret", "neo4j", "bolt://localhost:7687", false))
+	require.NoError(t, creds.Dbms.Add("local", "neo4j", "secret", "neo4j", "bolt://localhost:7687", false))
 
 	// Reload credentials from the same FS to verify persistence
 	creds2 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.Len(t, creds2.Database.Credentials, 1)
-	assert.Equal(t, "local", creds2.Database.Credentials[0].Name)
-	assert.Equal(t, "local", creds2.Database.DefaultCredential)
+	require.Len(t, creds2.Dbms.Credentials, 1)
+	assert.Equal(t, "local", creds2.Dbms.Credentials[0].Name)
+	assert.Equal(t, "local", creds2.Dbms.DefaultCredential)
 }
 
-func TestPrintableDatabaseCredentials_AsArray(t *testing.T) {
-	creds, _ := newTestDatabaseCredentials(t, `{"aura":{"credentials":[]},"database":{"default-credential":"first","credentials":[{"name":"first","username":"user1","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"user2","password":"hidden","database-name":"test","uri":"bolt://localhost:7688","insecure":true}]}}`)
+func TestPrintableDbmsCredentials_AsArray(t *testing.T) {
+	creds, _ := newTestDbmsCredentials(t, `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"user1","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"user2","password":"hidden","database-name":"test","uri":"bolt://localhost:7688","insecure":true}]}}`)
 
-	printable := creds.Database.Printable()
+	printable := creds.Dbms.Printable()
 	rows := printable.AsArray()
 
 	require.Len(t, rows, 2)
@@ -326,10 +326,10 @@ func TestPrintableDatabaseCredentials_AsArray(t *testing.T) {
 	assert.Equal(t, false, rows[1]["default"])
 }
 
-func TestPrintableDatabaseCredentials_MarshalJSON(t *testing.T) {
-	creds, _ := newTestDatabaseCredentials(t, `{"aura":{"credentials":[]},"database":{"default-credential":"local","credentials":[{"name":"local","username":"user1","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`)
+func TestPrintableDbmsCredentials_MarshalJSON(t *testing.T) {
+	creds, _ := newTestDbmsCredentials(t, `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"user1","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]}}`)
 
-	printable := creds.Database.Printable()
+	printable := creds.Dbms.Printable()
 	data, err := json.Marshal(printable)
 	require.NoError(t, err)
 
