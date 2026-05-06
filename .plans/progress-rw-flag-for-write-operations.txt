@@ -204,3 +204,23 @@ Key Decisions:
 - Verified completion by checking `make generate-check` instead of manufacturing bundle diffs where none remained.
 
 Next Task: task-010
+
+================================================================================
+TASK-010: Docs: README and npm README mention --rw with examples
+Date: 2026-05-06T14:58:18Z
+================================================================================
+
+Summary:
+Added terse write-operation guidance to both top-level READMEs, including examples for an Aura write, a config write, and a query write. Kept the wording aligned with the implemented gate behavior and query EXPLAIN preflight.
+
+Files Changed:
+- README.md (modified: adds --rw section with aura/config/query examples)
+- distribution/npm/cli/README.md (modified: adds matching --rw section for npm users)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Used one compact section per README instead of scattering notes across existing examples.
+- Matched the docs to implemented behavior: `query` preflights with `EXPLAIN` only when `--rw` is absent.
+
+Next Task: task-011

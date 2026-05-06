@@ -97,6 +97,16 @@ Schema introspection:
 
 Use `--insecure` to skip TLS verification for self-signed dev setups.
 
+## Write operations
+
+Write commands require `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
+
+```bash
+./neo4j-cli aura instance delete <id> --rw
+./neo4j-cli config set telemetry false --rw
+./neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
+```
+
 ## Agent skills
 
 `neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops that bundle into the supported agents' skill directories so the agent picks it up on next run.

@@ -62,6 +62,16 @@ The dist-tag is picked from the version string at publish time:
 `X.Y.Z-alpha*` → `alpha`, `X.Y.Z-beta*` → `beta`, `X.Y.Z-rc*` → `rc`, any
 other `-`-suffixed version → `next`, plain `X.Y.Z` → `latest`.
 
+## Write operations
+
+Write commands require `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
+
+```sh
+neo4j-cli aura instance delete <id> --rw
+neo4j-cli config set telemetry false --rw
+neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
+```
+
 ## Documentation and feedback
 
 - Project repo and full docs:

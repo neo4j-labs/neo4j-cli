@@ -128,14 +128,14 @@ tasks:
     title: "Docs: README and npm README mention --rw with examples"
     description: |
       In README.md and distribution/npm/cli/README.md, add a short section explaining that write operations require --rw and show one example each for an Aura write, a config write, and a query write. Keep text terse and aligned with existing style.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - "README gains --rw section with 3 examples"
       - "npm README updated when it shows mutating examples"
       - "Spellcheck and link formatting clean"
-    completed_at: null
+    completed_at: 2026-05-06T14:58:18Z
 
   - id: task-011
     title: "Contributor note: require write annotation convention"
