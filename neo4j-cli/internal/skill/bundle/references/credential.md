@@ -71,3 +71,9 @@ Lists database credentials
 
 Usage: `neo4j-cli credential database list`
 
+### neo4j-cli credential database use
+
+Sets the default database credential to be used
+
+Usage: `neo4j-cli credential database use <name>`
+
