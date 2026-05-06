@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add ''credential database'' commands (add, list, use, remove) and integrate stored database credentials into query connection resolution'
+time: 2026-05-06T07:00:00+00:00
