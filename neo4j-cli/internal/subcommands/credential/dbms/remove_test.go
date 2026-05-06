@@ -1,13 +1,13 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database_test
+package dbms_test
 
 import (
 	"testing"
 )
 
-func TestDatabaseCredentialRemove(t *testing.T) {
+func TestDbmsCredentialRemove(t *testing.T) {
 	tests := []struct {
 		name            string
 		initialCreds    []map[string]interface{}
@@ -52,10 +52,10 @@ func TestDatabaseCredentialRemove(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newDatabaseTestHelper(t)
-			h.setCredentialsValue("database.credentials", tc.initialCreds)
+			h := newDbmsTestHelper(t)
+			h.setCredentialsValue("dbms.credentials", tc.initialCreds)
 			if tc.initialDefault != "" {
-				h.setCredentialsValue("database.default-credential", tc.initialDefault)
+				h.setCredentialsValue("dbms.default-credential", tc.initialDefault)
 			}
 
 			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
@@ -66,8 +66,8 @@ func TestDatabaseCredentialRemove(t *testing.T) {
 			}
 
 			h.assertErr("")
-			h.assertCredentialsValue("database.credentials", tc.wantCredentials)
-			h.assertCredentialsValue("database.default-credential", tc.wantDefault)
+			h.assertCredentialsValue("dbms.credentials", tc.wantCredentials)
+			h.assertCredentialsValue("dbms.default-credential", tc.wantDefault)
 		})
 	}
 }

@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database_test
+package dbms_test
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDatabaseCredentialList(t *testing.T) {
+func TestDbmsCredentialList(t *testing.T) {
 	tests := []struct {
 		name           string
 		initialCreds   []map[string]interface{}
@@ -99,13 +99,13 @@ func TestDatabaseCredentialList(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newDatabaseTestHelper(t)
+			h := newDbmsTestHelper(t)
 
 			if tc.initialCreds != nil {
-				h.setCredentialsValue("database.credentials", tc.initialCreds)
+				h.setCredentialsValue("dbms.credentials", tc.initialCreds)
 			}
 			if tc.initialDefault != "" {
-				h.setCredentialsValue("database.default-credential", tc.initialDefault)
+				h.setCredentialsValue("dbms.default-credential", tc.initialDefault)
 			}
 
 			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr

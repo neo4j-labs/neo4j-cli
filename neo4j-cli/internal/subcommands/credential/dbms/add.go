@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database
+package dbms
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
@@ -29,9 +29,9 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "add",
-		Short: "Adds a database credential",
+		Short: "Adds a dbms credential",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Database.Add(name, username, password, databaseName, uri, insecure)
+			return cfg.Credentials.Dbms.Add(name, username, password, databaseName, uri, insecure)
 		},
 	}
 

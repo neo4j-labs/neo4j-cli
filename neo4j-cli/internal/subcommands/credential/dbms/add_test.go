@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database_test
+package dbms_test
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/database"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/dbms"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/neo4j/cli/test/utils/testjson"
 	"github.com/spf13/afero"
@@ -22,8 +22,8 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// databaseTestHelper wires database.NewCmd with an in-memory filesystem.
-type databaseTestHelper struct {
+// dbmsTestHelper wires dbms.NewCmd with an in-memory filesystem.
+type dbmsTestHelper struct {
 	out         *bytes.Buffer
 	err         *bytes.Buffer
 	credentials string
@@ -31,14 +31,14 @@ type databaseTestHelper struct {
 	t           *testing.T
 }
 
-func newDatabaseTestHelper(t *testing.T) databaseTestHelper {
+func newDbmsTestHelper(t *testing.T) dbmsTestHelper {
 	t.Helper()
 	cobra.EnableTraverseRunHooks = true
-	return databaseTestHelper{
+	return dbmsTestHelper{
 		out: bytes.NewBufferString(""),
 		err: bytes.NewBufferString(""),
 		credentials: `{
-			"database": {
+			"dbms": {
 				"credentials": [],
 				"default-credential": ""
 			}
@@ -47,13 +47,13 @@ func newDatabaseTestHelper(t *testing.T) databaseTestHelper {
 	}
 }
 
-func (h *databaseTestHelper) setCredentialsValue(key string, value interface{}) {
+func (h *dbmsTestHelper) setCredentialsValue(key string, value interface{}) {
 	creds, err := sjson.Set(h.credentials, key, value)
 	assert.Nil(h.t, err)
 	h.credentials = creds
 }
 
-func (h *databaseTestHelper) executeCommand(command string) error {
+func (h *dbmsTestHelper) executeCommand(command string) error {
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
@@ -63,7 +63,7 @@ func (h *databaseTestHelper) executeCommand(command string) error {
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	cmd := database.NewCmd(cfg)
+	cmd := dbms.NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
@@ -72,7 +72,7 @@ func (h *databaseTestHelper) executeCommand(command string) error {
 	return cmd.Execute()
 }
 
-func (h *databaseTestHelper) assertCredentialsValue(key string, expected string) {
+func (h *dbmsTestHelper) assertCredentialsValue(key string, expected string) {
 	file, err := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
 	assert.Nil(h.t, err)
 	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
@@ -94,7 +94,7 @@ func (h *databaseTestHelper) assertCredentialsValue(key string, expected string)
 	assert.Equal(h.t, formattedExpected, formattedActual)
 }
 
-func (h *databaseTestHelper) assertErr(expected string) {
+func (h *dbmsTestHelper) assertErr(expected string) {
 	out, err := io.ReadAll(h.err)
 	assert.Nil(h.t, err)
 	assert.Contains(h.t, string(out), expected)
@@ -102,7 +102,7 @@ func (h *databaseTestHelper) assertErr(expected string) {
 
 // --- add tests ---
 
-func TestDatabaseCredentialAdd(t *testing.T) {
+func TestDbmsCredentialAdd(t *testing.T) {
 	tests := []struct {
 		name            string
 		initialCreds    []map[string]interface{}
@@ -183,10 +183,10 @@ func TestDatabaseCredentialAdd(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newDatabaseTestHelper(t)
-			h.setCredentialsValue("database.credentials", tc.initialCreds)
+			h := newDbmsTestHelper(t)
+			h.setCredentialsValue("dbms.credentials", tc.initialCreds)
 			if tc.initialDefault != "" {
-				h.setCredentialsValue("database.default-credential", tc.initialDefault)
+				h.setCredentialsValue("dbms.default-credential", tc.initialDefault)
 			}
 
 			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
@@ -197,8 +197,8 @@ func TestDatabaseCredentialAdd(t *testing.T) {
 			}
 
 			h.assertErr("")
-			h.assertCredentialsValue("database.credentials", tc.wantCredentials)
-			h.assertCredentialsValue("database.default-credential", tc.wantDefaultCred)
+			h.assertCredentialsValue("dbms.credentials", tc.wantCredentials)
+			h.assertCredentialsValue("dbms.default-credential", tc.wantDefaultCred)
 		})
 	}
 }

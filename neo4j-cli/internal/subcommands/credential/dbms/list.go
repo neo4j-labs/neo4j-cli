@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database
+package dbms
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
@@ -9,15 +9,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var databaseCredentialFields = []string{"name", "username", "database-name", "uri", "insecure", "default"}
+var dbmsCredentialFields = []string{"name", "username", "database-name", "uri", "insecure", "default"}
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "Lists database credentials",
+		Short: "Lists dbms credentials",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Database.Printable(), databaseCredentialFields)
+			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Dbms.Printable(), dbmsCredentialFields)
 			return nil
 		},
 	}

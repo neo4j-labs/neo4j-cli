@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package database
+package dbms
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
@@ -10,8 +10,8 @@ import (
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "database",
-		Short: "Manage and view database credential values",
+		Use:   "dbms",
+		Short: "Manage and view dbms credential values",
 	}
 
 	cmd.AddCommand(newAddCmd(cfg))

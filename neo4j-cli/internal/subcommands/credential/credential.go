@@ -6,7 +6,7 @@ package credential
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/output"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/database"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/dbms"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.AddCommand(NewAuraClientCredentialCmd(cfg))
-	cmd.AddCommand(database.NewCmd(cfg))
+	cmd.AddCommand(dbms.NewCmd(cfg))
 
 	return cmd
 }
