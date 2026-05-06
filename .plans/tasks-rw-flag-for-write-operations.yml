@@ -114,7 +114,7 @@ tasks:
     title: "Regenerate skill bundles and commit diffs"
     description: |
       Run make generate to refresh SKILL.md bundles so --rw appears in Global Flags for both binaries. Ensure make generate-check passes locally. Commit regenerated files.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-008
@@ -122,7 +122,7 @@ tasks:
       - "Both bundle/SKILL.md files list --rw in Global Flags"
       - "make generate-check passes clean"
       - "No unrelated bundle drift remains"
-    completed_at: null
+    completed_at: 2026-05-06T14:55:59Z
 
   - id: task-010
     title: "Docs: README and npm README mention --rw with examples"

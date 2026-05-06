@@ -186,3 +186,21 @@ Key Decisions:
 - Folded the required generated bundle refresh into this finalize step because the doc change directly alters generated skill output.
 
 Next Task: task-009
+
+================================================================================
+TASK-009: Regenerate skill bundles and commit diffs
+Date: 2026-05-06T14:55:59Z
+================================================================================
+
+Summary:
+Verified the generated skill bundles were already refreshed by the task-008 doc work and that `make generate-check` now passes clean with no additional bundle drift. Synced the task ledger to reflect that the required generated outputs are already committed on this branch.
+
+Files Changed:
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-009 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Treated task-009 as satisfied by the generated bundle updates already committed in task-008 rather than forcing a no-op regeneration commit.
+- Verified completion by checking `make generate-check` instead of manufacturing bundle diffs where none remained.
+
+Next Task: task-010
