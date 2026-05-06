@@ -19,3 +19,30 @@ Key Decisions:
   task-003 will regenerate bundles to make it pass again.
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Add directive toon bullet to both skill additions.md files
+Date: 2026-05-06T19:55:00Z
+================================================================================
+
+Summary:
+Replaced the soft "Prefer `--format toon`..." bullet with a directive
+"**Always pass `--format toon` (`-f toon`) on read commands**" bullet (per
+REQ-F-002 wording) in both neo4j-cli/internal/skill/additions.md and
+neo4j-cli/aura/internal/skill/additions.md. Factual bullet immediately above
+preserved as-is. Wording identical across both files. Bundle regeneration
+deferred to task-003 — TestGenerator_RoundTrip will fail until then.
+
+Files Changed:
+- neo4j-cli/internal/skill/additions.md (modified — soft bullet replaced with directive)
+- neo4j-cli/aura/internal/skill/additions.md (modified — soft bullet replaced with directive)
+
+Key Decisions:
+- Used identical wording in both files (REQ-F-003) — directive has no
+  binary-specific content.
+- Kept the existing factual bullet (line 5) untouched; only swapped the
+  bullet that follows it.
+- make fmt-check + make lint pass; make test deferred (bundle round-trip
+  drift is expected until task-003).
+
+Next Task: task-003

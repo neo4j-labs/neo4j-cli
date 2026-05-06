@@ -30,7 +30,7 @@ tasks:
       requires explicit --format json where supported.") and replace the soft "Prefer
       --format toon ..." bullet with a directive bullet immediately after it. Wording per
       REQ-F-002. Apply the identical wording to both files so they stay in sync.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/internal/skill/additions.md contains the factual bullet followed immediately by the directive bullet"
@@ -38,7 +38,7 @@ tasks:
       - "the directive bullet starts with '**Always pass `--format toon` (`-f toon`) on read commands**'"
       - "the soft 'Prefer `--format toon`...' bullet is removed from both files"
       - "no other bullets in either file are modified"
-    completed_at: null
+    completed_at: 2026-05-06T19:55:00Z
 
   - id: task-003
     title: "Regenerate skill bundles and reference pages"
