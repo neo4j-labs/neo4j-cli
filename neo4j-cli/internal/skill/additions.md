@@ -7,3 +7,4 @@
 - Async resource operations (instance create/resize/destroy) accept `--await` to block until the resource reaches a terminal state.
 - The `version:` line in an installed SKILL.md reflects the binary that wrote it. Run `neo4j-cli skill check` after upgrading to detect drift; v1 reports drift only — re-run `skill install` to refresh.
 - If you pass a bolt-style URI (e.g. `neo4j+s://...:7687`) to `query` it is auto-rewritten to `https://...:7473`; this command speaks the HTTP Query API, not bolt. Aura hosts (`*.neo4j.io`) are always rewritten to `https://<host>` (port 443) regardless of the input scheme or port.
+- Write operations require `--rw`. `neo4j-cli query run` uses `EXPLAIN` first when `--rw` is not set and blocks statements classified as writes before execution.

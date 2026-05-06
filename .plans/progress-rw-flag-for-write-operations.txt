@@ -161,3 +161,28 @@ Key Decisions:
 - Advanced the plan state only after verifying the required cases in neo4j-cli/query/run_test.go on the main branch.
 
 Next Task: task-008
+
+================================================================================
+TASK-008: Docs: root help text and skill additions
+Date: 2026-05-06T14:53:36Z
+================================================================================
+
+Summary:
+Added concise root help text describing the --rw requirement and query EXPLAIN behavior, then updated both skill additions files with a matching write-operations gotcha. Regenerated the affected skill bundles so the committed docs match the changed root command Long text.
+
+Files Changed:
+- neo4j-cli/app/app.go (modified: adds root Long help for --rw and query EXPLAIN behavior)
+- neo4j-cli/aura/aura.go (modified: adds aura root Long help referencing --rw and super-CLI query behavior)
+- neo4j-cli/internal/skill/additions.md (modified: adds write-operations gotcha)
+- neo4j-cli/aura/internal/skill/additions.md (modified: adds write-operations gotcha)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated: reflects updated neo4j root Long/gotcha text)
+- neo4j-cli/internal/skill/bundle/references/aura.md (regenerated: reflects updated mounted aura root help)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated: reflects updated aura root Long/gotcha text)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept the root Long text brief and aligned it to implemented behavior instead of adding broader usage guidance.
+- Folded the required generated bundle refresh into this finalize step because the doc change directly alters generated skill output.
+
+Next Task: task-009

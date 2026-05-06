@@ -100,7 +100,7 @@ tasks:
     title: "Docs: root help text and skill additions"
     description: |
       Add a Long paragraph on both roots stating that write operations require --rw and that query run uses EXPLAIN to detect writes. Update neo4j-cli/internal/skill/additions.md and neo4j-cli/aura/internal/skill/additions.md with a "Write operations" gotcha describing the requirement and query behavior.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-005
@@ -108,7 +108,7 @@ tasks:
       - "Both roots show updated Long help"
       - "Both additions.md contain the new gotcha block"
       - "Wording matches PRD guidance and is concise"
-    completed_at: null
+    completed_at: 2026-05-06T14:53:36Z
 
   - id: task-009
     title: "Regenerate skill bundles and commit diffs"
