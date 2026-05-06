@@ -67,6 +67,8 @@ func (h *credentialTestHelper) executeCommand(command string) {
 
 	cmd := credential.NewCredentialCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
+	flags.RegisterRwFlag(cmd)
+	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
@@ -110,6 +112,14 @@ func (h *credentialTestHelper) assertErr(expected string) {
 
 // --- add aura-client tests ---
 
+func TestCredentialAddAuraClientRequiresRw(t *testing.T) {
+	h := newCredentialTestHelper(t)
+
+	h.executeCommand("aura-client add --name test --client-id testclientid --client-secret testclientsecret")
+
+	h.assertErr("Error: this command writes; pass --rw to allow it")
+}
+
 func TestCredentialAddAuraClient(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -124,7 +134,7 @@ func TestCredentialAddAuraClient(t *testing.T) {
 			name:            "first credential is stored and set as default",
 			initialCreds:    []map[string]string{},
 			initialDefault:  "",
-			command:         "aura-client add --name test --client-id testclientid --client-secret testclientsecret",
+			command:         "aura-client add --rw --name test --client-id testclientid --client-secret testclientsecret",
 			wantCredentials: `[{"name":"test","client-id":"testclientid","client-secret":"testclientsecret","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "test",
 		},
@@ -132,14 +142,14 @@ func TestCredentialAddAuraClient(t *testing.T) {
 			name:           "duplicate name returns an error",
 			initialCreds:   []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault: "test",
-			command:        "aura-client add --name test --client-id testclientid --client-secret testclientsecret",
+			command:        "aura-client add --rw --name test --client-id testclientid --client-secret testclientsecret",
 			wantErr:        "Error: already have credential with name test",
 		},
 		{
 			name:            "additional credential is stored without changing default",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault:  "test",
-			command:         "aura-client add --name test-new --client-id testclientid2 --client-secret testclientsecret2",
+			command:         "aura-client add --rw --name test-new --client-id testclientid2 --client-secret testclientsecret2",
 			wantCredentials: `[{"name":"test","client-id":"testclientid","client-secret":"testclientsecret","access-token":"","token-expiry":0},{"name":"test-new","client-id":"testclientid2","client-secret":"testclientsecret2","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "test",
 		},
@@ -259,13 +269,13 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 		{
 			name:            "named credential is removed",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			command:         "aura-client remove test",
+			command:         "aura-client remove --rw test",
 			wantCredentials: "[]",
 		},
 		{
 			name:         "missing credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "aura-client remove nonexistent",
+			command:      "aura-client remove --rw nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent to remove",
 		},
 	}
@@ -303,13 +313,13 @@ func TestCredentialUseAuraClient(t *testing.T) {
 			name:            "named credential becomes the default",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
 			initialDefault:  "",
-			command:         "aura-client use test",
+			command:         "aura-client use --rw test",
 			wantDefaultCred: "test",
 		},
 		{
 			name:         "nonexistent credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "aura-client use nonexistent",
+			command:      "aura-client use --rw nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent",
 		},
 	}

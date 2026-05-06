@@ -72,7 +72,7 @@ tasks:
     title: "Unit tests for write gate at root"
     description: |
       Add tests that a write-annotated leaf errors without --rw and succeeds with --rw. Use a minimal fake command wired under the root or pick one real annotated leaf to avoid heavy API mocking. Ensure tests also cover a non-annotated read leaf remaining unaffected.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -81,7 +81,7 @@ tasks:
       - "Fail without --rw for annotated leaf; pass with --rw"
       - "Read leaf unaffected"
       - "Tests green on linux, macos, windows runners"
-    completed_at: null
+    completed_at: 2026-05-06T14:46:47Z
 
   - id: task-007
     title: "Unit tests for query EXPLAIN preflight"

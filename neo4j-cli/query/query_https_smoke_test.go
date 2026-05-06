@@ -337,7 +337,9 @@ func postQueryV2(t *testing.T, httpPort int, password, statement string) []byte 
 
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		require.NoError(t, resp.Body.Close())
+	}()
 
 	payload, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)

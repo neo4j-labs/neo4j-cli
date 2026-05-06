@@ -120,3 +120,26 @@ Key Decisions:
 - Reused the existing root gate rather than adding per-command branching or bespoke test hooks.
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Unit tests for write gate at root
+Date: 2026-05-06T14:46:47Z
+================================================================================
+
+Summary:
+Added lightweight root-wired command tests that prove write leaves are blocked without --rw, succeed with --rw when intended, and that read leaves remain unaffected. Extended the neo4j config and aura-client credential test helpers to mirror real root gate wiring.
+
+Files Changed:
+- neo4j-cli/internal/subcommands/config/helpers_test.go (modified: wires root test helper with --rw flag and composed pre-run gate)
+- neo4j-cli/internal/subcommands/config/list_test.go (modified: asserts read leaf remains unaffected without --rw)
+- neo4j-cli/internal/subcommands/config/set_test.go (modified: adds missing --rw failure and with --rw success cases)
+- neo4j-cli/internal/subcommands/credential/credential_test.go (modified: wires root gate and adds aura-client write gating coverage)
+- neo4j-cli/query/query_https_smoke_test.go (modified: checks deferred close error so branch-wide lint passes)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Used existing package-level command tests with minimal root wrappers instead of adding heavier fake-command fixtures.
+- Fixed the unrelated smoke-test errcheck issue in the same finalize step because lint is a required branch-wide gate.
+
+Next Task: task-007
