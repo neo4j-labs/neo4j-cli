@@ -268,12 +268,13 @@ func setDefaultValues(Viper *viper.Viper) {
 }
 
 type AuraConfig struct {
-	viper           *viper.Viper
-	fs              afero.Fs
-	pollingOverride PollingConfig
-	ValidConfigKeys []string
-	Projects        *projects.AuraConfigProjects
-	betaEnabled     bool
+	viper            *viper.Viper
+	fs               afero.Fs
+	pollingOverride  PollingConfig
+	ValidConfigKeys  []string
+	Projects         *projects.AuraConfigProjects
+	betaEnabled      bool
+	activeCredential *credentials.AuraCredential
 }
 
 type PollingConfig struct {
@@ -368,6 +369,18 @@ func (config *AuraConfig) SetBetaEnabled(enabled bool) {
 
 func (config *AuraConfig) AuraBetaEnabled() bool {
 	return config.betaEnabled
+}
+
+// SetActiveCredential stores a per-invocation credential override. The value is
+// never persisted to disk or viper; it is cleared when the process exits.
+func (config *AuraConfig) SetActiveCredential(cred *credentials.AuraCredential) {
+	config.activeCredential = cred
+}
+
+// ActiveCredential returns the credential previously stored by SetActiveCredential,
+// or nil when no override has been set.
+func (config *AuraConfig) ActiveCredential() *credentials.AuraCredential {
+	return config.activeCredential
 }
 
 func (config *AuraConfig) DefaultTenant() string {
