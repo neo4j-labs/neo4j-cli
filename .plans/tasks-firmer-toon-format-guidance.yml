@@ -47,7 +47,7 @@ tasks:
       so committed bundles pick up the new flag description (from task-001) and the new
       gotcha bullets (from task-002). Both bundle/SKILL.md files and every references/*.md
       under both skill trees should regenerate. Verify with `make generate-check`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -57,7 +57,7 @@ tasks:
       - "neo4j-cli/aura/internal/skill/bundle/SKILL.md Global Flags table shows the updated --format description"
       - "both bundle/SKILL.md Gotchas sections show the factual + directive bullet pair in order"
       - "at least one references/*.md per binary (e.g. references/query.md, references/skill.md) shows the updated --format description"
-    completed_at: null
+    completed_at: 2026-05-06T20:05:00Z
 
   - id: task-004
     title: "Add changie Patch entry for the toon nudge"

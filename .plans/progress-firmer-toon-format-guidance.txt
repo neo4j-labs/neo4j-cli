@@ -46,3 +46,33 @@ Key Decisions:
   drift is expected until task-003).
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Regenerate skill bundles and reference pages
+Date: 2026-05-06T20:05:00Z
+================================================================================
+
+Summary:
+Ran `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`
+to refresh committed bundles. Regenerated both bundle/SKILL.md files and the
+references/*.md pages that surface the --format flag (skill.md per binary,
+query.md under neo4j-cli). Bundle round-trip gate (TestGenerator_RoundTrip)
+now passes; make test, fmt-check, and lint all clean.
+
+Files Changed:
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated — flag desc + directive bullet)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated — flag desc)
+- neo4j-cli/internal/skill/bundle/references/skill.md (regenerated — flag desc)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated — directive bullet only; aura SKILL.md has no --format in Global Flags table)
+- neo4j-cli/aura/internal/skill/bundle/references/skill.md (regenerated — flag desc)
+
+Key Decisions:
+- aura SKILL.md Global Flags only lists --rw (no --format); --format lives at
+  subcommand level. Acceptance criterion bullet about "aura SKILL.md Global
+  Flags table shows updated --format" was technically a no-op — the directive
+  bullet in Gotchas covers the substance for aura.
+- generate is idempotent — re-running produces no further changes; the
+  generate-check "stale" error only fires because the working tree has the
+  uncommitted regenerate diff itself (per AGENTS.md guidance).
+
+Next Task: task-004
