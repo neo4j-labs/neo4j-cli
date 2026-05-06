@@ -72,6 +72,14 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		c.password = pw
 	}
 
+	rwFlag := cmd.Flag("rw")
+	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
+	if !allowWrite {
+		if err := rejectWriteCypher(cmd, c, cypher, params); err != nil {
+			return err
+		}
+	}
+
 	res, err := runStatement(cmd.Context(), c, cypher, params)
 	if err != nil {
 		return err
@@ -141,6 +149,46 @@ func promptPassword(cmd *cobra.Command) (string, error) {
 		return "", fmt.Errorf("query: read password: %w", err)
 	}
 	return pw, nil
+}
+
+func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
+	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params)
+	if err != nil {
+		return err
+	}
+	if queryPlanAllowsWrite(resp.QueryPlan) {
+		return clierr.NewUsageError("this command writes; pass --rw to allow it")
+	}
+	return nil
+}
+
+func queryPlanAllowsWrite(plan *queryPlan) bool {
+	if plan == nil {
+		return false
+	}
+	if operatorLooksLikeWrite(plan.OperatorType) {
+		return true
+	}
+	for _, child := range plan.Children {
+		if queryPlanAllowsWrite(&child) {
+			return true
+		}
+	}
+	return false
+}
+
+func operatorLooksLikeWrite(operatorType string) bool {
+	base := operatorType
+	if at := strings.Index(base, "@"); at >= 0 {
+		base = base[:at]
+	}
+
+	switch base {
+	case "Create", "Delete", "DetachDelete", "SetProperty", "SetProperties", "SetLabels", "RemoveLabels", "Merge", "Foreach", "ProcedureCall":
+		return true
+	default:
+		return false
+	}
 }
 
 // truncateValues applies truncateArrays to each row's positional values. The

@@ -44,3 +44,46 @@ Key Decisions:
 - Included generated bundle diffs in this task because tests fail as soon as the root persistent flag changes.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Confirm EXPLAIN response JSON path for queryType via docker
+Date: 2026-05-06T13:51:17Z
+================================================================================
+
+Summary:
+Verified against docker neo4j:latest that EXPLAIN responses from POST /db/neo4j/query/v2 do not expose a summary.queryType-style scalar. The response includes data, bookmarks, and a queryPlan operator tree instead, and the HTTP status was 202 for the observed EXPLAIN calls. Added parsing coverage in connect tests and a docker-gated smoke subtest that locks in the observed shape.
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: records docker-verified queryPlan-only EXPLAIN shape in response structs/comment)
+- neo4j-cli/query/connect_test.go (modified: adds queryPlan decoding coverage)
+- neo4j-cli/query/query_https_smoke_test.go (modified: adds docker-backed EXPLAIN shape verification and 2xx response handling)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Treat EXPLAIN response classification as queryPlan-tree based, not summary.queryType based.
+- Accept 2xx from the Query API helper because docker neo4j:latest returned 202 Accepted for EXPLAIN.
+
+Next Task: task-005
+
+================================================================================
+TASK-005: Implement query EXPLAIN preflight and struct extension
+Date: 2026-05-06T13:59:33Z
+================================================================================
+
+Summary:
+Added EXPLAIN preflight to query execution when --rw is not set, reusing the full parsed response envelope so queryPlan-tree classification happens before the real statement runs. Read-only cypher now does one EXPLAIN + one execution call, write cypher is rejected before execution, and --rw skips the preflight entirely.
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: splits full response parsing into runStatementResponse)
+- neo4j-cli/query/connect_test.go (modified: reuses full-response helper in tests)
+- neo4j-cli/query/run.go (modified: adds EXPLAIN preflight and queryPlan write detection)
+- neo4j-cli/query/run_test.go (modified: adds preflight/read/write/skip/error coverage)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Use the same root-gate wording for write cypher: "this command writes; pass --rw to allow it".
+- Treat known mutating plan operators as writes and recurse the full queryPlan tree.
+
+Next Task: task-003

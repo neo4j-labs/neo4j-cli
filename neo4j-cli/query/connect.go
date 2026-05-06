@@ -70,7 +70,18 @@ type queryResponse struct {
 		Fields []string `json:"fields"`
 		Values [][]any  `json:"values"`
 	} `json:"data"`
-	Errors []queryError `json:"errors"`
+	Bookmarks []string     `json:"bookmarks"`
+	QueryPlan *queryPlan   `json:"queryPlan"`
+	Errors    []queryError `json:"errors"`
+}
+
+// queryPlan captures the subset of EXPLAIN output we need.
+// Docker-verified against neo4j:latest (2026.04): EXPLAIN responses expose a
+// queryPlan operator tree and do NOT include a summary.queryType scalar, so any
+// read-vs-write detection must inspect this tree instead.
+type queryPlan struct {
+	OperatorType string      `json:"operatorType"`
+	Children     []queryPlan `json:"children"`
 }
 
 type queryError struct {
@@ -370,9 +381,10 @@ func newHTTPClient(insecure bool) *http.Client {
 	return &http.Client{Transport: tr}
 }
 
-// runStatement POSTs a single Cypher statement to <uri>/db/<database>/query/v2
-// and parses the response into a queryResult. Non-2xx responses or non-empty
-// errors[] arrays produce a Go error containing the upstream code+message.
+// runStatementResponse POSTs a single Cypher statement to
+// <uri>/db/<database>/query/v2 and parses the full response envelope. Non-2xx
+// responses or non-empty errors[] arrays produce a Go error containing the
+// upstream code+message.
 //
 // Note: a `txMetadata` body field would let server logs (query.log /
 // SHOW TRANSACTIONS) tag CLI traffic as e.g. {app: "neo4j-cli", type:
@@ -381,7 +393,7 @@ func newHTTPClient(insecure bool) *http.Client {
 // request with HTTP 400. Re-enable once that is the minimum supported
 // server, ideally gated by a server-version probe so older servers keep
 // working.
-func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
 	}
@@ -432,6 +444,17 @@ func runStatement(ctx context.Context, c *conn, statement string, params map[str
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("query: HTTP %d from %s", resp.StatusCode, url)
+	}
+
+	return &parsed, nil
+}
+
+// runStatement POSTs a single Cypher statement to <uri>/db/<database>/query/v2
+// and returns just the tabular result payload.
+func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+	parsed, err := runStatementResponse(ctx, c, statement, params)
+	if err != nil {
+		return nil, err
 	}
 
 	return &queryResult{

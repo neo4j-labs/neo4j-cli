@@ -234,6 +234,77 @@ func TestRunStatement_HappyPath(t *testing.T) {
 	assert.NotContains(t, gotBody, "txMetadata")
 }
 
+func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"bookmarks": ["FB:test"],
+			"data": {"fields": [], "values": []},
+			"queryPlan": {
+				"operatorType": "ProduceResults@neo4j",
+				"children": [{
+					"operatorType": "EmptyResult@neo4j",
+					"children": [{"operatorType": "Create@neo4j", "children": []}]
+				}]
+			}
+		}`))
+	}))
+	defer srv.Close()
+
+	c := &conn{
+		uri:      srv.URL,
+		username: "neo4j",
+		password: "secret",
+		database: "neo4j",
+		doer:     srv.Client(),
+	}
+
+	res, err := runStatement(context.Background(), c, "EXPLAIN CREATE (n)", nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, res.Columns)
+	assert.Equal(t, [][]any{}, res.Rows)
+
+	resp, err := fetchQueryResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp.QueryPlan)
+	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
+	require.Len(t, resp.QueryPlan.Children, 1)
+	require.Len(t, resp.QueryPlan.Children[0].Children, 1)
+	assert.Equal(t, "Create@neo4j", resp.QueryPlan.Children[0].Children[0].OperatorType)
+	assert.Equal(t, []string{"FB:test"}, resp.Bookmarks)
+}
+
+func TestRunStatement_ExplainResponseWithoutQueryTypeStillParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"data": {"fields": ["n"], "values": []},
+			"queryPlan": {"operatorType": "ProduceResults@neo4j", "children": []}
+		}`))
+	}))
+	defer srv.Close()
+
+	c := &conn{
+		uri:      srv.URL,
+		username: "neo4j",
+		password: "secret",
+		database: "neo4j",
+		doer:     srv.Client(),
+	}
+
+	resp, err := fetchQueryResponse(context.Background(), c, "EXPLAIN RETURN 1 AS n", nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp.QueryPlan)
+	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
+	assert.Empty(t, resp.Bookmarks)
+}
+
+func fetchQueryResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
+	return runStatementResponse(ctx, c, statement, params)
+}
+
 func TestResolveConn_UserAgent(t *testing.T) {
 	tests := []struct {
 		name    string

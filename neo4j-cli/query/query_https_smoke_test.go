@@ -13,8 +13,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -54,6 +56,14 @@ func TestHTTPS_Smoke(t *testing.T) {
 
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Fatalf("docker is required on PATH but was not found: %v", err)
+	}
+
+	t.Run("explain_response_contains_query_plan_without_query_type", func(t *testing.T) {
+		testExplainResponseShape(t)
+	})
+
+	if testing.Short() {
+		return
 	}
 
 	certDir := t.TempDir()
@@ -243,4 +253,95 @@ func runQueryCmd(t *testing.T, args []string) (string, string, error) {
 	cmd.SetArgs(args)
 	execErr := cmd.Execute()
 	return stdout.String(), stderr.String(), execErr
+}
+
+func testExplainResponseShape(t *testing.T) {
+	t.Helper()
+
+	const containerName = "neo4j-query-type-test"
+	const password = "testtest"
+
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Fatalf("docker is required on PATH but was not found: %v", err)
+	}
+
+	httpPort := freePort(t)
+	_ = exec.Command("docker", "rm", "-f", containerName).Run()
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "rm", "-f", containerName).Run()
+	})
+
+	out, err := exec.Command("docker", "run", "-d", "--rm",
+		"--name", containerName,
+		"-p", fmt.Sprintf("%d:7474", httpPort),
+		"-e", "NEO4J_AUTH=neo4j/"+password,
+		httpsImage,
+	).CombinedOutput()
+	require.NoError(t, err, "docker run failed: %s", string(out))
+
+	waitForHTTPReady(t, httpPort)
+
+	readResp := postQueryV2(t, httpPort, password, "EXPLAIN RETURN 1 AS n")
+	writeResp := postQueryV2(t, httpPort, password, "EXPLAIN CREATE (n:Tmp)")
+
+	require.Contains(t, string(readResp), "queryPlan")
+	require.Contains(t, string(writeResp), "queryPlan")
+	assert.NotContains(t, string(readResp), "queryType")
+	assert.NotContains(t, string(writeResp), "queryType")
+
+	var readParsed queryResponse
+	require.NoError(t, json.Unmarshal(readResp, &readParsed))
+	require.NotNil(t, readParsed.QueryPlan)
+	assert.Equal(t, "ProduceResults@neo4j", readParsed.QueryPlan.OperatorType)
+
+	var writeParsed queryResponse
+	require.NoError(t, json.Unmarshal(writeResp, &writeParsed))
+	require.NotNil(t, writeParsed.QueryPlan)
+	require.Len(t, writeParsed.QueryPlan.Children, 1)
+	require.Len(t, writeParsed.QueryPlan.Children[0].Children, 1)
+	assert.Equal(t, "Create@neo4j", writeParsed.QueryPlan.Children[0].Children[0].OperatorType)
+}
+
+func waitForHTTPReady(t *testing.T, httpPort int) {
+	t.Helper()
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := fmt.Sprintf("http://127.0.0.1:%d", httpPort)
+
+	deadline := time.Now().Add(httpsReadyTimeout)
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		require.NoError(t, err)
+		req.SetBasicAuth("neo4j", httpsPassword)
+		resp, err := client.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	logs, _ := exec.Command("docker", "logs", "--tail", "50", "neo4j-query-type-test").CombinedOutput()
+	t.Logf("--- last 50 lines of neo4j-query-type-test logs ---\n%s", string(logs))
+	t.Fatalf("Neo4j HTTP endpoint at %s did not become ready within %s", url, httpsReadyTimeout)
+}
+
+func postQueryV2(t *testing.T, httpPort int, password, statement string) []byte {
+	t.Helper()
+
+	body := bytes.NewBufferString(fmt.Sprintf(`{"statement":%q}`, statement))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/db/neo4j/query/v2", httpPort), body)
+	require.NoError(t, err)
+	req.SetBasicAuth("neo4j", password)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	payload, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, resp.StatusCode, http.StatusOK, string(payload))
+	require.Less(t, resp.StatusCode, http.StatusMultipleChoices, string(payload))
+	return payload
 }

@@ -76,9 +76,8 @@ func startServer(t *testing.T, status int, body []byte) *httptest.Server {
 
 func (h *runHarness) execute(t *testing.T, args ...string) error {
 	t.Helper()
-	// Use afero.NewMemMapFs for the cobra command itself; the harness's cfg
-	// owns the testfs filesystem, which is what cfg.Global.Format() reads.
 	cmd := NewCmd(h.cfg)
+	cmd.PersistentFlags().Bool("rw", false, "")
 	cmd.SetOut(h.stdout)
 	cmd.SetErr(h.stderr)
 	cmd.SetContext(context.Background())
@@ -137,6 +136,155 @@ func TestRunQuery_ServerErrorSurfacesCodeAndMessage(t *testing.T) {
 	msg := err.Error()
 	assert.Contains(t, msg, "Neo.ClientError.Statement.SyntaxError")
 	assert.Contains(t, msg, "Invalid input")
+}
+
+func TestRunQuery_ReadOnlyCypherWithoutRwRunsExplainThenExecutes(t *testing.T) {
+	calls := make([]string, 0, 2)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Statement string `json:"statement"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		calls = append(calls, body.Statement)
+
+		w.Header().Set("Content-Type", "application/json")
+		switch body.Statement {
+		case "EXPLAIN MATCH (n) RETURN n":
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[]},"queryPlan":{"operatorType":"ProduceResults@neo4j","children":[{"operatorType":"NodeByLabelScan@neo4j","children":[]}]}}`))
+		case "MATCH (n) RETURN n":
+			_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
+		default:
+			t.Fatalf("unexpected statement: %s", body.Statement)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri="+srv.URL,
+		"--password=pw",
+		"MATCH (n) RETURN n",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"EXPLAIN MATCH (n) RETURN n", "MATCH (n) RETURN n"}, calls)
+}
+
+func TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution(t *testing.T) {
+	calls := make([]string, 0, 2)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Statement string `json:"statement"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		calls = append(calls, body.Statement)
+
+		w.Header().Set("Content-Type", "application/json")
+		require.Equal(t, "EXPLAIN CREATE (n)", body.Statement)
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]},"queryPlan":{"operatorType":"ProduceResults@neo4j","children":[{"operatorType":"EmptyResult@neo4j","children":[{"operatorType":"Create@neo4j","children":[]}]}]}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri="+srv.URL,
+		"--password=pw",
+		"CREATE (n)",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
+	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, calls)
+}
+
+func TestRunQuery_WriteCypherWithRwSkipsPreflight(t *testing.T) {
+	calls := make([]string, 0, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Statement string `json:"statement"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		calls = append(calls, body.Statement)
+
+		w.Header().Set("Content-Type", "application/json")
+		require.Equal(t, "CREATE (n)", body.Statement)
+		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri="+srv.URL,
+		"--password=pw",
+		"--rw",
+		"CREATE (n)",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"CREATE (n)"}, calls)
+}
+
+func TestRunQuery_ExplainErrorSurfacesVerbatim(t *testing.T) {
+	srv := startServer(t, http.StatusBadRequest,
+		[]byte(`{"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"Invalid input"}]}`))
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri="+srv.URL,
+		"--password=pw",
+		"RETURN 1",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Neo.ClientError.Statement.SyntaxError")
+	assert.Contains(t, err.Error(), "Invalid input")
+}
+
+func TestQueryPlanAllowsWrite(t *testing.T) {
+	tests := []struct {
+		name string
+		plan *queryPlan
+		want bool
+	}{
+		{
+			name: "nil plan is read",
+			plan: nil,
+			want: false,
+		},
+		{
+			name: "read operators stay read",
+			plan: &queryPlan{OperatorType: "ProduceResults@neo4j", Children: []queryPlan{{OperatorType: "Filter@neo4j"}}},
+			want: false,
+		},
+		{
+			name: "write operator in child marks write",
+			plan: &queryPlan{OperatorType: "ProduceResults@neo4j", Children: []queryPlan{{OperatorType: "EmptyResult@neo4j", Children: []queryPlan{{OperatorType: "Create@neo4j"}}}}},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, queryPlanAllowsWrite(tc.plan))
+		})
+	}
+}
+
+func TestOperatorLooksLikeWrite(t *testing.T) {
+	tests := []struct {
+		operator string
+		want     bool
+	}{
+		{operator: "ProduceResults@neo4j", want: false},
+		{operator: "Filter@neo4j", want: false},
+		{operator: "Create@neo4j", want: true},
+		{operator: "SetProperty@neo4j", want: true},
+		{operator: "", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.operator, func(t *testing.T) {
+			assert.Equal(t, tc.want, operatorLooksLikeWrite(tc.operator))
+		})
+	}
 }
 
 func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
