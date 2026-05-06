@@ -182,7 +182,7 @@ tasks:
     title: "Final verification: build, tests, lint, format, generate-check"
     description: |
       Run make build, make test, make fmt-check, make lint, and make generate-check. Resolve any failures. Perform brief manual smoke: aura instance list (no --rw), aura instance delete (requires --rw), config set (requires --rw), query run read (no --rw), query run write (requires --rw), and with --rw succeeds.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -200,7 +200,7 @@ tasks:
       - "All make gates pass locally"
       - "Manual smoke results match PRD's Verification section"
       - "No unexpected diffs remain"
-    completed_at: null
+    completed_at: 2026-05-06T17:45:00Z
 
   - id: task-015
     title: "Add neo4j-go-driver/v6 dep to go.mod"

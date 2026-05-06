@@ -204,6 +204,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Use `linters.default: none` to disable auto-enabled defaults (e.g. `ineffassign`) and run only explicitly listed linters
 - Config lives at `.golangci.yml` in repo root
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
+- If `make lint` reports issues whose paths point to a non-existent worktree (e.g. `.claude/worktrees/agent-…`) the cache is stale; run `golangci-lint cache clean` once and re-run — issues evaporate when the source path no longer exists.
 
 ## Config Architecture Notes
 

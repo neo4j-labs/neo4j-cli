@@ -284,3 +284,21 @@ Key Decisions:
 - Kept the aura-cli entry focused on the write-flag requirement and the neo4j-cli entry focused on the super-CLI plus query behavior.
 
 Next Task: task-014
+
+================================================================================
+TASK-014: Final verification: build, tests, lint, format, generate-check
+Date: 2026-05-06T17:45:00Z
+================================================================================
+
+Summary:
+Verified all gates green (make build, make test, make fmt-check, make lint, make generate-check) on the rw-flag branch. Performed manual smoke: aura instance list passes the gate without --rw, aura instance delete is rejected without --rw and passes with --rw, neo4j config set is rejected without --rw and config list passes without --rw. Both root binaries show --rw under Global Flags. No code changes required.
+
+Files Changed:
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-014 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Cleared the golangci-lint cache once to drop stale absolute paths from a deleted worktree; lint then ran clean.
+- Treated the task as verification-only: no source diff was needed because all gates already pass on this branch.
+
+Next Task: task-015 (Bolt migration phase begins)
