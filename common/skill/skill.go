@@ -35,6 +35,7 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	cmd.AddCommand(newRemoveCmd(cfg, skillName))
 	cmd.AddCommand(newListCmd(cfg, skillName))
 	cmd.AddCommand(newCheckCmd(cfg, skillName))
+	cmd.AddCommand(newPrintCmd(cfg, bundle, skillName))
 
 	return cmd
 }

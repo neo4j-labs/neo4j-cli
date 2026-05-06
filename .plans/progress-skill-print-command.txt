@@ -20,3 +20,27 @@ Key Decisions:
 - Long description notes that {{VERSION}} stays literal.
 
 Next Task: task-002 (mount print leaf in NewCmd)
+
+================================================================================
+TASK-002: Mount print leaf in common/skill/skill.go::NewCmd
+Date: 2026-05-06T08:50:00Z
+================================================================================
+
+Summary:
+Added single line `cmd.AddCommand(newPrintCmd(cfg, bundle, skillName))` to
+common/skill/skill.go::NewCmd. Both binaries now expose `skill print` as a
+subcommand. skill.go remains 41 lines (well under the 80-line cap).
+
+Files Changed:
+- common/skill/skill.go (modified — added AddCommand for print leaf)
+- .plans/tasks-skill-print-command.yml (status pending -> completed)
+
+Key Decisions:
+- TestGenerator_RoundTrip in neo4j-cli/internal/skill/gen and neo4j-cli/aura/
+  internal/skill/gen now correctly fails because the embedded bundles have
+  not yet been regenerated. This is the explicit responsibility of task-004
+  (`make generate`) and confirms the round-trip gate works as intended.
+- make build and both `skill --help` outputs verified locally; print appears
+  alongside install/remove/list/check.
+
+Next Task: task-003 (add common/skill/print_test.go colocated tests)

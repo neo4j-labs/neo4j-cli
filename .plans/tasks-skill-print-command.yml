@@ -31,7 +31,8 @@ tasks:
       common/skill/skill.go::NewCmd alongside the existing install/remove/list/check
       AddCommand calls. Keep the file under 80 lines per the repo's cobra-layout
       convention. No other edits to skill.go.
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T08:50:00Z
     dependencies:
       - task-001
     acceptance_criteria:
