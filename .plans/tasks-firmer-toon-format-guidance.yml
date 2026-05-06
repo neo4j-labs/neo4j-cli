@@ -12,14 +12,14 @@ tasks:
       truth for the flag description; the change propagates to live --help output
       and to every generated reference page that lists the flag. No literal % is
       added so no Sprintf escaping is needed.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "common/flags/flags.go line ~23 ends with '. (agents: prefer toon)' after the choices list"
       - "go build ./... succeeds"
       - "running any read command with --help shows the new nudge in the --format flag description"
       - "no other strings in common/flags/flags.go are modified"
-    completed_at: null
+    completed_at: 2026-05-06T19:50:00Z
 
   - id: task-002
     title: "Add directive toon bullet to both skill additions.md files"

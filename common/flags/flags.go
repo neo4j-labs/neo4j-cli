@@ -20,7 +20,7 @@ func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 		"format",
 		"f",
 		"",
-		fmt.Sprintf("Format to print console output in, from a choice of [%s]", strings.Join(clicfg.ValidFormatValues[:], ", ")),
+		fmt.Sprintf("Format to print console output in, from a choice of [%s]. (agents: prefer toon)", strings.Join(clicfg.ValidFormatValues[:], ", ")),
 	)
 
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {

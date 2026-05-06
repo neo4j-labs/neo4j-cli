@@ -1,0 +1,21 @@
+================================================================================
+TASK-001: Append agents-prefer-toon nudge to --format flag description
+Date: 2026-05-06T19:50:00Z
+================================================================================
+
+Summary:
+Appended ". (agents: prefer toon)" suffix to the --format flag description in
+common/flags/flags.go RegisterOutputFlag. Single source of truth — propagates
+to live --help and (after task-003 regenerate) to bundle/SKILL.md Global Flags
+tables and references/*.md across both skill trees. No Sprintf escaping needed
+(no literal %).
+
+Files Changed:
+- common/flags/flags.go (modified — appended nudge to --format help string)
+
+Key Decisions:
+- Wording per REQ-F-001 verbatim: "(agents: prefer toon)" — short, distinct.
+- Bundle round-trip test (TestGenerator_RoundTrip) now fails as expected;
+  task-003 will regenerate bundles to make it pass again.
+
+Next Task: task-002
