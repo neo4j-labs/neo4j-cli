@@ -46,6 +46,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
 
 ### neo4j-cli aura customer-managed-key create
 
@@ -119,6 +120,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
 
 ### neo4j-cli aura graph-analytics session
 
@@ -204,6 +206,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
 
 ### neo4j-cli aura instance create
 
@@ -408,6 +411,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
 
 ### neo4j-cli aura tenant get
 

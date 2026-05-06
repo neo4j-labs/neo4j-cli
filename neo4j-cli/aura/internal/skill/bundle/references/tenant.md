@@ -10,6 +10,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of the Aura credential to use for this command (overrides the default credential) |
 
 ## aura-cli tenant get
 

@@ -5,6 +5,7 @@ package dataapi
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/dataapi/graphql"
@@ -26,6 +27,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.PersistentFlags().String("auth-url", "", "")
 	cmd.PersistentFlags().String("base-url", "", "")
+
+	flags.RegisterAuraCredentialFlag(cmd, cfg)
 
 	return cmd
 }

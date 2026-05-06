@@ -63,3 +63,38 @@ func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
 
 	helper.AssertErr("Error: invalid format value specified: invalid")
 }
+
+func TestListTenantsWithCredentialFlag(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		command string
+	}{
+		{name: "--credential flag", command: "tenant list --credential named-cred"},
+		{name: "-c shorthand", command: "tenant list -c named-cred"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.SetCredentialsValue("aura", map[string]interface{}{
+				"credentials": []map[string]interface{}{
+					{
+						"name":          "named-cred",
+						"client-id":     "named-client-id",
+						"client-secret": "named-client-secret",
+						"access-token":  "",
+						"token-expiry":  0,
+					},
+				},
+				"default-credential": "",
+			})
+
+			mockHandler := helper.NewRequestHandlerMock("/v1/tenants", http.StatusOK, `{"data": []}`)
+
+			helper.ExecuteCommand(tc.command)
+
+			mockHandler.AssertCalledTimes(1)
+			helper.AsssertOk()
+		})
+	}
+}

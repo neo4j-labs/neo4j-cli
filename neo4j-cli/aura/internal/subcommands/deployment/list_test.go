@@ -211,3 +211,49 @@ func TestListDeploymentsWithMissingOrganizationId(t *testing.T) {
 
 	helper.AssertErr("Error: required flag(s) \"organization-id\" not set")
 }
+
+func TestListDeploymentsWithCredentialFlag(t *testing.T) {
+	organizationId := "81e4ae5c-171b-4700-b243-8d1dd34f7321"
+	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
+
+	for _, tc := range []struct {
+		name    string
+		command string
+	}{
+		{
+			name:    "--credential flag",
+			command: fmt.Sprintf("deployment list --organization-id=%s --project-id=%s --credential named-cred", organizationId, projectId),
+		},
+		{
+			name:    "-c shorthand",
+			command: fmt.Sprintf("deployment list --organization-id=%s --project-id=%s -c named-cred", organizationId, projectId),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.SetCredentialsValue("aura", map[string]interface{}{
+				"credentials": []map[string]interface{}{
+					{
+						"name":          "named-cred",
+						"client-id":     "named-client-id",
+						"client-secret": "named-client-secret",
+						"access-token":  "",
+						"token-expiry":  0,
+					},
+				},
+				"default-credential": "",
+			})
+
+			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments", organizationId, projectId), http.StatusOK, `{"data": []}`)
+
+			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("format", "json")
+			helper.ExecuteCommand(tc.command)
+
+			mockHandler.AssertCalledTimes(1)
+			helper.AsssertOk()
+		})
+	}
+}

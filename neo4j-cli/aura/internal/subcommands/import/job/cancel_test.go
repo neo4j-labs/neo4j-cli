@@ -69,6 +69,56 @@ func TestCancelImportJobWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	`, jobId))
 }
 
+func TestCancelImportJobWithCredentialFlag(t *testing.T) {
+	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	jobId := "87d485b4-73fc-4a7f-bb03-720f4672947e"
+
+	for _, tc := range []struct {
+		name    string
+		command string
+	}{
+		{
+			name:    "--credential flag",
+			command: fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --credential named-cred", organizationId, projectId, jobId),
+		},
+		{
+			name:    "-c shorthand",
+			command: fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s -c named-cred", organizationId, projectId, jobId),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.SetCredentialsValue("aura", map[string]interface{}{
+				"credentials": []map[string]interface{}{
+					{
+						"name":          "named-cred",
+						"client-id":     "named-client-id",
+						"client-secret": "named-client-secret",
+						"access-token":  "",
+						"token-expiry":  0,
+					},
+				},
+				"default-credential": "",
+			})
+
+			mockHandler := helper.NewRequestHandlerMock(
+				fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs/%s/cancellation", organizationId, projectId, jobId),
+				http.StatusOK,
+				fmt.Sprintf(`{"data": {"id": "%s"}}`, jobId),
+			)
+
+			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.ExecuteCommand(tc.command)
+
+			mockHandler.AssertCalledTimes(1)
+			helper.AsssertOk()
+		})
+	}
+}
+
 func TestCancelImportJobError(t *testing.T) {
 	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
 	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
