@@ -244,13 +244,14 @@ tasks:
     title: "Switch --rw classifier to summary.StatementType()"
     description: |
       In runQuery, when --rw is unset run the EXPLAIN preflight inside ExecuteRead and read summary.StatementType() from result.Consume(ctx). If StatementTypeReadOnly, proceed by running the real cypher inside ExecuteRead. Otherwise return the existing usage error. When --rw is set, skip preflight and run inside ExecuteWrite. Drop any operator-tree walking code introduced earlier.
-    status: pending
+    status: completed
     dependencies:
       - task-017
     acceptance_criteria:
       - "summary.StatementType() is the only classifier"
       - "No queryPlan struct or operator-type checks remain"
       - "Read/write/schema cypher classified per the PRD table"
+    completed_at: 2026-05-06T19:30:00Z
 
   - id: task-019
     title: "Drop --insecure flag and DbmsCredentials.Insecure field"

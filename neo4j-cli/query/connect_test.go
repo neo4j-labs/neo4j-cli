@@ -248,18 +248,12 @@ func TestRunStatement_HappyPath(t *testing.T) {
 	assert.True(t, gotReadOnly, "runStatement must route through ExecuteRead by default")
 }
 
-func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
+func TestRunStatement_ExplainResponseCarriesQueryType(t *testing.T) {
 	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
 		resp := &queryResponse{}
 		resp.Data.Fields = []string{}
 		resp.Data.Values = [][]any{}
-		resp.QueryPlan = &queryPlan{
-			OperatorType: "ProduceResults@neo4j",
-			Children: []queryPlan{{
-				OperatorType: "EmptyResult@neo4j",
-				Children:     []queryPlan{{OperatorType: "Create@neo4j"}},
-			}},
-		}
+		resp.QueryType = neo4j.QueryTypeReadWrite
 		resp.Bookmarks = []string{"FB:test"}
 		return resp, nil
 	})
@@ -273,11 +267,7 @@ func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
 
 	resp, err := runStatementResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil, true)
 	require.NoError(t, err)
-	require.NotNil(t, resp.QueryPlan)
-	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
-	require.Len(t, resp.QueryPlan.Children, 1)
-	require.Len(t, resp.QueryPlan.Children[0].Children, 1)
-	assert.Equal(t, "Create@neo4j", resp.QueryPlan.Children[0].Children[0].OperatorType)
+	assert.Equal(t, neo4j.QueryTypeReadWrite, resp.QueryType)
 	assert.Equal(t, []string{"FB:test"}, resp.Bookmarks)
 }
 

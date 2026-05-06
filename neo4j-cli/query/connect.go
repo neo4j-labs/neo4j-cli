@@ -56,23 +56,19 @@ type queryResult struct {
 }
 
 // queryResponse is the structured envelope around a Cypher response. Backed
-// by the Bolt driver Result + ResultSummary; QueryPlan is derived from the
-// driver's ResultSummary.Plan() tree (only non-nil for EXPLAIN/PROFILE).
+// by the Bolt driver Result + ResultSummary. QueryType is taken straight
+// from ResultSummary.QueryType() and is what the --rw classifier inspects
+// for EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else
+// requires --rw). The driver also exposes the equivalent (deprecated)
+// StatementType() / StatementTypeReadOnly aliases — we use the QueryType
+// names so staticcheck does not flag them.
 type queryResponse struct {
 	Data struct {
 		Fields []string
 		Values [][]any
 	}
 	Bookmarks []string
-	QueryPlan *queryPlan
-}
-
-// queryPlan captures the operator tree produced by EXPLAIN/PROFILE. Mapped
-// from the driver's neo4j.Plan tree returned via ResultSummary.Plan(). The
-// top-level walking code in run.go inspects OperatorType and Children only.
-type queryPlan struct {
-	OperatorType string
-	Children     []queryPlan
+	QueryType neo4j.QueryType
 }
 
 // driverOpener is the test seam used to construct the Bolt driver. Production
@@ -406,9 +402,9 @@ func runStatementResponse(ctx context.Context, c *conn, statement string, params
 // runStatementResponseImpl is the real Bolt-backed implementation. Opens a
 // session targeted at c.database, runs the statement inside a managed
 // transaction (ExecuteRead when readOnly is true, ExecuteWrite otherwise),
-// collects all records, and converts the resulting summary's Plan() tree
-// (if present) into the internal queryPlan shape. The session is closed via
-// defer; the driver retains pooling.
+// collects all records, and pulls summary.QueryType() (used by the --rw
+// classifier on EXPLAIN preflight runs) onto the response. The session is
+// closed via defer; the driver retains pooling.
 func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
@@ -455,10 +451,7 @@ func runStatementResponseImpl(ctx context.Context, c *conn, statement string, pa
 		}
 
 		if summary != nil {
-			if plan := summary.Plan(); plan != nil {
-				converted := convertPlan(plan)
-				resp.QueryPlan = &converted
-			}
+			resp.QueryType = summary.QueryType()
 		}
 
 		return resp, nil
@@ -509,18 +502,4 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
 	}, nil
-}
-
-// convertPlan recursively maps a neo4j.Plan tree into the local queryPlan
-// shape. The classifier in run.go walks queryPlan.Children + OperatorType.
-func convertPlan(p neo4j.Plan) queryPlan {
-	out := queryPlan{OperatorType: p.Operator()}
-	children := p.Children()
-	if len(children) > 0 {
-		out.Children = make([]queryPlan, 0, len(children))
-		for _, child := range children {
-			out.Children = append(out.Children, convertPlan(child))
-		}
-	}
-	return out
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -164,45 +165,19 @@ func promptPassword(cmd *cobra.Command) (string, error) {
 	return pw, nil
 }
 
+// rejectWriteCypher runs an EXPLAIN preflight against the supplied cypher and
+// returns a usage error unless the driver's ResultSummary classifies it as
+// QueryTypeReadOnly. EXPLAIN never mutates state, so it always runs inside
+// ExecuteRead.
 func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
-	// EXPLAIN never mutates state, so always run inside ExecuteRead.
 	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params, true)
 	if err != nil {
 		return err
 	}
-	if queryPlanAllowsWrite(resp.QueryPlan) {
+	if resp.QueryType != neo4j.QueryTypeReadOnly {
 		return clierr.NewUsageError("this command writes; pass --rw to allow it")
 	}
 	return nil
-}
-
-func queryPlanAllowsWrite(plan *queryPlan) bool {
-	if plan == nil {
-		return false
-	}
-	if operatorLooksLikeWrite(plan.OperatorType) {
-		return true
-	}
-	for _, child := range plan.Children {
-		if queryPlanAllowsWrite(&child) {
-			return true
-		}
-	}
-	return false
-}
-
-func operatorLooksLikeWrite(operatorType string) bool {
-	base := operatorType
-	if at := strings.Index(base, "@"); at >= 0 {
-		base = base[:at]
-	}
-
-	switch base {
-	case "Create", "Delete", "DetachDelete", "SetProperty", "SetProperties", "SetLabels", "RemoveLabels", "Merge", "Foreach", "ProcedureCall":
-		return true
-	default:
-		return false
-	}
 }
 
 // truncateValues applies truncateArrays to each row's positional values. The

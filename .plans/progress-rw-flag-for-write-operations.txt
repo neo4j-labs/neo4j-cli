@@ -373,3 +373,26 @@ Key Decisions:
 
 Next Task: task-018
 
+================================================================================
+TASK-018: Switch --rw classifier to summary.StatementType()
+Date: 2026-05-06T19:30:00Z
+================================================================================
+
+Summary:
+Replaced the queryPlan operator-tree classifier with the driver's ResultSummary classifier. queryResponse.QueryPlan is gone; queryResponse.QueryType (a neo4j.QueryType pulled from summary.QueryType()) is the sole classifier read-only signal. rejectWriteCypher now compares resp.QueryType != neo4j.QueryTypeReadOnly. Dropped queryPlan / convertPlan / queryPlanAllowsWrite / operatorLooksLikeWrite. Updated tests with a new makeExplainResponse(qt) helper and a five-case TestRejectWriteCypher_QueryTypeClassifier table covering ReadOnly/ReadWrite/WriteOnly/SchemaWrite/Unknown. Trimmed the (soon-to-be-deleted in task-021) HTTP smoke test's QueryPlan-shape assertions so the package compiles after the queryResponse rename.
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: queryResponse exposes QueryType; queryPlan/convertPlan removed; impl reads summary.QueryType())
+- neo4j-cli/query/run.go (modified: rejectWriteCypher uses neo4j.QueryTypeReadOnly; classifier helpers removed)
+- neo4j-cli/query/connect_test.go (modified: ExplainResponseCarriesQueryType replaces QueryPlan-shape decode test)
+- neo4j-cli/query/run_test.go (modified: makeExplainResponse helper; table-driven QueryType classifier test replaces TestQueryPlanAllowsWrite/TestOperatorLooksLikeWrite; remaining tests stamp resp.QueryType = neo4j.QueryTypeReadOnly)
+- neo4j-cli/query/query_https_smoke_test.go (modified: drop QueryPlan-shape decode block; keep substring assertions for task-021 cleanup)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-018 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Used neo4j.QueryType / QueryTypeReadOnly instead of StatementType / StatementTypeReadOnly because the v6 driver deprecates the StatementType API (staticcheck SA1019). Both share the same underlying int alias and method body, so the spec's "summary.StatementType()" wording maps cleanly to the QueryType API.
+- Trimmed the deprecated HTTP smoke test instead of deleting it; task-021 owns the full removal. Keeps task-018 scoped to the classifier swap.
+- Did not touch resolveConn / openDriver / driverOpener / runStatementWrite paths — the classifier swap only needed the response shape change and the rejectWriteCypher predicate.
+
+Next Task: task-019

@@ -13,7 +13,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -284,22 +283,15 @@ func testExplainResponseShape(t *testing.T) {
 	readResp := postQueryV2(t, httpPort, password, "EXPLAIN RETURN 1 AS n")
 	writeResp := postQueryV2(t, httpPort, password, "EXPLAIN CREATE (n:Tmp)")
 
+	// HTTP Query API still emits a queryPlan operator tree on EXPLAIN responses;
+	// the CLI no longer consumes that path (Bolt + summary.StatementType() is
+	// the classifier now). Keep the substring presence check as a
+	// regression-finder for the upstream HTTP shape until task-021 deletes
+	// this whole HTTP smoke file.
 	require.Contains(t, string(readResp), "queryPlan")
 	require.Contains(t, string(writeResp), "queryPlan")
 	assert.NotContains(t, string(readResp), "queryType")
 	assert.NotContains(t, string(writeResp), "queryType")
-
-	var readParsed queryResponse
-	require.NoError(t, json.Unmarshal(readResp, &readParsed))
-	require.NotNil(t, readParsed.QueryPlan)
-	assert.Equal(t, "ProduceResults@neo4j", readParsed.QueryPlan.OperatorType)
-
-	var writeParsed queryResponse
-	require.NoError(t, json.Unmarshal(writeResp, &writeParsed))
-	require.NotNil(t, writeParsed.QueryPlan)
-	require.Len(t, writeParsed.QueryPlan.Children, 1)
-	require.Len(t, writeParsed.QueryPlan.Children[0].Children, 1)
-	assert.Equal(t, "Create@neo4j", writeParsed.QueryPlan.Children[0].Children[0].OperatorType)
 }
 
 func waitForHTTPReady(t *testing.T, httpPort int) {

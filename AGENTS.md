@@ -294,6 +294,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Two entry points wrap the seam: `runStatement` (defaults to ExecuteRead) and `runStatementWrite` (forces ExecuteWrite). EXPLAIN preflight calls `runStatementResponse(..., readOnly=true)` directly because EXPLAIN never mutates.
 - Inside the managed-transaction work callback the order is `tx.Run` → `result.Collect(ctx)` → `result.Consume(ctx)`. Wrap errors once at the outer ExecuteRead/ExecuteWrite return (not per step) so retry semantics get the raw error and user output keeps a single `query: ...` prefix.
 - `seamRouter.readOnlyCalls map[string]bool` lets `run_test.go` assert the routing by statement (e.g. `assert.True(t, r.readOnlyCalls["EXPLAIN ..."])`).
+- v6 driver deprecates `StatementType()` / `StatementType*` constants in favor of `QueryType()` / `QueryType*` — staticcheck (SA1019) flags any use. They share the same underlying int alias, so the rename is purely API hygiene; CLI code stores `resp.QueryType neo4j.QueryType` and compares against `neo4j.QueryTypeReadOnly` for the --rw classifier.
 
 ---
 

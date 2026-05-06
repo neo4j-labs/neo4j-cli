@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,19 +123,21 @@ func makeQueryResponse(fields []string, values [][]any) *queryResponse {
 	return resp
 }
 
-func makePlan(operatorType string, children ...queryPlan) *queryPlan {
-	out := &queryPlan{OperatorType: operatorType}
-	if len(children) > 0 {
-		out.Children = children
-	}
-	return out
+// makeExplainResponse builds the canned EXPLAIN preflight envelope a test
+// expects when the cypher should classify as the supplied QueryType.
+// makeQueryResponse is the run-time variant — preflight responses must carry
+// a QueryType for the classifier to inspect.
+func makeExplainResponse(qt neo4j.QueryType) *queryResponse {
+	resp := makeQueryResponse([]string{}, [][]any{})
+	resp.QueryType = qt
+	return resp
 }
 
 func TestRunQuery_HappyPath_TableOutput(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1 AS n"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n", "m"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1 AS n"] = makeQueryResponse(
@@ -162,7 +165,7 @@ func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 42 AS n"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 42 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(42)}})
@@ -204,11 +207,7 @@ func TestRunQuery_ServerErrorSurfacesError(t *testing.T) {
 
 func TestRunQuery_ReadOnlyCypherWithoutRwRunsExplainThenExecutes(t *testing.T) {
 	r := newSeamRouter()
-	r.resp["EXPLAIN MATCH (n) RETURN n"] = func() *queryResponse {
-		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j", queryPlan{OperatorType: "NodeByLabelScan@neo4j"})
-		return resp
-	}()
+	r.resp["EXPLAIN MATCH (n) RETURN n"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
 	r.resp["MATCH (n) RETURN n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
 	r.install(t)
 
@@ -228,12 +227,7 @@ func TestRunQuery_ReadOnlyCypherWithoutRwRunsExplainThenExecutes(t *testing.T) {
 
 func TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution(t *testing.T) {
 	r := newSeamRouter()
-	r.resp["EXPLAIN CREATE (n)"] = func() *queryResponse {
-		resp := makeQueryResponse([]string{}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j",
-			queryPlan{OperatorType: "EmptyResult@neo4j", Children: []queryPlan{{OperatorType: "Create@neo4j"}}})
-		return resp
-	}()
+	r.resp["EXPLAIN CREATE (n)"] = makeExplainResponse(neo4j.QueryTypeReadWrite)
 	r.install(t)
 
 	h := newRunHarness(t, "json")
@@ -282,51 +276,36 @@ func TestRunQuery_ExplainErrorSurfacesVerbatim(t *testing.T) {
 	assert.Contains(t, err.Error(), "Invalid input")
 }
 
-func TestQueryPlanAllowsWrite(t *testing.T) {
+// TestRejectWriteCypher_QueryTypeClassifier locks the contract that
+// rejectWriteCypher uses summary.QueryType() (forwarded via
+// queryResponse.QueryType) as the sole classifier — only QueryTypeReadOnly
+// passes through; everything else (including QueryTypeUnknown) demands --rw.
+func TestRejectWriteCypher_QueryTypeClassifier(t *testing.T) {
 	tests := []struct {
-		name string
-		plan *queryPlan
-		want bool
+		name    string
+		qt      neo4j.QueryType
+		wantErr bool
 	}{
-		{
-			name: "nil plan is read",
-			plan: nil,
-			want: false,
-		},
-		{
-			name: "read operators stay read",
-			plan: &queryPlan{OperatorType: "ProduceResults@neo4j", Children: []queryPlan{{OperatorType: "Filter@neo4j"}}},
-			want: false,
-		},
-		{
-			name: "write operator in child marks write",
-			plan: &queryPlan{OperatorType: "ProduceResults@neo4j", Children: []queryPlan{{OperatorType: "EmptyResult@neo4j", Children: []queryPlan{{OperatorType: "Create@neo4j"}}}}},
-			want: true,
-		},
+		{name: "read-only proceeds", qt: neo4j.QueryTypeReadOnly, wantErr: false},
+		{name: "read-write rejected", qt: neo4j.QueryTypeReadWrite, wantErr: true},
+		{name: "write-only rejected", qt: neo4j.QueryTypeWriteOnly, wantErr: true},
+		{name: "schema-write rejected", qt: neo4j.QueryTypeSchemaWrite, wantErr: true},
+		{name: "unknown rejected", qt: neo4j.QueryTypeUnknown, wantErr: true},
 	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, queryPlanAllowsWrite(tc.plan))
-		})
-	}
-}
-
-func TestOperatorLooksLikeWrite(t *testing.T) {
-	tests := []struct {
-		operator string
-		want     bool
-	}{
-		{operator: "ProduceResults@neo4j", want: false},
-		{operator: "Filter@neo4j", want: false},
-		{operator: "Create@neo4j", want: true},
-		{operator: "SetProperty@neo4j", want: true},
-		{operator: "", want: false},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.operator, func(t *testing.T) {
-			assert.Equal(t, tc.want, operatorLooksLikeWrite(tc.operator))
+			withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+				return makeExplainResponse(tc.qt), nil
+			})
+			cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.QueryScope))
+			cmd.SetContext(context.Background())
+			err := rejectWriteCypher(cmd, &conn{}, "MATCH (n) RETURN n", nil)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -339,7 +318,7 @@ func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
 	}
 	r.resp["EXPLAIN RETURN range(1,10)"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN range(1,10)"] = makeQueryResponse([]string{"n"}, rows)
@@ -368,7 +347,7 @@ func TestRunQuery_RowLimitTruncates_JSONSetsTruncatedTrueAndPrintsWarning(t *tes
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN range(1,3)"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN range(1,3)"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}, {int64(2)}, {int64(3)}})
@@ -395,7 +374,7 @@ func TestRunQuery_RowLimitZeroMeansUnlimited(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN x"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN x"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}, {int64(2)}, {int64(3)}})
@@ -421,7 +400,7 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{[]any{int64(1), int64(2), int64(3), int64(4), int64(5)}}})
@@ -452,7 +431,7 @@ func TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	bigArr := make([]any, 10)
@@ -485,7 +464,7 @@ func TestRunQuery_TruncateArrays_NestedArray_JSONOutputContainsEmptyArray(t *tes
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN obj"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"obj"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	bigArr := make([]any, 10)
@@ -518,7 +497,7 @@ func TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	bigArr := make([]any, 10)
@@ -548,7 +527,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1 AS n"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
@@ -593,7 +572,7 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
@@ -625,7 +604,7 @@ func TestRunQuery_PasswordPromptedOnTTY(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
@@ -680,7 +659,7 @@ func TestRunQuery_ParamsForwardedAsRequestBody(t *testing.T) {
 	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any, _ bool) (*queryResponse, error) {
 		if strings.HasPrefix(statement, "EXPLAIN ") {
 			resp := makeQueryResponse([]string{"n"}, [][]any{})
-			resp.QueryPlan = makePlan("ProduceResults@neo4j")
+			resp.QueryType = neo4j.QueryTypeReadOnly
 			return resp, nil
 		}
 		seenParams = params
@@ -749,7 +728,7 @@ func TestRunQuery_TruncateArrays_JSON_AggregateWarningAndField(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	bigArr := make([]any, 10)
@@ -786,7 +765,7 @@ func TestRunQuery_TruncateArrays_Table_AggregateWarning(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	bigArr := make([]any, 10)
@@ -819,7 +798,7 @@ func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"xs"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{[]any{int64(1), int64(2), int64(3)}}})
@@ -851,7 +830,7 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
@@ -880,7 +859,7 @@ func TestRunQuery_URIPassthroughEmitsNoNotice(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
 		resp := makeQueryResponse([]string{"n"}, [][]any{})
-		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		resp.QueryType = neo4j.QueryTypeReadOnly
 		return resp
 	}()
 	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
