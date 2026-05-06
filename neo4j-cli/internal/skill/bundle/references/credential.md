@@ -42,3 +42,26 @@ Sets the default credential to be used
 
 Usage: `neo4j-cli credential aura-client use`
 
+## neo4j-cli credential database
+
+Manage and view database credential values
+
+Usage: `neo4j-cli credential database`
+
+### neo4j-cli credential database add
+
+Adds a database credential
+
+Usage: `neo4j-cli credential database add [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--database-name` | string | neo4j | Database name |
+| `--insecure` | bool | false | Disable TLS verification |
+| `--name` | string | - | (required) Name |
+| `--password` | string | - | (required) Password |
+| `--uri` | string | - | (required) URI |
+| `--username` | string | - | (required) Username |
+
