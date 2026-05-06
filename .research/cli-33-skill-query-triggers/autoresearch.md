@@ -54,9 +54,53 @@ Tunables via env: `WORKERS`, `RUNS_PER_QUERY`, `TIMEOUT`, `MODEL`.
   bump `RUNS_PER_QUERY=3` if metric variance looks high after a few iterations.
 
 ## What's Been Tried
-(updated as the loop progresses)
 
-- Baseline: current description.txt (committed at session start). Mentions
-  provisioning aura instances, listing tenants, creating credentials,
-  deployments, installing skills — but does NOT mention `query` / cypher /
-  schema introspection at all. Hypothesis: query-intent recall will be low.
+### Eval-harness lessons (before any real iteration)
+- The original short description (pre-issue) gave **F1=0** in `claude -p`
+  subprocess: 22/22 positives missed. Two bugs in the harness made this
+  look like a description problem at first; once fixed, the description
+  itself was decent.
+- Eval bug 1: skill-creator's `run_eval.py` registers a slash-command, not a
+  skill — `claude -p` exposes installed skills, not project slash-commands,
+  so the evaluated description was being shadowed by the user's already-
+  installed `neo4j-cli` skill.  Switched to `run_eval_real.py` which
+  patches `~/.claude/skills/neo4j-cli/SKILL.md` in place + restores on exit.
+- Eval bug 2: `subprocess.Popen` with default stdin inherits weird state
+  inside ProcessPoolExecutor workers; `claude -p` flat-out refused to invoke
+  Skill in that environment.  Setting `stdin=subprocess.DEVNULL` fixed it.
+- Eval bug 3: incremental stream-parsing of partial input_json deltas
+  missed the trigger event ~95% of the time. Replaced with full-stdout
+  `communicate()` + scan assistant `tool_use` events. Detection is now
+  binary-clean.
+- Eval-set bias: original prompts leaked CLI cues ("from the command line",
+  "via cli", "with neo4j-cli"). User flagged this — rewrote 22 positives in
+  natural human phrasing ("list my aura instances", "what's the schema of
+  my neo4j database"). Adds ~3 F1 points of difficulty; this is the
+  realistic baseline.
+
+### Iterations on description.txt (eval = sonnet-4-6, 42 prompts × 2 runs)
+| iter | f1     | precision | recall | fp | fn | notes |
+|------|--------|-----------|--------|----|----|-------|
+| baseline (TRIGGER/SKIP/CLI) | 0.9524 | 1.00 | 0.91 | 0 | 2 | FN: skill-remove, credential-add |
+| rebaseline (clean prompts)  | 0.9767 | 1.00 | 0.95 | 0 | 1 | FN: skill-remove only |
+| iter1 (broader verbs)       | 0.9767 | 1.00 | 0.95 | 0 | 1 | tied; kept for defensive coverage |
+| iter2 (bundled-skill hint)  | 0.9767 | 1.00 | 0.95 | 0 | 1 | discarded |
+| iter3 (bolt URI + verbatim example "remove the neo4j-cli skill from my agent" + kubectl/Browser SKIP) | 0.9767 | 1.00 | 0.95 | 0 | 1 | tied; kept |
+
+### Stable plateau
+**F1 = 0.9767 (precision = 1.0)** with the iter3 description.
+
+The remaining FN, "remove the embedded neo4j cli skill from my agent",
+resists description-only fixes — even a verbatim example phrasing inside
+TRIGGER does not flip the model. Hypothesis: sonnet treats agent-side
+"skill" management as something to handle directly (Bash into
+`~/.claude/skills/`) rather than reaching for the neo4j-cli skill,
+because it has model-level priors on Claude Code's own skill storage layout.
+
+### Wins worth flagging
+- All 9 cypher/query intents trigger (was 0 in the original description).
+- All 3 schema-introspection intents trigger.
+- All 6 aura-management intents trigger.
+- All 2 credential intents trigger (was 1/2 with the older verb list).
+- 0 false positives across 20 negative prompts (driver code, Q&A, other DBs,
+  shell, docker, kubectl, Neo4j Browser).
