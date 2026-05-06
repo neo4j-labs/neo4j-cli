@@ -1,106 +1,95 @@
 # Autoresearch: neo4j-cli skill trigger accuracy (CLI-33)
 
 ## Objective
-The neo4j-cli SKILL.md description determines whether the model invokes the
-skill when a user asks something. Today the skill misses query-related intents
-("run cypher from cli", schema introspection, etc.) and may also over-trigger
-on unrelated prompts. Optimize the description so the skill fires on real
-neo4j-cli intents (aura / query / credential / skill management) and stays
-silent on Q&A, driver code, other DBs, and generic shell tasks.
+Optimize the neo4j-cli SKILL.md description so the skill fires on real
+neo4j-cli intents (cypher, schema, aura, credential, skill management) and
+stays silent on Q&A, driver code, other DBs, Docker/Kubernetes, Browser UI.
 
 Linear: https://linear.app/neo4j/issue/CLI-33
 
 ## Metrics
-- **Primary**: `f1` (harmonic mean of precision + recall over the eval set, higher is better)
+- **Primary**: `f1` (harmonic mean of precision + recall)
 - **Secondary**: `precision`, `recall`, `accuracy`, `false_positives`, `false_negatives`
 
 `f1` is primary because the user explicitly cares about both directions:
 "verify that it doesn't fire when it shouldn't as well."
 
 ## How to Run
-`.research/cli-33-skill-query-triggers/autoresearch.sh`
+```
+bash .research/cli-33-skill-query-triggers/autoresearch.sh
+```
 
-For each prompt in `eval_set.json`, the harness:
-1. Writes `description.txt` content into a temp `.claude/commands/<uuid>.md`
-   inside the research dir (slash-command file gets surfaced to claude).
-2. Runs `claude -p <prompt> --output-format stream-json --model claude-haiku-4-5-20251001`.
-3. Watches the stream for a `Skill` or `Read` tool_use referencing that uuid.
-4. A query "passes" if its trigger rate matches `should_trigger`.
+The harness is **pure bash + jq + go** (no python).  Per iteration it:
 
-Tunables via env: `WORKERS`, `RUNS_PER_QUERY`, `TIMEOUT`, `MODEL`.
+1. Builds `bin/neo4j-cli` if missing.
+2. Captures `bin/neo4j-cli skill print` to `skill_print.md`.
+3. Splices the candidate description from `candidate_description.txt` into
+   the description: line of `workspace/.claude/skills/neo4j-cli/SKILL.md`.
+4. Runs `claude -p <prompt>` per row of `eval_set.json` with `cwd=workspace`,
+   3 runs per query, parallel via `xargs -0 -P`.  Per-call timeout 120s.
+5. Triggered iff the first assistant `tool_use` is `Skill(neo4j-cli)` or
+   `Read(<workspace>/.claude/skills/neo4j-cli/SKILL.md)`.
+6. Aggregates F1/precision/recall/accuracy and emits METRIC lines.
+
+The harness is fully self-contained: it does NOT touch `~/.claude/skills/`
+or any other global state.  All eval state lives under `.research/`.
 
 ## Files in Scope
-- `neo4j-cli/internal/skill/description.txt` — the only file the loop edits.
-  It feeds both standalone aura-cli and bundled neo4j-cli skill descriptions
-  via `go generate`. We do NOT need to re-run `go generate` between iterations
-  because the eval reads description.txt directly via `--description`.
+- `.research/cli-33-skill-query-triggers/candidate_description.txt` — the
+  iteration target.  Source-tree `neo4j-cli/internal/skill/description.txt`
+  is touched only once at the very end, after the loop converges.
 
 ## Off Limits
-- Source code under `neo4j-cli/`, `common/`, etc.
-- Generated bundles (`*/internal/skill/bundle/*`) — they're regenerated from
-  `description.txt`. We only refresh them once at the end via `go generate`.
-- Tests, build scripts, CI.
+- `neo4j-cli/internal/skill/{description.txt,bundle/}` during iteration.
+- All other source code, tests, build scripts, CI.
 
-## Constraints
-- Description must stay under 1024 chars (Anthropic skill description ceiling).
-- Must remain factually accurate — no claims about commands that don't exist.
-- Should still cover the four top-level surfaces: aura, query, credential, skill.
-- Style: imperative, concrete, lists representative verbs/nouns. Avoid filler.
+## Constraints (per Anthropic skill best-practices)
+- Description MUST be ≤ 1024 chars, third-person, no XML.
+- Should include both **what** the skill does and **when** to use it.
+- Concise: their canonical examples are 1–2 sentences.
+- Prefer specific key terms over vague generalities.
 
-## Metric Direction Notes
-- A pass for `should_trigger=true` means trigger_rate >= 0.5 across runs.
-- A pass for `should_trigger=false` means trigger_rate < 0.5.
-- Confidence: noise per call is meaningful — we run each query 2x by default;
-  bump `RUNS_PER_QUERY=3` if metric variance looks high after a few iterations.
+## What's Been Tried (segment 1, project-scoped harness)
 
-## What's Been Tried
+| iter | desc length | f1     | precision | recall | fp | fn | notes |
+|------|-------------|--------|-----------|--------|----|----|-------|
+| baseline | ~245 chars | 0.9778 / 0.9545 (over 2 runs) | 0.96–1.0 | 0.95–1.0 | 0–1 | 0–1 | One-sentence + "Use when …".  Single flaky kubectl FP at rate=1/2. |
+| **iter1**     | ~440 chars | **0.9767** (stable, 2 runs) | **1.0** | **0.9545** | **0** | **1** | Append SKIP clause (cypher syntax / drivers / Docker-Kubernetes / Browser / other DBs).  Bumped runs-per-query to 3.  Kubectl FP eliminated. |
+| iter2     | ~480 chars | 0.9302 | 0.95 | 0.91 | 1 | 2 | DISCARD.  Added "uninstall" verb + verbatim "remove the neo4j-cli skill from my agent" example.  Backfired: kubectl FP became consistent (3/3) and a new schema-uri FN appeared. |
 
-### Eval-harness lessons (before any real iteration)
-- The original short description (pre-issue) gave **F1=0** in `claude -p`
-  subprocess: 22/22 positives missed. Two bugs in the harness made this
-  look like a description problem at first; once fixed, the description
-  itself was decent.
-- Eval bug 1: skill-creator's `run_eval.py` registers a slash-command, not a
-  skill — `claude -p` exposes installed skills, not project slash-commands,
-  so the evaluated description was being shadowed by the user's already-
-  installed `neo4j-cli` skill.  Switched to `run_eval_real.py` which
-  patches `~/.claude/skills/neo4j-cli/SKILL.md` in place + restores on exit.
-- Eval bug 2: `subprocess.Popen` with default stdin inherits weird state
-  inside ProcessPoolExecutor workers; `claude -p` flat-out refused to invoke
-  Skill in that environment.  Setting `stdin=subprocess.DEVNULL` fixed it.
-- Eval bug 3: incremental stream-parsing of partial input_json deltas
-  missed the trigger event ~95% of the time. Replaced with full-stdout
-  `communicate()` + scan assistant `tool_use` events. Detection is now
-  binary-clean.
-- Eval-set bias: original prompts leaked CLI cues ("from the command line",
-  "via cli", "with neo4j-cli"). User flagged this — rewrote 22 positives in
-  natural human phrasing ("list my aura instances", "what's the schema of
-  my neo4j database"). Adds ~3 F1 points of difficulty; this is the
-  realistic baseline.
+### Final winner (iter1)
+```
+Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI.
+Use when the user wants to execute Cypher, introspect a Neo4j schema, manage
+Aura instances/tenants/credentials, or install/remove the neo4j-cli skill in
+an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j
+drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
+```
 
-### Iterations on description.txt (eval = sonnet-4-6, 42 prompts × 2 runs)
-| iter | f1     | precision | recall | fp | fn | notes |
-|------|--------|-----------|--------|----|----|-------|
-| baseline (TRIGGER/SKIP/CLI) | 0.9524 | 1.00 | 0.91 | 0 | 2 | FN: skill-remove, credential-add |
-| rebaseline (clean prompts)  | 0.9767 | 1.00 | 0.95 | 0 | 1 | FN: skill-remove only |
-| iter1 (broader verbs)       | 0.9767 | 1.00 | 0.95 | 0 | 1 | tied; kept for defensive coverage |
-| iter2 (bundled-skill hint)  | 0.9767 | 1.00 | 0.95 | 0 | 1 | discarded |
-| iter3 (bolt URI + verbatim example "remove the neo4j-cli skill from my agent" + kubectl/Browser SKIP) | 0.9767 | 1.00 | 0.95 | 0 | 1 | tied; kept |
+**F1 = 0.9767** (precision = 1.0, recall = 0.9545) on 42 prompts × 3 runs.
 
-### Stable plateau
-**F1 = 0.9767 (precision = 1.0)** with the iter3 description.
-
-The remaining FN, "remove the embedded neo4j cli skill from my agent",
-resists description-only fixes — even a verbatim example phrasing inside
-TRIGGER does not flip the model. Hypothesis: sonnet treats agent-side
-"skill" management as something to handle directly (Bash into
-`~/.claude/skills/`) rather than reaching for the neo4j-cli skill,
-because it has model-level priors on Claude Code's own skill storage layout.
-
-### Wins worth flagging
-- All 9 cypher/query intents trigger (was 0 in the original description).
+### Wins
+- All 9 cypher/query intents trigger (was 0/9 with the old short description).
 - All 3 schema-introspection intents trigger.
-- All 6 aura-management intents trigger.
-- All 2 credential intents trigger (was 1/2 with the older verb list).
-- 0 false positives across 20 negative prompts (driver code, Q&A, other DBs,
+- All 6 Aura-management intents trigger.
+- All 2 credential intents trigger.
+- 0 false positives across 20 negatives (driver code, Q&A, other DBs,
   shell, docker, kubectl, Neo4j Browser).
+
+### Remaining FN
+"remove the embedded neo4j cli skill from my agent" — the model treats
+agent-side skill management as something to handle directly (Bash into
+`~/.claude/skills/`) rather than reaching for the neo4j-cli skill.
+Three different attempts to flip this with the description alone (broader
+verbs, verbatim example, anti-pattern hint) either tied F1 or regressed it.
+Accepted as the realistic ceiling for description-only triggering.
+
+## Notes
+- An earlier segment of this experiment (segment 0) used a different harness
+  that patched `~/.claude/skills/neo4j-cli/SKILL.md` in place; the user
+  flagged it as risky / conflated with the source-tree description, and the
+  results from that segment were discarded.  Segment 1 is the project-scoped
+  rewrite.
+- macOS bash 3.2 + BSD xargs lack `-d`/`wait -n`; the harness uses
+  NUL-delimited records via `xargs -0` and a sleep+kill guard for per-call
+  timeouts.

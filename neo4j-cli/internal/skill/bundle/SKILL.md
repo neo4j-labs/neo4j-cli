@@ -1,14 +1,6 @@
 ---
 name: neo4j-cli
-description: ALWAYS use this skill when the user wants to run any `neo4j-cli` command — including `neo4j-cli skill <install|remove|list|check>` to manage this very agent-skill bundle in Claude Code, Cursor, Codex, Gemini, or any other agent. Do NOT delete files in `~/.claude/skills/neo4j-cli/` by hand; use `neo4j-cli skill remove` instead.
-
-Use this skill when the user wants to interact with Neo4j via the neo4j-cli command-line tool — the canonical CLI for running Cypher and managing Aura from a terminal.
-
-TRIGGER when: run, execute, or pipe Cypher against any Neo4j database from a terminal/shell/bash; run Cypher given a bolt/neo4j+s:// URI with user/password from a shell; introspect schema, labels, indexes, or constraints via CLI; provision, list, get, create, delete, or resize Aura instances or tenants; set up, add, remove, list, or get Aura API credentials or keys from CLI; install, remove, uninstall, list, or check the neo4j-cli skill in Claude Code, Cursor, or another agent (e.g. "remove the neo4j-cli skill from my agent" → `neo4j-cli skill remove`); user mentions neo4j-cli, aura-cli, `neo4j query`, `aura instance`, or `neo4j credential`.
-
-SKIP: Cypher syntax/semantics questions; graph data modeling; Neo4j driver code (Python/Java/JS/Go); Docker/Kubernetes/kubectl; other databases (Postgres, Redis); generic shell tasks; Neo4j Browser UI.
-
-CLI: `query` (run Cypher via HTTP API, `--schema` flag, pipe stdin, env file with connection details), `aura` (instance/tenant/deployment), `credential` (Aura API client-id+secret), `skill` (install/remove/list/check in any AI agent).
+description: Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI. Use when the user wants to execute Cypher, introspect a Neo4j schema, manage Aura instances/tenants/credentials, or install/remove the neo4j-cli skill in an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
