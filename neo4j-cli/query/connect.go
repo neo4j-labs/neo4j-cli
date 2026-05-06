@@ -79,9 +79,12 @@ type queryError struct {
 }
 
 // resolveConn merges connection settings from .env, OS environment, and
-// command-line flags (lowest → highest precedence). Defaults are applied last
-// for any value still empty after the merge. The returned conn carries an
-// *http.Client honouring --insecure.
+// command-line flags (lowest → highest precedence). When none of the four
+// connection params (uri, username, password, database) are explicitly
+// provided, the stored default database credential (if any) is used instead.
+// Partial explicit overrides (some but not all of the four params) are
+// rejected with a descriptive error. The returned conn carries an *http.Client
+// honouring --insecure or the insecure flag stored in the credential.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	envFlag := flagString(cmd, "env")
 	cwd, err := os.Getwd()
@@ -94,23 +97,25 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		return nil, err
 	}
 
+	// Collect values from dotenv + OS environment (before flags).
 	uri := overlay(dotenv[envURI], os.Getenv(envURI))
 	username := overlay(dotenv[envUsername], os.Getenv(envUsername))
 	password := overlay(dotenv[envPassword], os.Getenv(envPassword))
 	database := overlay(dotenv[envDatabase], os.Getenv(envDatabase))
 	insecureStr := overlay(dotenv[envInsecure], os.Getenv(envInsecure))
 
-	if v := flagString(cmd, "uri"); v != "" {
-		uri = v
+	// Apply flags (highest precedence — only when the flag was explicitly set).
+	if f := cmd.Flag("uri"); f != nil && f.Changed {
+		uri = f.Value.String()
 	}
-	if v := flagString(cmd, "username"); v != "" {
-		username = v
+	if f := cmd.Flag("username"); f != nil && f.Changed {
+		username = f.Value.String()
 	}
-	if v := flagString(cmd, "password"); v != "" {
-		password = v
+	if f := cmd.Flag("password"); f != nil && f.Changed {
+		password = f.Value.String()
 	}
-	if v := flagString(cmd, "database"); v != "" {
-		database = v
+	if f := cmd.Flag("database"); f != nil && f.Changed {
+		database = f.Value.String()
 	}
 
 	insecure, _ := parseBool(insecureStr)
@@ -119,7 +124,57 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			insecure = b
 		}
 	}
+	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
 
+	// Determine how many of the four connection params were explicitly provided
+	// (non-empty after merging dotenv + OS env + flags).
+	explicitCount := 0
+	if uri != "" {
+		explicitCount++
+	}
+	if username != "" {
+		explicitCount++
+	}
+	if password != "" {
+		explicitCount++
+	}
+	if database != "" {
+		explicitCount++
+	}
+
+	// Try to load the stored default database credential.
+	storedCred, _ := cfg.Credentials.Database.GetDefault()
+	hasStoredCred := storedCred != nil
+
+	switch {
+	case !hasStoredCred:
+		// No stored credential — existing behaviour: apply what was given and
+		// let built-in defaults fill in the blanks below.
+
+	case explicitCount == 0:
+		// Stored credential available and no explicit params — use the credential.
+		uri = storedCred.URI
+		username = storedCred.Username
+		password = storedCred.Password
+		database = storedCred.DatabaseName
+		// Only override insecure from the credential when the flag was not
+		// explicitly set by the caller.
+		if !insecureExplicit && storedCred.Insecure {
+			insecure = true
+		}
+
+	case explicitCount == 4:
+		// All four explicitly provided — bypass stored credential entirely.
+
+	default:
+		// Stored credential exists but only some params were provided — reject
+		// the ambiguous partial override.
+		return nil, fmt.Errorf(
+			"query: partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
+				"--password/NEO4J_PASSWORD, or --database/NEO4J_DATABASE is provided, all four are required")
+	}
+
+	// Apply built-in defaults for any param still empty after all sources.
 	if uri == "" {
 		uri = defaultURI
 	}

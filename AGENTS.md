@@ -274,6 +274,12 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - To assert toon encoding: check that `json.Unmarshal([]byte(out), &v)` returns an error — toon uses `key: value` syntax, not JSON, so valid toon is invalid JSON.
 - The json→any→toon round-trip in `printToon` honours custom `MarshalJSON` on the concrete `ResponseData` type. Test helpers that implement `MarshalJSON` (e.g. wrapping rows in `{"data": ...}`) let you verify the top-level envelope key appears in both toon and json output.
 
+## query/connect.go Credential Integration Notes
+
+- `resolveConn` integrates stored database credentials: when no params are set via flags/env/dotenv, the stored default credential is used; when a stored credential exists and only 1–3 of the 4 params are explicitly set, an all-or-nothing error is returned; when all 4 are set explicitly, the stored credential is bypassed entirely. When no stored credential exists, the original behavior (partial params + built-in defaults) applies unchanged.
+- Use `cmd.Flag("name").Changed` (not `flagString(cmd, "name") != ""`) to detect explicit flag-setting — `Changed` is the only reliable indicator that the user set the flag, versus just reading the default value.
+- `insecureExplicit` pattern: read `cmd.Flag("insecure").Changed` AFTER applying the insecure value, then gate credential's insecure on `!insecureExplicit` — ensures the explicit `--insecure=false` overrides the stored credential's `insecure:true`.
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._

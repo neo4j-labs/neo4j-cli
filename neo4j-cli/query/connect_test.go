@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/test/utils/testfs"
 )
 
 // newTestCmd returns a fresh query parent command + a memfs config wired in,
@@ -382,4 +383,153 @@ func TestParseBool(t *testing.T) {
 			assert.Equal(t, tc.recognised, ok)
 		})
 	}
+}
+
+// newTestCmdWithCreds returns a query command and config backed by an in-memory
+// filesystem that already has credentials.json populated with the supplied JSON.
+func newTestCmdWithCreds(t *testing.T, credsJSON string) (*cobra.Command, *clicfg.Config) {
+	t.Helper()
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, credsJSON)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
+	cmd := NewCmd(cfg)
+	return cmd, cfg
+}
+
+// storedCredJSON returns a credentials.json body with one database credential
+// set as the default.
+func storedCredJSON(uri, username, password, dbName string, insecure bool) string {
+	insecureStr := "false"
+	if insecure {
+		insecureStr = "true"
+	}
+	return `{"database":{"default-credential":"mydb","credentials":[{"name":"mydb","username":"` +
+		username + `","password":"` + password + `","database-name":"` + dbName +
+		`","uri":"` + uri + `","insecure":` + insecureStr + `}]}}`
+}
+
+func TestResolveConn_StoredCredential_UsedWhenNoFlagsOrEnv(t *testing.T) {
+	// Clear all env vars so the stored credential is the only source.
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "http://stored:7474", c.uri)
+	assert.Equal(t, "storedUser", c.username)
+	assert.Equal(t, "storedPass", c.password)
+	assert.Equal(t, "storedDB", c.database)
+	assert.False(t, c.insecure)
+}
+
+func TestResolveConn_StoredCredential_Insecure_AppliedWithoutFlag(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedCredJSON("http://stored:7474", "u", "p", "neo4j", true)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.True(t, c.insecure, "stored credential's insecure:true must be applied when --insecure flag is not set")
+}
+
+func TestResolveConn_StoredCredential_InsecureFlagOverridesCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Stored credential has insecure=true, but --insecure=false is passed explicitly.
+	credsJSON := storedCredJSON("http://stored:7474", "u", "p", "neo4j", true)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--insecure=false"}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.False(t, c.insecure, "--insecure=false flag must override stored credential's insecure:true")
+}
+
+func TestResolveConn_StoredCredential_AllFourFlagsBypassCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--uri=http://flag:7474",
+		"--username=flagUser",
+		"--password=flagPass",
+		"--database=flagDB",
+	}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "http://flag:7474", c.uri)
+	assert.Equal(t, "flagUser", c.username)
+	assert.Equal(t, "flagPass", c.password)
+	assert.Equal(t, "flagDB", c.database)
+}
+
+func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	// Only one of the four params provided — ambiguous partial override.
+	require.NoError(t, cmd.ParseFlags([]string{"--uri=http://override:7474"}))
+
+	_, err := resolveConn(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--uri/NEO4J_URI")
+	assert.Contains(t, err.Error(), "--username/NEO4J_USERNAME")
+	assert.Contains(t, err.Error(), "--password/NEO4J_PASSWORD")
+	assert.Contains(t, err.Error(), "--database/NEO4J_DATABASE")
+}
+
+func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Empty credentials — no stored credential.
+	cmd, cfg := newTestCmdWithCreds(t, "{}")
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, defaultURI, c.uri)
+	assert.Equal(t, defaultUsername, c.username)
+	assert.Equal(t, "", c.password)
+	assert.Equal(t, defaultDatabase, c.database)
+	assert.False(t, c.insecure)
 }
