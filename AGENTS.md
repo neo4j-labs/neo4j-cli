@@ -12,7 +12,7 @@ LINT COMMANDS: [`make lint`]
 FORMAT COMMANDS: [`make fmt-check`] — runs `gofmt -l .` and fails on any output. `make fmt` rewrites silently and is NOT a gate; use `make fmt-check` to verify. CI's golangci-lint v2 includes `gofmt` as a formatter and will fail the build on unformatted code.
 LICENSE CHECK: [`make license-check`]
 
-**Always run `make test` AND `make fmt-check` as final gates before marking any task or plan complete.** All tests must pass and no file may need gofmt — a build that compiles but has failing tests or unformatted code is not done. `make fmt-check` is the local equivalent of CI's gofmt linter, so drift fails before the push instead of after.
+**Always run `make test`, `make fmt-check`, AND `make lint` as final gates before marking any task or plan complete.** All tests must pass, no file may need gofmt, and lint must be clean — a build that compiles but has failing tests, unformatted code, or lint errors is not done. `make fmt-check` is the local equivalent of CI's gofmt linter, so drift fails before the push instead of after.
 
 ## Cobra Command Layout
 
