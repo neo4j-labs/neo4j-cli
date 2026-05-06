@@ -243,3 +243,24 @@ Key Decisions:
 - Placed the guidance next to the one-file-per-leaf cobra layout rules so new command authors see it at authoring time.
 
 Next Task: task-012
+
+================================================================================
+TASK-012: Minimal per-resource gating tests
+Date: 2026-05-06T15:05:58Z
+================================================================================
+
+Summary:
+Added lightweight gating tripwire tests across representative write resources so future regressions surface quickly if the root --rw gate stops applying. Covered Aura instance creation and skill install with explicit without/with --rw assertions, and reused the existing config set coverage as the third major resource category.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/create_test.go (modified: adds missing --rw gating tripwire for instance create)
+- common/skill/gating_test.go (created: adds without/with --rw tripwires for skill install)
+- common/skill/cmd_helpers_test.go (modified: adds root-mounted skill fixture so tripwire tests exercise the real root gate)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Reused the existing config set tests from task-006 as the config-category tripwire instead of duplicating nearly identical assertions.
+- Mounted `skill` under a minimal root fixture with traverse-run hooks enabled so the tests cover the real inherited --rw gate rather than a standalone leaf.
+
+Next Task: task-013

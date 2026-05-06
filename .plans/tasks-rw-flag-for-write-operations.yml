@@ -153,7 +153,7 @@ tasks:
     title: "Minimal per-resource gating tests"
     description: |
       Add one negative and one positive test per major resource category to act as tripwires (e.g., instance create, skill install, config set). Keep these light and avoid real HTTP by using fakes or command-layer tests.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -161,7 +161,7 @@ tasks:
       - "At least three representative resources covered"
       - "Without --rw they error; with --rw they proceed"
       - "Tests pass on all CI OS targets"
-    completed_at: null
+    completed_at: 2026-05-06T15:05:58Z
 
   - id: task-013
     title: "Create dual-project changie entries (Minor)"

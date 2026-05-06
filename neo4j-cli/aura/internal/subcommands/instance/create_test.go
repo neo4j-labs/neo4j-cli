@@ -11,6 +11,30 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
+func TestCreateFreeInstanceRequiresRw(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+			"data": {
+				"id": "db1d1234",
+				"connection_url": "YOUR_CONNECTION_URL",
+				"username": "neo4j",
+				"password": "letMeIn123!",
+				"tenant_id": "YOUR_TENANT_ID",
+				"cloud_provider": "gcp",
+				"region": "europe-west1",
+				"type": "free-db",
+				"name": "Instance01"
+			}
+		}`)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID")
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: this command writes; pass --rw to allow it")
+}
+
 func TestCreateFreeInstance(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
