@@ -85,7 +85,7 @@ tasks:
       `make fmt-check` must report no files needing gofmt, and `make lint` must be
       clean. Also confirm `git diff --stat` is bounded to the expected set of files
       from the PRD acceptance criteria (no stray edits).
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -94,4 +94,4 @@ tasks:
       - "`make fmt-check` exits 0"
       - "`make lint` exits 0"
       - "`git diff --stat` lists only: common/flags/flags.go, both additions.md files, regenerated bundle/SKILL.md and references/*.md under both skill trees, and one new .changes/unreleased/*.yaml"
-    completed_at: null
+    completed_at: 2026-05-06T20:15:00Z
