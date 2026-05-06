@@ -583,7 +583,6 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	t.Setenv(envURI, "")
 	t.Setenv(envUsername, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 
 	// Set passwordReader so a buggy fallthrough would surface as a test
 	// failure (returning a sentinel that wouldn't match).

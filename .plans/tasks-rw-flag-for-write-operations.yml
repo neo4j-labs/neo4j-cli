@@ -257,13 +257,14 @@ tasks:
     title: "Drop --insecure flag and DbmsCredentials.Insecure field"
     description: |
       Remove the --insecure flag registration in neo4j-cli/query/query.go, every reference in connect.go, the NEO4J_INSECURE env-var lookup, the Insecure bool field on DbmsCredentials, its inclusion in PrintableDbmsCredentials.AsArray() and MarshalJSON(), and any flag on the credential add/use commands that sets it. Update or remove tests that exercised --insecure / NEO4J_INSECURE. TLS is selected exclusively by URI scheme.
-    status: pending
+    status: completed
     dependencies:
       - task-016
     acceptance_criteria:
       - "grep -RIn -e insecure -e NEO4J_INSECURE returns only release-notes / archived plan hits"
       - "DbmsCredentials JSON output no longer contains the insecure field"
       - "Credential add/use no longer accept --insecure"
+    completed_at: 2026-05-06T20:00:00Z
 
   - id: task-020
     title: "URI rewrite — http→neo4j, https→neo4j+s, port forced to 7687"

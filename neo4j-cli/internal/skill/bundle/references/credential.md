@@ -59,7 +59,6 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--database-name` | string | neo4j | Database name |
-| `--insecure` | bool | false | Disable TLS verification |
 | `--name` | string | - | (required) Name |
 | `--password` | string | - | (required) Password |
 | `--uri` | string | - | (required) URI |

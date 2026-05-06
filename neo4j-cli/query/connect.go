@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
@@ -30,19 +29,18 @@ const (
 	envUsername = "NEO4J_USERNAME"
 	envPassword = "NEO4J_PASSWORD"
 	envDatabase = "NEO4J_DATABASE"
-	envInsecure = "NEO4J_INSECURE"
 )
 
 // conn holds the resolved Neo4j connection details. The opened Bolt driver
 // is attached lazily via openDriver after the password (if any) has been
 // resolved or prompted. Callers MUST close the driver via defer once they are
-// done using the connection.
+// done using the connection. TLS is selected exclusively by the URI scheme
+// (e.g. neo4j+s:// for verified TLS, neo4j+ssc:// for self-signed certs).
 type conn struct {
 	uri       string
 	username  string
 	password  string
 	database  string
-	insecure  bool
 	userAgent string
 	driver    neo4j.Driver
 }
@@ -72,15 +70,14 @@ type queryResponse struct {
 }
 
 // driverOpener is the test seam used to construct the Bolt driver. Production
-// calls neo4j.NewDriverWithContext; tests can swap in a fake to bypass the
-// real bolt:// connection.
-var driverOpener = func(target string, username, password, userAgent string, insecure bool) (neo4j.Driver, error) {
+// calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
+// connection.
+var driverOpener = func(target string, username, password, userAgent string) (neo4j.Driver, error) {
 	configurer := func(c *config.Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
 		}
 	}
-	_ = insecure // insecure handling is selected by URI scheme (e.g. neo4j+ssc://) post-Bolt; kept on conn for compatibility.
 	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), configurer)
 }
 
@@ -103,11 +100,9 @@ var runStatementResponseFn = runStatementResponseImpl
 // call c.openDriver(ctx) before issuing queries, and defer c.driver.Close(ctx)
 // for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
-	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
-
 	// --credential: when set, look up the named credential and use it directly.
-	// Dotenv / env vars are skipped entirely; only --insecure may be combined.
-	// None of --uri/--username/--password/--database may be set alongside it.
+	// Dotenv / env vars are skipped entirely. None of --uri/--username/
+	// --password/--database may be set alongside it.
 	if f := cmd.Flag("credential"); f != nil && f.Changed {
 		credName := f.Value.String()
 
@@ -132,13 +127,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 				credName)
 		}
 
-		insecure := cred.Insecure
-		if insecureExplicit {
-			if b, perr := strconv.ParseBool(cmd.Flag("insecure").Value.String()); perr == nil {
-				insecure = b
-			}
-		}
-
 		uri := cred.URI
 		if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
@@ -156,7 +144,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			username:  cred.Username,
 			password:  cred.Password,
 			database:  cred.DatabaseName,
-			insecure:  insecure,
 			userAgent: "neo4j-cli/v" + version,
 		}, nil
 	}
@@ -177,7 +164,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	username := overlay(dotenv[envUsername], os.Getenv(envUsername))
 	password := overlay(dotenv[envPassword], os.Getenv(envPassword))
 	database := overlay(dotenv[envDatabase], os.Getenv(envDatabase))
-	insecureStr := overlay(dotenv[envInsecure], os.Getenv(envInsecure))
 
 	// Apply flags (highest precedence — only when the flag was explicitly set).
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -191,13 +177,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	}
 	if f := cmd.Flag("database"); f != nil && f.Changed {
 		database = f.Value.String()
-	}
-
-	insecure, _ := parseBool(insecureStr)
-	if f := cmd.Flag("insecure"); f != nil && f.Changed {
-		if b, perr := strconv.ParseBool(f.Value.String()); perr == nil {
-			insecure = b
-		}
 	}
 
 	// Determine how many of the four connection params were explicitly provided
@@ -231,11 +210,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		username = storedCred.Username
 		password = storedCred.Password
 		database = storedCred.DatabaseName
-		// Only override insecure from the credential when the flag was not
-		// explicitly set by the caller.
-		if !insecureExplicit && storedCred.Insecure {
-			insecure = true
-		}
 
 	case explicitCount == 4:
 		// All four explicitly provided — bypass stored credential entirely.
@@ -277,7 +251,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		username:  username,
 		password:  password,
 		database:  database,
-		insecure:  insecure,
 		userAgent: userAgent,
 	}, nil
 }
@@ -293,7 +266,7 @@ func (c *conn) openDriver() error {
 	if c.driver != nil {
 		return nil
 	}
-	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent, c.insecure)
+	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent)
 	if err != nil {
 		return fmt.Errorf("query: open driver: %w", err)
 	}
@@ -367,26 +340,6 @@ func flagString(cmd *cobra.Command, name string) string {
 		return f.Value.String()
 	}
 	return ""
-}
-
-// parseBool parses a NEO4J_INSECURE-style value tolerantly: "1", "true", "yes",
-// "on" (case-insensitive) → true; everything else → false. Returns whether the
-// input was a recognised truthy form so callers can distinguish "explicitly
-// false" from "unset".
-func parseBool(s string) (bool, bool) {
-	if s == "" {
-		return false, false
-	}
-	if b, err := strconv.ParseBool(s); err == nil {
-		return b, true
-	}
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "yes", "on":
-		return true, true
-	case "no", "off":
-		return false, true
-	}
-	return false, false
 }
 
 // runStatementResponse executes a Cypher statement against the Bolt driver

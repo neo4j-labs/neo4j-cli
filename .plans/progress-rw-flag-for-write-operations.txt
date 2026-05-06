@@ -396,3 +396,38 @@ Key Decisions:
 - Did not touch resolveConn / openDriver / driverOpener / runStatementWrite paths — the classifier swap only needed the response shape change and the rejectWriteCypher predicate.
 
 Next Task: task-019
+
+================================================================================
+TASK-019: Drop --insecure flag and DbmsCredentials.Insecure field
+Date: 2026-05-06T20:00:00Z
+================================================================================
+
+Summary:
+Removed the --insecure CLI flag, the NEO4J_INSECURE env var lookup, and the Insecure bool field from DbmsCredentials. Trimmed the conn struct, driverOpener seam (now takes 4 args, not 5), parseBool helper, and strconv import in connect.go. Credential add no longer accepts --insecure; list dropped the insecure column. Regenerated skill bundles to drop the --insecure rows from query.md/credential.md reference tables. TLS is now selected exclusively by URI scheme (neo4j+s://, neo4j+ssc://). The HTTPS smoke test (slated for task-021 deletion) was patched to compile by removing its --insecure arg and dropping its TLS-flag assertion; logging-only until removal.
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: dropped envInsecure, conn.insecure, parseBool, strconv; driverOpener signature trimmed)
+- neo4j-cli/query/query.go (modified: removed --insecure persistent flag)
+- neo4j-cli/query/connect_test.go (rewrote: dropped all insecure test cases and helper insecure params)
+- neo4j-cli/query/run_test.go (modified: dropped t.Setenv(envInsecure, ""))
+- neo4j-cli/query/query_https_smoke_test.go (modified: dropped --insecure arg in subtest body; smoke is removed in task-021)
+- common/clicfg/credentials/dbms.go (modified: removed Insecure field from DbmsCredential, AsArray, Add signature)
+- common/clicfg/credentials/dbms_test.go (rewrote: dropped Insecure from Add tests and AsArray/MarshalJSON assertions; added negative assertions for the new shape)
+- neo4j-cli/internal/subcommands/credential/dbms/add.go (modified: dropped --insecure flag and Add call arg)
+- neo4j-cli/internal/subcommands/credential/dbms/add_test.go (modified: dropped --insecure cases, removed insecure from initialCreds and wantCredentials)
+- neo4j-cli/internal/subcommands/credential/dbms/list.go (modified: dropped insecure column from dbmsCredentialFields)
+- neo4j-cli/internal/subcommands/credential/dbms/list_test.go (modified: dropped insecure from initialCreds and INSECURE column assertion; added NotContains insecure assertions)
+- neo4j-cli/internal/subcommands/credential/dbms/remove_test.go (modified: dropped insecure from fixtures)
+- neo4j-cli/internal/subcommands/credential/dbms/use_test.go (modified: dropped insecure from fixtures)
+- neo4j-cli/internal/skill/bundle/references/credential.md (regenerated: --insecure flag row gone)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated: --insecure flag row gone)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-019 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept the smoke test compiling rather than deleting it now — task-021 owns the full removal, this task only needed to drop --insecure references.
+- Replaced the insecureExplicit override pattern in resolveConn with no override at all; with --insecure removed there is no flag-vs-credential precedence to manage. TLS comes from URI scheme.
+- Dropped parseBool entirely (only insecure used it) instead of keeping it as a generic helper — easier to delete than to justify keeping.
+- AGENTS.md notes referencing --insecure (Cobra Flag Access example, query/connect.go credential integration insecureExplicit pattern, Local Verification Scripts TestHTTPS_Smoke entry) are stale but task-021/024 will sweep them — left alone here to keep this task minimal.
+
+Next Task: task-020

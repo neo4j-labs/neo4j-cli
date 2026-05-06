@@ -22,7 +22,7 @@ func (c *DbmsCredentials) Printable() PrintableDbmsCredentials {
 	}
 }
 
-func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string, insecure bool) error {
+func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string) error {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)
@@ -35,7 +35,6 @@ func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string
 		Password:     password,
 		DatabaseName: databaseName,
 		URI:          uri,
-		Insecure:     insecure,
 	})
 	if len(c.Credentials) == 1 {
 		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
@@ -124,7 +123,6 @@ func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 			"username":      cred.Username,
 			"database-name": cred.DatabaseName,
 			"uri":           cred.URI,
-			"insecure":      cred.Insecure,
 			"default":       cred.Name == d.defaultCredential,
 		}
 	}
@@ -143,5 +141,4 @@ type DbmsCredential struct {
 	Password     string `json:"password"`
 	DatabaseName string `json:"database-name"`
 	URI          string `json:"uri"`
-	Insecure     bool   `json:"insecure"`
 }

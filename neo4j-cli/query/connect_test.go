@@ -75,7 +75,6 @@ func TestResolveConn_Defaults(t *testing.T) {
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 	t.Chdir(t.TempDir())
 
 	cmd, cfg := newTestCmd(t)
@@ -86,7 +85,6 @@ func TestResolveConn_Defaults(t *testing.T) {
 	assert.Equal(t, defaultUsername, c.username)
 	assert.Equal(t, "", c.password)
 	assert.Equal(t, defaultDatabase, c.database)
-	assert.False(t, c.insecure)
 	// resolveConn does not eagerly open the driver — that happens via
 	// c.openDriver() once the password has been prompted (when needed).
 	assert.Nil(t, c.driver)
@@ -100,7 +98,6 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	t.Setenv(envUsername, "fromenv")
 	t.Setenv(envPassword, "envpw")
 	t.Setenv(envDatabase, "envdb")
-	t.Setenv(envInsecure, "")
 
 	// Use a mem FS so the test is hermetic regardless of real credentials or
 	// dotenv files on the machine. Write the dotenv at the temp cwd path so
@@ -140,7 +137,6 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 
 	// Use a mem FS so the test is hermetic regardless of real credentials on the
 	// machine. Write the dotenv at the temp cwd path so the walk-up logic finds
@@ -158,28 +154,6 @@ func TestResolveConn_DotenvWinsWhenNoEnvOrFlag(t *testing.T) {
 	assert.Equal(t, "onlydotenvpw", c.password)
 }
 
-func TestResolveConn_InsecureFromEnv(t *testing.T) {
-	t.Chdir(t.TempDir())
-	t.Setenv(envInsecure, "true")
-
-	cmd, cfg := newTestCmd(t)
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-	assert.True(t, c.insecure)
-}
-
-func TestResolveConn_InsecureFlagOverridesEnv(t *testing.T) {
-	t.Chdir(t.TempDir())
-	t.Setenv(envInsecure, "true")
-
-	cmd, cfg := newTestCmd(t)
-	require.NoError(t, cmd.ParseFlags([]string{"--insecure=false"}))
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-	assert.False(t, c.insecure)
-}
-
 // withRunStatementSeam swaps the package-level runStatementResponseFn AND
 // driverOpener for the duration of the test, so individual tests can inject
 // canned responses without booting a real Neo4j server. The driverOpener stub
@@ -195,7 +169,7 @@ func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, st
 		driverOpener = origOpener
 	})
 	runStatementResponseFn = fn
-	driverOpener = func(target, username, password, userAgent string, insecure bool) (neo4j.Driver, error) {
+	driverOpener = func(target, username, password, userAgent string) (neo4j.Driver, error) {
 		return &noopDriver{}, nil
 	}
 }
@@ -286,7 +260,6 @@ func TestResolveConn_UserAgent(t *testing.T) {
 			t.Setenv(envUsername, "")
 			t.Setenv(envPassword, "")
 			t.Setenv(envDatabase, "")
-			t.Setenv(envInsecure, "")
 			t.Chdir(t.TempDir())
 
 			fs := afero.NewMemMapFs()
@@ -341,32 +314,6 @@ func (e *fakeNeo4jError) Error() string {
 	return e.code + ": " + e.message
 }
 
-func TestParseBool(t *testing.T) {
-	tests := []struct {
-		in         string
-		want       bool
-		recognised bool
-	}{
-		{"", false, false},
-		{"true", true, true},
-		{"false", false, true},
-		{"1", true, true},
-		{"0", false, true},
-		{"yes", true, true},
-		{"NO", false, true},
-		{"On", true, true},
-		{"off", false, true},
-		{"banana", false, false},
-	}
-	for _, tc := range tests {
-		t.Run(tc.in, func(t *testing.T) {
-			b, ok := parseBool(tc.in)
-			assert.Equal(t, tc.want, b)
-			assert.Equal(t, tc.recognised, ok)
-		})
-	}
-}
-
 // newTestCmdWithCreds returns a query command and config backed by an in-memory
 // filesystem that already has credentials.json populated with the supplied JSON.
 func newTestCmdWithCreds(t *testing.T, credsJSON string) (*cobra.Command, *clicfg.Config) {
@@ -380,14 +327,10 @@ func newTestCmdWithCreds(t *testing.T, credsJSON string) (*cobra.Command, *clicf
 
 // storedCredJSON returns a credentials.json body with one dbms credential
 // set as the default.
-func storedCredJSON(uri, username, password, dbName string, insecure bool) string {
-	insecureStr := "false"
-	if insecure {
-		insecureStr = "true"
-	}
+func storedCredJSON(uri, username, password, dbName string) string {
 	return `{"dbms":{"default-credential":"mydb","credentials":[{"name":"mydb","username":"` +
 		username + `","password":"` + password + `","database-name":"` + dbName +
-		`","uri":"` + uri + `","insecure":` + insecureStr + `}]}}`
+		`","uri":"` + uri + `"}]}}`
 }
 
 func TestResolveConn_StoredCredential_UsedWhenNoFlagsOrEnv(t *testing.T) {
@@ -396,10 +339,9 @@ func TestResolveConn_StoredCredential_UsedWhenNoFlagsOrEnv(t *testing.T) {
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 
 	c, err := resolveConn(cmd, cfg)
@@ -409,43 +351,6 @@ func TestResolveConn_StoredCredential_UsedWhenNoFlagsOrEnv(t *testing.T) {
 	assert.Equal(t, "storedUser", c.username)
 	assert.Equal(t, "storedPass", c.password)
 	assert.Equal(t, "storedDB", c.database)
-	assert.False(t, c.insecure)
-}
-
-func TestResolveConn_StoredCredential_Insecure_AppliedWithoutFlag(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	credsJSON := storedCredJSON("http://stored:7474", "u", "p", "neo4j", true)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-
-	assert.True(t, c.insecure, "stored credential's insecure:true must be applied when --insecure flag is not set")
-}
-
-func TestResolveConn_StoredCredential_InsecureFlagOverridesCredential(t *testing.T) {
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envPassword, "")
-	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
-	t.Chdir(t.TempDir())
-
-	// Stored credential has insecure=true, but --insecure=false is passed explicitly.
-	credsJSON := storedCredJSON("http://stored:7474", "u", "p", "neo4j", true)
-	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
-	require.NoError(t, cmd.ParseFlags([]string{"--insecure=false"}))
-
-	c, err := resolveConn(cmd, cfg)
-	require.NoError(t, err)
-
-	assert.False(t, c.insecure, "--insecure=false flag must override stored credential's insecure:true")
 }
 
 func TestResolveConn_StoredCredential_AllFourFlagsBypassCredential(t *testing.T) {
@@ -453,10 +358,9 @@ func TestResolveConn_StoredCredential_AllFourFlagsBypassCredential(t *testing.T)
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 	require.NoError(t, cmd.ParseFlags([]string{
 		"--uri=http://flag:7474",
@@ -479,10 +383,9 @@ func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false)
+	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 	// Only one of the four params provided — ambiguous partial override.
 	require.NoError(t, cmd.ParseFlags([]string{"--uri=http://override:7474"}))
@@ -500,7 +403,6 @@ func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
 	t.Setenv(envUsername, "")
 	t.Setenv(envPassword, "")
 	t.Setenv(envDatabase, "")
-	t.Setenv(envInsecure, "")
 	t.Chdir(t.TempDir())
 
 	// Empty credentials — no stored credential.
@@ -513,26 +415,20 @@ func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
 	assert.Equal(t, defaultUsername, c.username)
 	assert.Equal(t, "", c.password)
 	assert.Equal(t, defaultDatabase, c.database)
-	assert.False(t, c.insecure)
 }
 
 // namedCredJSON returns a credentials.json body with one named credential
 // (not necessarily set as the default).
-func namedCredJSON(name, uri, username, password, dbName string, insecure bool) string {
-	insecureStr := "false"
-	if insecure {
-		insecureStr = "true"
-	}
+func namedCredJSON(name, uri, username, password, dbName string) string {
 	return `{"dbms":{"default-credential":"","credentials":[{"name":"` + name +
 		`","username":"` + username + `","password":"` + password +
-		`","database-name":"` + dbName + `","uri":"` + uri +
-		`","insecure":` + insecureStr + `}]}}`
+		`","database-name":"` + dbName + `","uri":"` + uri + `"}]}}`
 }
 
 func TestResolveConn_CredentialFlag(t *testing.T) {
 	twoCredsJSON := `{"dbms":{"default-credential":"default-cred","credentials":[` +
-		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474","insecure":false},` +
-		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474","insecure":false}` +
+		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474"},` +
+		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474"}` +
 		`]}}`
 
 	tests := []struct {
@@ -544,21 +440,19 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 		wantUsername    string
 		wantPassword    string
 		wantDatabase    string
-		wantInsecure    bool
 	}{
 		{
 			name:         "resolves named credential",
-			credsJSON:    namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false),
+			credsJSON:    namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB"),
 			flags:        []string{"--credential=mydb"},
 			wantURI:      "http://named:7474",
 			wantUsername: "namedUser",
 			wantPassword: "namedPass",
 			wantDatabase: "namedDB",
-			wantInsecure: false,
 		},
 		{
 			name:            "conflicts with --username",
-			credsJSON:       namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB", false),
+			credsJSON:       namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB"),
 			flags:           []string{"--credential=mydb", "--username=other"},
 			wantErrContains: []string{"--credential", "--username"},
 		},
@@ -569,34 +463,13 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			wantErrContains: []string{"unknown", "credential dbms list"},
 		},
 		{
-			name:         "--insecure=false overrides credential's insecure:true",
-			credsJSON:    namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true),
-			flags:        []string{"--credential=mydb", "--insecure=false"},
-			wantURI:      "http://named:7474",
-			wantUsername: "u",
-			wantPassword: "p",
-			wantDatabase: "neo4j",
-			wantInsecure: false,
-		},
-		{
-			name:         "credential's insecure:true applied when --insecure not set",
-			credsJSON:    namedCredJSON("mydb", "http://named:7474", "u", "p", "neo4j", true),
-			flags:        []string{"--credential=mydb"},
-			wantURI:      "http://named:7474",
-			wantUsername: "u",
-			wantPassword: "p",
-			wantDatabase: "neo4j",
-			wantInsecure: true,
-		},
-		{
 			name:         "no --credential flag uses stored default (existing behaviour unchanged)",
-			credsJSON:    storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB", false),
+			credsJSON:    storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB"),
 			flags:        []string{},
 			wantURI:      "http://stored:7474",
 			wantUsername: "storedUser",
 			wantPassword: "storedPass",
 			wantDatabase: "storedDB",
-			wantInsecure: false,
 		},
 		{
 			name:         "overrides stored default credential",
@@ -606,7 +479,6 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			wantUsername: "otherUser",
 			wantPassword: "otherPass",
 			wantDatabase: "otherDB",
-			wantInsecure: false,
 		},
 	}
 
@@ -616,7 +488,6 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			t.Setenv(envUsername, "")
 			t.Setenv(envPassword, "")
 			t.Setenv(envDatabase, "")
-			t.Setenv(envInsecure, "")
 			t.Chdir(t.TempDir())
 
 			cmd, cfg := newTestCmdWithCreds(t, tc.credsJSON)
@@ -637,7 +508,6 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			assert.Equal(t, tc.wantUsername, c.username)
 			assert.Equal(t, tc.wantPassword, c.password)
 			assert.Equal(t, tc.wantDatabase, c.database)
-			assert.Equal(t, tc.wantInsecure, c.insecure)
 		})
 	}
 }
