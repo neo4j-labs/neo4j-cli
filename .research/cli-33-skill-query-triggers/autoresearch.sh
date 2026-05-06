@@ -23,7 +23,7 @@ BIN="$REPO/bin/neo4j-cli"
 WORKERS="${WORKERS:-8}"
 RUNS_PER_QUERY="${RUNS_PER_QUERY:-3}"
 TIMEOUT="${TIMEOUT:-90}"
-MODEL="${MODEL:-claude-sonnet-4-6}"
+MODEL="${MODEL:-claude-haiku-4-5}"
 
 if [ ! -x "$BIN" ]; then
   (cd "$REPO" && go build -o "$BIN" ./neo4j-cli)

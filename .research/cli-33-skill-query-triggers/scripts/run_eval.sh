@@ -17,7 +17,7 @@ OUTPUT=""
 WORKERS="${WORKERS:-4}"
 RUNS_PER_QUERY="${RUNS_PER_QUERY:-2}"
 TIMEOUT="${TIMEOUT:-120}"
-MODEL="${MODEL:-claude-sonnet-4-6}"
+MODEL="${MODEL:-claude-haiku-4-5}"
 SKILL_NAME="neo4j-cli"
 
 while [ $# -gt 0 ]; do
