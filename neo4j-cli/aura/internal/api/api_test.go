@@ -83,10 +83,6 @@ func TestMakeRequest_CredentialResolution(t *testing.T) {
 			wantClientID: "default-client",
 		},
 		{
-			// The active credential is fetched from the store by RegisterAuraCredentialFlag
-			// (task-003) before SetActiveCredential is called, so it is always a pointer
-			// into the store. Here we simulate that by including "active-cred" in the
-			// credentials store and pointing SetActiveCredential at the same struct.
 			name: "uses ActiveCredential when set, bypassing GetDefault",
 			credJSON: `{
 				"aura": {
