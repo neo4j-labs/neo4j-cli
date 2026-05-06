@@ -65,3 +65,9 @@ Flags:
 | `--uri` | string | - | (required) URI |
 | `--username` | string | - | (required) Username |
 
+### neo4j-cli credential database list
+
+Lists database credentials
+
+Usage: `neo4j-cli credential database list`
+
