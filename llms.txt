@@ -22,8 +22,9 @@ npm install -g @neo4j-labs/cli@alpha
 - `neo4j-cli aura instance list` — list Aura instances (table or JSON)
 - `neo4j-cli aura instance create` — provision a new Aura instance
 - `neo4j-cli aura instance get <id>` — get instance details
-- `neo4j-cli query <cypher>` — run Cypher against any Neo4j via HTTP Query API
+- `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
+- `neo4j-cli query 'CREATE ...' --rw` — write operations require `--rw`
 - `neo4j-cli skill install` — install the agent skill bundle into your AI assistant
 - `neo4j-cli skill list` — list installed skills
 - `neo4j-cli skill check` — verify skill installation
@@ -32,10 +33,9 @@ npm install -g @neo4j-labs/cli@alpha
 
 Connection precedence: flag → environment variable → `.env` file → stored default.
 
-Default URI: `http://localhost:7474`, username: `neo4j`, database: `neo4j`.
+Default URI: `neo4j://localhost:7687`, username: `neo4j`, database: `neo4j`.
 
-Bolt-family URIs (`bolt://`, `neo4j://`) are rewritten to HTTP automatically.
-Aura hostnames are forced to HTTPS port 443.
+`http://`/`https://` URIs are auto-rewritten to `neo4j://`/`neo4j+s://`. For self-signed certs use `neo4j+ssc://`. Aura hostnames are forced to `neo4j+s://<host>:7687`.
 
 ## Output formats
 
