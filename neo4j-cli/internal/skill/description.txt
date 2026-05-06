@@ -1,7 +1,7 @@
-Use this skill when the user wants to interact with Neo4j via the neo4j-cli command-line tool.
+Use this skill when the user wants to interact with Neo4j via the neo4j-cli command-line tool — the canonical CLI for running Cypher and managing Aura from a terminal.
 
-TRIGGER when: run or execute Cypher from a terminal/shell/CLI against Neo4j; pipe a Cypher script into neo4j-cli; fetch schema, labels, indexes, constraints, or relationship types via CLI; provision, list, delete, or resize Aura instances or tenants; manage Aura API credentials from the CLI; install, remove, or list the neo4j-cli agent skill; user mentions neo4j-cli, aura-cli, `neo4j query`, `aura instance`, `neo4j credential`, or similar CLI commands.
+TRIGGER when: run, execute, or pipe Cypher against any Neo4j database from a terminal/shell/bash; introspect schema, labels, indexes, or constraints via CLI; provision, list, get, create, delete, or resize Aura instances or tenants; add, remove, list, or get Aura API credentials from CLI; install, remove, uninstall, list, or check the neo4j-cli skill in Claude Code, Cursor, or another agent; user mentions neo4j-cli, aura-cli, `neo4j query`, `aura instance`, or `neo4j credential`.
 
-SKIP: Cypher language questions (syntax, MATCH, LIMIT, etc.); graph data modeling; Neo4j driver code (Python/Java/JS/Go); Docker or Kubernetes setup; other databases (Postgres, Redis); unrelated shell tasks.
+SKIP: Cypher syntax/semantics questions; graph data modeling; Neo4j driver code (Python/Java/JS/Go); Docker/Kubernetes setup; other databases (Postgres, Redis); generic shell tasks.
 
-CLI surfaces: `query` (run Cypher via HTTP Query API, supports stdin pipe), `aura` (instance/tenant/deployment management), `credential` (Aura API keys), `skill` (agent-skill install/remove/list/check).
+CLI: `query` (run Cypher via HTTP API, `--schema` flag, pipe stdin, env file with connection details), `aura` (instance/tenant/deployment), `credential` (Aura API client-id+secret), `skill` (install/remove/list/check in any AI agent).
