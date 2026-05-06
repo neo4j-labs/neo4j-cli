@@ -72,6 +72,11 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		c.password = pw
 	}
 
+	if err := c.openDriver(); err != nil {
+		return err
+	}
+	defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
+
 	rwFlag := cmd.Flag("rw")
 	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
 	if !allowWrite {

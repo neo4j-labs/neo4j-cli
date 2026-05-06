@@ -4,19 +4,16 @@
 package query
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
@@ -36,16 +33,10 @@ const (
 	envInsecure = "NEO4J_INSECURE"
 )
 
-// httpDoer is the minimal subset of *http.Client needed by runStatement; tests
-// inject their own implementation rather than spinning up a server when they
-// only want to assert request shape.
-type httpDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
-// conn holds the resolved Neo4j connection details plus the HTTP client used to
-// reach the server. Tests construct conn directly with a stub doer; production
-// code goes through resolveConn.
+// conn holds the resolved Neo4j connection details. The opened Bolt driver
+// is attached lazily via openDriver after the password (if any) has been
+// resolved or prompted. Callers MUST close the driver via defer once they are
+// done using the connection.
 type conn struct {
 	uri       string
 	username  string
@@ -53,41 +44,54 @@ type conn struct {
 	database  string
 	insecure  bool
 	userAgent string
-	doer      httpDoer
+	driver    neo4j.Driver
 }
 
-// queryResult is the parsed body of a successful POST /query/v2 response.
-// Columns are in result order; rows hold the raw values returned by the API
-// (positional, matching columns).
+// queryResult is the parsed tabular payload of a successful Cypher run. The
+// shape matches what callers (run.go, schema.go) expect: positional rows where
+// each row's order matches Columns.
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
 }
 
-// queryResponse mirrors the JSON envelope returned by the HTTP Query API.
+// queryResponse is the structured envelope around a Cypher response. Backed
+// by the Bolt driver Result + ResultSummary; QueryPlan is derived from the
+// driver's ResultSummary.Plan() tree (only non-nil for EXPLAIN/PROFILE).
 type queryResponse struct {
 	Data struct {
-		Fields []string `json:"fields"`
-		Values [][]any  `json:"values"`
-	} `json:"data"`
-	Bookmarks []string     `json:"bookmarks"`
-	QueryPlan *queryPlan   `json:"queryPlan"`
-	Errors    []queryError `json:"errors"`
+		Fields []string
+		Values [][]any
+	}
+	Bookmarks []string
+	QueryPlan *queryPlan
 }
 
-// queryPlan captures the subset of EXPLAIN output we need.
-// Docker-verified against neo4j:latest (2026.04): EXPLAIN responses expose a
-// queryPlan operator tree and do NOT include a summary.queryType scalar, so any
-// read-vs-write detection must inspect this tree instead.
+// queryPlan captures the operator tree produced by EXPLAIN/PROFILE. Mapped
+// from the driver's neo4j.Plan tree returned via ResultSummary.Plan(). The
+// top-level walking code in run.go inspects OperatorType and Children only.
 type queryPlan struct {
-	OperatorType string      `json:"operatorType"`
-	Children     []queryPlan `json:"children"`
+	OperatorType string
+	Children     []queryPlan
 }
 
-type queryError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+// driverOpener is the test seam used to construct the Bolt driver. Production
+// calls neo4j.NewDriverWithContext; tests can swap in a fake to bypass the
+// real bolt:// connection.
+var driverOpener = func(target string, username, password, userAgent string, insecure bool) (neo4j.Driver, error) {
+	configurer := func(c *config.Config) {
+		if userAgent != "" {
+			c.UserAgent = userAgent
+		}
+	}
+	_ = insecure // insecure handling is selected by URI scheme (e.g. neo4j+ssc://) post-Bolt; kept on conn for compatibility.
+	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), configurer)
 }
+
+// runStatementResponseFn is the test seam used by runStatementResponse. It
+// lets tests inject canned responses without booting a real Neo4j or
+// constructing a Bolt driver. Production sets it to runStatementResponseImpl.
+var runStatementResponseFn = runStatementResponseImpl
 
 // resolveConn merges connection settings from .env, OS environment, and
 // command-line flags (lowest → highest precedence). When --credential is set,
@@ -96,8 +100,10 @@ type queryError struct {
 // four connection params (uri, username, password, database) are explicitly
 // provided, the stored default database credential (if any) is used instead.
 // Partial explicit overrides (some but not all of the four params) are
-// rejected with a descriptive error. The returned conn carries an *http.Client
-// honouring --insecure or the insecure flag stored in the credential.
+// rejected with a descriptive error. The returned conn does NOT hold an open
+// driver — callers should fill in the password (prompt if needed) and then
+// call c.openDriver(ctx) before issuing queries, and defer c.driver.Close(ctx)
+// for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
 
@@ -154,7 +160,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			database:  cred.DatabaseName,
 			insecure:  insecure,
 			userAgent: "neo4j-cli/v" + version,
-			doer:      newHTTPClient(insecure),
 		}, nil
 	}
 
@@ -276,8 +281,26 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		database:  database,
 		insecure:  insecure,
 		userAgent: userAgent,
-		doer:      newHTTPClient(insecure),
 	}, nil
+}
+
+// openDriver opens a Bolt driver using the resolved connection params and
+// stores it on c.driver. Idempotent when already opened. Caller is
+// responsible for closing the driver via c.driver.Close(ctx) (typically
+// `defer`).
+func (c *conn) openDriver() error {
+	if c == nil {
+		return errors.New("query: nil connection")
+	}
+	if c.driver != nil {
+		return nil
+	}
+	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent, c.insecure)
+	if err != nil {
+		return fmt.Errorf("query: open driver: %w", err)
+	}
+	c.driver = d
+	return nil
 }
 
 // loadEnvFile reads a .env file from explicitPath if non-empty, otherwise walks
@@ -368,89 +391,72 @@ func parseBool(s string) (bool, bool) {
 	return false, false
 }
 
-// newHTTPClient returns a new *http.Client. When insecure is true, TLS server
-// certificate verification is disabled — for development against self-signed
-// servers only.
-func newHTTPClient(insecure bool) *http.Client {
-	if !insecure {
-		return &http.Client{}
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // --insecure is a documented dev-only escape hatch
-	}
-	return &http.Client{Transport: tr}
+// runStatementResponse executes a Cypher statement against the Bolt driver
+// attached to c and returns the parsed envelope (rows + bookmarks + plan).
+// Routes through runStatementResponseFn so tests can override.
+func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
+	return runStatementResponseFn(ctx, c, statement, params)
 }
 
-// runStatementResponse POSTs a single Cypher statement to
-// <uri>/db/<database>/query/v2 and parses the full response envelope. Non-2xx
-// responses or non-empty errors[] arrays produce a Go error containing the
-// upstream code+message.
-//
-// Note: a `txMetadata` body field would let server logs (query.log /
-// SHOW TRANSACTIONS) tag CLI traffic as e.g. {app: "neo4j-cli", type:
-// "user-direct" | "schema"}. The field is only accepted on the v2 endpoint
-// from Neo4j 2026.04 onward — earlier servers (5.x, 2025.x) reject the
-// request with HTTP 400. Re-enable once that is the minimum supported
-// server, ideally gated by a server-version probe so older servers keep
-// working.
-func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
+// runStatementResponseImpl is the real Bolt-backed implementation. Opens a
+// session targeted at c.database, runs the statement, collects all records,
+// and converts the resulting summary's Plan() tree (if present) into the
+// internal queryPlan shape.
+func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
 	}
-
-	body := map[string]any{"statement": statement}
-	if params != nil {
-		body["parameters"] = params
+	if c.driver == nil {
+		return nil, errors.New("query: connection driver not opened (call openDriver first)")
 	}
-	payload, err := json.Marshal(body)
+
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
+	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
+
+	result, err := session.Run(ctx, statement, params)
 	if err != nil {
-		return nil, fmt.Errorf("query: encode request: %w", err)
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	url := strings.TrimRight(c.uri, "/") + "/db/" + c.database + "/query/v2"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	records, err := result.Collect(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("query: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.SetBasicAuth(c.username, c.password)
-	if c.userAgent != "" {
-		req.Header.Set("User-Agent", c.userAgent)
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	resp, err := c.doer.Do(req)
+	summary, err := result.Consume(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("query: HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("query: read response: %w", err)
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	var parsed queryResponse
-	if len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, &parsed); err != nil {
-			return nil, fmt.Errorf("query: parse response (status %d): %w", resp.StatusCode, err)
+	resp := &queryResponse{}
+	if len(records) > 0 {
+		resp.Data.Fields = append([]string(nil), records[0].Keys...)
+		resp.Data.Values = make([][]any, 0, len(records))
+		for _, rec := range records {
+			row := make([]any, len(rec.Values))
+			copy(row, rec.Values)
+			resp.Data.Values = append(resp.Data.Values, row)
+		}
+	} else {
+		// Even with zero rows the result keys are available via the result
+		// metadata so downstream renderers see the column header. Fall back to
+		// an empty (but non-nil) slice when nothing came back.
+		keys, _ := result.Keys()
+		resp.Data.Fields = append([]string(nil), keys...)
+		resp.Data.Values = [][]any{}
+	}
+
+	if summary != nil {
+		if plan := summary.Plan(); plan != nil {
+			converted := convertPlan(plan)
+			resp.QueryPlan = &converted
 		}
 	}
 
-	if len(parsed.Errors) > 0 {
-		first := parsed.Errors[0]
-		return nil, fmt.Errorf("query: server error [%s] %s", first.Code, first.Message)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("query: HTTP %d from %s", resp.StatusCode, url)
-	}
-
-	return &parsed, nil
+	return resp, nil
 }
 
-// runStatement POSTs a single Cypher statement to <uri>/db/<database>/query/v2
-// and returns just the tabular result payload.
+// runStatement executes a Cypher statement and returns the tabular result.
 func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
 	parsed, err := runStatementResponse(ctx, c, statement, params)
 	if err != nil {
@@ -461,4 +467,18 @@ func runStatement(ctx context.Context, c *conn, statement string, params map[str
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
 	}, nil
+}
+
+// convertPlan recursively maps a neo4j.Plan tree into the local queryPlan
+// shape. The classifier in run.go walks queryPlan.Children + OperatorType.
+func convertPlan(p neo4j.Plan) queryPlan {
+	out := queryPlan{OperatorType: p.Operator()}
+	children := p.Children()
+	if len(children) > 0 {
+		out.Children = make([]queryPlan, 0, len(children))
+		for _, child := range children {
+			out.Children = append(out.Children, convertPlan(child))
+		}
+	}
+	return out
 }

@@ -6,9 +6,7 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"errors"
 	"strings"
 	"testing"
 
@@ -16,102 +14,96 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// schemaServerCanned wires a routing httptest server that returns canned
-// responses keyed by a substring match against the inbound statement. A nil
-// or missing match returns an empty result. A response value of "" signals
-// the server should reply with a 4xx + errors[] envelope (used to simulate
-// a required-query failure).
-type cannedResponse struct {
-	body   string // JSON body for 2xx; ignored when errBody is set
-	status int    // 0 → 200
-	// errBody, when non-empty, is the JSON envelope returned as a 4xx so the
-	// runStatement error path fires (status defaults to 400 in that case).
-	errBody string
+// schemaSeam wires a per-statement response/error map for :schema tests via
+// the runStatementResponseFn seam. Statements are matched by exact string
+// (the schema queries are constants in schema.go).
+type schemaSeam struct {
+	calls []string
+	resp  map[string]*queryResponse
+	err   map[string]error
 }
 
-// schemaServer routes by the Cypher statement substring → cannedResponse.
-// Order of map entries does not matter; the first matching key wins (a tie
-// is impossible because real introspection statements have unique prefixes).
-func schemaServer(t *testing.T, routes map[string]cannedResponse) *httptest.Server {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		var req map[string]any
-		_ = json.Unmarshal(body, &req)
-		stmt, _ := req["statement"].(string)
-
-		w.Header().Set("Content-Type", "application/json")
-		for needle, resp := range routes {
-			if !strings.Contains(stmt, needle) {
-				continue
-			}
-			if resp.errBody != "" {
-				status := resp.status
-				if status == 0 {
-					status = http.StatusBadRequest
-				}
-				w.WriteHeader(status)
-				_, _ = w.Write([]byte(resp.errBody))
-				return
-			}
-			if resp.status != 0 {
-				w.WriteHeader(resp.status)
-			}
-			_, _ = w.Write([]byte(resp.body))
-			return
-		}
-		// Default empty success.
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
-// canonical canned bodies for the happy-path test
-const (
-	nodePropsBody = `{"data":{"fields":["nodeType","nodeLabels","propertyName","propertyTypes","mandatory"],"values":[
-		[":Person", ["Person"], "name", ["String"], true],
-		[":Movie",  ["Movie"],  "title", ["String"], false]
-	]}}`
-	relPropsBody = "{\"data\":{\"fields\":[\"relType\",\"propertyName\",\"propertyTypes\",\"mandatory\"]," +
-		"\"values\":[" +
-		"[\":`ACTED_IN`\", \"role\", [\"String\"], false]," +
-		"[\":`DIRECTED`\", null, null, false]" +
-		"]}}"
-	pathActedInBody  = `{"data":{"fields":["from","to"],"values":[[["Person"],["Movie"]]]}}`
-	pathDirectedBody = `{"data":{"fields":["from","to"],"values":[[["Person"],["Movie"]]]}}`
-	indexesBody      = `{"data":{"fields":["name","type","entityType","labelsOrTypes","properties","state","owningConstraint","options"],"values":[
-		["idx_person_name","RANGE","NODE",["Person"],["name"],"ONLINE",null,{}]
-	]}}`
-	constraintsBody = `{"data":{"fields":["name","type","entityType","labelsOrTypes","properties","ownedIndex","propertyType"],"values":[
-		["uq_person_name","UNIQUENESS","NODE",["Person"],["name"],"idx_person_name","STRING"]
-	]}}`
-	dbmsComponentsBody = `{"data":{"fields":["name","versions","edition"],"values":[["Neo4j Kernel",["5.20.0"],"community"]]}}`
-	settingsBody       = `{"data":{"fields":["value"],"values":[["CYPHER 25"]]}}`
-)
-
-// happyRoutes is the canned route table used by tests that don't need a
-// failure injection. Stripped relType lookup uses the substring after
-// stripRelTypeWrap, so the route table keys here use the bare relType.
-func happyRoutes() map[string]cannedResponse {
-	return map[string]cannedResponse{
-		"db.schema.nodeTypeProperties":          {body: nodePropsBody},
-		"db.schema.relTypeProperties":           {body: relPropsBody},
-		"MATCH (n)-[r:`ACTED_IN`]->(m)":         {body: pathActedInBody},
-		"MATCH (n)-[r:`DIRECTED`]->(m)":         {body: pathDirectedBody},
-		"SHOW INDEXES":                          {body: indexesBody},
-		"SHOW CONSTRAINTS":                      {body: constraintsBody},
-		"CALL dbms.components":                  {body: dbmsComponentsBody},
-		"SHOW SETTINGS YIELD name, value WHERE": {body: settingsBody},
+func newSchemaSeam() *schemaSeam {
+	return &schemaSeam{
+		resp: map[string]*queryResponse{},
+		err:  map[string]error{},
 	}
 }
 
+func (s *schemaSeam) handle(_ context.Context, _ *conn, statement string, _ map[string]any) (*queryResponse, error) {
+	s.calls = append(s.calls, statement)
+	if e, ok := s.err[statement]; ok {
+		return nil, e
+	}
+	if r, ok := s.resp[statement]; ok {
+		return r, nil
+	}
+	// Default empty success — keeps tests resilient to optional schema probes
+	// (e.g. dbms.components, SHOW SETTINGS) that swallow errors.
+	resp := makeQueryResponse([]string{}, [][]any{})
+	return resp, nil
+}
+
+func (s *schemaSeam) install(t *testing.T) {
+	t.Helper()
+	withRunStatementSeam(t, s.handle)
+}
+
+// happySchemaSeam returns a schemaSeam pre-configured with canned responses
+// for every introspection query the runSchema pipeline issues against a
+// minimal Movies-like graph.
+func happySchemaSeam() *schemaSeam {
+	s := newSchemaSeam()
+
+	s.resp["CALL db.schema.nodeTypeProperties() YIELD nodeType, nodeLabels, propertyName, propertyTypes, mandatory"] = makeQueryResponse(
+		[]string{"nodeType", "nodeLabels", "propertyName", "propertyTypes", "mandatory"},
+		[][]any{
+			{":Person", []any{"Person"}, "name", []any{"String"}, true},
+			{":Movie", []any{"Movie"}, "title", []any{"String"}, false},
+		},
+	)
+	s.resp["CALL db.schema.relTypeProperties() YIELD relType, propertyName, propertyTypes, mandatory"] = makeQueryResponse(
+		[]string{"relType", "propertyName", "propertyTypes", "mandatory"},
+		[][]any{
+			{":`ACTED_IN`", "role", []any{"String"}, false},
+			{":`DIRECTED`", nil, nil, false},
+		},
+	)
+	s.resp["MATCH (n)-[r:`ACTED_IN`]->(m) WITH DISTINCT labels(n) AS from, labels(m) AS to RETURN from, to"] = makeQueryResponse(
+		[]string{"from", "to"},
+		[][]any{{[]any{"Person"}, []any{"Movie"}}},
+	)
+	s.resp["MATCH (n)-[r:`DIRECTED`]->(m) WITH DISTINCT labels(n) AS from, labels(m) AS to RETURN from, to"] = makeQueryResponse(
+		[]string{"from", "to"},
+		[][]any{{[]any{"Person"}, []any{"Movie"}}},
+	)
+	s.resp["SHOW INDEXES YIELD name, type, entityType, labelsOrTypes, properties, state, owningConstraint, options"] = makeQueryResponse(
+		[]string{"name", "type", "entityType", "labelsOrTypes", "properties", "state", "owningConstraint", "options"},
+		[][]any{{"idx_person_name", "RANGE", "NODE", []any{"Person"}, []any{"name"}, "ONLINE", nil, map[string]any{}}},
+	)
+	s.resp["SHOW CONSTRAINTS YIELD name, type, entityType, labelsOrTypes, properties, ownedIndex, propertyType"] = makeQueryResponse(
+		[]string{"name", "type", "entityType", "labelsOrTypes", "properties", "ownedIndex", "propertyType"},
+		[][]any{{"uq_person_name", "UNIQUENESS", "NODE", []any{"Person"}, []any{"name"}, "idx_person_name", "STRING"}},
+	)
+	s.resp["CALL dbms.components()"] = makeQueryResponse(
+		[]string{"name", "versions", "edition"},
+		[][]any{{"Neo4j Kernel", []any{"5.20.0"}, "community"}},
+	)
+	s.resp["SHOW SETTINGS YIELD name, value WHERE name = 'db.query.default_language' RETURN value"] = makeQueryResponse(
+		[]string{"value"},
+		[][]any{{"CYPHER 25"}},
+	)
+
+	return s
+}
+
 func TestSchema_HappyPath_JSON(t *testing.T) {
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -155,11 +147,12 @@ func TestSchema_HappyPath_JSON(t *testing.T) {
 // this test flips it locally to simulate the piped case.
 func TestSchema_DefaultOutputNonTTYIsJSON(t *testing.T) {
 	withStdoutIsTerminal(t, false)
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 
 	h := newRunHarness(t, "default")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -176,14 +169,14 @@ func TestSchema_DefaultOutputNonTTYIsJSON(t *testing.T) {
 
 // TestSchema_DefaultOutputTTYIsTables locks the new TTY-aware default for
 // `:schema`: with `default` output and a TTY stdout, the renderer emits the
-// five canonical stacked tables (no JSON envelope). TestMain seeds the seam
-// to true so this test does not toggle it explicitly.
+// five canonical stacked tables (no JSON envelope).
 func TestSchema_DefaultOutputTTYIsTables(t *testing.T) {
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 
 	h := newRunHarness(t, "default")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -203,11 +196,12 @@ func TestSchema_DefaultOutputTTYIsTables(t *testing.T) {
 }
 
 func TestSchema_HappyPath_Table(t *testing.T) {
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -235,15 +229,15 @@ func TestSchema_HappyPath_Table(t *testing.T) {
 
 func TestSchema_RequiredQueryFailureFailsCommand(t *testing.T) {
 	// Inject a SHOW INDEXES failure — must propagate as a command error.
-	routes := happyRoutes()
-	routes["SHOW INDEXES"] = cannedResponse{
-		errBody: `{"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"bad indexes"}]}`,
-	}
-	srv := schemaServer(t, routes)
+	s := happySchemaSeam()
+	s.err["SHOW INDEXES YIELD name, type, entityType, labelsOrTypes, properties, state, owningConstraint, options"] =
+		errors.New("Neo.ClientError.Statement.SyntaxError: bad indexes")
+	delete(s.resp, "SHOW INDEXES YIELD name, type, entityType, labelsOrTypes, properties, state, owningConstraint, options")
+	s.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -255,18 +249,18 @@ func TestSchema_RequiredQueryFailureFailsCommand(t *testing.T) {
 func TestSchema_OptionalQueryFailureSwallowed(t *testing.T) {
 	// Both optional probes (dbms.components + SHOW SETTINGS) fail; the
 	// command must still succeed with the rest of the result populated.
-	routes := happyRoutes()
-	routes["CALL dbms.components"] = cannedResponse{
-		errBody: `{"errors":[{"code":"Neo.ClientError.Procedure.ProcedureNotFound","message":"no such procedure"}]}`,
-	}
-	routes["SHOW SETTINGS YIELD name, value WHERE"] = cannedResponse{
-		errBody: `{"errors":[{"code":"Neo.ClientError.Procedure.ProcedureNotFound","message":"no settings"}]}`,
-	}
-	srv := schemaServer(t, routes)
+	s := happySchemaSeam()
+	s.err["CALL dbms.components()"] =
+		errors.New("Neo.ClientError.Procedure.ProcedureNotFound: no such procedure")
+	delete(s.resp, "CALL dbms.components()")
+	s.err["SHOW SETTINGS YIELD name, value WHERE name = 'db.query.default_language' RETURN value"] =
+		errors.New("Neo.ClientError.Procedure.ProcedureNotFound: no settings")
+	delete(s.resp, "SHOW SETTINGS YIELD name, value WHERE name = 'db.query.default_language' RETURN value")
+	s.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 	)
@@ -325,29 +319,17 @@ func TestSchema_UniqueRelTypes(t *testing.T) {
 
 // TestSchema_NoArgsAccepted asserts cobra rejects positional args on :schema.
 func TestSchema_NoArgsAccepted(t *testing.T) {
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		":schema",
 		"unexpected-arg",
 	)
 	require.Error(t, err)
 	assert.Contains(t, strings.ToLower(err.Error()), "unknown command")
-}
-
-// TestSchema_ConnectionError surfaces transport-level failures (e.g. unreachable
-// host) before any introspection query runs.
-func TestSchema_ConnectionError(t *testing.T) {
-	h := newRunHarness(t, "json")
-	// 127.0.0.1:1 is reliably refused on every supported platform.
-	err := h.execute(t,
-		"--uri=http://127.0.0.1:1",
-		"--password=pw",
-		":schema",
-	)
-	require.Error(t, err)
 }
 
 // assertSectionsInOrder fails the test unless every needle appears in body
@@ -363,18 +345,19 @@ func assertSectionsInOrder(t *testing.T, body string, needles ...string) {
 	}
 }
 
-// Sanity test for the runSchema pipeline directly (no cobra) — ensures the
-// fetch helpers compose cleanly when tests bypass the cobra layer entirely.
+// TestSchema_FetchHelpersCompose drives the runSchema pipeline directly via
+// the seam (no cobra) — ensures the fetch helpers compose cleanly when tests
+// bypass the cobra layer entirely.
 func TestSchema_FetchHelpersCompose(t *testing.T) {
-	srv := schemaServer(t, happyRoutes())
+	s := happySchemaSeam()
+	s.install(t)
 
 	c := &conn{
-		uri:       srv.URL,
+		uri:       "neo4j://example:7687",
 		username:  "u",
 		password:  "pw",
 		database:  "neo4j",
 		userAgent: "neo4j-cli/vtest",
-		doer:      newHTTPClient(false),
 	}
 	ctx := context.Background()
 

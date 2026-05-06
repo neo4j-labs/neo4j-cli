@@ -274,6 +274,14 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - To assert toon encoding: check that `json.Unmarshal([]byte(out), &v)` returns an error — toon uses `key: value` syntax, not JSON, so valid toon is invalid JSON.
 - The json→any→toon round-trip in `printToon` honours custom `MarshalJSON` on the concrete `ResponseData` type. Test helpers that implement `MarshalJSON` (e.g. wrapping rows in `{"data": ...}`) let you verify the top-level envelope key appears in both toon and json output.
 
+## query Bolt Driver Notes
+
+- neo4j-go-driver/v6 deprecates the `*WithContext` aliases (`Driver`, `NewDriver` are the canonical names in v6); staticcheck/SA1019 flags `DriverWithContext`/`NewDriverWithContext`. Use the unsuffixed names — the bare `neo4j.Driver` interface IS context-aware in v6.
+- `result.Consume(ctx)` returns `ResultSummary`; `summary.Plan()` is non-nil only for EXPLAIN/PROFILE. The `Plan` interface exposes `Operator() string` (not `OperatorType`) and `Children() []Plan` — recursive walk maps cleanly into our internal `queryPlan{OperatorType, Children}` shape via a `convertPlan` helper.
+- For driver-backed query tests: use a package-level `runStatementResponseFn` test seam (and a paired `driverOpener` seam returning a no-op driver) so tests inject canned `*queryResponse` envelopes without a live Bolt server. The no-op driver embeds `neo4j.Driver` (nil interface) and overrides only `Close(ctx) error`; type satisfaction is automatic, and any unrouted method call panics — which is the desired loud-fail signal that the seam was bypassed.
+- `c.openDriver()` is idempotent; production callers defer `c.driver.Close(ctx)` immediately after openDriver succeeds. The driver is opened LAZILY (after password prompt) because BasicAuth is bound at driver creation time and we cannot know the password during `resolveConn`.
+- `make generate-check` is `git diff --exit-code` after `go generate ./...`; on a working tree with uncommitted source changes it WILL fail (it's checking that nothing changed AT ALL during regenerate). The gate is meaningful only against a clean working tree (CI scenario). Locally, commit your source changes first OR ignore the false positive when the only reported diff is your own edits, not bundles.
+
 ## query/connect.go Credential Integration Notes
 
 - `resolveConn` integrates stored dbms credentials: when no params are set via flags/env/dotenv, the stored default credential is used; when a stored credential exists and only 1–3 of the 4 params are explicitly set, an all-or-nothing error is returned; when all 4 are set explicitly, the stored credential is bypassed entirely. When no stored credential exists, the original behavior (partial params + built-in defaults) applies unchanged.

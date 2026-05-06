@@ -218,13 +218,14 @@ tasks:
     title: "Replace HTTP transport in query/connect.go with Bolt driver"
     description: |
       Rewrite neo4j-cli/query/connect.go to drive Bolt via neo4j.NewDriverWithContext. Drop httpDoer, runStatement, runStatementResponse, newHTTPClient, parseBool, queryResponse, queryPlan, queryError, and the application/json + URL-composition logic. Keep resolveConn's precedence rules (.env < env < flag, --credential mutex, partial-cred error). The conn struct holds uri, database, userAgent, driver. Caller closes the driver via defer.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
       - "No HTTP-transport symbols remain in the query package"
       - "Driver is opened with BasicAuth and closed via defer"
       - "resolveConn unit tests pass with all credential-precedence cases unchanged"
+    completed_at: 2026-05-06T18:30:00Z
 
   - id: task-017
     title: "Switch query execution to ExecuteRead/ExecuteWrite"

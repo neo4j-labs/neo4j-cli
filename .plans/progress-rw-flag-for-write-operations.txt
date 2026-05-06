@@ -323,3 +323,29 @@ Key Decisions:
 
 Next Task: task-016
 
+================================================================================
+TASK-016: Replace HTTP transport in query/connect.go with Bolt driver
+Date: 2026-05-06T18:30:00Z
+================================================================================
+
+Summary:
+Replaced the HTTP Query API transport in connect.go with the neo4j-go-driver/v6 Bolt driver. Driver is opened lazily via c.openDriver() once the password is resolved/prompted, and callers (run.go, schema.go) defer driver.Close(ctx). Dropped HTTP-only types (httpDoer, newHTTPClient, queryError) and all URL/JSON composition. Kept queryResult, queryResponse, queryPlan, runStatement, runStatementResponse as compile-time scaffolding so downstream tasks 017–019 can refactor in their own scope without breaking the build mid-sequence; the EXPLAIN classifier in run.go still walks queryPlan via convertPlan(neo4j.Plan)→queryPlan. Added a runStatementResponseFn + driverOpener test seam so existing query tests inject canned responses without spinning up a real Bolt server, and rewrote httptest-backed tests in connect_test.go, run_test.go, schema_test.go to drive the seam (deleted assertions that targeted HTTP-only behaviour like URL paths, basic auth header, content-type).
+
+Files Changed:
+- neo4j-cli/query/connect.go (rewrote: replace HTTP client with Bolt driver, lazy openDriver, runStatementResponseFn + driverOpener seams, convertPlan(neo4j.Plan))
+- neo4j-cli/query/run.go (modified: open driver and defer close after password prompt)
+- neo4j-cli/query/schema.go (modified: open driver and defer close after password prompt)
+- neo4j-cli/query/connect_test.go (rewrote: seam-based fixtures, dropped HTTP-only assertions, added withRunStatementSeam + noopDriver helpers)
+- neo4j-cli/query/run_test.go (rewrote: seam-based seamRouter, dropped httptest server, added EXPLAIN-aware route maps)
+- neo4j-cli/query/schema_test.go (rewrote: schemaSeam built atop runStatementResponseFn, dropped httptest server)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task-016 marked completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Used neo4j.Driver / neo4j.NewDriver (not the deprecated *WithContext aliases) per staticcheck guidance; kept v6 dep semantics.
+- Kept username/password/insecure on the conn struct because run.go's prompt logic and resolveConn tests reference them; task-019 (--insecure removal) will trim these in its own scope.
+- Kept queryPlan/queryResponse/runStatement[Response] as compile scaffolds: tasks 017 (ExecuteRead/Write) and 018 (summary.StatementType) replace these in stages; the spec's "drop them all in 016" reading was incompatible with keeping the codebase compilable across the cut-over.
+- Test seam pattern: runStatementResponseFn returns canned envelopes; driverOpener returns a no-op stub so deferred Close calls are safe. Embedded nil neo4j.Driver provides type satisfaction without manual stubbing of the wide interface.
+
+Next Task: task-017
+

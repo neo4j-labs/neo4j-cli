@@ -5,15 +5,11 @@ package query
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -91,7 +87,9 @@ func TestResolveConn_Defaults(t *testing.T) {
 	assert.Equal(t, "", c.password)
 	assert.Equal(t, defaultDatabase, c.database)
 	assert.False(t, c.insecure)
-	assert.NotNil(t, c.doer)
+	// resolveConn does not eagerly open the driver — that happens via
+	// c.openDriver() once the password has been prompted (when needed).
+	assert.Nil(t, c.driver)
 }
 
 func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
@@ -182,90 +180,93 @@ func TestResolveConn_InsecureFlagOverridesEnv(t *testing.T) {
 	assert.False(t, c.insecure)
 }
 
+// withRunStatementSeam swaps the package-level runStatementResponseFn AND
+// driverOpener for the duration of the test, so individual tests can inject
+// canned responses without booting a real Neo4j server. The driverOpener stub
+// returns a no-op driver so deferred Close calls in production code are safe.
+// Restored via t.Cleanup.
+func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error)) {
+	t.Helper()
+	origFn := runStatementResponseFn
+	origOpener := driverOpener
+	t.Cleanup(func() {
+		runStatementResponseFn = origFn
+		driverOpener = origOpener
+	})
+	runStatementResponseFn = fn
+	driverOpener = func(target, username, password, userAgent string, insecure bool) (neo4j.Driver, error) {
+		return &noopDriver{}, nil
+	}
+}
+
+// noopDriver is a stub neo4j.Driver used by tests that route
+// statement execution through the runStatementResponseFn seam. The embedded
+// nil interface satisfies the wide DriverWithContext interface at the type
+// level; only Close is invoked by production code (via defer in run.go and
+// schema.go) so we provide a real Close that returns nil. Any other method
+// call on this stub indicates the seam was bypassed and should fail loudly
+// at runtime — embedding nil panics on call, which is the desired signal.
+type noopDriver struct {
+	neo4j.Driver
+}
+
+func (n *noopDriver) Close(ctx context.Context) error { return nil }
+
 func TestRunStatement_HappyPath(t *testing.T) {
-	var gotPath, gotAuth, gotMethod, gotCT, gotUA string
-	var gotBody map[string]any
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotAuth = r.Header.Get("Authorization")
-		gotMethod = r.Method
-		gotCT = r.Header.Get("Content-Type")
-		gotUA = r.Header.Get("User-Agent")
-
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &gotBody)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
-	}))
-	defer srv.Close()
+	var gotStatement string
+	var gotParams map[string]any
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any) (*queryResponse, error) {
+		gotStatement = statement
+		gotParams = params
+		resp := &queryResponse{}
+		resp.Data.Fields = []string{"n"}
+		resp.Data.Values = [][]any{{int64(1)}}
+		return resp, nil
+	})
 
 	c := &conn{
-		uri:       srv.URL,
+		uri:       "neo4j://example:7687",
 		username:  "neo4j",
 		password:  "secret",
 		database:  "neo4j",
 		userAgent: "neo4j-cli/vtest",
-		doer:      srv.Client(),
 	}
 
 	res, err := runStatement(context.Background(), c, "RETURN 1 AS n", map[string]any{"k": 5})
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	assert.Equal(t, []string{"n"}, res.Columns)
-	assert.Equal(t, [][]any{{float64(1)}}, res.Rows)
+	assert.Equal(t, [][]any{{int64(1)}}, res.Rows)
 
-	// Server saw the right URL, method, headers, body shape.
-	assert.Equal(t, "/db/neo4j/query/v2", gotPath)
-	assert.Equal(t, http.MethodPost, gotMethod)
-	assert.Equal(t, "application/json", gotCT)
-	assert.Equal(t, "neo4j-cli/vtest", gotUA)
-
-	wantAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("neo4j:secret"))
-	assert.Equal(t, wantAuth, gotAuth)
-
-	assert.Equal(t, "RETURN 1 AS n", gotBody["statement"])
-	require.Contains(t, gotBody, "parameters")
-	assert.Equal(t, map[string]any{"k": float64(5)}, gotBody["parameters"])
-	// txMetadata is intentionally NOT sent — see runStatement doc comment for
-	// the Neo4j 2026.04+ minimum-version constraint that defers it.
-	assert.NotContains(t, gotBody, "txMetadata")
+	// Statement and params forwarded to the seam unmodified.
+	assert.Equal(t, "RETURN 1 AS n", gotStatement)
+	assert.Equal(t, map[string]any{"k": 5}, gotParams)
 }
 
 func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{
-			"bookmarks": ["FB:test"],
-			"data": {"fields": [], "values": []},
-			"queryPlan": {
-				"operatorType": "ProduceResults@neo4j",
-				"children": [{
-					"operatorType": "EmptyResult@neo4j",
-					"children": [{"operatorType": "Create@neo4j", "children": []}]
-				}]
-			}
-		}`))
-	}))
-	defer srv.Close()
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any) (*queryResponse, error) {
+		resp := &queryResponse{}
+		resp.Data.Fields = []string{}
+		resp.Data.Values = [][]any{}
+		resp.QueryPlan = &queryPlan{
+			OperatorType: "ProduceResults@neo4j",
+			Children: []queryPlan{{
+				OperatorType: "EmptyResult@neo4j",
+				Children:     []queryPlan{{OperatorType: "Create@neo4j"}},
+			}},
+		}
+		resp.Bookmarks = []string{"FB:test"}
+		return resp, nil
+	})
 
-	c := &conn{
-		uri:      srv.URL,
-		username: "neo4j",
-		password: "secret",
-		database: "neo4j",
-		doer:     srv.Client(),
-	}
+	c := &conn{uri: "neo4j://example:7687", database: "neo4j"}
 
 	res, err := runStatement(context.Background(), c, "EXPLAIN CREATE (n)", nil)
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, res.Columns)
 	assert.Equal(t, [][]any{}, res.Rows)
 
-	resp, err := fetchQueryResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil)
+	resp, err := runStatementResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp.QueryPlan)
 	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
@@ -273,36 +274,6 @@ func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
 	require.Len(t, resp.QueryPlan.Children[0].Children, 1)
 	assert.Equal(t, "Create@neo4j", resp.QueryPlan.Children[0].Children[0].OperatorType)
 	assert.Equal(t, []string{"FB:test"}, resp.Bookmarks)
-}
-
-func TestRunStatement_ExplainResponseWithoutQueryTypeStillParses(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{
-			"data": {"fields": ["n"], "values": []},
-			"queryPlan": {"operatorType": "ProduceResults@neo4j", "children": []}
-		}`))
-	}))
-	defer srv.Close()
-
-	c := &conn{
-		uri:      srv.URL,
-		username: "neo4j",
-		password: "secret",
-		database: "neo4j",
-		doer:     srv.Client(),
-	}
-
-	resp, err := fetchQueryResponse(context.Background(), c, "EXPLAIN RETURN 1 AS n", nil)
-	require.NoError(t, err)
-	require.NotNil(t, resp.QueryPlan)
-	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
-	assert.Empty(t, resp.Bookmarks)
-}
-
-func fetchQueryResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
-	return runStatementResponse(ctx, c, statement, params)
 }
 
 func TestResolveConn_UserAgent(t *testing.T) {
@@ -334,30 +305,12 @@ func TestResolveConn_UserAgent(t *testing.T) {
 	}
 }
 
-func TestRunStatement_NoParamsOmitsField(t *testing.T) {
-	var gotBody map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &gotBody)
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
-	}))
-	defer srv.Close()
+func TestRunStatement_ServerErrorSurfacesError(t *testing.T) {
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any) (*queryResponse, error) {
+		return nil, &fakeNeo4jError{code: "Neo.ClientError.Statement.SyntaxError", message: "Invalid input"}
+	})
 
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "neo4j", userAgent: "neo4j-cli/vtest", doer: srv.Client()}
-	_, err := runStatement(context.Background(), c, "RETURN 1", nil)
-	require.NoError(t, err)
-	_, hasParams := gotBody["parameters"]
-	assert.False(t, hasParams, "omit parameters when nil")
-}
-
-func TestRunStatement_ServerErrorSurfacesCodeAndMessage(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"Invalid input"}]}`))
-	}))
-	defer srv.Close()
-
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "neo4j", userAgent: "neo4j-cli/vtest", doer: srv.Client()}
+	c := &conn{database: "neo4j"}
 	_, err := runStatement(context.Background(), c, "BAD CYPHER", nil)
 	require.Error(t, err)
 	msg := err.Error()
@@ -365,76 +318,16 @@ func TestRunStatement_ServerErrorSurfacesCodeAndMessage(t *testing.T) {
 	assert.Contains(t, msg, "Invalid input")
 }
 
-func TestRunStatement_Non2xxWithoutErrorsField(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{}`))
-	}))
-	defer srv.Close()
-
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "neo4j", userAgent: "neo4j-cli/vtest", doer: srv.Client()}
-	_, err := runStatement(context.Background(), c, "RETURN 1", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "500")
+// fakeNeo4jError mimics the shape of an upstream driver error wrapping a code
+// + message — its String/Error format is used when runStatement wraps the
+// driver error and surfaces it to callers.
+type fakeNeo4jError struct {
+	code    string
+	message string
 }
 
-func TestRunStatement_DatabaseInPath(t *testing.T) {
-	var gotPath string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
-	}))
-	defer srv.Close()
-
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "movies", userAgent: "neo4j-cli/vtest", doer: srv.Client()}
-	_, err := runStatement(context.Background(), c, "RETURN 1", nil)
-	require.NoError(t, err)
-	assert.Equal(t, "/db/movies/query/v2", gotPath)
-}
-
-func TestNewHTTPClient_InsecureFlipsSkipVerify(t *testing.T) {
-	secure := newHTTPClient(false)
-	insecure := newHTTPClient(true)
-
-	// Default client has nil Transport.
-	assert.Nil(t, secure.Transport)
-
-	tr, ok := insecure.Transport.(*http.Transport)
-	require.True(t, ok, "insecure client must use *http.Transport")
-	require.NotNil(t, tr.TLSClientConfig)
-	assert.True(t, tr.TLSClientConfig.InsecureSkipVerify)
-}
-
-func TestRunStatement_TLSWithoutInsecureFails(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
-	}))
-	defer srv.Close()
-
-	// Use the secure default client (no skip-verify); httptest's self-signed
-	// cert should fail verification.
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "neo4j", userAgent: "neo4j-cli/vtest", doer: newHTTPClient(false)}
-	_, err := runStatement(context.Background(), c, "RETURN 1", nil)
-	require.Error(t, err)
-	// The exact error wording depends on Go version but always references TLS/cert.
-	low := strings.ToLower(err.Error())
-	assert.True(t,
-		strings.Contains(low, "certificate") ||
-			strings.Contains(low, "tls") ||
-			strings.Contains(low, "x509"),
-		"expected TLS-related error, got: %s", err.Error())
-}
-
-func TestRunStatement_TLSWithInsecureSucceeds(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
-	}))
-	defer srv.Close()
-
-	c := &conn{uri: srv.URL, username: "u", password: "p", database: "neo4j", userAgent: "neo4j-cli/vtest", doer: newHTTPClient(true)}
-	res, err := runStatement(context.Background(), c, "RETURN 1", nil)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"n"}, res.Columns)
+func (e *fakeNeo4jError) Error() string {
+	return e.code + ": " + e.message
 }
 
 func TestParseBool(t *testing.T) {

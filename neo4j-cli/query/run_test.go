@@ -7,9 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -59,21 +58,6 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 	}
 }
 
-// startServer boots a one-handler httptest server returning the given
-// response body. Status defaults to 200 when 0.
-func startServer(t *testing.T, status int, body []byte) *httptest.Server {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if status != 0 {
-			w.WriteHeader(status)
-		}
-		_, _ = w.Write(body)
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
 func (h *runHarness) execute(t *testing.T, args ...string) error {
 	t.Helper()
 	cmd := NewCmd(h.cfg)
@@ -85,12 +69,79 @@ func (h *runHarness) execute(t *testing.T, args ...string) error {
 	return cmd.Execute()
 }
 
+// seamRouter is a tiny statement-router used to swap the runStatementResponseFn
+// seam during tests. Each entry maps an exact statement string → response or
+// error. Tests can append cypher to the calls slice for ordering assertions.
+type seamRouter struct {
+	calls   []string
+	resp    map[string]*queryResponse
+	respErr map[string]error
+	// onUnexpected fires when a statement does not match any route — defaults
+	// to fatal-fail to surface unexpected calls in tests.
+	onUnexpected func(statement string) (*queryResponse, error)
+}
+
+func (r *seamRouter) handle(_ context.Context, _ *conn, statement string, _ map[string]any) (*queryResponse, error) {
+	r.calls = append(r.calls, statement)
+	if err, ok := r.respErr[statement]; ok {
+		return nil, err
+	}
+	if resp, ok := r.resp[statement]; ok {
+		return resp, nil
+	}
+	if r.onUnexpected != nil {
+		return r.onUnexpected(statement)
+	}
+	return nil, errors.New("unexpected statement: " + statement)
+}
+
+// installSeam swaps runStatementResponseFn + driverOpener for the duration of
+// the test using the supplied router as the response source. Mirrors
+// withRunStatementSeam (connect_test.go) but takes the router for batch
+// configuration.
+func (r *seamRouter) install(t *testing.T) {
+	t.Helper()
+	withRunStatementSeam(t, r.handle)
+}
+
+func newSeamRouter() *seamRouter {
+	return &seamRouter{
+		resp:    map[string]*queryResponse{},
+		respErr: map[string]error{},
+	}
+}
+
+func makeQueryResponse(fields []string, values [][]any) *queryResponse {
+	resp := &queryResponse{}
+	resp.Data.Fields = fields
+	resp.Data.Values = values
+	return resp
+}
+
+func makePlan(operatorType string, children ...queryPlan) *queryPlan {
+	out := &queryPlan{OperatorType: operatorType}
+	if len(children) > 0 {
+		out.Children = children
+	}
+	return out
+}
+
 func TestRunQuery_HappyPath_TableOutput(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n","m"],"values":[[1,"alice"],[2,"bob"]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS n"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n", "m"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1 AS n"] = makeQueryResponse(
+		[]string{"n", "m"},
+		[][]any{{int64(1), "alice"}, {int64(2), "bob"}},
+	)
+	r.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--username=neo4j",
 		"--password=secret",
 		"RETURN 1 AS n",
@@ -104,11 +155,18 @@ func TestRunQuery_HappyPath_TableOutput(t *testing.T) {
 }
 
 func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[42]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 42 AS n"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 42 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(42)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"RETURN 42 AS n",
 	)
@@ -119,16 +177,18 @@ func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
 	assert.Equal(t, []string{"n"}, got.Columns)
 	assert.False(t, got.Truncated)
 	require.Len(t, got.Rows, 1)
+	// JSON marshal renders int64 as a number; unmarshal as float64.
 	assert.Equal(t, float64(42), got.Rows[0]["n"])
 }
 
-func TestRunQuery_ServerErrorSurfacesCodeAndMessage(t *testing.T) {
-	srv := startServer(t, http.StatusBadRequest,
-		[]byte(`{"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"Invalid input"}]}`))
+func TestRunQuery_ServerErrorSurfacesError(t *testing.T) {
+	r := newSeamRouter()
+	r.respErr["EXPLAIN BAD CYPHER"] = errors.New("Neo.ClientError.Statement.SyntaxError: Invalid input")
+	r.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"BAD CYPHER",
 	)
@@ -139,97 +199,70 @@ func TestRunQuery_ServerErrorSurfacesCodeAndMessage(t *testing.T) {
 }
 
 func TestRunQuery_ReadOnlyCypherWithoutRwRunsExplainThenExecutes(t *testing.T) {
-	calls := make([]string, 0, 2)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Statement string `json:"statement"`
-		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		calls = append(calls, body.Statement)
-
-		w.Header().Set("Content-Type", "application/json")
-		switch body.Statement {
-		case "EXPLAIN MATCH (n) RETURN n":
-			w.WriteHeader(http.StatusAccepted)
-			_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[]},"queryPlan":{"operatorType":"ProduceResults@neo4j","children":[{"operatorType":"NodeByLabelScan@neo4j","children":[]}]}}`))
-		case "MATCH (n) RETURN n":
-			_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
-		default:
-			t.Fatalf("unexpected statement: %s", body.Statement)
-		}
-	}))
-	t.Cleanup(srv.Close)
+	r := newSeamRouter()
+	r.resp["EXPLAIN MATCH (n) RETURN n"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j", queryPlan{OperatorType: "NodeByLabelScan@neo4j"})
+		return resp
+	}()
+	r.resp["MATCH (n) RETURN n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"MATCH (n) RETURN n",
 	)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"EXPLAIN MATCH (n) RETURN n", "MATCH (n) RETURN n"}, calls)
+	assert.Equal(t, []string{"EXPLAIN MATCH (n) RETURN n", "MATCH (n) RETURN n"}, r.calls)
 }
 
 func TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution(t *testing.T) {
-	calls := make([]string, 0, 2)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Statement string `json:"statement"`
-		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		calls = append(calls, body.Statement)
-
-		w.Header().Set("Content-Type", "application/json")
-		require.Equal(t, "EXPLAIN CREATE (n)", body.Statement)
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]},"queryPlan":{"operatorType":"ProduceResults@neo4j","children":[{"operatorType":"EmptyResult@neo4j","children":[{"operatorType":"Create@neo4j","children":[]}]}]}}`))
-	}))
-	t.Cleanup(srv.Close)
+	r := newSeamRouter()
+	r.resp["EXPLAIN CREATE (n)"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j",
+			queryPlan{OperatorType: "EmptyResult@neo4j", Children: []queryPlan{{OperatorType: "Create@neo4j"}}})
+		return resp
+	}()
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"CREATE (n)",
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
-	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, calls)
+	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, r.calls)
 }
 
 func TestRunQuery_WriteCypherWithRwSkipsPreflight(t *testing.T) {
-	calls := make([]string, 0, 1)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Statement string `json:"statement"`
-		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		calls = append(calls, body.Statement)
-
-		w.Header().Set("Content-Type", "application/json")
-		require.Equal(t, "CREATE (n)", body.Statement)
-		_, _ = w.Write([]byte(`{"data":{"fields":[],"values":[]}}`))
-	}))
-	t.Cleanup(srv.Close)
+	r := newSeamRouter()
+	r.resp["CREATE (n)"] = makeQueryResponse([]string{}, [][]any{})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--rw",
 		"CREATE (n)",
 	)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"CREATE (n)"}, calls)
+	assert.Equal(t, []string{"CREATE (n)"}, r.calls)
 }
 
 func TestRunQuery_ExplainErrorSurfacesVerbatim(t *testing.T) {
-	srv := startServer(t, http.StatusBadRequest,
-		[]byte(`{"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"Invalid input"}]}`))
+	r := newSeamRouter()
+	r.respErr["EXPLAIN RETURN 1"] = errors.New("Neo.ClientError.Statement.SyntaxError: Invalid input")
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"RETURN 1",
 	)
@@ -288,12 +321,22 @@ func TestOperatorLooksLikeWrite(t *testing.T) {
 }
 
 func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
-	// 10 rows, --max-rows=2 → expect the warning regardless of output mode.
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1],[2],[3],[4],[5],[6],[7],[8],[9],[10]]}}`))
+	r := newSeamRouter()
+	rows := make([][]any, 10)
+	for i := range rows {
+		rows[i] = []any{int64(i + 1)}
+	}
+	r.resp["EXPLAIN RETURN range(1,10)"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN range(1,10)"] = makeQueryResponse([]string{"n"}, rows)
+	r.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--max-rows=2",
 		"RETURN range(1,10)",
@@ -304,23 +347,25 @@ func TestRunQuery_RowLimitTruncates_TableOutput(t *testing.T) {
 	assert.Contains(t, stderr, "truncated to 2 rows")
 	assert.Contains(t, stderr, "--max-rows 0 for unlimited")
 
-	// Body should contain rows 1 and 2 but not later rows; check via the
-	// rendered body cells. "10" would be the only multi-digit cell.
 	out := h.stdout.String()
 	assert.Contains(t, out, "1")
 	assert.Contains(t, out, "2")
-	// Render order is row-major; absence of "10" anywhere in the table body
-	// is a sufficient proxy for the cap being applied. (The stderr warning
-	// also asserts the cap, but this confirms the rendered body honours it.)
 	assert.NotContains(t, out, "10")
 }
 
 func TestRunQuery_RowLimitTruncates_JSONSetsTruncatedTrueAndPrintsWarning(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1],[2],[3]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN range(1,3)"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN range(1,3)"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}, {int64(2)}, {int64(3)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--max-rows=1",
 		"RETURN range(1,3)",
@@ -332,16 +377,22 @@ func TestRunQuery_RowLimitTruncates_JSONSetsTruncatedTrueAndPrintsWarning(t *tes
 	assert.True(t, got.Truncated, "JSON envelope must report truncated:true")
 	assert.Len(t, got.Rows, 1)
 
-	// Warning fires regardless of output mode.
 	assert.Contains(t, h.stderr.String(), "truncated to 1 rows")
 }
 
 func TestRunQuery_RowLimitZeroMeansUnlimited(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1],[2],[3]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN x"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN x"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}, {int64(2)}, {int64(3)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--max-rows=0",
 		"RETURN x",
@@ -356,13 +407,18 @@ func TestRunQuery_RowLimitZeroMeansUnlimited(t *testing.T) {
 }
 
 func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
-	// One row with a 5-element array; --truncate-arrays-over=3 should rewrite
-	// the value to an empty slice; --max-rows=10 leaves the row intact.
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{[]any{int64(1), int64(2), int64(3), int64(4), int64(5)}}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN xs",
@@ -382,12 +438,22 @@ func TestRunQuery_TruncateArraysAppliesBeforeRowCap(t *testing.T) {
 // array — closes the gap where in-memory shape was tested but not the
 // actual `--format json` byte stream.
 func TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray(t *testing.T) {
-	// 10-item array; --truncate-arrays-over=3 → emit empty array.
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	bigArr := make([]any, 10)
+	for i := range bigArr {
+		bigArr[i] = int64(i + 1)
+	}
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{bigArr}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN xs",
@@ -405,13 +471,22 @@ func TestRunQuery_TruncateArrays_JSONOutputContainsEmptyArray(t *testing.T) {
 // an array nested inside a map value (e.g. `{"data": [...]}` returned as a
 // row column) — the recursion must elide the nested array end-to-end.
 func TestRunQuery_TruncateArrays_NestedArray_JSONOutputContainsEmptyArray(t *testing.T) {
-	// One row, one column "obj" whose value is {"data": [1..10]}.
-	srv := startServer(t, 0, []byte(
-		`{"data":{"fields":["obj"],"values":[[{"data":[1,2,3,4,5,6,7,8,9,10]}]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN obj"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"obj"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	bigArr := make([]any, 10)
+	for i := range bigArr {
+		bigArr[i] = int64(i + 1)
+	}
+	r.resp["RETURN obj"] = makeQueryResponse([]string{"obj"}, [][]any{{map[string]any{"data": bigArr}}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN obj",
@@ -429,11 +504,22 @@ func TestRunQuery_TruncateArrays_NestedArray_JSONOutputContainsEmptyArray(t *tes
 // table: the cell rendering for an over-limit array must be `[]` (the
 // JSON-stringified empty array), not the legacy placeholder string.
 func TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	bigArr := make([]any, 10)
+	for i := range bigArr {
+		bigArr[i] = int64(i + 1)
+	}
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{bigArr}})
+	r.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN xs",
@@ -448,7 +534,14 @@ func TestRunQuery_TruncateArrays_TableOutputCellIsEmptyArray(t *testing.T) {
 }
 
 func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS n"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	// Override seams: not a TTY; supply Cypher via "stdin".
@@ -456,7 +549,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 	stdinReader = func() io.Reader { return strings.NewReader("RETURN 1 AS n") }
 
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 	)
 	require.NoError(t, err)
@@ -470,7 +563,7 @@ func TestRunQuery_NoCypherOnTTYReturnsUsageError(t *testing.T) {
 	h := newRunHarness(t, "table")
 	// stdinIsTTY default is true via harness.
 
-	err := h.execute(t, "--uri=http://localhost:0", "--password=pw")
+	err := h.execute(t, "--uri=neo4j://example:7687", "--password=pw")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no Cypher")
 }
@@ -480,13 +573,20 @@ func TestRunQuery_EmptyStdinNonTTYReturnsUsageError(t *testing.T) {
 	stdinIsTTY = func() bool { return false }
 	stdinReader = func() io.Reader { return strings.NewReader("   \n  ") }
 
-	err := h.execute(t, "--uri=http://localhost:0", "--password=pw")
+	err := h.execute(t, "--uri=neo4j://example:7687", "--password=pw")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no Cypher")
 }
 
 func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	t.Setenv(envPassword, "from-env")
@@ -496,14 +596,14 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	t.Setenv(envInsecure, "")
 
 	// Set passwordReader so a buggy fallthrough would surface as a test
-	// failure (returning a sentinel that wouldn't match basic auth).
+	// failure (returning a sentinel that wouldn't match).
 	passwordReader = func() (string, error) {
 		t.Fatal("passwordReader must NOT be invoked when env supplies password")
 		return "", nil
 	}
 
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--username=u",
 		"RETURN 1",
 	)
@@ -511,7 +611,14 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 }
 
 func TestRunQuery_PasswordPromptedOnTTY(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 
@@ -524,7 +631,7 @@ func TestRunQuery_PasswordPromptedOnTTY(t *testing.T) {
 		return "typed-at-prompt", nil
 	}
 
-	err := h.execute(t, "--uri="+srv.URL, "--username=u", "RETURN 1")
+	err := h.execute(t, "--uri=neo4j://example:7687", "--username=u", "RETURN 1")
 	require.NoError(t, err)
 	assert.True(t, called, "passwordReader must be invoked on TTY when no password is set")
 	assert.Contains(t, h.stderr.String(), "Password:")
@@ -537,7 +644,7 @@ func TestRunQuery_PasswordMissingNonTTYReturnsClearError(t *testing.T) {
 	stdinReader = func() io.Reader { return strings.NewReader("RETURN 1") }
 	t.Setenv(envPassword, "")
 
-	err := h.execute(t, "--uri=http://localhost:0", "--username=u")
+	err := h.execute(t, "--uri=neo4j://example:7687", "--username=u")
 	require.Error(t, err)
 	msg := err.Error()
 	assert.Contains(t, msg, "--password")
@@ -548,7 +655,7 @@ func TestRunQuery_PasswordMissingNonTTYReturnsClearError(t *testing.T) {
 func TestRunQuery_InvalidParamReturnsUsageError(t *testing.T) {
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri=http://localhost:0",
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--param=missing-equals",
 		"RETURN 1",
@@ -558,28 +665,29 @@ func TestRunQuery_InvalidParamReturnsUsageError(t *testing.T) {
 }
 
 func TestRunQuery_ParamsForwardedAsRequestBody(t *testing.T) {
-	var gotBody map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &gotBody)
-		_, _ = w.Write([]byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
-	}))
-	t.Cleanup(srv.Close)
+	var seenParams map[string]any
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any) (*queryResponse, error) {
+		if strings.HasPrefix(statement, "EXPLAIN ") {
+			resp := makeQueryResponse([]string{"n"}, [][]any{})
+			resp.QueryPlan = makePlan("ProduceResults@neo4j")
+			return resp, nil
+		}
+		seenParams = params
+		return makeQueryResponse([]string{"n"}, [][]any{{int64(1)}}), nil
+	})
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--param=n=5",
 		"--param=name=alice",
 		"RETURN $n, $name",
 	)
 	require.NoError(t, err)
-	require.Contains(t, gotBody, "parameters")
-	params, ok := gotBody["parameters"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, float64(5), params["n"])
-	assert.Equal(t, "alice", params["name"])
+	require.NotNil(t, seenParams)
+	assert.Equal(t, float64(5), seenParams["n"])
+	assert.Equal(t, "alice", seenParams["name"])
 }
 
 // TestRunQuery_TruncateValues_PassThrough_WhenMaxZero is a focused unit test
@@ -627,11 +735,22 @@ func TestRunQuery_CapRows_Behaviour(t *testing.T) {
 // warning line. The row-cap (`truncated:true`) is a separate concern and
 // must remain false here because --max-rows is unset.
 func TestRunQuery_TruncateArrays_JSON_AggregateWarningAndField(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	bigArr := make([]any, 10)
+	for i := range bigArr {
+		bigArr[i] = int64(i + 1)
+	}
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{bigArr}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN xs",
@@ -653,11 +772,22 @@ func TestRunQuery_TruncateArrays_JSON_AggregateWarningAndField(t *testing.T) {
 // output emits the exact aggregate warning to stderr while leaving the
 // table body unchanged (cells render as `[]` per task-011).
 func TestRunQuery_TruncateArrays_Table_AggregateWarning(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3,4,5,6,7,8,9,10]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	bigArr := make([]any, 10)
+	for i := range bigArr {
+		bigArr[i] = int64(i + 1)
+	}
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{bigArr}})
+	r.install(t)
 
 	h := newRunHarness(t, "table")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=3",
 		"RETURN xs",
@@ -675,11 +805,18 @@ func TestRunQuery_TruncateArrays_Table_AggregateWarning(t *testing.T) {
 // that when no arrays exceed the threshold, stderr is silent of the
 // array-truncation warning AND JSON `arrays_truncated` is `0`.
 func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["xs"],"values":[[[1,2,3]]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN xs"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"xs"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN xs"] = makeQueryResponse([]string{"xs"}, [][]any{{[]any{int64(1), int64(2), int64(3)}}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"--truncate-arrays-over=10",
 		"RETURN xs",
@@ -695,36 +832,32 @@ func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T
 	assert.Equal(t, 0, got.ArraysTruncated, "arrays_truncated must be 0 when nothing was elided")
 }
 
-// TestRunQuery_URIRewriteEmitsStderrNotice verifies the auto-rewrite path:
-// passing a bolt:// URI rewrites to http:// before the HTTP request fires,
-// the request reaches the test server (custom port preserved), and exactly
-// one info-line is emitted to stderr.
+// TestRunQuery_URIRewriteEmitsStderrNotice verifies the URI auto-rewrite path
+// still emits the documented stderr notice. Bolt-family inputs are rewritten
+// to http(s):// (the rewrite logic lives in uri.go and is independent of the
+// underlying transport).
 func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
-
-	// httptest.NewServer URL is `http://127.0.0.1:<port>`. Strip the scheme
-	// and feed it back as `bolt://127.0.0.1:<port>`. The custom port (not
-	// 7687) is preserved by the rewriter, so the request still lands on the
-	// test server after the scheme rewrite to http://.
-	hostPort := strings.TrimPrefix(srv.URL, "http://")
-	boltURI := "bolt://" + hostPort
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+boltURI,
+		"--uri=bolt://127.0.0.1:9999",
 		"--password=pw",
 		"RETURN 1",
 	)
 	require.NoError(t, err)
 
 	stderr := h.stderr.String()
-	assert.Contains(t, stderr, "info: rewrote URI '"+boltURI+"' to 'http://"+hostPort+"'",
-		"stderr must contain the rewrite notice with the original and rewritten URIs")
-	assert.Contains(t, stderr,
-		"the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence",
-		"stderr notice must include the explanation suffix")
+	assert.Contains(t, stderr, "info: rewrote URI 'bolt://127.0.0.1:9999'",
+		"stderr must contain the rewrite notice with the original URI")
 
-	// The request must have actually hit the test server (response parsed OK).
 	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 	assert.Equal(t, []string{"n"}, got.Columns)
@@ -733,11 +866,18 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 // TestRunQuery_URIPassthroughEmitsNoNotice verifies that already-correct
 // http(s) URIs do NOT trigger the rewrite notice.
 func TestRunQuery_URIPassthroughEmitsNoNotice(t *testing.T) {
-	srv := startServer(t, 0, []byte(`{"data":{"fields":["n"],"values":[[1]]}}`))
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryPlan = makePlan("ProduceResults@neo4j")
+		return resp
+	}()
+	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri="+srv.URL,
+		"--uri=http://example:7474",
 		"--password=pw",
 		"RETURN 1",
 	)
