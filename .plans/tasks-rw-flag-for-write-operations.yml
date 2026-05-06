@@ -20,14 +20,14 @@ tasks:
     title: "Mount --rw flag on neo4j-cli and aura-cli roots"
     description: |
       Call RegisterRwFlag in neo4j-cli/app/app.go::NewCmd and in neo4j-cli/aura/aura.go::NewStandaloneCmd. Do not register --rw in aura.NewCmd (it inherits from super-CLI). Ensure cobra.EnableTraverseRunHooks remains true so the root hook fires for all leaves.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "neo4j-cli --help shows --rw under Global flags"
       - "aura-cli --help shows --rw when built standalone"
       - "Test asserts traverse-run hooks on root remain enabled"
-    completed_at: null
+    completed_at: 2026-05-06T13:36:59Z
 
   - id: task-003
     title: "Annotate all write leaves with Annotations['write']='true'"

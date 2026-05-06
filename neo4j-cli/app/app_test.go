@@ -25,5 +25,18 @@ func TestNewCmdEnablesTraverseRunHooks(t *testing.T) {
 
 	assert.True(t, cobra.EnableTraverseRunHooks,
 		"EnableTraverseRunHooks must be true so PersistentPreRunE hooks on root "+
-			"(e.g. format flag binding) are not shadowed by hooks on child commands")
+			"(e.g. format flag binding and write gating) are not shadowed by hooks on child commands")
+}
+
+func TestNewCmdRegistersRwFlag(t *testing.T) {
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := NewCmd(cfg)
+
+	flag := cmd.PersistentFlags().Lookup("rw")
+	require.NotNil(t, flag)
+	assert.Equal(t, "false", flag.DefValue)
+	assert.Contains(t, flag.Usage, "Allow write operations")
 }

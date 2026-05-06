@@ -18,3 +18,29 @@ Key Decisions:
 - Added ComposeRootPersistentPreRunE for roots that need format + write gate.
 
 Next Task: task-004
+
+================================================================================
+TASK-002: Mount --rw flag on neo4j-cli and aura-cli roots
+Date: 2026-05-06T13:36:59Z
+================================================================================
+
+Summary:
+Mounted --rw on the neo4j-cli root and standalone aura-cli root. Ensured standalone aura execution paths use the composed root pre-run hook so output binding and write gating both run. Added root flag tests and regenerated skill bundles so Global Flags include --rw.
+
+Files Changed:
+- neo4j-cli/app/app.go (modified: registers --rw on neo4j-cli root)
+- neo4j-cli/app/app_test.go (modified: asserts neo4j-cli root registers --rw)
+- neo4j-cli/aura/aura.go (modified: registers --rw only for standalone aura-cli)
+- neo4j-cli/aura/aura_test.go (created: asserts standalone vs mounted aura flag behavior)
+- neo4j-cli/aura/cmd/main.go (modified: uses composed persistent pre-run hook)
+- neo4j-cli/aura/internal/test/testutils/auratesthelper.go (modified: test helper uses composed hook)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated: Global Flags includes --rw)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated: Global Flags includes --rw)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- aura.NewCmd intentionally remains without --rw so it inherits from neo4j-cli when mounted.
+- Included generated bundle diffs in this task because tests fail as soon as the root persistent flag changes.
+
+Next Task: task-004

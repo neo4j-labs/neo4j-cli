@@ -13,6 +13,7 @@ Allows you to manage Neo4j resources
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon] |
+| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
 
 ## Subcommands
 

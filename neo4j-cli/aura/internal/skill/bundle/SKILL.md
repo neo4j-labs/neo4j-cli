@@ -8,6 +8,12 @@ version: {{VERSION}}
 
 Allows you to programmatically provision and manage your Aura resources
 
+## Global Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
+
 ## Subcommands
 
 | Command | Description |
