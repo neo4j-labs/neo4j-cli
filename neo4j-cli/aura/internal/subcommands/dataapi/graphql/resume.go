@@ -20,8 +20,9 @@ func NewResumeCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "resume <id>",
-		Short: "Resume a GraphQL Data API",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "resume <id>",
+		Short:       "Resume a GraphQL Data API",
 		Long: `This command starts the resuming process of an existing GraphQL Data API.
 
 Resuming a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "resuming" to "ready" you may begin to use your GraphQL Data API.	`,

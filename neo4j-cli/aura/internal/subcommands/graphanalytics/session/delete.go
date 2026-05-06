@@ -15,10 +15,11 @@ import (
 
 func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete <id>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Delete a Graph Analytics Serverless session",
-		Long:  `This subcommand deletes a Graph Analytics Serverless session by id.`,
+		Annotations: map[string]string{"write": "true"},
+		Use:         "delete <id>",
+		Args:        cobra.ExactArgs(1),
+		Short:       "Delete a Graph Analytics Serverless session",
+		Long:        `This subcommand deletes a Graph Analytics Serverless session by id.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/graph-analytics/sessions/%s", args[0])
 

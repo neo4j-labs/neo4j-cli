@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -72,7 +73,28 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		c.password = pw
 	}
 
-	res, err := runStatement(cmd.Context(), c, cypher, params)
+	if err := c.openDriver(); err != nil {
+		return err
+	}
+	defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
+
+	rwFlag := cmd.Flag("rw")
+	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
+	if !allowWrite {
+		if err := rejectWriteCypher(cmd, c, cypher, params); err != nil {
+			return err
+		}
+	}
+
+	// When --rw is set the user has opted in to writing, so run inside
+	// ExecuteWrite. When --rw is unset the preflight already classified the
+	// statement as read-only, so run inside ExecuteRead.
+	var res *queryResult
+	if allowWrite {
+		res, err = runStatementWrite(cmd.Context(), c, cypher, params)
+	} else {
+		res, err = runStatement(cmd.Context(), c, cypher, params)
+	}
 	if err != nil {
 		return err
 	}
@@ -141,6 +163,21 @@ func promptPassword(cmd *cobra.Command) (string, error) {
 		return "", fmt.Errorf("query: read password: %w", err)
 	}
 	return pw, nil
+}
+
+// rejectWriteCypher runs an EXPLAIN preflight against the supplied cypher and
+// returns a usage error unless the driver's ResultSummary classifies it as
+// QueryTypeReadOnly. EXPLAIN never mutates state, so it always runs inside
+// ExecuteRead.
+func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
+	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params, true)
+	if err != nil {
+		return err
+	}
+	if resp.QueryType != neo4j.QueryTypeReadOnly {
+		return clierr.NewUsageError("this command writes; pass --rw to allow it")
+	}
+	return nil
 }
 
 // truncateValues applies truncateArrays to each row's positional values. The

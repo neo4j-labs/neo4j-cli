@@ -8,11 +8,14 @@ version: {{VERSION}}
 
 Allows you to manage Neo4j resources
 
+Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli query` runs EXPLAIN first when --rw is not set and blocks statements classified as writes.
+
 ## Global Flags
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon] |
+| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
 
 ## Subcommands
 
@@ -21,7 +24,7 @@ Allows you to manage Neo4j resources
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
-| [`query`](references/query.md) | Run Cypher against a Neo4j database via the HTTP Query API |
+| [`query`](references/query.md) | Run Cypher against a Neo4j database via the Bolt protocol |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
 
 ## Gotchas
@@ -34,4 +37,6 @@ Allows you to manage Neo4j resources
 - Prefer `--format toon` (`-f toon`) on all read commands when the output will be read by an LLM or agent — toon uses ~40% fewer tokens than JSON while encoding the same data.
 - Async resource operations (instance create/resize/destroy) accept `--await` to block until the resource reaches a terminal state.
 - The `version:` line in an installed SKILL.md reflects the binary that wrote it. Run `neo4j-cli skill check` after upgrading to detect drift; v1 reports drift only — re-run `skill install` to refresh.
-- If you pass a bolt-style URI (e.g. `neo4j+s://...:7687`) to `query` it is auto-rewritten to `https://...:7473`; this command speaks the HTTP Query API, not bolt. Aura hosts (`*.neo4j.io`) are always rewritten to `https://<host>` (port 443) regardless of the input scheme or port.
+- If you pass an HTTP-style URI (e.g. `http://host:7474`) to `query` it is auto-rewritten to `neo4j://host:7687` (and `https://` to `neo4j+s://host:7687`); this command speaks the Bolt protocol. Use `neo4j+ssc://` for self-signed certs.
+- Write operations require `--rw`. `neo4j-cli query run` runs `EXPLAIN` over Bolt to detect write cypher when `--rw` is not set and blocks statements classified as writes before execution.
+- Do NOT add `--rw` unless the user explicitly asked to write/modify/delete. Run commands without it by default. If a command fails because `--rw` is missing, surface the error and ask the user for permission to retry with `--rw` — do not add it on your own.

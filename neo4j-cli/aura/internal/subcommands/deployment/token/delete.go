@@ -28,10 +28,11 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete the deployment token",
-		Long:  "Deletes the token for the given Fleet Manager deployment. After deleting the token, users should also disable Fleet Manager from the database using `call fleetManagement.disable();`",
-		Args:  cobra.ExactArgs(0),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "delete",
+		Short:       "Delete the deployment token",
+		Long:        "Deletes the token for the given Fleet Manager deployment. After deleting the token, users should also disable Fleet Manager from the database using `call fleetManagement.disable();`",
+		Args:        cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

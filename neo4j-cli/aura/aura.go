@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
 	binskill "github.com/neo4j/cli/neo4j-cli/aura/internal/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
@@ -24,6 +25,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "aura-cli",
 		Short:   "Allows you to programmatically provision and manage your Aura resources",
+		Long:    "Allows you to programmatically provision and manage your Aura resources. Write operations require --rw. `query run` under neo4j-cli runs EXPLAIN first when --rw is not set and blocks statements classified as writes.",
 		Version: cfg.Version,
 	}
 
@@ -42,6 +44,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := NewCmd(cfg)
+	flags.RegisterRwFlag(cmd)
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "aura-cli"))

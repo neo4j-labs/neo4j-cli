@@ -31,7 +31,7 @@ func TestPauseInstance(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance pause %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance pause %s --rw", instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -92,7 +92,7 @@ func TestPauseInstanceError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s/pause", instanceId), testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf(`instance pause %s`, instanceId))
+			helper.ExecuteCommand(fmt.Sprintf(`instance pause %s --rw`, instanceId))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodPost)

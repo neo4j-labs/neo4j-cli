@@ -4,19 +4,15 @@
 package query
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
@@ -25,7 +21,7 @@ import (
 )
 
 const (
-	defaultURI      = "http://localhost:7474"
+	defaultURI      = "neo4j://localhost:7687"
 	defaultUsername = "neo4j"
 	defaultDatabase = "neo4j"
 
@@ -33,50 +29,64 @@ const (
 	envUsername = "NEO4J_USERNAME"
 	envPassword = "NEO4J_PASSWORD"
 	envDatabase = "NEO4J_DATABASE"
-	envInsecure = "NEO4J_INSECURE"
 )
 
-// httpDoer is the minimal subset of *http.Client needed by runStatement; tests
-// inject their own implementation rather than spinning up a server when they
-// only want to assert request shape.
-type httpDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
-// conn holds the resolved Neo4j connection details plus the HTTP client used to
-// reach the server. Tests construct conn directly with a stub doer; production
-// code goes through resolveConn.
+// conn holds the resolved Neo4j connection details. The opened Bolt driver
+// is attached lazily via openDriver after the password (if any) has been
+// resolved or prompted. Callers MUST close the driver via defer once they are
+// done using the connection. TLS is selected exclusively by the URI scheme
+// (e.g. neo4j+s:// for verified TLS, neo4j+ssc:// for self-signed certs).
 type conn struct {
 	uri       string
 	username  string
 	password  string
 	database  string
-	insecure  bool
 	userAgent string
-	doer      httpDoer
+	driver    neo4j.Driver
 }
 
-// queryResult is the parsed body of a successful POST /query/v2 response.
-// Columns are in result order; rows hold the raw values returned by the API
-// (positional, matching columns).
+// queryResult is the parsed tabular payload of a successful Cypher run. The
+// shape matches what callers (run.go, schema.go) expect: positional rows where
+// each row's order matches Columns.
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
 }
 
-// queryResponse mirrors the JSON envelope returned by the HTTP Query API.
+// queryResponse is the structured envelope around a Cypher response. Backed
+// by the Bolt driver Result + ResultSummary. QueryType is taken straight
+// from ResultSummary.QueryType() and is what the --rw classifier inspects
+// for EXPLAIN preflight runs (QueryTypeReadOnly → safe; everything else
+// requires --rw). The driver also exposes the equivalent (deprecated)
+// StatementType() / StatementTypeReadOnly aliases — we use the QueryType
+// names so staticcheck does not flag them.
 type queryResponse struct {
 	Data struct {
-		Fields []string `json:"fields"`
-		Values [][]any  `json:"values"`
-	} `json:"data"`
-	Errors []queryError `json:"errors"`
+		Fields []string
+		Values [][]any
+	}
+	Bookmarks []string
+	QueryType neo4j.QueryType
 }
 
-type queryError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+// driverOpener is the test seam used to construct the Bolt driver. Production
+// calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
+// connection.
+var driverOpener = func(target string, username, password, userAgent string) (neo4j.Driver, error) {
+	configurer := func(c *config.Config) {
+		if userAgent != "" {
+			c.UserAgent = userAgent
+		}
+	}
+	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), configurer)
 }
+
+// runStatementResponseFn is the test seam used by runStatementResponse. It
+// lets tests inject canned responses without booting a real Neo4j or
+// constructing a Bolt driver. Production sets it to runStatementResponseImpl.
+// The readOnly flag selects ExecuteRead vs ExecuteWrite in production; tests
+// can assert on it to verify correct routing.
+var runStatementResponseFn = runStatementResponseImpl
 
 // resolveConn merges connection settings from .env, OS environment, and
 // command-line flags (lowest → highest precedence). When --credential is set,
@@ -85,14 +95,14 @@ type queryError struct {
 // four connection params (uri, username, password, database) are explicitly
 // provided, the stored default database credential (if any) is used instead.
 // Partial explicit overrides (some but not all of the four params) are
-// rejected with a descriptive error. The returned conn carries an *http.Client
-// honouring --insecure or the insecure flag stored in the credential.
+// rejected with a descriptive error. The returned conn does NOT hold an open
+// driver — callers should fill in the password (prompt if needed) and then
+// call c.openDriver(ctx) before issuing queries, and defer c.driver.Close(ctx)
+// for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
-	insecureExplicit := cmd.Flag("insecure") != nil && cmd.Flag("insecure").Changed
-
 	// --credential: when set, look up the named credential and use it directly.
-	// Dotenv / env vars are skipped entirely; only --insecure may be combined.
-	// None of --uri/--username/--password/--database may be set alongside it.
+	// Dotenv / env vars are skipped entirely. None of --uri/--username/
+	// --password/--database may be set alongside it.
 	if f := cmd.Flag("credential"); f != nil && f.Changed {
 		credName := f.Value.String()
 
@@ -117,17 +127,10 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 				credName)
 		}
 
-		insecure := cred.Insecure
-		if insecureExplicit {
-			if b, perr := strconv.ParseBool(cmd.Flag("insecure").Value.String()); perr == nil {
-				insecure = b
-			}
-		}
-
 		uri := cred.URI
 		if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"info: rewrote URI '%s' to '%s' (the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence)\n",
+				"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 				displayOrig, rewritten)
 			uri = rewritten
 		}
@@ -141,9 +144,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			username:  cred.Username,
 			password:  cred.Password,
 			database:  cred.DatabaseName,
-			insecure:  insecure,
 			userAgent: "neo4j-cli/v" + version,
-			doer:      newHTTPClient(insecure),
 		}, nil
 	}
 
@@ -163,7 +164,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	username := overlay(dotenv[envUsername], os.Getenv(envUsername))
 	password := overlay(dotenv[envPassword], os.Getenv(envPassword))
 	database := overlay(dotenv[envDatabase], os.Getenv(envDatabase))
-	insecureStr := overlay(dotenv[envInsecure], os.Getenv(envInsecure))
 
 	// Apply flags (highest precedence — only when the flag was explicitly set).
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -177,13 +177,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	}
 	if f := cmd.Flag("database"); f != nil && f.Changed {
 		database = f.Value.String()
-	}
-
-	insecure, _ := parseBool(insecureStr)
-	if f := cmd.Flag("insecure"); f != nil && f.Changed {
-		if b, perr := strconv.ParseBool(f.Value.String()); perr == nil {
-			insecure = b
-		}
 	}
 
 	// Determine how many of the four connection params were explicitly provided
@@ -217,11 +210,6 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		username = storedCred.Username
 		password = storedCred.Password
 		database = storedCred.DatabaseName
-		// Only override insecure from the credential when the flag was not
-		// explicitly set by the caller.
-		if !insecureExplicit && storedCred.Insecure {
-			insecure = true
-		}
 
 	case explicitCount == 4:
 		// All four explicitly provided — bypass stored credential entirely.
@@ -247,7 +235,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 
 	if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"info: rewrote URI '%s' to '%s' (the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence)\n",
+			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 			displayOrig, rewritten)
 		uri = rewritten
 	}
@@ -263,10 +251,27 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		username:  username,
 		password:  password,
 		database:  database,
-		insecure:  insecure,
 		userAgent: userAgent,
-		doer:      newHTTPClient(insecure),
 	}, nil
+}
+
+// openDriver opens a Bolt driver using the resolved connection params and
+// stores it on c.driver. Idempotent when already opened. Caller is
+// responsible for closing the driver via c.driver.Close(ctx) (typically
+// `defer`).
+func (c *conn) openDriver() error {
+	if c == nil {
+		return errors.New("query: nil connection")
+	}
+	if c.driver != nil {
+		return nil
+	}
+	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent)
+	if err != nil {
+		return fmt.Errorf("query: open driver: %w", err)
+	}
+	c.driver = d
+	return nil
 }
 
 // loadEnvFile reads a .env file from explicitPath if non-empty, otherwise walks
@@ -337,101 +342,113 @@ func flagString(cmd *cobra.Command, name string) string {
 	return ""
 }
 
-// parseBool parses a NEO4J_INSECURE-style value tolerantly: "1", "true", "yes",
-// "on" (case-insensitive) → true; everything else → false. Returns whether the
-// input was a recognised truthy form so callers can distinguish "explicitly
-// false" from "unset".
-func parseBool(s string) (bool, bool) {
-	if s == "" {
-		return false, false
-	}
-	if b, err := strconv.ParseBool(s); err == nil {
-		return b, true
-	}
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "yes", "on":
-		return true, true
-	case "no", "off":
-		return false, true
-	}
-	return false, false
+// runStatementResponse executes a Cypher statement against the Bolt driver
+// attached to c and returns the parsed envelope (rows + bookmarks + plan).
+// Routes through runStatementResponseFn so tests can override. The readOnly
+// flag drives ExecuteRead vs ExecuteWrite selection inside the production
+// impl; preflight EXPLAIN and read-only execution pass true, post-classified
+// write execution passes false.
+func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
+	return runStatementResponseFn(ctx, c, statement, params, readOnly)
 }
 
-// newHTTPClient returns a new *http.Client. When insecure is true, TLS server
-// certificate verification is disabled — for development against self-signed
-// servers only.
-func newHTTPClient(insecure bool) *http.Client {
-	if !insecure {
-		return &http.Client{}
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // --insecure is a documented dev-only escape hatch
-	}
-	return &http.Client{Transport: tr}
-}
-
-// runStatement POSTs a single Cypher statement to <uri>/db/<database>/query/v2
-// and parses the response into a queryResult. Non-2xx responses or non-empty
-// errors[] arrays produce a Go error containing the upstream code+message.
-//
-// Note: a `txMetadata` body field would let server logs (query.log /
-// SHOW TRANSACTIONS) tag CLI traffic as e.g. {app: "neo4j-cli", type:
-// "user-direct" | "schema"}. The field is only accepted on the v2 endpoint
-// from Neo4j 2026.04 onward — earlier servers (5.x, 2025.x) reject the
-// request with HTTP 400. Re-enable once that is the minimum supported
-// server, ideally gated by a server-version probe so older servers keep
-// working.
-func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+// runStatementResponseImpl is the real Bolt-backed implementation. Opens a
+// session targeted at c.database, runs the statement inside a managed
+// transaction (ExecuteRead when readOnly is true, ExecuteWrite otherwise),
+// collects all records, and pulls summary.QueryType() (used by the --rw
+// classifier on EXPLAIN preflight runs) onto the response. The session is
+// closed via defer; the driver retains pooling.
+func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
 	}
-
-	body := map[string]any{"statement": statement}
-	if params != nil {
-		body["parameters"] = params
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("query: encode request: %w", err)
+	if c.driver == nil {
+		return nil, errors.New("query: connection driver not opened (call openDriver first)")
 	}
 
-	url := strings.TrimRight(c.uri, "/") + "/db/" + c.database + "/query/v2"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("query: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.SetBasicAuth(c.username, c.password)
-	if c.userAgent != "" {
-		req.Header.Set("User-Agent", c.userAgent)
-	}
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
+	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
 
-	resp, err := c.doer.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("query: HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("query: read response: %w", err)
-	}
-
-	var parsed queryResponse
-	if len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, &parsed); err != nil {
-			return nil, fmt.Errorf("query: parse response (status %d): %w", resp.StatusCode, err)
+	work := func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, statement, params)
+		if err != nil {
+			return nil, err
 		}
+
+		records, err := result.Collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		summary, err := result.Consume(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		resp := &queryResponse{}
+		if len(records) > 0 {
+			resp.Data.Fields = append([]string(nil), records[0].Keys...)
+			resp.Data.Values = make([][]any, 0, len(records))
+			for _, rec := range records {
+				row := make([]any, len(rec.Values))
+				copy(row, rec.Values)
+				resp.Data.Values = append(resp.Data.Values, row)
+			}
+		} else {
+			// Even with zero rows the result keys are available via the result
+			// metadata so downstream renderers see the column header. Fall back
+			// to an empty (but non-nil) slice when nothing came back.
+			keys, _ := result.Keys()
+			resp.Data.Fields = append([]string(nil), keys...)
+			resp.Data.Values = [][]any{}
+		}
+
+		if summary != nil {
+			resp.QueryType = summary.QueryType()
+		}
+
+		return resp, nil
 	}
 
-	if len(parsed.Errors) > 0 {
-		first := parsed.Errors[0]
-		return nil, fmt.Errorf("query: server error [%s] %s", first.Code, first.Message)
+	var (
+		out any
+		err error
+	)
+	if readOnly {
+		out, err = session.ExecuteRead(ctx, work)
+	} else {
+		out, err = session.ExecuteWrite(ctx, work)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("query: HTTP %d from %s", resp.StatusCode, url)
+	resp, ok := out.(*queryResponse)
+	if !ok || resp == nil {
+		return nil, errors.New("query: unexpected nil response from managed transaction")
+	}
+	return resp, nil
+}
+
+// runStatement executes a Cypher statement and returns the tabular result.
+// Defaults to readOnly=true; callers that classify a statement as a write
+// (post-EXPLAIN or with --rw) MUST use runStatementWrite instead.
+func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+	return runStatementWithMode(ctx, c, statement, params, true)
+}
+
+// runStatementWrite executes a Cypher statement on the write path, routing
+// through ExecuteWrite. Used by the query run leaf when --rw is set (the
+// user has opted in) or when the post-classification path determines the
+// statement mutates state.
+func runStatementWrite(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+	return runStatementWithMode(ctx, c, statement, params, false)
+}
+
+func runStatementWithMode(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResult, error) {
+	parsed, err := runStatementResponse(ctx, c, statement, params, readOnly)
+	if err != nil {
+		return nil, err
 	}
 
 	return &queryResult{

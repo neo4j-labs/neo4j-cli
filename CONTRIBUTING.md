@@ -191,6 +191,8 @@ Nested subcommands are also allowed, for example:
 
 Folders and files should follow the same structure as the commands. So for example, `instance snapshot list` should be implemented in the folder `subcommands/instance/snapshot/list.go`. A single command per file
 
+Every new write leaf must set `Annotations["write"] = "true"` so the root `--rw` gate applies automatically.
+
 ### Common subcommands
 
 Most commands targetting API resources contain some of the following subcommands as actions:

@@ -15,7 +15,7 @@ func TestRemoveCredential(t *testing.T) {
 
 	helper.SetCredentialsValue("aura.credentials", []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}})
 
-	helper.ExecuteCommand("credential remove test")
+	helper.ExecuteCommand("credential remove test --rw")
 
 	helper.AssertCredentialsValue("aura.credentials", "[]")
 }

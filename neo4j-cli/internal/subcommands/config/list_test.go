@@ -20,7 +20,7 @@ func TestConfigList(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			name:    "list with default format auto-detects non-TTY and renders JSON",
+			name:    "read leaf list remains unaffected without rw",
 			command: "config list",
 			// "default" auto-detects: non-TTY test stdout → JSON rendering
 			wantOut: `{

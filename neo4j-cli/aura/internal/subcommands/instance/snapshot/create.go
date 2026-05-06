@@ -19,8 +19,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var await bool
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Takes an on-demand snapshot",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Takes an on-demand snapshot",
 		Long: `This subcommand starts the on-demand snapshot creation process for an Aura instance.
 Creating a snapshot is an asynchronous operation. You can poll the current status of this operation by periodically getting the snapshots details for the instance ID using the get subcommand.
 The time taken to complete a snapshot depends on the amount of data stored in the instance; larger quantities of data will take longer. The exact time this will take is dependent on the size of your data store.`,

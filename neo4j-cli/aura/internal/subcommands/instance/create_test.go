@@ -11,7 +11,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
-func TestCreateFreeInstance(t *testing.T) {
+func TestCreateFreeInstanceRequiresRw(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -30,6 +30,30 @@ func TestCreateFreeInstance(t *testing.T) {
 		}`)
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID")
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: this command writes; pass --rw to allow it")
+}
+
+func TestCreateFreeInstance(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+			"data": {
+				"id": "db1d1234",
+				"connection_url": "YOUR_CONNECTION_URL",
+				"username": "neo4j",
+				"password": "letMeIn123!",
+				"tenant_id": "YOUR_TENANT_ID",
+				"cloud_provider": "gcp",
+				"region": "europe-west1",
+				"type": "free-db",
+				"name": "Instance01"
+			}
+		}`)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -70,7 +94,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -111,7 +135,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB --vector-optimized --graph-analytics-plugin")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB --vector-optimized --graph-analytics-plugin --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -139,7 +163,7 @@ func TestCreateProfessionalInstanceNoMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -153,7 +177,7 @@ func TestCreateProfessionalInstanceNoTenant(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -167,7 +191,7 @@ func TestCreateProfessionalInstanceInvalidCloudProvider(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider invalid --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider invalid --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -181,7 +205,7 @@ func TestCreateProfessionalInstanceInvalidMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 3GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 3GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -195,7 +219,7 @@ func TestCreateProfessionalInstanceInvalidInstanceType(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type invalid-db --memory 1GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type invalid-db --memory 1GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -209,7 +233,7 @@ func TestCreateProfessionalInstanceInvalidVersion(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID --version 6")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --memory 1GB --cloud-provider gcp --tenant-id YOUR_TENANT_ID --version 6 --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -223,7 +247,7 @@ func TestCreateFreeInstanceWithMemory(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --memory 1GB --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --memory 1GB --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -237,7 +261,7 @@ func TestCreateFreeInstanceWithRegion(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -251,7 +275,7 @@ func TestCreateFreeInstanceWithCloudProvider(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --cloud-provider gcp --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --cloud-provider gcp --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -265,7 +289,7 @@ func TestCreateFreeInstanceWithGraphAnalyticsPlugin(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, "")
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --graph-analytics-plugin --tenant-id YOUR_TENANT_ID")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --graph-analytics-plugin --tenant-id YOUR_TENANT_ID --rw")
 
 	mockHandler.AssertCalledTimes(0)
 
@@ -313,7 +337,7 @@ func TestCreateInstanceError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock("/v1/instances", testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB")
+			helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB --rw")
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -342,7 +366,7 @@ func TestInstanceWithCmkId(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type enterprise-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 16GB --customer-managed-key-id UUID_OF_YOUR_KEY")
+	helper.ExecuteCommand("instance create --region europe-west1 --name Instance01 --type enterprise-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 16GB --customer-managed-key-id UUID_OF_YOUR_KEY --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -383,7 +407,7 @@ func TestCreateFreeInstanceWithConfigTenantId(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -434,7 +458,7 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw")
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)

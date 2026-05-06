@@ -27,9 +27,10 @@ func NewCancelCommand(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "cancel <id>",
-		Short: "Cancel a job by id",
-		Args:  cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
+		Use:         "cancel <id>",
+		Short:       "Cancel a job by id",
+		Args:        cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

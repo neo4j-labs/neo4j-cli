@@ -31,7 +31,7 @@ func TestDeleteInstance(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --rw", instanceId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -92,7 +92,7 @@ func TestDeleteInstanceError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf("instance delete %s", instanceId))
+			helper.ExecuteCommand(fmt.Sprintf("instance delete %s --rw", instanceId))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)

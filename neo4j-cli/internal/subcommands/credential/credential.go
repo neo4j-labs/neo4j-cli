@@ -50,8 +50,9 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Adds a credential",
+		Use:         "add",
+		Short:       "Adds a credential",
+		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
 		},
@@ -82,9 +83,10 @@ func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
 
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove",
-		Short: "Removes a credential",
-		Args:  cobra.ExactArgs(1),
+		Use:         "remove",
+		Short:       "Removes a credential",
+		Args:        cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Remove(args[0])
 		},
@@ -93,9 +95,10 @@ func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "use",
-		Short: "Sets the default credential to be used",
-		Args:  cobra.ExactArgs(1),
+		Use:         "use",
+		Short:       "Sets the default credential to be used",
+		Args:        cobra.ExactArgs(1),
+		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.SetDefault(args[0])
 		},

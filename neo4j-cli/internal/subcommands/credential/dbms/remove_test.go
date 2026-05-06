@@ -20,29 +20,29 @@ func TestDbmsCredentialRemove(t *testing.T) {
 		{
 			name: "removes a non-default credential",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
-				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688"},
 			},
 			initialDefault:  "mydb",
 			command:         "remove otherdb",
-			wantCredentials: `[{"name":"mydb","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false}]`,
+			wantCredentials: `[{"name":"mydb","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687"}]`,
 			wantDefault:     "mydb",
 		},
 		{
 			name: "removing the default credential clears default-credential",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
-				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688"},
 			},
 			initialDefault:  "mydb",
 			command:         "remove mydb",
-			wantCredentials: `[{"name":"otherdb","username":"neo4j","password":"secret2","database-name":"neo4j","uri":"bolt://localhost:7688","insecure":false}]`,
+			wantCredentials: `[{"name":"otherdb","username":"neo4j","password":"secret2","database-name":"neo4j","uri":"bolt://localhost:7688"}]`,
 			wantDefault:     "",
 		},
 		{
 			name: "unknown name returns descriptive error",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
 			},
 			initialDefault: "mydb",
 			command:        "remove nonexistent",

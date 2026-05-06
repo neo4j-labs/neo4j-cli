@@ -8,27 +8,26 @@ import (
 	"strings"
 )
 
-// normalizeURI rewrites bolt-family URIs (bolt://, bolt+s://, bolt+ssc://,
-// neo4j://, neo4j+s://, neo4j+ssc://) to the equivalent http(s):// URI for the
-// Neo4j HTTP Query API. The rewrite covers the scheme and, for the canonical
-// bolt port 7687, the port (→ 7473 for HTTPS or 7474 for HTTP). Any other port
-// is preserved (the user clearly meant it). Custom paths/query strings/userinfo
-// are preserved on the rewritten URI.
+// normalizeURI rewrites HTTP-family URIs to their Bolt equivalent so the
+// neo4j-go-driver can connect. The query command speaks the Bolt protocol
+// natively, but users (and the previous CLI default) frequently still pass
+// `http://localhost:7474` or `https://...:7473`. The rewrite turns:
 //
-// Aura special case: hosts ending in `.neo4j.io` (case-insensitive; apex
-// `neo4j.io` matches too) are always rewritten to `https://<host>` with NO
-// port — Aura always serves HTTPS on 443 regardless of what the user typed.
+//   - http://<host>[:<port>][/...]   → neo4j://<host>:7687
+//   - https://<host>[:<port>][/...]  → neo4j+s://<host>:7687
+//
+// Path and query are stripped (the driver does not use them). Userinfo is
+// preserved on the rewritten URI; the displayOrig form is run through
+// (*url.URL).Redacted() so any password is masked before it hits stderr.
 //
 // Returns:
-//   - rewritten:   the URI to use for the HTTP request
+//   - rewritten:   the URI to feed to neo4j.NewDriver
 //   - didRewrite:  true if the scheme/port was changed
-//   - displayOrig: redacted form of the input URI suitable for stderr; userinfo
-//     password is masked via (*url.URL).Redacted() so no secret leaks
+//   - displayOrig: redacted form of the input URI suitable for stderr
 //
-// Inputs that fail to parse, or that use an unrecognised scheme (including
-// already-correct http/https), pass through with didRewrite=false. The caller
-// is expected to feed `rewritten` to the HTTP client either way; downstream
-// transport errors surface naturally for genuine garbage.
+// Inputs that fail to parse, or that use a scheme other than http/https
+// (including bolt-family schemes that are already valid for the driver),
+// pass through with didRewrite=false.
 func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig string) {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -38,12 +37,13 @@ func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig st
 	scheme := strings.ToLower(u.Scheme)
 	var newScheme string
 	switch scheme {
-	case "bolt":
-		newScheme = "http"
-	case "bolt+s", "bolt+ssc", "neo4j", "neo4j+s", "neo4j+ssc":
-		newScheme = "https"
+	case "http":
+		newScheme = "neo4j"
+	case "https":
+		newScheme = "neo4j+s"
 	default:
-		// http, https, empty, or unknown scheme — passthrough.
+		// bolt, bolt+s, bolt+ssc, neo4j, neo4j+s, neo4j+ssc, empty,
+		// or anything else — passthrough.
 		return raw, false, ""
 	}
 
@@ -51,25 +51,14 @@ func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig st
 	// applied to the input form the user typed.
 	displayOrig = u.Redacted()
 
-	// Aura special case: any *.neo4j.io host (or apex neo4j.io) on a
-	// bolt-family scheme is forced to https with no port. Aura always serves
-	// HTTPS on 443. Suffix match (case-insensitive) — must NOT match
-	// `*.neo4j.io.evil.com`.
-	host := strings.ToLower(u.Hostname())
-	if host == "neo4j.io" || strings.HasSuffix(host, ".neo4j.io") {
-		u.Scheme = "https"
-		u.Host = u.Hostname() // strip any port
-		return u.String(), true, displayOrig
-	}
-
+	// Rewrite scheme, force port 7687, strip path/query/fragment.
 	u.Scheme = newScheme
-	if u.Port() == "7687" {
-		newPort := "7474"
-		if newScheme == "https" {
-			newPort = "7473"
-		}
-		u.Host = u.Hostname() + ":" + newPort
-	}
+	u.Host = u.Hostname() + ":7687"
+	u.Path = ""
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	u.RawFragment = ""
 
 	return u.String(), true, displayOrig
 }

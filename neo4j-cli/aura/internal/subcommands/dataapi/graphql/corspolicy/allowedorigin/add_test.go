@@ -37,19 +37,19 @@ func TestAddAllowedOriginFlagsValidation(t *testing.T) {
 		expectedError   string
 	}{
 		"missing all flags": {
-			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s", allowedOrigin),
+			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --rw", allowedOrigin),
 			expectedError:   "Error: required flag(s) \"data-api-id\", \"instance-id\" not set",
 		},
 		"missing origin": {
-			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add --data-api-id %s --instance-id %s", dataApiId, instanceId),
+			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add --data-api-id %s --instance-id %s --rw", dataApiId, instanceId),
 			expectedError:   "Error: accepts 1 arg(s), received 0",
 		},
 		"missing data api id flag": {
-			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s", allowedOrigin, instanceId),
+			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --rw", allowedOrigin, instanceId),
 			expectedError:   "Error: required flag(s) \"data-api-id\" not set",
 		},
 		"missing instance id flag": {
-			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --data-api-id %s", allowedOrigin, dataApiId),
+			executedCommand: fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --data-api-id %s --rw", allowedOrigin, dataApiId),
 			expectedError:   "Error: required flag(s) \"instance-id\" not set",
 		},
 	}
@@ -94,7 +94,7 @@ func TestAddAllowedOriginWithNoExistingOrigins(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -137,7 +137,7 @@ func TestAddAllowedOriginWithExistingOrigins(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -170,7 +170,7 @@ func TestAddAllowedOriginWithDuplicateOrigin(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -208,7 +208,7 @@ func TestAddAllowedOriginWithOutputTable(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --format table", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --format table --rw", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

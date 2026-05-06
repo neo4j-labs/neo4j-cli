@@ -1,0 +1,4 @@
+project: aura-cli
+kind: Minor
+body: 'Require --rw flag for any write operation (instance create/delete/update, config set, credential add/remove/use, etc.)'
+time: 2026-05-06T17:06:00+00:00

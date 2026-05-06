@@ -29,6 +29,7 @@ func main() {
 
 	cmd := aura.NewStandaloneCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 

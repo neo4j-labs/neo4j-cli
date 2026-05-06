@@ -8,6 +8,14 @@ version: {{VERSION}}
 
 Allows you to programmatically provision and manage your Aura resources
 
+Allows you to programmatically provision and manage your Aura resources. Write operations require --rw. `query run` under neo4j-cli runs EXPLAIN first when --rw is not set and blocks statements classified as writes.
+
+## Global Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
+
 ## Subcommands
 
 | Command | Description |
@@ -30,3 +38,5 @@ Allows you to programmatically provision and manage your Aura resources
 - Prefer `--format toon` (`-f toon`) on all read commands when the output will be read by an LLM or agent — toon uses ~40% fewer tokens than JSON while encoding the same data.
 - Async resource operations (instance create/resize/destroy) accept `--await` to block until the resource reaches a terminal state.
 - The `version:` line in an installed SKILL.md reflects the binary that wrote it. Run `aura-cli skill check` after upgrading to detect drift; v1 reports drift only — re-run `skill install` to refresh.
+- Write operations require `--rw`. Under the super-CLI, `neo4j-cli query run` runs `EXPLAIN` over Bolt to detect write cypher when `--rw` is not set and blocks statements classified as writes before execution.
+- Do NOT add `--rw` unless the user explicitly asked to write/modify/delete. Run commands without it by default. If a command fails because `--rw` is missing, surface the error and ask the user for permission to retry with `--rw` — do not add it on your own.

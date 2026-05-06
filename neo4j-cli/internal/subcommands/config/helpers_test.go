@@ -63,11 +63,13 @@ func (h *neo4jTestHelper) executeCommand(command string) {
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	// Build a minimal neo4j root command with just the config subcommand
+	// Build a minimal neo4j root command with just the config subcommand.
 	rootCmd := &cobra.Command{
 		Use: "neo4j-cli",
 	}
 	flags.RegisterOutputFlag(rootCmd, cfg)
+	flags.RegisterRwFlag(rootCmd)
+	rootCmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 	rootCmd.AddCommand(config.NewCmd(cfg))
 
 	rootCmd.SetArgs(args)

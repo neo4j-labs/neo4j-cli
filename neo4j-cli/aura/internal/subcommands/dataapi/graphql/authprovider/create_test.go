@@ -26,28 +26,27 @@ func TestCreateAuthProviderFlagsValidation(t *testing.T) {
 		expectedError   string
 	}{
 		"missing all create flags": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s", instanceId, dataApiId),
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --rw", instanceId, dataApiId),
 			expectedError:   "Error: required flag(s) \"name\", \"type\" not set",
 		},
 		"missing name flag": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --type api-key", instanceId, dataApiId),
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --type api-key --rw", instanceId, dataApiId),
 			expectedError:   "Error: required flag(s) \"name\" not set",
 		},
 		"missing type flag": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --disabled", instanceId, dataApiId, name),
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --disabled --rw", instanceId, dataApiId, name),
 			expectedError:   "Error: required flag(s) \"type\" not set",
 		},
 		"non-existing type flag": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type bla --disabled", instanceId, dataApiId, name),
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type bla --disabled --rw", instanceId, dataApiId, name),
 			expectedError:   `Error: invalid argument "bla" for "--type" flag: must be one of "api-key" or "jwks"`,
 		},
 		"missing url flag for jwks": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type jwks --disabled", instanceId, dataApiId, name),
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type jwks --disabled --rw", instanceId, dataApiId, name),
 			expectedError:   "Error: required flag(s) \"url\" not set",
 		},
 		"can not set url flag for api-key": {
-			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --url http://test.com/abc", instanceId, dataApiId, name),
-			expectedError:   "Error: url flag can not be set for authentication provider type 'api-key'",
+			executedCommand: fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --url http://test.com/abc --rw", instanceId, dataApiId, name), expectedError: "Error: url flag can not be set for authentication provider type 'api-key'",
 		},
 	}
 
@@ -131,37 +130,37 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 	}{
 		"create api-key only with name": {
 			mockResponse:        mockResponseApiKey,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key", instanceId, dataApiId, nameApiKey),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":true,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseJsonApiKey,
 		},
 		"create api-key with name and disabled flag": {
 			mockResponse:        mockResponseApiKey,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --disabled", instanceId, dataApiId, nameApiKey),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --disabled --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":false,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseJsonApiKey,
 		},
 		"create api-key with name and disabled flag response as table": {
 			mockResponse:        mockResponseApiKey,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --format table --instance-id %s --data-api-id %s --name %s --type api-key --disabled", instanceId, dataApiId, nameApiKey),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --format table --instance-id %s --data-api-id %s --name %s --type api-key --disabled --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":false,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseTableApiKey,
 		},
 		"create jwks only with name and url": {
 			mockResponse:        mockResponseJwks,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --url %s --type jwks", instanceId, dataApiId, nameJwks, url),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --url %s --type jwks --rw", instanceId, dataApiId, nameJwks, url),
 			expectedRequestBody: `{"enabled":true,"name":"my-jwks-2","type":"jwks","url":"https://test.com/.well-known/jwks.json"}`,
 			expectedResponse:    expectedResponseJsonJwks,
 		},
 		"create jwks with name and url and disabled flag": {
 			mockResponse:        mockResponseJwks,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --url %s --type jwks --disabled", instanceId, dataApiId, nameJwks, url),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --url %s --type jwks --disabled --rw", instanceId, dataApiId, nameJwks, url),
 			expectedRequestBody: `{"enabled":false,"name":"my-jwks-2","type":"jwks","url":"https://test.com/.well-known/jwks.json"}`,
 			expectedResponse:    expectedResponseJsonJwks,
 		},
 		"create jwks with name and url response as table": {
 			mockResponse:        mockResponseJwks,
-			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --format table --instance-id %s --data-api-id %s --name %s --url %s --type jwks", instanceId, dataApiId, nameJwks, url),
+			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --format table --instance-id %s --data-api-id %s --name %s --url %s --type jwks --rw", instanceId, dataApiId, nameJwks, url),
 			expectedRequestBody: `{"enabled":true,"name":"my-jwks-2","type":"jwks","url":"https://test.com/.well-known/jwks.json"}`,
 			expectedResponse:    expectedResponseTableJwks,
 		},

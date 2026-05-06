@@ -22,8 +22,9 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Adds a credential",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "add",
+		Short:       "Adds a credential",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
 		},

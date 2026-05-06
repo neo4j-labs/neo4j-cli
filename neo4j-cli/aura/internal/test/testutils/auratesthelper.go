@@ -62,6 +62,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 
 	cmd := aura.NewStandaloneCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
 
 	cmd.SetArgs(args)
 

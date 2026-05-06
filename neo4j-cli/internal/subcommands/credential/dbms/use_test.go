@@ -19,8 +19,8 @@ func TestDbmsCredentialUse(t *testing.T) {
 		{
 			name: "sets default credential by name",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
-				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+				{"name": "otherdb", "username": "neo4j", "password": "secret2", "database-name": "neo4j", "uri": "bolt://localhost:7688"},
 			},
 			initialDefault: "mydb",
 			command:        "use otherdb",
@@ -29,7 +29,7 @@ func TestDbmsCredentialUse(t *testing.T) {
 		{
 			name: "unknown name returns descriptive error",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
 			},
 			initialDefault: "mydb",
 			command:        "use nonexistent",

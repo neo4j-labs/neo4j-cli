@@ -23,7 +23,7 @@ func TestDeleteSession(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s", sessionId))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw", sessionId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -55,7 +55,7 @@ func TestDeleteSessionError(t *testing.T) {
 }
 `)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s", sessionId))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw", sessionId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)

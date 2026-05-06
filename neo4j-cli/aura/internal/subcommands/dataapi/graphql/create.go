@@ -36,8 +36,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Creates a new GraphQL Data API",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Creates a new GraphQL Data API",
 		Long: `This command starts the creation process of a GraphQL Data API.
 
 Creating a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "creating" to "ready" you may begin to use your GraphQL Data API.

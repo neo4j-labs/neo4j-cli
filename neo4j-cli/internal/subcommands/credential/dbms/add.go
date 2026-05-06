@@ -15,7 +15,6 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		password     string
 		databaseName string
 		uri          string
-		insecure     bool
 	)
 
 	const (
@@ -24,14 +23,14 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		passwordFlag     = "password"
 		databaseNameFlag = "database-name"
 		uriFlag          = "uri"
-		insecureFlag     = "insecure"
 	)
 
 	cmd := &cobra.Command{
-		Use:   "add",
-		Short: "Adds a dbms credential",
+		Use:         "add",
+		Short:       "Adds a dbms credential",
+		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Dbms.Add(name, username, password, databaseName, uri, insecure)
+			return cfg.Credentials.Dbms.Add(name, username, password, databaseName, uri)
 		},
 	}
 
@@ -48,7 +47,6 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.MarkFlagRequired(uriFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&databaseName, databaseNameFlag, "neo4j", "Database name")
-	cmd.Flags().BoolVar(&insecure, insecureFlag, false, "Disable TLS verification")
 
 	return cmd
 }
