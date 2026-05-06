@@ -288,6 +288,13 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Use `cmd.Flag("name").Changed` (not `flagString(cmd, "name") != ""`) to detect explicit flag-setting — `Changed` is the only reliable indicator that the user set the flag, versus just reading the default value.
 - `insecureExplicit` pattern: read `cmd.Flag("insecure").Changed` AFTER applying the insecure value, then gate credential's insecure on `!insecureExplicit` — ensures the explicit `--insecure=false` overrides the stored credential's `insecure:true`.
 
+## query Bolt Execution Notes
+
+- `runStatementResponseFn` seam takes a `readOnly bool` arg; production routes `readOnly=true` to `session.ExecuteRead` and `readOnly=false` to `session.ExecuteWrite`. Tests must forward this arg in their seam handlers (`func(_ ctx, _ *conn, stmt, params, readOnly bool) (*queryResponse, error)`).
+- Two entry points wrap the seam: `runStatement` (defaults to ExecuteRead) and `runStatementWrite` (forces ExecuteWrite). EXPLAIN preflight calls `runStatementResponse(..., readOnly=true)` directly because EXPLAIN never mutates.
+- Inside the managed-transaction work callback the order is `tx.Run` → `result.Collect(ctx)` → `result.Consume(ctx)`. Wrap errors once at the outer ExecuteRead/ExecuteWrite return (not per step) so retry semantics get the raw error and user output keeps a single `query: ...` prefix.
+- `seamRouter.readOnlyCalls map[string]bool` lets `run_test.go` assert the routing by statement (e.g. `assert.True(t, r.readOnlyCalls["EXPLAIN ..."])`).
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._

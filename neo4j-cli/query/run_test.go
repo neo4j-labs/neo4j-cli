@@ -71,18 +71,21 @@ func (h *runHarness) execute(t *testing.T, args ...string) error {
 
 // seamRouter is a tiny statement-router used to swap the runStatementResponseFn
 // seam during tests. Each entry maps an exact statement string → response or
-// error. Tests can append cypher to the calls slice for ordering assertions.
+// error. Tests can append cypher to the calls slice for ordering assertions
+// and inspect readOnlyCalls to verify ExecuteRead vs ExecuteWrite routing.
 type seamRouter struct {
-	calls   []string
-	resp    map[string]*queryResponse
-	respErr map[string]error
+	calls         []string
+	readOnlyCalls map[string]bool
+	resp          map[string]*queryResponse
+	respErr       map[string]error
 	// onUnexpected fires when a statement does not match any route — defaults
 	// to fatal-fail to surface unexpected calls in tests.
 	onUnexpected func(statement string) (*queryResponse, error)
 }
 
-func (r *seamRouter) handle(_ context.Context, _ *conn, statement string, _ map[string]any) (*queryResponse, error) {
+func (r *seamRouter) handle(_ context.Context, _ *conn, statement string, _ map[string]any, readOnly bool) (*queryResponse, error) {
 	r.calls = append(r.calls, statement)
+	r.readOnlyCalls[statement] = readOnly
 	if err, ok := r.respErr[statement]; ok {
 		return nil, err
 	}
@@ -106,8 +109,9 @@ func (r *seamRouter) install(t *testing.T) {
 
 func newSeamRouter() *seamRouter {
 	return &seamRouter{
-		resp:    map[string]*queryResponse{},
-		respErr: map[string]error{},
+		resp:          map[string]*queryResponse{},
+		respErr:       map[string]error{},
+		readOnlyCalls: map[string]bool{},
 	}
 }
 
@@ -216,6 +220,10 @@ func TestRunQuery_ReadOnlyCypherWithoutRwRunsExplainThenExecutes(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"EXPLAIN MATCH (n) RETURN n", "MATCH (n) RETURN n"}, r.calls)
+	// Both calls must route through ExecuteRead — preflight never mutates and
+	// the classifier proved the real cypher is read-only.
+	assert.True(t, r.readOnlyCalls["EXPLAIN MATCH (n) RETURN n"], "preflight must use ExecuteRead")
+	assert.True(t, r.readOnlyCalls["MATCH (n) RETURN n"], "read-only execution must use ExecuteRead")
 }
 
 func TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution(t *testing.T) {
@@ -253,6 +261,9 @@ func TestRunQuery_WriteCypherWithRwSkipsPreflight(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"CREATE (n)"}, r.calls)
+	// With --rw the user opted in to writing; the call must route through
+	// ExecuteWrite (readOnly=false) so the driver picks up write-server routing.
+	assert.False(t, r.readOnlyCalls["CREATE (n)"], "--rw execution must use ExecuteWrite")
 }
 
 func TestRunQuery_ExplainErrorSurfacesVerbatim(t *testing.T) {
@@ -666,7 +677,7 @@ func TestRunQuery_InvalidParamReturnsUsageError(t *testing.T) {
 
 func TestRunQuery_ParamsForwardedAsRequestBody(t *testing.T) {
 	var seenParams map[string]any
-	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any) (*queryResponse, error) {
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any, _ bool) (*queryResponse, error) {
 		if strings.HasPrefix(statement, "EXPLAIN ") {
 			resp := makeQueryResponse([]string{"n"}, [][]any{})
 			resp.QueryPlan = makePlan("ProduceResults@neo4j")

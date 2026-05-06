@@ -30,7 +30,7 @@ func newSchemaSeam() *schemaSeam {
 	}
 }
 
-func (s *schemaSeam) handle(_ context.Context, _ *conn, statement string, _ map[string]any) (*queryResponse, error) {
+func (s *schemaSeam) handle(_ context.Context, _ *conn, statement string, _ map[string]any, _ bool) (*queryResponse, error) {
 	s.calls = append(s.calls, statement)
 	if e, ok := s.err[statement]; ok {
 		return nil, e

@@ -91,6 +91,8 @@ var driverOpener = func(target string, username, password, userAgent string, ins
 // runStatementResponseFn is the test seam used by runStatementResponse. It
 // lets tests inject canned responses without booting a real Neo4j or
 // constructing a Bolt driver. Production sets it to runStatementResponseImpl.
+// The readOnly flag selects ExecuteRead vs ExecuteWrite in production; tests
+// can assert on it to verify correct routing.
 var runStatementResponseFn = runStatementResponseImpl
 
 // resolveConn merges connection settings from .env, OS environment, and
@@ -393,16 +395,21 @@ func parseBool(s string) (bool, bool) {
 
 // runStatementResponse executes a Cypher statement against the Bolt driver
 // attached to c and returns the parsed envelope (rows + bookmarks + plan).
-// Routes through runStatementResponseFn so tests can override.
-func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
-	return runStatementResponseFn(ctx, c, statement, params)
+// Routes through runStatementResponseFn so tests can override. The readOnly
+// flag drives ExecuteRead vs ExecuteWrite selection inside the production
+// impl; preflight EXPLAIN and read-only execution pass true, post-classified
+// write execution passes false.
+func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
+	return runStatementResponseFn(ctx, c, statement, params, readOnly)
 }
 
 // runStatementResponseImpl is the real Bolt-backed implementation. Opens a
-// session targeted at c.database, runs the statement, collects all records,
-// and converts the resulting summary's Plan() tree (if present) into the
-// internal queryPlan shape.
-func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error) {
+// session targeted at c.database, runs the statement inside a managed
+// transaction (ExecuteRead when readOnly is true, ExecuteWrite otherwise),
+// collects all records, and converts the resulting summary's Plan() tree
+// (if present) into the internal queryPlan shape. The session is closed via
+// defer; the driver retains pooling.
+func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
 	if c == nil {
 		return nil, errors.New("query: nil connection")
 	}
@@ -413,52 +420,87 @@ func runStatementResponseImpl(ctx context.Context, c *conn, statement string, pa
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
 	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
 
-	result, err := session.Run(ctx, statement, params)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	records, err := result.Collect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	summary, err := result.Consume(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	resp := &queryResponse{}
-	if len(records) > 0 {
-		resp.Data.Fields = append([]string(nil), records[0].Keys...)
-		resp.Data.Values = make([][]any, 0, len(records))
-		for _, rec := range records {
-			row := make([]any, len(rec.Values))
-			copy(row, rec.Values)
-			resp.Data.Values = append(resp.Data.Values, row)
+	work := func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, statement, params)
+		if err != nil {
+			return nil, err
 		}
+
+		records, err := result.Collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		summary, err := result.Consume(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		resp := &queryResponse{}
+		if len(records) > 0 {
+			resp.Data.Fields = append([]string(nil), records[0].Keys...)
+			resp.Data.Values = make([][]any, 0, len(records))
+			for _, rec := range records {
+				row := make([]any, len(rec.Values))
+				copy(row, rec.Values)
+				resp.Data.Values = append(resp.Data.Values, row)
+			}
+		} else {
+			// Even with zero rows the result keys are available via the result
+			// metadata so downstream renderers see the column header. Fall back
+			// to an empty (but non-nil) slice when nothing came back.
+			keys, _ := result.Keys()
+			resp.Data.Fields = append([]string(nil), keys...)
+			resp.Data.Values = [][]any{}
+		}
+
+		if summary != nil {
+			if plan := summary.Plan(); plan != nil {
+				converted := convertPlan(plan)
+				resp.QueryPlan = &converted
+			}
+		}
+
+		return resp, nil
+	}
+
+	var (
+		out any
+		err error
+	)
+	if readOnly {
+		out, err = session.ExecuteRead(ctx, work)
 	} else {
-		// Even with zero rows the result keys are available via the result
-		// metadata so downstream renderers see the column header. Fall back to
-		// an empty (but non-nil) slice when nothing came back.
-		keys, _ := result.Keys()
-		resp.Data.Fields = append([]string(nil), keys...)
-		resp.Data.Values = [][]any{}
+		out, err = session.ExecuteWrite(ctx, work)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	if summary != nil {
-		if plan := summary.Plan(); plan != nil {
-			converted := convertPlan(plan)
-			resp.QueryPlan = &converted
-		}
+	resp, ok := out.(*queryResponse)
+	if !ok || resp == nil {
+		return nil, errors.New("query: unexpected nil response from managed transaction")
 	}
-
 	return resp, nil
 }
 
 // runStatement executes a Cypher statement and returns the tabular result.
+// Defaults to readOnly=true; callers that classify a statement as a write
+// (post-EXPLAIN or with --rw) MUST use runStatementWrite instead.
 func runStatement(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
-	parsed, err := runStatementResponse(ctx, c, statement, params)
+	return runStatementWithMode(ctx, c, statement, params, true)
+}
+
+// runStatementWrite executes a Cypher statement on the write path, routing
+// through ExecuteWrite. Used by the query run leaf when --rw is set (the
+// user has opted in) or when the post-classification path determines the
+// statement mutates state.
+func runStatementWrite(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResult, error) {
+	return runStatementWithMode(ctx, c, statement, params, false)
+}
+
+func runStatementWithMode(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResult, error) {
+	parsed, err := runStatementResponse(ctx, c, statement, params, readOnly)
 	if err != nil {
 		return nil, err
 	}

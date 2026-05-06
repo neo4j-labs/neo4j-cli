@@ -231,13 +231,14 @@ tasks:
     title: "Switch query execution to ExecuteRead/ExecuteWrite"
     description: |
       In neo4j-cli/query/run.go, replace runStatement calls with a thin helper that opens session.NewSession + defer Close, then invokes session.ExecuteRead (read-only path or EXPLAIN preflight) or session.ExecuteWrite (post-classification write path). Inside the work callback, call tx.Run + result.Collect (for execution) or result.Consume (for preflight). Map []*neo4j.Record to the existing queryResult shape (Columns, Rows). No manual BeginTransaction.
-    status: pending
+    status: completed
     dependencies:
       - task-016
     acceptance_criteria:
       - "Reads run inside ExecuteRead; writes (post-classification) run inside ExecuteWrite"
       - "Existing output rendering unchanged (queryResult shape preserved)"
       - "Schema and run output match prior CLI output for representative queries"
+    completed_at: 2026-05-06T19:00:00Z
 
   - id: task-018
     title: "Switch --rw classifier to summary.StatementType()"

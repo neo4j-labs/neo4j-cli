@@ -349,3 +349,27 @@ Key Decisions:
 
 Next Task: task-017
 
+================================================================================
+TASK-017: Switch query execution to ExecuteRead/ExecuteWrite
+Date: 2026-05-06T19:00:00Z
+================================================================================
+
+Summary:
+Routed the Bolt-backed runStatementResponseImpl through session.ExecuteRead / ExecuteWrite via a managed-transaction work callback (tx.Run + result.Collect + result.Consume). Added a readOnly flag to the runStatementResponseFn seam and the runStatementResponse wrapper so callers select the access mode explicitly. Added runStatementWrite as the writes-only entry point used by run.go when --rw is set; runStatement keeps its read-only default. EXPLAIN preflight in rejectWriteCypher passes readOnly=true (EXPLAIN never mutates state). Schema fetches stay on the read path. Updated the connect/run/schema test seams to forward the new readOnly arg and added assertions on r.readOnlyCalls so the read/write routing is locked in. queryResult shape is preserved end to end so renderers and JSON/table output remain identical.
+
+Files Changed:
+- neo4j-cli/query/connect.go (modified: runStatementResponseImpl uses ExecuteRead/ExecuteWrite; added runStatementWrite + runStatementWithMode; seam fn now takes readOnly bool)
+- neo4j-cli/query/run.go (modified: rejectWriteCypher passes readOnly=true; runQuery routes through runStatementWrite when --rw is set, runStatement otherwise)
+- neo4j-cli/query/connect_test.go (modified: seam helper signature updated; added TestRunStatementWrite_RoutesThroughExecuteWrite; existing tests assert readOnly default)
+- neo4j-cli/query/run_test.go (modified: seamRouter records readOnlyCalls; assertions added for read/write routing)
+- neo4j-cli/query/schema_test.go (modified: schemaSeam.handle accepts readOnly arg)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-017 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept queryResponse/queryPlan as the seam payload. Task-018 will replace queryPlan-based classification with summary.StatementType(); doing both in one task would have inflated this scope.
+- Wrapped errors once at the outer ExecuteRead/ExecuteWrite call instead of per-step (Run/Collect/Consume) so the driver retry layer sees the raw error and the user-facing message stays a single "query: ..." prefix.
+- runStatement defaults to readOnly=true and kept its old signature to minimise churn in schema.go callers; runStatementWrite is the explicit write entry point so the writer's intent is obvious at the call site.
+
+Next Task: task-018
+

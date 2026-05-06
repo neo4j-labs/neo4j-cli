@@ -85,7 +85,15 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		}
 	}
 
-	res, err := runStatement(cmd.Context(), c, cypher, params)
+	// When --rw is set the user has opted in to writing, so run inside
+	// ExecuteWrite. When --rw is unset the preflight already classified the
+	// statement as read-only, so run inside ExecuteRead.
+	var res *queryResult
+	if allowWrite {
+		res, err = runStatementWrite(cmd.Context(), c, cypher, params)
+	} else {
+		res, err = runStatement(cmd.Context(), c, cypher, params)
+	}
 	if err != nil {
 		return err
 	}
@@ -157,7 +165,8 @@ func promptPassword(cmd *cobra.Command) (string, error) {
 }
 
 func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[string]any) error {
-	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params)
+	// EXPLAIN never mutates state, so always run inside ExecuteRead.
+	resp, err := runStatementResponse(cmd.Context(), c, "EXPLAIN "+cypher, params, true)
 	if err != nil {
 		return err
 	}

@@ -184,8 +184,9 @@ func TestResolveConn_InsecureFlagOverridesEnv(t *testing.T) {
 // driverOpener for the duration of the test, so individual tests can inject
 // canned responses without booting a real Neo4j server. The driverOpener stub
 // returns a no-op driver so deferred Close calls in production code are safe.
-// Restored via t.Cleanup.
-func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, statement string, params map[string]any) (*queryResponse, error)) {
+// Restored via t.Cleanup. The seam fn receives the readOnly flag so tests can
+// assert callers route ExecuteRead vs ExecuteWrite correctly.
+func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error)) {
 	t.Helper()
 	origFn := runStatementResponseFn
 	origOpener := driverOpener
@@ -215,9 +216,11 @@ func (n *noopDriver) Close(ctx context.Context) error { return nil }
 func TestRunStatement_HappyPath(t *testing.T) {
 	var gotStatement string
 	var gotParams map[string]any
-	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any) (*queryResponse, error) {
+	var gotReadOnly bool
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
 		gotStatement = statement
 		gotParams = params
+		gotReadOnly = readOnly
 		resp := &queryResponse{}
 		resp.Data.Fields = []string{"n"}
 		resp.Data.Values = [][]any{{int64(1)}}
@@ -241,10 +244,12 @@ func TestRunStatement_HappyPath(t *testing.T) {
 	// Statement and params forwarded to the seam unmodified.
 	assert.Equal(t, "RETURN 1 AS n", gotStatement)
 	assert.Equal(t, map[string]any{"k": 5}, gotParams)
+	// runStatement defaults to the read-only path (ExecuteRead).
+	assert.True(t, gotReadOnly, "runStatement must route through ExecuteRead by default")
 }
 
 func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
-	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any) (*queryResponse, error) {
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
 		resp := &queryResponse{}
 		resp.Data.Fields = []string{}
 		resp.Data.Values = [][]any{}
@@ -266,7 +271,7 @@ func TestRunStatement_ExplainResponseParsesQueryPlan(t *testing.T) {
 	assert.Equal(t, []string{}, res.Columns)
 	assert.Equal(t, [][]any{}, res.Rows)
 
-	resp, err := runStatementResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil)
+	resp, err := runStatementResponse(context.Background(), c, "EXPLAIN CREATE (n)", nil, true)
 	require.NoError(t, err)
 	require.NotNil(t, resp.QueryPlan)
 	assert.Equal(t, "ProduceResults@neo4j", resp.QueryPlan.OperatorType)
@@ -305,8 +310,24 @@ func TestResolveConn_UserAgent(t *testing.T) {
 	}
 }
 
+func TestRunStatementWrite_RoutesThroughExecuteWrite(t *testing.T) {
+	var gotReadOnly bool
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, readOnly bool) (*queryResponse, error) {
+		gotReadOnly = readOnly
+		resp := &queryResponse{}
+		resp.Data.Fields = []string{}
+		resp.Data.Values = [][]any{}
+		return resp, nil
+	})
+
+	c := &conn{database: "neo4j"}
+	_, err := runStatementWrite(context.Background(), c, "CREATE (n)", nil)
+	require.NoError(t, err)
+	assert.False(t, gotReadOnly, "runStatementWrite must route through ExecuteWrite (readOnly=false)")
+}
+
 func TestRunStatement_ServerErrorSurfacesError(t *testing.T) {
-	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any) (*queryResponse, error) {
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
 		return nil, &fakeNeo4jError{code: "Neo.ClientError.Statement.SyntaxError", message: "Invalid input"}
 	})
 
