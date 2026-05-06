@@ -42,17 +42,17 @@ Sets the default credential to be used
 
 Usage: `neo4j-cli credential aura-client use`
 
-## neo4j-cli credential database
+## neo4j-cli credential dbms
 
-Manage and view database credential values
+Manage and view dbms credential values
 
-Usage: `neo4j-cli credential database`
+Usage: `neo4j-cli credential dbms`
 
-### neo4j-cli credential database add
+### neo4j-cli credential dbms add
 
-Adds a database credential
+Adds a dbms credential
 
-Usage: `neo4j-cli credential database add [flags]`
+Usage: `neo4j-cli credential dbms add [flags]`
 
 Flags:
 
@@ -65,21 +65,21 @@ Flags:
 | `--uri` | string | - | (required) URI |
 | `--username` | string | - | (required) Username |
 
-### neo4j-cli credential database list
+### neo4j-cli credential dbms list
 
-Lists database credentials
+Lists dbms credentials
 
-Usage: `neo4j-cli credential database list`
+Usage: `neo4j-cli credential dbms list`
 
-### neo4j-cli credential database remove
+### neo4j-cli credential dbms remove
 
-Removes a database credential
+Removes a dbms credential
 
-Usage: `neo4j-cli credential database remove <name>`
+Usage: `neo4j-cli credential dbms remove <name>`
 
-### neo4j-cli credential database use
+### neo4j-cli credential dbms use
 
-Sets the default database credential to be used
+Sets the default dbms credential to be used
 
-Usage: `neo4j-cli credential database use <name>`
+Usage: `neo4j-cli credential dbms use <name>`
 
