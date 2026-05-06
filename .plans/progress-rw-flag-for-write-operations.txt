@@ -480,3 +480,21 @@ Key Decisions:
 - Asserted directly on resp.QueryType (the field rejectWriteCypher reads) so the smoke locks in classifier behaviour at the seam the CLI consumes.
 
 Next Task: task-022
+
+================================================================================
+TASK-022: Rewrite query unit tests for the driver path
+Date: 2026-05-06T21:30:00Z
+================================================================================
+
+Summary:
+Reconciled the task ledger with the branch state. The httptest/httpDoer-to-driver-seam test rewrite was already completed during task-016 (and refined in 017–021). Verified with grep that no httptest.Server / httpDoer / net/http references remain in neo4j-cli/query/ tests, all five required test cases exist in run_test.go (read no-rw, write no-rw, write with-rw, EXPLAIN error verbatim) plus the partial-credential error case in connect_test.go. make test, fmt-check, and lint all pass clean.
+
+Files Changed:
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-022 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Treated task-022 as already implemented (similar to task-007 / task-009): the test rewrite happened in lockstep with the connect.go Bolt rewrite to keep the build compilable. Verified coverage parity rather than duplicating tests.
+- Confirmed the seam pattern (runStatementResponseFn + driverOpener + noopDriver) is the chosen "interface seam over the bits of the driver runQuery touches" and satisfies the spec's seam-or-DriverWithContext alternatives.
+
+Next Task: task-023

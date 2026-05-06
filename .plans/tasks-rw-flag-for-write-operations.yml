@@ -297,7 +297,7 @@ tasks:
     title: "Rewrite query unit tests for the driver path"
     description: |
       Update neo4j-cli/query/run_test.go and connect_test.go to swap the httptest-server + httpDoer fakes for a driver-level fake (interface seam over the bits of the driver runQuery touches, or a custom DriverWithContext if simpler). Preserve coverage parity for: read no-rw succeeds, write no-rw errors before execution, write with-rw skips preflight and runs once, EXPLAIN syntax error surfaces verbatim, partial-credential error rules unchanged.
-    status: pending
+    status: completed
     dependencies:
       - task-018
       - task-019
@@ -306,6 +306,7 @@ tasks:
       - "All existing query test cases have an equivalent on the driver path"
       - "make test ./neo4j-cli/query/... is green"
       - "No httptest.Server or httpDoer references remain in tests"
+    completed_at: 2026-05-06T21:30:00Z
 
   - id: task-023
     title: "Update changie entry body for Bolt migration"
