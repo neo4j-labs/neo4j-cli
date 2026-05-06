@@ -1,3 +1,4 @@
-.claude/
+workspace/
+skill_print.md
 last_run.json
-__pycache__/
+last_run.json.tmp

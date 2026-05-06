@@ -1,0 +1,1 @@
+Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI. Use when the user wants to execute Cypher, introspect a Neo4j schema, manage Aura instances/tenants/credentials, or install/remove the neo4j-cli skill in an agent.
