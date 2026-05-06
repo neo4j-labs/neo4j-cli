@@ -87,14 +87,14 @@ tasks:
     title: "Unit tests for query EXPLAIN preflight"
     description: |
       Add tests in neo4j-cli/query/run_test.go using a mock HTTP server that distinguishes EXPLAIN from real execution. Cover read cypher without --rw (succeeds), write cypher without --rw (errors before execution), and write cypher with --rw (executes; preflight skipped). Include a case where EXPLAIN returns a syntax error.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - "Three core cases covered: read/no-rw, write/no-rw, write/with-rw"
       - "Mock verifies EXPLAIN called only when --rw is false"
       - "EXPLAIN error surfaces verbatim"
-    completed_at: null
+    completed_at: 2026-05-06T14:49:34Z
 
   - id: task-008
     title: "Docs: root help text and skill additions"

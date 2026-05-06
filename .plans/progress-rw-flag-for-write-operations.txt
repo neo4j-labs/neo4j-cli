@@ -143,3 +143,21 @@ Key Decisions:
 - Fixed the unrelated smoke-test errcheck issue in the same finalize step because lint is a required branch-wide gate.
 
 Next Task: task-007
+
+================================================================================
+TASK-007: Unit tests for query EXPLAIN preflight
+Date: 2026-05-06T14:49:34Z
+================================================================================
+
+Summary:
+Reconciled the task ledger with the branch state after confirming query EXPLAIN preflight coverage was already present in the committed query test suite. The existing tests already cover read cypher without --rw, write cypher without --rw, write cypher with --rw, and EXPLAIN error propagation.
+
+Files Changed:
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-007 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Treated task-007 as already implemented by the earlier query test work rather than duplicating the same coverage.
+- Advanced the plan state only after verifying the required cases in neo4j-cli/query/run_test.go on the main branch.
+
+Next Task: task-008
