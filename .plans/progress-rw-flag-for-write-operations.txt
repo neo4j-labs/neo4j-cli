@@ -539,3 +539,22 @@ Key Decisions:
 - No --insecure mentions remained in additions.md or bundle/* before this task (task-019/020 already swept them); confirmed via grep, no extra cleanup needed.
 
 Next Task: task-025
+
+================================================================================
+TASK-025: Update README and npm README
+Date: 2026-05-06T22:30:00Z
+================================================================================
+
+Summary:
+Updated the top-level README to reflect the Bolt migration: query intro now says "via the Bolt protocol", default URI table shows neo4j://localhost:7687, the rewrite paragraph describes http→neo4j / https→neo4j+s with a neo4j+ssc:// hint, and the --insecure trailing line is removed. The npm README already had no --insecure references and no URI examples to update — confirmed via grep and left untouched.
+
+Files Changed:
+- README.md (modified: Bolt protocol wording, neo4j:// default URI, rewrite description rewritten, --insecure line removed)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-025 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept the rewrite paragraph (just inverted direction) rather than dropping it — users coming from the old HTTP setup still benefit from knowing http:// auto-rewrites.
+- npm README needed no edits — it never had --insecure or URI examples; only the existing --rw section.
+
+Next Task: task-026

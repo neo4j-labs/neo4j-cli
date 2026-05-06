@@ -340,7 +340,7 @@ tasks:
     title: "Update README and npm README"
     description: |
       Drop every --insecure reference in README.md and distribution/npm/cli/README.md. URI examples should use neo4j:// natively (http:// works at runtime via auto-rewrite but is not the documented form). Keep the existing --rw section and three examples.
-    status: pending
+    status: completed
     dependencies:
       - task-019
       - task-020
@@ -348,6 +348,7 @@ tasks:
       - "Neither README mentions --insecure"
       - "URI examples use neo4j:// (or neo4j+s:// where TLS is shown)"
       - "Existing --rw guidance and examples preserved"
+    completed_at: 2026-05-06T22:30:00Z
 
   - id: task-026
     title: "Final verification post-Bolt — rerun task-014 gates and Bolt smoke"
