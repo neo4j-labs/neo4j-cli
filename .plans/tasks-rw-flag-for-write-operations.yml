@@ -141,13 +141,13 @@ tasks:
     title: "Contributor note: require write annotation convention"
     description: |
       In CONTRIBUTING.md, add a one-liner under the cobra layout notes that every new write leaf must set Annotations["write"] = "true". This ensures future leaves are gated automatically.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CONTRIBUTING.md updated with the annotation convention"
       - "Placement matches existing style and sectioning"
       - "CI markdown lints (if any) pass"
-    completed_at: null
+    completed_at: 2026-05-06T15:00:56Z
 
   - id: task-012
     title: "Minimal per-resource gating tests"

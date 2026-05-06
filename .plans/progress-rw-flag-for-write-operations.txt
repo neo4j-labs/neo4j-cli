@@ -224,3 +224,22 @@ Key Decisions:
 - Matched the docs to implemented behavior: `query` preflights with `EXPLAIN` only when `--rw` is absent.
 
 Next Task: task-011
+
+================================================================================
+TASK-011: Contributor note: require write annotation convention
+Date: 2026-05-06T15:00:56Z
+================================================================================
+
+Summary:
+Added a contributor-facing convention note that every new write leaf must set the write annotation so the root --rw gate keeps applying automatically. Placed it with the existing cobra command layout guidance where contributors choose file and command structure.
+
+Files Changed:
+- CONTRIBUTING.md (modified: adds write-annotation convention under cobra layout guidance)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept the note as a single convention line instead of expanding the section with examples.
+- Placed the guidance next to the one-file-per-leaf cobra layout rules so new command authors see it at authoring time.
+
+Next Task: task-012
