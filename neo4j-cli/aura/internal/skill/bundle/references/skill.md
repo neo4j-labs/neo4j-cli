@@ -34,6 +34,14 @@ List supported agents and per-agent install state
 
 Usage: `aura-cli skill list`
 
+## aura-cli skill print
+
+Print the embedded SKILL.md to stdout
+
+Writes the bundled SKILL.md verbatim to stdout so you can preview the skill markdown before running `skill install`. The {{VERSION}} placeholder is left literal; substitution happens at install time.
+
+Usage: `aura-cli skill print`
+
 ## aura-cli skill remove
 
 Remove the installed skill bundle

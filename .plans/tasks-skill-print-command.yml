@@ -69,7 +69,8 @@ tasks:
       neo4j-cli/aura/internal/skill/bundle/references/skill.md so they include
       the new `## <bin> skill print` section. Verify with `make generate-check`
       (which is the CI gate that runs `go generate ./...` then `git diff --exit-code`).
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T09:20:00Z
     dependencies:
       - task-002
     acceptance_criteria:

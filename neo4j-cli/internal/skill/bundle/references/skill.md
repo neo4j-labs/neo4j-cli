@@ -34,6 +34,14 @@ List supported agents and per-agent install state
 
 Usage: `neo4j-cli skill list`
 
+## neo4j-cli skill print
+
+Print the embedded SKILL.md to stdout
+
+Writes the bundled SKILL.md verbatim to stdout so you can preview the skill markdown before running `skill install`. The {{VERSION}} placeholder is left literal; substitution happens at install time.
+
+Usage: `neo4j-cli skill print`
+
 ## neo4j-cli skill remove
 
 Remove the installed skill bundle

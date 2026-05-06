@@ -69,3 +69,28 @@ Key Decisions:
   expected (stale bundle); task-004 will fix via `make generate`.
 
 Next Task: task-004 (regenerate skill bundles)
+
+================================================================================
+TASK-004: Regenerate skill bundles to include the print leaf
+Date: 2026-05-06T09:20:00Z
+================================================================================
+
+Summary:
+Ran `make generate` to walk the cobra tree and rewrite both per-binary skill
+bundles. Both neo4j-cli/internal/skill/bundle/references/skill.md and
+neo4j-cli/aura/internal/skill/bundle/references/skill.md now include a
+`## <bin> skill print` section between `list` and `remove`, sourced from the
+new leaf's Short and Long fields. make test passes; TestGenerator_RoundTrip
+in both gen packages now goes green.
+
+Files Changed:
+- neo4j-cli/aura/internal/skill/bundle/references/skill.md (modified — added print section)
+- neo4j-cli/internal/skill/bundle/references/skill.md (modified — added print section)
+- .plans/tasks-skill-print-command.yml (status pending -> completed)
+
+Key Decisions:
+- `make generate-check` reports stale at the diff-exit-code step before the
+  commit, which is by design — once the regen + tasks/progress edits land in
+  one commit, the CI gate will pass on the next checkout.
+
+Next Task: task-005 (add dual-project Minor changelog entries)
