@@ -152,6 +152,16 @@ func TestDatabaseCredentialAdd(t *testing.T) {
 			wantDefaultCred: "mydb",
 		},
 		{
+			name: "second credential does not override existing default",
+			initialCreds: []map[string]interface{}{
+				{"name": "first", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
+			},
+			initialDefault:  "first",
+			command:         "add --name second --username neo4j --password secret2 --uri bolt://localhost:7688",
+			wantCredentials: `[{"name":"first","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","insecure":false},{"name":"second","username":"neo4j","password":"secret2","database-name":"neo4j","uri":"bolt://localhost:7688","insecure":false}]`,
+			wantDefaultCred: "first",
+		},
+		{
 			name:         "missing --name produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --username neo4j --password secret --uri bolt://localhost:7687",
