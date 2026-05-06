@@ -47,26 +47,26 @@ tasks:
     title: "Confirm EXPLAIN response JSON path for queryType via docker"
     description: |
       Boot neo4j:latest (mirror query_https_smoke_test.go pattern), POST EXPLAIN MATCH and EXPLAIN CREATE to /db/neo4j/query/v2, and capture the full JSON. Identify the exact JSON path and enum for query type. Document findings in a short code comment next to the struct field.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Captured JSON shows the field path holding query type"
       - "Enum values for read vs write documented (e.g., r/rw/w/s)"
       - "A minimal test or snippet demonstrates decoding into a struct"
-    completed_at: null
+    completed_at: 2026-05-06T13:51:17Z
 
   - id: task-005
     title: "Implement query EXPLAIN preflight and struct extension"
     description: |
       In query/run.go, before runStatement, run a preflight runStatement with EXPLAIN + original cypher and params when --rw is not set. Extend query/connect.go::queryResponse to include the confirmed query-type field. If classified non-read-only, return a usage error before execution; skip preflight entirely when --rw is set.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
       - "Read-only cypher runs without --rw; write cypher errors without --rw"
       - "With --rw, cypher executes and preflight is skipped (single call)"
       - "Struct decodes the confirmed field; no panics on missing fields"
-    completed_at: null
+    completed_at: 2026-05-06T13:59:33Z
 
   - id: task-006
     title: "Unit tests for write gate at root"
