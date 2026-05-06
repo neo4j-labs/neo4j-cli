@@ -1,6 +1,12 @@
 ---
 name: neo4j-cli
-description: Use this skill when the user asks to manage Neo4j resources from the command line via neo4j-cli — provisioning Aura instances, listing tenants, creating credentials, working with deployments, or installing agent skills. neo4j-cli is the super-CLI that bundles aura-cli (under the `aura` subcommand) plus a top-level `credential` group and a `skill` group for installing/removing/listing/checking the embedded agent-skill bundle. Commands follow `<resource> <action>` form (e.g. `aura instance list`), take at most one positional argument, and support `--format json|table|toon` (shorthand `-f`) on read commands.
+description: Use this skill when the user wants to interact with Neo4j via the neo4j-cli command-line tool — the canonical CLI for running Cypher and managing Aura from a terminal.
+
+TRIGGER when: run, execute, or pipe Cypher against any Neo4j database from a terminal/shell/bash; run Cypher given a bolt/neo4j+s:// URI with user/password from a shell; introspect schema, labels, indexes, or constraints via CLI; provision, list, get, create, delete, or resize Aura instances or tenants; set up, add, remove, list, or get Aura API credentials or keys from CLI; install, remove, uninstall, list, or check the neo4j-cli skill in Claude Code, Cursor, or another agent (e.g. "remove the neo4j-cli skill from my agent" → `neo4j-cli skill remove`); user mentions neo4j-cli, aura-cli, `neo4j query`, `aura instance`, or `neo4j credential`.
+
+SKIP: Cypher syntax/semantics questions; graph data modeling; Neo4j driver code (Python/Java/JS/Go); Docker/Kubernetes/kubectl; other databases (Postgres, Redis); generic shell tasks; Neo4j Browser UI.
+
+CLI: `query` (run Cypher via HTTP API, `--schema` flag, pipe stdin, env file with connection details), `aura` (instance/tenant/deployment), `credential` (Aura API client-id+secret), `skill` (install/remove/list/check in any AI agent).
 version: {{VERSION}}
 ---
 
