@@ -1,0 +1,8 @@
+name = "neo4j-sh"
+compatibility_date = "2024-01-01"
+
+[env.production]
+# Cloudflare Pages project — deploy via dashboard or:
+#   wrangler pages deploy . --project-name neo4j-sh
+# Connect https://github.com/neo4j-labs/neo4j-cli (gh-pages branch) in the
+# Cloudflare Pages dashboard for automatic deployment on push.

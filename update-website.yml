@@ -1,0 +1,94 @@
+# NOTE: This file belongs at .github/workflows/update-website.yml on the main branch.
+# Copy it there after merging. It is stored here on gh-pages for reference only.
+#
+# What it does:
+#   1. Runs weekly (Monday 09:00 UTC) and on any push to main
+#   2. Checks the latest neo4j-cli version on PyPI and npm
+#   3. Updates installer commands in gh-pages/index.html if the version changed
+#   4. Commits and pushes to gh-pages → Cloudflare Pages auto-deploys
+
+name: Update website
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'   # every Monday 09:00 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Get latest versions
+        id: ver
+        run: |
+          PIP=$(curl -sf https://pypi.org/pypi/neo4j-cli/json | jq -r '.info.version')
+          NPM=$(curl -sf https://registry.npmjs.org/@neo4j-labs/cli | jq -r '."dist-tags".alpha // ."dist-tags".latest')
+          echo "pip=${PIP}" >> "$GITHUB_OUTPUT"
+          echo "npm=${NPM}" >> "$GITHUB_OUTPUT"
+          echo "Detected: pip=${PIP}  npm=${NPM}"
+
+      - name: Check if update needed
+        id: check
+        run: |
+          CURRENT=$(grep -o 'pipx install neo4j-cli==[^<"]*' index.html | head -1 | sed 's/pipx install neo4j-cli==//')
+          echo "current=${CURRENT}"
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+          if [ "${CURRENT}" != "${{ steps.ver.outputs.pip }}" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update index.html
+        if: steps.check.outputs.needs_update == 'true'
+        env:
+          OLD_PIP: ${{ steps.check.outputs.current }}
+          NEW_PIP: ${{ steps.ver.outputs.pip }}
+          NEW_NPM: ${{ steps.ver.outputs.npm }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, re
+
+          old_pip = os.environ['OLD_PIP']
+          new_pip = os.environ['NEW_PIP']
+          new_npm = os.environ['NEW_NPM']
+
+          with open('index.html', 'r') as f:
+              html = f.read()
+
+          # Update pipx version everywhere it appears
+          html = html.replace(f'neo4j-cli=={old_pip}', f'neo4j-cli=={new_pip}')
+
+          # Update npm version in installers object
+          html = re.sub(
+              r'@neo4j-labs/cli@[^\'"<]+',
+              f'@neo4j-labs/cli@{new_npm}',
+              html
+          )
+
+          with open('index.html', 'w') as f:
+              f.write(html)
+
+          print(f"Updated: neo4j-cli=={old_pip} -> neo4j-cli=={new_pip}")
+          print(f"Updated: @neo4j-labs/cli@... -> @neo4j-labs/cli@{new_npm}")
+          PYEOF
+
+      - name: Commit and push
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "chore(website): update installer to neo4j-cli==${{ steps.ver.outputs.pip }}"
+          git push

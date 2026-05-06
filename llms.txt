@@ -1,0 +1,63 @@
+# neo4j-cli
+
+> A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.
+
+neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the HTTP Query API, and integrating with AI agent frameworks (Claude Code, Cursor, Copilot, and more).
+
+## Installation
+
+```bash
+pipx install neo4j-cli==0.1.0a6
+```
+
+or via npm:
+
+```bash
+npm install -g @neo4j-labs/cli@alpha
+```
+
+## Command surface
+
+- `neo4j-cli aura credential add` — store Aura API credentials
+- `neo4j-cli aura instance list` — list Aura instances (table or JSON)
+- `neo4j-cli aura instance create` — provision a new Aura instance
+- `neo4j-cli aura instance get <id>` — get instance details
+- `neo4j-cli query <cypher>` — run Cypher against any Neo4j via HTTP Query API
+- `neo4j-cli query :schema` — introspect node labels, rel types, properties
+- `neo4j-cli skill install` — install the agent skill bundle into your AI assistant
+- `neo4j-cli skill list` — list installed skills
+- `neo4j-cli skill check` — verify skill installation
+
+## Connection
+
+Connection precedence: flag → environment variable → `.env` file → stored default.
+
+Default URI: `http://localhost:7474`, username: `neo4j`, database: `neo4j`.
+
+Bolt-family URIs (`bolt://`, `neo4j://`) are rewritten to HTTP automatically.
+Aura hostnames are forced to HTTPS port 443.
+
+## Output formats
+
+All read commands support `--format json|table` (`-f` shorthand). Default is `table` on a TTY, `json` when piped.
+
+JSON envelope: `{"columns": [...], "rows": [[...]], "truncated": false}`
+
+## Agent skills
+
+neo4j-cli ships with a built-in agent skill bundle that teaches AI assistants (Claude Code, Cursor, etc.) how to drive the CLI. Install with:
+
+```bash
+neo4j-cli skill install
+```
+
+Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
+
+## Links
+
+- Homepage: https://neo4j.sh/
+- GitHub: https://github.com/neo4j-labs/neo4j-cli
+- Issues: https://github.com/neo4j-labs/neo4j-cli/issues
+- Neo4j Docs: https://neo4j.com/docs/
+- Aura Console: https://console.neo4j.io/
+- Neo4j Agent Skills: https://skills.sh/neo4j-contrib/neo4j-skills

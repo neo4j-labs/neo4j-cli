@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>neo4j-cli — a super CLI for graph apps</title>
+<meta name="description" content="A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.">
+
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="canonical" href="https://neo4j.sh/">
+<link rel="describedby" href="/llms.txt">
+<meta property="og:title" content="neo4j-cli — a super CLI for graph apps">
+<meta property="og:description" content="A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.">
+<meta property="og:url" content="https://neo4j.sh/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<style>
+  /* ---------- Fonts (self-hosted Public Sans + Fira Code) ---------- */
+  @font-face {
+    font-family: 'Public Sans'; font-style: normal; font-weight: 400;
+    src: url("fonts/public-sans-400.woff2") format('woff2');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Public Sans'; font-style: normal; font-weight: 500;
+    src: url("fonts/public-sans-500.woff2") format('woff2'); font-display: swap;
+  }
+  @font-face {
+    font-family: 'Public Sans'; font-style: normal; font-weight: 600;
+    src: url("fonts/public-sans-600.woff2") format('woff2'); font-display: swap;
+  }
+  @font-face {
+    font-family: 'Public Sans'; font-style: normal; font-weight: 700;
+    src: url("fonts/public-sans-700.woff2") format('woff2'); font-display: swap;
+  }
+  @font-face {
+    font-family: 'Fira Code'; font-style: normal; font-weight: 400;
+    src: url("fonts/fira-code-400.woff2") format('woff2'); font-display: swap;
+  }
+  @font-face {
+    font-family: 'Fira Code'; font-style: normal; font-weight: 500;
+    src: url("fonts/fira-code-500.woff2") format('woff2'); font-display: swap;
+  }
+  @font-face {
+    font-family: 'Fira Code'; font-style: normal; font-weight: 700;
+    src: url("fonts/fira-code-700.woff2") format('woff2'); font-display: swap;
+  }
+
+  /* ---------- Tokens ---------- */
+  :root {
+    --font-sans: 'Public Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Needle palette */
+    --baltic-50: #006FD6;
+    --baltic-55: #0061BD;
+    --baltic-60: #014063;
+    --baltic-70: #00253D;
+
+    --hibiscus-40: #f96746;
+    --hibiscus-50: #d43300;
+
+    --forest-50: #158838;
+    --forest-40: #1ea34a;
+
+    --lavender-40: #8B5CF6;
+    --lavender-50: #7C39C9;
+    --lavender-30: #B89AFF;
+
+    --lemon-50: #B8860B;
+
+    /* Light theme (default) */
+    --bg: #ffffff;
+    --bg-alt: #F7F8FA;
+    --bg-code: #0F141A;
+    --fg: #0A1014;
+    --fg-muted: #4A5664;
+    --fg-faint: #6B7A88;
+    --border: #E3E8EE;
+    --border-strong: #C9D2DB;
+    --accent: var(--baltic-50);
+    --accent-hover: var(--baltic-55);
+    --discovery: var(--lavender-50);
+    --success: var(--forest-50);
+    --danger: var(--hibiscus-50);
+
+    --code-bg: #0F141A;
+    --code-fg: #E3E8EE;
+    --code-comment: #6B7A88;
+    --code-keyword: #B89AFF;
+    --code-string: #6BD0A0;
+    --code-fn: #5BB7FF;
+    --code-num: #FFB060;
+    --code-flag: #F09595;
+
+    --terminal-prompt: #6BD0A0;
+    --terminal-cursor: var(--accent);
+
+    --shadow-raised: 0 1px 2px rgba(10, 16, 20, 0.06), 0 1px 3px rgba(10, 16, 20, 0.04);
+    --shadow-overlay: 0 4px 16px rgba(10, 16, 20, 0.10);
+
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0B0E12;
+    --bg-alt: #11161C;
+    --bg-code: #060A0E;
+    --fg: #ECEFF3;
+    --fg-muted: #9AA8B4;
+    --fg-faint: #6B7A88;
+    --border: #1E2530;
+    --border-strong: #2A3340;
+    --accent: #4FA3F0;
+    --accent-hover: #6FB7FA;
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  /* prefers-color-scheme: dark sets dark by default */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B0E12;
+      --bg-alt: #11161C;
+      --bg-code: #060A0E;
+      --fg: #ECEFF3;
+      --fg-muted: #9AA8B4;
+      --fg-faint: #6B7A88;
+      --border: #1E2530;
+      --border-strong: #2A3340;
+      --accent: #4FA3F0;
+      --accent-hover: #6FB7FA;
+      --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-overlay: 0 4px 16px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+
+  /* ---------- Reset ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--fg);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  ::selection { background: var(--accent); color: #fff; }
+
+  /* ---------- Layout ---------- */
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- Top nav ---------- */
+  header.top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s ease;
+  }
+  header.top.scrolled { border-bottom-color: var(--border); }
+  header.top .inner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    color: var(--fg);
+  }
+  .brand .glyph {
+    width: 24px;
+    height: 24px;
+  }
+  .brand .name { font-family: var(--font-mono); font-weight: 500; white-space: nowrap; }
+  .brand .name .dash { color: var(--fg-faint); }
+  .brand-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    margin-left: 4px;
+  }
+  nav.top-nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  nav.top-nav a {
+    color: var(--fg-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: color 0.1s, background-color 0.1s;
+  }
+  nav.top-nav a:hover { color: var(--fg); background: var(--bg-alt); }
+
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .icon-btn:hover { background: var(--bg-alt); color: var(--fg); border-color: var(--border-strong); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .theme-toggle .moon { display: none; }
+  [data-theme="dark"] .theme-toggle .sun { display: none; }
+  [data-theme="dark"] .theme-toggle .moon { display: block; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .theme-toggle .sun { display: none; }
+    :root:not([data-theme="light"]) .theme-toggle .moon { display: block; }
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative;
+    padding: 88px 0 80px;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 40%),
+      radial-gradient(circle at 80% 30%, color-mix(in srgb, var(--discovery) 8%, transparent), transparent 40%);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.4;
+    mask-image: radial-gradient(ellipse at center top, black 0%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center top, black 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero .inner { position: relative; z-index: 1; text-align: center; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 6px;
+    border-radius: 999px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    text-decoration: none;
+    transition: all 0.1s;
+  }
+  .pill:hover { border-color: var(--border-strong); color: var(--fg); }
+  .pill .pill-tag {
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  h1.hero-title {
+    margin: 24px 0 16px;
+    font-size: clamp(40px, 6vw, 64px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+  h1.hero-title .accent {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--discovery) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  h1.hero-title .mono { font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.02em; }
+  .hero-sub {
+    max-width: 620px;
+    margin: 0 auto 36px;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--fg-muted);
+    text-wrap: pretty;
+  }
+
+  /* ---------- Install command block ---------- */
+  .install {
+    max-width: 640px;
+    margin: 0 auto 16px;
+  }
+  .cmd-block {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-code);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-overlay);
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  [data-theme="dark"] .cmd-block,
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .cmd-block { border-color: var(--border); }
+  }
+  .cmd-block .cmd-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--code-fg);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .cmd-block .cmd-content::-webkit-scrollbar { display: none; }
+  .cmd-block .prompt { color: var(--terminal-prompt); user-select: none; flex-shrink: 0; }
+  .cmd-block .cmd-text { font-weight: 500; }
+  .cmd-block .cmd-text .flag { color: var(--code-flag); }
+  .cmd-block .cmd-text .pipe { color: var(--code-comment); }
+  .cmd-block .copy-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 22px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid color-mix(in srgb, var(--code-fg) 12%, transparent);
+    color: var(--code-fg);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.1s, color 0.1s;
+  }
+  .cmd-block .copy-btn:hover { background: rgba(255,255,255,0.04); }
+  .cmd-block .copy-btn.copied { color: var(--terminal-prompt); }
+  .cmd-block .copy-btn svg { width: 14px; height: 14px; }
+  .cmd-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--fg-faint);
+    font-family: var(--font-mono);
+  }
+  .cmd-hint kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    background: var(--bg-alt);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-muted);
+    margin: 0 1px;
+  }
+
+  .install-tabs {
+    display: inline-flex;
+    margin: 0 auto 14px;
+    padding: 4px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    gap: 2px;
+  }
+  .install-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: all 0.1s;
+    white-space: nowrap;
+  }
+  .install-tab:hover { color: var(--fg); }
+  .install-tab.active {
+    background: var(--bg);
+    color: var(--fg);
+    box-shadow: var(--shadow-raised);
+  }
+  .install-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--fg);
+    color: var(--bg);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: var(--shadow-overlay);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s cubic-bezier(0.42, 0, 0.58, 1);
+    pointer-events: none;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast svg { width: 14px; height: 14px; color: var(--forest-40); }
+
+  /* ---------- Section ---------- */
+  section { padding: 80px 0; }
+  section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .section-header { text-align: center; margin-bottom: 56px; }
+  .section-eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+  }
+  .section-eyebrow::before { content: '// '; color: var(--fg-faint); }
+  h2.section-title {
+    margin: 0 0 12px;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .section-sub {
+    max-width: 560px;
+    margin: 0 auto;
+    font-size: 17px;
+    color: var(--fg-muted);
+    text-wrap: pretty;
+  }
+
+  /* ---------- Code examples grid ---------- */
+  .examples {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 24px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-raised);
+  }
+  @media (max-width: 720px) {
+    .examples { grid-template-columns: 1fr; }
+  }
+  .example-tabs {
+    background: var(--bg-alt);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (max-width: 720px) {
+    .example-tabs { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 0; }
+  }
+  .example-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: transparent;
+    border: 0;
+    border-left: 2px solid transparent;
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.1s;
+  }
+  @media (max-width: 720px) {
+    .example-tab { border-left: 0; border-bottom: 2px solid transparent; flex-shrink: 0; }
+  }
+  .example-tab:hover { color: var(--fg); background: color-mix(in srgb, var(--accent) 4%, transparent); }
+  .example-tab.active {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-left-color: var(--accent);
+  }
+  @media (max-width: 720px) {
+    .example-tab.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+  }
+  .example-tab .label-tag {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--fg-faint);
+    font-weight: 500;
+  }
+  @media (max-width: 720px) { .example-tab .label-tag { display: none; } }
+
+  .example-pane {
+    display: none;
+    padding: 0;
+    background: var(--bg-code);
+    color: var(--code-fg);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-x: auto;
+    position: relative;
+    min-height: 400px;
+  }
+  .example-pane.active { display: block; }
+  .example-pane .example-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid color-mix(in srgb, var(--code-fg) 8%, transparent);
+    font-size: 12px;
+    color: var(--fg-faint);
+  }
+  .example-pane .example-header .desc { color: color-mix(in srgb, var(--code-fg) 70%, transparent); }
+  .example-pane .copy-mini {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--code-fg) 15%, transparent);
+    color: color-mix(in srgb, var(--code-fg) 70%, transparent);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.1s;
+  }
+  .example-pane .copy-mini:hover { background: color-mix(in srgb, var(--code-fg) 8%, transparent); color: var(--code-fg); }
+  .example-pane .copy-mini.copied { color: var(--terminal-prompt); border-color: color-mix(in srgb, var(--terminal-prompt) 40%, transparent); }
+  .example-pane .copy-mini svg { width: 11px; height: 11px; }
+  .example-pane pre {
+    margin: 0;
+    padding: 20px 24px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .example-pane .prompt { color: var(--terminal-prompt); user-select: none; }
+  .example-pane .comment { color: var(--code-comment); font-style: italic; }
+  .example-pane .keyword { color: var(--code-keyword); }
+  .example-pane .string { color: var(--code-string); }
+  .example-pane .num { color: var(--code-num); }
+  .example-pane .flag { color: var(--code-flag); }
+  .example-pane .fn { color: var(--code-fn); }
+  .example-pane .out { color: color-mix(in srgb, var(--code-fg) 75%, transparent); }
+  .example-pane .ok { color: var(--terminal-prompt); }
+  .example-pane .info { color: var(--code-fn); }
+
+  /* ---------- Quickstart ---------- */
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 8px;
+  }
+  @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: var(--shadow-raised);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .step .step-num {
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-raised);
+  }
+  .step h3 {
+    margin: 4px 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .step p {
+    margin: 0 0 14px;
+    font-size: 14px;
+    color: var(--fg-muted);
+    line-height: 1.55;
+  }
+  .step .step-cmd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-code);
+    color: var(--code-fg);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    overflow-x: auto;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    position: relative;
+    margin-top: auto;
+  }
+  .step .step-cmd::-webkit-scrollbar { display: none; }
+  .step .step-cmd:hover { background: #1a212a; }
+  .step .step-cmd .prompt { color: var(--terminal-prompt); flex-shrink: 0; }
+  .step .step-cmd .copy-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fg-faint);
+    background: var(--bg-code);
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+  .step .step-cmd:hover .copy-icon { opacity: 1; }
+  .step .step-cmd .copy-icon svg { width: 12px; height: 12px; display: block; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0 32px;
+    color: var(--fg-faint);
+    font-size: 13px;
+  }
+  footer .inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  footer a { color: var(--fg-muted); text-decoration: none; transition: color 0.1s; }
+  footer a:hover { color: var(--fg); }
+  footer .links { display: flex; gap: 20px; flex-wrap: wrap; }
+  footer .meta { font-family: var(--font-mono); font-size: 12px; }
+
+  /* ---------- Cursor ---------- */
+  .cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1.05em;
+    vertical-align: text-bottom;
+    background: var(--terminal-cursor);
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+
+
+  /* ---------- Noscript: show everything, hide JS-only chrome ---------- */
+  noscript + .noscript-info { display: block; }
+  .noscript-info {
+    display: none;
+    max-width: 640px;
+    margin: 0 auto 16px;
+    padding: 12px 18px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+  }
+  /* ---------- Reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== TOP NAV ============== -->
+<header class="top" id="top">
+  <div class="container inner">
+    <a href="#top" class="brand">
+      <svg class="glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="6" r="2.6" fill="var(--accent)"></circle>
+        <circle cx="5.5" cy="17" r="2.6" fill="var(--discovery)"></circle>
+        <circle cx="18.5" cy="17" r="2.6" fill="var(--hibiscus-40)"></circle>
+        <line x1="12" y1="6" x2="5.5" y2="17" stroke="currentColor" stroke-width="1.4" opacity="0.6"></line>
+        <line x1="12" y1="6" x2="18.5" y2="17" stroke="currentColor" stroke-width="1.4" opacity="0.6"></line>
+        <line x1="5.5" y1="17" x2="18.5" y2="17" stroke="currentColor" stroke-width="1.4" opacity="0.6"></line>
+      </svg>
+      <span class="name">neo4j<span class="dash">-</span>cli</span>
+      <span class="brand-tag">labs</span>
+    </a>
+    <nav class="top-nav">
+      <a href="#examples">Examples</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+      </svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============== HERO ============== -->
+<section class="hero">
+  <div class="container inner">
+    <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener" class="pill">
+      <span class="pill-tag">new</span>
+      <span>open source · neo4j-labs</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;opacity:0.6">
+        <path d="M5 12h14M13 6l6 6-6 6"></path>
+      </svg>
+    </a>
+
+    <h1 class="hero-title">
+      The graph database,<br>
+      <span class="accent">in your terminal.</span>
+    </h1>
+
+    <p class="hero-sub">
+      A super CLI for Neo4j. Manage Aura instances, run Cypher against any
+      database, and teach your AI agents to drive it all — without ever
+      leaving the prompt.
+    </p>
+
+    <div class="install">
+      <div class="install-tabs" role="tablist" aria-label="Installer for your OS">
+        <button class="install-tab" data-os="macos" role="tab">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 1.5a4 4 0 0 0-3 1.6 3.6 3.6 0 0 0-.9 3 3.7 3.7 0 0 0 3-1.5 3.7 3.7 0 0 0 .9-3.1zM20 17.4a8.6 8.6 0 0 1-1.2 2.2c-.7 1-1.6 2.3-2.8 2.3-1 0-1.3-.7-2.7-.7s-1.7.7-2.7.7c-1.2 0-2.2-1.3-2.9-2.4-1.9-2.7-3.4-7.7-1.4-11 .9-1.6 2.5-2.6 4.3-2.6 1.1 0 2.2.7 2.9.7.7 0 2-.9 3.4-.7a4.4 4.4 0 0 1 3.5 1.9 4.3 4.3 0 0 0-2 3.6 4.2 4.2 0 0 0 1.6 4z"></path></svg>
+          <span>macOS</span>
+        </button>
+        <button class="install-tab" data-os="linux" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a4 4 0 0 0-4 4v3l-2 4 2 2v4a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3v-4l2-2-2-4V6a4 4 0 0 0-4-4z"></path><circle cx="10" cy="7" r=".7" fill="currentColor"></circle><circle cx="14" cy="7" r=".7" fill="currentColor"></circle></svg>
+          <span>Linux</span>
+        </button>
+        <button class="install-tab" data-os="windows" role="tab">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 11 4v8H3V5.5zM12 4l9-1.4V12h-9V4zM3 13h8v7L3 18.5V13zm9 0h9v8.4L12 20v-7z"></path></svg>
+          <span>Windows</span>
+        </button>
+        <button class="install-tab" data-os="docker" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 6v12l8 4 8-4V6l-8-4z"></path><path d="m4 6 8 4 8-4M12 22V10"></path></svg>
+          <span>npm</span>
+        </button>
+      </div>
+
+      <div class="cmd-block" id="installBlock">
+        <div class="cmd-content">
+          <span class="prompt" id="installPrompt">$</span>
+          <span class="cmd-text" id="installCmd"></span>
+        </div>
+        <button class="copy-btn" id="copyInstall" aria-label="Copy install command">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="copyIconMain">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copyText">copy</span>
+        </button>
+      </div>
+      <div class="cmd-hint">
+        <span id="osDetected">detected your OS</span> · <kbd>⌘</kbd><kbd>C</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd> to copy from anywhere
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== EXAMPLES ============== -->
+<section class="alt" id="examples">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-eyebrow">examples</span>
+      <h2 class="section-title">Built for the prompt.</h2>
+      <p class="section-sub">
+        Manage Aura, query any Neo4j over the HTTP Query API, introspect the
+        schema, pipe Cypher in, JSON out — and let your agents play too.
+      </p>
+    </div>
+
+    <div class="examples">
+      <div class="example-tabs" role="tablist">
+        <button class="example-tab active" data-tab="aura" role="tab">
+          <span>aura</span>
+          <span class="label-tag">instances</span>
+        </button>
+        <button class="example-tab" data-tab="query" role="tab">
+          <span>query</span>
+          <span class="label-tag">cypher</span>
+        </button>
+        <button class="example-tab" data-tab="schema" role="tab">
+          <span>:schema</span>
+          <span class="label-tag">introspect</span>
+        </button>
+        <button class="example-tab" data-tab="pipe" role="tab">
+          <span>pipe</span>
+          <span class="label-tag">stdin</span>
+        </button>
+        <button class="example-tab" data-tab="skill" role="tab">
+          <span>skill</span>
+          <span class="label-tag">agents</span>
+        </button>
+      </div>
+
+      <!-- aura -->
+      <div class="example-pane active" data-pane="aura">
+        <div class="example-header">
+          <span class="desc">Manage Aura instances from the terminal</span>
+          <button class="copy-mini" data-copy-pane="aura">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="comment"># add your Aura API credentials (one-time)</span>
+<span class="prompt">$</span> neo4j-cli aura credential add <span class="flag">--name</span> <span class="string">"prod"</span> \
+    <span class="flag">--client-id</span> <span class="string">&lt;client-id&gt;</span> <span class="flag">--client-secret</span> <span class="string">&lt;secret&gt;</span>
+
+<span class="ok">✓</span> credential <span class="string">"prod"</span> saved · set as default
+
+<span class="comment"># list your instances</span>
+<span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> table
+
+<span class="out">┌──────────┬───────────────┬────────┬───────────┬─────────┐
+│ id       │ name          │ tier   │ region    │ status  │
+├──────────┼───────────────┼────────┼───────────┼─────────┤
+│ <span class="string">f1ab2c34</span> │ <span class="string">movies-prod</span>   │ <span class="keyword">free</span>   │ <span class="info">us-east-1</span> │ <span class="ok">running</span> │
+│ <span class="string">9d8e7f6a</span> │ <span class="string">staging</span>       │ <span class="keyword">pro</span>    │ <span class="info">eu-west-1</span> │ <span class="ok">running</span> │
+└──────────┴───────────────┴────────┴───────────┴─────────┘</span>
+</pre>
+      </div>
+
+      <!-- query -->
+      <div class="example-pane" data-pane="query">
+        <div class="example-header">
+          <span class="desc">Run Cypher against any Neo4j database via the HTTP Query API</span>
+          <button class="copy-mini" data-copy-pane="query">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (p:Person {name:$name})-[:ACTED_IN]-&gt;(m) RETURN m.title'</span> \
+    <span class="flag">--param</span> name=Alice
+
+<span class="out">┌────────────────────┐
+│ m.title            │
+├────────────────────┤
+│ <span class="string">"The Matrix"</span>       │
+│ <span class="string">"John Wick"</span>        │
+│ <span class="string">"Speed"</span>            │
+└────────────────────┘</span>
+
+<span class="info">▸</span> <span class="num">3</span> rows · <span class="num">42</span>ms · connected to <span class="string">neo4j+s://f1ab…b2.databases.neo4j.io</span>
+
+<span class="comment"># typed params via JSON</span>
+<span class="prompt">$</span> neo4j-cli query <span class="string">'RETURN $ids'</span> <span class="flag">--param</span> <span class="string">'ids=[1,2,3]'</span>
+
+<span class="comment"># connection settings: flag → env → .env → default</span>
+<span class="comment">#   --uri / NEO4J_URI            (default: http://localhost:7474)</span>
+<span class="comment">#   --username / NEO4J_USERNAME  (default: neo4j)</span>
+<span class="comment">#   --password / NEO4J_PASSWORD  (prompted on TTY)</span>
+<span class="comment">#   --database / NEO4J_DATABASE  (default: neo4j)</span>
+</pre>
+      </div>
+
+      <!-- schema -->
+      <div class="example-pane" data-pane="schema">
+        <div class="example-header">
+          <span class="desc">Introspect labels, relationships, properties &amp; indexes</span>
+          <button class="copy-mini" data-copy-pane="schema">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="prompt">$</span> neo4j-cli query :schema
+
+<span class="info">▸</span> <span class="keyword">node labels</span>
+   :Movie  (<span class="num">38</span>)   :Person  (<span class="num">133</span>)   :Genre  (<span class="num">13</span>)
+
+<span class="info">▸</span> <span class="keyword">relationship types</span>
+   ACTED_IN  (<span class="num">172</span>)   DIRECTED  (<span class="num">44</span>)   IN_GENRE  (<span class="num">94</span>)
+
+<span class="info">▸</span> <span class="keyword">indexes</span>
+   <span class="ok">●</span> Movie(title)        RANGE        <span class="ok">ONLINE</span>
+   <span class="ok">●</span> Person(name)        RANGE        <span class="ok">ONLINE</span>
+   <span class="ok">●</span> Movie(plot)         FULLTEXT     <span class="ok">ONLINE</span>
+
+<span class="info">▸</span> <span class="keyword">constraints</span>
+   <span class="ok">●</span> Movie.id  IS UNIQUE
+   <span class="ok">●</span> Person.id IS UNIQUE
+</pre>
+      </div>
+
+      <!-- pipe -->
+      <div class="example-pane" data-pane="pipe">
+        <div class="example-header">
+          <span class="desc">Pipe Cypher in, JSON out — friendly to scripts</span>
+          <button class="copy-mini" data-copy-pane="pipe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="comment"># cypher from stdin, JSON to stdout (auto when piped)</span>
+<span class="prompt">$</span> <span class="fn">echo</span> <span class="string">'MATCH (n) RETURN count(n) AS n'</span> | neo4j-cli query
+
+<span class="out">{
+  <span class="string">"columns"</span>: [<span class="string">"n"</span>],
+  <span class="string">"rows"</span>: [[<span class="num">184</span>]],
+  <span class="string">"truncated"</span>: <span class="keyword">false</span>,
+  <span class="string">"arrays_truncated"</span>: <span class="keyword">false</span>
+}</span>
+
+<span class="comment"># tune the row cap (0 = unlimited)</span>
+<span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (m:Movie) RETURN m'</span> <span class="flag">--max-rows</span> <span class="num">0</span>
+
+<span class="comment"># drive it from anywhere with env vars or .env (auto-discovered)</span>
+<span class="prompt">$</span> NEO4J_URI=neo4j+s://f1ab…b2.databases.neo4j.io \
+  NEO4J_PASSWORD=<span class="string">$AURA_PW</span> \
+  neo4j-cli query <span class="string">'MATCH (n) RETURN count(n)'</span>
+</pre>
+      </div>
+
+      <!-- skill -->
+      <div class="example-pane" data-pane="skill">
+        <div class="example-header">
+          <span class="desc">Teach your AI agents how to drive the CLI</span>
+          <button class="copy-mini" data-copy-pane="skill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="prompt">$</span> neo4j-cli skill install
+
+<span class="info">▸</span> detecting installed agents…
+<span class="ok">✓</span> claude-code     installed (v1.4.0)
+<span class="ok">✓</span> cursor          installed (v1.4.0)
+<span class="ok">✓</span> windsurf        installed (v1.4.0)
+<span class="info">○</span> copilot         not detected — skipped
+<span class="info">○</span> gemini-cli      not detected — skipped
+
+<span class="info">▸</span> bundle reflects the default-config command surface
+<span class="info">▸</span> agents now know: aura, query, :schema, env resolution, JSON envelope
+
+<span class="comment"># target a single agent</span>
+<span class="prompt">$</span> neo4j-cli skill install claude-code
+
+<span class="comment"># list state and check for version drift</span>
+<span class="prompt">$</span> neo4j-cli skill list
+<span class="prompt">$</span> neo4j-cli skill check
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== QUICKSTART ============== -->
+<section id="quickstart">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-eyebrow">quickstart</span>
+      <h2 class="section-title">From zero to graph in 60 seconds.</h2>
+      <p class="section-sub">
+        New to Neo4j? AuraDB has a free tier — no credit card. The CLI walks
+        you through connecting it.
+      </p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Install the CLI</h3>
+        <p>Install via <a href="https://pipx.pypa.io/" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">pipx</a> (macOS, Linux, Windows) or npm — use the tabs above.</p>
+        <div class="step-cmd" data-copy="pipx install neo4j-cli==0.1.0a6">
+          <span class="prompt">$</span><span>pipx install neo4j-cli==0.1.0a6</span>
+          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Add Aura credentials</h3>
+        <p>Grab a client ID + secret from your <a href="https://console.neo4j.io/#account" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Aura account</a> and tell the CLI about them.</p>
+        <div class="step-cmd" data-copy="neo4j-cli aura credential add --name &quot;default&quot; --client-id &lt;id&gt; --client-secret &lt;secret&gt;">
+          <span class="prompt">$</span><span>neo4j-cli aura credential add --name <span style="color:var(--code-string)">"default"</span> ...</span>
+          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>List your instances</h3>
+        <p>Free tier counts. Pretty table by default; pipe-friendly JSON when stdout isn't a TTY.</p>
+        <div class="step-cmd" data-copy="neo4j-cli aura instance list --format table">
+          <span class="prompt">$</span><span>neo4j-cli aura instance list --format table</span>
+          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Run Cypher</h3>
+        <p>Or hand the keys to your favorite agent — <code style="font-family:var(--font-mono);font-size:0.9em;color:var(--accent)">skill install</code> teaches Claude Code, Cursor &amp; co. how to drive the CLI.</p>
+        <div class="step-cmd" data-copy="neo4j-cli query 'MATCH (n) RETURN count(n)'">
+          <span class="prompt">$</span><span>neo4j-cli query <span style="color:var(--code-string)">'MATCH (n) RETURN count(n)'</span></span>
+          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== FOOTER ============== -->
+<footer>
+  <div class="container inner">
+    <div class="meta">
+      neo4j-cli · maintained by <a href="https://neo4j.com" target="_blank" rel="noopener">Neo4j</a> labs
+    </div>
+    <div class="links">
+      <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/neo4j-labs/neo4j-cli/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="https://neo4j.com/docs/" target="_blank" rel="noopener">Docs</a>
+      <a href="https://neo4j.com/aura/" target="_blank" rel="noopener">Aura</a>
+      <a href="https://skills.sh/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener">Agent Skills</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ============== TOAST ============== -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+  <span id="toastText">Copied to clipboard</span>
+</div>
+
+<script>
+  // ---------- Theme ----------
+  const themeToggle = document.getElementById('themeToggle');
+  const root = document.documentElement;
+  const stored = localStorage.getItem('theme');
+  if (stored === 'light' || stored === 'dark') {
+    root.setAttribute('data-theme', stored);
+  }
+  themeToggle.addEventListener('click', () => {
+    const current = root.getAttribute('data-theme');
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let next;
+    if (current === 'dark') next = 'light';
+    else if (current === 'light') next = 'dark';
+    else next = sysDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  });
+
+  // ---------- Sticky header shadow ----------
+  const header = document.getElementById('top');
+  const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // ---------- Toast ----------
+  const toast = document.getElementById('toast');
+  const toastText = document.getElementById('toastText');
+  let toastTimer;
+  function showToast(msg) {
+    toastText.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
+  // ---------- Copy helper ----------
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); document.body.removeChild(ta); return true; }
+      catch (e2) { document.body.removeChild(ta); return false; }
+    }
+  }
+
+  // ---------- OS detection + install tabs ----------
+  const installers = {
+    macos: {
+      prompt: '$',
+      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a6</span>',
+      raw: 'pipx install neo4j-cli==0.1.0a6',
+      label: 'detected macOS',
+    },
+    linux: {
+      prompt: '$',
+      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a6</span>',
+      raw: 'pipx install neo4j-cli==0.1.0a6',
+      label: 'detected Linux',
+    },
+    windows: {
+      prompt: '$',
+      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a6</span>',
+      raw: 'pipx install neo4j-cli==0.1.0a6',
+      label: 'detected Windows',
+    },
+    docker: {
+      prompt: '$',
+      html: 'npm install <span class="flag">-g</span> @neo4j-labs/cli<span class="flag">@alpha</span>',
+      raw: 'npm install -g @neo4j-labs/cli@alpha',
+      label: 'via npm',
+    },
+  };
+
+  function detectOS() {
+    const ua = (navigator.userAgent || '').toLowerCase();
+    const plat = (navigator.platform || '').toLowerCase();
+    if (/win/.test(plat) || /windows/.test(ua)) return 'windows';
+    if (/mac/.test(plat) || /darwin|mac os/.test(ua)) return 'macos';
+    if (/linux|x11/.test(plat) || /linux/.test(ua)) return 'linux';
+    return 'macos';
+  }
+
+  const installCmdEl = document.getElementById('installCmd');
+  const installPromptEl = document.getElementById('installPrompt');
+  const osDetectedEl = document.getElementById('osDetected');
+  const copyInstallBtn = document.getElementById('copyInstall');
+  const copyTextLabel = document.getElementById('copyText');
+  const installTabs = document.querySelectorAll('.install-tab');
+  let currentOS = detectOS();
+
+  function setOS(os, userPicked) {
+    currentOS = os;
+    const i = installers[os];
+    installCmdEl.innerHTML = i.html;
+    installPromptEl.innerHTML = i.prompt;
+    osDetectedEl.textContent = userPicked ? i.label.replace('detected ', '') : i.label;
+    installTabs.forEach(t => t.classList.toggle('active', t.dataset.os === os));
+  }
+
+  installTabs.forEach(tab => {
+    tab.addEventListener('click', () => setOS(tab.dataset.os, true));
+  });
+  setOS(currentOS, false);
+
+  async function copyInstall() {
+    const ok = await copyText(installers[currentOS].raw);
+    if (ok) {
+      copyInstallBtn.classList.add('copied');
+      copyTextLabel.textContent = 'copied!';
+      showToast('Install command copied');
+      setTimeout(() => {
+        copyInstallBtn.classList.remove('copied');
+        copyTextLabel.textContent = 'copy';
+      }, 1600);
+    }
+  }
+  copyInstallBtn.addEventListener('click', copyInstall);
+
+  // ---------- ⌘C / Ctrl+C anywhere ----------
+  document.addEventListener('keydown', (e) => {
+    const isCopy = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c';
+    if (!isCopy) return;
+    // don't hijack a real text selection
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim().length > 0) return;
+    // don't hijack inputs
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    copyInstall();
+  });
+
+  // ---------- Tabs ----------
+  const tabs = document.querySelectorAll('.example-tab');
+  const panes = document.querySelectorAll('.example-pane');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const id = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      panes.forEach(p => p.classList.toggle('active', p.dataset.pane === id));
+    });
+  });
+
+  // ---------- Per-pane copy ----------
+  const paneCommands = {
+    aura: 'neo4j-cli aura instance list --format table',
+    query: 'neo4j-cli query \'MATCH (p:Person {name:$name})-[:ACTED_IN]->(m) RETURN m.title\' --param name=Alice',
+    schema: 'neo4j-cli query :schema',
+    pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
+    skill: 'neo4j-cli skill install',
+  };
+  document.querySelectorAll('.copy-mini').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.copyPane;
+      const ok = await copyText(paneCommands[id]);
+      if (ok) {
+        btn.classList.add('copied');
+        const original = btn.innerHTML;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> copied';
+        showToast('Command copied');
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1600);
+      }
+    });
+  });
+
+  // ---------- Step copy ----------
+  document.querySelectorAll('.step-cmd').forEach(el => {
+    el.addEventListener('click', async () => {
+      const cmd = el.dataset.copy;
+      if (!cmd) return;
+      const ok = await copyText(cmd);
+      if (ok) showToast('Copied: ' + cmd.slice(0, 30) + (cmd.length > 30 ? '…' : ''));
+    });
+  });
+
+  // ---------- Alt-install copy ----------
+  document.querySelectorAll('.alt-install').forEach(el => {
+    el.addEventListener('click', async () => {
+      const cmd = el.dataset.cmd;
+      const ok = await copyText(cmd);
+      if (ok) showToast('Copied: ' + cmd);
+    });
+  });
+</script>
+
+
+</body></html>
