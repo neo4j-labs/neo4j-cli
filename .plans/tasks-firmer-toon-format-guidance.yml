@@ -68,14 +68,14 @@ tasks:
       in help text and skill bundles." Use the non-interactive form
       `changie new --projects neo4j-cli --kind Patch --body "<body>"` if available;
       otherwise hand-author the YAML per the documented schema.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "exactly one new file appears under .changes/unreleased/ matching neo4j-cli-Patch-*.yaml"
       - "the YAML's project field is 'neo4j-cli' and kind is 'Patch'"
       - "the body single-line-mentions both 'toon' and the surfaces affected (help text + skill bundles)"
       - "RFC3339 time field is populated"
-    completed_at: null
+    completed_at: 2026-05-06T19:51:00Z
 
   - id: task-005
     title: "Run final gates: make test, fmt-check, lint"

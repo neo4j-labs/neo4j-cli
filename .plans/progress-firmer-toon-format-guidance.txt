@@ -76,3 +76,29 @@ Key Decisions:
   uncommitted regenerate diff itself (per AGENTS.md guidance).
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Add changie Patch entry for the toon nudge
+Date: 2026-05-06T19:51:00Z
+================================================================================
+
+Summary:
+Hand-authored a changie Patch entry under .changes/unreleased/ for project
+neo4j-cli (changie not installed locally). Body mentions both `toon` and the
+surfaces affected (help text + skill bundles) per REQ. Schema mirrors the
+existing aura-cli-Minor-*.yaml sibling: project / kind / body (single-quoted) /
+time (RFC3339 with +00:00 offset).
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Patch-20260506-195030.yaml (new)
+
+Key Decisions:
+- Hand-authored rather than installing changie — schema is documented in
+  AGENTS.md and the sibling aura-cli entry confirms the exact shape.
+- Used RFC3339 with `+00:00` (not `Z`) to match the existing sibling file's
+  format exactly.
+- make fmt-check, make lint, make test all clean. make generate-check skipped
+  per AGENTS.md (working tree has uncommitted source/bundle diffs from prior
+  tasks, so the gate is meaningful only in CI).
+
+Next Task: task-005
