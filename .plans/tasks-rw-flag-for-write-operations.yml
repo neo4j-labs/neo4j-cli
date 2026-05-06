@@ -354,7 +354,7 @@ tasks:
     title: "Final verification post-Bolt — rerun task-014 gates and Bolt smoke"
     description: |
       Re-run make build, make test, make fmt-check, make lint, make license-check, make generate-check after the Bolt migration. In addition: run NEO4J_BOLT_TEST=1 go test -run TestBolt -v ./neo4j-cli/query/... against a docker daemon. Manually smoke: query run RETURN 1 (read, no --rw), query run CREATE (n:T) (errors without --rw), query run CREATE (n:T) --rw (succeeds), --uri http://localhost:7474 (logs rewrite line, connects to bolt://localhost:7687).
-    status: pending
+    status: completed
     dependencies:
       - task-015
       - task-016
@@ -371,3 +371,4 @@ tasks:
       - "All make gates green"
       - "Bolt smoke test green with NEO4J_BOLT_TEST=1"
       - "Manual smoke matches PRD acceptance criteria for both --rw and Bolt sections"
+    completed_at: 2026-05-06T23:00:00Z

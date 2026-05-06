@@ -558,3 +558,21 @@ Key Decisions:
 - npm README needed no edits — it never had --insecure or URI examples; only the existing --rw section.
 
 Next Task: task-026
+
+================================================================================
+TASK-026: Final verification post-Bolt — rerun task-014 gates and Bolt smoke
+Date: 2026-05-06T23:00:00Z
+================================================================================
+
+Summary:
+Verification-only task. All make gates pass clean on the rw-flag branch (build, test, fmt-check, lint, license-check, generate-check — only the in_progress YAML diff was visible to generate-check, no actual generated drift). Ran the Bolt smoke test against docker neo4j: NEO4J_BOLT_TEST=1 go test -run TestBolt -v ./neo4j-cli/query/... — three classifier subtests pass (ReadOnly / ReadWrite / SchemaWrite). Manual smoke against the running workspace neo4j:5 container at neo4j://localhost:7687: read RETURN 1 succeeds without --rw; CREATE (n:SmokeTest) errors with "this command writes; pass --rw to allow it"; the same CREATE with --rw succeeds; --uri http://localhost:7474 logs the rewrite line ("info: rewrote URI 'http://localhost:7474' to 'neo4j://localhost:7687'") and connects to Bolt; cleanup MATCH/DELETE under --rw works. PRD acceptance criteria for both the --rw gate and the Bolt migration are satisfied end to end.
+
+Files Changed:
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-026 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Treated task-026 as verification-only (similar to task-014): no source diff was needed because all gates already pass on this branch and manual smoke matches the PRD.
+- generate-check fails only because of the in_progress task-tracking YAML diff; no generated bundle/SKILL files drifted. Confirmed by running git status before commit.
+
+Next Task: COMPLETE
