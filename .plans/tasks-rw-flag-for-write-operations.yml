@@ -167,7 +167,7 @@ tasks:
     title: "Create dual-project changie entries (Minor)"
     description: |
       Add two unreleased changie YAML files (aura-cli and neo4j-cli, kind Minor) describing the --rw requirement and the query EXPLAIN preflight. Follow repo changie conventions exactly.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-009
@@ -176,7 +176,7 @@ tasks:
       - ".changes/unreleased contains two YAMLs with correct project keys"
       - "Bodies match PRD wording"
       - "changie merge produces expected changelog sections"
-    completed_at: null
+    completed_at: 2026-05-06T15:09:12Z
 
   - id: task-014
     title: "Final verification: build, tests, lint, format, generate-check"

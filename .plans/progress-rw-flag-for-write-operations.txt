@@ -264,3 +264,23 @@ Key Decisions:
 - Mounted `skill` under a minimal root fixture with traverse-run hooks enabled so the tests cover the real inherited --rw gate rather than a standalone leaf.
 
 Next Task: task-013
+
+================================================================================
+TASK-013: Create dual-project changie entries (Minor)
+Date: 2026-05-06T15:09:12Z
+================================================================================
+
+Summary:
+Added dual-project unreleased changie entries describing the new --rw write gate and query EXPLAIN preflight behavior. Verified the YAML shape matches this repo's hand-authored fallback convention even though `changie` is not installed locally.
+
+Files Changed:
+- .changes/unreleased/aura-cli-Minor-20260506-170600.yaml (created: aura-cli changie entry for --rw write gate)
+- .changes/unreleased/neo4j-cli-Minor-20260506-170600.yaml (created: neo4j-cli changie entry for --rw and query EXPLAIN preflight)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Used hand-authored unreleased YAML files because `changie` is not installed locally.
+- Kept the aura-cli entry focused on the write-flag requirement and the neo4j-cli entry focused on the super-CLI plus query behavior.
+
+Next Task: task-014

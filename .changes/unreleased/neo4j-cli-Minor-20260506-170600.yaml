@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Require --rw flag for any write operation; query run uses EXPLAIN to detect write cypher'
+time: 2026-05-06T17:06:00+00:00
