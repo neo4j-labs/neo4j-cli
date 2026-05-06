@@ -24,7 +24,7 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
-| [`query`](references/query.md) | Run Cypher against a Neo4j database via the HTTP Query API |
+| [`query`](references/query.md) | Run Cypher against a Neo4j database via the Bolt protocol |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
 
 ## Gotchas

@@ -270,13 +270,14 @@ tasks:
     title: "URI rewrite — http→neo4j, https→neo4j+s, port forced to 7687"
     description: |
       Update neo4j-cli/query/uri.go (and tests) so the rewrite turns http://<host>[:p][/...] into neo4j://<host>:7687 and https://<host>[:p][/...] into neo4j+s://<host>:7687. Path/query are stripped; the existing one-line stderr notice is preserved. Default URI when none is supplied: neo4j://localhost:7687. Default username stays neo4j, default database stays neo4j.
-    status: pending
+    status: completed
     dependencies:
       - task-016
     acceptance_criteria:
       - "Unit tests cover http/https inputs with and without explicit ports and paths"
       - "Default URI is neo4j://localhost:7687"
       - "Bolt smoke test verifies the rewrite end-to-end"
+    completed_at: 2026-05-06T20:30:00Z
 
   - id: task-021
     title: "Delete HTTPS smoke test; add Bolt smoke test"

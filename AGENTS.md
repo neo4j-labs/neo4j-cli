@@ -297,6 +297,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 - Inside the managed-transaction work callback the order is `tx.Run` → `result.Collect(ctx)` → `result.Consume(ctx)`. Wrap errors once at the outer ExecuteRead/ExecuteWrite return (not per step) so retry semantics get the raw error and user output keeps a single `query: ...` prefix.
 - `seamRouter.readOnlyCalls map[string]bool` lets `run_test.go` assert the routing by statement (e.g. `assert.True(t, r.readOnlyCalls["EXPLAIN ..."])`).
 - v6 driver deprecates `StatementType()` / `StatementType*` constants in favor of `QueryType()` / `QueryType*` — staticcheck (SA1019) flags any use. They share the same underlying int alias, so the rename is purely API hygiene; CLI code stores `resp.QueryType neo4j.QueryType` and compares against `neo4j.QueryTypeReadOnly` for the --rw classifier.
+- `normalizeURI` rewrites `http://<host>[:p][/...]` → `neo4j://<host>:7687` and `https://...` → `neo4j+s://<host>:7687`; path/query/fragment are stripped, userinfo is preserved on the rewritten URI, and the displayOrig form is `(*url.URL).Redacted()` so passwords are masked on stderr. Bolt-family schemes (bolt, bolt+s, bolt+ssc, neo4j, neo4j+s, neo4j+ssc) pass through unchanged. Default URI is `neo4j://localhost:7687`.
 
 ---
 

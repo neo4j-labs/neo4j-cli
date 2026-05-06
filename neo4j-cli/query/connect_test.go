@@ -94,7 +94,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	tmp := t.TempDir()
 	t.Chdir(tmp)
 
-	t.Setenv(envURI, "http://from-env:7474")
+	t.Setenv(envURI, "neo4j://from-env:7687")
 	t.Setenv(envUsername, "fromenv")
 	t.Setenv(envPassword, "envpw")
 	t.Setenv(envDatabase, "envdb")
@@ -106,7 +106,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
 		[]byte(strings.Join([]string{
-			"NEO4J_URI=http://from-dotenv:7474",
+			"NEO4J_URI=neo4j://from-dotenv:7687",
 			"NEO4J_USERNAME=fromdotenv",
 			"NEO4J_PASSWORD=dotenv-pw",
 			"NEO4J_DATABASE=dotenvdb",
@@ -114,7 +114,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
 	cmd := NewCmd(cfg)
 	require.NoError(t, cmd.ParseFlags([]string{
-		"--uri=http://from-flag:7474",
+		"--uri=neo4j://from-flag:7687",
 		"--database=flagdb",
 	}))
 
@@ -122,7 +122,7 @@ func TestResolveConn_PrecedenceFlagsBeatEnvBeatsDotenv(t *testing.T) {
 	require.NoError(t, err)
 
 	// uri+database: flag wins outright.
-	assert.Equal(t, "http://from-flag:7474", c.uri)
+	assert.Equal(t, "neo4j://from-flag:7687", c.uri)
 	assert.Equal(t, "flagdb", c.database)
 	// username+password: no flag → env wins over .env.
 	assert.Equal(t, "fromenv", c.username)
@@ -341,13 +341,13 @@ func TestResolveConn_StoredCredential_UsedWhenNoFlagsOrEnv(t *testing.T) {
 	t.Setenv(envDatabase, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
+	credsJSON := storedCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 
 	c, err := resolveConn(cmd, cfg)
 	require.NoError(t, err)
 
-	assert.Equal(t, "http://stored:7474", c.uri)
+	assert.Equal(t, "neo4j://stored:7687", c.uri)
 	assert.Equal(t, "storedUser", c.username)
 	assert.Equal(t, "storedPass", c.password)
 	assert.Equal(t, "storedDB", c.database)
@@ -360,10 +360,10 @@ func TestResolveConn_StoredCredential_AllFourFlagsBypassCredential(t *testing.T)
 	t.Setenv(envDatabase, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
+	credsJSON := storedCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 	require.NoError(t, cmd.ParseFlags([]string{
-		"--uri=http://flag:7474",
+		"--uri=neo4j://flag:7687",
 		"--username=flagUser",
 		"--password=flagPass",
 		"--database=flagDB",
@@ -372,7 +372,7 @@ func TestResolveConn_StoredCredential_AllFourFlagsBypassCredential(t *testing.T)
 	c, err := resolveConn(cmd, cfg)
 	require.NoError(t, err)
 
-	assert.Equal(t, "http://flag:7474", c.uri)
+	assert.Equal(t, "neo4j://flag:7687", c.uri)
 	assert.Equal(t, "flagUser", c.username)
 	assert.Equal(t, "flagPass", c.password)
 	assert.Equal(t, "flagDB", c.database)
@@ -385,10 +385,10 @@ func TestResolveConn_StoredCredential_PartialOverrideErrors(t *testing.T) {
 	t.Setenv(envDatabase, "")
 	t.Chdir(t.TempDir())
 
-	credsJSON := storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB")
+	credsJSON := storedCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB")
 	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
 	// Only one of the four params provided — ambiguous partial override.
-	require.NoError(t, cmd.ParseFlags([]string{"--uri=http://override:7474"}))
+	require.NoError(t, cmd.ParseFlags([]string{"--uri=neo4j://override:7687"}))
 
 	_, err := resolveConn(cmd, cfg)
 	require.Error(t, err)
@@ -427,8 +427,8 @@ func namedCredJSON(name, uri, username, password, dbName string) string {
 
 func TestResolveConn_CredentialFlag(t *testing.T) {
 	twoCredsJSON := `{"dbms":{"default-credential":"default-cred","credentials":[` +
-		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474"},` +
-		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474"}` +
+		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"neo4j://default:7687"},` +
+		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"neo4j://other:7687"}` +
 		`]}}`
 
 	tests := []struct {
@@ -443,16 +443,16 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 	}{
 		{
 			name:         "resolves named credential",
-			credsJSON:    namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB"),
+			credsJSON:    namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB"),
 			flags:        []string{"--credential=mydb"},
-			wantURI:      "http://named:7474",
+			wantURI:      "neo4j://named:7687",
 			wantUsername: "namedUser",
 			wantPassword: "namedPass",
 			wantDatabase: "namedDB",
 		},
 		{
 			name:            "conflicts with --username",
-			credsJSON:       namedCredJSON("mydb", "http://named:7474", "namedUser", "namedPass", "namedDB"),
+			credsJSON:       namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB"),
 			flags:           []string{"--credential=mydb", "--username=other"},
 			wantErrContains: []string{"--credential", "--username"},
 		},
@@ -464,9 +464,9 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 		},
 		{
 			name:         "no --credential flag uses stored default (existing behaviour unchanged)",
-			credsJSON:    storedCredJSON("http://stored:7474", "storedUser", "storedPass", "storedDB"),
+			credsJSON:    storedCredJSON("neo4j://stored:7687", "storedUser", "storedPass", "storedDB"),
 			flags:        []string{},
-			wantURI:      "http://stored:7474",
+			wantURI:      "neo4j://stored:7687",
 			wantUsername: "storedUser",
 			wantPassword: "storedPass",
 			wantDatabase: "storedDB",
@@ -475,7 +475,7 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			name:         "overrides stored default credential",
 			credsJSON:    twoCredsJSON,
 			flags:        []string{"--credential=other-cred"},
-			wantURI:      "http://other:7474",
+			wantURI:      "neo4j://other:7687",
 			wantUsername: "otherUser",
 			wantPassword: "otherPass",
 			wantDatabase: "otherDB",

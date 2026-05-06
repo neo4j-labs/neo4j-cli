@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	defaultURI      = "http://localhost:7474"
+	defaultURI      = "neo4j://localhost:7687"
 	defaultUsername = "neo4j"
 	defaultDatabase = "neo4j"
 
@@ -130,7 +130,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		uri := cred.URI
 		if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"info: rewrote URI '%s' to '%s' (the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence)\n",
+				"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 				displayOrig, rewritten)
 			uri = rewritten
 		}
@@ -235,7 +235,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 
 	if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"info: rewrote URI '%s' to '%s' (the query command uses Neo4j's HTTP Query API; pass --uri https://... to silence)\n",
+			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 			displayOrig, rewritten)
 		uri = rewritten
 	}

@@ -431,3 +431,31 @@ Key Decisions:
 - AGENTS.md notes referencing --insecure (Cobra Flag Access example, query/connect.go credential integration insecureExplicit pattern, Local Verification Scripts TestHTTPS_Smoke entry) are stale but task-021/024 will sweep them — left alone here to keep this task minimal.
 
 Next Task: task-020
+
+================================================================================
+TASK-020: URI rewrite — http→neo4j, https→neo4j+s, port forced to 7687
+Date: 2026-05-06T20:30:00Z
+================================================================================
+
+Summary:
+Inverted normalizeURI so http(s):// inputs rewrite to neo4j(+s)://<host>:7687 (path/query stripped). Bolt-family schemes now passthrough (already valid for the v6 driver). Default URI flipped to neo4j://localhost:7687. Stderr rewrite notice text updated to mention Bolt instead of HTTP Query API. uri_test.go rewritten as a fresh table covering http/https with/without ports/paths/userinfo, bolt-family passthrough, and case-insensitive scheme matching. Removed the Aura *.neo4j.io special case — neo4j+s://<aura-host>:7687 is the correct Bolt URI for Aura, and the v6 driver's routing layer handles port 7687 natively.
+
+Files Changed:
+- neo4j-cli/query/uri.go (rewrote: http→neo4j, https→neo4j+s, port forced to 7687, path/query stripped, Aura special case dropped)
+- neo4j-cli/query/uri_test.go (rewrote: new table for inverted rewrite + bolt-family passthrough)
+- neo4j-cli/query/connect.go (modified: defaultURI = "neo4j://localhost:7687"; stderr notice mentions Bolt)
+- neo4j-cli/query/query.go (modified: --uri help text + Short/Long now describe Bolt; package doc updated)
+- neo4j-cli/query/connect_test.go (modified: stored/precedence URIs swapped to neo4j://...:7687 to keep tests focused on resolution, not rewrite)
+- neo4j-cli/query/run_test.go (modified: rewrite-notice and passthrough tests swapped — http now triggers, neo4j passes through)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated: query Short reflects Bolt protocol)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated: --uri help text + Long reflect Bolt rewrite)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: task status)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Dropped the Aura *.neo4j.io https-no-port special case. With Bolt the canonical Aura URI is neo4j+s://<host>:7687, and the routing driver handles port resolution itself. Keeping the special case would have produced an https:// URI for the driver to mis-handle.
+- Stripped path/query/fragment outright on rewrite (not preserved) per PRD REQ-F-023; the Bolt protocol does not use HTTP path semantics.
+- Updated stored-credential test fixtures from http://stored:7474 to neo4j://stored:7687 so each test asserts what it cares about: precedence and credential lookup, not URI rewriting (rewriting is its own test in uri_test.go).
+- Bundle regen folded into this task because the query Short/help text changed; the generated docs would otherwise drift and fail TestGenerator_RoundTrip.
+
+Next Task: task-021

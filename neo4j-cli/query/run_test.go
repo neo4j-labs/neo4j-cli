@@ -822,8 +822,8 @@ func TestRunQuery_TruncateArrays_NoTruncation_NoWarningAndZeroField(t *testing.T
 }
 
 // TestRunQuery_URIRewriteEmitsStderrNotice verifies the URI auto-rewrite path
-// still emits the documented stderr notice. Bolt-family inputs are rewritten
-// to http(s):// (the rewrite logic lives in uri.go and is independent of the
+// still emits the documented stderr notice. http(s):// inputs are rewritten
+// to neo4j(+s):// (the rewrite logic lives in uri.go and is independent of the
 // underlying transport).
 func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 	r := newSeamRouter()
@@ -837,15 +837,17 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri=bolt://127.0.0.1:9999",
+		"--uri=http://127.0.0.1:9999",
 		"--password=pw",
 		"RETURN 1",
 	)
 	require.NoError(t, err)
 
 	stderr := h.stderr.String()
-	assert.Contains(t, stderr, "info: rewrote URI 'bolt://127.0.0.1:9999'",
+	assert.Contains(t, stderr, "info: rewrote URI 'http://127.0.0.1:9999'",
 		"stderr must contain the rewrite notice with the original URI")
+	assert.Contains(t, stderr, "neo4j://127.0.0.1:7687",
+		"stderr must mention the rewritten neo4j:// URI")
 
 	var got decodedResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
@@ -853,7 +855,7 @@ func TestRunQuery_URIRewriteEmitsStderrNotice(t *testing.T) {
 }
 
 // TestRunQuery_URIPassthroughEmitsNoNotice verifies that already-correct
-// http(s) URIs do NOT trigger the rewrite notice.
+// neo4j(+s) URIs do NOT trigger the rewrite notice.
 func TestRunQuery_URIPassthroughEmitsNoNotice(t *testing.T) {
 	r := newSeamRouter()
 	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
@@ -866,14 +868,14 @@ func TestRunQuery_URIPassthroughEmitsNoNotice(t *testing.T) {
 
 	h := newRunHarness(t, "json")
 	err := h.execute(t,
-		"--uri=http://example:7474",
+		"--uri=neo4j://example:7687",
 		"--password=pw",
 		"RETURN 1",
 	)
 	require.NoError(t, err)
 
 	assert.NotContains(t, h.stderr.String(), "rewrote URI",
-		"http(s) URIs must pass through without a rewrite notice")
+		"neo4j(+s) URIs must pass through without a rewrite notice")
 }
 
 func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
