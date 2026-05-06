@@ -1,0 +1,203 @@
+feature: rw-flag-for-write-operations
+prd: ./prd-rw-flag-for-write-operations.md
+created_at: 2026-05-06T13:40:00Z
+updated_at: 2026-05-06T13:40:00Z
+
+tasks:
+  - id: task-001
+    title: "Add RegisterRwFlag and compose root PersistentPreRunE"
+    description: |
+      In common/flags/flags.go, add RegisterRwFlag to register a persistent --rw bool flag and refactor the existing format binding into a callable helper. Create a single composed PersistentPreRunE on the root that first binds/validates format, then enforces the write gate. Do not leave two competing PersistentPreRunE setters.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "--rw appears in root --help with correct help text"
+      - "Root sets exactly one PersistentPreRunE composing format + write-gate"
+      - "Unit coverage exists for the write-gate helper (true/false, annotated/non-annotated)"
+    completed_at: null
+
+  - id: task-002
+    title: "Mount --rw flag on neo4j-cli and aura-cli roots"
+    description: |
+      Call RegisterRwFlag in neo4j-cli/app/app.go::NewCmd and in neo4j-cli/aura/aura.go::NewStandaloneCmd. Do not register --rw in aura.NewCmd (it inherits from super-CLI). Ensure cobra.EnableTraverseRunHooks remains true so the root hook fires for all leaves.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli --help shows --rw under Global flags"
+      - "aura-cli --help shows --rw when built standalone"
+      - "Test asserts traverse-run hooks on root remain enabled"
+    completed_at: null
+
+  - id: task-003
+    title: "Annotate all write leaves with Annotations['write']='true'"
+    description: |
+      For every state-mutating leaf listed in the PRD, set cmd.Annotations["write"] = "true" in its constructor. This includes Aura API writes, local config/credential writes, and skill install/remove leaves. Keep the change mechanical; do not alter command behavior beyond annotation.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Each listed write leaf sets Annotations['write'] to 'true'"
+      - "Spot check: at least one leaf per category confirmed annotated in code review"
+      - "Help/usage output for those leaves unchanged except for gate behavior"
+    completed_at: null
+
+  - id: task-004
+    title: "Confirm EXPLAIN response JSON path for queryType via docker"
+    description: |
+      Boot neo4j:latest (mirror query_https_smoke_test.go pattern), POST EXPLAIN MATCH and EXPLAIN CREATE to /db/neo4j/query/v2, and capture the full JSON. Identify the exact JSON path and enum for query type. Document findings in a short code comment next to the struct field.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Captured JSON shows the field path holding query type"
+      - "Enum values for read vs write documented (e.g., r/rw/w/s)"
+      - "A minimal test or snippet demonstrates decoding into a struct"
+    completed_at: null
+
+  - id: task-005
+    title: "Implement query EXPLAIN preflight and struct extension"
+    description: |
+      In query/run.go, before runStatement, run a preflight runStatement with EXPLAIN + original cypher and params when --rw is not set. Extend query/connect.go::queryResponse to include the confirmed query-type field. If classified non-read-only, return a usage error before execution; skip preflight entirely when --rw is set.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Read-only cypher runs without --rw; write cypher errors without --rw"
+      - "With --rw, cypher executes and preflight is skipped (single call)"
+      - "Struct decodes the confirmed field; no panics on missing fields"
+    completed_at: null
+
+  - id: task-006
+    title: "Unit tests for write gate at root"
+    description: |
+      Add tests that a write-annotated leaf errors without --rw and succeeds with --rw. Use a minimal fake command wired under the root or pick one real annotated leaf to avoid heavy API mocking. Ensure tests also cover a non-annotated read leaf remaining unaffected.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "Fail without --rw for annotated leaf; pass with --rw"
+      - "Read leaf unaffected"
+      - "Tests green on linux, macos, windows runners"
+    completed_at: null
+
+  - id: task-007
+    title: "Unit tests for query EXPLAIN preflight"
+    description: |
+      Add tests in neo4j-cli/query/run_test.go using a mock HTTP server that distinguishes EXPLAIN from real execution. Cover read cypher without --rw (succeeds), write cypher without --rw (errors before execution), and write cypher with --rw (executes; preflight skipped). Include a case where EXPLAIN returns a syntax error.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "Three core cases covered: read/no-rw, write/no-rw, write/with-rw"
+      - "Mock verifies EXPLAIN called only when --rw is false"
+      - "EXPLAIN error surfaces verbatim"
+    completed_at: null
+
+  - id: task-008
+    title: "Docs: root help text and skill additions"
+    description: |
+      Add a Long paragraph on both roots stating that write operations require --rw and that query run uses EXPLAIN to detect writes. Update neo4j-cli/internal/skill/additions.md and neo4j-cli/aura/internal/skill/additions.md with a "Write operations" gotcha describing the requirement and query behavior.
+    status: pending
+    dependencies:
+      - task-002
+      - task-005
+    acceptance_criteria:
+      - "Both roots show updated Long help"
+      - "Both additions.md contain the new gotcha block"
+      - "Wording matches PRD guidance and is concise"
+    completed_at: null
+
+  - id: task-009
+    title: "Regenerate skill bundles and commit diffs"
+    description: |
+      Run make generate to refresh SKILL.md bundles so --rw appears in Global Flags for both binaries. Ensure make generate-check passes locally. Commit regenerated files.
+    status: pending
+    dependencies:
+      - task-002
+      - task-008
+    acceptance_criteria:
+      - "Both bundle/SKILL.md files list --rw in Global Flags"
+      - "make generate-check passes clean"
+      - "No unrelated bundle drift remains"
+    completed_at: null
+
+  - id: task-010
+    title: "Docs: README and npm README mention --rw with examples"
+    description: |
+      In README.md and distribution/npm/cli/README.md, add a short section explaining that write operations require --rw and show one example each for an Aura write, a config write, and a query write. Keep text terse and aligned with existing style.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "README gains --rw section with 3 examples"
+      - "npm README updated when it shows mutating examples"
+      - "Spellcheck and link formatting clean"
+    completed_at: null
+
+  - id: task-011
+    title: "Contributor note: require write annotation convention"
+    description: |
+      In CONTRIBUTING.md, add a one-liner under the cobra layout notes that every new write leaf must set Annotations["write"] = "true". This ensures future leaves are gated automatically.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "CONTRIBUTING.md updated with the annotation convention"
+      - "Placement matches existing style and sectioning"
+      - "CI markdown lints (if any) pass"
+    completed_at: null
+
+  - id: task-012
+    title: "Minimal per-resource gating tests"
+    description: |
+      Add one negative and one positive test per major resource category to act as tripwires (e.g., instance create, skill install, config set). Keep these light and avoid real HTTP by using fakes or command-layer tests.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "At least three representative resources covered"
+      - "Without --rw they error; with --rw they proceed"
+      - "Tests pass on all CI OS targets"
+    completed_at: null
+
+  - id: task-013
+    title: "Create dual-project changie entries (Minor)"
+    description: |
+      Add two unreleased changie YAML files (aura-cli and neo4j-cli, kind Minor) describing the --rw requirement and the query EXPLAIN preflight. Follow repo changie conventions exactly.
+    status: pending
+    dependencies:
+      - task-005
+      - task-009
+      - task-010
+    acceptance_criteria:
+      - ".changes/unreleased contains two YAMLs with correct project keys"
+      - "Bodies match PRD wording"
+      - "changie merge produces expected changelog sections"
+    completed_at: null
+
+  - id: task-014
+    title: "Final verification: build, tests, lint, format, generate-check"
+    description: |
+      Run make build, make test, make fmt-check, make lint, and make generate-check. Resolve any failures. Perform brief manual smoke: aura instance list (no --rw), aura instance delete (requires --rw), config set (requires --rw), query run read (no --rw), query run write (requires --rw), and with --rw succeeds.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+      - task-012
+      - task-013
+    acceptance_criteria:
+      - "All make gates pass locally"
+      - "Manual smoke results match PRD's Verification section"
+      - "No unexpected diffs remain"
+    completed_at: null
