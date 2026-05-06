@@ -44,3 +44,28 @@ Key Decisions:
   alongside install/remove/list/check.
 
 Next Task: task-003 (add common/skill/print_test.go colocated tests)
+
+================================================================================
+TASK-003: Add common/skill/print_test.go colocated tests
+Date: 2026-05-06T09:05:00Z
+================================================================================
+
+Summary:
+Added common/skill/print_test.go with two tests using the existing newFixture
+helper. TestPrintCmd_RawSkillMd asserts stdout contains literal
+`version: {{VERSION}}` and does NOT contain `version: 1.7.0` (placeholder
+preserved). TestPrintCmd_RejectsPositionalArg asserts `skill print extra`
+returns a non-nil error.
+
+Files Changed:
+- common/skill/print_test.go (created)
+- .plans/tasks-skill-print-command.yml (status pending -> completed)
+
+Key Decisions:
+- Reused fixtureBundle() from cmd_helpers_test.go which already includes the
+  literal `version: {{VERSION}}` line — perfect for the placeholder test.
+- No agentNames passed to newFixture since print doesn't touch the FS.
+- TestGenerator_RoundTrip in neo4j-cli/internal/skill/gen still fails as
+  expected (stale bundle); task-004 will fix via `make generate`.
+
+Next Task: task-004 (regenerate skill bundles)

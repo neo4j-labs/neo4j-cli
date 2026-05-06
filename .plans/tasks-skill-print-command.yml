@@ -50,7 +50,8 @@ tasks:
       (NOT substituted to 1.7.0), and (b) passing a positional arg returns a
       non-nil error. Use require/assert from testify, follow existing
       *_test.go style with package skill_test.
-    status: pending
+    status: completed
+    completed_at: 2026-05-06T09:05:00Z
     dependencies:
       - task-002
     acceptance_criteria:
