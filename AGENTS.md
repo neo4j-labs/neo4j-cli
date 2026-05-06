@@ -176,6 +176,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 
 See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill subsystem layout, embed roots, mount points, and bundle regen.
 
+- Aura SKILL.md's Global Flags table lists only `--rw` (not `--format`); `--format` is registered per-subcommand via `RegisterOutputFlag` and surfaces in `references/<cmd>.md`. neo4j-cli SKILL.md DOES list `--format` at root because it's bound globally there. When a flag-description change needs to land in bundle/SKILL.md Global Flags, expect it on the neo4j-cli side only — aura side propagates through references/*.md.
+
 ## Hermetic Test Notes
 
 - For path-expansion tests using `~` / `$XDG_CONFIG_HOME`, use `t.Setenv("HOME", "...")` and `t.Setenv("XDG_CONFIG_HOME", "")` — Go's `os.Getenv` returns "" for both unset and set-to-empty, and `t.Setenv` auto-restores after the test.
