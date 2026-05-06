@@ -670,3 +670,28 @@ func TestResolveConn_NoCredentialFlag_ExistingBehaviourUnchanged(t *testing.T) {
 	assert.Equal(t, "http://stored:7474", c.uri)
 	assert.Equal(t, "storedUser", c.username)
 }
+
+func TestResolveConn_CredentialFlag_OverridesDefaultCredential(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Setenv(envInsecure, "")
+	t.Chdir(t.TempDir())
+
+	// Two credentials: "default-cred" is the stored default, "other-cred" is not.
+	credsJSON := `{"database":{"default-credential":"default-cred","credentials":[` +
+		`{"name":"default-cred","username":"defaultUser","password":"defaultPass","database-name":"defaultDB","uri":"http://default:7474","insecure":false},` +
+		`{"name":"other-cred","username":"otherUser","password":"otherPass","database-name":"otherDB","uri":"http://other:7474","insecure":false}` +
+		`]}}`
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=other-cred"}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "http://other:7474", c.uri, "--credential should override the stored default")
+	assert.Equal(t, "otherUser", c.username)
+	assert.Equal(t, "otherPass", c.password)
+	assert.Equal(t, "otherDB", c.database)
+}
