@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add --credential/-c flag to Aura resource commands (instance, tenant, deployment, dataapi, graphanalytics, customermanagedkey, import) to override the active credential per-invocation; add -c shorthand to neo4j-cli query --credential
+time: 2026-05-06T17:51:25.020203+01:00
