@@ -45,124 +45,145 @@ func executeWithArgs(t *testing.T, rootUse string, cmd *cobra.Command, args []st
 	return root.Execute()
 }
 
-func TestRegisterAuraCredentialFlag_FlagNotSet_NilActiveCredential(t *testing.T) {
+func TestRegisterAuraCredentialFlag_ActiveCredential(t *testing.T) {
 	credJSON := credentialsJSON("my-cred", "client-1", "secret-1")
-	cfg := buildConfig(t, credJSON)
 
-	cmd := &cobra.Command{
-		Use:  "resource",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
-
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource"})
-	require.NoError(t, err)
-	assert.Nil(t, cfg.Aura.ActiveCredential(), "ActiveCredential should remain nil when --credential is not supplied")
-}
-
-func TestRegisterAuraCredentialFlag_CredentialFound_SetsActiveCredential(t *testing.T) {
-	credJSON := credentialsJSON("my-cred", "client-1", "secret-1")
-	cfg := buildConfig(t, credJSON)
-
-	cmd := &cobra.Command{
-		Use:  "resource",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
-
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource", "--credential", "my-cred"})
-	require.NoError(t, err)
-
-	active := cfg.Aura.ActiveCredential()
-	require.NotNil(t, active)
-	assert.Equal(t, "my-cred", active.Name)
-}
-
-func TestRegisterAuraCredentialFlag_ShorthandAccepted(t *testing.T) {
-	credJSON := credentialsJSON("my-cred", "client-1", "secret-1")
-	cfg := buildConfig(t, credJSON)
-
-	cmd := &cobra.Command{
-		Use:  "resource",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
-
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource", "-c", "my-cred"})
-	require.NoError(t, err)
-
-	active := cfg.Aura.ActiveCredential()
-	require.NotNil(t, active)
-	assert.Equal(t, "my-cred", active.Name)
-}
-
-func TestRegisterAuraCredentialFlag_CredentialNotFound_Neo4jCliHint(t *testing.T) {
-	cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
-
-	cmd := &cobra.Command{
-		Use:  "resource",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
-
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource", "--credential", "missing"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "neo4j-cli aura credential list")
-}
-
-func TestRegisterAuraCredentialFlag_CredentialNotFound_AuraCliHint(t *testing.T) {
-	cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
-
-	cmd := &cobra.Command{
-		Use:  "resource",
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
-
-	err := executeWithArgs(t, "aura-cli", cmd, []string{"resource", "--credential", "missing"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "aura-cli credential list")
-	assert.NotContains(t, err.Error(), "neo4j-cli aura credential list")
-}
-
-func TestRegisterAuraCredentialFlag_WrapsExistingPersistentPreRunE(t *testing.T) {
-	credJSON := credentialsJSON("my-cred", "client-1", "secret-1")
-	cfg := buildConfig(t, credJSON)
-
-	priorCalled := false
-	cmd := &cobra.Command{
-		Use: "resource",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			priorCalled = true
-			return nil
+	for _, tc := range []struct {
+		name           string
+		args           []string
+		wantActiveName string // empty means expect nil
+	}{
+		{
+			name:           "flag not set leaves ActiveCredential nil",
+			args:           []string{"resource"},
+			wantActiveName: "",
 		},
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
+		{
+			name:           "long form --credential sets ActiveCredential",
+			args:           []string{"resource", "--credential", "my-cred"},
+			wantActiveName: "my-cred",
+		},
+		{
+			name:           "shorthand -c sets ActiveCredential",
+			args:           []string{"resource", "-c", "my-cred"},
+			wantActiveName: "my-cred",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := buildConfig(t, credJSON)
+			cmd := &cobra.Command{
+				Use:  "resource",
+				RunE: func(cmd *cobra.Command, args []string) error { return nil },
+			}
+			flags.RegisterAuraCredentialFlag(cmd, cfg)
 
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource", "--credential", "my-cred"})
-	require.NoError(t, err)
-	assert.True(t, priorCalled, "prior PersistentPreRunE should have been called")
-	require.NotNil(t, cfg.Aura.ActiveCredential())
-	assert.Equal(t, "my-cred", cfg.Aura.ActiveCredential().Name)
+			err := executeWithArgs(t, "neo4j-cli", cmd, tc.args)
+			require.NoError(t, err)
+
+			if tc.wantActiveName == "" {
+				assert.Nil(t, cfg.Aura.ActiveCredential())
+			} else {
+				require.NotNil(t, cfg.Aura.ActiveCredential())
+				assert.Equal(t, tc.wantActiveName, cfg.Aura.ActiveCredential().Name)
+			}
+		})
+	}
 }
 
-func TestRegisterAuraCredentialFlag_PriorHookError_AbortsBefore_CredentialResolution(t *testing.T) {
-	cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
+func TestRegisterAuraCredentialFlag_CredentialNotFound(t *testing.T) {
+	emptyCreds := `{"aura":{"credentials":[],"default-credential":""}}`
 
-	priorErr := errors.New("prior hook failed")
-	cmd := &cobra.Command{
-		Use: "resource",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return priorErr
+	for _, tc := range []struct {
+		name            string
+		rootUse         string
+		wantContains    string
+		wantNotContains string
+	}{
+		{
+			name:         "neo4j-cli root hints aura subcommand",
+			rootUse:      "neo4j-cli",
+			wantContains: "neo4j-cli aura credential list",
 		},
-		RunE: func(cmd *cobra.Command, args []string) error { return nil },
-	}
-	flags.RegisterAuraCredentialFlag(cmd, cfg)
+		{
+			name:            "aura-cli root hints standalone command",
+			rootUse:         "aura-cli",
+			wantContains:    "aura-cli credential list",
+			wantNotContains: "neo4j-cli aura credential list",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := buildConfig(t, emptyCreds)
+			cmd := &cobra.Command{
+				Use:  "resource",
+				RunE: func(cmd *cobra.Command, args []string) error { return nil },
+			}
+			flags.RegisterAuraCredentialFlag(cmd, cfg)
 
-	err := executeWithArgs(t, "neo4j-cli", cmd, []string{"resource", "--credential", "any"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "prior hook failed")
-	// ActiveCredential should not be set because prior hook aborted
-	assert.Nil(t, cfg.Aura.ActiveCredential())
+			err := executeWithArgs(t, tc.rootUse, cmd, []string{"resource", "--credential", "missing"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantContains)
+			if tc.wantNotContains != "" {
+				assert.NotContains(t, err.Error(), tc.wantNotContains)
+			}
+		})
+	}
+}
+
+func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		credJSON        string
+		priorErr        error
+		args            []string
+		wantActiveName  string // empty means expect nil
+		wantErrContains string // empty means expect no error
+	}{
+		{
+			name:           "prior hook runs and credential is resolved on success",
+			credJSON:       credentialsJSON("my-cred", "client-1", "secret-1"),
+			priorErr:       nil,
+			args:           []string{"resource", "--credential", "my-cred"},
+			wantActiveName: "my-cred",
+		},
+		{
+			name:            "prior hook error aborts credential resolution",
+			credJSON:        `{"aura":{"credentials":[],"default-credential":""}}`,
+			priorErr:        errors.New("prior hook failed"),
+			args:            []string{"resource", "--credential", "any"},
+			wantErrContains: "prior hook failed",
+			wantActiveName:  "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := buildConfig(t, tc.credJSON)
+			priorCalled := false
+			cmd := &cobra.Command{
+				Use: "resource",
+				PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+					priorCalled = true
+					return tc.priorErr
+				},
+				RunE: func(cmd *cobra.Command, args []string) error { return nil },
+			}
+			flags.RegisterAuraCredentialFlag(cmd, cfg)
+
+			err := executeWithArgs(t, "neo4j-cli", cmd, tc.args)
+
+			assert.True(t, priorCalled, "prior hook should always be called")
+
+			if tc.wantErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContains)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.wantActiveName == "" {
+				assert.Nil(t, cfg.Aura.ActiveCredential())
+			} else {
+				require.NotNil(t, cfg.Aura.ActiveCredential())
+				assert.Equal(t, tc.wantActiveName, cfg.Aura.ActiveCredential().Name)
+			}
+		})
+	}
 }
