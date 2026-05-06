@@ -326,7 +326,7 @@ tasks:
     title: "Update skill additions.md and regenerate bundles"
     description: |
       In neo4j-cli/internal/skill/additions.md (and the aura one if applicable), drop every --insecure mention and HTTP Query API reference. The Write-operations gotcha block stays; update the explanation to "the CLI runs EXPLAIN over Bolt to detect write cypher". Run make generate so bundle/SKILL.md regenerates and commit the diff.
-    status: pending
+    status: completed
     dependencies:
       - task-019
       - task-020
@@ -334,6 +334,7 @@ tasks:
       - "additions.md has no --insecure or HTTP API mentions"
       - "make generate-check passes clean"
       - "Bundle Global Flags table has --rw and lacks --insecure"
+    completed_at: 2026-05-06T22:15:00Z
 
   - id: task-025
     title: "Update README and npm README"

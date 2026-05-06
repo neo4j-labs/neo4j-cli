@@ -517,3 +517,25 @@ Key Decisions:
 - Kept aura-cli body untouched because the Bolt migration only affects the neo4j-cli super-CLI's query path.
 
 Next Task: task-024
+
+================================================================================
+TASK-024: Update skill additions.md and regenerate bundles
+Date: 2026-05-06T22:15:00Z
+================================================================================
+
+Summary:
+Refreshed both additions.md files for the Bolt migration. Replaced the stale neo4j-cli URI gotcha (bolt→https rewrite + Aura *.neo4j.io special case) with the new http→neo4j / https→neo4j+s rewrite plus a neo4j+ssc:// hint for self-signed certs. Updated the Write-operations gotcha in both files to say "EXPLAIN over Bolt" instead of "EXPLAIN first". Regenerated bundles so SKILL.md mirrors the additions.
+
+Files Changed:
+- neo4j-cli/internal/skill/additions.md (modified: drops HTTP Query API gotcha; rewords Bolt rewrite + write-ops EXPLAIN line)
+- neo4j-cli/aura/internal/skill/additions.md (modified: rewords write-ops EXPLAIN line for Bolt)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated)
+- neo4j-cli/aura/internal/skill/bundle/SKILL.md (regenerated)
+- .plans/tasks-rw-flag-for-write-operations.yml (modified: marks task-024 completed)
+- .plans/progress-rw-flag-for-write-operations.txt (modified: progress log)
+
+Key Decisions:
+- Kept the http://host:7474 example port in the URI gotcha — it's the canonical Neo4j HTTP port that users will recognize and want to know rewrites to Bolt; not a stale --insecure-style leak.
+- No --insecure mentions remained in additions.md or bundle/* before this task (task-019/020 already swept them); confirmed via grep, no extra cleanup needed.
+
+Next Task: task-025
