@@ -1,0 +1,203 @@
+================================================================================
+TASK-001: Add PEP 440 version normaliser shell script
+Date: 2026-05-07T11:40:00Z
+================================================================================
+
+Summary:
+Added `.github/scripts/version-to-pep440.sh`, a pure-bash helper that
+normalises a Git-tag-shaped version string (with or without leading `v`)
+into its PEP 440 equivalent. Implements the REQ-F-005 contract:
+  X.Y.Z              -> X.Y.Z
+  X.Y.Z-alpha.N      -> X.Y.ZaN
+  X.Y.Z-beta.N       -> X.Y.ZbN
+  X.Y.Z-rc.N         -> X.Y.ZrcN
+Anything else (e.g. v0.1.0-pre.6, v0.1.0.alpha.6, empty, dev) exits
+non-zero with an error to stderr naming the offending input. Zero
+non-bash dependencies so it runs on any GitHub-hosted ubuntu runner.
+
+Files Changed:
+- .github/scripts/version-to-pep440.sh (created; chmod +x; #!/bin/bash + set -euo pipefail)
+- .plans/tasks-release-to-pypi.yml (task-001 marked completed)
+- .plans/progress-release-to-pypi.txt (created)
+
+Key Decisions:
+- Argument-count guard up front (exactly one arg), separate from the
+  regex check, so the error message is more useful when called wrong.
+- Two-branch [[ =~ ]] match (X.Y.Z and X.Y.Z-pre.N) after stripping the
+  optional leading `v`, mirroring the reference snippet in the PRD.
+- Error message includes the original raw input (with leading `v` if
+  present), not the v-stripped form, so failure logs match what the
+  caller passed.
+- No `case` fallthrough fallback — the second regex already restricts
+  pre to alpha|beta|rc so the case statement covers all reachable cases.
+
+Next Task: task-002 (Rewrite publish-pypi.yml to trigger on release.yml + support recovery)
+
+================================================================================
+TASK-002: Rewrite publish-pypi.yml to trigger on release.yml + support recovery
+Date: 2026-05-07T12:30:00Z
+================================================================================
+
+Summary:
+Replaced the `release: types: [released]` trigger with `workflow_run`
+against the `release` workflow, and added a `workflow_dispatch` recovery
+path with `version` (required) + `dry_run` (default false) inputs.
+Mirrored publish-npm.yml's three-job shape (build / smoke-test / publish)
+and its cross-workflow artifact pull (release-meta.json + dist) gated on
+`include_neo4j == 'true'`. The manual path uses `gh release download`
+with `--pattern 'neo4j-cli_*'` to recreate the GoReleaser dist layout.
+
+Both paths converge on a single Resolve-versions step that calls
+`.github/scripts/version-to-pep440.sh` exactly once. The output is split
+into two values:
+  - `original_version` (e.g. 0.1.0-alpha.6) -> what the GoReleaser-built
+    binary's ldflags `Version` actually contains -> consumed by smoke
+    test's --version grep.
+  - `pep440_version` (e.g. 0.1.0a6) -> what stamps the wheel filename and
+    PyPI metadata.
+
+The reference linux-amd64 `go build`, sha256sum parity check, and
+`cp neo4j-cli/main.go main.go` shim are all removed: parity is now
+guaranteed by reusing the same GoReleaser dist artifact as npm and
+Homebrew. Since the `go-to-wheel` CLI ALWAYS cross-compiles from Go
+source (verified by reading the source at /Users/jgiffard/.local/pipx/
+venvs/go-to-wheel/lib/python3.13/site-packages/go_to_wheel/__init__.py),
+we bypass it and call `go_to_wheel.build_wheel()` directly via an
+inline Python heredoc — that helper accepts a `binary_path` argument
+and skips the compile step.
+
+Created `.github/workflows/requirements-build.txt` (the file the
+previous publish-pypi.yml referenced but didn't actually exist in the
+repo). Pinned `go-to-wheel==0.2` with sha256 hash for
+--require-hashes supply-chain safety per REQ-NF-004.
+
+Files Changed:
+- .github/workflows/publish-pypi.yml (rewritten end-to-end)
+- .github/workflows/requirements-build.txt (created; pins go-to-wheel)
+- .plans/tasks-release-to-pypi.yml (task-002 -> completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+- AGENTS.md (added Open Question resolution to PyPI distribution notes)
+
+Key Decisions:
+- Bypass go-to-wheel's CLI: the public `go-to-wheel` CLI lacks a
+  --binary-path flag; its argparse only accepts `go_dir` and always
+  cross-compiles. We import `go_to_wheel.build_wheel` (the underlying
+  library function) and feed it pre-built GoReleaser binaries directly.
+  Documented inline in the wheel-build step.
+- `permissions: contents: read` + `actions: read` at the workflow level
+  (matches publish-npm.yml). Per-job `permissions: {}` on smoke-test
+  and publish (same-run artifact downloads do not need additional
+  permissions in v4).
+- Build job emits THREE outputs: original_version, pep440_version,
+  include_neo4j. Smoke-test reads original_version (so the binary's
+  --version grep still matches the baked ldflag). Publish gates on
+  include_neo4j and on `!(workflow_dispatch && inputs.dry_run)`.
+- Versions step is gated on the same include_neo4j condition as the
+  rest of the build path, so a workflow_run with include_neo4j=false
+  skips cleanly without trying to PEP 440-normalise the unused version.
+- publish job uses `needs: [build, smoke-test]` (not just smoke-test)
+  so it can read `needs.build.outputs.include_neo4j` directly.
+- README content for PyPI long description is read at wheel-build time
+  from the repo root README.md (no separate copy/shim).
+- Used the same `actions/download-artifact@d3f86a10... # v4` SHA as
+  publish-npm.yml (was `# v8` in the previous publish-pypi.yml; both
+  resolve to v4 line).
+
+Validation:
+- `actionlint .github/workflows/publish-pypi.yml` reports only the same
+  shellcheck info/style warnings that publish-npm.yml has (SC2086,
+  SC2129) — no structural errors.
+- Python heredoc compiles cleanly (verified via PyYAML round-trip +
+  compile()).
+- `make test`, `make lint`, `make fmt-check` all pass (no Go-side
+  changes; gates verified clean).
+
+Next Task: task-003 (Create distribution/pypi/README.md)
+
+================================================================================
+TASK-003: Create distribution/pypi/README.md documenting the PyPI channel
+Date: 2026-05-07T13:15:00Z
+================================================================================
+
+Summary:
+Created `distribution/pypi/README.md` to document the PyPI distribution
+channel for maintainers. Mirrors the shape and tone of the sibling
+`distribution/homebrew/README.md` and `distribution/npm/README.md`:
+opening blurb -> "What this directory does" -> "User install" ->
+"PyPI project location" -> "Release cadence" -> "PEP 440 version mapping"
+-> "Platform wheels published per release" -> "Local dry-run" ->
+"Manual recovery" -> "Auth prerequisites" -> "See also".
+
+Documentation-only — no runtime code in `distribution/pypi/`. The
+actual publication is handled by `.github/workflows/publish-pypi.yml`
+(task-002) plus `go-to-wheel`.
+
+Files Changed:
+- distribution/pypi/README.md (created)
+- .plans/tasks-release-to-pypi.yml (task-003 -> completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+
+Key Decisions:
+- Source the six platform suffix strings (manylinux_2_17_*, macosx_*,
+  win_*) directly from go-to-wheel's PLATFORM_MAPPINGS dict so the
+  README matches what publish-pypi.yml's wheel-build step actually
+  produces. Verified by reading the upstream package source.
+- Worked example uses v0.1.0-alpha.6 -> 0.1.0a6 (the most recent
+  prerelease in this repo, per the recent-commits log) so future
+  maintainers can cross-check against an actual published wheel
+  filename when the first PyPI release lands.
+- OIDC trusted publishing is flagged as a follow-up with a link
+  back to .plans/prd-release-to-pypi.md "Open Questions" rather than
+  duplicating the migration plan in the README.
+- Manual recovery section uses `gh workflow run` invocation matching
+  the workflow_dispatch input shape (`version` without leading v,
+  `dry_run` boolean) so the README is copy-paste runnable.
+- All relative paths verified resolvable from
+  distribution/pypi/README.md (RELEASING.md, publish-pypi.yml,
+  version-to-pep440.sh, sibling READMEs, PRD).
+
+Validation:
+- `make fmt-check`, `make lint`, `make test` all pass — docs-only
+  change but ran the full gate to confirm nothing else regressed.
+
+Next Task: task-004 (Cross-link new pypi README from npm and homebrew READMEs)
+
+================================================================================
+TASK-004: Cross-link new pypi README from npm and homebrew READMEs
+Date: 2026-05-07T13:35:00Z
+================================================================================
+
+Summary:
+Added reciprocal cross-links from the npm and homebrew distribution
+READMEs into the new PyPI README created in task-003, completing the
+second half of REQ-F-012's "linked from sibling READMEs" criterion.
+Both link lines use relative paths (`../pypi/README.md`) and match the
+existing one-line description style used in each file's sibling-channel
+section.
+
+Files Changed:
+- distribution/homebrew/README.md (modified; added one bullet to ## See also)
+- distribution/npm/README.md (modified; added trailing "See ../pypi/README.md" sentence to the existing pip / PyPI bullet under ## Other channels)
+- .plans/tasks-release-to-pypi.yml (task-004 marked completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+
+Key Decisions:
+- Did NOT reword the npm README's "(future)" descriptor on the pip /
+  PyPI bullet, even though it is now technically stale, because task
+  AC explicitly forbids touching surrounding content beyond the
+  minimum needed for the link to read naturally. The descriptor can
+  be tightened in a follow-up if/when the npm README sees its next
+  unrelated edit.
+- Used the same one-line "channel — short description" shape on the
+  homebrew side that the existing `../npm/README.md` bullet uses;
+  npm side appends a "See [link]." sentence to the existing bullet
+  rather than rewriting its body.
+- Both relative paths resolve to the file added in task-003 when
+  rendered on github.com.
+
+Validation:
+- `make fmt-check`, `make lint`, `make test` all pass — docs-only
+  change but ran the full gate to confirm nothing else regressed.
+
+Next Task: All tasks complete
+

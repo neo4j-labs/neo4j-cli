@@ -1,0 +1,428 @@
+name: publish-pypi
+
+# Publishes neo4j-cli wheels (six platform variants) to PyPI.
+#
+# Two triggers:
+#   - workflow_run (auto): fires after `release.yml` succeeds. Reads the
+#     dist/ and release-meta.json artifacts uploaded by release.yml, gates
+#     on include_neo4j == 'true' so non-neo4j-cli runs are skipped.
+#   - workflow_dispatch (manual): for failure recovery. Takes a `version`
+#     input (no leading v), downloads existing GH release archives via
+#     `gh release download`, extracts them into the dist/<archive_basename>/
+#     layout the wheel-build step expects. Does NOT re-invoke GoReleaser.
+#
+# Both paths feed the source version through `.github/scripts/version-to-pep440.sh`
+# to obtain a PEP 440-compliant wheel version (e.g. v0.1.0-alpha.6 -> 0.1.0a6).
+# The Go ldflags `Version` is baked into the binaries by GoReleaser using the
+# original (non-PEP 440) tag, so `neo4j-cli --version` continues to report the
+# upstream tag and the smoke test grep keeps matching.
+#
+# Wheel binaries come from the reused GoReleaser dist artifact — the same
+# source as the npm and Homebrew channels — so binary parity is guaranteed by
+# construction. We do NOT rebuild from Go source here; instead we call
+# go_to_wheel.build_wheel() directly per platform with the pre-built binary,
+# bypassing go-to-wheel's CLI (which always cross-compiles).
+
+on:
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "neo4j-cli version (no leading v), e.g. 0.2.0 or 0.2.0-alpha.1"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: build and smoke-test only, skip publish"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # Required by the workflow_run path's cross-workflow `actions/download-artifact`
+  # calls (release-meta + dist) to read the upstream release.yml run's artifacts.
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Skip the auto path entirely unless the upstream release succeeded AND
+    # ran on the default branch from a `push` event. The branch + event guard
+    # closes the cache-poisoning vector that CodeQL flags on workflow_run
+    # handlers: even if a malicious workflow named "release" ran on a fork
+    # PR or non-default branch, this gate prevents us from consuming its
+    # artifacts. release.yml is itself restricted to push-to-main upstream,
+    # but CodeQL does not trace that — the guard belongs here. The
+    # include_neo4j gate is applied per-step below (after we have downloaded
+    # the release-meta.json artifact and parsed it). For workflow_dispatch we
+    # always run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+       github.event.workflow_run.event == 'push')
+    outputs:
+      original_version: ${{ steps.versions.outputs.original_version }}
+      pep440_version: ${{ steps.versions.outputs.pep440_version }}
+      include_neo4j: ${{ steps.versions.outputs.include_neo4j }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # ----- workflow_run path: pull dist/ + release-meta.json from release.yml -----
+
+      - name: Download release-meta artifact (auto)
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-meta
+          path: ${{ runner.temp }}/release-meta
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Parse release-meta (auto)
+        id: meta
+        if: github.event_name == 'workflow_run'
+        run: |
+          # release-meta.json is a compact `{version, include_neo4j}` blob.
+          # Surface both as step outputs so downstream gates and the wheel
+          # build can read them uniformly.
+          META_FILE="${{ runner.temp }}/release-meta/release-meta.json"
+          if [ ! -f "${META_FILE}" ]; then
+            echo "ERROR: release-meta.json not found in artifact" >&2
+            exit 1
+          fi
+          VERSION=$(jq -r '.version' "${META_FILE}")
+          INCLUDE_NEO4J=$(jq -r '.include_neo4j' "${META_FILE}")
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "ERROR: Invalid version in release-meta.json: ${VERSION}" >&2
+            exit 1
+          fi
+          if [[ "${INCLUDE_NEO4J}" != "true" && "${INCLUDE_NEO4J}" != "false" ]]; then
+            echo "ERROR: Invalid include_neo4j in release-meta.json: ${INCLUDE_NEO4J}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
+          echo "[publish-pypi] auto path: version=${VERSION} include_neo4j=${INCLUDE_NEO4J}"
+
+      - name: Skip — no neo4j-cli release in this run (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j != 'true'
+        env:
+          INCLUDE_NEO4J: ${{ steps.meta.outputs.include_neo4j }}
+        run: |
+          echo "[publish-pypi] include_neo4j=$INCLUDE_NEO4J — skipping pypi publish"
+
+      - name: Download dist artifact (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: ${{ runner.temp }}/downloaded-dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify dist archives against release checksums (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DOWNLOADED: ${{ runner.temp }}/downloaded-dist
+          CHECKSUMS_DIR: ${{ runner.temp }}/release-checksums
+        run: |
+          # Defence-in-depth against the workflow_run cache-poisoning class:
+          # verify each archive in the downloaded dist artifact against the
+          # checksums.txt published by GoReleaser to the GitHub Release.
+          # CRITICAL: download checksums.txt to a SEPARATE directory, not
+          # alongside the dist artifact contents — the dist artifact itself
+          # contains its own checksums.txt (GoReleaser writes one to dist/),
+          # but trusting that file would be circular: if the artifact were
+          # tampered with, its bundled checksums.txt could be too. The
+          # GitHub Release is the independent trusted source.
+          mkdir -p "${CHECKSUMS_DIR}"
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*_checksums.txt' \
+            --dir "${CHECKSUMS_DIR}"
+          CHECKSUMS=$(ls "${CHECKSUMS_DIR}"/*_checksums.txt | head -n1)
+          test -f "${CHECKSUMS}"
+          ( cd "${DOWNLOADED}" && sha256sum -c "${CHECKSUMS}" )
+
+      - name: Prepare dist from downloaded artifact (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        run: |
+          # The dist artifact carries GoReleaser's full working dir: archives
+          # (.tar.gz / .zip) + raw build dirs + metadata. The wheel-build step
+          # reads from dist/<archive_basename>/<binary>, which only exists once
+          # the archives are extracted — so unpack them here, matching the
+          # layout the workflow_dispatch path produces via `gh release download`.
+          rm -rf dist
+          mkdir -p dist
+          test -d "${{ runner.temp }}/downloaded-dist"
+          cp -a "${{ runner.temp }}/downloaded-dist"/. dist/
+          shopt -s nullglob
+          for archive in dist/neo4j-cli_*.tar.gz; do
+            base=$(basename "$archive" .tar.gz)
+            mkdir -p "dist/${base}"
+            tar -xzf "$archive" -C "dist/${base}"
+            echo "[publish-pypi] extracted ${archive} -> dist/${base}/"
+          done
+          for archive in dist/neo4j-cli_*.zip; do
+            base=$(basename "$archive" .zip)
+            mkdir -p "dist/${base}"
+            unzip -q "$archive" -d "dist/${base}"
+            echo "[publish-pypi] extracted ${archive} -> dist/${base}/"
+          done
+
+      # ----- workflow_dispatch path: rebuild dist/ from existing GH release -----
+
+      - name: Download release archives (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Mirror the GoReleaser dist/ layout from already-published GH release
+          # archives, no GoReleaser re-invocation needed. The wheel-build step
+          # expects dist/<archive_basename>/<binary>; archive_basename matches
+          # the .tar.gz / .zip filename without the extension. The `neo4j-cli_*`
+          # pattern matches both the platform archives AND the checksums.txt
+          # we use in the verify step below.
+          mkdir -p "${{ runner.temp }}/dist-archives" dist
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern 'neo4j-cli_*' \
+            --dir "${{ runner.temp }}/dist-archives/"
+          echo "[publish-pypi] downloaded archives:"
+          ls -la "${{ runner.temp }}/dist-archives/"
+
+      - name: Verify release archives against checksums (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ARCHIVES_DIR: ${{ runner.temp }}/dist-archives
+        run: |
+          # Same defence-in-depth pattern as the auto path: verify each
+          # archive against GoReleaser's checksums.txt before extracting.
+          # The checksums.txt was already downloaded alongside the archives
+          # by the previous step (the `neo4j-cli_*` pattern matches it).
+          CHECKSUMS=$(ls "${ARCHIVES_DIR}"/*_checksums.txt | head -n1)
+          test -f "${CHECKSUMS}"
+          ( cd "${ARCHIVES_DIR}" && sha256sum -c "$(basename "${CHECKSUMS}")" )
+
+      - name: Extract release archives (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ARCHIVES_DIR: ${{ runner.temp }}/dist-archives
+        run: |
+          # Extract each archive into dist/<archive_basename>/ to recreate the
+          # GoReleaser dist/ layout. Same logic as the auto path post-extract.
+          shopt -s nullglob
+          for archive in "${ARCHIVES_DIR}"/neo4j-cli_*.tar.gz; do
+            base=$(basename "$archive" .tar.gz)
+            mkdir -p "dist/${base}"
+            tar -xzf "$archive" -C "dist/${base}"
+            echo "[publish-pypi] extracted ${archive} -> dist/${base}/"
+          done
+          for archive in "${ARCHIVES_DIR}"/neo4j-cli_*.zip; do
+            base=$(basename "$archive" .zip)
+            mkdir -p "dist/${base}"
+            unzip -q "$archive" -d "dist/${base}"
+            echo "[publish-pypi] extracted ${archive} -> dist/${base}/"
+          done
+
+      # ----- common: resolve versions, install build deps, build wheels -----
+
+      - name: Resolve versions (original tag + PEP 440 form)
+        id: versions
+        # Skip on the auto-path no-op case (include_neo4j != 'true'). All
+        # downstream steps gate on the same condition; we still emit
+        # `include_neo4j` so the smoke-test/publish jobs can read it.
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          # workflow_run path reads version from release-meta.json (parsed in
+          # `meta` step). workflow_dispatch reads it from the input. Both are
+          # bare semver (no leading v).
+          RAW_VERSION: >-
+            ${{ github.event_name == 'workflow_dispatch' && inputs.version || steps.meta.outputs.version }}
+          INCLUDE_NEO4J: >-
+            ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.meta.outputs.include_neo4j }}
+        run: |
+          # Single canonical normalisation pass — both auto and manual paths
+          # converge here. The original tag (e.g. 0.1.0-alpha.6) is what the
+          # baked-in Go ldflags `Version` reports; the PEP 440 form
+          # (0.1.0a6) is what we stamp onto the wheel filename and metadata.
+          ORIGINAL="${RAW_VERSION}"
+          PEP440=$(.github/scripts/version-to-pep440.sh "${ORIGINAL}")
+          echo "original_version=${ORIGINAL}" >> $GITHUB_OUTPUT
+          echo "pep440_version=${PEP440}" >> $GITHUB_OUTPUT
+          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
+          echo "[publish-pypi] original=${ORIGINAL} pep440=${PEP440} include_neo4j=${INCLUDE_NEO4J}"
+
+      - name: Set up Python
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.x"
+
+      - name: Install build dependencies
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          # Belt-and-braces with --no-cache-dir below: env var disables the
+          # cache for any nested pip invocation too (e.g. build backends
+          # invoked transitively).
+          PIP_NO_CACHE_DIR: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        # CodeQL's cache-poisoning rule flags pip install in workflow_run
+        # contexts because pip's local cache (~/.cache/pip) is a potential
+        # vector even when --require-hashes verifies content. --no-cache-dir
+        # neither reads from nor writes to that cache, eliminating the
+        # surface entirely. Combined with --require-hashes, every package
+        # is fetched fresh from PyPI and verified against the pinned hash.
+        run: pip install --no-cache-dir --require-hashes -r .github/workflows/requirements-build.txt
+
+      - name: Build wheels from GoReleaser binaries
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          ORIGINAL_VERSION: ${{ steps.versions.outputs.original_version }}
+          PEP440_VERSION: ${{ steps.versions.outputs.pep440_version }}
+        run: |
+          # Wrap the pre-built GoReleaser binaries into wheels by calling
+          # go_to_wheel.build_wheel() directly. The CLI entry point of
+          # go-to-wheel always cross-compiles from Go source, which would
+          # break the binary-parity invariant required by REQ-F-009 — using
+          # the library function lets us feed binary_path= directly and skip
+          # the compile step entirely.
+          mkdir -p wheels
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from go_to_wheel import PLATFORM_MAPPINGS, build_wheel
+
+          original_version = os.environ["ORIGINAL_VERSION"]
+          pep440_version = os.environ["PEP440_VERSION"]
+          dist_dir = Path("dist")
+
+          # Map (goos, goarch) tuples to the GoReleaser archive_basename
+          # template. The OS segment in dist/<basename>/ is title-cased
+          # (Linux/Darwin/Windows) and the arch segment uses x86_64 / arm64.
+          GORELEASER_ARCH = {"amd64": "x86_64", "arm64": "arm64"}
+          GORELEASER_OS = {"linux": "Linux", "darwin": "Darwin", "windows": "Windows"}
+
+          # Six platforms shipped per release — keep this list in sync with
+          # the `name=` entries the .goreleaser.yaml builds for.
+          platforms = [
+              "linux-amd64",
+              "linux-arm64",
+              "darwin-amd64",
+              "darwin-arm64",
+              "windows-amd64",
+              "windows-arm64",
+          ]
+
+          # README content for PyPI long description (rendered as Markdown).
+          readme_content = Path("README.md").read_text(encoding="utf-8")
+
+          built = []
+          for platform_str in platforms:
+              goos, goarch, platform_tag = PLATFORM_MAPPINGS[platform_str]
+              is_windows = goos == "windows"
+              goreleaser_dirname = (
+                  f"neo4j-cli_{original_version}_"
+                  f"{GORELEASER_OS[goos]}_{GORELEASER_ARCH[goarch]}"
+              )
+              binary_name = "neo4j-cli.exe" if is_windows else "neo4j-cli"
+              binary_path = dist_dir / goreleaser_dirname / binary_name
+              if not binary_path.exists():
+                  raise SystemExit(
+                      f"ERROR: pre-built binary not found at {binary_path} "
+                      f"(did the GoReleaser dist artifact contain {goreleaser_dirname}?)"
+                  )
+
+              wheel = build_wheel(
+                  str(binary_path),
+                  "wheels",
+                  name="neo4j-cli",
+                  version=pep440_version,
+                  platform_tag=platform_tag,
+                  entry_point="neo4j-cli",
+                  is_windows=is_windows,
+                  description="Neo4j CLI",
+                  license_="GPL-3.0-only",
+                  url="https://github.com/neo4j-labs/neo4j-cli/",
+                  readme_content=readme_content,
+              )
+              print(f"[publish-pypi] built {wheel}")
+              built.append(wheel)
+
+          if len(built) != len(platforms):
+              raise SystemExit(
+                  f"ERROR: expected {len(platforms)} wheels, built {len(built)}"
+              )
+          PY
+          ls -la wheels/
+
+      - name: Upload wheels artifact
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          steps.meta.outputs.include_neo4j == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wheels
+          path: wheels/
+          retention-days: 7
+          if-no-files-found: error
+
+  smoke-test:
+    needs: build
+    if: needs.build.outputs.include_neo4j == 'true'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: wheels
+          path: dist/
+      - name: Smoke test linux-amd64 binary
+        # Pass the ORIGINAL (non-PEP 440) tag because that is what the binary's
+        # ldflags `Version` actually contains — the smoke script greps for
+        # this value verbatim in `neo4j-cli --version` output.
+        env:
+          VERSION: ${{ needs.build.outputs.original_version }}
+        run: bash .github/scripts/smoke-test-wheel.sh "$VERSION"
+
+  publish:
+    needs: [build, smoke-test]
+    # Skip publish on dry_run; otherwise gate on the same include_neo4j
+    # condition the build job already enforces.
+    if: >-
+      needs.build.outputs.include_neo4j == 'true' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: wheels
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
