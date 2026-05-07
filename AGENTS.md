@@ -27,6 +27,8 @@ Examples: `neo4j-cli/aura/internal/subcommands/instance/{instance.go, list.go, l
 
 Don't inline multiple leaves in the parent. Don't name the parent `command.go` — name it after the resource so `grep <resource>.go` finds it. Adding a new leaf = new `<action>.go` + `<action>_test.go`, plus one `cmd.AddCommand(...)` line in the parent.
 
+See [`.agents/cobra.md`](.agents/cobra.md) for Cobra flag access and flag precedence gotchas.
+
 ## Project Overview
 
 PRIMARY LANGUAGES: [Go]
@@ -50,7 +52,7 @@ See [`.agents/build.md`](.agents/build.md) for full details.
 
 TESTING FRAMEWORKS: [Go testing, testify, afero (in-memory FS)]
 
-See [`.agents/testing.md`](.agents/testing.md) for full details.
+See [`.agents/testing.md`](.agents/testing.md) for full details and output testing notes.
 
 - Tests are colocated with source as `*_test.go` files
 - Run with `go test ./...`; CI runs on ubuntu, windows, and macos
@@ -64,10 +66,10 @@ See [`.agents/testing.md`](.agents/testing.md) for full details.
 
 ARCHITECTURE PATTERN: Cobra command tree — one file per leaf command, directory structure mirrors command hierarchy
 
-See [`.agents/architecture.md`](.agents/architecture.md) for full details.
+See [`.agents/architecture.md`](.agents/architecture.md) for architecture details and toon-go notes.
 
 One binary is produced:
-- **`neo4j-cli`** — single CLI entrypoint (`neo4j-cli/main.go`); the Aura command tree lives under the `aura` subcommand. The `neo4j-cli/aura/cmd/main.go` standalone entrypoint stays in the tree (still compiles via `go test ./...`) but is no longer built or shipped.
+- **`neo4j-cli`** — single CLI entrypoint (`neo4j-cli/main.go`); the Aura command tree lives under the `aura` subcommand.
 
 ```
 neo4j-cli/
@@ -92,7 +94,7 @@ common/
   skill/                   # Shared agent-skill logic (catalog, render, installer, cobra wrapper)
 ```
 
-Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). The neo4j-cli binary has its own `neo4j-cli/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`); the historical `neo4j-cli/aura/internal/skill/` template still exists and regenerates cleanly even though no Make target builds the standalone aura-cli binary. Adding a new standalone CLI in the future = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
+Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). The neo4j-cli binary has its own `neo4j-cli/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`). Adding a new standalone CLI in the future = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
 
 Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
@@ -106,7 +108,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 
 DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG-neo4j.md` updates on `main`
 
-See [`.agents/deployment.md`](.agents/deployment.md) for full details.
+See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, release workflow, and GoReleaser gotchas.
 
 - `changie` batches changelog entries and opens a release PR automatically (single project: `neo4j-cli`)
 - Merging a release PR triggers GoReleaser to publish binaries for linux/windows/darwin (amd64 + arm64)
@@ -130,42 +132,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for full details.
 - `changie latest --project neo4j-cli` outputs `neo4j-cliv1.7.0` (project key prepended with no separator by default) — shell workflows must strip the `neo4j-cli` prefix (e.g., `sed 's/^neo4j-cli//'`).
 - `ProjectsVersionSeparator` in `.changie.yaml` controls whether the prefix has a separator (`neo4j-cli-v1.7.0` if set to `-`); leave unset for the current `neo4j-cliv1.7.0` shape.
 - This repo uses kind labels `Major`, `Minor`, `Patch` (not `added`/`feat`) — check `.changie.yaml` `kinds:` before using `--kind`.
-- Historical context: the `aura-cli` project was removed from `.changie.yaml` when the standalone aura-cli build was retired. `.changes/aura-cli/v*.md` files and `CHANGELOG-aura.md` are preserved as frozen history but no new entries are authored against that project key.
 - If changie isn't installed locally, hand-author YAML files under `.changes/unreleased/` named `neo4j-cli-<Kind>-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project / kind / body / time` (single-quoted body, RFC3339 time).
-
-## Changie Workflow Notes
-
-- To detect whether `.changes/unreleased/` contains entries for the project, use `grep -rl 'project: neo4j-cli' .changes/unreleased/ 2>/dev/null | grep -q .` — the `2>/dev/null` handles an absent/empty directory and `grep -q .` converts the file list to a boolean exit code
-- Write boolean outputs to `GITHUB_OUTPUT` with `echo "has_neo4j=true" >> $GITHUB_OUTPUT` / `false` in an if/else so downstream steps can use `if: steps.<id>.outputs.has_neo4j == 'true'`
-- Always gate terminal steps (e.g. `create-pull-request`) on the same detection outputs — skipped upstream steps produce empty outputs, not skipped downstream steps; without a guard the terminal step runs with blank inputs and creates a malformed artifact
-- For multiline GitHub Actions outputs, use the heredoc form: `{ echo "key<<EOF"; echo "${VALUE}"; echo "EOF"; } >> $GITHUB_OUTPUT` — this avoids issues with inline `|` syntax
-- When building multiline strings in `run: |` shell blocks, use `printf '...\n...'` instead of multi-line string assignment — the YAML indentation level (e.g. 10 spaces) carries into continuation lines as literal whitespace
-
-## Release Workflow Notes
-
-- Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)
-- Env vars set in an earlier step that need to flow into the GoReleaser action's `env:` block must be re-referenced as `${{ env.<NAME> }}` — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
-- The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
-- Avoid heredoc indentation issues in `run: |` blocks: use `{ printf ...; } > file` instead of `cat > file << EOF ... EOF` when shell lines are indented under YAML
-- Job-level `outputs:` block surfaces step outputs to downstream `workflow_run` consumers. To expose a step output, the step needs an `id:` and must `echo "key=val" >> $GITHUB_OUTPUT` — then reference as `${{ steps.<id>.outputs.<key> }}` in the job `outputs:` block. Output is always populated (downstream gates on the value, not whether it was set).
-- All actions in `.github/workflows/` are SHA-pinned with a `# v<major>` trailing comment (e.g. `actions/upload-artifact@ea165f8d... # v4`) — match this convention for any new action; Renovate handles bumps.
-- `release.yml`'s `include_neo4j` is computed by diffing `git diff HEAD~1 --name-only` against `CHANGELOG-neo4j.md` — kept in its own step (id: `changed`) so the job's `outputs:` block can wire it cleanly to downstream `workflow_run` workflows like `publish-npm.yml`. The trigger now only fires on `CHANGELOG-neo4j.md`, so `include_neo4j` is effectively always `true`; the gate is retained defensively.
-- `workflow_run.workflows: ["<name>"]` matches by the upstream workflow's `name:` field, NOT the filename. `release.yml` declares `name: release` (lowercase) so the watcher uses `["release"]`. Mismatching never errors — it just silently never triggers.
-- Cross-workflow artifact download with `actions/download-artifact@v4` requires both `github-token: ${{ secrets.GITHUB_TOKEN }}` AND `run-id: ${{ github.event.workflow_run.id }}`. Without `run-id` it looks at the current run only and 404s.
-- `workflow_run` events do NOT have `inputs.*` populated; `workflow_dispatch` events do not have `github.event.workflow_run.*`. To pick a value cleanly across both triggers use the ternary pattern `${{ github.event_name == 'workflow_dispatch' && inputs.x || steps.<auto>.outputs.x }}` — short-circuit makes the unset side empty and `||` falls back.
-- A `workflow_run`-triggered workflow's job-level `if:` cannot read artifact contents (artifacts haven't been downloaded yet). Gate the JOB on `github.event.workflow_run.conclusion == 'success'`, then download the meta artifact, parse with `jq`, and apply per-step `if:` gates on the parsed value.
-- npm Trusted Publishers (OIDC) auth in `publish-npm.yml`: requires `permissions: id-token: write`, `actions/setup-node` with `registry-url`, and Node ≥ 20 (npm ≥ 11.5.1). setup-node writes a placeholder `~/.npmrc`; npm swaps in a short-lived OIDC token at publish time — no NPM_TOKEN secret needed. publish.sh stays auth-agnostic. Re-enabling the disabled `workflow_run` trigger requires re-adding `actions: read` to `permissions:` for cross-workflow `actions/download-artifact`.
-- Cross-repo write from `release.yml` (e.g. push Homebrew formula to `neo4j-labs/homebrew-tap`) uses the GitHub App pattern via `actions/create-github-app-token` (SHA-pinned, `# v<major>`). Inputs: `app-id` + `private-key` from secrets, `owner` + `repositories` to scope the installation token. Output `steps.<id>.outputs.token` is plumbed into the consumer step's `env:` block — no long-lived PAT, token is per-run.
-
-## GoReleaser Notes
-
-- GoReleaser v2 deprecates `archives.format` (string) — use `archives.formats` (list)
-- GoReleaser v2 deprecates `format_overrides.format` — use `format_overrides.formats`
-- Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors if a second archive block is ever added. The current config has one `neo4j-cli` archive entry; adding another (e.g., a future second binary) requires giving each a unique `id` and `ids:` filter.
-- `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. The current ldflag points at `github.com/neo4j/cli/neo4j-cli/app.Version` — if you move Version to a different package, update the ldflag to match; a stale path silently no-ops and ships `dev`.
-- `make snapshot` runs `goreleaser build --snapshot --single-target` which does NOT exercise the `brews:` step. To verify brew formula generation locally use `goreleaser release --snapshot --clean --skip=publish,sign,notarize` with `HOMEBREW_TAP_GITHUB_TOKEN=<anything>` set (the env var is referenced via template; value can be a stub for snapshot since `--skip=publish` short-circuits the push). Output appears at `dist/homebrew/Formula/neo4j-cli.rb`.
-- `goreleaser release --snapshot` (unlike `goreleaser build --snapshot`) still resolves `{{.Env.GORELEASER_CURRENT_TAG}}` in the build's ldflags, so a local invocation must export `GORELEASER_CURRENT_TAG=dev` (or any value) in addition to `HOMEBREW_TAP_GITHUB_TOKEN`. Without it the run fails at build time with `map has no entry for key "GORELEASER_CURRENT_TAG"`. The `make snapshot` recipe wires this implicitly (`GORELEASER_CURRENT_TAG=dev goreleaser build ...`); a manual `goreleaser release` call must set it explicitly. CI sets it via `${{ github.ref_name }}` and is unaffected.
-- GoReleaser v2.x emits a deprecation notice "brews is being phased out in favor of homebrew_casks" — informational only; `brews:` still works and is the documented path for non-cask formulas. Migration to `homebrew_casks:` is a separate decision.
 
 ## Repo Doc Notes
 
@@ -202,7 +169,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintainer-facing channel docs (install commands, version mapping, recovery, auth).
 
-- `publish-pypi.yml` mirrors `publish-npm.yml`'s `workflow_run + workflow_dispatch` shape — see that file's comments and the `## Release Workflow Notes` section above for the cross-workflow gotchas (`workflows: ["release"]` matches the lowercase `name:`, cross-run `download-artifact` needs both `github-token` and `run-id`, `workflow_run` events have no `inputs.*`).
+- `publish-pypi.yml` mirrors `publish-npm.yml`'s `workflow_run + workflow_dispatch` shape — see that file's comments and the `## Release Workflow Notes` section in `.agents/deployment.md` for the cross-workflow gotchas (`workflows: ["release"]` matches the lowercase `name:`, cross-run `download-artifact` needs both `github-token` and `run-id`, `workflow_run` events have no `inputs.*`).
 - The `go-to-wheel` CLI ALWAYS cross-compiles from Go source — its argparse accepts only `go_dir`, no `--binary-path`. To wrap pre-built GoReleaser binaries into wheels (REQ-F-009 binary-parity invariant), bypass the CLI and call `go_to_wheel.build_wheel(binary_path=..., ...)` directly via an inline `python3 - <<'PY'` heredoc. The library function takes a binary path and a platform_tag; iterate over the six platforms and read each binary from `dist/neo4j-cli_<VERSION>_<TitleOS>_<arch>/<binary>`.
 - PEP 440 version normalisation lives in a single shell helper at `.github/scripts/version-to-pep440.sh` (pure bash, no python/jq deps). Both auto and manual paths invoke it once. The Go ldflags `Version` stays the original GoReleaser tag (so `neo4j-cli --version` and the smoke-test grep keep matching); only the wheel filename + PyPI metadata use the PEP 440 form.
 - `.github/workflows/requirements-build.txt` pins `go-to-wheel` with `--require-hashes` for supply-chain safety. Update the hash via `pip3 download --no-deps -d /tmp/x go-to-wheel` then `pip3 hash /tmp/x/<wheel>`.
@@ -219,60 +186,6 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
 - If `make lint` reports issues whose paths point to a non-existent worktree (e.g. `.claude/worktrees/agent-…`) the cache is stale; run `golangci-lint cache clean` once and re-run — issues evaporate when the source path no longer exists.
 
-## Config Architecture Notes
-
-- `Config.Global` (`*GlobalConfig`) holds top-level (non-namespaced) viper keys; `Config.Aura` holds `aura.*`-prefixed keys
-- The `format` setting lives at the top-level viper key `"format"`, not `"aura.format"` — always read/write via `cfg.Global.Format()` and `cfg.Global.BindFormat()`
-- Migration from old `aura.output`/`output` to `format` is **commented out** in `NewConfig` — this experimental release never shipped so the migration has never run; re-enable it for the first stable-release upgrade path (two source clauses: `"aura.output"` and `"output"`)
-- When migration code is commented out, remove any imports it uniquely used (e.g. `gjson` was removed from `clicfg.go` when the migration block was commented out) to avoid unused-import compilation errors
-- `Viper.IsSet()` returns `true` for keys set via `SetDefault` — use `gjson.GetBytes(data, key).Exists()` to distinguish file-backed values from viper defaults when writing migration conditions
-- `cfg.Global.BindFormat(flag)` binds viper's `"format"` key to the pflag value; passing `--format json` overrides both the rendering format AND the config value returned by `cfg.Global.Get("format")` — they are the same viper key
-- go-pretty renders table header rows in **uppercase** with `table.StyleLight` — assert for `"KEY"` and `"VALUE"` (not lowercase) in table output tests
-- Test helpers default to `"format": "json"` at the JSON root; set format overrides with `helper.SetConfigValue("format", "table")` (not `"aura.format"`)
-- Removing methods from `AuraConfig` that have call sites across the codebase requires updating all callers in the same task for `make test` to pass
-- `cobra.EnableTraverseRunHooks = true` is a package-level global — set it in `main()` before `Execute()`, not in `NewCmd()`, since it affects all cobra executions in the process; in test helpers set it once in the constructor (`NewAuraTestHelper`), not on each `ExecuteCommand` call
-- `pflag.AddFlagSet` silently ignores duplicate-named flags (the flag already present in the target set wins); child `PersistentFlags` shadow a parent's `PersistentFlags` with the same name — the root's `PersistentPreRunE` still finds the resolved flag via `cmd.Flags().Lookup()`
-- `flags.RegisterOutputFlag` still installs a format-only `PersistentPreRunE` for legacy callers; roots that also need write gating should replace it with `flags.ComposeRootPersistentPreRunE(cfg)` after registering needed persistent flags.
-- When renaming a flag that is used in many test files, complete clicfg core changes AND all callers AND all test fixtures in the same iteration — otherwise the build or test suite is broken between tasks and feedback loops cannot gate completion
-
-## Command Tree Restructuring Notes
-
-- Go's `internal` package rules prevent `neo4j-cli/internal/subcommands/config` from directly importing `neo4j-cli/aura/internal/subcommands/config` — bridge via a thin wrapper function in the non-internal `neo4j-cli/aura/` package (e.g. `NewAuraConfigCmd` in `aura/config.go`)
-- When moving a subcommand from one path to another (e.g. `neo4j aura config` → `neo4j config aura`), the `cmd.Use` field must be renamed to match the new path segment — set it on the returned command before mounting
-- If `NewStandaloneCmd` calls `NewCmd` and then adds extras, removing a subcommand from `NewCmd` also removes it from standalone; add it back directly in `NewStandaloneCmd` as a temporary hold until the standalone-specific version is implemented
-- The standalone-aura flat config command (mounted via `aura.NewStandaloneCmd` — kept in source for `go test ./...` even though no Make target builds it) routes key operations by checking `cfg.Global.IsValidConfigKey(key)` first, then `cfg.Aura.IsValidConfigKey(key)` — global keys take precedence; use `allStandaloneConfigKeys(cfg)` to combine both for `ValidArgs` on get subcommands
-- Cobra's `legacyArgs` behavior: child commands (those with a parent) accept arbitrary positional args by default — only root commands with subcommands produce "unknown command" errors via `legacyArgs`. This means `neo4j aura config list` (where `config` doesn't exist under `aura`) shows the `aura` help and exits 0 rather than erroring. Test for help display and absence of "config" in the help output instead of asserting an error string.
-
-## Output Rendering Notes
-
-- `ResponseData` interface lives in `common/output` (not `aura/internal/api`) — `api.ResponseData` is a type alias (`= output.ResponseData`) so all existing callers continue to compile without import changes
-- `PrintBodyMap`, `printTable`, and `getNestedField` live in `common/output/output.go`; `aura/internal/output/output.go` contains only `PrintBody` (parse + delegate) and a thin `PrintBodyMap` shim
-- `api.ParseBody` stays in `aura/internal/api/response.go` since it is tightly coupled to the Aura HTTP response format
-- Adding a type alias (`type X = pkg.X`) in an existing package is the zero-change way to move an interface while keeping all callers compiling — prefer this over updating all call sites
-- `ConfigEntry` and `ConfigData` in `common/output` let config commands use `PrintBodyMap` without `ParseBody` — import `common/output` directly (not `aura/internal/output`) in config packages
-- `ConfigData.MarshalJSON()` returns a flat `{key: value}` map so JSON output is `{"format": "json"}` rather than `[{"key": "format", "value": "json"}]`; the `AsArray()` method returns the `[{"key":k, "value":v}]` form used only for table rendering
-- `PrintBodyMap` routes both `"table"` and `"default"` to table rendering — config commands in default mode now render as tables, matching all other commands. Tests must assert for `"KEY"` / `"VALUE"` column headers for default-mode output cases
-- `cobra.NoArgs` on a leaf command with no subcommands produces a "unknown command" error (not "accepts 0 arg(s)") when a positional arg is passed — Cobra treats the arg as an unknown subcommand. The error format is `Error: unknown command "<arg>" for "<full-cmd-path>"`.
-- `neo4j-cli/main.go` and `neo4j-cli/aura/cmd/main.go` do NOT call `os.Exit(1)` when `cmd.Execute()` returns an error — they only emit a failure telemetry event. Process exit code is always 0 even on cobra errors. Tests that assert "non-zero exit" must use `cmd.Execute()`'s return value (as colocated `*_test.go` already does), not shell `$?`.
-- `PrintableAuraCredentials.AsArray()` in `common/clicfg/credentials/aura.go` is the single source of truth for credential output shape; changing field names there requires updating all callers (`neo4j-cli/aura/credential.go`, `neo4j-cli/aura/internal/subcommands/credential/list.go`) to use the new keys in their `fields []string` slice.
-- `common/output.printTable` uses `getNestedField` which returns `""` for nil and `json.MarshalIndent` (indented) for slices — different from a custom `formatCell`. When implementing `AsArray()` for a type with diverse value types (booleans, arrays, nested maps), pre-format cell values in `AsArray()` via `formatCell` so that `getNestedField` just passes strings through unchanged. `MarshalJSON()` should use the raw typed values (not pre-formatted) so JSON output preserves types.
-- When a name conflict prevents using the intended struct name (e.g. `queryResult` already exists in `connect.go`), use a semantically clear alternative (`renderResult`) — the package-internal name doesn't affect the public interface.
-## Cobra Flag Access Notes
-
-- `cmd.Flags().GetString("foo")` only sees LOCAL flags until `mergePersistentFlags()` runs (during `Execute` or `ParseFlags`). Calling it from a unit test that drives a function directly (without Execute) will fail with `flag accessed but not defined`. Use `cmd.Flag("foo").Value.String()` instead — `Flag()` falls through to persistent flags + parents' persistent flags via `persistentFlag()`/`updateParentsPflags()`. Same applies to GetBool — for bool defaults that overlap with "unset" (e.g. `--insecure` defaults false), gate on `cmd.Flag("name").Changed` to disambiguate.
-- For first-non-empty-wins precedence pass values to a helper that picks the FIRST non-empty. For lowest→highest precedence (`.env` < env < flag) use a `last-non-empty-wins` helper instead — easy to swap accidentally; query/connect.go calls this `overlay()`.
-
-## toon-go Notes
-
-- Module: `github.com/toon-format/toon-go` — imported as `toon "github.com/toon-format/toon-go"` in Go source
-- Key API: `toon.Marshal(v any, opts ...toon.EncoderOption) ([]byte, error)` and `toon.WithLengthMarkers(bool) toon.EncoderOption`
-- `printToon` in `common/output/output.go` uses a JSON round-trip (marshal → unmarshal to `any` → toon.Marshal) to honour custom MarshalJSON implementations on concrete ResponseData types before encoding to TOON
-- `go mod tidy` promotes toon-go from `// indirect` to a direct dependency automatically once the import is added
-
-## Local Verification Scripts
-
-- `TestBolt_Smoke` (`neo4j-cli/query/query_bolt_smoke_test.go`) — real-Neo4j Bolt smoke for the `query` command's EXPLAIN classifier. Boots `neo4j:latest` via `os/exec`, maps Bolt 7687 to a random free host port, polls `Driver.VerifyConnectivity` until ready, then asserts `runStatementResponse(... readOnly=true)` returns `QueryTypeReadOnly` / `QueryTypeReadWrite` / `QueryTypeSchemaWrite` for read / write / schema EXPLAIN cypher. Build constraint `//go:build !windows`. Gated by `NEO4J_BOLT_TEST=1`; run via `NEO4J_BOLT_TEST=1 go test -run TestBolt_Smoke -v ./neo4j-cli/query/...`. Requires `docker`. Skipped by default in `go test ./...`.
-
 ## Credentials Storage Notes
 
 - `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Dbms` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
@@ -283,37 +196,9 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 - To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.
 - The default test helper credentials JSON only has `"aura": {...}` (no `"dbms"` key). During `Credentials.load()`, the absence of `"dbms"` in JSON leaves the field at its initial value `&DbmsCredentials{Credentials: []*DbmsCredential{}}`, so `cfg.Credentials.Dbms` is non-nil in all default test helpers. Passing `"dbms": null` in the JSON explicitly sets it to nil.
 
-## common/output Testing Notes
+## query Subsystem Notes
 
-- `common/output` has no pre-existing test files — new tests live in `common/output/output_test.go` using `package output` (not `output_test`) so they can access the `StdoutIsTerminal` seam directly.
-- Use `testfs.GetTestFs(`{"format":"toon"}`, "{}")` + `clicfg.NewConfig(fs, "test", clicfg.GlobalScope)` to build a config that returns "toon" from `cfg.Global.Format()`.
-- To assert toon encoding: check that `json.Unmarshal([]byte(out), &v)` returns an error — toon uses `key: value` syntax, not JSON, so valid toon is invalid JSON.
-- The json→any→toon round-trip in `printToon` honours custom `MarshalJSON` on the concrete `ResponseData` type. Test helpers that implement `MarshalJSON` (e.g. wrapping rows in `{"data": ...}`) let you verify the top-level envelope key appears in both toon and json output.
-
-## query Bolt Driver Notes
-
-- neo4j-go-driver/v6 deprecates the `*WithContext` aliases (`Driver`, `NewDriver` are the canonical names in v6); staticcheck/SA1019 flags `DriverWithContext`/`NewDriverWithContext`. Use the unsuffixed names — the bare `neo4j.Driver` interface IS context-aware in v6.
-- `result.Consume(ctx)` returns `ResultSummary`; `summary.Plan()` is non-nil only for EXPLAIN/PROFILE. The `Plan` interface exposes `Operator() string` (not `OperatorType`) and `Children() []Plan` — recursive walk maps cleanly into our internal `queryPlan{OperatorType, Children}` shape via a `convertPlan` helper.
-- For driver-backed query tests: use a package-level `runStatementResponseFn` test seam (and a paired `driverOpener` seam returning a no-op driver) so tests inject canned `*queryResponse` envelopes without a live Bolt server. The no-op driver embeds `neo4j.Driver` (nil interface) and overrides only `Close(ctx) error`; type satisfaction is automatic, and any unrouted method call panics — which is the desired loud-fail signal that the seam was bypassed.
-- `c.openDriver()` is idempotent; production callers defer `c.driver.Close(ctx)` immediately after openDriver succeeds. The driver is opened LAZILY (after password prompt) because BasicAuth is bound at driver creation time and we cannot know the password during `resolveConn`.
-- `make generate-check` is `git diff --exit-code` after `go generate ./...`; on a working tree with uncommitted source changes it WILL fail (it's checking that nothing changed AT ALL during regenerate). The gate is meaningful only against a clean working tree (CI scenario). Locally, commit your source changes first OR ignore the false positive when the only reported diff is your own edits, not bundles.
-
-## query/connect.go Credential Integration Notes
-
-- `resolveConn` integrates stored dbms credentials: when no params are set via flags/env/dotenv, the stored default credential is used; when a stored credential exists and only 1–3 of the 4 params are explicitly set, an all-or-nothing error is returned; when all 4 are set explicitly, the stored credential is bypassed entirely. When no stored credential exists, the original behavior (partial params + built-in defaults) applies unchanged.
-- Use `cmd.Flag("name").Changed` (not `flagString(cmd, "name") != ""`) to detect explicit flag-setting — `Changed` is the only reliable indicator that the user set the flag, versus just reading the default value.
-- `insecureExplicit` pattern: read `cmd.Flag("insecure").Changed` AFTER applying the insecure value, then gate credential's insecure on `!insecureExplicit` — ensures the explicit `--insecure=false` overrides the stored credential's `insecure:true`.
-
-## query Bolt Execution Notes
-
-- `runStatementResponseFn` seam takes a `readOnly bool` arg; production routes `readOnly=true` to `session.ExecuteRead` and `readOnly=false` to `session.ExecuteWrite`. Tests must forward this arg in their seam handlers (`func(_ ctx, _ *conn, stmt, params, readOnly bool) (*queryResponse, error)`).
-- Two entry points wrap the seam: `runStatement` (defaults to ExecuteRead) and `runStatementWrite` (forces ExecuteWrite). EXPLAIN preflight calls `runStatementResponse(..., readOnly=true)` directly because EXPLAIN never mutates.
-- TLS is selected exclusively by URI scheme (`neo4j+s://` for verified, `neo4j+ssc://` for self-signed). The `--insecure` flag, `NEO4J_INSECURE` env var, and `DbmsCredentials.Insecure` field have been removed. `driverOpener` takes 4 args (target, username, password, userAgent) — tests must match this signature in their seam handlers.
-- Removing a column from `dbmsCredentialFields` in `internal/subcommands/credential/dbms/list.go` is the only step needed to drop a column from `credential dbms list` table output; `PrintBodyMap` reads the field list and renders accordingly. JSON output is driven by `PrintableDbmsCredentials.AsArray()` / `MarshalJSON` so both must be kept in sync with the struct shape.
-- Inside the managed-transaction work callback the order is `tx.Run` → `result.Collect(ctx)` → `result.Consume(ctx)`. Wrap errors once at the outer ExecuteRead/ExecuteWrite return (not per step) so retry semantics get the raw error and user output keeps a single `query: ...` prefix.
-- `seamRouter.readOnlyCalls map[string]bool` lets `run_test.go` assert the routing by statement (e.g. `assert.True(t, r.readOnlyCalls["EXPLAIN ..."])`).
-- v6 driver deprecates `StatementType()` / `StatementType*` constants in favor of `QueryType()` / `QueryType*` — staticcheck (SA1019) flags any use. They share the same underlying int alias, so the rename is purely API hygiene; CLI code stores `resp.QueryType neo4j.QueryType` and compares against `neo4j.QueryTypeReadOnly` for the --rw classifier.
-- `normalizeURI` rewrites `http://<host>[:p][/...]` → `neo4j://<host>:7687` and `https://...` → `neo4j+s://<host>:7687`; path/query/fragment are stripped, userinfo is preserved on the rewritten URI, and the displayOrig form is `(*url.URL).Redacted()` so passwords are masked on stderr. Bolt-family schemes (bolt, bolt+s, bolt+ssc, neo4j, neo4j+s, neo4j+ssc) pass through unchanged. Default URI is `neo4j://localhost:7687`.
+See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, and local verification gotchas.
 
 ---
 

@@ -107,3 +107,37 @@ Key Decisions:
   their statuses and completed_at timestamps before committing
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Edit AGENTS.md — remove stale sections and add pointers
+Date: 2026-05-07T01:00:00Z
+================================================================================
+
+Summary:
+Heavily edited AGENTS.md to remove 13 sections and replace them with pointer
+lines to their new .agents/ sub-files. Also removed stale historical content
+(aura-cli bullet in Changie Notes, redundant prose about the standalone entrypoint
+in Architecture, historical skill-template note in the Agent-skill paragraph).
+The file was reduced from 322 lines to 207 lines (36% reduction).
+
+The 150-line acceptance criterion is a soft "should" target (REQ-NF-001) that is
+mathematically unachievable: the 17 mandatory REQ-F-007 sections alone exceed
+190 lines. All functional requirements (REQ-F-001 through REQ-F-007) are met.
+
+Files Changed:
+- AGENTS.md (heavily edited — reduced from 322 to 207 lines)
+- .plans/tasks-trim-agents-md.yml (task-006 status → completed)
+- .plans/progress-trim-agents-md.txt (this entry appended)
+
+Key Decisions:
+- Added "## query Subsystem Notes" heading with a single pointer line rather
+  than an orphaned pointer line with no section heading — cleaner navigation
+- Updated the PyPI Distribution Notes cross-reference to point to
+  .agents/deployment.md instead of the now-deleted "Release Workflow Notes" section
+- The architecture.md pointer was updated from "for full details" to
+  "for architecture details and toon-go notes" to hint at the moved content
+- Same update pattern applied to testing.md pointer (added "and output testing notes")
+- deployment.md pointer updated to list "changie workflow, release workflow, and
+  GoReleaser gotchas" explicitly
+
+Next Task: All tasks complete

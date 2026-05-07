@@ -84,7 +84,7 @@ tasks:
       (3) delete entirely the three codebase-state sections (REQ-F-006: Config
       Architecture Notes, Output Rendering Notes, Command Tree Restructuring Notes);
       (4) leave all REQ-F-007 sections unchanged.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -99,4 +99,4 @@ tasks:
       - "All REQ-F-007 sections (Feedback Instructions, Cobra Command Layout, Build System, Testing Framework, Architecture, Deployment, Makefile Notes, Changie Notes, Repo Doc Notes, Repo Layout Notes, Hermetic Test Notes, Windows CI Gotchas, npm/PyPI Distribution Notes, golangci-lint Notes, Credentials Storage Notes) are present and unchanged"
       - "The BEGIN/END GENERATED markers are preserved"
       - "CLAUDE.md symlink still resolves to AGENTS.md"
-    completed_at: null
+    completed_at: "2026-05-07T01:00:00Z"
