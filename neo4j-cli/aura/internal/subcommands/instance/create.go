@@ -54,6 +54,20 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Creates a new instance",
+		Example: `  # Create a free-db instance (no cloud provider, region, or memory required)
+  neo4j aura instance create --name my-free-instance --type free-db --tenant-id a0a00a0a
+
+  # Create a professional-db instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-aws-instance --type professional-db --tenant-id a0a00a0a --cloud-provider aws --region us-east-1 --memory 8GB
+
+  # Create a professional-db instance on Azure (eastus, Virginia)
+  neo4j aura instance create --name my-azure-instance --type professional-db --tenant-id a0a00a0a --cloud-provider azure --region eastus --memory 8GB
+
+  # Create a professional-db instance on GCP (europe-west1, Belgium)
+  neo4j aura instance create --name my-gcp-instance --type professional-db --tenant-id a0a00a0a --cloud-provider gcp --region europe-west1 --memory 8GB
+
+  # Create a business-critical instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id a0a00a0a --cloud-provider aws --region us-east-1 --memory 64GB`,
 		Long: `This subcommand starts the creation process of an Aura instance.
 
 Before creating a non-free-db instance, run 'tenant get' to discover the supported configurations for your tenant. The output lists every valid combination of --cloud-provider, --region, --type, and --memory. Region identifiers follow each cloud provider's own naming convention: AWS uses identifiers such as us-east-1, Azure uses identifiers such as eastus, and GCP uses identifiers such as us-central1.

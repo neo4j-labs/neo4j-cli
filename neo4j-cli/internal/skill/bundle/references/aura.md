@@ -245,6 +245,25 @@ Flags:
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. |
 
+Examples:
+
+```
+# Create a free-db instance (no cloud provider, region, or memory required)
+  neo4j aura instance create --name my-free-instance --type free-db --tenant-id a0a00a0a
+
+  # Create a professional-db instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-aws-instance --type professional-db --tenant-id a0a00a0a --cloud-provider aws --region us-east-1 --memory 8GB
+
+  # Create a professional-db instance on Azure (eastus, Virginia)
+  neo4j aura instance create --name my-azure-instance --type professional-db --tenant-id a0a00a0a --cloud-provider azure --region eastus --memory 8GB
+
+  # Create a professional-db instance on GCP (europe-west1, Belgium)
+  neo4j aura instance create --name my-gcp-instance --type professional-db --tenant-id a0a00a0a --cloud-provider gcp --region europe-west1 --memory 8GB
+
+  # Create a business-critical instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id a0a00a0a --cloud-provider aws --region us-east-1 --memory 64GB
+```
+
 ### neo4j-cli aura instance delete
 
 Deletes an instance

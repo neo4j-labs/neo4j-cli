@@ -52,7 +52,7 @@ tasks:
       real region identifiers from the reference data in the PRD. Each example should be
       preceded by a comment line describing what it does. Indent all examples with two spaces
       as required by cobra.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "'neo4j aura instance create --help' shows an 'Examples:' section"
@@ -62,7 +62,7 @@ tasks:
       - "Examples section includes professional-db on GCP with --region europe-west1"
       - "Examples section includes a business-critical invocation"
       - "All region values are real identifiers from the PRD reference data, not placeholders"
-    completed_at: null
+    completed_at: "2026-05-07T02:00:00Z"
 
   - id: task-004
     title: "Regenerate skill bundles and verify all test gates pass"
