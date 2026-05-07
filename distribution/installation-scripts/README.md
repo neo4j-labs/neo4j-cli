@@ -9,6 +9,8 @@ Two scripts are provided depending on your platform:
 | macOS / Linux | `install-neo4j-cli.sh` |
 | Windows | `install-neo4j-cli.ps1` |
 
+> Note: If you edit the ps1 installer on a Linux like OS, run unix2dos afterwards
+
 ---
 
 ## macOS / Linux — `install-neo4j-cli.sh`
