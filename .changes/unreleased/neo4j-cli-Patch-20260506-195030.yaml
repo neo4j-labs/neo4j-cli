@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Nudge agents toward `--format toon` in help text and skill bundles.'
-time: 2026-05-06T19:50:30+00:00
