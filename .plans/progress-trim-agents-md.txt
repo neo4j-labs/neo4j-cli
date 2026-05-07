@@ -85,3 +85,25 @@ Key Decisions:
 - Section content matches AGENTS.md lines 136-168 exactly
 
 Next Task: task-004
+
+================================================================================
+TASK-005: Append toon-go Notes to .agents/architecture.md
+Date: 2026-05-07T00:30:00Z
+================================================================================
+
+Summary:
+Appended the "toon-go Notes" section from AGENTS.md to .agents/architecture.md
+verbatim. The section heading and all four bullet points were preserved exactly
+as they appear in AGENTS.md. Pre-existing content in the file was not modified.
+
+Files Changed:
+- .agents/architecture.md (modified — toon-go Notes appended)
+
+Key Decisions:
+- Appended after the existing "Config & State" section with a blank line separator
+- Documentation-only change; no Go feedback loops required
+- Fixed a side-effect from the sed command used during status update: task-003
+  and task-004 were accidentally reverted from completed to in_progress; restored
+  their statuses and completed_at timestamps before committing
+
+Next Task: task-006

@@ -66,12 +66,12 @@ tasks:
       Append the full content of the "toon-go Notes" section from AGENTS.md to
       the existing `.agents/architecture.md` file. Preserve the section heading
       and all bullet content verbatim.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/architecture.md` contains the full toon-go Notes section verbatim"
       - "Pre-existing content in `.agents/architecture.md` is unchanged"
-    completed_at: null
+    completed_at: "2026-05-07T00:30:00Z"
 
   - id: task-006
     title: "Edit AGENTS.md: remove stale historical sections and replace moved sections with pointers"
