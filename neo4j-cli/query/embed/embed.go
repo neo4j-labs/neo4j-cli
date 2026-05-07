@@ -11,7 +11,6 @@ package embed
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -361,7 +360,7 @@ func New(cfg Config) (Provider, error) {
 	case ProviderOllama:
 		return newOllamaProvider(cfg), nil
 	case ProviderHuggingFace:
-		return nil, fmt.Errorf("embed: huggingface provider not implemented")
+		return newHuggingFaceProvider(cfg), nil
 	default:
 		return nil, clierr.NewUsageError(
 			"invalid embed provider %q: must be one of %s, %s, %s",

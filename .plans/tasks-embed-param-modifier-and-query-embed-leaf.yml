@@ -199,7 +199,7 @@ tasks:
       leakage. Honour `cmd.Context()`. Tests cover both URL modes,
       both response shapes, missing key, non-200, malformed body, ctx
       cancellation.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -208,7 +208,7 @@ tasks:
       - "Missing APIKey returns the documented usage error before any HTTP call."
       - "Non-2xx responses surface provider + HTTP status; Authorization value never leaks."
       - "Tests cover both URL modes, both response shapes, missing key, non-200, malformed body, ctx-cancellation."
-    completed_at: null
+    completed_at: 2026-05-07T14:00:00Z
 
   - id: task-009
     title: "Extend parseParams to recognise the `:embed` modifier"

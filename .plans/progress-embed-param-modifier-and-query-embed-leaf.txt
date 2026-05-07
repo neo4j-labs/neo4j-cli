@@ -253,3 +253,46 @@ Key Decisions:
   pulls in the OpenAI auth pattern.
 
 Next Task: task-008 (HuggingFace provider)
+
+================================================================================
+TASK-008: Implement HuggingFace embedding provider (serverless + dedicated)
+Date: 2026-05-07T14:00:00Z
+================================================================================
+
+Summary:
+Implemented `huggingFaceProvider` in neo4j-cli/query/embed/huggingface.go: POST to
+{BaseURL}/{Model} when BaseURL == default (serverless mode) or to {BaseURL} verbatim
+when overridden (dedicated endpoint mode). Bearer auth, body `{inputs: text}`. Tolerates
+both [[floats]] (typical serverless shape) and [floats] (some dedicated endpoints) by
+attempting nested unmarshal first then falling back to flat. Default
+BaseURL=https://router.huggingface.co/hf-inference/models. Wired New(Config) to construct
+it instead of returning the not-implemented stub.
+
+Tests cover happy paths (serverless+nested, dedicated+flat), cross-shape tolerance
+(serverless+flat, dedicated+nested), missing key short-circuit, non-200 + auth-leak
+assertion, malformed body, empty arrays (both shapes), ctx cancellation, and default-
+BaseURL via a serverlessRedirectTransport that rewrites only the host so the path
+construction remains under test.
+
+Files Changed:
+- neo4j-cli/query/embed/huggingface.go (new — provider impl, mode selection in Embed)
+- neo4j-cli/query/embed/huggingface_test.go (new — 11 tests, custom serverlessRedirectTransport)
+- neo4j-cli/query/embed/embed.go (New() wires ProviderHuggingFace; dropped unused fmt import)
+- neo4j-cli/query/embed/embed_test.go (removed TestNew_NotImplementedStubs; new TestNew_HuggingFaceReturnsProvider)
+
+Key Decisions:
+- Mode selection lives in Embed() (one branch on `base == defaultHuggingFaceBaseURL`)
+  rather than at provider construction so a future Config mutation between New and
+  Embed (currently impossible but harmless to support) routes correctly.
+- Body is read once into []byte then attempted as [[floats]] then [floats] — simpler
+  than peeking the first byte of the JSON and lets json.Unmarshal own all whitespace
+  handling. The double-decode cost is irrelevant at embedding-vector size.
+- serverlessRedirectTransport (test-only) rewrites the default scheme+host to the
+  httptest server while preserving the /hf-inference/models/<Model> path, so the
+  default-BaseURL test asserts on the path the provider actually constructs rather
+  than on the request URL alone.
+- Mirror openAIProvider structure exactly — same field names, same idioms (4KiB body
+  snippet cap, defer Close with nolint, default-BaseURL at request time, lazy APIKey
+  check). Keeps the file diffable against openai.go for future maintainers.
+
+Next Task: task-009

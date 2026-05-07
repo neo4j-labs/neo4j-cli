@@ -328,25 +328,6 @@ func TestResolve_FlagsForProviderAndDimensions(t *testing.T) {
 	assert.Equal(t, 768, got.Dimensions)
 }
 
-func TestNew_NotImplementedStubs(t *testing.T) {
-	tests := []struct {
-		name      string
-		provider  string
-		wantErrIs string
-	}{
-		{"huggingface", ProviderHuggingFace, "not implemented"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			p, err := New(Config{Provider: tc.provider})
-			require.Error(t, err)
-			assert.Nil(t, p)
-			assert.Contains(t, err.Error(), tc.wantErrIs)
-		})
-	}
-}
-
 func TestNew_OpenAIReturnsProvider(t *testing.T) {
 	p, err := New(Config{Provider: ProviderOpenAI})
 	require.NoError(t, err)
@@ -355,6 +336,12 @@ func TestNew_OpenAIReturnsProvider(t *testing.T) {
 
 func TestNew_OllamaReturnsProvider(t *testing.T) {
 	p, err := New(Config{Provider: ProviderOllama})
+	require.NoError(t, err)
+	require.NotNil(t, p)
+}
+
+func TestNew_HuggingFaceReturnsProvider(t *testing.T) {
+	p, err := New(Config{Provider: ProviderHuggingFace})
 	require.NoError(t, err)
 	require.NotNil(t, p)
 }
