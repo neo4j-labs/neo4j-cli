@@ -348,3 +348,97 @@ tasks:
       - "No new test in this feature uses `afero.NewOsFs()` in the query package; all use `testfs.GetTestFs(...)`."
       - "Grep across test output confirms no Authorization header value leakage from provider error paths."
     completed_at: 2026-05-07T16:00:00Z
+
+  - id: task-014
+    title: "Documentation coverage: README, help output, skill bundle for embed param modifier, :embed leaf, and all credential subtrees"
+    description: |
+      Audit and update every user/agent-facing documentation surface so
+      the new functionality is discoverable. Specifically cover (a) the
+      `embed:<text>` param-value modifier on `--param`, (b) the
+      `query :embed` leaf, (c) the dbms→embed credential link
+      (`--embed-credential` on `credential dbms add`,
+      `credential dbms set-embed`, the `embed-credential` column), and
+      (d) the broader `credential` tree — `credential aura`,
+      `credential dbms`, and `credential embed` — none of which are
+      currently summarised in README. Surfaces:
+
+      1. README.md
+         - Add a `## Credentials` section above `## Querying Neo4j`
+           describing the three credential trees (`aura`, `dbms`, `embed`)
+           with one short example per tree (`add`, `list`, `use`/`set-default`,
+           `remove`). Briefly note the dbms→embed link and that
+           `credential dbms` lets `query` run without flags or env vars.
+         - Extend `## Querying Neo4j`: a new `### Embedding parameters`
+           subsection covering `embed:<text>` param values, the
+           `query :embed` leaf, and ALL five `--embed-*` flags PLUS
+           every matching `NEO4J_EMBED_*` env var (`--embed-provider` /
+           `NEO4J_EMBED_PROVIDER`, `--embed-model` /
+           `NEO4J_EMBED_MODEL`, `--embed-base-url` /
+           `NEO4J_EMBED_BASE_URL`, `--embed-dimensions` /
+           `NEO4J_EMBED_DIMENSIONS`, plus the API-key env vars
+           `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`).
+           Render as a table in the same shape as the existing
+           Connection-settings table. Show `--embed-credential` usage,
+           the API-key precedence chain
+           (OS-per-provider > OS-generic > dotenv-per-provider >
+           dotenv-generic > stored), and the dotenv/env precedence
+           summary.
+         - Verify the existing `aura credential add` example still
+           matches the actual command (note: top-level `credential aura`
+           is the canonical path now).
+      2. Cobra help output (`Short` / `Long` / examples)
+         - Verify every leaf under `credential aura`, `credential dbms`,
+           `credential embed` has a non-empty `Short` and a `Long` that
+           explains when to use it.
+         - `query` parent `Long` mentions both the `embed:` modifier and
+           the `:embed` leaf.
+         - `query :embed` leaf has at least one `Example` showing
+           positional + stdin + `--format json|toon`.
+         - `credential dbms add` `Long` mentions `--embed-credential` and
+           the link semantics; `credential dbms set-embed` Long explains
+           "no embed-credential is required for query; this only links
+           one for vector embedding".
+         - Consistent capitalisation/period style across new help text
+           (match existing leaves).
+      3. Skill bundle (`neo4j-cli/internal/skill/bundle/SKILL.md` +
+         `references/*.md`)
+         - SKILL.md description front-matter (line 3) updated to
+           include "manage Neo4j connection (dbms) credentials and
+           embedding-provider credentials" alongside the existing Aura
+           credential phrase.
+         - SKILL.md Gotchas: add a bullet on the `embed:` param
+           modifier (one-line: "use `--param vec='embed:hello world'`
+           to inject a vector inline; resolves via the configured
+           embedding provider before the statement runs"). Add a bullet
+           on the dbms→embed link.
+         - `references/credential.md`: confirm regen contains all three
+           subtrees with full leaf docs.
+         - `references/query.md`: confirm regen documents both the
+           `embed:` modifier (under `--param` description) and the
+           `:embed` subcommand. If the modifier isn't surfaced by the
+           cobra description today, extend the `--param` flag's
+           `Usage` string in `query.go` so the renderer picks it up.
+         - Run `go generate ./neo4j-cli/internal/skill/...` and confirm
+           the bundle changes land in the committed files.
+         - The aura skill template (`neo4j-cli/aura/internal/skill/`)
+           still regenerates cleanly; if any aura-side help text moved
+           it must regen identically.
+      4. Verify no stale references
+         - grep for `aura.output`, removed `--insecure` flag mentions,
+           and any "credential" wording that implies it lives only
+           under `aura`.
+
+      Out of scope: changing CLI behaviour, adding new flags, renaming
+      anything. This is documentation only.
+    status: pending
+    dependencies:
+      - task-012
+      - task-013
+    acceptance_criteria:
+      - "README.md has a `## Credentials` section covering `credential aura`, `credential dbms`, `credential embed` (one example each) and an `### Embedding parameters` subsection under `## Querying Neo4j` covering `embed:<text>` param values, `query :embed`, ALL five `--embed-*` flags paired with their matching `NEO4J_EMBED_*` env vars (provider, model, base-url, dimensions, plus api-key envs `NEO4J_EMBED_API_KEY` / `OPENAI_API_KEY` / `HF_TOKEN`), and the API-key precedence chain."
+      - "Every leaf under `credential aura`, `credential dbms`, `credential embed` has a non-empty `Short` and a `Long`; `query :embed` has at least one `Example`."
+      - "`query` parent `Long` mentions both the `embed:` param modifier and the `:embed` leaf; `credential dbms add --embed-credential` and `credential dbms set-embed` help text explains the dbms→embed link."
+      - "SKILL.md front-matter `description` (line 3) lists dbms credentials and embedding credentials alongside Aura credentials; SKILL.md Gotchas section includes a bullet for the `embed:` param modifier and one for the dbms→embed link."
+      - "`references/query.md` documents the `embed:` modifier under `--param` (extend the cobra flag Usage if needed) and the `:embed` subcommand; `references/credential.md` documents all three credential subtrees and every leaf."
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` followed by `make generate-check` exits 0; `make fmt-check`, `make lint`, `make test` exit 0."
+      - "No stale documentation references to removed flags (e.g. `--insecure`) or to credentials living only under `aura`."
