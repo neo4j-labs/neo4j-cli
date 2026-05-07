@@ -71,7 +71,7 @@ tasks:
       that make generate-check exits cleanly (git diff --exit-code passes) and that
       TestGenerator_RoundTrip passes. Commit the updated bundle files alongside the
       implementation changes.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -79,7 +79,7 @@ tasks:
       - "make generate-check exits 0 (no diff after generate)"
       - "TestGenerator_RoundTrip passes"
       - "Updated bundle files reflect the new --name flag description"
-    completed_at: null
+    completed_at: "2026-05-07T00:00:00Z"
 
   - id: task-005
     title: "Final gates: test, fmt-check, lint, and changelog entry"
@@ -87,7 +87,7 @@ tasks:
       Run make test, make fmt-check, and make lint to confirm all gates are clean across the
       full change set. Add a changelog entry using changie (kind: Minor) describing the new
       optional --name behaviour for instance create.
-    status: pending
+    status: in_progress
     dependencies:
       - task-003
       - task-004

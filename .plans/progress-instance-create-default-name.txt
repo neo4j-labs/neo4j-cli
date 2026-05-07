@@ -70,3 +70,28 @@ Key Decisions:
 - Removed an unused struct field (expectErr) after self-review.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Regenerate skill bundles and verify generate-check gate
+Date: 2026-05-07T00:00:00Z
+================================================================================
+
+Summary:
+Verified that skill bundles were already regenerated and committed as part of
+task-002. Confirmed make generate-check exits 0 (git diff --exit-code passes with
+no uncommitted Go source changes), TestGenerator_RoundTrip passes (included in
+make test), make test passes with all tests green, make fmt-check passes with no
+files needing gofmt, and make lint passes with 0 issues.
+
+Files Changed:
+- No new file changes required; bundles were already regenerated in the task-002 commit
+  (neo4j-cli/aura/internal/skill/bundle/references/instance.md and
+  neo4j-cli/internal/skill/bundle/references/aura.md are up to date)
+
+Key Decisions:
+- generate-check was verified by stashing the tasks YAML (the only uncommitted change)
+  and confirming go generate ./... produces no diff against the committed bundle files.
+- All acceptance criteria confirmed: generate exits clean, TestGenerator_RoundTrip
+  passes, bundle files reflect the updated --name flag description.
+
+Next Task: task-005
