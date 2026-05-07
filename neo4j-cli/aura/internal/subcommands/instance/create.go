@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -156,16 +155,28 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			// NOTE: Instance create should not return OK (200), it always returns 202, checking both just in case
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "connection_url", "username", "password", "cloud_provider", "region", "type"})
+				responseData := api.ParseBody(resBody)
+				instance, err := responseData.GetSingleOrError()
+				if err != nil {
+					return err
+				}
+
+				fields := []string{"id", "name", "tenant_id", "connection_url", "username"}
+				if !noCredentialPrint {
+					fields = append(fields, "password")
+				}
+				if !noCredentialStorage {
+					fields = append(fields, "credential_name")
+				}
+				fields = append(fields, "cloud_provider", "region", "type")
+
+				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(instance), fields)
 
 				if await {
 					cmd.Println("Waiting for instance to be ready...")
-					var response api.CreateInstanceResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
+					instanceId, _ := instance["id"].(string)
 
-					pollResponse, err := api.PollInstance(cfg, response.Data.Id, api.InstanceStatusCreating)
+					pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}
@@ -207,9 +218,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 	cmd.Flags().BoolVar(&noCredentialStorage, noCredentialStorageFlag, false, "Skip storing the instance credentials locally after creation.")
 
 	cmd.Flags().BoolVar(&noCredentialPrint, noCredentialPrintFlag, false, "Omit the password from the command output.")
-
-	// suppress unused variable warning until a subsequent task uses this flag
-	_ = noCredentialPrint
 
 	return cmd
 }
