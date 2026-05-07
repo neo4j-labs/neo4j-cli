@@ -29,6 +29,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		vectorOptimized      bool
 		graphAnalyticsPlugin bool
 		await                bool
+		credentialName       string
+		noCredentialStorage  bool
+		noCredentialPrint    bool
 	)
 
 	const (
@@ -43,6 +46,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		vectorOptimizedFlag      = "vector-optimized"
 		graphAnalyticsPluginFlag = "graph-analytics-plugin"
 		awaitFlag                = "await"
+		credentialNameFlag       = "credential-name"
+		noCredentialStorageFlag  = "no-credential-storage"
+		noCredentialPrintFlag    = "no-credential-print"
 	)
 
 	cmd := &cobra.Command{
@@ -181,6 +187,17 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 	cmd.Flags().BoolVar(&graphAnalyticsPlugin, graphAnalyticsPluginFlag, false, "An optional graph analytics plugin configuration to be set during instance creation")
 
 	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created instance is ready.")
+
+	cmd.Flags().StringVar(&credentialName, credentialNameFlag, "", "The name to use when storing the credentials locally. Defaults to <instance-id>-default.")
+
+	cmd.Flags().BoolVar(&noCredentialStorage, noCredentialStorageFlag, false, "Skip storing the instance credentials locally after creation.")
+
+	cmd.Flags().BoolVar(&noCredentialPrint, noCredentialPrintFlag, false, "Omit the password from the command output.")
+
+	// suppress unused variable warnings until subsequent tasks use these flags
+	_ = credentialName
+	_ = noCredentialStorage
+	_ = noCredentialPrint
 
 	return cmd
 }
