@@ -87,7 +87,7 @@ tasks:
       follow-up), and a "See also" section linking to `RELEASING.md`,
       `.github/workflows/publish-pypi.yml`, the npm README, and the
       homebrew README.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -99,7 +99,7 @@ tasks:
       - "Auth prerequisites section names `PYPI_API_TOKEN` as the current secret, links to `.github/workflows/publish-pypi.yml`, and flags OIDC trusted publishing as a tracked follow-up (out of scope for this PRD)."
       - "`## See also` section contains relative-path links to `../../RELEASING.md`, `../../.github/workflows/publish-pypi.yml`, `../npm/README.md`, and `../homebrew/README.md`."
       - "All file/path/URL references in the README use relative paths and resolve correctly when previewed on github.com."
-    completed_at: null
+    completed_at: 2026-05-07T13:15:00Z
 
   - id: task-004
     title: "Cross-link new pypi README from npm and homebrew READMEs"

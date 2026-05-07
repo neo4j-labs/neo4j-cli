@@ -114,3 +114,51 @@ Validation:
 
 Next Task: task-003 (Create distribution/pypi/README.md)
 
+================================================================================
+TASK-003: Create distribution/pypi/README.md documenting the PyPI channel
+Date: 2026-05-07T13:15:00Z
+================================================================================
+
+Summary:
+Created `distribution/pypi/README.md` to document the PyPI distribution
+channel for maintainers. Mirrors the shape and tone of the sibling
+`distribution/homebrew/README.md` and `distribution/npm/README.md`:
+opening blurb -> "What this directory does" -> "User install" ->
+"PyPI project location" -> "Release cadence" -> "PEP 440 version mapping"
+-> "Platform wheels published per release" -> "Local dry-run" ->
+"Manual recovery" -> "Auth prerequisites" -> "See also".
+
+Documentation-only — no runtime code in `distribution/pypi/`. The
+actual publication is handled by `.github/workflows/publish-pypi.yml`
+(task-002) plus `go-to-wheel`.
+
+Files Changed:
+- distribution/pypi/README.md (created)
+- .plans/tasks-release-to-pypi.yml (task-003 -> completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+
+Key Decisions:
+- Source the six platform suffix strings (manylinux_2_17_*, macosx_*,
+  win_*) directly from go-to-wheel's PLATFORM_MAPPINGS dict so the
+  README matches what publish-pypi.yml's wheel-build step actually
+  produces. Verified by reading the upstream package source.
+- Worked example uses v0.1.0-alpha.6 -> 0.1.0a6 (the most recent
+  prerelease in this repo, per the recent-commits log) so future
+  maintainers can cross-check against an actual published wheel
+  filename when the first PyPI release lands.
+- OIDC trusted publishing is flagged as a follow-up with a link
+  back to .plans/prd-release-to-pypi.md "Open Questions" rather than
+  duplicating the migration plan in the README.
+- Manual recovery section uses `gh workflow run` invocation matching
+  the workflow_dispatch input shape (`version` without leading v,
+  `dry_run` boolean) so the README is copy-paste runnable.
+- All relative paths verified resolvable from
+  distribution/pypi/README.md (RELEASING.md, publish-pypi.yml,
+  version-to-pep440.sh, sibling READMEs, PRD).
+
+Validation:
+- `make fmt-check`, `make lint`, `make test` all pass — docs-only
+  change but ran the full gate to confirm nothing else regressed.
+
+Next Task: task-004 (Cross-link new pypi README from npm and homebrew READMEs)
+

@@ -200,6 +200,8 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 ## PyPI Distribution Notes
 
+See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintainer-facing channel docs (install commands, version mapping, recovery, auth).
+
 - `publish-pypi.yml` mirrors `publish-npm.yml`'s `workflow_run + workflow_dispatch` shape — see that file's comments and the `## Release Workflow Notes` section above for the cross-workflow gotchas (`workflows: ["release"]` matches the lowercase `name:`, cross-run `download-artifact` needs both `github-token` and `run-id`, `workflow_run` events have no `inputs.*`).
 - The `go-to-wheel` CLI ALWAYS cross-compiles from Go source — its argparse accepts only `go_dir`, no `--binary-path`. To wrap pre-built GoReleaser binaries into wheels (REQ-F-009 binary-parity invariant), bypass the CLI and call `go_to_wheel.build_wheel(binary_path=..., ...)` directly via an inline `python3 - <<'PY'` heredoc. The library function takes a binary path and a platform_tag; iterate over the six platforms and read each binary from `dist/neo4j-cli_<VERSION>_<TitleOS>_<arch>/<binary>`.
 - PEP 440 version normalisation lives in a single shell helper at `.github/scripts/version-to-pep440.sh` (pure bash, no python/jq deps). Both auto and manual paths invoke it once. The Go ldflags `Version` stays the original GoReleaser tag (so `neo4j-cli --version` and the smoke-test grep keep matching); only the wheel filename + PyPI metadata use the PEP 440 form.
