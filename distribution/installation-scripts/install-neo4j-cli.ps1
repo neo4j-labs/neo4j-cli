@@ -24,6 +24,10 @@ param(
     [string] $InstallDir = "$Env:LOCALAPPDATA\neo4j-cli"
 )
 
+# ── TLS — PowerShell 5.1 defaults to TLS 1.0; GitHub requires TLS 1.2+ ───────
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+ 
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
