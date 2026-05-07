@@ -47,6 +47,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newSchemaCmd(cfg))
+	cmd.AddCommand(newEmbedCmd(cfg))
 
 	return cmd
 }

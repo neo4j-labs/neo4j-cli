@@ -370,3 +370,54 @@ Key Decisions:
   path.
 
 Next Task: task-011
+
+================================================================================
+TASK-011: Add `query :embed [text]` standalone leaf and shared input helper
+Date: 2026-05-07T15:30:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/query/input.go with readPositionalOrStdin(cmd, args, label).
+Refactored resolveCypher to delegate to it (one-liner now). Created
+neo4j-cli/query/embed.go with newEmbedCmd + runEmbed + embedVector type
+implementing ResponseData (AsArray) and json.Marshaler. Mounted on query
+parent. The leaf does NOT open a Bolt driver and does NOT prompt for
+password. Tests cover positional/stdin paths, json/table/toon rendering,
+provider error propagation, factory error propagation, AsArray/MarshalJSON
+shape locks, and a hard-fail driverOpener+statementSeam to prove no DB
+connection is opened. Regenerated skill bundle so references/query.md
+reflects the new :embed sub-leaf.
+
+Files Changed:
+- neo4j-cli/query/input.go (created)
+- neo4j-cli/query/run.go (resolveCypher delegates to readPositionalOrStdin; dropped strings import)
+- neo4j-cli/query/embed.go (created — newEmbedCmd, runEmbed, embedVector)
+- neo4j-cli/query/embed_test.go (created — 9 tests)
+- neo4j-cli/query/query.go (cmd.AddCommand(newEmbedCmd(cfg)))
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated)
+
+Key Decisions:
+- readPositionalOrStdin parameterised by label string ("Cypher" / "text") so
+  the helper can be reused by future `:foo [bar]` leaves with consistent
+  diagnostic wording. Old "cypher statement is empty" message becomes
+  "Cypher is empty" — no tests pinned to the old wording.
+- embedVector.AsArray returns a single row {"embedding": "<compact JSON>"}
+  rather than a multi-row "one float per row" view. Single row keeps the
+  table compact for short vectors AND avoids huge tables for 1536-dim
+  OpenAI vectors. Header passed to PrintBodyMap is "embedding".
+- embedVector.MarshalJSON returns the raw float array (not wrapped in an
+  object) so json/toon outputs stay machine-friendly for downstream piping.
+- Empty/nil vector marshals to `[]` (test-locked) rather than `null` to
+  preserve the array contract for consumers.
+- runEmbed wraps provider errors as `query: embed: %w` (mirrors run.go's
+  `query: embed %q: %w` for the per-job case). Test asserts contains
+  "embed" rather than the exact prefix to stay resilient to future tweaks.
+- Test for "no Bolt connection / no password prompt" uses a panicking
+  driverOpener AND a t.Fatal-ing passwordReader AND a t.Fatal-ing
+  statement seam — three independent guards prove the leaf is fully
+  provider-side.
+- Regenerated bundle here (rather than waiting for task-012) because
+  TestGenerator_RoundTrip otherwise gates `make test` red as soon as the
+  new leaf is added.
+
+Next Task: task-012

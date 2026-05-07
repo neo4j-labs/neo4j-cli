@@ -26,6 +26,14 @@ Flags:
 | `--uri` | string | - | Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
 | `-u, --username` | string | - | Neo4j username [env: NEO4J_USERNAME] (default "neo4j") |
 
+## neo4j-cli query :embed
+
+Compute an embedding vector for the given text
+
+Compute an embedding vector for the supplied text using the configured embed provider. Text is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. The embed provider configuration follows the same --embed-* flags as the parent `query` command. No Bolt connection is opened.
+
+Usage: `neo4j-cli query :embed [text]`
+
 ## neo4j-cli query :schema
 
 Introspect the connected database (labels, rel types, indexes, constraints)

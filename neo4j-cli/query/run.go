@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
@@ -127,28 +126,11 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 
 // resolveCypher returns the Cypher statement from the positional arg or, if
 // no arg was supplied and stdin is piped, reads it from stdin. A missing
-// argument with a TTY stdin is a usage error.
-func resolveCypher(_ *cobra.Command, args []string) (string, error) {
-	if len(args) == 1 {
-		s := strings.TrimSpace(args[0])
-		if s == "" {
-			return "", clierr.NewUsageError("cypher statement is empty")
-		}
-		return s, nil
-	}
-	if stdinIsTTY() {
-		return "", clierr.NewUsageError(
-			"no Cypher provided: pass a positional argument or pipe a statement on stdin")
-	}
-	b, err := io.ReadAll(stdinReader())
-	if err != nil {
-		return "", fmt.Errorf("query: read stdin: %w", err)
-	}
-	s := strings.TrimSpace(string(b))
-	if s == "" {
-		return "", clierr.NewUsageError("no Cypher provided on stdin")
-	}
-	return s, nil
+// argument with a TTY stdin is a usage error. Thin wrapper around the shared
+// readPositionalOrStdin helper so the `:embed` leaf can reuse the same
+// stdin/TTY logic without duplicating it.
+func resolveCypher(cmd *cobra.Command, args []string) (string, error) {
+	return readPositionalOrStdin(cmd, args, "Cypher")
 }
 
 // promptPassword reads a password from the controlling terminal with no echo,

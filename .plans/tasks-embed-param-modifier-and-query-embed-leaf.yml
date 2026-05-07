@@ -290,7 +290,7 @@ tasks:
       `embed_test.go` covering arg + stdin paths, json/table/toon
       rendering, provider error propagation, and a fake driverOpener
       that panics to prove no DB connection is opened.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -299,7 +299,7 @@ tasks:
       - "Bolt driver is NOT opened (panicking driverOpener seam confirms) and password prompt is NOT triggered even with no --password/NEO4J_PASSWORD."
       - "`readPositionalOrStdin` is reused by both `resolveCypher` and `runEmbed`; no duplicated stdin/TTY logic remains."
       - "Provider errors propagate cleanly with a `query: ` prefix or wrapped form consistent with the rest of the package."
-    completed_at: null
+    completed_at: 2026-05-07T15:30:00Z
 
   - id: task-012
     title: "Regenerate skill bundle and add changelog entry"
