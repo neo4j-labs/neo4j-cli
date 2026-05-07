@@ -4,9 +4,9 @@
 package tenant
 
 import (
-	"github.com/spf13/cobra"
-
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
+	"github.com/spf13/cobra"
 )
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
@@ -27,6 +27,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.AddCommand(NewGetCmd(cfg))
 	cmd.AddCommand(NewListCmd(cfg))
+
+	flags.RegisterAuraCredentialFlag(cmd, cfg)
 
 	return cmd
 }

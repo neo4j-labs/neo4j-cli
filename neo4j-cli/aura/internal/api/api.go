@@ -12,6 +12,7 @@ import (
 	"net/url"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 )
 
 const userAgent = "Neo4jCLI/%s"
@@ -63,9 +64,14 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		panic(err)
 	}
 
-	credential, err := cfg.Credentials.Aura.GetDefault()
-	if err != nil {
-		return responseBody, 0, err
+	var credential *credentials.AuraCredential
+	if active := cfg.Aura.ActiveCredential(); active != nil {
+		credential = active
+	} else {
+		credential, err = cfg.Credentials.Aura.GetDefault()
+		if err != nil {
+			return responseBody, 0, err
+		}
 	}
 
 	req.Header, err = getHeaders(credential, cfg)

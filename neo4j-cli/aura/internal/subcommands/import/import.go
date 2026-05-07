@@ -5,6 +5,7 @@ package _import
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/import/job"
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.AddCommand(job.NewCmd(cfg))
+
+	flags.RegisterAuraCredentialFlag(cmd, cfg)
 
 	return cmd
 }

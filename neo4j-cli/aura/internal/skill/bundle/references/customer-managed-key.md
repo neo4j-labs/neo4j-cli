@@ -10,6 +10,7 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
 
 ## aura-cli customer-managed-key create
 

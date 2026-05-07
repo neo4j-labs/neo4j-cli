@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,4 +127,53 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 
 	//The path parameter will be removed from GET base url
 	assert.Equal(t, server.URL, cfg.Aura.BaseUrl())
+}
+
+func TestAuraConfigActiveCredential(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(cfg *clicfg.Config)
+		wantNil  bool
+		wantName string
+	}{
+		{
+			name:    "returns nil when no active credential has been set",
+			setup:   func(cfg *clicfg.Config) {},
+			wantNil: true,
+		},
+		{
+			name: "returns the credential after SetActiveCredential",
+			setup: func(cfg *clicfg.Config) {
+				cred := &credentials.AuraCredential{Name: "my-cred", ClientId: "id1", ClientSecret: "secret1"}
+				cfg.Aura.SetActiveCredential(cred)
+			},
+			wantNil:  false,
+			wantName: "my-cred",
+		},
+		{
+			name: "overwrites previous active credential",
+			setup: func(cfg *clicfg.Config) {
+				first := &credentials.AuraCredential{Name: "first", ClientId: "id1", ClientSecret: "secret1"}
+				cfg.Aura.SetActiveCredential(first)
+				second := &credentials.AuraCredential{Name: "second", ClientId: "id2", ClientSecret: "secret2"}
+				cfg.Aura.SetActiveCredential(second)
+			},
+			wantNil:  false,
+			wantName: "second",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := newTestConfig(t, clicfg.AuraScope)
+			tc.setup(cfg)
+			got := cfg.Aura.ActiveCredential()
+			if tc.wantNil {
+				assert.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				assert.Equal(t, tc.wantName, got.Name)
+			}
+		})
+	}
 }

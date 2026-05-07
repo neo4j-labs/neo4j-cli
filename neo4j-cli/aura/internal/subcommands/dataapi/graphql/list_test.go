@@ -26,7 +26,7 @@ func TestListGraphQLDataApis(t *testing.T) {
 				"status": "creating",
 				"url": "https://23423.453489590fdsgs34.test.com/graphql"
 			}
-		]	
+		]
 	}`)
 
 	helper.ExecuteCommand(fmt.Sprintf("data-api graphql list --instance-id %s", instanceId))
@@ -45,4 +45,49 @@ func TestListGraphQLDataApis(t *testing.T) {
 		]
 	}
 	`)
+}
+
+func TestListGraphQLDataApisWithCredentialFlag(t *testing.T) {
+	instanceId := "2f49c2b3"
+
+	for _, tc := range []struct {
+		name    string
+		command string
+	}{
+		{
+			name:    "--credential flag",
+			command: fmt.Sprintf("data-api graphql list --instance-id %s --credential named-cred", instanceId),
+		},
+		{
+			name:    "-c shorthand",
+			command: fmt.Sprintf("data-api graphql list --instance-id %s -c named-cred", instanceId),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.SetCredentialsValue("aura", map[string]interface{}{
+				"credentials": []map[string]interface{}{
+					{
+						"name":          "named-cred",
+						"client-id":     "named-client-id",
+						"client-secret": "named-client-secret",
+						"access-token":  "",
+						"token-expiry":  0,
+					},
+				},
+				"default-credential": "",
+			})
+
+			helper.SetConfigValue("aura.beta-enabled", true)
+
+			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{"data": []}`)
+
+			helper.ExecuteCommand(tc.command)
+
+			mockHandler.AssertCalledTimes(1)
+			helper.AsssertOk()
+		})
+	}
 }

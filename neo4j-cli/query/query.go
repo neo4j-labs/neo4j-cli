@@ -36,7 +36,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
-	cmd.PersistentFlags().String("credential", "", "Name of a stored dbms credential to use for the connection (see 'credential dbms list')")
+	cmd.PersistentFlags().StringP("credential", "c", "", "Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list')")
 
 	flags.RegisterOutputFlag(cmd, cfg)
 
