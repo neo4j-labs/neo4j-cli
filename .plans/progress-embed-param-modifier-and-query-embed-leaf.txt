@@ -296,3 +296,38 @@ Key Decisions:
   check). Keeps the file diffable against openai.go for future maintainers.
 
 Next Task: task-009
+
+================================================================================
+TASK-009: Extend parseParams to recognise the `:embed` modifier
+Date: 2026-05-07T14:30:00Z
+================================================================================
+
+Summary:
+Extended parseParams to return (map[string]any, []EmbedJob, error). Detects
+`key:modifier` by splitting on first `:` in the key portion (before `=`).
+Only `embed` is recognised; any other modifier returns a usage error. With
+`:embed`, JSON-typing is disabled (text passes through verbatim) — except a
+JSON array literal is rejected as a guardrail. Empty Text accepted. Multiple
+`--param NAME:embed=...` entries are collected in order. Errors now use
+clierr.NewUsageError directly, so run.go just returns err.
+
+Files Changed:
+- neo4j-cli/query/params.go (rewrote: new signature, helpers, EmbedJob type)
+- neo4j-cli/query/params_test.go (added embed/modifier cases; renamed want -> wantParams + wantEmbeds)
+- neo4j-cli/query/run.go (caller: 3-return tuple, no longer wraps with clierr)
+
+Key Decisions:
+- splitKeyModifier helper kept private — only one call site, but extracted
+  for readability and to make the "first `:` wins" rule explicit in code.
+- looksLikeJSONArray short-circuits on `[` prefix before attempting full
+  unmarshal — keeps the happy-path string check O(1) for non-array text.
+- Switched parseParams errors to clierr.NewUsageError (was fmt.Errorf with
+  caller wrapping in run.go). One-step is cleaner; usage-error semantics
+  are preserved at the entry point regardless.
+- EmbedJob exported (capital E) — task-010 in run.go and task-011 in
+  embed.go both consume it, so package-private isn't enough.
+- `:embed` value is appended verbatim including any `=` — `q:embed=a=b`
+  yields Text=`"a=b"`. Matches existing literal-param behaviour for `=`
+  in values.
+
+Next Task: task-010

@@ -55,9 +55,9 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 
 	rawParams, _ := cmd.Flags().GetStringArray("param")
-	params, err := parseParams(rawParams)
+	params, _, err := parseParams(rawParams)
 	if err != nil {
-		return clierr.NewUsageError("%s", err.Error())
+		return err
 	}
 
 	c, err := resolveConn(cmd, cfg)

@@ -228,7 +228,7 @@ tasks:
       Update `params_test.go` table to cover the new cases (`q:embed=hello`,
       `q:bogus=x`, `:embed=x`, `q:embed=`, `q:embed=[1,2,3]`, mixed
       embed + literal).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "parseParams signature is `(map[string]any, []EmbedJob, error)` and existing literal-param cases still pass."
@@ -236,7 +236,7 @@ tasks:
       - "Unknown modifier (`q:bogus=x`) and empty name (`:embed=x`) each return a usage error referencing the offending entry."
       - "`q:embed=[1,2,3]` returns the documented JSON-array rejection error."
       - "Multiple embed entries preserve command-line order in the EmbedJob slice."
-    completed_at: null
+    completed_at: 2026-05-07T14:30:00Z
 
   - id: task-010
     title: "Register `--embed-*` flags on `query` parent and wire embed resolution into runQuery"
