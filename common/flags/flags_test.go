@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package flags_test
+package flags
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -75,7 +74,7 @@ func TestRegisterAuraCredentialFlag_ActiveCredential(t *testing.T) {
 				Use:  "resource",
 				RunE: func(cmd *cobra.Command, args []string) error { return nil },
 			}
-			flags.RegisterAuraCredentialFlag(cmd, cfg)
+			RegisterAuraCredentialFlag(cmd, cfg)
 
 			err := executeWithArgs(t, "neo4j-cli", cmd, tc.args)
 			require.NoError(t, err)
@@ -117,7 +116,7 @@ func TestRegisterAuraCredentialFlag_CredentialNotFound(t *testing.T) {
 				Use:  "resource",
 				RunE: func(cmd *cobra.Command, args []string) error { return nil },
 			}
-			flags.RegisterAuraCredentialFlag(cmd, cfg)
+			RegisterAuraCredentialFlag(cmd, cfg)
 
 			err := executeWithArgs(t, tc.rootUse, cmd, []string{"resource", "--credential", "missing"})
 			require.Error(t, err)
@@ -165,7 +164,7 @@ func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
 				},
 				RunE: func(cmd *cobra.Command, args []string) error { return nil },
 			}
-			flags.RegisterAuraCredentialFlag(cmd, cfg)
+			RegisterAuraCredentialFlag(cmd, cfg)
 
 			err := executeWithArgs(t, "neo4j-cli", cmd, tc.args)
 
@@ -186,6 +185,8 @@ func TestRegisterAuraCredentialFlag_PriorHook(t *testing.T) {
 			}
 		})
 	}
+}
+
 func TestEnforceWriteGate(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

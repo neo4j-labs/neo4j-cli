@@ -80,11 +80,11 @@ func TestCancelImportJobWithCredentialFlag(t *testing.T) {
 	}{
 		{
 			name:    "--credential flag",
-			command: fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --credential named-cred", organizationId, projectId, jobId),
+			command: fmt.Sprintf("import job cancel --rw --organization-id=%s --project-id=%s %s --credential named-cred", organizationId, projectId, jobId),
 		},
 		{
 			name:    "-c shorthand",
-			command: fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s -c named-cred", organizationId, projectId, jobId),
+			command: fmt.Sprintf("import job cancel --rw --organization-id=%s --project-id=%s %s -c named-cred", organizationId, projectId, jobId),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
