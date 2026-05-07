@@ -125,7 +125,7 @@ tasks:
       table-driven precedence-matrix test using `testfs.GetTestFs` and a
       synthetic `*cobra.Command` with the persistent flags registered for
       tests only.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -135,7 +135,7 @@ tasks:
       - "Resolve returns a clear usage error when --embed-credential names a missing cred (points at `credential embed list`)."
       - "API-key resolution per provider: OPENAI_API_KEY beats NEO4J_EMBED_API_KEY beats stored APIKey for OpenAI; HF_TOKEN equivalent for HuggingFace; Ollama needs no key."
       - "Tests use testfs.GetTestFs (no afero.NewOsFs) and pass under `make test`."
-    completed_at: null
+    completed_at: 2026-05-07T13:00:00Z
 
   - id: task-006
     title: "Implement OpenAI embedding provider"

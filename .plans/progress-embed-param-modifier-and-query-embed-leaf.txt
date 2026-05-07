@@ -136,3 +136,48 @@ Key Decisions:
   soon as new flags/leaves are added.
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Add embed provider package skeleton (Provider, Config, Resolve, New, dbms-link helper)
+Date: 2026-05-07T13:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/query/embed/ package. Defined Provider interface (Embed),
+Config struct (Provider, Model, BaseURL, APIKey, Dimensions, UserAgent),
+package-private resolveSelectedDbmsCred helper, pickBaseEmbedCred (REQ-F-013
+step 4 + REQ-F-014 + REQ-F-027 stale-link error), Resolve (stored cred <
+.env < OS env < flags), provider-specific API-key precedence (per-provider
+env beats generic env beats stored), New() factory with not-implemented
+stubs for openai/ollama/huggingface (fleshed out in tasks 006-008), and a
+providerFactory test seam exposed via WithFactory for cross-package test
+injection.
+
+Files Changed:
+- neo4j-cli/query/embed/embed.go (created)
+- neo4j-cli/query/embed/embed_test.go (created)
+
+Key Decisions:
+- findDotenv duplicated rather than exported from query/connect.go to keep
+  the embed package free of cross-package internals (PRD says either is
+  acceptable; duplication is ~15 lines and matches the existing helper
+  exactly).
+- API-key resolution staged: stages = [dotenv, osEnv]; within each stage
+  generic key applies first then per-provider overrides. So provider-
+  specific env beats generic env beats provider-specific dotenv beats
+  generic dotenv beats stored. Matches the PRD-described chain.
+- providerFactory exposed via WithFactory(restoreFn) closure rather than
+  t.Cleanup so the helper stays test-framework-agnostic for future cross-
+  package tests in tasks 010/011.
+- Provider name constants (ProviderOpenAI/Ollama/HuggingFace) exported so
+  the cobra add.go validator and the runtime factory share one source of
+  truth.
+- New() returns not-implemented errors for known providers + an invalid-
+  provider usage error for unknown ones; an empty Provider returns the
+  "missing embed provider" usage error since that's the most likely case
+  during normal use (no --embed-provider set).
+- Test commands register the same five persistent flags (plus --credential)
+  the real query parent registers, then ParseFlags so cmd.Flag.Changed
+  semantics match production exactly.
+
+Next Task: task-006

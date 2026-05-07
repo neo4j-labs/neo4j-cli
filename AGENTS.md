@@ -204,6 +204,16 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, and local verification gotchas.
 
+## query/embed Package Notes
+
+- `neo4j-cli/query/embed/` owns the embedding provider abstraction: `Provider` interface, `Config`, `Resolve(cmd, cfg) (Config, error)`, `New(cfg) (Provider, error)`, and the `providerFactory = New` test seam exposed via `WithFactory(fn) func()` for cross-package test injection (run_test.go, embed leaf tests).
+- `findDotenv` is duplicated in the embed package rather than exported from `query/connect.go` to keep the embed package free of cross-package internals. ~15 lines, behaviour kept identical.
+- API-key precedence in `resolveAPIKey(provider, storedKey, dotenv)`: stages `[dotenv, osEnvSnapshot()]`; within each stage the generic key (`NEO4J_EMBED_API_KEY`) applies first, then a per-provider override (`OPENAI_API_KEY` / `HF_TOKEN`). Result: `OS-per-provider > OS-generic > dotenv-per-provider > dotenv-generic > stored`. Ollama is left untouched (no API key required) but still honours the generic key if set, since the runtime simply ignores it.
+- `pickBaseEmbedCred` returns `(*credentials.EmbedCredential, error)` — error carries usage-error semantics for missing `--embed-credential` (REQ-F-014) and stale dbms→embed link (REQ-F-027). Default-cred fallback swallows the "no default" error (returns nil, nil) since absence of a default is normal.
+- Validation lives in `New(cfg)`, NOT in `Resolve` — so the standalone `:embed` leaf can produce a clean usage error path with the resolved values in hand. Empty Provider returns a "missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored embed credential" usage error; unknown provider returns "invalid embed provider %q: must be one of openai, ollama, huggingface".
+- Tests register the same persistent flags the real `query` parent registers (`--credential`, `--embed-credential`, `--embed-provider`, `--embed-model`, `--embed-base-url`, `--embed-dimensions`) on a synthetic cobra.Command, then `cmd.ParseFlags(args)` so `cmd.Flag("x").Changed` semantics match production. Going through ParseFlags (not Execute) keeps the tests fast and avoids RunE wiring.
+- `t.TempDir()` returns a real-fs path; `withDotenvCwd(t, fs, body)` writes `<tmp>/.env` into the memfs (afero.WriteFile) and `t.Chdir(tmp)` so `os.Getwd()` returns the tmp path. `findDotenv(memfs, tmp)` then looks up the memfs at `<tmp>/.env` and finds it. The disk fs at `<tmp>/.env` is empty but irrelevant — embed.loadDotenv only consults `cfg.Aura.Fs()`.
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._
