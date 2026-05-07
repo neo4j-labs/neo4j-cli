@@ -27,20 +27,20 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# ── TLS — PowerShell 5.1 defaults to TLS 1.0; GitHub requires TLS 1.2+ ───────
+# -- TLS -- PowerShell 5.1 defaults to TLS 1.0; GitHub requires TLS 1.2+ ------
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# -- Constants ----------------------------------------------------------------
 $Repo       = "neo4j-labs/neo4j-cli"
 $BinaryName = "neo4j-cli.exe"
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-function Write-Step  { param($msg) Write-Host "▶  $msg" -ForegroundColor Cyan }
-function Write-Ok    { param($msg) Write-Host "✔  $msg" -ForegroundColor Green }
-function Write-Warn  { param($msg) Write-Host "⚠  $msg" -ForegroundColor Yellow }
-function Write-Fatal { param($msg) Write-Host "✖  $msg" -ForegroundColor Red; exit 1 }
+# -- Helpers ------------------------------------------------------------------
+function Write-Step  { param($msg) Write-Host "->  $msg"   -ForegroundColor Cyan }
+function Write-Ok    { param($msg) Write-Host "[OK] $msg"  -ForegroundColor Green }
+function Write-Warn  { param($msg) Write-Host "[!]  $msg"  -ForegroundColor Yellow }
+function Write-Fatal { param($msg) Write-Host "[X]  $msg"  -ForegroundColor Red; exit 1 }
 
-# ── Detect architecture ───────────────────────────────────────────────────────
+# -- Detect architecture ------------------------------------------------------
 function Get-Arch {
     switch ($Env:PROCESSOR_ARCHITECTURE) {
         "AMD64" { return "x86_64" }
@@ -50,11 +50,11 @@ function Get-Arch {
     }
 }
 
-# ── Resolve latest GitHub release version ────────────────────────────────────
+# -- Resolve latest GitHub release version ------------------------------------
 function Get-LatestVersion {
     Write-Step "Resolving latest release version..."
     $url = "https://github.com/$Repo/releases/latest"
-    # GitHub redirects /releases/latest → /releases/tag/vX.Y.Z
+    # GitHub redirects /releases/latest -> /releases/tag/vX.Y.Z
     $response = Invoke-WebRequest -Uri $url -MaximumRedirection 0 -UseBasicParsing -ErrorAction SilentlyContinue
     if ($response.StatusCode -eq 302) {
         $location = $response.Headers["Location"]
@@ -69,7 +69,7 @@ function Get-LatestVersion {
     Write-Fatal "Could not determine the latest release version. Set -Version explicitly."
 }
 
-# ── Verify SHA256 checksum ────────────────────────────────────────────────────
+# -- Verify SHA256 checksum ---------------------------------------------------
 function Test-Checksum {
     param(
         [string] $FilePath,
@@ -97,7 +97,7 @@ function Test-Checksum {
     Write-Ok "Checksum verified."
 }
 
-# ── Add directory to user PATH (persistent) ───────────────────────────────────
+# -- Add directory to user PATH (persistent) ----------------------------------
 function Add-ToUserPath {
     param([string] $Dir)
     $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
@@ -111,7 +111,7 @@ function Add-ToUserPath {
     Write-Warn "Restart your terminal (or run: `$Env:PATH += ';$Dir'`) to use it now."
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ---------------------------------------------------------------------
 
 $Arch = Get-Arch
 
@@ -130,12 +130,12 @@ Write-Host "  neo4j-cli installer" -ForegroundColor White
 Write-Host "  Version : $Version  |  Arch : $Arch" -ForegroundColor DarkGray
 Write-Host ""
 
-# ── Temporary working directory ───────────────────────────────────────────────
+# -- Temporary working directory ----------------------------------------------
 $TmpDir = Join-Path $Env:TEMP "neo4j-cli-install-$(New-Guid)"
 New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
 try {
-    # ── Download archive ──────────────────────────────────────────────────────
+    # -- Download archive -----------------------------------------------------
     $ArchivePath  = Join-Path $TmpDir $ArchiveName
     $ChecksumPath = Join-Path $TmpDir $ChecksumFile
 
@@ -145,11 +145,11 @@ try {
     Write-Step "Downloading checksums..."
     Invoke-WebRequest -Uri "$BaseUrl/$ChecksumFile" -OutFile $ChecksumPath -UseBasicParsing
 
-    # ── Verify checksum ───────────────────────────────────────────────────────
+    # -- Verify checksum ------------------------------------------------------
     Write-Step "Verifying SHA256 checksum..."
     Test-Checksum -FilePath $ArchivePath -ChecksumFile $ChecksumPath -ArchiveName $ArchiveName
 
-    # ── Extract ───────────────────────────────────────────────────────────────
+    # -- Extract --------------------------------------------------------------
     Write-Step "Extracting archive..."
     $ExtractDir = Join-Path $TmpDir "extracted"
     Expand-Archive -Path $ArchivePath -DestinationPath $ExtractDir -Force
@@ -162,7 +162,7 @@ try {
         Write-Fatal "Binary '$BinaryName' not found in the extracted archive."
     }
 
-    # ── Install ───────────────────────────────────────────────────────────────
+    # -- Install --------------------------------------------------------------
     if (-not (Test-Path $InstallDir)) {
         New-Item -ItemType Directory -Path $InstallDir | Out-Null
     }
@@ -170,12 +170,12 @@ try {
     $Destination = Join-Path $InstallDir $BinaryName
     Copy-Item -Path $ExtractedBinary.FullName -Destination $Destination -Force
 
-    Write-Ok "Installed → $Destination"
+    Write-Ok "Installed -> $Destination"
 
-    # ── Update PATH ───────────────────────────────────────────────────────────
+    # -- Update PATH ----------------------------------------------------------
     Add-ToUserPath -Dir $InstallDir
 
-    # ── Smoke test ────────────────────────────────────────────────────────────
+    # -- Smoke test -----------------------------------------------------------
     Write-Host ""
     try {
         & $Destination --version 2>$null
