@@ -12,7 +12,7 @@ tasks:
       Create a corresponding name_helpers_test.go with table-driven tests covering: no existing
       instances (returns Instance01), some names taken with gaps, contiguous names from Instance01
       upward, all two-digit names taken (rolls to Instance100), and case-insensitive matching.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "defaultInstanceName(nil) returns \"Instance01\""
@@ -20,7 +20,7 @@ tasks:
       - "defaultInstanceName with Instance01–Instance99 all taken returns \"Instance100\""
       - "Comparison is case-insensitive (instance01 blocks Instance01)"
       - "make test passes for the new test file"
-    completed_at: null
+    completed_at: "2026-05-07T00:00:00Z"
 
   - id: task-002
     title: "Make --name optional and wire default name generation into RunE"

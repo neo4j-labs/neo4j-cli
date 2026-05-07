@@ -1,0 +1,21 @@
+================================================================================
+TASK-001: Add defaultInstanceName helper and unit tests
+Date: 2026-05-07T00:00:00Z
+================================================================================
+
+Summary:
+Created the defaultInstanceName helper function and its table-driven unit tests
+in the instance subcommands package. The function selects the lowest available
+InstanceNN name (zero-padded to two digits for N=1-99, plain decimal for N>=100)
+using case-insensitive comparison against a list of existing names.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/name_helpers.go (created — contains defaultInstanceName function)
+- neo4j-cli/aura/internal/subcommands/instance/name_helpers_test.go (created — table-driven tests covering all acceptance criteria)
+
+Key Decisions:
+- Placed the helper in name_helpers.go alongside the existing credential_helpers.go, following the package convention.
+- Used an immediately-invoked function literal in the test table to build the 99-name slice for the "rolls to Instance100" case, keeping the test data inline.
+- All acceptance criteria verified: nil/empty input, gap detection, two-digit rollover, and case-insensitive matching.
+
+Next Task: task-002
