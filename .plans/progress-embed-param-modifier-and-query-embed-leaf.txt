@@ -95,3 +95,44 @@ Key Decisions:
   no embed link; on-the-wire `Printable` always emits the key.
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Wire dbms→embed link into cobra (`add --embed-credential`, `set-embed`, list column)
+Date: 2026-05-07T12:30:00Z
+================================================================================
+
+Summary:
+Added `--embed-credential` flag to `credential dbms add` (validates target
+exists in Embed.Get BEFORE Dbms.Add so a bad name never half-creates a cred).
+Added `credential dbms set-embed <dbms-name> [embed-name]` leaf that validates
+both dbms cred and embed cred existence then calls SetEmbed; one-arg form
+clears the link. Both leaves annotated `write: true`. Appended `embed-credential`
+column to `dbmsCredentialFields` in list.go. Regenerated skill bundle so
+`references/credential.md` reflects the new flag and leaf.
+
+Files Changed:
+- neo4j-cli/internal/subcommands/credential/dbms/add.go (modified: --embed-credential flag + pre-validation + post-Add SetEmbed)
+- neo4j-cli/internal/subcommands/credential/dbms/add_test.go (modified: helper now seeds embed section; new cases for valid/invalid --embed-credential; assertNoCredsAdd flag)
+- neo4j-cli/internal/subcommands/credential/dbms/dbms.go (modified: AddCommand for set-embed)
+- neo4j-cli/internal/subcommands/credential/dbms/list.go (modified: appended embed-credential to dbmsCredentialFields)
+- neo4j-cli/internal/subcommands/credential/dbms/list_test.go (modified: assert EMBED-CREDENTIAL column header + value)
+- neo4j-cli/internal/subcommands/credential/dbms/set_embed.go (created: cobra leaf with RangeArgs(1,2), validates both creds, calls SetEmbed)
+- neo4j-cli/internal/subcommands/credential/dbms/set_embed_test.go (created: write annotation check + table-driven set/clear/missing-dbms/missing-embed/arg-count cases)
+- neo4j-cli/internal/skill/bundle/references/credential.md (regenerated)
+
+Key Decisions:
+- add.go does Embed.Get pre-check then Dbms.Add then Dbms.SetEmbed — three
+  steps but keeps the Add signature unchanged (Add still takes the original
+  5 args; embed link is a separate persistence step). Alternative was to add
+  a 6th arg to Dbms.Add, but that would force Add to also know how to
+  validate embed creds, leaking cobra-level concerns into the storage layer.
+- set-embed errors phrase the resolution path in the message (`run \`credential
+  embed list\``) rather than relying on cobra's generic Usage output, since
+  the offending name comes from positional args and won't appear in help text.
+- assertNoCredsAdd boolean on the test struct beats name-string matching for
+  the "no half-creation" assertion — clearer + survives test renames.
+- Regenerated the skill bundle here even though task-012 plans the full
+  regen pass, because TestGenerator_RoundTrip otherwise fails the gate as
+  soon as new flags/leaves are added.
+
+Next Task: task-005

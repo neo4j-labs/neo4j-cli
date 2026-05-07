@@ -91,7 +91,7 @@ tasks:
       `cfg.Credentials.Dbms.SetEmbed(...)`. Mount via `dbms.go`
       `cmd.AddCommand(newSetEmbedCmd(cfg))`. Append `"embed-credential"`
       to `dbmsCredentialFields` in `list.go`. Add colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -101,7 +101,7 @@ tasks:
       - "`set-embed missing e` and `set-embed p missing` each return a clear usage error pointing at `credential embed list` / `credential dbms list`."
       - "`credential dbms list` always shows `embed-credential` column (empty string when unset)."
       - "All new leaves carry the Neo4j copyright header, are tested, and `set-embed` is annotated `write: true`."
-    completed_at: null
+    completed_at: 2026-05-07T12:30:00Z
 
   - id: task-005
     title: "Add embed provider package skeleton (Provider, Config, Resolve, New, dbms-link helper)"

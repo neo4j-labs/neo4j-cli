@@ -11,6 +11,7 @@
 - [neo4j-cli credential dbms add](#neo4j-cli-credential-dbms-add)
 - [neo4j-cli credential dbms list](#neo4j-cli-credential-dbms-list)
 - [neo4j-cli credential dbms remove](#neo4j-cli-credential-dbms-remove)
+- [neo4j-cli credential dbms set-embed](#neo4j-cli-credential-dbms-set-embed)
 - [neo4j-cli credential dbms use](#neo4j-cli-credential-dbms-use)
 - [neo4j-cli credential embed](#neo4j-cli-credential-embed)
 - [neo4j-cli credential embed add](#neo4j-cli-credential-embed-add)
@@ -77,6 +78,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--database-name` | string | neo4j | Database name |
+| `--embed-credential` | string | - | Name of an embed credential to link (must already exist; see `credential embed list`) |
 | `--name` | string | - | (required) Name |
 | `--password` | string | - | (required) Password |
 | `--uri` | string | - | (required) URI |
@@ -93,6 +95,14 @@ Usage: `neo4j-cli credential dbms list`
 Removes a dbms credential
 
 Usage: `neo4j-cli credential dbms remove <name>`
+
+### neo4j-cli credential dbms set-embed
+
+Links (or clears) an embed credential on a dbms credential
+
+Links a dbms credential to an embed credential by name. Pass only the dbms name to clear the link.
+
+Usage: `neo4j-cli credential dbms set-embed <dbms-name> [embed-name]`
 
 ### neo4j-cli credential dbms use
 

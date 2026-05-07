@@ -83,6 +83,7 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.Contains(t, out, "USERNAME")
 				assert.Contains(t, out, "DATABASE-NAME")
 				assert.Contains(t, out, "URI")
+				assert.Contains(t, out, "EMBED-CREDENTIAL")
 				assert.Contains(t, out, "DEFAULT")
 				assert.NotContains(t, out, "INSECURE")
 				assert.Contains(t, out, "mydb")
@@ -90,6 +91,19 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.Contains(t, out, "bolt://localhost:7687")
 				assert.NotContains(t, out, "secret")
 				assert.NotContains(t, out, "password")
+			},
+		},
+		{
+			name: "list as table includes embed-credential column when linked",
+			initialCreds: []map[string]interface{}{
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "embed-credential": "myembed"},
+			},
+			initialDefault: "mydb",
+			command:        "list --format table",
+			wantOut: func(t *testing.T, out string) {
+				t.Helper()
+				assert.Contains(t, out, "EMBED-CREDENTIAL")
+				assert.Contains(t, out, "myembed")
 			},
 		},
 		{
