@@ -180,6 +180,10 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					}
 				}
 
+				if noCredentialPrint {
+					delete(instance, "password")
+				}
+
 				fields := []string{"id", "name", "tenant_id", "connection_url", "username"}
 				if !noCredentialPrint {
 					fields = append(fields, "password")

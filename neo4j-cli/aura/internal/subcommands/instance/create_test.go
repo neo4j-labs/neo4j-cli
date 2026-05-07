@@ -586,3 +586,277 @@ func TestCreatePreRunERejectsNilDbms(t *testing.T) {
 	err = cmd.PreRunE(cmd, nil)
 	require.EqualError(t, err, `credential storage is not available; use --no-credential-storage to skip storing credentials locally`)
 }
+
+// createAPIResponse is the shared response body used across credential storage tests.
+const createAPIResponse = `{
+	"data": {
+		"id": "db1d1234",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"username": "neo4j",
+		"password": "letMeIn123!",
+		"tenant_id": "YOUR_TENANT_ID",
+		"cloud_provider": "gcp",
+		"region": "europe-west1",
+		"type": "free-db",
+		"name": "Instance01"
+	}
+}`
+
+func TestCreateDefaultCredentialStorage(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw")
+
+	helper.AssertErr("")
+
+	// Verify the credential was stored with the expected name.
+	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")
+	helper.AssertCredentialsValue("dbms.credentials.0.username", "neo4j")
+	helper.AssertCredentialsValue("dbms.credentials.0.uri", "YOUR_CONNECTION_URL")
+	helper.AssertCredentialsValue("dbms.credentials.0.database-name", "neo4j")
+
+	// credential_name must appear in JSON output.
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"password": "letMeIn123!",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateCollisionResolution(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	// Pre-populate a DBMS credential with the default name so the new create is forced
+	// to use the collision-resolved suffix "-1".
+	helper.SetCredentialsValue("dbms.credentials", []map[string]string{
+		{
+			"name":          "db1d1234-default",
+			"username":      "neo4j",
+			"password":      "old-pass",
+			"database-name": "neo4j",
+			"uri":           "old-url",
+		},
+	})
+	helper.SetCredentialsValue("dbms.default-credential", "db1d1234-default")
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw")
+
+	helper.AssertErr("")
+
+	// Collision resolved: stored as db1d1234-default-1 (not -default, which already exists).
+	helper.AssertCredentialsValue("dbms.credentials.1.name", "db1d1234-default-1")
+	helper.AssertCredentialsValue("dbms.credentials.1.username", "neo4j")
+
+	// Output must reflect the resolved name.
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default-1",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"password": "letMeIn123!",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateCustomCredentialName(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --credential-name myinstance --rw")
+
+	helper.AssertErr("")
+
+	// Stored with the custom name.
+	helper.AssertCredentialsValue("dbms.credentials.0.name", "myinstance")
+
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "myinstance",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"password": "letMeIn123!",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateCustomCredentialNameCollision(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	// Pre-populate with the custom name so collision handling kicks in.
+	helper.SetCredentialsValue("dbms.credentials", []map[string]string{
+		{
+			"name":          "myinstance",
+			"username":      "neo4j",
+			"password":      "old-pass",
+			"database-name": "neo4j",
+			"uri":           "old-url",
+		},
+	})
+	helper.SetCredentialsValue("dbms.default-credential", "myinstance")
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --credential-name myinstance --rw")
+
+	helper.AssertErr("")
+
+	// Stored as myinstance-1 because myinstance is taken.
+	helper.AssertCredentialsValue("dbms.credentials.1.name", "myinstance-1")
+
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "myinstance-1",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"password": "letMeIn123!",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateNoCredentialStorage(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw")
+
+	helper.AssertErr("")
+
+	// No DBMS credential must have been stored.
+	helper.AssertCredentialsValue("dbms.credentials", "[]")
+
+	// credential_name must be absent; password must be present.
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"password": "letMeIn123!",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateNoCredentialPrint(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --no-credential-print --rw")
+
+	helper.AssertErr("")
+
+	// Credential must still be stored.
+	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")
+
+	// password must be absent; credential_name must be present.
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateNoCredentialStorageAndNoPrint(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --no-credential-print --rw")
+
+	helper.AssertErr("")
+
+	// No credential stored.
+	helper.AssertCredentialsValue("dbms.credentials", "[]")
+
+	// Neither password nor credential_name in output.
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"id": "db1d1234",
+		"name": "Instance01",
+		"region": "europe-west1",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "free-db",
+		"username": "neo4j"
+	  }
+	}`)
+}
+
+func TestCreateCredentialStoredBeforeAwait(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, createAPIResponse)
+
+	helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
+		"data": {
+			"id": "db1d1234",
+			"status": "creating"
+		}
+	}`).AddResponse(http.StatusOK, `{
+		"data": {
+			"id": "db1d1234",
+			"status": "ready"
+		}
+	}`)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw")
+
+	helper.AssertErr("")
+
+	// Credential must be stored even though --await polling followed.
+	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")
+}
