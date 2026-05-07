@@ -238,7 +238,7 @@ Flags:
 | `--customer-managed-key-id` | string | - | An optional customer managed key to be used for instance creation. |
 | `--graph-analytics-plugin` | bool | false | An optional graph analytics plugin configuration to be set during instance creation |
 | `--memory` | memory | - | The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes. |
-| `--name` | string | - | (required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace). |
+| `--name` | string | - | The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01). |
 | `--no-credential-print` | bool | false | Omit the password from the command output. |
 | `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'tenant get' to see the full list of supported regions for your tenant. |

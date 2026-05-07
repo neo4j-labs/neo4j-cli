@@ -18,4 +18,29 @@ Key Decisions:
 - Used an immediately-invoked function literal in the test table to build the 99-name slice for the "rolls to Instance100" case, keeping the test data inline.
 - All acceptance criteria verified: nil/empty input, gap detection, two-digit rollover, and case-insensitive matching.
 
-Next Task: task-002
+Next Task: task-003
+
+================================================================================
+TASK-002: Make --name optional and wire default name generation into RunE
+Date: 2026-05-07T01:00:00Z
+================================================================================
+
+Summary:
+Made --name optional in the instance create command. When --name is omitted, the
+RunE now resolves the effective tenant ID first, then calls GET /instances?tenantId=...
+to fetch existing instance names, and passes them to defaultInstanceName() to generate
+the lowest available InstanceNN name. When --name is provided, no extra GET call is made.
+Skill bundles were regenerated (go generate) as a side effect to keep TestGenerator_RoundTrip green.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/create.go (modified — removed MarkFlagRequired(nameFlag), updated flag usage string, added default name resolution logic in RunE, refactored tenant ID resolution to a local variable used by both paths)
+- neo4j-cli/aura/internal/skill/bundle/ (modified — regenerated skill bundle after --name flag description change)
+- neo4j-cli/internal/skill/bundle/ (modified — regenerated skill bundle after --name flag description change)
+
+Key Decisions:
+- Tenant ID is now resolved into a `resolvedTenantId` local variable at the top of RunE so it can be reused for the list API call without duplication.
+- `cmd.SilenceUsage = true` is set before the list API call so usage is not printed on API errors during name resolution.
+- The body map is constructed with `tenant_id` set directly (no separate if/else block needed).
+- Skill bundles were regenerated in this task rather than waiting for task-004 because test suite gating required it.
+
+Next Task: task-003

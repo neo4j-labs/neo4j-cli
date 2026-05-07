@@ -125,18 +125,39 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve tenant ID before using it for default name generation.
+			resolvedTenantId := tenantId
+			if resolvedTenantId == "" {
+				resolvedTenantId = cfg.Aura.DefaultTenant()
+			}
+
+			// Auto-generate a default name when --name is omitted.
+			if name == "" {
+				cmd.SilenceUsage = true
+				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
+					Method:      http.MethodGet,
+					QueryParams: map[string]string{"tenantId": resolvedTenantId},
+				})
+				if listErr != nil {
+					return listErr
+				}
+				listData := api.ParseBody(listBody)
+				existingNames := make([]string, 0, len(listData.AsArray()))
+				for _, inst := range listData.AsArray() {
+					if n, ok := inst["name"].(string); ok {
+						existingNames = append(existingNames, n)
+					}
+				}
+				name = defaultInstanceName(existingNames)
+			}
+
 			body := map[string]any{
 				"version":        version,
 				"region":         region,
 				"name":           name,
 				"type":           _type,
 				"cloud_provider": cloudProvider,
-			}
-
-			if tenantId == "" {
-				body["tenant_id"] = cfg.Aura.DefaultTenant()
-			} else {
-				body["tenant_id"] = tenantId
+				"tenant_id":      resolvedTenantId,
 			}
 
 			if _type == "free-db" {
@@ -232,8 +253,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 
-	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace).")
-	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")
 
 	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

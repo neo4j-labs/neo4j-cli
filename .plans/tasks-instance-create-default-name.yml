@@ -32,7 +32,7 @@ tasks:
       the response with api.ParseBody, extract all instance names, and call defaultInstanceName
       to set name. Propagate any API error from the list call as-is (same pattern as the create
       error path).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "When --name is provided, no GET /instances request is made"
       - "A list API failure causes the command to exit non-zero with the propagated error message"
       - "The resolved name appears in the create request body and in the command output"
-    completed_at: null
+    completed_at: "2026-05-07T01:00:00Z"
 
   - id: task-003
     title: "Add integration tests for default name in create_test.go"
