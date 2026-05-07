@@ -1,0 +1,103 @@
+name: Publish to PyPI
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and smoke-test only, skip publish"
+        type: boolean
+        default: false
+  release:
+    types:
+      - released
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: stable
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.x"
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION=$(curl -shttps://github.com/neo4j-labs/neo4j-cli/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - run: pip install --require-hashes -r .github/workflows/requirements-build.txt
+      - name: Prepare main package for go-to-wheel
+        run: cp neo4j-cli/main.go main.go
+      - name: Build wheels with go-to-wheel
+        run: |
+          go-to-wheel . \
+            --name neo4j-cli \
+            --version $VERSION \
+            --description "Neo4j  CLI" \
+            --license GPL-3.0-only \
+            --url https://github.com/neo4j-labs/neo4j-cli/ \
+            --readme README.md \
+            --platforms linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64,windows-arm64 \
+            --set-version-var main.Version
+        env:
+          VERSION: ${{ steps.get-version.outputs.version }}
+      - name: Build reference linux-amd64 binary
+        env:
+          VERSION: ${{ steps.get-version.outputs.version }}
+          CGO_ENABLED: "0"
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.Version=$VERSION" -o /tmp/neo4j-cli-ref .
+      - name: Extract wheel binary
+        run: |
+          WHL=$(ls dist/*linux*x86_64*.whl | head -n1)
+          unzip -q "$WHL" -d /tmp/wheel_verify
+          cp /tmp/wheel_verify/neo4j_cli/bin/neo4j-cli /tmp/neo4j-cli-wheel
+      - name: Verify checksum matches go-to-wheel binary
+        run: |
+          REF_HASH=$(sha256sum /tmp/neo4j-cli-ref | awk '{print $1}')
+          WHEEL_HASH=$(sha256sum /tmp/neo4j-cli-wheel| awk '{print $1}')
+
+          if [ "$REF_HASH" != "$WHEEL_HASH" ]; then
+            echo "ERROR: Checksum mismatch!"
+            echo "  Reference: $REF_HASH"
+            echo "  Wheel:     $WHEEL_HASH"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: wheels
+          path: dist/
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: wheels
+          path: dist/
+      - name: Smoke test linux-amd64 binary
+        run: bash .github/scripts/smoke-test-wheel.sh "$VERSION"
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+  publish:
+    needs: smoke-test
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: wheels
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
