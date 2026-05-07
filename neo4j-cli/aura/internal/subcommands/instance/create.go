@@ -214,19 +214,19 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")
 
-	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted.")
+	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'tenant get' to see the full list of supported regions for your tenant.")
 
-	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory in GB.")
+	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace).")
 	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().Var(&_type, typeFlag, "(required) The type of the instance.")
+	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 
-	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, "The cloud provider hosting the instance.")
+	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)
 
 	cmd.Flags().StringVar(&customerManagedKeyId, customerManagedKeyIdFlag, "", "An optional customer managed key to be used for instance creation.")
 

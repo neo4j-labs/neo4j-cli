@@ -13,7 +13,7 @@ tasks:
       than the exhaustive set. `--region` should state that values are cloud-provider-specific
       identifiers (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP) and point
       to `tenant get` for the full list.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "--help shows --type usage as: '(required) The type of the instance. Must be one of \"free-db\", \"professional-db\", \"business-critical\", \"enterprise-db\", \"professional-ds\", or \"enterprise-ds\".'"
@@ -21,7 +21,7 @@ tasks:
       - "--help shows --memory usage with representative examples (e.g. 2GB, 8GB, 64GB) rather than an exhaustive list"
       - "--help shows --region usage string referencing cloud-provider naming conventions and pointing to tenant get"
       - "No change to flag parsing, validation logic, or error messages"
-    completed_at: null
+    completed_at: "2026-05-07T00:00:00Z"
 
   - id: task-002
     title: "Update Long description to surface tenant get discovery path"
