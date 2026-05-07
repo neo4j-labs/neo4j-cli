@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Fix `install-neo4j-cli.ps1` parse error on Windows PowerShell 5.1 by replacing UTF-8 glyph and box-drawing characters with ASCII equivalents; the BOM-less file was previously misread under the system ANSI codepage.'
+time: 2026-05-07T21:58:20+00:00
