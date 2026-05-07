@@ -334,7 +334,6 @@ func TestNew_NotImplementedStubs(t *testing.T) {
 		provider  string
 		wantErrIs string
 	}{
-		{"openai", ProviderOpenAI, "not implemented"},
 		{"ollama", ProviderOllama, "not implemented"},
 		{"huggingface", ProviderHuggingFace, "not implemented"},
 	}
@@ -347,6 +346,12 @@ func TestNew_NotImplementedStubs(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantErrIs)
 		})
 	}
+}
+
+func TestNew_OpenAIReturnsProvider(t *testing.T) {
+	p, err := New(Config{Provider: ProviderOpenAI})
+	require.NoError(t, err)
+	require.NotNil(t, p)
 }
 
 func TestNew_EmptyProviderUsageError(t *testing.T) {

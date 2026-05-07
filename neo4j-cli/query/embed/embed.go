@@ -357,7 +357,7 @@ func New(cfg Config) (Provider, error) {
 		return nil, clierr.NewUsageError(
 			"missing embed provider: set --embed-provider, NEO4J_EMBED_PROVIDER, or pick a stored embed credential")
 	case ProviderOpenAI:
-		return nil, fmt.Errorf("embed: openai provider not implemented")
+		return newOpenAIProvider(cfg), nil
 	case ProviderOllama:
 		return nil, fmt.Errorf("embed: ollama provider not implemented")
 	case ProviderHuggingFace:

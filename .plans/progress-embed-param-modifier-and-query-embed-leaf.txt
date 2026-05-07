@@ -181,3 +181,41 @@ Key Decisions:
   semantics match production exactly.
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Implement OpenAI embedding provider
+Date: 2026-05-07T11:54:50Z
+================================================================================
+
+Summary:
+Implemented `openAIProvider` in neo4j-cli/query/embed/openai.go: POST {BaseURL}/embeddings,
+bearer auth, dimensions pointer-omitempty so Config.Dimensions=0 drops the field, default
+BaseURL=https://api.openai.com/v1 applied at request time so a stored credential overrides
+cleanly. Wired New(Config) to construct it instead of returning the not-implemented stub.
+Errors: missing APIKey -> clierr usage error before any HTTP; non-2xx wraps "openai: HTTP
+<code>: <body-snippet (4KiB cap)>"; auth header value never echoed.
+
+Tests cover happy path with/without dimensions, missing key short-circuit (server fatals if
+hit), non-200 + auth-leak assertion, malformed body, empty data array, default-BaseURL via
+RoundTripper stub, and ctx cancellation.
+
+ctx-cancellation gotcha: httptest server-side r.Context().Done() did NOT unblock when the
+client cancelled — the handler hung until the 10-min go-test timeout. Root cause: server-side
+ctx propagation from a closed client conn is best-effort and timing-dependent in this Go
+version (1.26.2). Fixed by a 2s safety timeout in the handler's select and a 5s test-side
+select on errCh. The test still verifies the client-side err contains "context", which is
+what we actually want to assert.
+
+Files Changed:
+- neo4j-cli/query/embed/openai.go (new — provider impl)
+- neo4j-cli/query/embed/openai_test.go (new — 8 tests, 1 stub RoundTripper)
+- neo4j-cli/query/embed/embed.go (New() wires ProviderOpenAI to newOpenAIProvider)
+- neo4j-cli/query/embed/embed_test.go (TestNew_NotImplementedStubs minus openai; new TestNew_OpenAIReturnsProvider)
+
+Key Decisions:
+- Default BaseURL applied at request time (not in Resolve) so credential.BaseURL="" overrides cleanly.
+- Dimensions as *int with omitempty — OpenAI rejects an explicit `0` for models that ignore the field.
+- Body snippet capped at 4KiB for non-2xx error wrap to avoid spamming on misconfigured-proxy HTML.
+- Always add a server-side handler timeout when testing client-cancellation paths via httptest.
+
+Next Task: task-007 (Ollama provider)

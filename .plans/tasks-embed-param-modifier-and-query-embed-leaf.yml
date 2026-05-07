@@ -152,7 +152,7 @@ tasks:
       ctx-aware request). Tests use `httptest.NewServer` and cover happy
       path, missing key, non-200, malformed body, dimensions present/
       omitted, ctx cancellation.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -161,7 +161,7 @@ tasks:
       - "Missing APIKey returns the documented usage error before any HTTP call."
       - "Non-2xx responses surface the provider name + HTTP status; no Authorization header value leaks."
       - "Tests cover happy path, dimensions omit/include, missing key, non-200, malformed body, ctx-cancellation."
-    completed_at: null
+    completed_at: 2026-05-07T11:54:50Z
 
   - id: task-007
     title: "Implement Ollama embedding provider"
