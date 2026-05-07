@@ -219,3 +219,37 @@ Key Decisions:
 - Always add a server-side handler timeout when testing client-cancellation paths via httptest.
 
 Next Task: task-007 (Ollama provider)
+
+================================================================================
+TASK-007: Implement Ollama embedding provider
+Date: 2026-05-07T13:30:00Z
+================================================================================
+
+Summary:
+Implemented `ollamaProvider` in neo4j-cli/query/embed/ollama.go: POST {BaseURL}/api/embed
+with no auth header (Config.APIKey ignored intentionally), body `{model, input}` only —
+no `dimensions` field regardless of Config.Dimensions. Default BaseURL=http://localhost:11434
+applied at request time so a stored credential pointing at a remote Ollama host overrides
+cleanly. Wired New(Config) to construct it instead of returning the not-implemented stub.
+Errors: non-2xx wraps "ollama: HTTP <code>: <body-snippet (4KiB cap)>".
+
+Tests cover happy path, dimensions ignored, no-auth-header even with APIKey populated,
+non-2xx + body propagation, malformed body, empty embeddings array, ctx cancellation,
+default-BaseURL via captureRoundTripper stub.
+
+Files Changed:
+- neo4j-cli/query/embed/ollama.go (new — provider impl)
+- neo4j-cli/query/embed/ollama_test.go (new — 8 tests, reuses captureRoundTripper from openai_test.go)
+- neo4j-cli/query/embed/embed.go (New() wires ProviderOllama to newOllamaProvider)
+- neo4j-cli/query/embed/embed_test.go (TestNew_NotImplementedStubs minus ollama; new TestNew_OllamaReturnsProvider)
+
+Key Decisions:
+- Mirror openAIProvider structure exactly — same field names (cfg, client), same idioms
+  (4KiB body snippet cap, defer Close with nolint, default-BaseURL at request time).
+- Reuse the package-private captureRoundTripper from openai_test.go for the default-BaseURL
+  test rather than defining a parallel one — both files live in the same `package embed`.
+- Explicit assertion in TestOllama_Embed_NoAuthHeaderEvenWithAPIKey that Authorization is
+  empty even when Config.APIKey is set — guards against a future refactor that mistakenly
+  pulls in the OpenAI auth pattern.
+
+Next Task: task-008 (HuggingFace provider)

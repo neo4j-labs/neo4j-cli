@@ -359,7 +359,7 @@ func New(cfg Config) (Provider, error) {
 	case ProviderOpenAI:
 		return newOpenAIProvider(cfg), nil
 	case ProviderOllama:
-		return nil, fmt.Errorf("embed: ollama provider not implemented")
+		return newOllamaProvider(cfg), nil
 	case ProviderHuggingFace:
 		return nil, fmt.Errorf("embed: huggingface provider not implemented")
 	default:

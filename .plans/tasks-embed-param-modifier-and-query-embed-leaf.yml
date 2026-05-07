@@ -174,7 +174,7 @@ tasks:
       non-2xx with provider + status. Tests via `httptest.NewServer`
       cover happy path, non-200, malformed body, ctx cancellation, and
       verify dimensions is not sent.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -183,7 +183,7 @@ tasks:
       - "Request body never includes a `dimensions` field."
       - "Response shape `embeddings[0]` is parsed into []float32; non-2xx and malformed bodies error cleanly."
       - "Tests cover happy path, non-200, malformed body, ctx-cancellation."
-    completed_at: null
+    completed_at: 2026-05-07T13:30:00Z
 
   - id: task-008
     title: "Implement HuggingFace embedding provider (serverless + dedicated)"
