@@ -25,12 +25,12 @@ tasks:
       Create a new `.agents/cobra.md` file containing the content from the
       "Cobra Flag Access Notes" section of AGENTS.md (verbatim). Give the file
       a brief intro header so it is self-contained.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/cobra.md` exists and contains the full Cobra Flag Access Notes section verbatim"
       - "File has a top-level heading (e.g. `# Cobra Notes`)"
-    completed_at: null
+    completed_at: "2026-05-07T00:10:00Z"
 
   - id: task-003
     title: "Append Changie Workflow Notes, Release Workflow Notes, GoReleaser Notes to .agents/deployment.md"
@@ -38,7 +38,7 @@ tasks:
       Append the full content of "Changie Workflow Notes", "Release Workflow Notes",
       and "GoReleaser Notes" from AGENTS.md to the existing `.agents/deployment.md`
       file. Preserve section headings and all bullet content verbatim.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "`.agents/deployment.md` contains the full Changie Workflow Notes section"
@@ -53,7 +53,7 @@ tasks:
       Append the full content of the "common/output Testing Notes" section from
       AGENTS.md to the existing `.agents/testing.md` file. Preserve the section
       heading and all bullet content verbatim.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "`.agents/testing.md` contains the full common/output Testing Notes section verbatim"

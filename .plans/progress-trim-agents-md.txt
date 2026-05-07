@@ -21,3 +21,25 @@ Key Decisions:
 - No changes to Go source files; all feedback gates (test, fmt-check, lint) pass
 
 Next Task: task-002 (Create .agents/cobra.md with Cobra Flag Access Notes)
+
+================================================================================
+TASK-002: Create .agents/cobra.md with Cobra Flag Access Notes
+Date: 2026-05-07T00:10:00Z
+================================================================================
+
+Summary:
+Created .agents/cobra.md containing the "Cobra Flag Access Notes" section from
+AGENTS.md verbatim. Added a top-level intro heading and brief description to make
+the file self-contained.
+
+Files Changed:
+- .agents/cobra.md (created — contains Cobra Flag Access Notes from AGENTS.md)
+- .plans/tasks-trim-agents-md.yml (updated task-002 status to completed)
+- .plans/progress-trim-agents-md.txt (this file)
+
+Key Decisions:
+- Kept both bullet points 100% verbatim from AGENTS.md as required
+- Added a brief intro paragraph under the top-level heading for self-contained context
+- Documentation-only change; no Go feedback loops required
+
+Next Task: task-003
