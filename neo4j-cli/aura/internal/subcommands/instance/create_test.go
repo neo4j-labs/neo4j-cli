@@ -68,6 +68,7 @@ func TestCreateFreeInstance(t *testing.T) {
 	  "data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
@@ -108,6 +109,7 @@ func TestCreateProfessionalInstance(t *testing.T) {
 	  "data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
@@ -149,6 +151,7 @@ func TestCreateProfessionalInstanceVectorOptimizedGraphAnalyticsPlugin(t *testin
 	  "data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
@@ -380,6 +383,7 @@ func TestInstanceWithCmkId(t *testing.T) {
 	  "data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
@@ -421,6 +425,7 @@ func TestCreateFreeInstanceWithConfigTenantId(t *testing.T) {
 	  "data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
@@ -476,6 +481,7 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 	"data": {
 		"cloud_provider": "gcp",
 		"connection_url": "YOUR_CONNECTION_URL",
+		"credential_name": "db1d1234-default",
 		"id": "db1d1234",
 		"name": "Instance01",
 		"password": "letMeIn123!",
