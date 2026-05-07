@@ -37,3 +37,10 @@ test/utils/testfs/
 ## CI Matrix
 
 Tests run on `ubuntu-latest`, `windows-latest`, and `macos-latest` on every push/PR to `main`.
+
+## common/output Testing Notes
+
+- `common/output` has no pre-existing test files — new tests live in `common/output/output_test.go` using `package output` (not `output_test`) so they can access the `StdoutIsTerminal` seam directly.
+- Use `testfs.GetTestFs(`{"format":"toon"}`, "{}")` + `clicfg.NewConfig(fs, "test", clicfg.GlobalScope)` to build a config that returns "toon" from `cfg.Global.Format()`.
+- To assert toon encoding: check that `json.Unmarshal([]byte(out), &v)` returns an error — toon uses `key: value` syntax, not JSON, so valid toon is invalid JSON.
+- The json→any→toon round-trip in `printToon` honours custom `MarshalJSON` on the concrete `ResponseData` type. Test helpers that implement `MarshalJSON` (e.g. wrapping rows in `{"data": ...}`) let you verify the top-level envelope key appears in both toon and json output.

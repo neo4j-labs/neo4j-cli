@@ -53,12 +53,12 @@ tasks:
       Append the full content of the "common/output Testing Notes" section from
       AGENTS.md to the existing `.agents/testing.md` file. Preserve the section
       heading and all bullet content verbatim.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/testing.md` contains the full common/output Testing Notes section verbatim"
       - "Pre-existing content in `.agents/testing.md` is unchanged"
-    completed_at: null
+    completed_at: "2026-05-07T00:20:00Z"
 
   - id: task-005
     title: "Append toon-go Notes to .agents/architecture.md"

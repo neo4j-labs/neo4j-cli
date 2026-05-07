@@ -43,3 +43,24 @@ Key Decisions:
 - Documentation-only change; no Go feedback loops required
 
 Next Task: task-003
+
+================================================================================
+TASK-004: Append common/output Testing Notes to .agents/testing.md
+Date: 2026-05-07T00:20:00Z
+================================================================================
+
+Summary:
+Appended the "common/output Testing Notes" section from AGENTS.md to
+.agents/testing.md verbatim. The section heading and all four bullet points
+were preserved exactly as they appear in AGENTS.md. Pre-existing content
+in the file was not modified.
+
+Files Changed:
+- .agents/testing.md (modified — section appended)
+
+Key Decisions:
+- Appended with a blank line separator after the existing "CI Matrix" section
+- Documentation-only change; no Go feedback loops required
+- Section content matches AGENTS.md lines 286-291 exactly
+
+Next Task: task-005
