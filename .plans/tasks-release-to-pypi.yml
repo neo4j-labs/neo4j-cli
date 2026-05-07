@@ -50,7 +50,7 @@ tasks:
       the exact `go-to-wheel` invocation needed when fed pre-built
       per-platform binaries from `dist/` (the Open Question flagged in
       the PRD) and document the chosen shape inline in the workflow.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -63,7 +63,7 @@ tasks:
       - "Job permissions block includes `contents: read` AND `actions: read`; all actions are SHA-pinned with `# v<major>` trailing comments matching the repo convention."
       - "`pip install --require-hashes -r .github/workflows/requirements-build.txt` is preserved; no new long-lived secrets are introduced (only `PYPI_API_TOKEN` and `GITHUB_TOKEN`)."
       - "`actionlint` (or equivalent local YAML/workflow validation) reports no errors against the rewritten file."
-    completed_at: null
+    completed_at: 2026-05-07T12:30:00Z
 
   - id: task-003
     title: "Create distribution/pypi/README.md documenting the PyPI channel"

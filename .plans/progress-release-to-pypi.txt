@@ -32,3 +32,85 @@ Key Decisions:
   pre to alpha|beta|rc so the case statement covers all reachable cases.
 
 Next Task: task-002 (Rewrite publish-pypi.yml to trigger on release.yml + support recovery)
+
+================================================================================
+TASK-002: Rewrite publish-pypi.yml to trigger on release.yml + support recovery
+Date: 2026-05-07T12:30:00Z
+================================================================================
+
+Summary:
+Replaced the `release: types: [released]` trigger with `workflow_run`
+against the `release` workflow, and added a `workflow_dispatch` recovery
+path with `version` (required) + `dry_run` (default false) inputs.
+Mirrored publish-npm.yml's three-job shape (build / smoke-test / publish)
+and its cross-workflow artifact pull (release-meta.json + dist) gated on
+`include_neo4j == 'true'`. The manual path uses `gh release download`
+with `--pattern 'neo4j-cli_*'` to recreate the GoReleaser dist layout.
+
+Both paths converge on a single Resolve-versions step that calls
+`.github/scripts/version-to-pep440.sh` exactly once. The output is split
+into two values:
+  - `original_version` (e.g. 0.1.0-alpha.6) -> what the GoReleaser-built
+    binary's ldflags `Version` actually contains -> consumed by smoke
+    test's --version grep.
+  - `pep440_version` (e.g. 0.1.0a6) -> what stamps the wheel filename and
+    PyPI metadata.
+
+The reference linux-amd64 `go build`, sha256sum parity check, and
+`cp neo4j-cli/main.go main.go` shim are all removed: parity is now
+guaranteed by reusing the same GoReleaser dist artifact as npm and
+Homebrew. Since the `go-to-wheel` CLI ALWAYS cross-compiles from Go
+source (verified by reading the source at /Users/jgiffard/.local/pipx/
+venvs/go-to-wheel/lib/python3.13/site-packages/go_to_wheel/__init__.py),
+we bypass it and call `go_to_wheel.build_wheel()` directly via an
+inline Python heredoc — that helper accepts a `binary_path` argument
+and skips the compile step.
+
+Created `.github/workflows/requirements-build.txt` (the file the
+previous publish-pypi.yml referenced but didn't actually exist in the
+repo). Pinned `go-to-wheel==0.2` with sha256 hash for
+--require-hashes supply-chain safety per REQ-NF-004.
+
+Files Changed:
+- .github/workflows/publish-pypi.yml (rewritten end-to-end)
+- .github/workflows/requirements-build.txt (created; pins go-to-wheel)
+- .plans/tasks-release-to-pypi.yml (task-002 -> completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+- AGENTS.md (added Open Question resolution to PyPI distribution notes)
+
+Key Decisions:
+- Bypass go-to-wheel's CLI: the public `go-to-wheel` CLI lacks a
+  --binary-path flag; its argparse only accepts `go_dir` and always
+  cross-compiles. We import `go_to_wheel.build_wheel` (the underlying
+  library function) and feed it pre-built GoReleaser binaries directly.
+  Documented inline in the wheel-build step.
+- `permissions: contents: read` + `actions: read` at the workflow level
+  (matches publish-npm.yml). Per-job `permissions: {}` on smoke-test
+  and publish (same-run artifact downloads do not need additional
+  permissions in v4).
+- Build job emits THREE outputs: original_version, pep440_version,
+  include_neo4j. Smoke-test reads original_version (so the binary's
+  --version grep still matches the baked ldflag). Publish gates on
+  include_neo4j and on `!(workflow_dispatch && inputs.dry_run)`.
+- Versions step is gated on the same include_neo4j condition as the
+  rest of the build path, so a workflow_run with include_neo4j=false
+  skips cleanly without trying to PEP 440-normalise the unused version.
+- publish job uses `needs: [build, smoke-test]` (not just smoke-test)
+  so it can read `needs.build.outputs.include_neo4j` directly.
+- README content for PyPI long description is read at wheel-build time
+  from the repo root README.md (no separate copy/shim).
+- Used the same `actions/download-artifact@d3f86a10... # v4` SHA as
+  publish-npm.yml (was `# v8` in the previous publish-pypi.yml; both
+  resolve to v4 line).
+
+Validation:
+- `actionlint .github/workflows/publish-pypi.yml` reports only the same
+  shellcheck info/style warnings that publish-npm.yml has (SC2086,
+  SC2129) — no structural errors.
+- Python heredoc compiles cleanly (verified via PyYAML round-trip +
+  compile()).
+- `make test`, `make lint`, `make fmt-check` all pass (no Go-side
+  changes; gates verified clean).
+
+Next Task: task-003 (Create distribution/pypi/README.md)
+
