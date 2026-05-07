@@ -1,0 +1,124 @@
+feature: release-to-pypi
+prd: ./prd-release-to-pypi.md
+created_at: 2026-05-07T00:00:00Z
+updated_at: 2026-05-07T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add PEP 440 version normaliser shell script"
+    description: |
+      Create `.github/scripts/version-to-pep440.sh` that reads a single
+      argument (a version string, with or without a leading `v`) and prints
+      the PEP 440-normalised form to stdout. The script is the single shell
+      helper referenced by REQ-NF-002 and will be invoked by both the auto
+      and manual paths of the rewritten publish-pypi.yml. It MUST exit
+      non-zero with a clear error on any input that does not match the
+      contract in REQ-F-005, so the workflow fails before a wheel is built.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`.github/scripts/version-to-pep440.sh` exists, is executable (`chmod +x`), and starts with `#!/bin/bash` + `set -euo pipefail`."
+      - "`version-to-pep440.sh v1.2.3` prints `1.2.3`; `1.2.3` (no leading v) also prints `1.2.3`."
+      - "`v0.1.0-alpha.6` prints `0.1.0a6`; `v0.1.0-beta.6` prints `0.1.0b6`; `v0.1.0-rc.6` prints `0.1.0rc6`."
+      - "Inputs that do not match `^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpha|beta|rc)\\.[0-9]+)?$` (e.g. `v0.1.0-pre.6`, `v0.1.0.alpha.6`, empty string, `dev`) cause the script to exit non-zero with an error to stderr that names the offending input."
+      - "Script has zero non-bash dependencies (no python, no jq) so it can run on any GitHub-hosted ubuntu runner without extra setup."
+    completed_at: null
+
+  - id: task-002
+    title: "Rewrite publish-pypi.yml to trigger on release.yml + support recovery"
+    description: |
+      Rewrite `.github/workflows/publish-pypi.yml` to mirror the structure
+      of `.github/workflows/publish-npm.yml`. Replace the `release: types:
+      [released]` trigger with `workflow_run` against the `release`
+      workflow, and add a `workflow_dispatch` `version` input for manual
+      recovery (keeping the existing `dry_run` boolean). On the auto path,
+      consume the `release-meta` and `dist` artifacts uploaded by
+      release.yml, parse `release-meta.json` with `jq`, and gate
+      downstream steps on `include_neo4j == 'true'`. On the manual path,
+      rebuild the GoReleaser dist layout via `gh release download`. Both
+      paths feed their version into `version-to-pep440.sh` from task-001
+      and pass the normalised value to `go-to-wheel --version`, while the
+      Go ldflags `main.Version` value continues to use the original
+      (non-PEP 440) tag. Remove the inline reference-binary `go build` +
+      sha256 parity check and the `cp neo4j-cli/main.go main.go` shim,
+      since binary parity is now guaranteed by reusing the GoReleaser
+      dist artifact (same source as npm and Homebrew). Keep the
+      smoke-test job unchanged in shape and pass it the *original*
+      version string so the existing `--version` grep continues to match.
+      Add `actions: read` to the publish job's permissions block (needed
+      by the cross-workflow `actions/download-artifact` calls). Confirm
+      the exact `go-to-wheel` invocation needed when fed pre-built
+      per-platform binaries from `dist/` (the Open Question flagged in
+      the PRD) and document the chosen shape inline in the workflow.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`on:` block contains `workflow_run: workflows: [\"release\"], types: [completed]` and `workflow_dispatch` with both `version` (string, required) and `dry_run` (boolean, default false) inputs; the old `release: types: [released]` trigger is removed."
+      - "Job-level `if:` gates on `github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'`; per-step `include_neo4j == 'true'` gates are applied after `release-meta.json` is parsed."
+      - "Both auto and manual paths invoke `.github/scripts/version-to-pep440.sh` exactly once and write the normalised value into a step output that is consumed by the `go-to-wheel --version` flag."
+      - "The Go ldflags `main.Version` value passed to `go build` (or `go-to-wheel --set-version-var`) is the original GoReleaser tag, NOT the PEP 440 form; the smoke test job receives the same original tag via its `VERSION` env var."
+      - "The reference linux-amd64 `go build` step, the `sha256sum` parity check, and the `cp neo4j-cli/main.go main.go` shim are all removed — wheel binaries come exclusively from the reused GoReleaser dist artifact."
+      - "Manual recovery path uses `gh release download \"v${VERSION}\"` with the same `--pattern` and dist-layout reconstruction logic as `publish-npm.yml`."
+      - "Job permissions block includes `contents: read` AND `actions: read`; all actions are SHA-pinned with `# v<major>` trailing comments matching the repo convention."
+      - "`pip install --require-hashes -r .github/workflows/requirements-build.txt` is preserved; no new long-lived secrets are introduced (only `PYPI_API_TOKEN` and `GITHUB_TOKEN`)."
+      - "`actionlint` (or equivalent local YAML/workflow validation) reports no errors against the rewritten file."
+    completed_at: null
+
+  - id: task-003
+    title: "Create distribution/pypi/README.md documenting the PyPI channel"
+    description: |
+      Create the `distribution/pypi/` directory and add a `README.md`
+      that documents the PyPI distribution channel for maintainers.
+      Mirror the shape, headings, and tone of
+      `distribution/homebrew/README.md` and `distribution/npm/README.md`.
+      The README is documentation-only — there is no runtime code in
+      this directory, since the actual publication is handled by
+      `.github/workflows/publish-pypi.yml` and `go-to-wheel`. Include
+      every section listed in REQ-F-012: what this directory does,
+      end-user install commands (stable + `--pre` for alpha/beta/rc),
+      PyPI project URL and ownership notes, release cadence covering
+      both stable and prereleases, the PEP 440 version mapping table,
+      the six platform wheel filename suffixes published per release,
+      local dry-run instructions via `workflow_dispatch` with
+      `dry_run: true`, the manual recovery procedure via
+      `workflow_dispatch` with a `version` input, auth prerequisites
+      (`PYPI_API_TOKEN` today, OIDC trusted publishing as a flagged
+      follow-up), and a "See also" section linking to `RELEASING.md`,
+      `.github/workflows/publish-pypi.yml`, the npm README, and the
+      homebrew README.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`distribution/pypi/README.md` exists; the parent `distribution/pypi/` directory is created (lowercase `pypi/` to match `npm/` and `homebrew/` siblings)."
+      - "Top-level structure matches `distribution/homebrew/README.md`: opening one-line description, `## What this directory does`, `## User install`, project location/ownership section, `## Release cadence`, dry-run section, manual recovery section, `## Auth prerequisites`, `## See also`."
+      - "Includes a markdown table mapping at least four version shapes (`vX.Y.Z`, `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, `vX.Y.Z-rc.N`) to their PEP 440 forms, plus a worked example using a real recent tag from this repo (e.g. `v0.1.0-alpha.6` → `0.1.0a6`)."
+      - "Lists the six platform wheel filename suffixes published per release (linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64) with example wheel filenames showing the PEP 440 version slot."
+      - "Documents both end-user install commands: `pip install neo4j-cli` (stable) and `pip install --pre neo4j-cli` (prerelease) with a one-line explanation of why `--pre` is required for alpha/beta/rc."
+      - "Auth prerequisites section names `PYPI_API_TOKEN` as the current secret, links to `.github/workflows/publish-pypi.yml`, and flags OIDC trusted publishing as a tracked follow-up (out of scope for this PRD)."
+      - "`## See also` section contains relative-path links to `../../RELEASING.md`, `../../.github/workflows/publish-pypi.yml`, `../npm/README.md`, and `../homebrew/README.md`."
+      - "All file/path/URL references in the README use relative paths and resolve correctly when previewed on github.com."
+    completed_at: null
+
+  - id: task-004
+    title: "Cross-link new pypi README from npm and homebrew READMEs"
+    description: |
+      Add a relative-path link to `../pypi/README.md` from the
+      `## See also` (or equivalent) sections of
+      `distribution/npm/README.md` and `distribution/homebrew/README.md`,
+      so the three distribution channels reciprocally reference each
+      other. This is the second half of REQ-F-012's acceptance criterion
+      ("linked from the appropriate 'See also' sections in the sibling
+      READMEs"). Match the existing link style (relative paths,
+      one-line descriptions where the sibling READMEs use them) and do
+      not reorganise either file beyond the minimal addition needed.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`distribution/homebrew/README.md` `## See also` section contains a link to `../pypi/README.md` with a short description naming it as the PyPI channel."
+      - "`distribution/npm/README.md` has an equivalent link to `../pypi/README.md` in its 'See also' (or sibling-channel) section, matching that file's existing link style."
+      - "No other content in either README is reorganised, reworded, or otherwise touched — diff is limited to the new link line(s) and any minimal context needed for the addition to read naturally."
+      - "Both new links resolve correctly when the README is previewed on github.com (relative paths land on the file added in task-003)."
+    completed_at: null
