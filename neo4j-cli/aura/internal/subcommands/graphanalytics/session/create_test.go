@@ -32,7 +32,7 @@ func TestCreateAttachedSession(t *testing.T) {
   }
 }`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7")
+	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -80,7 +80,7 @@ func TestCreateStandAloneSession(t *testing.T) {
   }
 }`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --tenant-id YOUR_PROJECT_ID")
+	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --tenant-id YOUR_PROJECT_ID --rw")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -139,7 +139,7 @@ func TestCreateSessionWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --await")
+	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --await --rw")
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)

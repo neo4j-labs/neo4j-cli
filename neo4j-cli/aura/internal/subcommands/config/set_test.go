@@ -15,7 +15,7 @@ func TestSetConfig(t *testing.T) {
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config set auth-url test")
+	helper.ExecuteCommand("config set auth-url test --rw")
 
 	helper.AssertConfigValue("aura.auth-url", "test")
 }
@@ -26,7 +26,7 @@ func TestSetConfigWithInvalidConfigKey(t *testing.T) {
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config set invalid test")
+	helper.ExecuteCommand("config set invalid test --rw")
 
 	helper.AssertErr("Error: invalid config key specified: invalid")
 }
@@ -37,7 +37,7 @@ func TestSetConfigWithInvalidFormatValue(t *testing.T) {
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config set format invalid")
+	helper.ExecuteCommand("config set format invalid --rw")
 
 	// format is a valid global key; the error is about the invalid value, not the key
 	helper.AssertErr("Error: invalid value for 'format': invalid (valid values: default, json, table, toon)")
@@ -49,11 +49,11 @@ func TestSetBetaEnabledConfig(t *testing.T) {
 
 	helper.OverwriteConfig("{}")
 
-	helper.ExecuteCommand("config set beta-enabled true")
+	helper.ExecuteCommand("config set beta-enabled true --rw")
 
 	helper.AssertErr("Error: invalid config key specified: beta-enabled")
 
-	helper.ExecuteCommand("config set beta-enabled false")
+	helper.ExecuteCommand("config set beta-enabled false --rw")
 
 	helper.AssertErr("Error: invalid config key specified: beta-enabled")
 }

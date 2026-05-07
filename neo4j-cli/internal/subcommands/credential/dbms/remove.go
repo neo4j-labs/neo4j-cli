@@ -10,9 +10,10 @@ import (
 
 func newRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Removes a dbms credential",
-		Args:  cobra.ExactArgs(1),
+		Use:         "remove <name>",
+		Short:       "Removes a dbms credential",
+		Annotations: map[string]string{"write": "true"},
+		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Dbms.Remove(args[0])
 		},

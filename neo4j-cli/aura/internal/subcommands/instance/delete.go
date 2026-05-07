@@ -15,8 +15,9 @@ import (
 
 func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete <id>",
-		Short: "Deletes an instance",
+		Use:         "delete <id>",
+		Short:       "Deletes an instance",
+		Annotations: map[string]string{"write": "true"},
 		Long: `Starts the deletion process of an Aura instance.
 
 Deleting an instance is an asynchronous operation. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand.

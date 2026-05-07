@@ -29,8 +29,9 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "add <origin>",
-		Short: "Adds a new allowed origin to the CORS policy",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "add <origin>",
+		Short:       "Adds a new allowed origin to the CORS policy",
 		Long: `This command adds a new allowed origin to the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
 
 Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.

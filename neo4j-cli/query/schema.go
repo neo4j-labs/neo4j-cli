@@ -103,6 +103,11 @@ func runSchema(cmd *cobra.Command, cfg *clicfg.Config) error {
 
 	ctx := cmd.Context()
 
+	if err := c.openDriver(); err != nil {
+		return err
+	}
+	defer c.driver.Close(ctx) //nolint:errcheck // driver close error not actionable in defer
+
 	nodes, err := fetchNodeProperties(ctx, c)
 	if err != nil {
 		return err

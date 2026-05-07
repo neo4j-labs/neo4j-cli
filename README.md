@@ -61,7 +61,7 @@ Help for each command is accessed by using it without any flags or options. For 
 
 ## Querying Neo4j
 
-`neo4j-cli query` runs Cypher against any Neo4j database via the HTTP Query API. Cypher comes from the positional argument or piped stdin.
+`neo4j-cli query` runs Cypher against any Neo4j database via the Bolt protocol. Cypher comes from the positional argument or piped stdin.
 
 ```bash
 ./neo4j-cli query 'RETURN 1 AS n'
@@ -70,14 +70,14 @@ echo 'MATCH (n) RETURN count(n)' | ./neo4j-cli query
 
 Connection settings are resolved with this precedence (highest first): flag → env var → `.env` file (auto-discovered by walking up from cwd) → built-in default.
 
-| Setting  | Flag         | Env var          | Default                 |
-| -------- | ------------ | ---------------- | ----------------------- |
-| URI      | `--uri`      | `NEO4J_URI`      | `http://localhost:7474` |
-| Username | `--username` | `NEO4J_USERNAME` | `neo4j`                 |
-| Password | `--password` | `NEO4J_PASSWORD` | prompted on TTY         |
-| Database | `--database` | `NEO4J_DATABASE` | `neo4j`                 |
+| Setting  | Flag         | Env var          | Default                   |
+| -------- | ------------ | ---------------- | ------------------------- |
+| URI      | `--uri`      | `NEO4J_URI`      | `neo4j://localhost:7687`  |
+| Username | `--username` | `NEO4J_USERNAME` | `neo4j`                   |
+| Password | `--password` | `NEO4J_PASSWORD` | prompted on TTY           |
+| Database | `--database` | `NEO4J_DATABASE` | `neo4j`                   |
 
-Bolt-family URIs (`bolt://`, `neo4j://`, `neo4j+s://`, …) are auto-rewritten to `http(s)://` and Aura hosts (`*.neo4j.io`) are forced to `https://<host>:443`.
+`http://` and `https://` URIs are auto-rewritten to `neo4j://<host>:7687` and `neo4j+s://<host>:7687` respectively (path/query stripped). For self-signed certs use `neo4j+ssc://`.
 
 Pass parameters with `--param key=value` (repeatable). Values that parse as JSON are typed; everything else is a string:
 
@@ -95,7 +95,15 @@ Schema introspection:
 ./neo4j-cli query :schema
 ```
 
-Use `--insecure` to skip TLS verification for self-signed dev setups.
+## Write operations
+
+Write commands require `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
+
+```bash
+./neo4j-cli aura instance delete <id> --rw
+./neo4j-cli config set telemetry false --rw
+./neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
+```
 
 ## Agent skills
 

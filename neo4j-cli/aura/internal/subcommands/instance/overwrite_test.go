@@ -32,7 +32,7 @@ func TestOverwriteFromInstance(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s", instanceId, sourceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --rw", instanceId, sourceId))
 	postMock.AssertCalledTimes(1)
 	postMock.AssertCalledWithBody(`{
 		"source_instance_id": "191b0da2"
@@ -75,7 +75,7 @@ func TestOverwriteFromSnapshot(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --source-snapshot-id %s", instanceId, sourceId, snapshotId))
+	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --source-snapshot-id %s --rw", instanceId, sourceId, snapshotId))
 
 	postMock.AssertCalledTimes(1)
 	postMock.AssertCalledWithBody(`{
@@ -130,7 +130,7 @@ func TestOverwriteWithAwait(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --await", instanceId, sourceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --await --rw", instanceId, sourceId))
 
 	postMock.AssertCalledTimes(1)
 	postMock.AssertCalledWithBody(`{

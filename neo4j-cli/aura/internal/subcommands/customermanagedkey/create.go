@@ -36,8 +36,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Creates a new customer managed key",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Creates a new customer managed key",
 		Long: `This subcommand creates a new Customer Managed Key in Aura. Creating a new key is an asynchronous operation.
 
 Before you can use the key you will need to setup permissions for it. Log in to the Console, navigate to 'Customer Managed Keys' and click on the Edit icon next to the Key in order to see the instructions.

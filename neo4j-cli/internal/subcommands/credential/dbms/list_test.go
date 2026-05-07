@@ -31,7 +31,7 @@ func TestDbmsCredentialList(t *testing.T) {
 		{
 			name: "single credential listed as JSON",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
 			},
 			initialDefault: "mydb",
 			command:        "list --format json",
@@ -44,13 +44,14 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.Contains(t, out, `"default": true`)
 				assert.NotContains(t, out, "secret")
 				assert.NotContains(t, out, "password")
+				assert.NotContains(t, out, "insecure")
 			},
 		},
 		{
 			name: "multiple credentials listed as JSON with correct default",
 			initialCreds: []map[string]interface{}{
-				{"name": "first", "username": "neo4j", "password": "secret1", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
-				{"name": "second", "username": "admin", "password": "secret2", "database-name": "mydb", "uri": "neo4j://remotehost:7687", "insecure": true},
+				{"name": "first", "username": "neo4j", "password": "secret1", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+				{"name": "second", "username": "admin", "password": "secret2", "database-name": "mydb", "uri": "neo4j://remotehost:7687"},
 			},
 			initialDefault: "second",
 			command:        "list --format json",
@@ -66,12 +67,13 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.NotContains(t, out, "secret1")
 				assert.NotContains(t, out, "secret2")
 				assert.NotContains(t, out, "password")
+				assert.NotContains(t, out, "insecure")
 			},
 		},
 		{
 			name: "list as table shows correct columns",
 			initialCreds: []map[string]interface{}{
-				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687", "insecure": false},
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
 			},
 			initialDefault: "mydb",
 			command:        "list --format table",
@@ -81,8 +83,8 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.Contains(t, out, "USERNAME")
 				assert.Contains(t, out, "DATABASE-NAME")
 				assert.Contains(t, out, "URI")
-				assert.Contains(t, out, "INSECURE")
 				assert.Contains(t, out, "DEFAULT")
+				assert.NotContains(t, out, "INSECURE")
 				assert.Contains(t, out, "mydb")
 				assert.Contains(t, out, "neo4j")
 				assert.Contains(t, out, "bolt://localhost:7687")

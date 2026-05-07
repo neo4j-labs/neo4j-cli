@@ -2,7 +2,7 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package query implements the `neo4j-cli query` command tree, which executes
-// Cypher against a Neo4j database via the HTTP Query API.
+// Cypher against a Neo4j database via the Bolt protocol.
 package query
 
 import (
@@ -18,9 +18,9 @@ import (
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query [cypher]",
-		Short: "Run Cypher against a Neo4j database via the HTTP Query API",
-		Long: "Run a Cypher statement against a Neo4j database via the HTTP " +
-			"Query API. Cypher is taken from the positional argument, or from " +
+		Short: "Run Cypher against a Neo4j database via the Bolt protocol",
+		Long: "Run a Cypher statement against a Neo4j database via the Bolt " +
+			"protocol. Cypher is taken from the positional argument, or from " +
 			"stdin when no argument is provided and stdin is piped.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -28,7 +28,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().String("uri", "", "Neo4j HTTP Query API base URI [env: NEO4J_URI]. Bolt URIs (bolt://, neo4j://, neo4j+s://) are auto-rewritten to http(s)://. Aura hosts (*.neo4j.io) are always rewritten to https://<host> (port 443). (default \"http://localhost:7474\")")
+	cmd.PersistentFlags().String("uri", "", "Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default \"neo4j://localhost:7687\")")
 	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username [env: NEO4J_USERNAME] (default \"neo4j\")")
 	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset")
 	cmd.PersistentFlags().StringP("database", "d", "", "Target database name [env: NEO4J_DATABASE] (default \"neo4j\")")

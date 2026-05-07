@@ -16,8 +16,9 @@ import (
 
 func newInstallCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "install [agent]",
-		Short: "Install the skill bundle into supported AI agents",
+		Use:         "install [agent]",
+		Short:       "Install the skill bundle into supported AI agents",
+		Annotations: map[string]string{"write": "true"},
 		Long: "Without an argument, installs into every detected agent. " +
 			"With an [agent] argument (case-insensitive), installs into that " +
 			"single agent. Unknown agent names exit non-zero with the list " +

@@ -27,7 +27,7 @@ func TestUpdateDeploymentToken(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
@@ -57,7 +57,7 @@ func TestUpdateDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
-	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s", deploymentId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --rw", deploymentId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
@@ -84,7 +84,7 @@ func TestUpdateDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("format", "json")
-	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s", deploymentId, organizationId, projectId))
+	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)

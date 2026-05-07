@@ -35,8 +35,9 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "update <id>",
-		Short: "Edit a GraphQL Data API",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "update <id>",
+		Short:       "Edit a GraphQL Data API",
 		Long: `This endpoint edits a specific GraphQL Data API.
 		
 Updating a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.`,

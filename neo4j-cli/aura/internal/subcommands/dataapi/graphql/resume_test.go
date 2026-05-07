@@ -28,7 +28,7 @@ func TestResumeGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql resume --format json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql resume --format json --instance-id %s %s --rw", instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)

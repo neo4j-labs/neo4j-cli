@@ -20,8 +20,9 @@ func NewPauseCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "pause <id>",
-		Short: "Pause a GraphQL Data API",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "pause <id>",
+		Short:       "Pause a GraphQL Data API",
 		Long: `This command starts the pausing process of an existing GraphQL Data API.
 
 Pausing a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be paused. The GraphQL Data API will only be paused once the status transitions from "pausing" to "paused".`,

@@ -17,7 +17,7 @@ func TestRemoveProject(t *testing.T) {
 	helper.SetConfigValue("aura.beta-enabled", true)
 	helper.SetConfigValue("aura-projects.projects", map[string]*projects.AuraProject{"test": {OrganizationId: "testorganizationid", ProjectId: "testprojectid"}})
 
-	helper.ExecuteCommand("config project remove test")
+	helper.ExecuteCommand("config project remove test --rw")
 
 	helper.AssertConfigValue("aura-projects.projects", "{}")
 	helper.AssertConfigValue("aura-projects.default", "")
@@ -29,7 +29,7 @@ func TestRemoveProjectWhenProjectDoesNotExist(t *testing.T) {
 
 	helper.SetConfigValue("aura.beta-enabled", true)
 
-	helper.ExecuteCommand("config project remove test")
+	helper.ExecuteCommand("config project remove test --rw")
 
 	helper.AssertErr("Error: could not find a project with the name test to remove")
 }
@@ -45,7 +45,7 @@ func TestRemoveProjectWhenMultipleProjectsExist(t *testing.T) {
 	})
 	helper.SetConfigValue("aura-projects.default", "first-project")
 
-	helper.ExecuteCommand("config project remove first-project")
+	helper.ExecuteCommand("config project remove first-project --rw")
 
 	helper.AssertConfigValue("aura-projects.projects", `
 	{
@@ -68,7 +68,7 @@ func TestRemoveProjectWhenProjectDoesNotExistWithMultipleProjects(t *testing.T) 
 	})
 	helper.SetConfigValue("aura-projects.default", "first-project")
 
-	helper.ExecuteCommand("config project remove non-existing")
+	helper.ExecuteCommand("config project remove non-existing --rw")
 
 	helper.AssertErr("Error: could not find a project with the name non-existing to remove")
 	helper.AssertConfigValue("aura-projects.projects", `

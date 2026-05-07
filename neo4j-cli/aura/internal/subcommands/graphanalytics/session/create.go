@@ -36,8 +36,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Creates a new Aura Graph Analytics Serverless session",
+		Annotations: map[string]string{"write": "true"},
+		Use:         "create",
+		Short:       "Creates a new Aura Graph Analytics Serverless session",
 		Long: `This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
 				Creating a session is an asynchronous operation that can be awaited with --await.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
