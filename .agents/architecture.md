@@ -53,3 +53,10 @@ common/
 - Project-level configuration
 
 Config file location is OS-specific (handled by `common/clicfg/darwin.go`, `linux.go`, `windows.go`).
+
+## toon-go Notes
+
+- Module: `github.com/toon-format/toon-go` — imported as `toon "github.com/toon-format/toon-go"` in Go source
+- Key API: `toon.Marshal(v any, opts ...toon.EncoderOption) ([]byte, error)` and `toon.WithLengthMarkers(bool) toon.EncoderOption`
+- `printToon` in `common/output/output.go` uses a JSON round-trip (marshal → unmarshal to `any` → toon.Marshal) to honour custom MarshalJSON implementations on concrete ResponseData types before encoding to TOON
+- `go mod tidy` promotes toon-go from `// indirect` to a direct dependency automatically once the import is added

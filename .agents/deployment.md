@@ -75,3 +75,21 @@ GoReleaser's auto-changelog generation is disabled (`changelog: disable: true` i
 ## npm Publication (`publish-npm.yml`)
 
 After `release.yml` succeeds, `.github/workflows/publish-npm.yml` fires via `workflow_run`. It downloads the `dist/` artifact + `release-meta.json` uploaded by `release.yml`, gates on `include_neo4j == 'true'` (aura-cli-only releases skip), and runs `distribution/npm/publish.sh` which publishes 8 platform packages then the `@neo4j-labs/cli` wrapper. Same workflow has a `workflow_dispatch` trigger for manual recovery — pulls binaries from the existing GitHub Release rather than re-running GoReleaser. See `distribution/npm/README.md` for npm specifics.
+
+## Release Workflow Notes
+
+- Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)
+- Env vars set in an earlier step that need to flow into the GoReleaser action's `env:` block must be re-referenced as `${{ env.<NAME> }}` — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
+- The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
+- Job-level `outputs:` block surfaces step outputs to downstream `workflow_run` consumers. To expose a step output, the step needs an `id:` and must `echo "key=val" >> $GITHUB_OUTPUT` — then reference as `${{ steps.<id>.outputs.<key> }}` in the job `outputs:` block. Output is always populated (downstream gates on the value, not whether it was set).
+- npm Trusted Publishers (OIDC) auth in `publish-npm.yml`: requires `permissions: id-token: write`, `actions/setup-node` with `registry-url`, and Node ≥ 20 (npm ≥ 11.5.1). setup-node writes a placeholder `~/.npmrc`; npm swaps in a short-lived OIDC token at publish time — no NPM_TOKEN secret needed. publish.sh stays auth-agnostic. Re-enabling the disabled `workflow_run` trigger requires re-adding `actions: read` to `permissions:` for cross-workflow `actions/download-artifact`.
+- Cross-repo write from `release.yml` (e.g. push Homebrew formula to `neo4j-labs/homebrew-tap`) uses the GitHub App pattern via `actions/create-github-app-token` (SHA-pinned, `# v<major>`). Inputs: `app-id` + `private-key` from secrets, `owner` + `repositories` to scope the installation token. Output `steps.<id>.outputs.token` is plumbed into the consumer step's `env:` block — no long-lived PAT, token is per-run.
+
+## GoReleaser Notes
+
+- GoReleaser v2 deprecates `archives.format` (string) — use `archives.formats` (list)
+- GoReleaser v2 deprecates `format_overrides.format` — use `format_overrides.formats`
+- Each `archives` entry must have a unique `id`; omitting it defaults to `"default"` and causes errors if a second archive block is ever added. The current config has one `neo4j-cli` archive entry; adding another (e.g., a future second binary) requires giving each a unique `id` and `ids:` filter.
+- `-X "<importpath>.Version=..."` ldflag must match the actual package path of the Version var. The current ldflag points at `github.com/neo4j/cli/neo4j-cli/app.Version` — if you move Version to a different package, update the ldflag to match; a stale path silently no-ops and ships `dev`.
+- `make snapshot` runs `goreleaser build --snapshot --single-target` which does NOT exercise the `brews:` step. To verify brew formula generation locally use `goreleaser release --snapshot --clean --skip=publish,sign,notarize` with `HOMEBREW_TAP_GITHUB_TOKEN=<anything>` set (the env var is referenced via template; value can be a stub for snapshot since `--skip=publish` short-circuits the push). Output appears at `dist/homebrew/Formula/neo4j-cli.rb`.
+- `goreleaser release --snapshot` (unlike `goreleaser build --snapshot`) still resolves `{{.Env.GORELEASER_CURRENT_TAG}}` in the build's ldflags, so a local invocation must export `GORELEASER_CURRENT_TAG=dev` (or any value) in addition to `HOMEBREW_TAP_GITHUB_TOKEN`. Without it the run fails at build time with `map has no entry for key "GORELEASER_CURRENT_TAG"`. The `make snapshot` recipe wires this implicitly (`GORELEASER_CURRENT_TAG=dev goreleaser build ...`); a manual `goreleaser release` call must set it explicitly. CI sets it via `${{ github.ref_name }}` and is unaffected.

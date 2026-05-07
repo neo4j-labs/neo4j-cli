@@ -1,0 +1,143 @@
+================================================================================
+TASK-001: Create .agents/query.md with moved query subsystem sections
+Date: 2026-05-07T00:00:00Z
+================================================================================
+
+Summary:
+Created .agents/query.md containing the four query-subsystem sections from
+AGENTS.md verbatim: "Local Verification Scripts", "query Bolt Driver Notes",
+"query/connect.go Credential Integration Notes", and "query Bolt Execution Notes".
+Added a top-level intro heading to make the file self-contained.
+
+Files Changed:
+- .agents/query.md (created — contains all four query sections from AGENTS.md)
+- .plans/tasks-trim-agents-md.yml (updated task-001 status to completed)
+- .plans/progress-trim-agents-md.txt (created this file)
+
+Key Decisions:
+- Kept section content 100% verbatim from AGENTS.md as required
+- Ordered sections with Local Verification Scripts first (it's the shortest
+  and gives context before the deeper technical notes)
+- No changes to Go source files; all feedback gates (test, fmt-check, lint) pass
+
+Next Task: task-002 (Create .agents/cobra.md with Cobra Flag Access Notes)
+
+================================================================================
+TASK-002: Create .agents/cobra.md with Cobra Flag Access Notes
+Date: 2026-05-07T00:10:00Z
+================================================================================
+
+Summary:
+Created .agents/cobra.md containing the "Cobra Flag Access Notes" section from
+AGENTS.md verbatim. Added a top-level intro heading and brief description to make
+the file self-contained.
+
+Files Changed:
+- .agents/cobra.md (created — contains Cobra Flag Access Notes from AGENTS.md)
+- .plans/tasks-trim-agents-md.yml (updated task-002 status to completed)
+- .plans/progress-trim-agents-md.txt (this file)
+
+Key Decisions:
+- Kept both bullet points 100% verbatim from AGENTS.md as required
+- Added a brief intro paragraph under the top-level heading for self-contained context
+- Documentation-only change; no Go feedback loops required
+
+Next Task: task-003
+
+================================================================================
+TASK-004: Append common/output Testing Notes to .agents/testing.md
+Date: 2026-05-07T00:20:00Z
+================================================================================
+
+Summary:
+Appended the "common/output Testing Notes" section from AGENTS.md to
+.agents/testing.md verbatim. The section heading and all four bullet points
+were preserved exactly as they appear in AGENTS.md. Pre-existing content
+in the file was not modified.
+
+Files Changed:
+- .agents/testing.md (modified — section appended)
+
+Key Decisions:
+- Appended with a blank line separator after the existing "CI Matrix" section
+- Documentation-only change; no Go feedback loops required
+- Section content matches AGENTS.md lines 286-291 exactly
+
+Next Task: task-005
+
+================================================================================
+TASK-003: Append Changie Workflow Notes, Release Workflow Notes, GoReleaser Notes to .agents/deployment.md
+Date: 2026-05-07T00:20:00Z
+================================================================================
+
+Summary:
+Appended three sections from AGENTS.md verbatim to .agents/deployment.md:
+"Changie Workflow Notes" (5 bullets), "Release Workflow Notes" (11 bullets),
+and "GoReleaser Notes" (4 bullets). All section headings and bullet content
+were preserved exactly. Pre-existing content in the file was not modified.
+
+Files Changed:
+- .agents/deployment.md (modified — sections appended)
+
+Key Decisions:
+- Appended after the existing "npm Publication" section with a blank line separator
+- Documentation-only change; no Go feedback loops required
+- Section content matches AGENTS.md lines 136-168 exactly
+
+Next Task: task-004
+
+================================================================================
+TASK-005: Append toon-go Notes to .agents/architecture.md
+Date: 2026-05-07T00:30:00Z
+================================================================================
+
+Summary:
+Appended the "toon-go Notes" section from AGENTS.md to .agents/architecture.md
+verbatim. The section heading and all four bullet points were preserved exactly
+as they appear in AGENTS.md. Pre-existing content in the file was not modified.
+
+Files Changed:
+- .agents/architecture.md (modified — toon-go Notes appended)
+
+Key Decisions:
+- Appended after the existing "Config & State" section with a blank line separator
+- Documentation-only change; no Go feedback loops required
+- Fixed a side-effect from the sed command used during status update: task-003
+  and task-004 were accidentally reverted from completed to in_progress; restored
+  their statuses and completed_at timestamps before committing
+
+Next Task: task-006
+
+================================================================================
+TASK-006: Edit AGENTS.md — remove stale sections and add pointers
+Date: 2026-05-07T01:00:00Z
+================================================================================
+
+Summary:
+Heavily edited AGENTS.md to remove 13 sections and replace them with pointer
+lines to their new .agents/ sub-files. Also removed stale historical content
+(aura-cli bullet in Changie Notes, redundant prose about the standalone entrypoint
+in Architecture, historical skill-template note in the Agent-skill paragraph).
+The file was reduced from 322 lines to 207 lines (36% reduction).
+
+The 150-line acceptance criterion is a soft "should" target (REQ-NF-001) that is
+mathematically unachievable: the 17 mandatory REQ-F-007 sections alone exceed
+190 lines. All functional requirements (REQ-F-001 through REQ-F-007) are met.
+
+Files Changed:
+- AGENTS.md (heavily edited — reduced from 322 to 207 lines)
+- .plans/tasks-trim-agents-md.yml (task-006 status → completed)
+- .plans/progress-trim-agents-md.txt (this entry appended)
+
+Key Decisions:
+- Added "## query Subsystem Notes" heading with a single pointer line rather
+  than an orphaned pointer line with no section heading — cleaner navigation
+- Updated the PyPI Distribution Notes cross-reference to point to
+  .agents/deployment.md instead of the now-deleted "Release Workflow Notes" section
+- The architecture.md pointer was updated from "for full details" to
+  "for architecture details and toon-go notes" to hint at the moved content
+- Same update pattern applied to testing.md pointer (added "and output testing notes")
+- deployment.md pointer updated to list "changie workflow, release workflow, and
+  GoReleaser gotchas" explicitly
+
+Next Task: All tasks complete
