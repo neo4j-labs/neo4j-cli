@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '`neo4j aura instance create` now automatically saves the new instance credentials to local storage; use `--credential-name` to set a custom name, `--no-credential-storage` to skip saving, or `--no-credential-print` to suppress the password from output.'
+time: 2026-05-07T05:00:00+00:00

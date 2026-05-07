@@ -234,10 +234,13 @@ Flags:
 |------|------|---------|-------------|
 | `--await` | bool | false | Waits until created instance is ready. |
 | `--cloud-provider` | cloud-provider | - | The cloud provider hosting the instance. |
+| `--credential-name` | string | - | The name to use when storing the credentials locally. Defaults to <instance-id>-default. |
 | `--customer-managed-key-id` | string | - | An optional customer managed key to be used for instance creation. |
 | `--graph-analytics-plugin` | bool | false | An optional graph analytics plugin configuration to be set during instance creation |
 | `--memory` | memory | - | The size of the instance memory in GB. |
 | `--name` | string | - | (required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace). |
+| `--no-credential-print` | bool | false | Omit the password from the command output. |
+| `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. |
 | `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. |

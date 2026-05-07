@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -29,6 +28,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		vectorOptimized      bool
 		graphAnalyticsPlugin bool
 		await                bool
+		credentialName       string
+		noCredentialStorage  bool
+		noCredentialPrint    bool
 	)
 
 	const (
@@ -43,6 +45,9 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		vectorOptimizedFlag      = "vector-optimized"
 		graphAnalyticsPluginFlag = "graph-analytics-plugin"
 		awaitFlag                = "await"
+		credentialNameFlag       = "credential-name"
+		noCredentialStorageFlag  = "no-credential-storage"
+		noCredentialPrintFlag    = "no-credential-print"
 	)
 
 	cmd := &cobra.Command{
@@ -87,6 +92,20 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			if cfg.Aura.DefaultTenant() == "" {
 				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+			}
+
+			credentialNameChanged := cmd.Flags().Changed(credentialNameFlag)
+
+			if credentialNameChanged && noCredentialStorage {
+				return fmt.Errorf(`"--%s" and "--%s" cannot be used together`, credentialNameFlag, noCredentialStorageFlag)
+			}
+
+			if credentialNameChanged && credentialName == "" {
+				return fmt.Errorf(`invalid argument "" for "--%s" flag: name must not be empty`, credentialNameFlag)
+			}
+
+			if !noCredentialStorage && (cfg.Credentials == nil || cfg.Credentials.Dbms == nil) {
+				return fmt.Errorf("credential storage is not available; use --%s to skip storing credentials locally", noCredentialStorageFlag)
 			}
 
 			return nil
@@ -136,16 +155,51 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			// NOTE: Instance create should not return OK (200), it always returns 202, checking both just in case
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "connection_url", "username", "password", "cloud_provider", "region", "type"})
+				responseData := api.ParseBody(resBody)
+				instance, err := responseData.GetSingleOrError()
+				if err != nil {
+					return err
+				}
+
+				if !noCredentialStorage {
+					instanceID, _ := instance["id"].(string)
+					username, _ := instance["username"].(string)
+					password, _ := instance["password"].(string)
+					uri, _ := instance["connection_url"].(string)
+
+					base := baseCredentialName(instanceID, credentialName)
+					resolvedName := resolveCredentialName(cfg.Credentials.Dbms, base)
+					instance["credential_name"] = resolvedName
+
+					if addErr := cfg.Credentials.Dbms.Add(resolvedName, username, password, "neo4j", uri); addErr != nil {
+						if noCredentialPrint {
+							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). The password has been omitted from output; reset it via the Aura Console.\n", addErr) //nolint:errcheck // warning to stderr; write errors are not actionable
+						} else {
+							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). Save the printed password now — it cannot be retrieved later.\n", addErr) //nolint:errcheck // warning to stderr; write errors are not actionable
+						}
+					}
+				}
+
+				if noCredentialPrint {
+					delete(instance, "password")
+				}
+
+				fields := []string{"id", "name", "tenant_id", "connection_url", "username"}
+				if !noCredentialPrint {
+					fields = append(fields, "password")
+				}
+				if !noCredentialStorage {
+					fields = append(fields, "credential_name")
+				}
+				fields = append(fields, "cloud_provider", "region", "type")
+
+				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(instance), fields)
 
 				if await {
 					cmd.Println("Waiting for instance to be ready...")
-					var response api.CreateInstanceResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
+					instanceId, _ := instance["id"].(string)
 
-					pollResponse, err := api.PollInstance(cfg, response.Data.Id, api.InstanceStatusCreating)
+					pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusCreating)
 					if err != nil {
 						return err
 					}
@@ -181,6 +235,12 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 	cmd.Flags().BoolVar(&graphAnalyticsPlugin, graphAnalyticsPluginFlag, false, "An optional graph analytics plugin configuration to be set during instance creation")
 
 	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created instance is ready.")
+
+	cmd.Flags().StringVar(&credentialName, credentialNameFlag, "", "The name to use when storing the credentials locally. Defaults to <instance-id>-default.")
+
+	cmd.Flags().BoolVar(&noCredentialStorage, noCredentialStorageFlag, false, "Skip storing the instance credentials locally after creation.")
+
+	cmd.Flags().BoolVar(&noCredentialPrint, noCredentialPrintFlag, false, "Omit the password from the command output.")
 
 	return cmd
 }
