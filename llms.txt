@@ -2,7 +2,7 @@
 
 > A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.
 
-neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the HTTP Query API, and integrating with AI agent frameworks (Claude Code, Cursor, Copilot, and more).
+neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the Bolt protocol, and integrating with AI agent frameworks (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie).
 
 ## Installation
 
@@ -25,9 +25,12 @@ npm install -g @neo4j-labs/cli@alpha
 - `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
 - `neo4j-cli query 'CREATE ...' --rw` — write operations require `--rw`
+- `neo4j-cli credential dbms add` — store Neo4j database credentials for reuse via `--credential`
 - `neo4j-cli skill install` — install the agent skill bundle into your AI assistant
-- `neo4j-cli skill list` — list installed skills
-- `neo4j-cli skill check` — verify skill installation
+- `neo4j-cli skill list` — list supported agents and per-agent install state
+- `neo4j-cli skill check` — verify installed bundles for version drift
+- `neo4j-cli skill print` — preview the embedded SKILL.md before installing
+- `neo4j-cli skill remove` — remove an installed bundle (idempotent)
 
 ## Connection
 
@@ -35,7 +38,7 @@ Connection precedence: flag → environment variable → `.env` file → stored 
 
 Default URI: `neo4j://localhost:7687`, username: `neo4j`, database: `neo4j`.
 
-`http://`/`https://` URIs are auto-rewritten to `neo4j://`/`neo4j+s://`. For self-signed certs use `neo4j+ssc://`. Aura hostnames are forced to `neo4j+s://<host>:7687`.
+`http://` and `https://` URIs are auto-rewritten to `neo4j://<host>:7687` and `neo4j+s://<host>:7687` respectively (path/query stripped). For self-signed certs use `neo4j+ssc://`.
 
 ## Output formats
 
