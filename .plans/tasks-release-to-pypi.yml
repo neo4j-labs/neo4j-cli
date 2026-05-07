@@ -14,7 +14,7 @@ tasks:
       and manual paths of the rewritten publish-pypi.yml. It MUST exit
       non-zero with a clear error on any input that does not match the
       contract in REQ-F-005, so the workflow fails before a wheel is built.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.github/scripts/version-to-pep440.sh` exists, is executable (`chmod +x`), and starts with `#!/bin/bash` + `set -euo pipefail`."
@@ -22,7 +22,7 @@ tasks:
       - "`v0.1.0-alpha.6` prints `0.1.0a6`; `v0.1.0-beta.6` prints `0.1.0b6`; `v0.1.0-rc.6` prints `0.1.0rc6`."
       - "Inputs that do not match `^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(alpha|beta|rc)\\.[0-9]+)?$` (e.g. `v0.1.0-pre.6`, `v0.1.0.alpha.6`, empty string, `dev`) cause the script to exit non-zero with an error to stderr that names the offending input."
       - "Script has zero non-bash dependencies (no python, no jq) so it can run on any GitHub-hosted ubuntu runner without extra setup."
-    completed_at: null
+    completed_at: 2026-05-07T11:40:00Z
 
   - id: task-002
     title: "Rewrite publish-pypi.yml to trigger on release.yml + support recovery"

@@ -1,0 +1,34 @@
+================================================================================
+TASK-001: Add PEP 440 version normaliser shell script
+Date: 2026-05-07T11:40:00Z
+================================================================================
+
+Summary:
+Added `.github/scripts/version-to-pep440.sh`, a pure-bash helper that
+normalises a Git-tag-shaped version string (with or without leading `v`)
+into its PEP 440 equivalent. Implements the REQ-F-005 contract:
+  X.Y.Z              -> X.Y.Z
+  X.Y.Z-alpha.N      -> X.Y.ZaN
+  X.Y.Z-beta.N       -> X.Y.ZbN
+  X.Y.Z-rc.N         -> X.Y.ZrcN
+Anything else (e.g. v0.1.0-pre.6, v0.1.0.alpha.6, empty, dev) exits
+non-zero with an error to stderr naming the offending input. Zero
+non-bash dependencies so it runs on any GitHub-hosted ubuntu runner.
+
+Files Changed:
+- .github/scripts/version-to-pep440.sh (created; chmod +x; #!/bin/bash + set -euo pipefail)
+- .plans/tasks-release-to-pypi.yml (task-001 marked completed)
+- .plans/progress-release-to-pypi.txt (created)
+
+Key Decisions:
+- Argument-count guard up front (exactly one arg), separate from the
+  regex check, so the error message is more useful when called wrong.
+- Two-branch [[ =~ ]] match (X.Y.Z and X.Y.Z-pre.N) after stripping the
+  optional leading `v`, mirroring the reference snippet in the PRD.
+- Error message includes the original raw input (with leading `v` if
+  present), not the v-stripped form, so failure logs match what the
+  caller passed.
+- No `case` fallthrough fallback — the second regex already restricts
+  pre to alpha|beta|rc so the case statement covers all reachable cases.
+
+Next Task: task-002 (Rewrite publish-pypi.yml to trigger on release.yml + support recovery)
