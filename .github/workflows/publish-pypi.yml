@@ -281,7 +281,19 @@ jobs:
         if: >-
           github.event_name == 'workflow_dispatch' ||
           steps.meta.outputs.include_neo4j == 'true'
-        run: pip install --require-hashes -r .github/workflows/requirements-build.txt
+        env:
+          # Belt-and-braces with --no-cache-dir below: env var disables the
+          # cache for any nested pip invocation too (e.g. build backends
+          # invoked transitively).
+          PIP_NO_CACHE_DIR: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        # CodeQL's cache-poisoning rule flags pip install in workflow_run
+        # contexts because pip's local cache (~/.cache/pip) is a potential
+        # vector even when --require-hashes verifies content. --no-cache-dir
+        # neither reads from nor writes to that cache, eliminating the
+        # surface entirely. Combined with --require-hashes, every package
+        # is fetched fresh from PyPI and verified against the pinned hash.
+        run: pip install --no-cache-dir --require-hashes -r .github/workflows/requirements-build.txt
 
       - name: Build wheels from GoReleaser binaries
         if: >-
