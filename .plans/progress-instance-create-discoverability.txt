@@ -75,3 +75,32 @@ Key Decisions:
 - Ran go generate immediately after the Example edit to keep bundles in sync
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Regenerate skill bundles and verify all test gates pass
+Date: 2026-05-07T03:00:00Z
+================================================================================
+
+Summary:
+Verified that all test gates pass after the string edits in tasks 001-003. Skill
+bundles were already regenerated incrementally during each prior task (go generate
+was run immediately after each string edit). Final gate checks confirmed:
+- `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` clean
+- `make test` passes (TestGenerator_RoundTrip included)
+- `make fmt-check` reports no unformatted files
+- `make lint` reports no lint errors
+
+Review approved with no blockers. One cosmetic non-blocking note observed: the first
+comment line in the cobra Example field has no leading spaces while command lines have
+two, causing a minor visual inconsistency in the generated instance.md. This does not
+affect --help output and was not fixed (non-blocking).
+
+Files Changed:
+- .plans/tasks-instance-create-discoverability.yml (status: completed, completed_at set)
+- .plans/progress-instance-create-discoverability.txt (this entry)
+
+Key Decisions:
+- No code changes were needed in the finalize phase; all gates were already passing
+- Incremental go generate after each task avoids stale-bundle failures at final gate
+
+Feature Status: ALL TASKS COMPLETE
