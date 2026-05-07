@@ -69,6 +69,9 @@ func newEmbedCmd(cfg *clicfg.Config) *cobra.Command {
 			"is piped. The embed provider configuration follows the same " +
 			"--embed-* flags as the parent `query` command. No Bolt connection " +
 			"is opened.",
+		Example: "neo4j-cli query :embed \"hello world\" --format json\n" +
+			"echo \"hello world\" | neo4j-cli query :embed --format toon\n" +
+			"neo4j-cli query :embed \"hello\" --embed-provider openai --embed-model text-embedding-3-small",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEmbed(cmd, args, cfg)

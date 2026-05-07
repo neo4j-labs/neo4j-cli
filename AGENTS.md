@@ -206,6 +206,15 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
 
+## Cobra Help / Skill Bundle Rendering Notes
+
+- `common/skill/render/render.go:235` strips a cobra command's `Example` field via `strings.TrimSpace` before wrapping it in a fenced code block. The leading 2-space "cobra convention" indent is therefore stripped from the FIRST line only and preserved on subsequent lines, producing a ragged block. Write multi-line Examples with NO leading indent so the rendered bundle stays flush-left and consistent.
+- Adding/changing a `Long` field on any cobra command in `neo4j-cli/internal/subcommands/credential/...` or `neo4j-cli/query/...` requires `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle, otherwise `TestGenerator_RoundTrip` (the gate in `make test`) fails with a "references/<sub>.md differs" diff.
+- `make generate-check` is `git diff --exit-code` after `go generate ./...`; on a working tree with uncommitted source-side help-text edits it WILL fail (the gate is meaningful only against a clean tree, i.e. CI). Locally: commit the source AND the regenerated bundle in the same commit, then re-run.
+- `--param` flag Usage on the `query` parent now mentions the `:embed` modifier (`key:embed=<text>`) — keeping the modifier discoverable in `--help` was cheaper than a separate flag. The full rule (JSON-array rejection, empty-text accepted) lives in README and the bundle additions.md, not the flag Usage.
+- README's "Aura API Credentials" example uses `credential aura-client add` (canonical neo4j-cli path), NOT the standalone-aura `aura credential add` form. The standalone aura binary is no longer built/shipped, so README must lead with commands the shipped binary actually has.
+- Skill bundle `description.txt` (frontmatter description) is single-paragraph, ≤1024 chars, third-person. When adding new top-level capability to it, list every credential subtree explicitly ("Aura, Neo4j connection (dbms), and embedding-provider credentials") rather than collapsing them — the agent-side trigger phrasing matches user wording better when each subtree is named.
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._

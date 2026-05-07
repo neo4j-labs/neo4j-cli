@@ -11,9 +11,11 @@ import (
 
 func newSetEmbedCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:         "set-embed <dbms-name> [embed-name]",
-		Short:       "Links (or clears) an embed credential on a dbms credential",
-		Long:        "Links a dbms credential to an embed credential by name. Pass only the dbms name to clear the link.",
+		Use:   "set-embed <dbms-name> [embed-name]",
+		Short: "Links (or clears) an embed credential on a dbms credential",
+		Long: "Link a stored dbms credential to an existing embed credential by name. Pass only the dbms name to clear the link. " +
+			"No embed-credential is required for `query` to run plain Cypher; this only links one for downstream embedding via `--param NAME:embed=...` and `query :embed`. " +
+			"With a link in place, `query --credential <dbms-name>` picks up both the connection and the embed config in a single selector.",
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {

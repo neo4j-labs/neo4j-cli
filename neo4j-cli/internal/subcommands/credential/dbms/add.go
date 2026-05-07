@@ -29,8 +29,11 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:         "add",
-		Short:       "Adds a dbms credential",
+		Use:   "add",
+		Short: "Adds a dbms credential",
+		Long: "Add a Neo4j Bolt connection profile. The first credential added becomes the default. " +
+			"Pass `--embed-credential <name>` to link this profile to an existing embed credential — " +
+			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`.",
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if embedCredential != "" {

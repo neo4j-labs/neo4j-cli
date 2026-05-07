@@ -481,3 +481,68 @@ Key Decisions:
   regular query path.
 
 Feature Complete: all 13 tasks now status=completed.
+
+================================================================================
+TASK-014: Documentation coverage — README, help output, skill bundle
+Date: 2026-05-07T17:00:00Z
+================================================================================
+
+Summary:
+Doc-only pass across four surfaces. (a) README.md gained a top-level
+`## Credentials` section covering all three credential trees with one
+example per leaf, plus a new `### Embedding parameters` subsection under
+`## Querying Neo4j` documenting `embed:<text>` modifier, `query :embed`
+leaf, all five `--embed-*` flags + matching `NEO4J_EMBED_*` env vars, the
+API-key precedence chain, and provider defaults. Existing `Aura API
+Credentials` example updated from the standalone-aura `aura credential
+add` path to the canonical `credential aura-client add` path. (b) Cobra
+help text: every leaf under `credential aura-client`, `credential dbms`,
+`credential embed` got a Long; the credential parent + dbms parent +
+embed parent each got a Long; `query` parent Long now mentions both the
+`embed:` modifier and the `:embed` leaf; `query :embed` got an Example
+with positional + stdin + provider-flag forms; `--param` Usage extended
+to mention `:embed=<text>`. (c) Skill bundle: description.txt updated to
+list dbms + embed credentials alongside Aura credentials; additions.md
+gained two new gotchas (embed param modifier; dbms→embed link). Bundle
+regenerated. (d) Verified no stale `--insecure` or "credentials only
+under aura" references in user-facing docs.
+
+Files Changed:
+- README.md (Aura cred example path fix; new ## Credentials section; new ### Embedding parameters subsection)
+- neo4j-cli/internal/skill/description.txt (front-matter description)
+- neo4j-cli/internal/skill/additions.md (two new gotchas)
+- neo4j-cli/internal/subcommands/credential/credential.go (Long on parent + 4 aura-client leaves)
+- neo4j-cli/internal/subcommands/credential/dbms/{dbms,add,list,remove,use,set_embed}.go (Long on parent + 5 leaves)
+- neo4j-cli/internal/subcommands/credential/embed/{embed,add,list,remove,use}.go (Long on parent + 4 leaves)
+- neo4j-cli/query/query.go (extended parent Long; extended --param Usage)
+- neo4j-cli/query/embed.go (added Example with 3 lines)
+- neo4j-cli/internal/skill/bundle/SKILL.md (regenerated)
+- neo4j-cli/internal/skill/bundle/references/credential.md (regenerated)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated)
+
+Key Decisions:
+- Cobra Examples render via `strings.TrimSpace` then a fenced code block
+  in the skill bundle (common/skill/render/render.go:235), so the leading
+  2-space "cobra convention" indent gets stripped from the FIRST line
+  only — leaving subsequent lines indented and the first not. Wrote the
+  Example WITHOUT any leading indent so the rendered block is consistent
+  across all lines.
+- README's API-key row in the Embedding-settings table uses an em-dash
+  for the "Flag" column with a footnote-style "(none — see below)" since
+  there is no `--embed-api-key` flag. The precedence chain is described
+  in prose immediately after the table.
+- Updated the existing Usage section's Aura cred example to use
+  `credential aura-client add` (canonical neo4j-cli path) rather than
+  the standalone-aura `aura credential add` form. The standalone aura
+  binary is no longer built/shipped (per AGENTS.md), so the README
+  should not lead with a command that doesn't exist on the shipped
+  binary.
+- Skill `description.txt` reworded to list "Neo4j Aura, Neo4j connection
+  (dbms) credentials, and embedding-provider credentials" — matches the
+  task's "alongside the existing Aura credential phrase" requirement
+  while staying under the 1024-char frontmatter cap.
+- Did not extend `--param` Usage to fully spell out the JSON-array
+  rejection rule — kept the help-text terse with a pointer to
+  `query :embed`. The full rule lives in README + the bundle.
+
+Feature Complete: all 14 tasks now status=completed.

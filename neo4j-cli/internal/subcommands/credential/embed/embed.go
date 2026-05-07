@@ -12,6 +12,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "embed",
 		Short: "Manage and view embed credential values",
+		Long: "Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). " +
+			"`query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. " +
+			"Supported providers: openai, ollama, huggingface.",
 	}
 
 	cmd.AddCommand(newAddCmd(cfg))

@@ -15,6 +15,10 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "credential",
 		Short: "Manage and view credential values",
+		Long: "Manage stored credentials. Three subtrees are available: " +
+			"`aura-client` for Aura Console API client credentials, " +
+			"`dbms` for Neo4j Bolt connection profiles consumed by `query`, " +
+			"and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.",
 	}
 
 	cmd.AddCommand(NewAuraClientCredentialCmd(cfg))
@@ -28,6 +32,9 @@ func NewAuraClientCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "aura-client",
 		Short: "Manage and view aura-client credential values",
+		Long: "Manage Aura Console API client credentials (client ID + client secret). " +
+			"These credentials are required by every `aura ...` subcommand that calls " +
+			"the Aura Console API. The first credential added is set as default.",
 	}
 
 	cmd.AddCommand(newCredentialAddCmd(cfg))
@@ -52,8 +59,11 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:         "add",
-		Short:       "Adds a credential",
+		Use:   "add",
+		Short: "Adds an aura-client credential",
+		Long: "Add an Aura Console API client credential (client ID + secret). " +
+			"The first credential added becomes the default; switch later with " +
+			"`credential aura-client use <name>`.",
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
@@ -75,7 +85,8 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List credentials",
+		Short: "List aura-client credentials",
+		Long:  "List stored Aura Console API client credentials. The `default` column flags the credential used by `aura ...` commands when no other selector is set.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), []string{"name", "type", "identifier", "default"})
 			return nil
@@ -86,7 +97,8 @@ func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:         "remove",
-		Short:       "Removes a credential",
+		Short:       "Removes an aura-client credential",
+		Long:        "Remove a stored Aura Console API client credential by name.",
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -98,7 +110,8 @@ func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:         "use",
-		Short:       "Sets the default credential to be used",
+		Short:       "Sets the default aura-client credential to be used",
+		Long:        "Set the named aura-client credential as the default consumed by `aura ...` commands.",
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {

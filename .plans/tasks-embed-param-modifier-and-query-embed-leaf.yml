@@ -430,7 +430,7 @@ tasks:
 
       Out of scope: changing CLI behaviour, adding new flags, renaming
       anything. This is documentation only.
-    status: pending
+    status: completed
     dependencies:
       - task-012
       - task-013
@@ -442,3 +442,4 @@ tasks:
       - "`references/query.md` documents the `embed:` modifier under `--param` (extend the cobra flag Usage if needed) and the `:embed` subcommand; `references/credential.md` documents all three credential subtrees and every leaf."
       - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` followed by `make generate-check` exits 0; `make fmt-check`, `make lint`, `make test` exit 0."
       - "No stale documentation references to removed flags (e.g. `--insecure`) or to credentials living only under `aura`."
+    completed_at: 2026-05-07T17:00:00Z

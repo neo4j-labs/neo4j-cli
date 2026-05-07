@@ -15,6 +15,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Lists embed credentials",
+		Long:  "List stored embedding-provider credentials. The `api-key` column is never shown — keys are persisted on disk but redacted in every printable form.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Embed.Printable(), embedCredentialFields)
