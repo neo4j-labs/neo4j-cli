@@ -44,3 +44,29 @@ Key Decisions:
 - Skill bundles were regenerated in this task rather than waiting for task-004 because test suite gating required it.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Add integration tests for default name in create_test.go
+Date: 2026-05-07T02:00:00Z
+================================================================================
+
+Summary:
+Added end-to-end integration tests for the default name generation feature in
+create_test.go. The tests use the mock HTTP server to verify the GET /instances
+pre-flight call and the resulting POST /instances body. A separate error-path test
+verifies that a 500 from the list API aborts the create with a non-zero exit code.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/create_test.go (modified — added
+  TestCreateDefaultNameGeneration table-driven test and TestCreateDefaultNameListAPIError)
+
+Key Decisions:
+- Used --no-credential-storage in the new tests to keep assertions focused on name
+  generation rather than credential storage side effects.
+- The error path test was kept as a standalone function (not in the table) to match
+  the existing TestCreateInstanceError pattern for error cases.
+- Used method-prefixed handler paths ("GET /v1/instances" vs "POST /v1/instances")
+  so the mock server can distinguish the pre-flight list call from the create POST.
+- Removed an unused struct field (expectErr) after self-review.
+
+Next Task: task-004

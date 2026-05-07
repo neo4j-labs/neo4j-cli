@@ -860,3 +860,92 @@ func TestCreateCredentialStoredBeforeAwait(t *testing.T) {
 	// Credential must be stored even though --await polling followed.
 	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")
 }
+
+func TestCreateDefaultNameGeneration(t *testing.T) {
+	testCases := []struct {
+		name             string
+		command          string
+		listResponseBody string
+		listCalledTimes  int
+		expectedPostBody string
+	}{
+		{
+			name:    "no existing instances generates Instance01",
+			command: "instance create --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw",
+			listResponseBody: `{
+				"data": []
+			}`,
+			listCalledTimes:  1,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+		},
+		{
+			name:    "Instance01 already exists generates Instance02",
+			command: "instance create --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw",
+			listResponseBody: `{
+				"data": [
+					{"id": "abc123", "name": "Instance01", "tenant_id": "YOUR_TENANT_ID"}
+				]
+			}`,
+			listCalledTimes:  1,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"Instance02","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+		},
+		{
+			name:             "explicit --name skips the list GET call",
+			command:          "instance create --name MyInstance --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw",
+			listResponseBody: `{"data": []}`,
+			listCalledTimes:  0,
+			expectedPostBody: `{"cloud_provider":"gcp","memory":"1GB","name":"MyInstance","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			listMock := helper.NewRequestHandlerMock("GET /v1/instances", http.StatusOK, tc.listResponseBody)
+			postMock := helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{
+				"data": {
+					"id": "db1d1234",
+					"connection_url": "YOUR_CONNECTION_URL",
+					"username": "neo4j",
+					"password": "letMeIn123!",
+					"tenant_id": "YOUR_TENANT_ID",
+					"cloud_provider": "gcp",
+					"region": "europe-west1",
+					"type": "free-db",
+					"name": "Instance01"
+				}
+			}`)
+
+			helper.ExecuteCommand(tc.command)
+
+			listMock.AssertCalledTimes(tc.listCalledTimes)
+			postMock.AssertCalledTimes(1)
+			postMock.AssertCalledWithMethod(http.MethodPost)
+			postMock.AssertCalledWithBody(tc.expectedPostBody)
+			helper.AssertErr("")
+		})
+	}
+}
+
+func TestCreateDefaultNameListAPIError(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	listMock := helper.NewRequestHandlerMock("GET /v1/instances", http.StatusInternalServerError, `{
+		"errors": [
+			{
+				"message": "internal server error",
+				"reason": "server-error"
+			}
+		]
+	}`)
+	postMock := helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{"data": {}}`)
+
+	helper.ExecuteCommand("instance create --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw")
+
+	listMock.AssertCalledTimes(1)
+	postMock.AssertCalledTimes(0)
+	helper.AssertErr("Error: [internal server error]")
+}

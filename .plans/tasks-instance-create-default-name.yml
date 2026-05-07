@@ -52,7 +52,7 @@ tasks:
       (expect Instance02), explicit --name bypasses the list call entirely, and a list API
       error aborts with a non-zero exit code. Follow the table-driven pattern already used
       throughout create_test.go.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -61,7 +61,7 @@ tasks:
       - "Test case with explicit --name asserts no GET /instances mock is hit"
       - "Test case with list 500 response asserts non-zero exit and error output"
       - "make test passes with no regressions in existing create test cases"
-    completed_at: null
+    completed_at: "2026-05-07T02:00:00Z"
 
   - id: task-004
     title: "Regenerate skill bundles and verify generate-check gate"
