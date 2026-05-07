@@ -196,6 +196,7 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 - `DbmsCredentials.Add` can only fail with "already exists". Since `resolveCredentialName` guarantees the resolved name is free, Add cannot fail in a single-threaded context after a successful `resolveCredentialName` call. Storage failure warning paths are effectively dead code in normal operation.
 - To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.
 - The default test helper credentials JSON only has `"aura": {...}` (no `"dbms"` key). During `Credentials.load()`, the absence of `"dbms"` in JSON leaves the field at its initial value `&DbmsCredentials{Credentials: []*DbmsCredential{}}`, so `cfg.Credentials.Dbms` is non-nil in all default test helpers. Passing `"dbms": null` in the JSON explicitly sets it to nil.
+- `DbmsCredential.EmbedCredential` uses `json:"embed-credential,omitempty"` so older creds without a link don't gain the key on disk. `PrintableDbmsCredentials.AsArray` / `MarshalJSON` always emit the key (empty string when unset) so the column is stable across rows for table rendering and external JSON consumers. Pattern: omitempty on the persisted struct, unconditional emit on the printable wrapper.
 
 ## query Subsystem Notes
 

@@ -64,3 +64,34 @@ Key Decisions:
   cmd is the entrypoint.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Add EmbedCredential link field + SetEmbed on DbmsCredential
+Date: 2026-05-07T12:00:00Z
+================================================================================
+
+Summary:
+Added `EmbedCredential string` field (json:"embed-credential,omitempty") to
+DbmsCredential. Added SetEmbed(dbmsName, embedName) method on DbmsCredentials
+that mutates the named cred and triggers onUpdate; empty embedName clears the
+link; missing dbmsName returns a usage error. Updated PrintableDbmsCredentials.
+AsArray to always emit "embed-credential" (empty string when unset) so the
+column is stable for table rendering and JSON output.
+
+Files Changed:
+- common/clicfg/credentials/dbms.go (modified: new field, SetEmbed, AsArray)
+- common/clicfg/credentials/dbms_test.go (modified: SetEmbed table tests,
+  persistence test, JSON round-trip omitempty test, AsArray/MarshalJSON
+  always-includes-key test)
+
+Key Decisions:
+- SetEmbed reuses existing iteration pattern; no helper extracted (keeps the
+  dbms.go file in the same shape as DbmsCredentials.Get/Remove).
+- PrintableDbmsCredentials.AsArray adds the key unconditionally — table
+  rendering still filters by dbmsCredentialFields in list.go (task-004 will
+  append the column there); JSON output now always includes "embed-credential"
+  (existing JSON tests use Contains assertions and remain green).
+- omitempty on the struct keeps credentials.json clean for older creds with
+  no embed link; on-the-wire `Printable` always emits the key.
+
+Next Task: task-004

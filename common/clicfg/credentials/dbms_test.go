@@ -5,6 +5,7 @@ package credentials_test
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -342,4 +343,136 @@ func TestPrintableDbmsCredentials_MarshalJSON(t *testing.T) {
 	// Insecure must not appear in JSON output
 	_, hasInsecure := result[0]["insecure"]
 	assert.False(t, hasInsecure, "insecure must not appear in JSON output")
+}
+
+func TestDbmsCredentials_SetEmbed(t *testing.T) {
+	tests := []struct {
+		name        string
+		initialJSON string
+		dbmsName    string
+		embedName   string
+		wantErr     string
+		wantValue   string
+	}{
+		{
+			name:        "set embed link on existing credential",
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
+			dbmsName:    "local",
+			embedName:   "openai-default",
+			wantErr:     "",
+			wantValue:   "openai-default",
+		},
+		{
+			name:        "clear embed link with empty embedName",
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687","embed-credential":"openai-default"}]}}`,
+			dbmsName:    "local",
+			embedName:   "",
+			wantErr:     "",
+			wantValue:   "",
+		},
+		{
+			name:        "missing dbms credential returns error",
+			initialJSON: `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
+			dbmsName:    "nonexistent",
+			embedName:   "openai-default",
+			wantErr:     "could not find credential with name nonexistent",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			creds, _ := newTestDbmsCredentials(t, tc.initialJSON)
+			err := creds.Dbms.SetEmbed(tc.dbmsName, tc.embedName)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			cred, getErr := creds.Dbms.Get(tc.dbmsName)
+			require.NoError(t, getErr)
+			assert.Equal(t, tc.wantValue, cred.EmbedCredential)
+		})
+	}
+}
+
+func TestDbmsCredentials_SetEmbed_Persists(t *testing.T) {
+	// Verify that SetEmbed mutations persist via onUpdate callback
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[]},"dbms":{"default-credential":"local","credentials":[{"name":"local","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+	require.NoError(t, err)
+
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	require.NoError(t, creds.Dbms.SetEmbed("local", "openai-default"))
+
+	// Reload credentials from the same FS to verify persistence
+	creds2 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	require.Len(t, creds2.Dbms.Credentials, 1)
+	assert.Equal(t, "openai-default", creds2.Dbms.Credentials[0].EmbedCredential)
+
+	// Now clear and verify the field is omitted on disk via omitempty
+	require.NoError(t, creds2.Dbms.SetEmbed("local", ""))
+	credsFile, err := afero.ReadFile(fs, filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(credsFile), "embed-credential", "embed-credential must be omitted on disk when empty (omitempty)")
+}
+
+func TestDbmsCredential_JSONRoundTrip_EmbedCredential(t *testing.T) {
+	// On-disk: empty value omitted via omitempty; non-empty preserved.
+	emptyCred := credentials.DbmsCredential{
+		Name:         "local",
+		Username:     "u",
+		Password:     "p",
+		DatabaseName: "neo4j",
+		URI:          "bolt://localhost:7687",
+	}
+	data, err := json.Marshal(emptyCred)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "embed-credential", "empty EmbedCredential must be omitted on disk")
+
+	linkedCred := credentials.DbmsCredential{
+		Name:            "local",
+		Username:        "u",
+		Password:        "p",
+		DatabaseName:    "neo4j",
+		URI:             "bolt://localhost:7687",
+		EmbedCredential: "openai-default",
+	}
+	data, err = json.Marshal(linkedCred)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"embed-credential":"openai-default"`)
+
+	// Round-trip preserves the field
+	var got credentials.DbmsCredential
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, "openai-default", got.EmbedCredential)
+}
+
+func TestPrintableDbmsCredentials_AlwaysIncludesEmbedCredential(t *testing.T) {
+	// Even when no credential has an embed link set, AsArray and JSON output
+	// must always emit the `embed-credential` key (empty string) so the
+	// column is stable for table rendering.
+	creds, _ := newTestDbmsCredentials(t, `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687"},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","embed-credential":"openai-default"}]}}`)
+
+	printable := creds.Dbms.Printable()
+	rows := printable.AsArray()
+	require.Len(t, rows, 2)
+
+	v1, has1 := rows[0]["embed-credential"]
+	assert.True(t, has1, "embed-credential key must always be present in AsArray")
+	assert.Equal(t, "", v1, "embed-credential must be empty string when unset")
+
+	v2, has2 := rows[1]["embed-credential"]
+	assert.True(t, has2)
+	assert.Equal(t, "openai-default", v2)
+
+	// MarshalJSON also emits the key for both rows.
+	data, err := json.Marshal(printable)
+	require.NoError(t, err)
+	var parsed []map[string]any
+	require.NoError(t, json.Unmarshal(data, &parsed))
+	require.Len(t, parsed, 2)
+	_, jsonHas1 := parsed[0]["embed-credential"]
+	assert.True(t, jsonHas1, "embed-credential key must always be present in MarshalJSON")
+	assert.Equal(t, "", parsed[0]["embed-credential"])
+	assert.Equal(t, "openai-default", parsed[1]["embed-credential"])
 }

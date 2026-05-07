@@ -66,7 +66,7 @@ tasks:
       `dbms_test.go` with `SetEmbed` cases (set, clear, missing dbms
       cred), JSON round-trip preserves the field, on-disk omits when
       empty (`omitempty`), Printable always emits the key.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -75,7 +75,7 @@ tasks:
       - "PrintableDbmsCredentials always includes `embed-credential` (empty string when unset) in both AsArray and MarshalJSON."
       - "JSON round-trip: dbms cred without a link omits the field on disk; with a link, value preserved through save/load."
       - "Existing dbms tests continue to pass byte-identical (no regressions to current Printable/JSON output keys)."
-    completed_at: null
+    completed_at: 2026-05-07T12:00:00Z
 
   - id: task-004
     title: "Wire dbms→embed link into cobra (`add --embed-credential`, `set-embed`, list column)"
