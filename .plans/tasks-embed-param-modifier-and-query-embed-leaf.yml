@@ -314,7 +314,7 @@ tasks:
       column. Add a `changie` entry for `neo4j-cli` (kind `Minor`)
       summarising the embed support and the `embed-credential` link
       addition. Confirm `make generate-check` exits 0.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-004
@@ -326,7 +326,7 @@ tasks:
       - "A new `.changes/unreleased/neo4j-cli-Minor-*.yaml` file exists with project `neo4j-cli` and a clear user-facing body covering both `:embed` features and the dbms→embed link."
       - "`TestGenerator_RoundTrip` and `TestCommittedBundlesAndTestdataAreLF` pass."
       - "No CRLF line endings introduced in any committed `.md` / golden / bundle file."
-    completed_at: null
+    completed_at: 2026-05-07T12:30:00Z
 
   - id: task-013
     title: "Final gate: lint, fmt-check, full test suite, Bolt smoke pass"

@@ -421,3 +421,34 @@ Key Decisions:
   new leaf is added.
 
 Next Task: task-012
+
+================================================================================
+TASK-012: Regenerate skill bundle and add changelog entry
+Date: 2026-05-07T12:30:00Z
+================================================================================
+
+Summary:
+Bundle was already in sync (tasks 004, 010, 011 each ran `go generate` to
+keep TestGenerator_RoundTrip green). Verified via `go generate ./...` + a
+stashed-task-file `make generate-check` — bundle files unchanged. Added
+hand-authored changie YAML at .changes/unreleased/neo4j-cli-Minor-
+20260507-122741.yaml (changie not installed locally) covering the
+`:embed` param modifier, the `query :embed` standalone leaf, five new
+persistent --embed-* flags, the new `credential embed` subtree, the
+`--embed-credential` flag on `credential dbms add`, and the new
+`credential dbms set-embed` leaf.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260507-122741.yaml (created)
+
+Key Decisions:
+- Single Minor changelog entry covering the whole feature rather than
+  splitting per-leaf — user-facing surface is one cohesive change set
+  ("embedding support in query") even though it spans multiple files.
+- Body written as a single YAML literal with embedded markdown-style
+  formatting (backticks, parentheses) — matches the existing
+  neo4j-cli-Minor-20260506-175125.yaml shape.
+- generate-check verification used `git stash` of the task YAML so the
+  diff reported by --exit-code reflected only bundle drift; passed clean.
+
+Next Task: task-013 (final gate)
