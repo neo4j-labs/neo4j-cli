@@ -184,7 +184,7 @@ try {
     }
 
     Write-Host ""
-    Write-Ok "Done! Run 'aura-cli --help' to get started."
+    Write-Ok "Done! Run 'neo4j-cli --help' to get started."
 
 } finally {
     # Always clean up temp files
