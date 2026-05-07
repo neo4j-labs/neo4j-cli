@@ -95,6 +95,20 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 			}
 
+			credentialNameChanged := cmd.Flags().Changed(credentialNameFlag)
+
+			if credentialNameChanged && noCredentialStorage {
+				return fmt.Errorf(`"--%s" and "--%s" cannot be used together`, credentialNameFlag, noCredentialStorageFlag)
+			}
+
+			if credentialNameChanged && credentialName == "" {
+				return fmt.Errorf(`invalid argument "" for "--%s" flag: name must not be empty`, credentialNameFlag)
+			}
+
+			if !noCredentialStorage && (cfg.Credentials == nil || cfg.Credentials.Dbms == nil) {
+				return fmt.Errorf("credential storage is not available; use --%s to skip storing credentials locally", noCredentialStorageFlag)
+			}
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -194,9 +208,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().BoolVar(&noCredentialPrint, noCredentialPrintFlag, false, "Omit the password from the command output.")
 
-	// suppress unused variable warnings until subsequent tasks use these flags
-	_ = credentialName
-	_ = noCredentialStorage
+	// suppress unused variable warning until a subsequent task uses this flag
 	_ = noCredentialPrint
 
 	return cmd

@@ -8,7 +8,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
+	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateFreeInstanceRequiresRw(t *testing.T) {
@@ -484,4 +488,95 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 Waiting for instance to be ready...
 Instance Status: ready
 	`)
+}
+
+func TestCreateCredentialFlagValidation(t *testing.T) {
+	testCases := []struct {
+		name        string
+		command     string
+		expectedErr string
+		wantHTTP    int
+	}{
+		{
+			name:        "credential-name and no-credential-storage are mutually exclusive",
+			command:     "instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --credential-name myname --no-credential-storage --rw",
+			expectedErr: `Error: "--credential-name" and "--no-credential-storage" cannot be used together`,
+			wantHTTP:    0,
+		},
+		{
+			name:        "explicit empty credential-name is rejected",
+			command:     `instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --credential-name "" --rw`,
+			expectedErr: `Error: invalid argument "" for "--credential-name" flag: name must not be empty`,
+			wantHTTP:    0,
+		},
+		{
+			name:        "valid flags proceed to HTTP call",
+			command:     "instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --no-credential-storage --rw",
+			expectedErr: "",
+			wantHTTP:    1,
+		},
+		{
+			name:        "credential-name without no-credential-storage proceeds to HTTP call",
+			command:     "instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --credential-name myname --rw",
+			expectedErr: "",
+			wantHTTP:    1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, `{
+				"data": {
+					"id": "db1d1234",
+					"connection_url": "YOUR_CONNECTION_URL",
+					"username": "neo4j",
+					"password": "letMeIn123!",
+					"tenant_id": "YOUR_TENANT_ID",
+					"cloud_provider": "gcp",
+					"region": "europe-west1",
+					"type": "free-db",
+					"name": "Instance01"
+				}
+			}`)
+
+			helper.ExecuteCommand(tc.command)
+
+			mockHandler.AssertCalledTimes(tc.wantHTTP)
+			if tc.expectedErr != "" {
+				helper.AssertErr(tc.expectedErr)
+			} else {
+				helper.AssertErr("")
+			}
+		})
+	}
+}
+
+func TestCreatePreRunERejectsNilDbms(t *testing.T) {
+	// credentials.json with "dbms": null causes cfg.Credentials.Dbms to be nil after
+	// JSON unmarshal, exercising the "credential storage is not available" guard.
+	credentialsJSON := `{
+		"aura": {
+			"credentials": [{"name": "test-cred", "access-token": "dsa", "token-expiry": 123}],
+			"default-credential": "test-cred"
+		},
+		"dbms": null
+	}`
+
+	fs, err := testfs.GetTestFs(`{"format":"json","aura":{"default-tenant":"YOUR_TENANT_ID"}}`, credentialsJSON)
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	require.Nil(t, cfg.Credentials.Dbms, "expected Dbms to be nil with 'dbms: null' in credentials file")
+
+	cmd := instance.NewCreateCmd(cfg)
+	// Set required flags so PreRunE reaches the Dbms-nil check (not an earlier guard).
+	require.NoError(t, cmd.Flags().Set("name", "Instance01"))
+	require.NoError(t, cmd.Flags().Set("type", "free-db"))
+	require.NoError(t, cmd.Flags().Set("tenant-id", "YOUR_TENANT_ID"))
+
+	err = cmd.PreRunE(cmd, nil)
+	require.EqualError(t, err, `credential storage is not available; use --no-credential-storage to skip storing credentials locally`)
 }
