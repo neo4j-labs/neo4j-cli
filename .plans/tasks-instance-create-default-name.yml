@@ -87,7 +87,7 @@ tasks:
       Run make test, make fmt-check, and make lint to confirm all gates are clean across the
       full change set. Add a changelog entry using changie (kind: Minor) describing the new
       optional --name behaviour for instance create.
-    status: in_progress
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -96,4 +96,4 @@ tasks:
       - "make fmt-check exits 0 (no files need gofmt)"
       - "make lint exits 0 with no lint errors"
       - "A .changes/unreleased/ YAML file exists describing the --name default name feature"
-    completed_at: null
+    completed_at: "2026-05-07T00:00:00Z"

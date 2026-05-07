@@ -95,3 +95,24 @@ Key Decisions:
   passes, bundle files reflect the updated --name flag description.
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Final gates: test, fmt-check, lint, and changelog entry
+Date: 2026-05-07T00:00:00Z
+================================================================================
+
+Summary:
+All final gates confirmed clean. make test passes with all packages green,
+make fmt-check exits 0 (no files need gofmt), and make lint exits 0 with 0 issues.
+A changelog entry was added using changie for the new optional --name behaviour.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Minor-20260507-182710.yaml (created — changelog entry
+  describing the optional --name flag and automatic InstanceNN name generation)
+
+Key Decisions:
+- changie was available (v1.24.0) and used directly with --projects neo4j-cli --kind Minor.
+- All acceptance criteria verified: make test, make fmt-check, make lint all exit 0,
+  and the unreleased changelog YAML exists with the correct project/kind/body fields.
+
+Next Task: none — feature complete
