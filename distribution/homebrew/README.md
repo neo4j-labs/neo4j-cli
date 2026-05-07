@@ -112,3 +112,4 @@ The `Mint Homebrew tap token` step in
 - [`../../.goreleaser.yaml`](../../.goreleaser.yaml) — `brews:` block (source of truth)
 - [`../../.github/workflows/release.yml`](../../.github/workflows/release.yml) — token mint + GoReleaser env wiring
 - [`../npm/README.md`](../npm/README.md) — npm channel (alpha install path)
+- [`../pypi/README.md`](../pypi/README.md) — PyPI channel (`pip install neo4j-cli`)

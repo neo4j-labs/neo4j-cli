@@ -162,3 +162,42 @@ Validation:
 
 Next Task: task-004 (Cross-link new pypi README from npm and homebrew READMEs)
 
+================================================================================
+TASK-004: Cross-link new pypi README from npm and homebrew READMEs
+Date: 2026-05-07T13:35:00Z
+================================================================================
+
+Summary:
+Added reciprocal cross-links from the npm and homebrew distribution
+READMEs into the new PyPI README created in task-003, completing the
+second half of REQ-F-012's "linked from sibling READMEs" criterion.
+Both link lines use relative paths (`../pypi/README.md`) and match the
+existing one-line description style used in each file's sibling-channel
+section.
+
+Files Changed:
+- distribution/homebrew/README.md (modified; added one bullet to ## See also)
+- distribution/npm/README.md (modified; added trailing "See ../pypi/README.md" sentence to the existing pip / PyPI bullet under ## Other channels)
+- .plans/tasks-release-to-pypi.yml (task-004 marked completed)
+- .plans/progress-release-to-pypi.txt (this entry)
+
+Key Decisions:
+- Did NOT reword the npm README's "(future)" descriptor on the pip /
+  PyPI bullet, even though it is now technically stale, because task
+  AC explicitly forbids touching surrounding content beyond the
+  minimum needed for the link to read naturally. The descriptor can
+  be tightened in a follow-up if/when the npm README sees its next
+  unrelated edit.
+- Used the same one-line "channel — short description" shape on the
+  homebrew side that the existing `../npm/README.md` bullet uses;
+  npm side appends a "See [link]." sentence to the existing bullet
+  rather than rewriting its body.
+- Both relative paths resolve to the file added in task-003 when
+  rendered on github.com.
+
+Validation:
+- `make fmt-check`, `make lint`, `make test` all pass — docs-only
+  change but ran the full gate to confirm nothing else regressed.
+
+Next Task: All tasks complete
+

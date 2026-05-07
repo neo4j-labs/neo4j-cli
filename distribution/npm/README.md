@@ -228,6 +228,7 @@ ships standalone in the tarball with no runtime access to `platforms.tsv`.
 - **pip / PyPI** (future): create `distribution/pypi/{publish.sh, wheel templates}` +
   `.github/workflows/publish-pip.yml` mirroring `publish-npm.yml`'s two-trigger
   shape. Source the same `distribution/platforms.tsv`. No edits to the npm side.
+  See [`../pypi/README.md`](../pypi/README.md).
 
 Open follow-ups (not blocking the npm channel): Linux 32-bit ARM
 (`linux-arm`, not built by GoReleaser today); auto-promotion of prerelease

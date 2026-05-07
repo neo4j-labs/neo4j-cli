@@ -113,7 +113,7 @@ tasks:
       READMEs"). Match the existing link style (relative paths,
       one-line descriptions where the sibling READMEs use them) and do
       not reorganise either file beyond the minimal addition needed.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -121,4 +121,4 @@ tasks:
       - "`distribution/npm/README.md` has an equivalent link to `../pypi/README.md` in its 'See also' (or sibling-channel) section, matching that file's existing link style."
       - "No other content in either README is reorganised, reworded, or otherwise touched — diff is limited to the new link line(s) and any minimal context needed for the addition to read naturally."
       - "Both new links resolve correctly when the README is previewed on github.com (relative paths land on the file added in task-003)."
-    completed_at: null
+    completed_at: 2026-05-07T13:35:00Z
