@@ -31,14 +31,14 @@ tasks:
       supported configurations for a tenant. Also add a note that region identifiers follow
       each cloud provider's own naming convention (AWS uses us-east-1 style, Azure uses
       eastus style, GCP uses us-central1 style).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Long description explicitly names 'tenant get' as the command to run for discovering supported configurations"
       - "Long description notes that region identifiers follow each cloud provider's naming convention"
       - "Long description remains accurate and does not introduce placeholder text"
       - "No behaviour change — only the Long string is modified"
-    completed_at: null
+    completed_at: "2026-05-07T01:00:00Z"
 
   - id: task-003
     title: "Add cobra Example field with five copy-paste-ready invocations"
