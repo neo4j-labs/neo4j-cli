@@ -113,7 +113,7 @@ Implementation should pick whichever requires the smallest delta against `go-to-
 ## Acceptance Criteria
 
 - [ ] Merging a release PR that publishes `vX.Y.Z-alpha.N` causes [publish-pypi.yml](.github/workflows/publish-pypi.yml) to fire automatically via `workflow_run`, with no manual intervention.
-- [ ] The published wheel filename contains the PEP 440 form of the version (e.g. `neo4j_cli-0.1.0a6-py3-none-manylinux2014_x86_64.whl`).
+- [ ] The published wheel filename contains the PEP 440 form of the version (e.g. `neo4j_cli-0.1.0a6-py3-none-manylinux_2_17_x86_64.whl` — the PEP 600 form that `go-to-wheel 0.2` emits; equivalent to the legacy `manylinux2014_x86_64`).
 - [ ] `pip install neo4j-cli==0.1.0a6` (or the corresponding stable / beta / rc form) succeeds against PyPI from a clean venv on linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64.
 - [ ] The installed wheel ships a binary whose `--version` output matches the original GoReleaser tag (e.g. `0.1.0-alpha.6`), not the PEP 440 form.
 - [ ] `sha256sum` of the binary inside the linux-amd64 wheel matches the binary inside the corresponding GitHub Release archive `neo4j-cli_<version>_linux_amd64.tar.gz`.
