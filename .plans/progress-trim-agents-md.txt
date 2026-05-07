@@ -64,3 +64,24 @@ Key Decisions:
 - Section content matches AGENTS.md lines 286-291 exactly
 
 Next Task: task-005
+
+================================================================================
+TASK-003: Append Changie Workflow Notes, Release Workflow Notes, GoReleaser Notes to .agents/deployment.md
+Date: 2026-05-07T00:20:00Z
+================================================================================
+
+Summary:
+Appended three sections from AGENTS.md verbatim to .agents/deployment.md:
+"Changie Workflow Notes" (5 bullets), "Release Workflow Notes" (11 bullets),
+and "GoReleaser Notes" (4 bullets). All section headings and bullet content
+were preserved exactly. Pre-existing content in the file was not modified.
+
+Files Changed:
+- .agents/deployment.md (modified — sections appended)
+
+Key Decisions:
+- Appended after the existing "npm Publication" section with a blank line separator
+- Documentation-only change; no Go feedback loops required
+- Section content matches AGENTS.md lines 136-168 exactly
+
+Next Task: task-004

@@ -38,14 +38,14 @@ tasks:
       Append the full content of "Changie Workflow Notes", "Release Workflow Notes",
       and "GoReleaser Notes" from AGENTS.md to the existing `.agents/deployment.md`
       file. Preserve section headings and all bullet content verbatim.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/deployment.md` contains the full Changie Workflow Notes section"
       - "`.agents/deployment.md` contains the full Release Workflow Notes section"
       - "`.agents/deployment.md` contains the full GoReleaser Notes section"
       - "Pre-existing content in `.agents/deployment.md` is unchanged"
-    completed_at: null
+    completed_at: "2026-05-07T00:20:00Z"
 
   - id: task-004
     title: "Append common/output Testing Notes to .agents/testing.md"
