@@ -1,0 +1,23 @@
+================================================================================
+TASK-001: Create .agents/query.md with moved query subsystem sections
+Date: 2026-05-07T00:00:00Z
+================================================================================
+
+Summary:
+Created .agents/query.md containing the four query-subsystem sections from
+AGENTS.md verbatim: "Local Verification Scripts", "query Bolt Driver Notes",
+"query/connect.go Credential Integration Notes", and "query Bolt Execution Notes".
+Added a top-level intro heading to make the file self-contained.
+
+Files Changed:
+- .agents/query.md (created — contains all four query sections from AGENTS.md)
+- .plans/tasks-trim-agents-md.yml (updated task-001 status to completed)
+- .plans/progress-trim-agents-md.txt (created this file)
+
+Key Decisions:
+- Kept section content 100% verbatim from AGENTS.md as required
+- Ordered sections with Local Verification Scripts first (it's the shortest
+  and gives context before the deeper technical notes)
+- No changes to Go source files; all feedback gates (test, fmt-check, lint) pass
+
+Next Task: task-002 (Create .agents/cobra.md with Cobra Flag Access Notes)

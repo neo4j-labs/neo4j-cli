@@ -11,13 +11,13 @@ tasks:
       AGENTS.md sections (verbatim): "query Bolt Driver Notes", "query Bolt Execution
       Notes", "query/connect.go Credential Integration Notes", and "Local Verification
       Scripts". Give the file a brief intro header so it is self-contained.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/query.md` exists and contains all four sections verbatim"
       - "File has a top-level heading (e.g. `# Query Subsystem Notes`)"
       - "No content from the four sections is missing or truncated"
-    completed_at: null
+    completed_at: "2026-05-07T00:00:00Z"
 
   - id: task-002
     title: "Create .agents/cobra.md with Cobra Flag Access Notes"
