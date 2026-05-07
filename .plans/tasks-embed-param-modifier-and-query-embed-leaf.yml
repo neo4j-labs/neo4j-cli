@@ -255,7 +255,7 @@ tasks:
       `run_test.go` with end-to-end cases using a fake providerFactory:
       embed-once-up-front, --rw still embeds once, mixing literal +
       embed params, provider error aborts before EXPLAIN.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -268,7 +268,7 @@ tasks:
       - "Provider error during embed aborts the command before any Cypher is sent (verified by a fake driverOpener that panics)."
       - "Mock providerFactory called exactly len(embeds) times per invocation regardless of `--rw`."
       - "All existing run_test.go cases (no embed) continue to pass byte-identical."
-    completed_at: null
+    completed_at: 2026-05-07T15:00:00Z
 
   - id: task-011
     title: "Add `query :embed [text]` standalone leaf and shared input helper"

@@ -331,3 +331,42 @@ Key Decisions:
   in values.
 
 Next Task: task-010
+
+================================================================================
+TASK-010: Register `--embed-*` flags on `query` parent and wire embed resolution into runQuery
+Date: 2026-05-07T15:00:00Z
+================================================================================
+
+Summary:
+Registered five new persistent flags on the query parent (--embed-credential,
+--embed-provider, --embed-model, --embed-base-url, --embed-dimensions). Added
+resolveEmbedJobs in run.go that calls embed.Resolve + embed.Factory()(cfg) +
+provider.Embed for each EmbedJob, populating params before resolveConn (so
+embed errors short-circuit before any driver is opened). The same params map
+then feeds both the EXPLAIN preflight and the real run, so a vector is
+computed exactly once per invocation regardless of --rw routing.
+
+Files Changed:
+- neo4j-cli/query/query.go (5 new persistent flags)
+- neo4j-cli/query/run.go (parseParams 3-tuple, resolveEmbedJobs helper, embed import)
+- neo4j-cli/query/run_test.go (5 new tests + stubEmbedProvider helper; embed import)
+- neo4j-cli/internal/skill/bundle/references/query.md (regenerated)
+
+Key Decisions:
+- resolveEmbedJobs short-circuits when len(embeds) == 0 so the embed package
+  is never consulted for queries that don't use :embed. Keeps the cold path
+  zero-cost for the 99% case.
+- Embed resolution happens BEFORE resolveConn / promptPassword / openDriver
+  so a missing provider key (or any embed error) aborts before we touch the
+  database — protects users from a 5s connect timeout when the real failure
+  was OPENAI_API_KEY.
+- Provider error wrap format `query: embed %q: %w` mirrors the existing
+  `query: read stdin` / `query: read password` idiom for stderr presentation
+  consistency.
+- Tests use `embed.WithFactory(...)` (the cross-package seam) rather than
+  reaching into the unexported providerFactory directly. The driverOpener
+  panic in TestRunQuery_EmbedParam_ProviderErrorAbortsBeforeExplain is the
+  hard signal that we never reach driver construction on the embed-error
+  path.
+
+Next Task: task-011

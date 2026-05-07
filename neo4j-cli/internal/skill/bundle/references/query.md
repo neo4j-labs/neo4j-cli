@@ -12,6 +12,11 @@ Flags:
 |------|------|---------|-------------|
 | `-c, --credential` | string | - | Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
+| `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
+| `--embed-credential` | string | - | Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list') |
+| `--embed-dimensions` | int | 0 | Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS] |
+| `--embed-model` | string | - | Embedding model name [env: NEO4J_EMBED_MODEL] |
+| `--embed-provider` | string | - | Embedding provider: openai \| ollama \| huggingface [env: NEO4J_EMBED_PROVIDER] |
 | `--env` | string | - | Path to a .env file (auto-discovered by walking up from cwd if unset) |
 | `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
 | `--max-rows` | int | 100 | Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON |

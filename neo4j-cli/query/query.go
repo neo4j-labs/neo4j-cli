@@ -38,6 +38,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().StringP("credential", "c", "", "Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list')")
 
+	cmd.PersistentFlags().String("embed-credential", "", "Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list')")
+	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface [env: NEO4J_EMBED_PROVIDER]")
+	cmd.PersistentFlags().String("embed-model", "", "Embedding model name [env: NEO4J_EMBED_MODEL]")
+	cmd.PersistentFlags().String("embed-base-url", "", "Embedding provider base URL [env: NEO4J_EMBED_BASE_URL]")
+	cmd.PersistentFlags().Int("embed-dimensions", 0, "Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS]")
+
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newSchemaCmd(cfg))

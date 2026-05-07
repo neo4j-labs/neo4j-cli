@@ -15,6 +15,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/query/embed"
 )
 
 // passwordReader is the test seam for the no-echo TTY password prompt. The
@@ -55,8 +56,12 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 
 	rawParams, _ := cmd.Flags().GetStringArray("param")
-	params, _, err := parseParams(rawParams)
+	params, embeds, err := parseParams(rawParams)
 	if err != nil {
+		return err
+	}
+
+	if err := resolveEmbedJobs(cmd, cfg, params, embeds); err != nil {
 		return err
 	}
 
@@ -214,4 +219,35 @@ func capRows(values [][]any, maxRows int) ([][]any, bool) {
 		return values, false
 	}
 	return values[:maxRows], true
+}
+
+// resolveEmbedJobs runs each pending EmbedJob through the resolved embed
+// provider and inserts the resulting vector into params under the job's name.
+// The same params map then feeds both the EXPLAIN preflight and the real
+// statement execution, so the vector is computed exactly once per invocation.
+//
+// A no-op when embeds is empty: the embed package is not consulted, so a
+// query that uses no `:embed` params never pays the cost of resolving an
+// embed config or constructing a provider.
+func resolveEmbedJobs(cmd *cobra.Command, cfg *clicfg.Config, params map[string]any, embeds []EmbedJob) error {
+	if len(embeds) == 0 {
+		return nil
+	}
+	ec, err := embed.Resolve(cmd, cfg)
+	if err != nil {
+		return err
+	}
+	provider, err := embed.Factory()(ec)
+	if err != nil {
+		return err
+	}
+	ctx := cmd.Context()
+	for _, j := range embeds {
+		vec, err := provider.Embed(ctx, j.Text)
+		if err != nil {
+			return fmt.Errorf("query: embed %q: %w", j.Name, err)
+		}
+		params[j.Name] = vec
+	}
+	return nil
 }

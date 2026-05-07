@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/query/embed"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
@@ -894,4 +895,206 @@ func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "--password")
 	assert.Contains(t, err.Error(), "NEO4J_PASSWORD")
 	assert.Contains(t, err.Error(), ".env")
+}
+
+// stubEmbedProvider is a deterministic Provider used by the runQuery embed
+// tests below. Embed appends a sentinel float so each invocation can be
+// inspected, and bumps `calls` for cardinality checks. When `failOn` matches
+// the input text exactly, Embed returns an error instead of a vector — used
+// to verify provider errors abort the command before any Cypher is sent.
+type stubEmbedProvider struct {
+	calls  int
+	inputs []string
+	failOn string
+}
+
+func (s *stubEmbedProvider) Embed(_ context.Context, text string) ([]float32, error) {
+	s.calls++
+	s.inputs = append(s.inputs, text)
+	if s.failOn != "" && text == s.failOn {
+		return nil, errors.New("provider boom")
+	}
+	return []float32{1, 2, 3}, nil
+}
+
+// TestRunQuery_EmbedParam_VectorForwardedToBothPreflightAndRun verifies that
+// `--param NAME:embed=TEXT` produces exactly one provider call AND the same
+// vector lands in both the EXPLAIN preflight params map and the real run
+// params map. Locks REQ-F-019: embedding happens once before EXPLAIN.
+func TestRunQuery_EmbedParam_VectorForwardedToBothPreflightAndRun(t *testing.T) {
+	stub := &stubEmbedProvider{}
+	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
+		return stub, nil
+	})
+	t.Cleanup(restore)
+	t.Setenv("NEO4J_EMBED_PROVIDER", "openai")
+	t.Setenv("OPENAI_API_KEY", "k")
+
+	var explainParams, runParams map[string]any
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any, _ bool) (*queryResponse, error) {
+		if strings.HasPrefix(statement, "EXPLAIN ") {
+			explainParams = params
+			resp := makeQueryResponse([]string{"n"}, [][]any{})
+			resp.QueryType = neo4j.QueryTypeReadOnly
+			return resp, nil
+		}
+		runParams = params
+		return makeQueryResponse([]string{"n"}, [][]any{{int64(1)}}), nil
+	})
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--param=q:embed=hello",
+		"RETURN $q",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stub.calls, "provider must be called exactly once per :embed param")
+	assert.Equal(t, []string{"hello"}, stub.inputs)
+	assert.Equal(t, []float32{1, 2, 3}, explainParams["q"])
+	assert.Equal(t, []float32{1, 2, 3}, runParams["q"])
+}
+
+// TestRunQuery_EmbedParam_RWStillEmbedsOnce verifies that --rw routing (which
+// skips EXPLAIN preflight) still results in exactly one provider call: the
+// embed step lives upstream of the preflight branch.
+func TestRunQuery_EmbedParam_RWStillEmbedsOnce(t *testing.T) {
+	stub := &stubEmbedProvider{}
+	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
+		return stub, nil
+	})
+	t.Cleanup(restore)
+	t.Setenv("NEO4J_EMBED_PROVIDER", "ollama")
+
+	var runParams map[string]any
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, _ string, params map[string]any, _ bool) (*queryResponse, error) {
+		runParams = params
+		return makeQueryResponse([]string{}, [][]any{}), nil
+	})
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--rw",
+		"--param=q:embed=hello",
+		"CREATE (n {v: $q}) RETURN n",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stub.calls, "provider must be called exactly once even with --rw")
+	assert.Equal(t, []float32{1, 2, 3}, runParams["q"])
+}
+
+// TestRunQuery_EmbedParam_MixedLiteralAndEmbed verifies a query with both a
+// literal `--param k=v` and a `--param k:embed=...` ends up with both keys in
+// the same params map, with the literal kept as a JSON-typed value and the
+// embed slot replaced by the resolved vector.
+func TestRunQuery_EmbedParam_MixedLiteralAndEmbed(t *testing.T) {
+	stub := &stubEmbedProvider{}
+	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
+		return stub, nil
+	})
+	t.Cleanup(restore)
+	t.Setenv("NEO4J_EMBED_PROVIDER", "openai")
+	t.Setenv("OPENAI_API_KEY", "k")
+
+	var runParams map[string]any
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, params map[string]any, _ bool) (*queryResponse, error) {
+		if strings.HasPrefix(statement, "EXPLAIN ") {
+			resp := makeQueryResponse([]string{"n"}, [][]any{})
+			resp.QueryType = neo4j.QueryTypeReadOnly
+			return resp, nil
+		}
+		runParams = params
+		return makeQueryResponse([]string{"n"}, [][]any{{int64(1)}}), nil
+	})
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--param=limit=10",
+		"--param=q:embed=hello",
+		"RETURN $q, $limit",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stub.calls)
+	assert.Equal(t, []float32{1, 2, 3}, runParams["q"])
+	// JSON-typed literal: 10 unmarshals as float64 (encoding/json's default).
+	assert.Equal(t, float64(10), runParams["limit"])
+}
+
+// TestRunQuery_EmbedParam_ProviderErrorAbortsBeforeExplain verifies a provider
+// error short-circuits the command before any Cypher (including EXPLAIN) is
+// sent to the driver. A panicking driverOpener AND a panicking statement seam
+// confirm we never reach driver construction or statement execution.
+func TestRunQuery_EmbedParam_ProviderErrorAbortsBeforeExplain(t *testing.T) {
+	stub := &stubEmbedProvider{failOn: "boom-input"}
+	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
+		return stub, nil
+	})
+	t.Cleanup(restore)
+	t.Setenv("NEO4J_EMBED_PROVIDER", "openai")
+	t.Setenv("OPENAI_API_KEY", "k")
+
+	// Swap driverOpener to panic so we prove no Bolt driver is ever opened.
+	origOpener := driverOpener
+	t.Cleanup(func() { driverOpener = origOpener })
+	driverOpener = func(_, _, _, _ string) (neo4j.Driver, error) {
+		panic("driverOpener must not be called when embed errors before driver-open")
+	}
+
+	origFn := runStatementResponseFn
+	t.Cleanup(func() { runStatementResponseFn = origFn })
+	runStatementResponseFn = func(_ context.Context, _ *conn, statement string, _ map[string]any, _ bool) (*queryResponse, error) {
+		t.Fatalf("statement seam must not be called when provider errors: got %q", statement)
+		return nil, nil
+	}
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--param=q:embed=boom-input",
+		"RETURN $q",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "embed")
+	assert.Contains(t, err.Error(), "provider boom")
+	assert.Equal(t, 1, stub.calls, "provider was the failing call site; should be hit exactly once")
+}
+
+// TestRunQuery_EmbedParam_MultipleJobsPreserveOrder verifies multiple
+// `:embed` params produce one provider call per job in command-line order;
+// each entry's vector lands in its own params slot.
+func TestRunQuery_EmbedParam_MultipleJobsPreserveOrder(t *testing.T) {
+	stub := &stubEmbedProvider{}
+	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
+		return stub, nil
+	})
+	t.Cleanup(restore)
+	t.Setenv("NEO4J_EMBED_PROVIDER", "openai")
+	t.Setenv("OPENAI_API_KEY", "k")
+
+	withRunStatementSeam(t, func(_ context.Context, _ *conn, statement string, _ map[string]any, _ bool) (*queryResponse, error) {
+		if strings.HasPrefix(statement, "EXPLAIN ") {
+			resp := makeQueryResponse([]string{"n"}, [][]any{})
+			resp.QueryType = neo4j.QueryTypeReadOnly
+			return resp, nil
+		}
+		return makeQueryResponse([]string{"n"}, [][]any{{int64(1)}}), nil
+	})
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--param=a:embed=first",
+		"--param=b:embed=second",
+		"RETURN $a, $b",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stub.calls)
+	assert.Equal(t, []string{"first", "second"}, stub.inputs)
 }
