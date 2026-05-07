@@ -14,6 +14,38 @@ npm i -g @neo4j-labs/cli
 
 Installs a small Node wrapper plus a prebuilt `neo4j-cli` binary matching your OS and CPU. `pnpm add -g @neo4j-labs/cli` and `yarn global add @neo4j-labs/cli` work the same way. Prereleases via `npm i -g @neo4j-labs/cli@alpha` (also `@beta`, `@rc`, `@next`). See [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md) for the supported platform matrix.
 
+> Note: To install a pre-release, the version must be specified for pip, pipx etc..  This is achieved by adding == immediately after neo4j-cli with the version you want. For example, pipx install neo4j-cli==0.1.0a6  will install 0.1.0a6 of Neo4j CLI
+>
+
+### pip
+
+```bash
+pip install neo4j-cli
+```
+
+### pipx
+
+```bash
+pipx install neo4j-cli
+```
+
+### uv
+
+```bash
+uv tool install neo4j-cli
+```
+
+### uvx
+
+uvx will install and execute neo4j-cli. This means that you must include the commands you want to use with uvx
+
+```bash
+uvx -i neo4j-cli YOUR_COMMANDS
+```
+
+Check the installation by running neo4j-cli --help
+
+
 ## Usage
 
 Extract the executable to a directory of your choosing.
