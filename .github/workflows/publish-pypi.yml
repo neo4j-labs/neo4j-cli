@@ -47,13 +47,21 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Skip the auto path entirely if the upstream release didn't succeed. The
-    # include_neo4j gate is applied per-step below (after we've downloaded the
-    # release-meta.json artifact and parsed it). For workflow_dispatch we
+    # Skip the auto path entirely unless the upstream release succeeded AND
+    # ran on the default branch from a `push` event. The branch + event guard
+    # closes the cache-poisoning vector that CodeQL flags on workflow_run
+    # handlers: even if a malicious workflow named "release" ran on a fork
+    # PR or non-default branch, this gate prevents us from consuming its
+    # artifacts. release.yml is itself restricted to push-to-main upstream,
+    # but CodeQL does not trace that — the guard belongs here. The
+    # include_neo4j gate is applied per-step below (after we have downloaded
+    # the release-meta.json artifact and parsed it). For workflow_dispatch we
     # always run.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+       github.event.workflow_run.event == 'push')
     outputs:
       original_version: ${{ steps.versions.outputs.original_version }}
       pep440_version: ${{ steps.versions.outputs.pep440_version }}
@@ -119,6 +127,34 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
+      - name: Verify dist archives against release checksums (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DOWNLOADED: ${{ runner.temp }}/downloaded-dist
+          CHECKSUMS_DIR: ${{ runner.temp }}/release-checksums
+        run: |
+          # Defence-in-depth against the workflow_run cache-poisoning class:
+          # verify each archive in the downloaded dist artifact against the
+          # checksums.txt published by GoReleaser to the GitHub Release.
+          # CRITICAL: download checksums.txt to a SEPARATE directory, not
+          # alongside the dist artifact contents — the dist artifact itself
+          # contains its own checksums.txt (GoReleaser writes one to dist/),
+          # but trusting that file would be circular: if the artifact were
+          # tampered with, its bundled checksums.txt could be too. The
+          # GitHub Release is the independent trusted source.
+          mkdir -p "${CHECKSUMS_DIR}"
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*_checksums.txt' \
+            --dir "${CHECKSUMS_DIR}"
+          CHECKSUMS=$(ls "${CHECKSUMS_DIR}"/*_checksums.txt | head -n1)
+          test -f "${CHECKSUMS}"
+          ( cd "${DOWNLOADED}" && sha256sum -c "${CHECKSUMS}" )
+
       - name: Prepare dist from downloaded artifact (auto)
         if: >-
           github.event_name == 'workflow_run' &&
@@ -158,7 +194,9 @@ jobs:
           # Mirror the GoReleaser dist/ layout from already-published GH release
           # archives, no GoReleaser re-invocation needed. The wheel-build step
           # expects dist/<archive_basename>/<binary>; archive_basename matches
-          # the .tar.gz / .zip filename without the extension.
+          # the .tar.gz / .zip filename without the extension. The `neo4j-cli_*`
+          # pattern matches both the platform archives AND the checksums.txt
+          # we use in the verify step below.
           mkdir -p "${{ runner.temp }}/dist-archives" dist
           gh release download "v${VERSION}" \
             --repo "${GITHUB_REPOSITORY}" \
@@ -166,6 +204,19 @@ jobs:
             --dir "${{ runner.temp }}/dist-archives/"
           echo "[publish-pypi] downloaded archives:"
           ls -la "${{ runner.temp }}/dist-archives/"
+
+      - name: Verify release archives against checksums (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ARCHIVES_DIR: ${{ runner.temp }}/dist-archives
+        run: |
+          # Same defence-in-depth pattern as the auto path: verify each
+          # archive against GoReleaser's checksums.txt before extracting.
+          # The checksums.txt was already downloaded alongside the archives
+          # by the previous step (the `neo4j-cli_*` pattern matches it).
+          CHECKSUMS=$(ls "${ARCHIVES_DIR}"/*_checksums.txt | head -n1)
+          test -f "${CHECKSUMS}"
+          ( cd "${ARCHIVES_DIR}" && sha256sum -c "$(basename "${CHECKSUMS}")" )
 
       - name: Extract release archives (manual)
         if: github.event_name == 'workflow_dispatch'
