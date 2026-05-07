@@ -338,7 +338,7 @@ tasks:
       unbroken. Verify by inspection that no `Authorization` header value
       appears anywhere in the test output for failing-provider tests and
       that no `query` package test references `afero.NewOsFs`.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -347,4 +347,4 @@ tasks:
       - "Existing `query` and `credential dbms` behaviours pass byte-identical to before this feature when no embed flag/param is used."
       - "No new test in this feature uses `afero.NewOsFs()` in the query package; all use `testfs.GetTestFs(...)`."
       - "Grep across test output confirms no Authorization header value leakage from provider error paths."
-    completed_at: null
+    completed_at: 2026-05-07T16:00:00Z

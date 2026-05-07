@@ -118,6 +118,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 
 ## Makefile Notes
 
+- `make generate-check` is `git diff --exit-code` after `go generate`. It flags ANY tracked-file diff, including unrelated edits in the working tree (e.g. a `.plans/tasks-*.yml` status flip). When validating "did this task introduce bundle drift?", inspect the diff output — only `internal/skill/bundle/**` paths matter for the gate. The hone harness's mid-task in_progress flip will always show up here; ignore it.
 - `license-check` target uses `$(GOPATH)/bin/addlicense` (not bare `addlicense`) — GOPATH/bin may not be on PATH
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
 - `make generate` runs `go generate ./...`; `make generate-check` runs generate then `git diff --exit-code` (CI gate). Wired in `.github/workflows/test.yml` between Build and Lint, runs on full OS matrix.

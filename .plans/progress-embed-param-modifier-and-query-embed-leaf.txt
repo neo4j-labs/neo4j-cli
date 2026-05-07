@@ -452,3 +452,32 @@ Key Decisions:
   diff reported by --exit-code reflected only bundle drift; passed clean.
 
 Next Task: task-013 (final gate)
+
+================================================================================
+TASK-013: Final gate — lint, fmt-check, full test suite, Bolt smoke pass
+Date: 2026-05-07T16:00:00Z
+================================================================================
+
+Summary:
+Verification-only task. Ran `make fmt-check`, `make lint`, `make test`,
+`make generate-check`, and the gated Bolt smoke
+(`NEO4J_BOLT_TEST=1 go test -run TestBolt_Smoke -v ./neo4j-cli/query/...`).
+All exited 0. `make generate-check` reported only the task-yaml status
+flip from this very task (no bundle / source drift). Verified no
+`afero.NewOsFs` references in the query package and that the auth-leak
+NotContains assertions in openai_test.go and huggingface_test.go are
+present and pass.
+
+Files Changed:
+- .plans/tasks-embed-param-modifier-and-query-embed-leaf.yml (status flip only)
+- .plans/progress-embed-param-modifier-and-query-embed-leaf.txt (this entry)
+
+Key Decisions:
+- generate-check's only diff was the task-yaml in_progress flip — that
+  is the expected harness behaviour, not real bundle drift. Bundle was
+  pre-confirmed clean by tasks 004/010/011/012 each running go generate.
+- Bolt smoke ran in 5.78s end-to-end (read/write/schema EXPLAIN
+  classification) — confirms the embed work has not regressed the
+  regular query path.
+
+Feature Complete: all 13 tasks now status=completed.
