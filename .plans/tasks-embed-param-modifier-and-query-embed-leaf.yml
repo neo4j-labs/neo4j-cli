@@ -18,7 +18,7 @@ tasks:
       Dbms block at lines 45-65). Add `embed_test.go` covering add/remove/
       default round-trip, JSON round-trip preserves `api-key` on disk,
       `Printable` omits it, first-added becomes default.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "EmbedCredential and EmbedCredentials types defined with kebab-case JSON keys (base-url, api-key)."
@@ -26,7 +26,7 @@ tasks:
       - "credentials.json round-trips: add a cred, reload Credentials, default and fields preserved including api-key on disk."
       - "First credential added is automatically marked default (matches DbmsCredentials.Add)."
       - "onUpdate callback rewired correctly post-load so subsequent mutations persist."
-    completed_at: null
+    completed_at: 2026-05-07T11:00:00Z
 
   - id: task-002
     title: "Add `credential embed {add,list,remove,use}` cobra subtree"

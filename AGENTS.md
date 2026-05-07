@@ -188,9 +188,10 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 
 ## Credentials Storage Notes
 
-- `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Dbms` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
-- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies.
-- `PrintableDbmsCredentials.AsArray()` and `MarshalJSON()` intentionally omit `password` — any future credential type that has sensitive fields must also exclude them from both methods.
+- `Credentials.load()` re-wires `onUpdate` on Aura, Dbms, AND Embed after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
+- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies. `EmbedCredentials.GetDefault()` follows the same convention.
+- `PrintableDbmsCredentials.AsArray()` / `MarshalJSON()` omit `password`; `PrintableEmbedCredentials.AsArray()` / `MarshalJSON()` omit `api-key`. Any future credential type with sensitive fields must follow this pattern.
+- When adding a new credential type to `CredentialsFile` with `omitempty`, `load()` must defensively re-init the field if older credentials.json files lack the key — otherwise `c.Embed.onUpdate = c.save` panics on nil. Mirror the `if c.Embed == nil { ... }` guard in credentials.go.
 - `PrintBodyMap` `fields` slice only affects TABLE rendering — it is ignored for JSON/toon formats. To suppress a sensitive field (e.g. `password`) from ALL output formats you must `delete(data, "field")` from the map before passing to `NewSingleValueResponseData`. The `fields` slice alone is insufficient.
 - `DbmsCredentials.Add` can only fail with "already exists". Since `resolveCredentialName` guarantees the resolved name is free, Add cannot fail in a single-threaded context after a successful `resolveCredentialName` call. Storage failure warning paths are effectively dead code in normal operation.
 - To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.

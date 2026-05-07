@@ -1,0 +1,27 @@
+================================================================================
+TASK-001: Add EmbedCredentials storage type and wire into Credentials
+Date: 2026-05-07T11:00:00Z
+================================================================================
+
+Summary:
+Added EmbedCredential / EmbedCredentials types mirroring the dbms equivalents.
+Wired into CredentialsFile + Credentials with onUpdate rewire after JSON
+unmarshal. Printable types omit api-key from AsArray and MarshalJSON; on-disk
+credentials.json preserves api-key. First credential added becomes default.
+
+Files Changed:
+- common/clicfg/credentials/embed.go (created)
+- common/clicfg/credentials/embed_test.go (created)
+- common/clicfg/credentials/credentials.go (modified: added Embed field, init, onUpdate rewire, save block)
+
+Key Decisions:
+- Mirror DbmsCredentials API exactly so cobra leaf code in task-002 can be
+  copy-paste from dbms.
+- Add(name, provider, model, baseURL, apiKey, dimensions) — explicit positional
+  signature matches Add for dbms; keeps the struct field order documented.
+- Embed re-init guard in load() handles the case where credentials.json exists
+  but has no "embed" key (older files written before this change).
+- omitempty on CredentialsFile.Embed kept to avoid noisy `"embed":null` writes
+  from older code paths; load() always reinstates a non-nil Embed before save.
+
+Next Task: task-002
