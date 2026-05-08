@@ -496,7 +496,7 @@
   .examples {
     display: grid;
     grid-template-columns: 220px 1fr;
-    gap: 24px;
+    column-gap: 24px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -609,6 +609,64 @@
   .example-pane .ok { color: var(--terminal-prompt); }
   .example-pane .info { color: var(--code-fn); }
 
+  /* ---------- Human / Agent mode toggle ---------- */
+  .mode-btn {
+    padding: 3px 11px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.1s;
+    line-height: 1.6;
+  }
+  .mode-btn:hover { color: var(--fg); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .mode-btn.active {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  }
+  .mode-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 14px;
+  }
+  .mode-bar .mode-label {
+    color: var(--fg-faint);
+    font-size: 11px;
+    margin-right: 4px;
+    font-family: var(--font-mono);
+    user-select: none;
+  }
+  /* examples mode bar: first child inside the grid, spans both cols */
+  .examples > .mode-bar {
+    grid-column: 1 / -1;
+    background: var(--bg-alt);
+    border-bottom: 1px solid var(--border);
+  }
+  /* quickstart mode bar: sits above .steps, centered */
+  .quickstart-mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 0 20px;
+    font-family: var(--font-mono);
+  }
+  .quickstart-mode-bar .mode-label {
+    color: var(--fg-faint);
+    font-size: 11px;
+    margin-right: 4px;
+    user-select: none;
+  }
+  /* Unified agentic/cli toggle — agentic mode by default */
+  .agentic-comment { color: var(--terminal-prompt); }
+  .examples.cli-mode .agentic-line { display: none; }
+  #quickstartSteps.cli-mode .agentic-line { display: none; }
+
   /* ---------- Quickstart ---------- */
   .steps {
     display: grid;
@@ -661,17 +719,15 @@
   .step p a:hover { text-decoration: underline; }
   .step-link { color: var(--accent); font-weight: 500; }
   .step .step-cmd {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: block;
     background: var(--bg-code);
     color: var(--code-fg);
-    padding: 10px 14px;
+    padding: 10px 36px 10px 14px;
     border-radius: 6px;
     font-family: var(--font-mono);
     font-size: 13px;
     overflow-x: auto;
-    white-space: nowrap;
+    white-space: pre;
     cursor: pointer;
     transition: background-color 0.1s;
     position: relative;
@@ -679,7 +735,7 @@
   }
   .step .step-cmd::-webkit-scrollbar { display: none; }
   .step .step-cmd:hover { background: #1a212a; }
-  .step .step-cmd .prompt { color: var(--terminal-prompt); flex-shrink: 0; }
+  .step .step-cmd .prompt { color: var(--terminal-prompt); }
   .step .step-cmd .copy-icon {
     position: absolute;
     right: 10px;
@@ -857,50 +913,66 @@
       <span class="section-eyebrow">quickstart</span>
       <h2 class="section-title">From zero to graph in 60 seconds.</h2>
       <p class="section-sub">
-        New to Neo4j? AuraDB has a free tier — no credit card. The CLI walks
-        you through connecting it.
+        New to Neo4j? AuraDB has a free tier — no credit card.
       </p>
     </div>
 
-    <div class="steps">
+    <div class="quickstart-mode-bar">
+      <button class="mode-btn" data-qs-mode="cli">cli</button>
+      <button class="mode-btn active" data-qs-mode="agentic">agentic</button>
+    </div>
+
+    <div class="steps" id="quickstartSteps">
+      <!-- Step 1: always CLI -->
       <div class="step">
         <div class="step-num">1</div>
         <h3>Install the CLI</h3>
         <p>Pick your platform from the <a href="#install" class="step-link">install tabs</a> above, or use the one-liner for your OS.</p>
-        <div class="step-cmd" id="quickstartInstallCmd" data-copy="curl -sSfL https://neo4j.sh/install.sh | bash">
-          <span class="prompt" id="quickstartPrompt">$</span><span id="quickstartCmdText">curl <span class="flag">-sSfL</span> https://neo4j.sh/install.sh | bash</span>
-          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
-        </div>
+        <div class="step-cmd" id="quickstartInstallCmd" data-copy="curl -sSfL https://neo4j.sh/install.sh | bash"><span class="prompt" id="quickstartPrompt">$</span><span id="quickstartCmdText"> curl <span class="flag">-sSfL</span> https://neo4j.sh/install.sh | bash</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
+      <!-- Step 2: always CLI -->
       <div class="step">
         <div class="step-num">2</div>
         <h3>Install the skill</h3>
         <p>Teaches Claude Code, Codex, Cursor, and all others how to drive the CLI. <a href="#examples" data-activate-tab="skill" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli skill install --rw">
-          <span class="prompt">$</span><span>neo4j-cli skill install <span style="color:var(--code-flag)">--rw</span></span>
-          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
-        </div>
+        <div class="step-cmd" data-copy="neo4j-cli skill install"><span class="prompt">$</span><span> neo4j-cli skill install</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
+      <!-- Step 3 -->
       <div class="step">
         <div class="step-num">3</div>
         <h3>Add Aura credentials</h3>
-        <p>Grab a client ID + secret from your <a href="https://console.neo4j.io/#account" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">Aura account</a> and register them. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli credential aura-client add --name &quot;default&quot; --client-id &lt;id&gt; --client-secret &lt;secret&gt; --rw">
-          <span class="prompt">$</span><span>neo4j-cli credential aura-client add --name <span style="color:var(--code-string)">"default"</span> --rw ...</span>
-          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
-        </div>
+        <p>Grab a client ID + secret from your <a href="https://console.neo4j.io/#account" target="_blank" rel="noopener" class="step-link">Aura account</a> and register them. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
+        <div class="step-cmd" data-copy="neo4j-cli credential aura-client add --name &quot;default&quot; --client-id &lt;id&gt; --client-secret &lt;secret&gt; --rw"><span class="agentic-line"><span class="agentic-comment"># Add my Aura credentials — grab client ID and secret from console.neo4j.io</span>
+</span><span class="prompt">$</span> neo4j-cli credential aura-client add --name <span style="color:var(--code-string)">"default"</span> --rw ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
+      <!-- Step 4 -->
       <div class="step">
         <div class="step-num">4</div>
+        <h3>Create an instance</h3>
+        <p>Provision a new Aura instance. Free tier needs no credit card. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
+        <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --cloud-provider aws --region us-east-1 --tier free"><span class="agentic-line"><span class="agentic-comment"># Create a free Aura instance called movies-dev in us-east-1</span>
+</span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --tier <span style="color:var(--code-keyword)">free</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step">
+        <div class="step-num">5</div>
+        <h3>Insert data</h3>
+        <p>Pass typed params inline with <code style="font-size:12px">--param</code>, or pipe a Cypher file. <a href="#examples" data-activate-tab="pipe" class="step-link">↓</a></p>
+        <div class="step-cmd" data-copy="neo4j-cli query --rw 'UNWIND $p AS r CREATE (:Person {name:r.name,born:r.born})' --param 'p=[{&quot;name&quot;:&quot;Alice&quot;,&quot;born&quot;:1990},{&quot;name&quot;:&quot;Bob&quot;,&quot;born&quot;:1985},{&quot;name&quot;:&quot;Carol&quot;,&quot;born&quot;:1992}]'"><span class="agentic-line"><span class="agentic-comment"># Insert 3 Person nodes: Alice born 1990, Bob 1985, Carol 1992</span>
+</span><span class="prompt">$</span> neo4j-cli query <span style="color:var(--code-keyword)">--rw</span> <span style="color:var(--code-string)">'UNWIND $p AS r CREATE (:Person …)'</span> <span style="color:var(--code-keyword)">--param</span> <span style="color:var(--code-string)">'p=[…]'</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step">
+        <div class="step-num">6</div>
         <h3>Query your database</h3>
         <p>Run Cypher against any Neo4j. Pretty table by default; JSON when piped. <a href="#examples" data-activate-tab="query" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli query 'MATCH (n) RETURN count(n)'">
-          <span class="prompt">$</span><span>neo4j-cli query <span style="color:var(--code-string)">'MATCH (n) RETURN count(n)'</span></span>
-          <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
-        </div>
+        <div class="step-cmd" data-copy="neo4j-cli query 'MATCH (p:Person) WHERE p.born < 1990 RETURN p.name, p.born ORDER BY p.born'"><span class="agentic-line"><span class="agentic-comment"># Find all people born before 1990 and return their names</span>
+</span><span class="prompt">$</span> neo4j-cli query <span style="color:var(--code-string)">'MATCH (p:Person) WHERE p.born &lt; 1990 RETURN p.name, p.born'</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
     </div>
   </div>
@@ -918,7 +990,14 @@
       </p>
     </div>
 
-    <div class="examples">
+    <div class="examples" id="examplesSection">
+      <!-- mode bar spans both grid columns -->
+      <div class="mode-bar">
+        <span class="mode-label">view as</span>
+        <button class="mode-btn" data-ex-mode="cli">cli</button>
+        <button class="mode-btn active" data-ex-mode="agentic">agentic</button>
+      </div>
+
       <div class="example-tabs" role="tablist">
         <button class="example-tab active" data-tab="aura" role="tab">
           <span>aura</span>
@@ -945,25 +1024,33 @@
       <!-- aura -->
       <div class="example-pane active" data-pane="aura">
         <div class="example-header">
-          <span class="desc">Manage Aura instances from the terminal</span>
+          <span class="desc">Manage Aura instances — credentials, create, list</span>
           <button class="copy-mini" data-copy-pane="aura">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             copy
           </button>
         </div>
-<pre><span class="comment"># add your Aura API credentials (one-time)</span>
+<pre><span class="agentic-line"><span class="agentic-comment"># Set up my Aura environment — add credentials, create a free movies instance, then list all</span>
+</span><span class="comment"># add your Aura API credentials (one-time)</span>
 <span class="prompt">$</span> neo4j-cli credential aura-client add <span class="flag">--name</span> <span class="string">"prod"</span> <span class="flag">--rw</span> \
     <span class="flag">--client-id</span> <span class="string">&lt;client-id&gt;</span> <span class="flag">--client-secret</span> <span class="string">&lt;secret&gt;</span>
 
 <span class="ok">✓</span> credential <span class="string">"prod"</span> saved · set as default
 
-<span class="comment"># list your instances</span>
+<span class="comment"># create a free instance</span>
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> <span class="string">"movies-dev"</span> \
+    <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--tier</span> <span class="keyword">free</span>
+
+<span class="info">▸</span> instance creating… (may take ~60s)
+<span class="ok">✓</span> movies-dev (<span class="string">f1ab2c34</span>) · <span class="keyword">free</span> · <span class="info">us-east-1</span> · <span class="ok">running</span>
+
+<span class="comment"># list instances</span>
 <span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> table
 
 <span class="out">┌──────────┬───────────────┬────────┬───────────┬─────────┐
 │ id       │ name          │ tier   │ region    │ status  │
 ├──────────┼───────────────┼────────┼───────────┼─────────┤
-│ <span class="string">f1ab2c34</span> │ <span class="string">movies-prod</span>   │ <span class="keyword">free</span>   │ <span class="info">us-east-1</span> │ <span class="ok">running</span> │
+│ <span class="string">f1ab2c34</span> │ <span class="string">movies-dev</span>    │ <span class="keyword">free</span>   │ <span class="info">us-east-1</span> │ <span class="ok">running</span> │
 │ <span class="string">9d8e7f6a</span> │ <span class="string">staging</span>       │ <span class="keyword">pro</span>    │ <span class="info">eu-west-1</span> │ <span class="ok">running</span> │
 └──────────┴───────────────┴────────┴───────────┴─────────┘</span>
 </pre>
@@ -978,31 +1065,30 @@
             copy
           </button>
         </div>
-<pre><span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (p:Person {name:$name})-[:ACTED_IN]-&gt;(m) RETURN m.title'</span> \
-    <span class="flag">--param</span> name=Alice
+<pre><span class="agentic-line"><span class="agentic-comment"># Who are the top 3 directors by movie count? List their movies sorted by year.</span>
+</span><span class="comment"># check structure first</span>
+<span class="prompt">$</span> neo4j-cli query :schema
 
-<span class="out">┌────────────────────┐
-│ m.title            │
-├────────────────────┤
-│ <span class="string">"The Matrix"</span>       │
-│ <span class="string">"John Wick"</span>        │
-│ <span class="string">"Speed"</span>            │
-└────────────────────┘</span>
+<span class="comment"># find top directors</span>
+<span class="prompt">$</span> neo4j-cli query \
+    <span class="string">'MATCH (d:Person)-[:DIRECTED]-&gt;(m:Movie)
+     WITH d, collect(m) AS movies ORDER BY size(movies) DESC LIMIT 3
+     UNWIND movies AS m
+     RETURN d.name AS director, m.title AS movie, m.released AS year
+     ORDER BY director, year'</span>
 
-<span class="info">▸</span> <span class="num">3</span> rows · <span class="num">42</span>ms · connected to <span class="string">neo4j+s://f1ab…b2.databases.neo4j.io</span>
+<span class="out">┌────────────────────┬──────────────────────────────┬──────┐
+│ director           │ movie                        │ year │
+├────────────────────┼──────────────────────────────┼──────┤
+│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Close Encounters"</span>           │ <span class="num">1977</span> │
+│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Raiders of the Lost Ark"</span>    │ <span class="num">1981</span> │
+│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Schindler's List"</span>           │ <span class="num">1993</span> │
+│ <span class="string">"Martin Scorsese"</span>  │ <span class="string">"Goodfellas"</span>                 │ <span class="num">1990</span> │
+└────────────────────┴──────────────────────────────┴──────┘</span>
 
-<span class="comment"># typed params via JSON</span>
+<span class="comment"># typed params, writes (--rw), and env-based connection all supported</span>
 <span class="prompt">$</span> neo4j-cli query <span class="string">'RETURN $ids'</span> <span class="flag">--param</span> <span class="string">'ids=[1,2,3]'</span>
-
-<span class="comment"># writes require --rw (EXPLAIN preflight blocks unintended mutations)</span>
-<span class="prompt">$</span> neo4j-cli query <span class="string">'CREATE (:Person {name:"Alice"})'</span> <span class="flag">--rw</span>
-
-<span class="comment"># connection settings: flag → env → .env → default</span>
-<span class="comment">#   --uri / NEO4J_URI            (default: neo4j://localhost:7687)</span>
-<span class="comment">#   --username / NEO4J_USERNAME  (default: neo4j)</span>
-<span class="comment">#   --password / NEO4J_PASSWORD  (prompted on TTY)</span>
-<span class="comment">#   --database / NEO4J_DATABASE  (default: neo4j)</span>
-<span class="comment"># http(s):// URIs auto-rewrite to neo4j(+s)://&lt;host&gt;:7687</span>
+<span class="prompt">$</span> neo4j-cli query <span class="string">'CREATE (:Person {name:$n})'</span> <span class="flag">--rw</span> <span class="flag">--param</span> n=Alice
 </pre>
       </div>
 
@@ -1015,7 +1101,8 @@
             copy
           </button>
         </div>
-<pre><span class="prompt">$</span> neo4j-cli query :schema
+<pre><span class="agentic-line"><span class="agentic-comment"># What's in my database? Show all labels, relationships, indexes, and count per type.</span>
+</span><span class="prompt">$</span> neo4j-cli query :schema
 
 <span class="info">▸</span> <span class="keyword">node labels</span>
    :Movie  (<span class="num">38</span>)   :Person  (<span class="num">133</span>)   :Genre  (<span class="num">13</span>)
@@ -1031,32 +1118,51 @@
 <span class="info">▸</span> <span class="keyword">constraints</span>
    <span class="ok">●</span> Movie.id  IS UNIQUE
    <span class="ok">●</span> Person.id IS UNIQUE
+
+<span class="comment"># count nodes per label</span>
+<span class="prompt">$</span> neo4j-cli query \
+    <span class="string">'MATCH (n) RETURN labels(n)[0] AS label, count(n) AS cnt ORDER BY cnt DESC'</span>
+
+<span class="out">┌──────────┬─────┐
+│ label    │ cnt │
+├──────────┼─────┤
+│ <span class="string">Person</span>   │ <span class="num">133</span> │
+│ <span class="string">Movie</span>    │  <span class="num">38</span> │
+│ <span class="string">Genre</span>    │  <span class="num">13</span> │
+└──────────┴─────┘</span>
 </pre>
       </div>
 
       <!-- pipe -->
       <div class="example-pane" data-pane="pipe">
         <div class="example-header">
-          <span class="desc">Pipe Cypher in, JSON out — friendly to scripts</span>
+          <span class="desc">Pipe Cypher in, JSON out — params, files, scripts</span>
           <button class="copy-mini" data-copy-pane="pipe">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             copy
           </button>
         </div>
-<pre><span class="comment"># cypher from stdin, JSON to stdout (auto when piped)</span>
-<span class="prompt">$</span> <span class="fn">echo</span> <span class="string">'MATCH (n) RETURN count(n) AS n'</span> | neo4j-cli query
+<pre><span class="agentic-line"><span class="agentic-comment"># Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON</span>
+</span><span class="comment"># pipe a cypher file (--rw for writes)</span>
+<span class="prompt">$</span> neo4j-cli query <span class="flag">--rw</span> &lt; seeds/people.cypher
 
-<span class="out">{
-  <span class="string">"columns"</span>: [<span class="string">"n"</span>],
-  <span class="string">"rows"</span>: [{ <span class="string">"n"</span>: <span class="num">184</span> }],
-  <span class="string">"truncated"</span>: <span class="keyword">false</span>,
-  <span class="string">"arrays_truncated"</span>: <span class="num">0</span>
-}</span>
+<span class="ok">✓</span>  <span class="num">247</span> rows affected · <span class="num">84</span>ms
 
-<span class="comment"># tune the row cap (0 = unlimited)</span>
-<span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (m:Movie) RETURN m'</span> <span class="flag">--max-rows</span> <span class="num">0</span>
+<span class="comment"># pipe result to jq to filter and reshape</span>
+<span class="prompt">$</span> neo4j-cli query \
+    <span class="string">'MATCH (p:Person) RETURN p.name AS name, p.born AS born ORDER BY p.born DESC LIMIT 3'</span> \
+    | jq <span class="string">'.rows[] | {name: .[0], born: .[1]}'</span>
 
-<span class="comment"># drive it from anywhere with env vars or .env (auto-discovered)</span>
+<span class="out">{<span class="string">"name"</span>: <span class="string">"Carol"</span>, <span class="string">"born"</span>: <span class="num">1992</span>}
+{<span class="string">"name"</span>: <span class="string">"Alice"</span>, <span class="string">"born"</span>: <span class="num">1990</span>}
+{<span class="string">"name"</span>: <span class="string">"Bob"</span>,   <span class="string">"born"</span>: <span class="num">1985</span>}</span>
+
+<span class="comment"># inline params instead of a file</span>
+<span class="prompt">$</span> neo4j-cli query <span class="flag">--rw</span> \
+    <span class="string">'UNWIND $p AS r CREATE (:Person {name:r.name,born:r.born})'</span> \
+    <span class="flag">--param</span> <span class="string">'p=[{"name":"Alice","born":1990},{"name":"Bob","born":1985}]'</span>
+
+<span class="comment"># connection via env or .env (auto-discovered)</span>
 <span class="prompt">$</span> NEO4J_URI=neo4j+s://f1ab…b2.databases.neo4j.io \
   NEO4J_PASSWORD=<span class="string">$AURA_PW</span> \
   neo4j-cli query <span class="string">'MATCH (n) RETURN count(n)'</span>
@@ -1066,13 +1172,14 @@
       <!-- skill -->
       <div class="example-pane" data-pane="skill">
         <div class="example-header">
-          <span class="desc">Teach your AI agents how to drive the CLI</span>
+          <span class="desc">Teach your AI agents the full CLI API in one command</span>
           <button class="copy-mini" data-copy-pane="skill">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             copy
           </button>
         </div>
-<pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
+<pre><span class="agentic-line"><span class="agentic-comment"># Install the neo4j skill for all my agents, then verify it's up to date everywhere</span>
+</span><span class="prompt">$</span> neo4j-cli skill install
 
 <span class="info">▸</span> detecting installed agents…
 <span class="ok">✓</span> claude-code     installed (v1.4.0)
@@ -1080,21 +1187,21 @@
 <span class="ok">✓</span> windsurf        installed (v1.4.0)
 <span class="info">○</span> copilot         not detected — skipped
 <span class="info">○</span> gemini-cli      not detected — skipped
-<span class="info">○</span> cline           not detected — skipped
 <span class="info">○</span> codex           not detected — skipped
-<span class="info">○</span> pi              not detected — skipped
-<span class="info">○</span> opencode        not detected — skipped
-<span class="info">○</span> junie           not detected — skipped
 
-<span class="info">▸</span> bundle reflects the default-config command surface
 <span class="info">▸</span> agents now know: aura, query, :schema, env resolution, JSON envelope
 
-<span class="comment"># target a single agent</span>
-<span class="prompt">$</span> neo4j-cli skill install claude-code <span class="flag">--rw</span>
-
-<span class="comment"># list state and check for version drift</span>
-<span class="prompt">$</span> neo4j-cli skill list
+<span class="comment"># check for version drift across all agents</span>
 <span class="prompt">$</span> neo4j-cli skill check
+
+<span class="ok">✓</span> claude-code     v1.4.0  up to date
+<span class="ok">✓</span> cursor          v1.4.0  up to date
+<span class="info">!</span> windsurf        v1.3.2  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf
+
+<span class="comment"># update the outdated one</span>
+<span class="prompt">$</span> neo4j-cli skill install windsurf
+
+<span class="ok">✓</span> windsurf        updated to v1.4.0
 </pre>
       </div>
     </div>
@@ -1290,7 +1397,27 @@
     a.addEventListener('click', () => activateExampleTab(a.dataset.activateTab));
   });
 
-  // ---------- Per-pane copy ----------
+  // ---------- cli / agentic mode — global state ----------
+  let viewMode = 'agentic';
+  const examplesEl = document.getElementById('examplesSection');
+  const quickstartStepsEl = document.getElementById('quickstartSteps');
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    examplesEl.classList.toggle('cli-mode', mode === 'cli');
+    quickstartStepsEl.classList.toggle('cli-mode', mode === 'cli');
+    document.querySelectorAll('[data-ex-mode]').forEach(b =>
+      b.classList.toggle('active', b.dataset.exMode === mode));
+    document.querySelectorAll('[data-qs-mode]').forEach(b =>
+      b.classList.toggle('active', b.dataset.qsMode === mode));
+  }
+
+  document.querySelectorAll('[data-ex-mode]').forEach(btn =>
+    btn.addEventListener('click', () => setViewMode(btn.dataset.exMode)));
+  document.querySelectorAll('[data-qs-mode]').forEach(btn =>
+    btn.addEventListener('click', () => setViewMode(btn.dataset.qsMode)));
+
+  // ---------- Per-pane copy (mode-aware) ----------
   const paneCommands = {
     aura: 'neo4j-cli aura instance list --format table',
     query: 'neo4j-cli query \'MATCH (p:Person {name:$name})-[:ACTED_IN]->(m) RETURN m.title\' --param name=Alice',
@@ -1298,15 +1425,23 @@
     pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
     skill: 'neo4j-cli skill install --rw',
   };
+  const panePrompts = {
+    aura: 'Set up my Aura environment — add credentials, create a free movies instance, then list all',
+    query: 'Who are the top 3 directors by movie count? List their movies sorted by year.',
+    schema: "What's in my database? Show all labels, relationships, indexes, and count per type.",
+    pipe: 'Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON',
+    skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
+  };
   document.querySelectorAll('.copy-mini').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.copyPane;
-      const ok = await copyText(paneCommands[id]);
+      const text = viewMode === 'agentic' ? panePrompts[id] : paneCommands[id];
+      const ok = await copyText(text);
       if (ok) {
         btn.classList.add('copied');
         const original = btn.innerHTML;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> copied';
-        showToast('Command copied');
+        showToast('Copied');
         setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1600);
       }
     });
@@ -1318,7 +1453,7 @@
       const cmd = el.dataset.copy;
       if (!cmd) return;
       const ok = await copyText(cmd);
-      if (ok) showToast('Copied: ' + cmd.slice(0, 30) + (cmd.length > 30 ? '…' : ''));
+      if (ok) showToast('Copied: ' + cmd.slice(0, 40) + (cmd.length > 40 ? '…' : ''));
     });
   });
 
