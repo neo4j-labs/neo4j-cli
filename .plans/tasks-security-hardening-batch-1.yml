@@ -272,7 +272,8 @@ tasks:
       runner (sufficient — vulnerabilities are platform-portable). Use the
       default exit semantics (non-zero only on callable vulns). Future stdlib
       regressions will fail CI.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T18:25:00Z
     dependencies:
       - task-014
     acceptance_criteria:

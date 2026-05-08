@@ -64,3 +64,8 @@ Decisions: fast-path scan-without-alloc preserves the no-control-char common cas
 Pinned Go toolchain to 1.26.3 via `toolchain go1.26.3` directive in go.mod (kept `go 1.25.0` minimum) and switched all three setup-go workflows (test.yml, release.yml, license.yml) from go-version: "stable"/"1.26.1" to go-version-file: go.mod for single-source-of-truth. Closes govulncheck-reachable stdlib vulns.
 Files: ~go.mod, ~.github/workflows/test.yml, ~.github/workflows/release.yml, ~.github/workflows/license.yml
 Decisions: kept `go 1.25.0` directive (module minimum) and added separate `toolchain` directive (build version) — Go auto-downloads 1.26.3 when local toolchain is older; license.yml previously hardcoded 1.26.1 but go-version-file unifies it.
+
+## task-015 — 2026-05-08T18:25:00Z
+Added Govulncheck step to test.yml after Build, gated to ubuntu-latest only; installs govulncheck@latest then runs `govulncheck ./...` with default exit semantics (non-zero only on callable vulns). Local run on pinned 1.26.3 toolchain reports no vulnerabilities.
+Files: ~.github/workflows/test.yml
+Decisions: install via `go install ...@latest` instead of adding a third-party action — matches "future stdlib regressions fail CI" intent and avoids new SHA-pin maintenance; runs before Generate check so a vuln gates the rest of the pipeline early.
