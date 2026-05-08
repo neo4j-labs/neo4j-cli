@@ -44,7 +44,7 @@ tasks:
       in the mocked API response, and add `helper.AssertCredentialsValue` assertions for the stored
       database name. Add table-driven test cases covering: free-db with non-"neo4j" username (uses
       username), free-db with "neo4j" username (uses "neo4j"), and a non-free type (always "neo4j").
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -53,7 +53,7 @@ tasks:
       - "A test case covers a non-free type (e.g. professional-db) and asserts databaseName is always \"neo4j\""
       - "Tests are table-driven where multiple cases are added"
       - "make test passes with no failures"
-    completed_at: null
+    completed_at: 2026-05-08T00:15:00Z
 
   - id: task-004
     title: "Run final quality gates"

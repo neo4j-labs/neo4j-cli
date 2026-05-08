@@ -41,3 +41,26 @@ Key Decisions:
 - make build, make test, make fmt-check, and make lint all pass
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Update and extend tests for database name logic
+Date: 2026-05-08T00:15:00Z
+================================================================================
+
+Summary:
+Updated `TestCreateFreeInstance` in `create_test.go` to use a non-"neo4j" username
+("alice123") in the mocked API response and added an `AssertCredentialsValue` assertion
+for `database-name`. Added a new table-driven test `TestCreateDatabaseNameStorage` covering
+all three scenarios: free-db + non-"neo4j" username (database-name = username), free-db +
+"neo4j" username (database-name = "neo4j"), and professional-db + non-"neo4j" username
+(database-name always = "neo4j").
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/create_test.go (modified — updated TestCreateFreeInstance to use non-"neo4j" username and added TestCreateDatabaseNameStorage table-driven test)
+
+Key Decisions:
+- Updated existing TestCreateFreeInstance to demonstrate the non-"neo4j" free-db path rather than adding a duplicate test
+- Used fmt.Sprintf with %q formatting in the table-driven test to safely embed usernames and types in JSON
+- Included vector_optimized field in the professional-db mock response to keep the JSON consistent with existing professional-db fixtures
+
+Next Task: task-004
