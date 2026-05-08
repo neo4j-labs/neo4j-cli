@@ -135,18 +135,24 @@ tasks:
       - "make test green"
 
   - id: task-008
-    title: "Set 60s Timeout on every outbound HTTP client"
+    title: "Set 60s Timeout on Aura HTTP clients"
     description: |
       Set Timeout: 60 * time.Second on the http.Client{} constructions in
-      neo4j-cli/aura/internal/api/api.go:40, token.go:43, query/embed/openai.go:37,
-      query/embed/ollama.go:36, and query/embed/huggingface.go:43. ctx plumbing
-      into MakeRequest/getToken is explicitly out of scope (separate refactor);
-      this task closes the slow-loris vector only.
+      neo4j-cli/aura/internal/api/api.go:40 and token.go:43. The three embed
+      clients (openai.go:37, ollama.go:36, huggingface.go:43) are intentionally
+      excluded — they document a ctx-owned cancellation contract and a hard 60s
+      cap would break legitimate long-running local inference (e.g. Ollama on
+      CPU with a large model). --await is unaffected: Poll() issues a fresh
+      MakeRequest per iteration, so the per-request 60s wall does not bound the
+      polling loop. ctx plumbing into MakeRequest/getToken is explicitly out of
+      scope (separate refactor); this task closes the slow-loris vector against
+      Aura calls only.
     status: pending
     dependencies: []
     acceptance_criteria:
-      - "All five http.Client constructions have Timeout: 60 * time.Second"
+      - "Both Aura http.Client constructions (api.go:40, token.go:43) have Timeout: 60 * time.Second"
       - "Test using a httptest.Server that sleeps longer than 60s confirms the request errors with a deadline-exceeded error"
+      - "Embed client constructions (openai.go, ollama.go, huggingface.go) remain unchanged — no Timeout field"
       - "Existing Aura+embed tests stay green (timeout is well above any unit-test latency)"
       - "make test green"
 

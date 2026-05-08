@@ -12,7 +12,7 @@ Skipped from this batch (intentional, tracked separately): #9 (plain-flag → st
 
 - Stop secrets (`--password`, `--client-secret`, `--api-key`, `--instance-password`) reaching Mixpanel, panic stdout, or any error template that interpolates `os.Args[1:]`.
 - Make `credentials.json` durable (atomic write) and recoverable (corrupt-file backup instead of panic), and tighten file/dir modes.
-- Bound every outbound HTTP call with a request timeout; reject SSRF-shaped base URLs at request time.
+- Bound the Aura HTTP clients (`api.go`, `token.go`) with a request timeout; reject SSRF-shaped base URLs at request time across Aura and embed providers. (Embed clients keep their ctx-owned cancellation contract — see REQ-F-C01.)
 - Pin Go toolchain to a patched stdlib version (`1.26.3`) and harden five GitHub workflows (`claude.yml`, `cla-check.yml`, `update-website.yml`, `publish-npm.yml`, `test.yml`/`release.yml`).
 - Strip control characters from rendered table output; warn on cleartext Bolt URIs to non-loopback hosts; escape backticks in introspected Cypher relType names.
 - Scope `.env` discovery to stop at the first `.git` ancestor or `$HOME` boundary.
@@ -49,12 +49,11 @@ Skipped from this batch (intentional, tracked separately): #9 (plain-flag → st
 
 #### Group C — HTTP client hardening (closes #13, #18)
 
-- **REQ-F-C01:** Set `Timeout: 60 * time.Second` on the five `http.Client{}` constructions:
+- **REQ-F-C01:** Set `Timeout: 60 * time.Second` on the two Aura `http.Client{}` constructions:
   - `neo4j-cli/aura/internal/api/api.go:40`
   - `neo4j-cli/aura/internal/api/token.go:43`
-  - `neo4j-cli/query/embed/openai.go:37`
-  - `neo4j-cli/query/embed/ollama.go:36`
-  - `neo4j-cli/query/embed/huggingface.go:43`
+
+  The three embed clients (`openai.go:37`, `ollama.go:36`, `huggingface.go:43`) intentionally have no client-side timeout — cancellation is owned by the caller's ctx (see in-file comments) — and are excluded so legitimate long-running local inference (e.g. Ollama on CPU with a large model) is not capped at 60s. `--await` is unaffected: `Poll()` issues a fresh `MakeRequest` per iteration, so the per-request 60s wall does not bound the polling loop. ctx plumbing into `MakeRequest` / `getToken` remains out of scope for this batch.
 - **REQ-F-C02:** Add `common/clicfg/urlcheck/urlcheck.go` with `func ValidateRemoteURL(raw string) error`. Accept `https://` to any host. Accept `http://` only when host is loopback (`localhost`, `127.0.0.1`, `::1`). Reject IP-literal hosts that match `IsPrivate()`, `IsLinkLocalUnicast()`, `IsLinkLocalMulticast()`, or `IsMulticast()`. Reject empty/malformed URLs and the metadata IP `169.254.169.254`. Hostnames are passed through (DNS-rebinding is documented as out of scope).
 - **REQ-F-C03:** Apply `ValidateRemoteURL` at request time:
   - `aura/internal/api/api.go:54` — propagate error rather than discarding via `_`.
