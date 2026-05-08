@@ -191,3 +191,72 @@ func TestMakeRequest_Timeout(t *testing.T) {
 			strings.Contains(msg, "context deadline exceeded"),
 		"expected deadline-exceeded marker, got: %s", msg)
 }
+
+// TestMakeRequest_RejectsBlockedBaseURL asserts that MakeRequest rejects an
+// SSRF-blocked aura base-url (e.g. cloud metadata IP) before issuing any HTTP
+// traffic. The captured roundtripper would panic if hit.
+func TestMakeRequest_RejectsBlockedBaseURL(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		baseURL string
+	}{
+		{name: "metadata IP", baseURL: "http://169.254.169.254"},
+		{name: "private RFC1918", baseURL: "http://10.0.0.1"},
+		{name: "link-local", baseURL: "http://[fe80::1]"},
+		{name: "cleartext non-loopback", baseURL: "http://api.openai.com"},
+		{name: "malformed scheme", baseURL: "ftp://example.com"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfgJSON := fmt.Sprintf(`{
+				"format": "json",
+				"aura": {
+					"auth-url": "https://api.neo4j.io/oauth/token",
+					"base-url": "%s"
+				}
+			}`, tc.baseURL)
+			fs, err := testfs.GetTestFs(cfgJSON, `{
+				"aura": {
+					"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"tok","token-expiry":9999999999}],
+					"default-credential": "c"
+				}
+			}`)
+			require.NoError(t, err)
+			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+
+			_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+				Method:  http.MethodGet,
+				Version: api.AuraApiVersion1,
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "aura base-url")
+		})
+	}
+}
+
+// TestMakeRequest_RejectsBlockedAuthURL asserts that getToken rejects an
+// SSRF-blocked aura auth-url. The credential intentionally has no valid access
+// token so the code path enters getToken.
+func TestMakeRequest_RejectsBlockedAuthURL(t *testing.T) {
+	cfgJSON := `{
+		"format": "json",
+		"aura": {
+			"auth-url": "http://169.254.169.254/oauth/token",
+			"base-url": "https://api.neo4j.io"
+		}
+	}`
+	fs, err := testfs.GetTestFs(cfgJSON, `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"","token-expiry":0}],
+			"default-credential": "c"
+		}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+
+	_, _, err = api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "aura auth-url")
+}

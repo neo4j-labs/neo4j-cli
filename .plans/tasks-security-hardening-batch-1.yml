@@ -167,7 +167,8 @@ tasks:
       validate BaseURL before issuing the request and return the error from
       Embed(). Failing fast at request time avoids breaking already-stored
       configs at load.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T16:25:00Z
     dependencies:
       - task-002
     acceptance_criteria:

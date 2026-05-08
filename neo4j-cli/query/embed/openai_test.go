@@ -202,6 +202,44 @@ func TestOpenAI_Embed_CtxCancellationAborts(t *testing.T) {
 	}
 }
 
+// TestOpenAI_Embed_RejectsBlockedBaseURL asserts that an SSRF-blocked base
+// URL fails before any HTTP traffic. The provider's transport would panic if
+// hit (we use captureRoundTripper-style checks via t.Fatal in the handler).
+func TestOpenAI_Embed_RejectsBlockedBaseURL(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		baseURL string
+	}{
+		{name: "metadata IP", baseURL: "http://169.254.169.254/v1"},
+		{name: "private RFC1918", baseURL: "http://10.0.0.1/v1"},
+		{name: "cleartext non-loopback", baseURL: "http://api.openai.com/v1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newOpenAIProvider(Config{
+				Provider: ProviderOpenAI,
+				Model:    "m",
+				BaseURL:  tc.baseURL,
+				APIKey:   "sk-test",
+			})
+			p.client = &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				t.Fatalf("transport must not be hit for blocked URL")
+				return nil, nil
+			})}
+
+			_, err := p.Embed(context.Background(), "hello")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "openai")
+			assert.Contains(t, err.Error(), "rejected")
+		})
+	}
+}
+
+// roundTripperFunc adapts a func to http.RoundTripper for tests that must
+// assert no HTTP traffic was issued.
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestOpenAI_Embed_DefaultBaseURL(t *testing.T) {
 	// Construct provider with no BaseURL set; assert the default is used at
 	// request time. We swap http.Client.Transport so we never hit a real

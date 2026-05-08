@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -66,6 +67,9 @@ func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32
 	base := p.cfg.BaseURL
 	if base == "" {
 		base = defaultHuggingFaceBaseURL
+	}
+	if err := urlcheck.ValidateRemoteURL(base); err != nil {
+		return nil, fmt.Errorf("huggingface: base url rejected: %w", err)
 	}
 
 	// Serverless mode: append the model to the base URL. Dedicated mode: post

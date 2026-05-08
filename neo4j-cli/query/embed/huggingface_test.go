@@ -270,6 +270,37 @@ func TestHuggingFace_Embed_CtxCancellationAborts(t *testing.T) {
 	}
 }
 
+// TestHuggingFace_Embed_RejectsBlockedBaseURL asserts that an SSRF-blocked
+// dedicated-endpoint base URL fails before any HTTP traffic.
+func TestHuggingFace_Embed_RejectsBlockedBaseURL(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		baseURL string
+	}{
+		{name: "metadata IP", baseURL: "http://169.254.169.254"},
+		{name: "private RFC1918", baseURL: "http://10.0.0.1"},
+		{name: "cleartext non-loopback", baseURL: "http://prod.example.com"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newHuggingFaceProvider(Config{
+				Provider: ProviderHuggingFace,
+				Model:    "m",
+				BaseURL:  tc.baseURL,
+				APIKey:   "hf_test",
+			})
+			p.client = &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				t.Fatalf("transport must not be hit for blocked URL")
+				return nil, nil
+			})}
+
+			_, err := p.Embed(context.Background(), "hello")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "huggingface")
+			assert.Contains(t, err.Error(), "rejected")
+		})
+	}
+}
+
 func TestHuggingFace_Embed_DefaultBaseURL_AppendsModelToServerlessBase(t *testing.T) {
 	// Construct provider with no BaseURL set; assert the default is used at
 	// request time AND the model is appended (serverless mode). We swap
