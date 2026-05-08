@@ -86,3 +86,7 @@ Files: ~.github/workflows/update-website.yml
 ## task-019 — 2026-05-08T19:10:00Z
 Mirrored publish-pypi.yml verify-checksums step into publish-npm.yml auto path: downloads *_checksums.txt from GH Release into a separate dir (avoids circular trust on the dist artifact's bundled checksums.txt), runs sha256sum -c against the downloaded dist artifact before extraction. Gated to workflow_run + push event + include_neo4j == true so make npm-publish-dry and the workflow_dispatch path stay unaffected.
 Files: ~.github/workflows/publish-npm.yml
+
+## task-020 — 2026-05-08T15:48:00Z
+Documented the .env scope change: README query/connection paragraph now describes the .git/$HOME boundary rule and the stderr `info: loading .env from <path>` overlay announcement; hand-authored changie Patch entry under .changes/unreleased/ since changie isn't installed locally.
+Files: ~README.md, +.changes/unreleased/neo4j-cli-Patch-20260508-154720.yaml

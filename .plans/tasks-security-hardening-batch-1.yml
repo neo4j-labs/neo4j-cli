@@ -360,7 +360,8 @@ tasks:
       from above CWD). Add a changie entry under --kind Patch for the
       neo4j-cli project. Use `changie new --projects neo4j-cli --kind Patch
       --body "..."` or hand-author the YAML if changie isn't installed locally.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T15:48:00Z
     dependencies:
       - task-010
     acceptance_criteria:

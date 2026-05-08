@@ -93,6 +93,8 @@ echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 
 Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all four** of URI/username/password/database (any partial set is rejected). Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
 
+`.env` discovery walks up from cwd and stops at the first `.git` ancestor or your `$HOME` boundary (whichever comes first), so a `.env` outside your repo or above your home directory is never loaded. When the loaded `.env` lives strictly above cwd, an `info: loading .env from <path>` line is printed to stderr so the overlay is never silent.
+
 | Setting  | Flag         | Env var          | Default                   |
 | -------- | ------------ | ---------------- | ------------------------- |
 | URI      | `--uri`      | `NEO4J_URI`      | `neo4j://localhost:7687`  |
