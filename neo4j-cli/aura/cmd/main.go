@@ -5,9 +5,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	"github.com/spf13/afero"
@@ -16,12 +18,17 @@ import (
 
 var Version = "dev"
 
+// recoverPanic prints a redacted "unexpected error" line to w and re-panics.
+// Extracted so the redaction format is unit-testable without invoking main().
+func recoverPanic(w io.Writer, args []string, r any) {
+	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j/cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
+	panic(r)
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j/cli\n\n", os.Args[1:])
-
-			panic(r)
+			recoverPanic(os.Stdout, os.Args[1:], r)
 		}
 	}()
 

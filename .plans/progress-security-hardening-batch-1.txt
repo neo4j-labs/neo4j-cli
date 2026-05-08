@@ -15,3 +15,8 @@ Decisions: homeDirFn is package-level overridable (cleaner than t.Setenv("HOME")
 ## task-004 — 2026-05-08T15:02:00Z
 Wired RedactArgs into aura/skill/default telemetry branches in clievents.Emit; query branch left untouched (already command-name only). Added table-driven Mixpanel-payload test asserting *** present, flag name preserved, secret value never leaked across AURA/SKILL/COMMAND suffixes including --flag=value form.
 Files: ~common/clievents/clievents.go, ~common/clievents/clievents_test.go
+
+## task-005 — 2026-05-08T15:18:00Z
+Wrapped every os.Args[1:] interpolation in panic/error templates with clievents.RedactArgs: 10 sites in api/response.go (handleResponseError + formatAuthorizationError), 1 in allowedorigin/utils.go, 1 each in neo4j-cli/main.go and aura/cmd/main.go panic-recover. Extracted recoverPanic helpers in both binary mains so the format is unit-testable. Added in-package response_test.go (415/502/307/400-malformed/default-status) and main_test.go in both mains; all assert *** present and secret value absent.
+Files: ~neo4j-cli/main.go, +neo4j-cli/main_test.go, ~neo4j-cli/aura/cmd/main.go, +neo4j-cli/aura/cmd/main_test.go, ~neo4j-cli/aura/internal/api/response.go, +neo4j-cli/aura/internal/api/response_test.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/corspolicy/allowedorigin/utils.go
+Decisions: response_test uses package api (in-package) to access private handleResponseError; nil credential/cfg is safe on the panic paths exercised. recoverPanic helper accepts io.Writer so tests don't have to redirect os.Stdout.

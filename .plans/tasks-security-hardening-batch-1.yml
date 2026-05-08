@@ -86,7 +86,8 @@ tasks:
       131, 141, 335), and neo4j-cli/aura/internal/subcommands/dataapi/graphql/
       corspolicy/allowedorigin/utils.go:42. If a circular import surfaces, lift
       the helper from common/clievents to common/redact.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T15:18:00Z
     dependencies:
       - task-001
     acceptance_criteria:
