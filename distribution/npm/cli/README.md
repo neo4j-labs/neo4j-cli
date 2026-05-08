@@ -78,8 +78,8 @@ neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
   https://github.com/neo4j-labs/neo4j-cli
 - Issue tracker:
   https://github.com/neo4j-labs/neo4j-cli/issues
-- Aura CLI usage guide:
-  https://github.com/neo4j-labs/neo4j-cli/blob/main/docs/usageGuide/A%20Guide%20To%20The%20New%20Aura%20CLI.md
+- Project README:
+  https://github.com/neo4j-labs/neo4j-cli/blob/main/README.md
 
 ## License
 

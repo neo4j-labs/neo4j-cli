@@ -46,51 +46,6 @@ uvx -i neo4j-cli YOUR_COMMANDS
 Check the installation by running neo4j-cli --help
 
 
-## Usage
-
-Extract the executable to a directory of your choosing.
-
-Create Aura API Credentials in your [Account Settings](https://console.neo4j.io/#account), and note down the client ID and secret.
-
-Add these credentials into the CLI with a name of your choosing:
-
-```bash
-./neo4j-cli credential aura-client add --name "Aura API Credentials" --client-id <client-id> --client-secret <client-secret>
-```
-
-This will add and set the credential as the default credential for use. See [Credentials](#credentials) below for the full credential surface (`aura-client`, `dbms`, `embed`).
-
-You can then, for example, list your instances in a table format:
-
-```bash
-./neo4j-cli aura instance list --format table
-```
-
-If you would rather just type `neo4j-cli` then move the neo4j-cli binary into the file path of your computer.  
-Windows:
-
-```bash
-move neo4j-cli.exe c:\windows\system32
-```
-
-Mac:
-
-```bash
-sudo mv neo4j-cli /usr/local/bin
-```
-
-To see all of the available commands:
-
-```bash
-./neo4j-cli
-```
-
-Help for each command is accessed by using it without any flags or options. For example, to see help creating an instance:
-
-```bash
-./neo4j-cli aura instance create
-```
-
 ## Credentials
 
 `neo4j-cli` stores three kinds of credentials in `credentials.json` under your OS config directory. All three trees share the same `add / list / use / remove` shape; `use` sets the default consumed by downstream commands.
@@ -123,6 +78,29 @@ Help for each command is accessed by using it without any flags or options. For 
 ./neo4j-cli credential embed use openai-shared
 ./neo4j-cli credential embed remove openai-shared
 ```
+
+## Aura
+
+Manage Neo4j Aura instances from the terminal. Requires an `aura-client` credential — create one in your Aura [Account Settings](https://console.neo4j.io/#account) and add it via [Credentials](#credentials) above.
+
+### List your instances
+
+```bash
+neo4j-cli aura instance list --format table
+```
+
+### Create an instance
+
+```bash
+# Free-db — no cloud provider, region, or memory required
+neo4j-cli aura instance create --name my-free-db --type free-db --tenant-id <tenant-id> --rw
+
+# Professional-db on AWS, awaiting readiness
+neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-provider aws \
+  --region us-east-1 --memory 4GB --tenant-id <tenant-id> --await --rw
+```
+
+`aura tenant list` shows tenant IDs. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
 ## Querying Neo4j
 

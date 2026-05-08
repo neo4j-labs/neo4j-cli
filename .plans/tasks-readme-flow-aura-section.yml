@@ -1,0 +1,71 @@
+feature: readme-flow-aura-section
+prd: ./prd-readme-flow-aura-section.md
+created_at: 2026-05-08T11:09:14Z
+updated_at: 2026-05-08T11:09:14Z
+
+tasks:
+  - id: task-001
+    title: "Verify Aura/credential CLI flag names against live --help output"
+    description: |
+      Before drafting the README copy, confirm that every flag and command path
+      referenced in the new Aura section actually exists with the spelling used
+      in the PRD. Run the CLI's --help against credential aura-client add, aura
+      tenant list, aura instance list, and aura instance create and capture the
+      flag names. This is a read-only verification step; no files are modified.
+      If any flag has been renamed or removed, flag it now so the README edit
+      uses correct names rather than shipping stale prose.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "go run ./neo4j-cli credential aura-client add --help confirms --name, --client-id, --client-secret"
+      - "go run ./neo4j-cli aura instance list --help confirms --format and --tenant-id"
+      - "go run ./neo4j-cli aura instance create --help confirms --name, --type, --tenant-id, --memory, --region, --cloud-provider, --await, --no-credential-storage, and that the command requires --rw"
+      - "go run ./neo4j-cli aura tenant list --help runs successfully (used as the discoverability hint in the new section)"
+      - "Any flag-name discrepancies vs the PRD draft are reported back so task-002 uses correct names"
+    completed_at: 2026-05-08T11:15:00Z
+
+  - id: task-002
+    title: "Replace README Usage section with new Aura quickstart"
+    description: |
+      In README.md, delete the entire ## Usage block (currently lines 49 to 92,
+      including the macOS/Windows binary-rename advice and generic --help
+      discovery hints) and insert the new ## Aura section between ## Credentials
+      and ## Querying Neo4j per the PRD's drafted content. The new section must
+      link back to [Credentials](#credentials) for the credential-add surface,
+      use <tenant-id> placeholders, include --rw on every aura instance create
+      example, mention aura tenant list and the auto-stored
+      <instance-id>-default dbms credential plus --no-credential-storage opt-out.
+      No other sections of README.md may change.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "## Usage section no longer exists in README.md"
+      - "## Aura section is positioned between ## Credentials and ## Querying Neo4j"
+      - "Aura section contains aura instance list, free-db create, and professional-db create examples; create commands include --rw"
+      - "Aura section uses literal <tenant-id> placeholder, links to [Credentials](#credentials), and does not duplicate a credential aura-client add command"
+      - "Aura section mentions aura tenant list, the auto-stored <instance-id>-default dbms credential, and --no-credential-storage"
+      - "Diff is scoped to the deleted Usage block and the new Aura section; no edits to Installation, Credentials, Querying Neo4j, Write operations, Agent skills, or any subsequent section"
+    completed_at: 2026-05-08T11:30:00Z
+
+  - id: task-003
+    title: "Run final gates and confirm clean scope"
+    description: |
+      Run the mandatory project gates per CLAUDE.md (make test, make fmt-check,
+      make lint) and confirm the diff stays scoped to README.md only. Also
+      confirm that no skill-bundle regeneration was triggered (no changes under
+      neo4j-cli/internal/skill/bundle/ or neo4j-cli/aura/internal/skill/bundle/),
+      no .changes/unreleased/ entry was added, and the in-document
+      [Credentials](#credentials) anchor in the new section resolves to the
+      existing ## Credentials heading.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "git status / git diff --stat shows README.md as the only modified file"
+      - "No new files under .changes/unreleased/"
+      - "Manual scan of README.md confirms the [Credentials](#credentials) link target (## Credentials heading) still exists"
+    completed_at: 2026-05-08T11:40:00Z
