@@ -1,7 +1,7 @@
 feature: security-hardening-batch-1
 prd: ./prd-security-hardening-batch-1.md
 created_at: 2026-05-08T14:14:28Z
-updated_at: 2026-05-08T14:14:28Z
+updated_at: 2026-05-08T19:30:00Z
 
 tasks:
   - id: task-001
@@ -369,3 +369,37 @@ tasks:
       - ".changes/unreleased/neo4j-cli-Patch-*.yaml exists with project: neo4j-cli, kind: Patch, body covering the scope change"
       - "make test, make fmt-check, make lint stay green"
       - "make changelog (or changie merge) produces a clean release section"
+
+  - id: task-021
+    title: "Fix update-website.yml gh release download pattern"
+    description: |
+      The `Install neo4j-cli` step in .github/workflows/update-website.yml
+      uses `--pattern "*linux*amd64*.tar.gz"` which never matches GoReleaser's
+      output. Archives are named neo4j-cli_<ver>_Linux_x86_64.tar.gz (capital
+      Linux, x86_64 not amd64) and `gh release download --pattern` uses
+      case-sensitive filepath.Match. Verified against v1.7.0: the lowercase/
+      amd64 pattern returns "no assets match the file pattern" (exit 1) while
+      "*Linux*x86_64*.tar.gz" succeeds. Next release will fail this step and
+      block the website sync.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Pattern updated to *Linux*x86_64*.tar.gz (or equivalent that matches the actual archive name)"
+      - "Verified locally with `gh release download v1.7.0 --pattern <new> --repo neo4j/cli` returns exit 0 and downloads exactly one archive"
+      - "tar/install lines still resolve the extracted neo4j-cli binary"
+
+  - id: task-022
+    title: "Fix update-website.yml workflow_dispatch fallback check"
+    description: |
+      In .github/workflows/update-website.yml the install step's fallback
+      branch tests `[ "$TAG" = "refs/heads/main" ]`, but github.ref_name on
+      a branch dispatch is `main` (not the full ref). For workflow_dispatch
+      from main, $TAG="main" survives the guard and `gh release download
+      "main"` then fails. Replace the guard with a tag-shaped check so any
+      non-tag value falls back to the latest published release.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Fallback branch triggers when $TAG does not match a release tag (e.g. starts with v) — e.g. `case \"$TAG\" in v*) ;; *) TAG=$(gh release view ... -q .tagName);; esac`"
+      - "release: published path still uses the event tag directly (no fallback)"
+      - "workflow_dispatch from main resolves to the latest release tag without failing the download step"
