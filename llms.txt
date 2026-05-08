@@ -7,7 +7,7 @@ neo4j-cli is an open-source command-line tool for managing Neo4j resources, exec
 ## Installation
 
 ```bash
-pipx install neo4j-cli==0.1.0a8
+pipx install neo4j-cli==0.1.0a9
 ```
 
 or via npm:
@@ -18,14 +18,17 @@ npm install -g @neo4j-labs/cli@alpha
 
 ## Command surface
 
-- `neo4j-cli aura credential add` — store Aura API credentials
+- `neo4j-cli credential aura-client add` — store Aura Console API credentials (client ID + secret)
+- `neo4j-cli credential dbms add` — store Neo4j Bolt connection profiles for reuse via `--credential`
+- `neo4j-cli credential embed add` — store embedding-provider credentials (openai, ollama, huggingface)
 - `neo4j-cli aura instance list` — list Aura instances (table or JSON)
-- `neo4j-cli aura instance create` — provision a new Aura instance
+- `neo4j-cli aura instance create` — provision a new Aura instance (`--name` optional; auto-generates `InstanceNN` if omitted)
 - `neo4j-cli aura instance get <id>` — get instance details
 - `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
+- `neo4j-cli query :embed [text]` — compute an embedding vector standalone (no Bolt connection)
+- `neo4j-cli query --param NAME:embed=<text>` — bind an inline-embedded vector parameter
 - `neo4j-cli query 'CREATE ...' --rw` — write operations require `--rw`
-- `neo4j-cli credential dbms add` — store Neo4j database credentials for reuse via `--credential`
 - `neo4j-cli skill install` — install the agent skill bundle into your AI assistant
 - `neo4j-cli skill list` — list supported agents and per-agent install state
 - `neo4j-cli skill check` — verify installed bundles for version drift
@@ -44,15 +47,17 @@ Default URI: `neo4j://localhost:7687`, username: `neo4j`, database: `neo4j`.
 
 All read commands support `--format json|table` (`-f` shorthand). Default is `table` on a TTY, `json` when piped.
 
-JSON envelope: `{"columns": [...], "rows": [[...]], "truncated": false}`
+JSON envelope: `{"columns": [...], "rows": [{"<col>": <value>, ...}, ...], "truncated": false, "arrays_truncated": 0}` — `rows` are column-keyed objects; `arrays_truncated` is the count of cell arrays elided by `--truncate-arrays-over`.
 
 ## Agent skills
 
 neo4j-cli ships with a built-in agent skill bundle that teaches AI assistants (Claude Code, Cursor, etc.) how to drive the CLI. Install with:
 
 ```bash
-neo4j-cli skill install
+neo4j-cli skill install --rw
 ```
+
+`--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher). Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) do not need it.
 
 Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
 

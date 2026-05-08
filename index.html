@@ -877,8 +877,8 @@
         <div class="step-num">2</div>
         <h3>Install the skill</h3>
         <p>Teaches Claude Code, Codex, Cursor, and all others how to drive the CLI. <a href="#examples" data-activate-tab="skill" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli skill install">
-          <span class="prompt">$</span><span>neo4j-cli skill install</span>
+        <div class="step-cmd" data-copy="neo4j-cli skill install --rw">
+          <span class="prompt">$</span><span>neo4j-cli skill install <span style="color:var(--code-flag)">--rw</span></span>
           <span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
         </div>
       </div>
@@ -1048,9 +1048,9 @@
 
 <span class="out">{
   <span class="string">"columns"</span>: [<span class="string">"n"</span>],
-  <span class="string">"rows"</span>: [[<span class="num">184</span>]],
+  <span class="string">"rows"</span>: [{ <span class="string">"n"</span>: <span class="num">184</span> }],
   <span class="string">"truncated"</span>: <span class="keyword">false</span>,
-  <span class="string">"arrays_truncated"</span>: <span class="keyword">false</span>
+  <span class="string">"arrays_truncated"</span>: <span class="num">0</span>
 }</span>
 
 <span class="comment"># tune the row cap (0 = unlimited)</span>
@@ -1072,7 +1072,7 @@
             copy
           </button>
         </div>
-<pre><span class="prompt">$</span> neo4j-cli skill install
+<pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
 
 <span class="info">▸</span> detecting installed agents…
 <span class="ok">✓</span> claude-code     installed (v1.4.0)
@@ -1090,7 +1090,7 @@
 <span class="info">▸</span> agents now know: aura, query, :schema, env resolution, JSON envelope
 
 <span class="comment"># target a single agent</span>
-<span class="prompt">$</span> neo4j-cli skill install claude-code
+<span class="prompt">$</span> neo4j-cli skill install claude-code <span class="flag">--rw</span>
 
 <span class="comment"># list state and check for version drift</span>
 <span class="prompt">$</span> neo4j-cli skill list
@@ -1200,8 +1200,8 @@
     },
     pipx: {
       prompt: '$',
-      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a8</span>',
-      raw: 'pipx install neo4j-cli==0.1.0a8',
+      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a9</span>',
+      raw: 'pipx install neo4j-cli==0.1.0a9',
       label: 'via pipx',
     },
     npm: {
@@ -1296,7 +1296,7 @@
     query: 'neo4j-cli query \'MATCH (p:Person {name:$name})-[:ACTED_IN]->(m) RETURN m.title\' --param name=Alice',
     schema: 'neo4j-cli query :schema',
     pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
-    skill: 'neo4j-cli skill install',
+    skill: 'neo4j-cli skill install --rw',
   };
   document.querySelectorAll('.copy-mini').forEach(btn => {
     btn.addEventListener('click', async () => {
