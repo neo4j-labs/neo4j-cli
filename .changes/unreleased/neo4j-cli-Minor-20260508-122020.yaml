@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Fix: `neo4j-cli aura instance create --type free-db` now correctly stores the database name inside the dbms credential'
-time: 2026-05-08T12:20:20.26155+01:00
