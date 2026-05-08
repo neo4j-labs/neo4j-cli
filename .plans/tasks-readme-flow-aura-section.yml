@@ -58,7 +58,7 @@ tasks:
       no .changes/unreleased/ entry was added, and the in-document
       [Credentials](#credentials) anchor in the new section resolves to the
       existing ## Credentials heading.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -68,4 +68,4 @@ tasks:
       - "git status / git diff --stat shows README.md as the only modified file"
       - "No new files under .changes/unreleased/"
       - "Manual scan of README.md confirms the [Credentials](#credentials) link target (## Credentials heading) still exists"
-    completed_at: null
+    completed_at: 2026-05-08T11:40:00Z

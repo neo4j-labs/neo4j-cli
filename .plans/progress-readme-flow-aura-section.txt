@@ -5,3 +5,7 @@ Files: ~.plans/tasks-readme-flow-aura-section.yml
 ## task-002 — 2026-05-08T11:30:00Z
 Deleted ## Usage block; inserted ## Aura quickstart between Credentials and Querying Neo4j per PRD verbatim. make test/fmt-check/lint all pass.
 Files: ~README.md, ~.plans/tasks-readme-flow-aura-section.yml
+
+## task-003 — 2026-05-08T11:40:00Z
+Final gates: make test/fmt-check/lint pass. Diff scoped to README.md (committed in task-002) + plan files; no skill-bundle drift, no new .changes/unreleased entries; #credentials anchor resolves.
+Files: ~.plans/tasks-readme-flow-aura-section.yml, ~.plans/progress-readme-flow-aura-section.txt
