@@ -342,7 +342,8 @@ tasks:
       Run sha256sum -c against the dist artifact. Gate the step
       `if: github.event.workflow_run.event == 'push'` so make npm-publish-dry
       stays green.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T19:10:00Z
     dependencies: []
     acceptance_criteria:
       - "publish-npm.yml has the verify-checksums step matching publish-pypi.yml"

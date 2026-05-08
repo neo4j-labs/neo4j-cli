@@ -82,3 +82,7 @@ Decisions: helper script ./bin/examine-pull-request lives in neo-technology/whit
 ## task-018 — 2026-05-08T18:25:00Z
 Tightened update-website.yml workflow_run guard to mirror publish-pypi.yml pattern: now requires success AND head_branch == default_branch AND event == push (workflow_dispatch still passes). Closes cache-poisoning vector where a non-default-branch "release" run could trigger the contents:write + pull-requests:write job.
 Files: ~.github/workflows/update-website.yml
+
+## task-019 — 2026-05-08T19:10:00Z
+Mirrored publish-pypi.yml verify-checksums step into publish-npm.yml auto path: downloads *_checksums.txt from GH Release into a separate dir (avoids circular trust on the dist artifact's bundled checksums.txt), runs sha256sum -c against the downloaded dist artifact before extraction. Gated to workflow_run + push event + include_neo4j == true so make npm-publish-dry and the workflow_dispatch path stay unaffected.
+Files: ~.github/workflows/publish-npm.yml
