@@ -90,7 +90,9 @@ neo4j-cli query 'RETURN 1 AS n'
 echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 ```
 
-Connection settings are resolved with this precedence (highest first): flag → env var → `.env` file (auto-discovered by walking up from cwd) → built-in default.
+**Preferred:** add a `dbms` credential (see [Credentials](#credentials)) and `query` connects with no further config. `aura instance create` auto-stores one for new instances.
+
+Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all four** of URI/username/password/database (any partial set is rejected). Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
 
 | Setting  | Flag         | Env var          | Default                   |
 | -------- | ------------ | ---------------- | ------------------------- |
