@@ -11,3 +11,7 @@ Decisions: metadata-IP guard is explicit string match (catches trailing-dot vari
 Added shared dotenv.Find helper walking up from startDir, stopping at first .git ancestor or $HOME boundary; returns (path, found, walkedAboveCWD). No clicfg/cobra dependency.
 Files: +common/clicfg/dotenv/dotenv.go, +common/clicfg/dotenv/dotenv_test.go
 Decisions: homeDirFn is package-level overridable (cleaner than t.Setenv("HOME") and platform-portable); .git boundary inclusive (repo-root .env still loaded), $HOME boundary inclusive.
+
+## task-004 — 2026-05-08T15:02:00Z
+Wired RedactArgs into aura/skill/default telemetry branches in clievents.Emit; query branch left untouched (already command-name only). Added table-driven Mixpanel-payload test asserting *** present, flag name preserved, secret value never leaked across AURA/SKILL/COMMAND suffixes including --flag=value form.
+Files: ~common/clievents/clievents.go, ~common/clievents/clievents_test.go

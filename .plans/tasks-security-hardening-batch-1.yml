@@ -67,7 +67,8 @@ tasks:
       branch (lines 82-91) unchanged. Add a clievents-level test that captures the
       Mixpanel payload via the existing analytics test recorder and asserts the
       command property contains *** for the three secret flags.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T15:02:00Z
     dependencies:
       - task-001
     acceptance_criteria:
