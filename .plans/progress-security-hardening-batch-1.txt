@@ -50,3 +50,7 @@ Decisions: exported SetHomeDirFnForTest from dotenv pkg for cross-package hermet
 normalizeURI now returns a 4th value `warning string`: non-empty when resolved scheme is cleartext bolt-family (bolt:// or neo4j://) AND host is not loopback. Warning uses (*url.URL).Redacted() so userinfo password is masked. Both connect.go call sites print via cmd.PrintErrln. Loopback (localhost / 127.0.0.1 / ::1) and encrypted (+s/+ssc) variants stay silent. Existing http→neo4j rewrite to non-loopback now ALSO emits the cleartext warning post-rewrite.
 Files: ~neo4j-cli/query/uri.go, ~neo4j-cli/query/uri_test.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/query/run_test.go
 Decisions: cleartextWarning + isLoopbackHost as private helpers in uri.go (kept small, no new pkg); warning fires post-rewrite too so http://prod.example also warns about the resulting cleartext neo4j://.
+
+## task-012 — 2026-05-08T17:25:00Z
+fetchRelPaths now doubles literal backticks in the stripped relType before fmt.Sprintf interpolation (Cypher escape rule), closing the injection vector where a relType containing "`" could close the backtick-quoted identifier and inject statements. Added schema_test.go case feeding the canonical injection payload and asserting doubled-backtick form, balanced wrapper count, and canonical MATCH prefix/suffix shell.
+Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go

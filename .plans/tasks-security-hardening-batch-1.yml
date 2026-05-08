@@ -223,7 +223,8 @@ tasks:
       before fmt.Sprintf interpolation. Add a unit test feeding a relType that
       contains a backtick and assert it survives the round-trip without
       breaking out of the backtick wrapper.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T17:25:00Z
     dependencies: []
     acceptance_criteria:
       - "Backticks are doubled (Cypher escape) before interpolation"

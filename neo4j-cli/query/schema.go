@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
@@ -209,9 +210,13 @@ func fetchRelPaths(ctx context.Context, c *conn, relTypes []string) ([]relPath, 
 		if stripped == "" {
 			continue
 		}
+		// Cypher escapes a literal backtick inside a backtick-quoted identifier
+		// by doubling it; without this a relType containing "`" would close the
+		// quote early and let attacker-controlled text inject Cypher.
+		escaped := strings.ReplaceAll(stripped, "`", "``")
 		stmt := fmt.Sprintf(
 			"MATCH (n)-[r:`%s`]->(m) WITH DISTINCT labels(n) AS from, labels(m) AS to RETURN from, to",
-			stripped)
+			escaped)
 		res, err := runStatement(ctx, c, stmt, nil)
 		if err != nil {
 			return nil, err
