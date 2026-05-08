@@ -78,3 +78,7 @@ Files: ~.github/workflows/claude.yml
 Hardened cla-check.yml: added top-level least-privilege `permissions: { contents: read, pull-requests: read }`; moved PAT from inline `${{ secrets.X }}` positional interpolation to env var GITHUB_TOKEN_PAT forwarded as positional (helper from external whitelist-check repo accepts positional only — wrap pattern).
 Files: ~.github/workflows/cla-check.yml
 Decisions: helper script ./bin/examine-pull-request lives in neo-technology/whitelist-check (checked out at runtime) — couldn't audit env-input support, so used the env-then-forward wrap; closes GHA-rendering exposure even though ps-output exposure of positional remains.
+
+## task-018 — 2026-05-08T18:25:00Z
+Tightened update-website.yml workflow_run guard to mirror publish-pypi.yml pattern: now requires success AND head_branch == default_branch AND event == push (workflow_dispatch still passes). Closes cache-poisoning vector where a non-default-branch "release" run could trigger the contents:write + pull-requests:write job.
+Files: ~.github/workflows/update-website.yml
