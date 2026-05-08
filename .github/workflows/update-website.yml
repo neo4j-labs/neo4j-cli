@@ -44,6 +44,7 @@ jobs:
             --pattern "*Linux*x86_64*.tar.gz" \
             --dir /tmp/neo4j-cli-release
           tar -xzf /tmp/neo4j-cli-release/*.tar.gz -C /tmp/neo4j-cli-release
+          mkdir -p "$HOME/.local/bin"
           install -m755 /tmp/neo4j-cli-release/neo4j-cli "$HOME/.local/bin/neo4j-cli"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
