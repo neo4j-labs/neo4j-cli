@@ -54,15 +54,29 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Creates a new instance",
+		Example: `  # Create a free-db instance (no cloud provider, region, or memory required)
+  neo4j aura instance create --name my-free-instance --type free-db --tenant-id 00000000-0000-0000-0000-000000000000
+
+  # Create a professional-db instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+
+  # Create a professional-db instance on Azure (eastus, Virginia)
+  neo4j aura instance create --name my-azure-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider azure --region eastus --memory 4GB
+
+  # Create a professional-db instance on GCP (europe-west1, Belgium)
+  neo4j aura instance create --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB
+
+  # Create a business-critical instance on AWS (us-east-1, N. Virginia)
+  neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 64GB`,
 		Long: `This subcommand starts the creation process of an Aura instance.
 
-Creating an instance is an asynchronous operation that can be awaited with --await. Supported instance configurations for your tenant can be obtained by calling the tenant get subcommand.
+Region identifiers follow each cloud provider's own naming convention: AWS uses identifiers such as us-east-1, Azure uses identifiers such as eastus, and GCP uses identifiers such as us-central1.
 
-You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
+If you're unsure of possible configurations, run 'tenant get' to discover the full list of supported configurations for your tenant. The output lists every valid combination of --cloud-provider, --region, --type, and --memory.
+
+Creating an instance is an asynchronous operation that can be awaited with --await. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
 This subcommand returns your instance ID, initial credentials, connection URL along with your tenant id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
-
-You must also provide a --cloud-provider flag with the subcommand, which specifies which cloud provider the instances will be hosted in. The acceptable values for this field are gcp, aws, or azure.
 
 For Enterprise instances you can specify a --customer-managed-key-id flag to use a Customer Managed Key for encryption.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -111,18 +125,39 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve tenant ID before using it for default name generation.
+			resolvedTenantId := tenantId
+			if resolvedTenantId == "" {
+				resolvedTenantId = cfg.Aura.DefaultTenant()
+			}
+
+			// Auto-generate a default name when --name is omitted.
+			if name == "" {
+				cmd.SilenceUsage = true
+				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
+					Method:      http.MethodGet,
+					QueryParams: map[string]string{"tenantId": resolvedTenantId},
+				})
+				if listErr != nil {
+					return listErr
+				}
+				listData := api.ParseBody(listBody)
+				existingNames := make([]string, 0, len(listData.AsArray()))
+				for _, inst := range listData.AsArray() {
+					if n, ok := inst["name"].(string); ok {
+						existingNames = append(existingNames, n)
+					}
+				}
+				name = defaultInstanceName(existingNames)
+			}
+
 			body := map[string]any{
 				"version":        version,
 				"region":         region,
 				"name":           name,
 				"type":           _type,
 				"cloud_provider": cloudProvider,
-			}
-
-			if tenantId == "" {
-				body["tenant_id"] = cfg.Aura.DefaultTenant()
-			} else {
-				body["tenant_id"] = tenantId
+				"tenant_id":      resolvedTenantId,
 			}
 
 			if _type == "free-db" {
@@ -214,19 +249,18 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().StringVar(&version, versionFlag, "5", "The Neo4j version of the instance.")
 
-	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted.")
+	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'tenant get' to see the full list of supported regions for your tenant.")
 
-	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory in GB.")
+	cmd.Flags().Var(&memory, memoryFlag, "The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes.")
 
-	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the instance (any UTF-8 characters with no trailing or leading whitespace).")
-	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01).")
 
-	cmd.Flags().Var(&_type, typeFlag, "(required) The type of the instance.")
+	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 
-	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, "The cloud provider hosting the instance.")
+	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)
 
 	cmd.Flags().StringVar(&customerManagedKeyId, customerManagedKeyIdFlag, "", "An optional customer managed key to be used for instance creation.")
 

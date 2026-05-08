@@ -1,0 +1,99 @@
+feature: instance-create-default-name
+prd: ./prd-instance-create-default-name.md
+created_at: 2026-05-07T00:00:00Z
+updated_at: 2026-05-07T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add defaultInstanceName helper and unit tests"
+    description: |
+      Create name_helpers.go in neo4j-cli/aura/internal/subcommands/instance/ containing
+      the defaultInstanceName(existingNames []string) string function as specified in the PRD.
+      Create a corresponding name_helpers_test.go with table-driven tests covering: no existing
+      instances (returns Instance01), some names taken with gaps, contiguous names from Instance01
+      upward, all two-digit names taken (rolls to Instance100), and case-insensitive matching.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "defaultInstanceName(nil) returns \"Instance01\""
+      - "defaultInstanceName with Instance01 and Instance03 taken returns \"Instance02\""
+      - "defaultInstanceName with Instance01–Instance99 all taken returns \"Instance100\""
+      - "Comparison is case-insensitive (instance01 blocks Instance01)"
+      - "make test passes for the new test file"
+    completed_at: "2026-05-07T00:00:00Z"
+
+  - id: task-002
+    title: "Make --name optional and wire default name generation into RunE"
+    description: |
+      In create.go, remove cmd.MarkFlagRequired(nameFlag) to make --name optional and update
+      the flag usage string to remove the \"(required)\" prefix and document auto-generation.
+      In RunE, after tenantID is resolved and before the body map is assembled, check whether
+      name is empty; if so, call GET /instances?tenantId=<tenantID> via api.MakeRequest, parse
+      the response with api.ParseBody, extract all instance names, and call defaultInstanceName
+      to set name. Propagate any API error from the list call as-is (same pattern as the create
+      error path).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "--name is no longer required; omitting it does not produce a cobra validation error"
+      - "When --name is omitted, a GET /instances?tenantId=... request is made before the POST"
+      - "When --name is provided, no GET /instances request is made"
+      - "A list API failure causes the command to exit non-zero with the propagated error message"
+      - "The resolved name appears in the create request body and in the command output"
+    completed_at: "2026-05-07T01:00:00Z"
+
+  - id: task-003
+    title: "Add integration tests for default name in create_test.go"
+    description: |
+      Extend create_test.go (or add a focused table block) with cases that exercise the new
+      default-name flow end-to-end via the existing mock HTTP server. Cover: no existing
+      instances (expect Instance01 in POST body), one existing instance named Instance01
+      (expect Instance02), explicit --name bypasses the list call entirely, and a list API
+      error aborts with a non-zero exit code. Follow the table-driven pattern already used
+      throughout create_test.go.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Test case with empty tenant list asserts POST body contains \"name\": \"Instance01\""
+      - "Test case with Instance01 existing asserts POST body contains \"name\": \"Instance02\""
+      - "Test case with explicit --name asserts no GET /instances mock is hit"
+      - "Test case with list 500 response asserts non-zero exit and error output"
+      - "make test passes with no regressions in existing create test cases"
+    completed_at: "2026-05-07T02:00:00Z"
+
+  - id: task-004
+    title: "Regenerate skill bundles and verify generate-check gate"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/... to
+      regenerate the embedded skill bundles after the --name flag description change. Verify
+      that make generate-check exits cleanly (git diff --exit-code passes) and that
+      TestGenerator_RoundTrip passes. Commit the updated bundle files alongside the
+      implementation changes.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/... runs without error"
+      - "make generate-check exits 0 (no diff after generate)"
+      - "TestGenerator_RoundTrip passes"
+      - "Updated bundle files reflect the new --name flag description"
+    completed_at: "2026-05-07T00:00:00Z"
+
+  - id: task-005
+    title: "Final gates: test, fmt-check, lint, and changelog entry"
+    description: |
+      Run make test, make fmt-check, and make lint to confirm all gates are clean across the
+      full change set. Add a changelog entry using changie (kind: Minor) describing the new
+      optional --name behaviour for instance create.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "make test exits 0 with no failing tests"
+      - "make fmt-check exits 0 (no files need gofmt)"
+      - "make lint exits 0 with no lint errors"
+      - "A .changes/unreleased/ YAML file exists describing the --name default name feature"
+    completed_at: "2026-05-07T00:00:00Z"

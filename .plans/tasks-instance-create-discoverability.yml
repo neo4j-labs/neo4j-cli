@@ -1,0 +1,86 @@
+feature: instance-create-discoverability
+prd: ./prd-instance-create-discoverability.md
+created_at: 2026-05-07T00:00:00Z
+updated_at: 2026-05-07T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Update flag usage strings for --type, --cloud-provider, --memory, and --region"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/instance/create.go`, update the usage strings
+      for four flags. `--type` and `--cloud-provider` should use "must be one of" wording
+      enumerating all valid values. `--memory` should list a few representative sizes rather
+      than the exhaustive set. `--region` should state that values are cloud-provider-specific
+      identifiers (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP) and point
+      to `tenant get` for the full list.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "--help shows --type usage as: '(required) The type of the instance. Must be one of \"free-db\", \"professional-db\", \"business-critical\", \"enterprise-db\", \"professional-ds\", or \"enterprise-ds\".'"
+      - "--help shows --cloud-provider usage as: 'The cloud provider hosting the instance. Must be one of \"aws\", \"azure\", or \"gcp\".'"
+      - "--help shows --memory usage with representative examples (e.g. 2GB, 8GB, 64GB) rather than an exhaustive list"
+      - "--help shows --region usage string referencing cloud-provider naming conventions and pointing to tenant get"
+      - "No change to flag parsing, validation logic, or error messages"
+    completed_at: "2026-05-07T00:00:00Z"
+
+  - id: task-002
+    title: "Update Long description to surface tenant get discovery path"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/instance/create.go`, rewrite the `Long` field
+      of `NewCreateCmd` to more prominently surface `tenant get` as the way to discover
+      supported configurations for a tenant. Also add a note that region identifiers follow
+      each cloud provider's own naming convention (AWS uses us-east-1 style, Azure uses
+      eastus style, GCP uses us-central1 style).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Long description explicitly names 'tenant get' as the command to run for discovering supported configurations"
+      - "Long description notes that region identifiers follow each cloud provider's naming convention"
+      - "Long description remains accurate and does not introduce placeholder text"
+      - "No behaviour change — only the Long string is modified"
+    completed_at: "2026-05-07T01:00:00Z"
+
+  - id: task-003
+    title: "Add cobra Example field with five copy-paste-ready invocations"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/instance/create.go`, add an `Example` field
+      to the cobra.Command struct in `NewCreateCmd`. The field must include at least five
+      representative invocations: free-db (no region/cloud-provider), professional-db on
+      AWS (us-east-1), professional-db on Azure (eastus), professional-db on GCP
+      (europe-west1), and one business-critical example. Each non-free-db example must
+      include --name, --type, --tenant-id, --cloud-provider, --region, and --memory using
+      real region identifiers from the reference data in the PRD. Each example should be
+      preceded by a comment line describing what it does. Indent all examples with two spaces
+      as required by cobra.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "'neo4j aura instance create --help' shows an 'Examples:' section"
+      - "Examples section includes a free-db invocation with no --region, --cloud-provider, or --memory"
+      - "Examples section includes professional-db on AWS with --region us-east-1"
+      - "Examples section includes professional-db on Azure with --region eastus"
+      - "Examples section includes professional-db on GCP with --region europe-west1"
+      - "Examples section includes a business-critical invocation"
+      - "All region values are real identifiers from the PRD reference data, not placeholders"
+    completed_at: "2026-05-07T02:00:00Z"
+
+  - id: task-004
+    title: "Regenerate skill bundles and verify all test gates pass"
+    description: |
+      After all string edits in create.go are complete, run `go generate
+      ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` to regenerate the
+      bundle reference docs so they stay in sync with the updated command tree. Then run the
+      full test suite (`make test`), format check (`make fmt-check`), and linter (`make lint`)
+      to confirm nothing is broken. TestGenerator_RoundTrip must pass.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "'go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...' completes without error"
+      - "'make test' passes with no test failures"
+      - "'make fmt-check' reports no unformatted files"
+      - "'make lint' reports no lint errors"
+      - "TestGenerator_RoundTrip passes (bundle docs match the regenerated output)"
+    completed_at: "2026-05-07T03:00:00Z"
