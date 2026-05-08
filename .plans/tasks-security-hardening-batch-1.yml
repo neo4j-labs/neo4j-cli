@@ -124,7 +124,8 @@ tasks:
       and return clierr.NewFatalError naming the backup path so the user sees
       what happened. CLI still fails fast on the current invocation, but the
       next invocation succeeds with empty credentials.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T15:55:00Z
     dependencies:
       - task-006
     acceptance_criteria:

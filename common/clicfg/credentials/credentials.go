@@ -5,11 +5,18 @@ package credentials
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/neo4j/cli/common/clicfg/fileutils"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/afero"
 )
+
+// nowUnix is overridable in tests so the timestamp suffix on the corrupt
+// backup file is deterministic.
+var nowUnix = func() int64 { return time.Now().Unix() }
 
 type CredentialsFile struct {
 	Aura  *AuraCredentials  `json:"aura"`
@@ -31,11 +38,24 @@ func NewCredentials(fs afero.Fs, configPrefix string) *Credentials {
 		fs:       fs,
 		filePath: configPath,
 	}
-	c.load()
+	if err := c.load(); err != nil {
+		// Surface the error via panic to match the existing fatal-error flow
+		// (main()'s recover prints and exits). The backup-and-reset side
+		// effects have already run inside load(), so the next invocation
+		// will succeed with empty credentials.
+		panic(err)
+	}
 	return &c
 }
 
-func (c *Credentials) load() {
+// load reads credentials.json into the Credentials struct.
+//
+// On a malformed file, load backs up the corrupt bytes to
+// <path>.corrupt-<unix-ts>, resets the in-memory state to empty
+// credentials, persists the empty state to disk, and returns a
+// clierr.FatalError naming the backup path. The current invocation
+// fails fast; subsequent invocations succeed with empty credentials.
+func (c *Credentials) load() error {
 	data := fileutils.ReadFileSafe(c.fs, c.filePath)
 	fileHasData := len(data) != 0
 
@@ -55,7 +75,15 @@ func (c *Credentials) load() {
 	}
 	if fileHasData {
 		if err := json.Unmarshal(data, &credentials); err != nil {
-			panic(err)
+			backupPath, backupErr := c.backupCorruptFile(data)
+			// Reset to empty credentials regardless of backup outcome so
+			// the next invocation does not re-trip the same parse error.
+			c.resetToEmpty()
+			c.save()
+			if backupErr != nil {
+				return clierr.NewFatalError("credentials file %s is corrupt and could not be parsed (%v); additionally failed to back it up: %v. The file has been reset to empty credentials.", c.filePath, err, backupErr)
+			}
+			return clierr.NewFatalError("credentials file %s is corrupt and could not be parsed (%v); a copy has been saved to %s and the file has been reset to empty credentials.", c.filePath, err, backupPath)
 		}
 	}
 
@@ -80,6 +108,33 @@ func (c *Credentials) load() {
 	if !fileHasData {
 		c.save()
 	}
+	return nil
+}
+
+// resetToEmpty wires fresh empty credentials with onUpdate callbacks.
+func (c *Credentials) resetToEmpty() {
+	c.Aura = &AuraCredentials{
+		Credentials: []*AuraCredential{},
+		onUpdate:    c.save,
+	}
+	c.Dbms = &DbmsCredentials{
+		Credentials: []*DbmsCredential{},
+		onUpdate:    c.save,
+	}
+	c.Embed = &EmbedCredentials{
+		Credentials: []*EmbedCredential{},
+		onUpdate:    c.save,
+	}
+}
+
+// backupCorruptFile writes the original (corrupt) bytes to
+// <path>.corrupt-<unix-ts> and returns the backup path.
+func (c *Credentials) backupCorruptFile(data []byte) (string, error) {
+	backupPath := fmt.Sprintf("%s.corrupt-%d", c.filePath, nowUnix())
+	if err := afero.WriteFile(c.fs, backupPath, data, 0o600); err != nil {
+		return "", err
+	}
+	return backupPath, nil
 }
 
 func (c *Credentials) save() {

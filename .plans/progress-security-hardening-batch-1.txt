@@ -25,3 +25,8 @@ Decisions: response_test uses package api (in-package) to access private handleR
 Atomic credentials.json write: WriteFile now writes <path>.tmp via OpenFile O_CREATE|O_WRONLY|O_TRUNC mode 0600, Sync, Close, Rename; cleanup on any failure. createFile collapses Create→Chmod chain to a single OpenFile (umask race window closed). Both fileutils MkdirAll and clicfg.go config-dir MkdirAll now use 0o700.
 Files: ~common/clicfg/fileutils/fileutils.go, +common/clicfg/fileutils/fileutils_test.go, +common/clicfg/fileutils/umask_unix_test.go, +common/clicfg/fileutils/umask_windows_test.go, ~common/clicfg/clicfg.go
 Decisions: rename-failure test uses an Fs wrapper (renameFailFs) injecting a fixed error rather than reflecting on os internals; OS-fs mode assertions guarded by syscall.Umask(0) on POSIX with a Windows-no-op shim so tests stay cross-platform; Sync errors that wrap os.ErrInvalid are tolerated (some afero backends).
+
+## task-007 — 2026-05-08T15:55:00Z
+load() returns error instead of panicking on Unmarshal failure; on corrupt file backs up to <path>.corrupt-<unix-ts>, resets in-memory + on-disk state to empty creds, returns clierr.NewFatalError naming backup. NewCredentials wraps load() and panics with that error so existing main() recover-and-print flow stays intact (no signature change to 13 call sites).
+Files: ~common/clicfg/credentials/credentials.go, +common/clicfg/credentials/credentials_test.go, +common/clicfg/credentials/export_test.go
+Decisions: package-level nowUnix var + SetNowUnixForTest helper for deterministic backup-path assertions (cleaner than freezing time globally); panic-with-error preserved over signature change to keep blast radius local.
