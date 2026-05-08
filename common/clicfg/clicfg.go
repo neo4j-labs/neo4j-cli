@@ -69,7 +69,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	setDefaultValues(Viper)
 
 	if !fileutils.FileExists(fs, fullConfigPath) {
-		if err := fs.MkdirAll(configPath, 0755); err != nil {
+		if err := fs.MkdirAll(configPath, 0o700); err != nil {
 			panic(err)
 		}
 		if err := Viper.SafeWriteConfig(); err != nil {
