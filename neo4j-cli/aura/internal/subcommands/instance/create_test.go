@@ -47,7 +47,7 @@ func TestCreateFreeInstance(t *testing.T) {
 			"data": {
 				"id": "db1d1234",
 				"connection_url": "YOUR_CONNECTION_URL",
-				"username": "neo4j",
+				"username": "alice123",
 				"password": "letMeIn123!",
 				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
@@ -64,6 +64,8 @@ func TestCreateFreeInstance(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"1GB","name":"Instance01","region":"europe-west1","tenant_id":"YOUR_TENANT_ID","type":"free-db","version":"5"}`)
 
 	helper.AssertErr("")
+	// For free-db with a non-"neo4j" username, the database name stored in credentials is the username.
+	helper.AssertCredentialsValue("dbms.credentials.0.database-name", "alice123")
 	helper.AssertOutJson(`{
 	  "data": {
 		"cloud_provider": "gcp",
@@ -75,7 +77,7 @@ func TestCreateFreeInstance(t *testing.T) {
 		"region": "europe-west1",
 		"tenant_id": "YOUR_TENANT_ID",
 		"type": "free-db",
-		"username": "neo4j"
+		"username": "alice123"
 	  }
 	}`)
 }
@@ -633,6 +635,67 @@ func TestCreateDefaultCredentialStorage(t *testing.T) {
 		"username": "neo4j"
 	  }
 	}`)
+}
+
+// TestCreateDatabaseNameStorage verifies that the correct database name is stored
+// depending on the instance type and the username returned by the API.
+func TestCreateDatabaseNameStorage(t *testing.T) {
+	testCases := []struct {
+		name             string
+		instanceType     string
+		apiUsername      string
+		command          string
+		wantDatabaseName string
+	}{
+		{
+			name:             "free-db with non-neo4j username stores username as database-name",
+			instanceType:     "free-db",
+			apiUsername:      "tenant-user-abc",
+			command:          "instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw",
+			wantDatabaseName: "tenant-user-abc",
+		},
+		{
+			name:             "free-db with neo4j username stores neo4j as database-name",
+			instanceType:     "free-db",
+			apiUsername:      "neo4j",
+			command:          "instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --rw",
+			wantDatabaseName: "neo4j",
+		},
+		{
+			name:             "professional-db always stores neo4j as database-name regardless of username",
+			instanceType:     "professional-db",
+			apiUsername:      "tenant-user-abc",
+			command:          "instance create --region europe-west1 --name Instance01 --type professional-db --tenant-id YOUR_TENANT_ID --cloud-provider gcp --memory 4GB --rw",
+			wantDatabaseName: "neo4j",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.NewRequestHandlerMock("/v1/instances", http.StatusAccepted, fmt.Sprintf(`{
+				"data": {
+					"id": "db1d1234",
+					"connection_url": "YOUR_CONNECTION_URL",
+					"username": %q,
+					"password": "letMeIn123!",
+					"tenant_id": "YOUR_TENANT_ID",
+					"cloud_provider": "gcp",
+					"region": "europe-west1",
+					"type": %q,
+					"name": "Instance01",
+					"vector_optimized": false
+				}
+			}`, tc.apiUsername, tc.instanceType))
+
+			helper.ExecuteCommand(tc.command)
+
+			helper.AssertErr("")
+			helper.AssertCredentialsValue("dbms.credentials.0.database-name", tc.wantDatabaseName)
+		})
+	}
 }
 
 func TestCreateCollisionResolution(t *testing.T) {
