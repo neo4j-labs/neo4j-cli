@@ -25,6 +25,53 @@ func (s *stubDbmsGetter) Get(name string) (*credentials.DbmsCredential, error) {
 	return nil, clierr.NewUsageError("could not find credential with name %s", name)
 }
 
+func TestDatabaseName(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instanceType string
+		username     string
+		want         string
+	}{
+		{
+			name:         "free-db with non-neo4j username returns username",
+			instanceType: "free-db",
+			username:     "alice",
+			want:         "alice",
+		},
+		{
+			name:         "free-db with neo4j username returns neo4j",
+			instanceType: "free-db",
+			username:     "neo4j",
+			want:         "neo4j",
+		},
+		{
+			name:         "professional-db always returns neo4j",
+			instanceType: "professional-db",
+			username:     "alice",
+			want:         "neo4j",
+		},
+		{
+			name:         "business-critical always returns neo4j",
+			instanceType: "business-critical",
+			username:     "alice",
+			want:         "neo4j",
+		},
+		{
+			name:         "empty instance type returns neo4j",
+			instanceType: "",
+			username:     "alice",
+			want:         "neo4j",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := databaseName(tc.instanceType, tc.username)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestBaseCredentialName(t *testing.T) {
 	testCases := []struct {
 		name       string

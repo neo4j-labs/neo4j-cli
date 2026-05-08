@@ -11,14 +11,14 @@ tasks:
       in the instance subcommand package. It returns `username` when `instanceType == "free-db"`
       AND `username != "neo4j"`, and returns `"neo4j"` in all other cases. This encapsulates
       the detection logic cleanly and makes it independently testable.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Helper returns the username when instanceType is \"free-db\" and username is not \"neo4j\""
       - "Helper returns \"neo4j\" when instanceType is \"free-db\" and username is \"neo4j\""
       - "Helper returns \"neo4j\" for any non-free instance type regardless of username"
       - "Function is private and lives in the instance subcommand package (credential_helpers.go or a new helper file)"
-    completed_at: null
+    completed_at: 2026-05-08T00:00:00Z
 
   - id: task-002
     title: "Use databaseName helper in create.go credential storage"

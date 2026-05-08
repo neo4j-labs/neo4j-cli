@@ -1,0 +1,22 @@
+================================================================================
+TASK-001: Add databaseName helper to instance create
+Date: 2026-05-08T00:00:00Z
+================================================================================
+
+Summary:
+Added a private `databaseName(instanceType, username string) string` helper function
+to `credential_helpers.go` in the instance subcommand package. The function returns
+the username when the instance type is "free-db" and the username is not "neo4j",
+and returns "neo4j" in all other cases. Added comprehensive table-driven tests in
+`credential_helpers_test.go` covering all acceptance criteria cases.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/credential_helpers.go (modified — added databaseName helper)
+- neo4j-cli/aura/internal/subcommands/instance/credential_helpers_test.go (modified — added TestDatabaseName table-driven tests)
+
+Key Decisions:
+- Added helper to credential_helpers.go (not a new file) since it is closely related to the other credential helper functions there
+- Documented the free-db username convention in the function comment for future maintainers
+- Included edge cases in tests: empty instance type and "neo4j" username for free-db
+
+Next Task: task-002
