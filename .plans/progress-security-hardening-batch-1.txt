@@ -94,3 +94,7 @@ Files: ~README.md, +.changes/unreleased/neo4j-cli-Patch-20260508-154720.yaml
 ## task-021 — 2026-05-08T19:45:00Z
 Fixed update-website.yml gh release download pattern: lowercase `*linux*amd64*.tar.gz` never matched GoReleaser's `Linux_x86_64` archives (case-sensitive filepath.Match); updated to `*Linux*x86_64*.tar.gz`. Verified against v1.7.0: old pattern exits 1 ("no assets match"), new pattern exits 0 with exactly one archive.
 Files: ~.github/workflows/update-website.yml
+
+## task-022 — 2026-05-08T20:00:00Z
+Replaced update-website.yml install-step fallback guard with a tag-shaped (v*) case so workflow_dispatch from main (where github.ref_name is "main", not "refs/heads/main") falls back to the latest release tag instead of `gh release download "main"` failing.
+Files: ~.github/workflows/update-website.yml

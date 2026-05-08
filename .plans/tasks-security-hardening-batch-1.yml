@@ -398,7 +398,8 @@ tasks:
       from main, $TAG="main" survives the guard and `gh release download
       "main"` then fails. Replace the guard with a tag-shaped check so any
       non-tag value falls back to the latest published release.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T20:00:00Z
     dependencies: []
     acceptance_criteria:
       - "Fallback branch triggers when $TAG does not match a release tag (e.g. starts with v) — e.g. `case \"$TAG\" in v*) ;; *) TAG=$(gh release view ... -q .tagName);; esac`"
