@@ -1,0 +1,237 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package embed
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestOpenAI_Embed_HappyPath_NoDimensions(t *testing.T) {
+	var gotPath string
+	var gotAuth string
+	var gotUA string
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		gotUA = r.Header.Get("User-Agent")
+		body, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(body, &gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2,0.3]}]}`))
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider:  ProviderOpenAI,
+		Model:     "text-embedding-3-small",
+		BaseURL:   srv.URL,
+		APIKey:    "sk-test",
+		UserAgent: "neo4j-cli/vtest",
+	})
+	got, err := p.Embed(context.Background(), "hello")
+	require.NoError(t, err)
+	assert.Equal(t, []float32{0.1, 0.2, 0.3}, got)
+
+	assert.Equal(t, "/embeddings", gotPath)
+	assert.Equal(t, "Bearer sk-test", gotAuth)
+	assert.Equal(t, "neo4j-cli/vtest", gotUA)
+	assert.Equal(t, "text-embedding-3-small", gotBody["model"])
+	assert.Equal(t, "hello", gotBody["input"])
+	_, hasDim := gotBody["dimensions"]
+	assert.False(t, hasDim, "dimensions should be omitted when 0")
+}
+
+func TestOpenAI_Embed_HappyPath_WithDimensions(t *testing.T) {
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		require.NoError(t, json.Unmarshal(body, &gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.5]}]}`))
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider:   ProviderOpenAI,
+		Model:      "text-embedding-3-small",
+		BaseURL:    srv.URL,
+		APIKey:     "sk-test",
+		Dimensions: 256,
+	})
+	got, err := p.Embed(context.Background(), "hello")
+	require.NoError(t, err)
+	assert.Equal(t, []float32{0.5}, got)
+
+	assert.EqualValues(t, 256, gotBody["dimensions"])
+}
+
+func TestOpenAI_Embed_MissingKeyReturnsUsageError(t *testing.T) {
+	// Server that would fail loudly if hit; missing key must short-circuit
+	// before any HTTP traffic.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("server should not be hit when API key is missing")
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "text-embedding-3-small",
+		BaseURL:  srv.URL,
+		// No APIKey.
+	})
+	got, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	assert.Nil(t, got)
+	assert.Contains(t, err.Error(), "missing API key for openai")
+	assert.Contains(t, err.Error(), "OPENAI_API_KEY")
+}
+
+func TestOpenAI_Embed_Non2xxWrapsStatusNoAuthLeak(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"Incorrect API key"}}`))
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "text-embedding-3-small",
+		BaseURL:  srv.URL,
+		APIKey:   "sk-secret-do-not-leak",
+	})
+	_, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "openai")
+	assert.Contains(t, err.Error(), "401")
+	assert.Contains(t, err.Error(), "Incorrect API key")
+	assert.NotContains(t, err.Error(), "sk-secret-do-not-leak")
+	assert.NotContains(t, err.Error(), "Bearer")
+}
+
+func TestOpenAI_Embed_MalformedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[`)) // truncated JSON
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "m",
+		BaseURL:  srv.URL,
+		APIKey:   "sk-test",
+	})
+	_, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "openai")
+	assert.Contains(t, strings.ToLower(err.Error()), "decode")
+}
+
+func TestOpenAI_Embed_EmptyDataArray(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "m",
+		BaseURL:  srv.URL,
+		APIKey:   "sk-test",
+	})
+	_, err := p.Embed(context.Background(), "hello")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty embedding")
+}
+
+func TestOpenAI_Embed_CtxCancellationAborts(t *testing.T) {
+	// Server that blocks until the test cancels ctx, then writes a response
+	// the client will never see. The handler signals via started so we know
+	// the request reached the server before we cancel.
+	started := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		// Server-side ctx propagation from a closed client conn is best-effort;
+		// add a hard cap so a flaky propagation does not hang the handler (and
+		// the whole test binary) if the client-side cancellation does not reach
+		// us. The test asserts on the client-side error, not the server timing.
+		select {
+		case <-r.Context().Done():
+		case <-time.After(2 * time.Second):
+		}
+	}))
+	defer srv.Close()
+
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "m",
+		BaseURL:  srv.URL,
+		APIKey:   "sk-test",
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := p.Embed(ctx, "hello")
+		errCh <- err
+	}()
+	<-started
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.Contains(t, strings.ToLower(err.Error()), "context")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Embed did not return after ctx cancel")
+	}
+}
+
+func TestOpenAI_Embed_DefaultBaseURL(t *testing.T) {
+	// Construct provider with no BaseURL set; assert the default is used at
+	// request time. We swap http.Client.Transport so we never hit a real
+	// network.
+	captured := captureRoundTripper{}
+	p := newOpenAIProvider(Config{
+		Provider: ProviderOpenAI,
+		Model:    "m",
+		APIKey:   "sk-test",
+	})
+	p.client = &http.Client{Transport: &captured}
+
+	_, _ = p.Embed(context.Background(), "hello") // err expected (no real response)
+	require.NotNil(t, captured.req)
+	assert.Equal(t, "https://api.openai.com/v1/embeddings", captured.req.URL.String())
+}
+
+// captureRoundTripper records the outbound request and returns a stub error
+// so the embed call short-circuits without performing real I/O.
+type captureRoundTripper struct {
+	req *http.Request
+}
+
+func (c *captureRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	c.req = r
+	return nil, errStubTransport
+}
+
+var errStubTransport = stubErr("stub transport: no real response")
+
+type stubErr string
+
+func (e stubErr) Error() string { return string(e) }

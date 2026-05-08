@@ -118,6 +118,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 
 ## Makefile Notes
 
+- `make generate-check` is `git diff --exit-code` after `go generate`. It flags ANY tracked-file diff, including unrelated edits in the working tree (e.g. a `.plans/tasks-*.yml` status flip). When validating "did this task introduce bundle drift?", inspect the diff output — only `internal/skill/bundle/**` paths matter for the gate. The hone harness's mid-task in_progress flip will always show up here; ignore it.
 - `license-check` target uses `$(GOPATH)/bin/addlicense` (not bare `addlicense`) — GOPATH/bin may not be on PATH
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
 - `make generate` runs `go generate ./...`; `make generate-check` runs generate then `git diff --exit-code` (CI gate). Wired in `.github/workflows/test.yml` between Build and Lint, runs on full OS matrix.
@@ -154,6 +155,7 @@ See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill 
 - For repo-wide gate tests that must auto-discover content (e.g. `common/skill/bundles_test.go` walking every `<bin>/internal/skill/bundle/SKILL.md`), resolve repo root via `runtime.Caller(0)` then `filepath.Walk` from there. Suffix-match paths after `filepath.ToSlash` so Windows runs match. Prune `.git`, `node_modules`, `bin`, `.changes` to keep the walk fast.
 - `os.OpenFile(..., 0o644)` mode bits are masked by umask on create — if downstream readers (e.g. a docker container running as a different uid) need a specific perm, follow up with `os.Chmod` rather than relying on the OpenFile mode. Same applies to `t.TempDir()` which creates with 0700; a read-only bind mount into a container needs `os.Chmod(dir, 0o755)` for the in-container user to traverse.
 - Package-level test seams (e.g. `stdinIsTTY` at `neo4j-cli/query/run.go`, `stdoutIsTerminal` at `neo4j-cli/query/output.go`) are `var <name> = func(...) ...` declarations that production fills with the real impl. For TTY-related seams in the `query` package, `TestMain` in `testseam_test.go` seeds the seam to the most-common-existing-assertion value (e.g. TTY=true) so legacy tests stay green without per-test edits; tests that need the other branch use a small `withX(t, val)` helper that swaps the seam and registers `t.Cleanup` to restore it.
+- `httptest.NewServer` server-side `r.Context().Done()` propagation from a closed client connection is best-effort and timing-dependent — when testing client ctx-cancellation paths, ALWAYS guard the handler with a short safety timeout (`select { case <-r.Context().Done(): case <-time.After(2*time.Second): }`) AND wrap the test-side wait on `errCh` in a `select` with a 5s fallback `t.Fatal`. Without these, a propagation miss hangs the handler until `-test.timeout` (default 10m), looking exactly like an infinite go-test loop. Symptom: `pkill -QUIT <pid>` shows the handler's goroutine blocked on `chanrecv` at `<-r.Context().Done()` while the client side has long returned.
 
 ## Windows CI Gotchas
 
@@ -188,17 +190,30 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 
 ## Credentials Storage Notes
 
-- `Credentials.load()` re-wires `onUpdate` on both `Aura` and `Dbms` after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
-- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies.
-- `PrintableDbmsCredentials.AsArray()` and `MarshalJSON()` intentionally omit `password` — any future credential type that has sensitive fields must also exclude them from both methods.
+- `Credentials.load()` re-wires `onUpdate` on Aura, Dbms, AND Embed after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
+- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies. `EmbedCredentials.GetDefault()` follows the same convention.
+- `PrintableDbmsCredentials.AsArray()` / `MarshalJSON()` omit `password`; `PrintableEmbedCredentials.AsArray()` / `MarshalJSON()` omit `api-key`. Any future credential type with sensitive fields must follow this pattern.
+- When adding a new credential type to `CredentialsFile` with `omitempty`, `load()` must defensively re-init the field if older credentials.json files lack the key — otherwise `c.Embed.onUpdate = c.save` panics on nil. Mirror the `if c.Embed == nil { ... }` guard in credentials.go.
 - `PrintBodyMap` `fields` slice only affects TABLE rendering — it is ignored for JSON/toon formats. To suppress a sensitive field (e.g. `password`) from ALL output formats you must `delete(data, "field")` from the map before passing to `NewSingleValueResponseData`. The `fields` slice alone is insufficient.
 - `DbmsCredentials.Add` can only fail with "already exists". Since `resolveCredentialName` guarantees the resolved name is free, Add cannot fail in a single-threaded context after a successful `resolveCredentialName` call. Storage failure warning paths are effectively dead code in normal operation.
 - To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.
 - The default test helper credentials JSON only has `"aura": {...}` (no `"dbms"` key). During `Credentials.load()`, the absence of `"dbms"` in JSON leaves the field at its initial value `&DbmsCredentials{Credentials: []*DbmsCredential{}}`, so `cfg.Credentials.Dbms` is non-nil in all default test helpers. Passing `"dbms": null` in the JSON explicitly sets it to nil.
+- `DbmsCredential.EmbedCredential` uses `json:"embed-credential,omitempty"` so older creds without a link don't gain the key on disk. `PrintableDbmsCredentials.AsArray` / `MarshalJSON` always emit the key (empty string when unset) so the column is stable across rows for table rendering and external JSON consumers. Pattern: omitempty on the persisted struct, unconditional emit on the printable wrapper.
+- Cross-credential-type validation (e.g. `credential dbms add --embed-credential x`): validate the target with `Embed.Get(name)` BEFORE calling `Dbms.Add(...)` so a bad name never half-creates a cred. Then call `Dbms.SetEmbed(name, embedName)` AFTER `Dbms.Add` succeeds — keeps the storage `Add` signature stable rather than threading new optional fields through.
+- Test fixture seeding: when a dbms test exercises code that touches `cfg.Credentials.Embed`, seed the `embed` block in `newDbmsTestHelper` initial JSON; sjson.Set on `embed.credentials` from a partial fixture works but seeding upfront is more honest about the test surface.
 
 ## query Subsystem Notes
 
-See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, and local verification gotchas.
+See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
+
+## Cobra Help / Skill Bundle Rendering Notes
+
+- `common/skill/render/render.go:235` strips a cobra command's `Example` field via `strings.TrimSpace` before wrapping it in a fenced code block. The leading 2-space "cobra convention" indent is therefore stripped from the FIRST line only and preserved on subsequent lines, producing a ragged block. Write multi-line Examples with NO leading indent so the rendered bundle stays flush-left and consistent.
+- Adding/changing a `Long` field on any cobra command in `neo4j-cli/internal/subcommands/credential/...` or `neo4j-cli/query/...` requires `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle, otherwise `TestGenerator_RoundTrip` (the gate in `make test`) fails with a "references/<sub>.md differs" diff.
+- `make generate-check` is `git diff --exit-code` after `go generate ./...`; on a working tree with uncommitted source-side help-text edits it WILL fail (the gate is meaningful only against a clean tree, i.e. CI). Locally: commit the source AND the regenerated bundle in the same commit, then re-run.
+- `--param` flag Usage on the `query` parent now mentions the `:embed` modifier (`key:embed=<text>`) — keeping the modifier discoverable in `--help` was cheaper than a separate flag. The full rule (JSON-array rejection, empty-text accepted) lives in README and the bundle additions.md, not the flag Usage.
+- README's "Aura API Credentials" example uses `credential aura-client add` (canonical neo4j-cli path), NOT the standalone-aura `aura credential add` form. The standalone aura binary is no longer built/shipped, so README must lead with commands the shipped binary actually has.
+- Skill bundle `description.txt` (frontmatter description) is single-paragraph, ≤1024 chars, third-person. When adding new top-level capability to it, list every credential subtree explicitly ("Aura, Neo4j connection (dbms), and embedding-provider credentials") rather than collapsing them — the agent-side trigger phrasing matches user wording better when each subtree is named.
 
 ---
 

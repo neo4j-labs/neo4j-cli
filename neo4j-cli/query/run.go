@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/query/embed"
 )
 
 // passwordReader is the test seam for the no-echo TTY password prompt. The
@@ -55,9 +55,13 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 
 	rawParams, _ := cmd.Flags().GetStringArray("param")
-	params, err := parseParams(rawParams)
+	params, embeds, err := parseParams(rawParams)
 	if err != nil {
-		return clierr.NewUsageError("%s", err.Error())
+		return err
+	}
+
+	if err := resolveEmbedJobs(cmd, cfg, params, embeds); err != nil {
+		return err
 	}
 
 	c, err := resolveConn(cmd, cfg)
@@ -122,28 +126,11 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 
 // resolveCypher returns the Cypher statement from the positional arg or, if
 // no arg was supplied and stdin is piped, reads it from stdin. A missing
-// argument with a TTY stdin is a usage error.
-func resolveCypher(_ *cobra.Command, args []string) (string, error) {
-	if len(args) == 1 {
-		s := strings.TrimSpace(args[0])
-		if s == "" {
-			return "", clierr.NewUsageError("cypher statement is empty")
-		}
-		return s, nil
-	}
-	if stdinIsTTY() {
-		return "", clierr.NewUsageError(
-			"no Cypher provided: pass a positional argument or pipe a statement on stdin")
-	}
-	b, err := io.ReadAll(stdinReader())
-	if err != nil {
-		return "", fmt.Errorf("query: read stdin: %w", err)
-	}
-	s := strings.TrimSpace(string(b))
-	if s == "" {
-		return "", clierr.NewUsageError("no Cypher provided on stdin")
-	}
-	return s, nil
+// argument with a TTY stdin is a usage error. Thin wrapper around the shared
+// readPositionalOrStdin helper so the `:embed` leaf can reuse the same
+// stdin/TTY logic without duplicating it.
+func resolveCypher(cmd *cobra.Command, args []string) (string, error) {
+	return readPositionalOrStdin(cmd, args, "Cypher")
 }
 
 // promptPassword reads a password from the controlling terminal with no echo,
@@ -214,4 +201,35 @@ func capRows(values [][]any, maxRows int) ([][]any, bool) {
 		return values, false
 	}
 	return values[:maxRows], true
+}
+
+// resolveEmbedJobs runs each pending EmbedJob through the resolved embed
+// provider and inserts the resulting vector into params under the job's name.
+// The same params map then feeds both the EXPLAIN preflight and the real
+// statement execution, so the vector is computed exactly once per invocation.
+//
+// A no-op when embeds is empty: the embed package is not consulted, so a
+// query that uses no `:embed` params never pays the cost of resolving an
+// embed config or constructing a provider.
+func resolveEmbedJobs(cmd *cobra.Command, cfg *clicfg.Config, params map[string]any, embeds []EmbedJob) error {
+	if len(embeds) == 0 {
+		return nil
+	}
+	ec, err := embed.Resolve(cmd, cfg)
+	if err != nil {
+		return err
+	}
+	provider, err := embed.Factory()(ec)
+	if err != nil {
+		return err
+	}
+	ctx := cmd.Context()
+	for _, j := range embeds {
+		vec, err := provider.Embed(ctx, j.Text)
+		if err != nil {
+			return fmt.Errorf("query: embed %q: %w", j.Name, err)
+		}
+		params[j.Name] = vec
+	}
+	return nil
 }

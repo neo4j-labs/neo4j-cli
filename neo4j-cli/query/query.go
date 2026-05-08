@@ -21,7 +21,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Run Cypher against a Neo4j database via the Bolt protocol",
 		Long: "Run a Cypher statement against a Neo4j database via the Bolt " +
 			"protocol. Cypher is taken from the positional argument, or from " +
-			"stdin when no argument is provided and stdin is piped.",
+			"stdin when no argument is provided and stdin is piped. " +
+			"Use `--param NAME:embed=<text>` to inject an embedding vector inline " +
+			"(text is sent to the configured embedding provider, the resulting vector " +
+			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
+			"The sibling `query :embed [text]` leaf computes a vector standalone " +
+			"without opening a Bolt connection.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)
@@ -33,14 +38,21 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset")
 	cmd.PersistentFlags().StringP("database", "d", "", "Target database name [env: NEO4J_DATABASE] (default \"neo4j\")")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
-	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string")
+	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`).")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().StringP("credential", "c", "", "Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list')")
 
+	cmd.PersistentFlags().String("embed-credential", "", "Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list')")
+	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface [env: NEO4J_EMBED_PROVIDER]")
+	cmd.PersistentFlags().String("embed-model", "", "Embedding model name [env: NEO4J_EMBED_MODEL]")
+	cmd.PersistentFlags().String("embed-base-url", "", "Embedding provider base URL [env: NEO4J_EMBED_BASE_URL]")
+	cmd.PersistentFlags().Int("embed-dimensions", 0, "Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS]")
+
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newSchemaCmd(cfg))
+	cmd.AddCommand(newEmbedCmd(cfg))
 
 	return cmd
 }

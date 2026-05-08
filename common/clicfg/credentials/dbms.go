@@ -66,6 +66,20 @@ func (c *DbmsCredentials) Remove(name string) error {
 	return nil
 }
 
+// SetEmbed links a named dbms credential to an embed credential. Passing an
+// empty embedName clears the link. Returns a usage error when dbmsName does
+// not exist.
+func (c *DbmsCredentials) SetEmbed(dbmsName, embedName string) error {
+	for _, credential := range c.Credentials {
+		if credential.Name == dbmsName {
+			credential.EmbedCredential = embedName
+			c.onUpdate()
+			return nil
+		}
+	}
+	return clierr.NewUsageError("could not find credential with name %s", dbmsName)
+}
+
 func (c *DbmsCredentials) SetDefault(name string) error {
 	if !c.credentialExists(name) {
 		return clierr.NewUsageError("could not find credential with name %s", name)
@@ -114,16 +128,18 @@ type PrintableDbmsCredentials struct {
 }
 
 // AsArray returns each credential as a map for table rendering.
-// Password is intentionally omitted.
+// Password is intentionally omitted. The `embed-credential` key is always
+// emitted (empty string when unset) so the column is stable across rows.
 func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
 		result[i] = map[string]any{
-			"name":          cred.Name,
-			"username":      cred.Username,
-			"database-name": cred.DatabaseName,
-			"uri":           cred.URI,
-			"default":       cred.Name == d.defaultCredential,
+			"name":             cred.Name,
+			"username":         cred.Username,
+			"database-name":    cred.DatabaseName,
+			"uri":              cred.URI,
+			"embed-credential": cred.EmbedCredential,
+			"default":          cred.Name == d.defaultCredential,
 		}
 	}
 	return result
@@ -136,9 +152,10 @@ func (d PrintableDbmsCredentials) MarshalJSON() ([]byte, error) {
 }
 
 type DbmsCredential struct {
-	Name         string `json:"name"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	DatabaseName string `json:"database-name"`
-	URI          string `json:"uri"`
+	Name            string `json:"name"`
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	DatabaseName    string `json:"database-name"`
+	URI             string `json:"uri"`
+	EmbedCredential string `json:"embed-credential,omitempty"`
 }

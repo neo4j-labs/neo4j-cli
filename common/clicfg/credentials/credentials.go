@@ -12,14 +12,16 @@ import (
 )
 
 type CredentialsFile struct {
-	Aura *AuraCredentials `json:"aura"`
-	Dbms *DbmsCredentials `json:"dbms,omitempty"`
+	Aura  *AuraCredentials  `json:"aura"`
+	Dbms  *DbmsCredentials  `json:"dbms,omitempty"`
+	Embed *EmbedCredentials `json:"embed,omitempty"`
 }
 
 type Credentials struct {
 	fs       afero.Fs
 	Aura     *AuraCredentials
 	Dbms     *DbmsCredentials
+	Embed    *EmbedCredentials
 	filePath string
 }
 
@@ -46,6 +48,10 @@ func (c *Credentials) load() {
 			Credentials: []*DbmsCredential{},
 			onUpdate:    c.save,
 		},
+		Embed: &EmbedCredentials{
+			Credentials: []*EmbedCredential{},
+			onUpdate:    c.save,
+		},
 	}
 	if fileHasData {
 		if err := json.Unmarshal(data, &credentials); err != nil {
@@ -55,6 +61,7 @@ func (c *Credentials) load() {
 
 	c.Aura = credentials.Aura
 	c.Dbms = credentials.Dbms
+	c.Embed = credentials.Embed
 
 	// Ensure onUpdate callbacks are wired even when loaded from file
 	if c.Aura != nil {
@@ -63,6 +70,12 @@ func (c *Credentials) load() {
 	if c.Dbms != nil {
 		c.Dbms.onUpdate = c.save
 	}
+	if c.Embed == nil {
+		c.Embed = &EmbedCredentials{
+			Credentials: []*EmbedCredential{},
+		}
+	}
+	c.Embed.onUpdate = c.save
 
 	if !fileHasData {
 		c.save()
@@ -71,8 +84,9 @@ func (c *Credentials) load() {
 
 func (c *Credentials) save() {
 	data, err := json.Marshal(CredentialsFile{
-		Aura: c.Aura,
-		Dbms: c.Dbms,
+		Aura:  c.Aura,
+		Dbms:  c.Dbms,
+		Embed: c.Embed,
 	})
 	if err != nil {
 		panic(err)

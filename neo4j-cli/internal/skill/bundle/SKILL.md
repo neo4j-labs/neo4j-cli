@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Runs Cypher and manages Neo4j Aura from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, introspect a schema, list/create/get/delete/provision/resize Aura instances or tenants, set up/add/remove Aura API credentials, or install/remove the neo4j-cli skill in an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
+description: Runs Cypher and manages Neo4j Aura, Neo4j connection (dbms) credentials, and embedding-provider credentials from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, embed text inline as a Cypher parameter, introspect a schema, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura/dbms/embed credentials, or install/remove the neo4j-cli skill in an agent. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
@@ -40,3 +40,6 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 - If you pass an HTTP-style URI (e.g. `http://host:7474`) to `query` it is auto-rewritten to `neo4j://host:7687` (and `https://` to `neo4j+s://host:7687`); this command speaks the Bolt protocol. Use `neo4j+ssc://` for self-signed certs.
 - Write operations require `--rw`. `neo4j-cli query run` runs `EXPLAIN` over Bolt to detect write cypher when `--rw` is not set and blocks statements classified as writes before execution.
 - Do NOT add `--rw` unless the user explicitly asked to write/modify/delete. Run commands without it by default. If a command fails because `--rw` is missing, surface the error and ask the user for permission to retry with `--rw` — do not add it on your own.
+- Use `--param NAME:embed=<text>` on `neo4j-cli query` to inject an embedding vector inline; the text is sent to the configured embedding provider and the resulting `[]float32` is bound to `$NAME` for both the EXPLAIN preflight and the real run. The sibling `neo4j-cli query :embed [text]` leaf computes a vector standalone (no Bolt connection opened).
+- Embedding config (`--embed-provider`, `--embed-model`, `--embed-base-url`, `--embed-dimensions`) resolves with the same precedence as connection config: flag > OS env (`NEO4J_EMBED_*`) > `.env` walk-up > stored embed credential. API keys layer per provider: `OPENAI_API_KEY` / `HF_TOKEN` (per-provider) beats `NEO4J_EMBED_API_KEY` (generic) beats the stored credential. Ollama needs no API key.
+- Linking dbms→embed: `credential dbms add --embed-credential <name>` or `credential dbms set-embed <dbms-name> [embed-name]` attaches an embed cred to a dbms cred so `query --credential <dbms-name> --param NAME:embed=...` picks up both connection and embed config in one selector. Removing an embed cred is non-cascading; stale links surface lazily at query time.

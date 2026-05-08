@@ -41,6 +41,10 @@ func newDbmsTestHelper(t *testing.T) dbmsTestHelper {
 			"dbms": {
 				"credentials": [],
 				"default-credential": ""
+			},
+			"embed": {
+				"credentials": [],
+				"default-credential": ""
 			}
 		}`,
 		t: t,
@@ -104,13 +108,15 @@ func (h *dbmsTestHelper) assertErr(expected string) {
 
 func TestDbmsCredentialAdd(t *testing.T) {
 	tests := []struct {
-		name            string
-		initialCreds    []map[string]interface{}
-		initialDefault  string
-		command         string
-		wantErr         string
-		wantCredentials string
-		wantDefaultCred string
+		name             string
+		initialCreds     []map[string]interface{}
+		initialDefault   string
+		initialEmbed     []map[string]interface{}
+		command          string
+		wantErr          string
+		wantCredentials  string
+		wantDefaultCred  string
+		assertNoCredsAdd bool
 	}{
 		{
 			name:            "first credential is stored and set as default",
@@ -171,6 +177,24 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			command:      "add --name mydb --username neo4j --password secret",
 			wantErr:      `required flag(s) "uri" not set`,
 		},
+		{
+			name:             "--embed-credential pointing at missing embed cred errors before persisting",
+			initialCreds:     []map[string]interface{}{},
+			initialEmbed:     []map[string]interface{}{},
+			command:          "add --name mydb --username neo4j --password secret --uri bolt://localhost:7687 --embed-credential nope",
+			wantErr:          `invalid --embed-credential "nope"`,
+			assertNoCredsAdd: true,
+		},
+		{
+			name:         "--embed-credential matching an existing embed cred persists link",
+			initialCreds: []map[string]interface{}{},
+			initialEmbed: []map[string]interface{}{
+				{"name": "myembed", "provider": "openai", "model": "text-embedding-3-small", "base-url": "", "dimensions": 0, "api-key": "k"},
+			},
+			command:         "add --name mydb --username neo4j --password secret --uri bolt://localhost:7687 --embed-credential myembed",
+			wantCredentials: `[{"name":"mydb","username":"neo4j","password":"secret","database-name":"neo4j","uri":"bolt://localhost:7687","embed-credential":"myembed"}]`,
+			wantDefaultCred: "mydb",
+		},
 	}
 
 	for _, tc := range tests {
@@ -180,11 +204,18 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			if tc.initialDefault != "" {
 				h.setCredentialsValue("dbms.default-credential", tc.initialDefault)
 			}
+			if tc.initialEmbed != nil {
+				h.setCredentialsValue("embed.credentials", tc.initialEmbed)
+			}
 
 			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
+				if tc.assertNoCredsAdd {
+					// Confirm no half-creation: dbms.credentials remains the empty slice it started as.
+					h.assertCredentialsValue("dbms.credentials", `[]`)
+				}
 				return
 			}
 

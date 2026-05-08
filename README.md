@@ -55,10 +55,10 @@ Create Aura API Credentials in your [Account Settings](https://console.neo4j.io/
 Add these credentials into the CLI with a name of your choosing:
 
 ```bash
-./neo4j-cli aura credential add --name "Aura API Credentials" --client-id <client-id> --client-secret <client-secret>
+./neo4j-cli credential aura-client add --name "Aura API Credentials" --client-id <client-id> --client-secret <client-secret>
 ```
 
-This will add and set the credential as the default credential for use.
+This will add and set the credential as the default credential for use. See [Credentials](#credentials) below for the full credential surface (`aura-client`, `dbms`, `embed`).
 
 You can then, for example, list your instances in a table format:
 
@@ -89,6 +89,39 @@ Help for each command is accessed by using it without any flags or options. For 
 
 ```bash
 ./neo4j-cli aura instance create
+```
+
+## Credentials
+
+`neo4j-cli` stores three kinds of credentials in `credentials.json` under your OS config directory. All three trees share the same `add / list / use / remove` shape; `use` sets the default consumed by downstream commands.
+
+`credential aura-client` — Aura Console API credentials (client ID + secret). Required for any `aura ...` subcommand that calls the Console API.
+
+```bash
+./neo4j-cli credential aura-client add --name "my-org" --client-id <id> --client-secret <secret>
+./neo4j-cli credential aura-client list
+./neo4j-cli credential aura-client use my-org
+./neo4j-cli credential aura-client remove my-org
+```
+
+`credential dbms` — Neo4j Bolt connection profiles (URI, username, password, database, optional embed-credential link). When a default profile exists, `neo4j-cli query` connects without any connection flags or env vars.
+
+```bash
+./neo4j-cli credential dbms add --name prod --uri neo4j+s://example.databases.neo4j.io --username neo4j --password '<pw>'
+./neo4j-cli credential dbms list
+./neo4j-cli credential dbms use prod
+./neo4j-cli credential dbms set-embed prod openai-shared    # link an embed credential
+./neo4j-cli credential dbms set-embed prod                  # clear the link
+./neo4j-cli credential dbms remove prod
+```
+
+`credential embed` — Embedding-provider credentials (provider, model, base URL, dimensions, optional API key). Consumed by `query --param NAME:embed=...` and `query :embed`. Supported providers: `openai`, `ollama`, `huggingface`.
+
+```bash
+./neo4j-cli credential embed add --name openai-shared --provider openai --model text-embedding-3-small --api-key '<key>'
+./neo4j-cli credential embed list                           # api-key is never printed
+./neo4j-cli credential embed use openai-shared
+./neo4j-cli credential embed remove openai-shared
 ```
 
 ## Querying Neo4j
@@ -126,6 +159,35 @@ Schema introspection:
 ```bash
 ./neo4j-cli query :schema
 ```
+
+### Embedding parameters
+
+Bind a vector parameter inline by passing `--param NAME:embed=<text>` — the text is sent to the configured embedding provider and the resulting `[]float32` is bound to `$NAME` for both the EXPLAIN preflight and the real run. The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection.
+
+```bash
+./neo4j-cli query --param q:embed='sci-fi movies' --param k=5 \
+  "CALL db.index.vector.queryNodes('idx', \$k, \$q) YIELD node, score RETURN node, score"
+
+./neo4j-cli query :embed "hello world" --format json
+echo "hello world" | ./neo4j-cli query :embed --format toon
+```
+
+Embedding settings resolve with this precedence (highest first): flag → env var → `.env` file → stored embed credential → provider built-in default.
+
+| Setting    | Flag                  | Env var                  |
+| ---------- | --------------------- | ------------------------ |
+| Credential | `--embed-credential`  | —                        |
+| Provider   | `--embed-provider`    | `NEO4J_EMBED_PROVIDER`   |
+| Model      | `--embed-model`       | `NEO4J_EMBED_MODEL`      |
+| Base URL   | `--embed-base-url`    | `NEO4J_EMBED_BASE_URL`   |
+| Dimensions | `--embed-dimensions`  | `NEO4J_EMBED_DIMENSIONS` |
+| API key    | (none — see below)    | `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN` |
+
+API-key precedence (highest first): per-provider OS env (`OPENAI_API_KEY` / `HF_TOKEN`) → generic OS env (`NEO4J_EMBED_API_KEY`) → per-provider `.env` value → generic `.env` value → stored credential `api-key`. Ollama needs no API key.
+
+`--embed-credential <name>` selects a stored embed credential explicitly; without it the resolver falls back to the embed credential linked from the resolved dbms credential (via `credential dbms add --embed-credential` or `credential dbms set-embed`), then to `credential embed`'s default. So one `--credential <name>` can drive both DB connection and embedding when the dbms credential carries an embed link.
+
+Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://localhost:11434`, HuggingFace `https://router.huggingface.co/hf-inference/models` (serverless mode). Setting `--embed-base-url` switches HuggingFace to dedicated-endpoint mode.
 
 ## Write operations
 

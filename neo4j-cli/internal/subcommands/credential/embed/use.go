@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package dbms
+package embed
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
@@ -11,12 +11,12 @@ import (
 func newUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:         "use <name>",
-		Short:       "Sets the default dbms credential to be used",
-		Long:        "Set the named dbms credential as the default consumed by `query` when no `--credential <name>` flag and no connection flags / env vars / .env values are present.",
+		Short:       "Sets the default embed credential to be used",
+		Long:        "Set the named embed credential as the default consumed by `query --param NAME:embed=...` and `query :embed` when no `--embed-credential` flag, no `NEO4J_EMBED_*` env, no `.env` value, and no dbms→embed link resolves first.",
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Dbms.SetDefault(args[0])
+			return cfg.Credentials.Embed.SetDefault(args[0])
 		},
 	}
 }

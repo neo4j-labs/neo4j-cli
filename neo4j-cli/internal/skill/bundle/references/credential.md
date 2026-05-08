@@ -1,6 +1,27 @@
 # neo4j-cli credential
 
+## Contents
+
+- [neo4j-cli credential aura-client](#neo4j-cli-credential-aura-client)
+- [neo4j-cli credential aura-client add](#neo4j-cli-credential-aura-client-add)
+- [neo4j-cli credential aura-client list](#neo4j-cli-credential-aura-client-list)
+- [neo4j-cli credential aura-client remove](#neo4j-cli-credential-aura-client-remove)
+- [neo4j-cli credential aura-client use](#neo4j-cli-credential-aura-client-use)
+- [neo4j-cli credential dbms](#neo4j-cli-credential-dbms)
+- [neo4j-cli credential dbms add](#neo4j-cli-credential-dbms-add)
+- [neo4j-cli credential dbms list](#neo4j-cli-credential-dbms-list)
+- [neo4j-cli credential dbms remove](#neo4j-cli-credential-dbms-remove)
+- [neo4j-cli credential dbms set-embed](#neo4j-cli-credential-dbms-set-embed)
+- [neo4j-cli credential dbms use](#neo4j-cli-credential-dbms-use)
+- [neo4j-cli credential embed](#neo4j-cli-credential-embed)
+- [neo4j-cli credential embed add](#neo4j-cli-credential-embed-add)
+- [neo4j-cli credential embed list](#neo4j-cli-credential-embed-list)
+- [neo4j-cli credential embed remove](#neo4j-cli-credential-embed-remove)
+- [neo4j-cli credential embed use](#neo4j-cli-credential-embed-use)
+
 Manage and view credential values
+
+Manage stored credentials. Three subtrees are available: `aura-client` for Aura Console API client credentials, `dbms` for Neo4j Bolt connection profiles consumed by `query`, and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.
 
 Usage: `neo4j-cli credential`
 
@@ -8,11 +29,15 @@ Usage: `neo4j-cli credential`
 
 Manage and view aura-client credential values
 
+Manage Aura Console API client credentials (client ID + client secret). These credentials are required by every `aura ...` subcommand that calls the Aura Console API. The first credential added is set as default.
+
 Usage: `neo4j-cli credential aura-client`
 
 ### neo4j-cli credential aura-client add
 
-Adds a credential
+Adds an aura-client credential
+
+Add an Aura Console API client credential (client ID + secret). The first credential added becomes the default; switch later with `credential aura-client use <name>`.
 
 Usage: `neo4j-cli credential aura-client add [flags]`
 
@@ -26,19 +51,25 @@ Flags:
 
 ### neo4j-cli credential aura-client list
 
-List credentials
+List aura-client credentials
+
+List stored Aura Console API client credentials. The `default` column flags the credential used by `aura ...` commands when no other selector is set.
 
 Usage: `neo4j-cli credential aura-client list`
 
 ### neo4j-cli credential aura-client remove
 
-Removes a credential
+Removes an aura-client credential
+
+Remove a stored Aura Console API client credential by name.
 
 Usage: `neo4j-cli credential aura-client remove`
 
 ### neo4j-cli credential aura-client use
 
-Sets the default credential to be used
+Sets the default aura-client credential to be used
+
+Set the named aura-client credential as the default consumed by `aura ...` commands.
 
 Usage: `neo4j-cli credential aura-client use`
 
@@ -46,11 +77,15 @@ Usage: `neo4j-cli credential aura-client use`
 
 Manage and view dbms credential values
 
+Manage stored Neo4j Bolt connection profiles (URI, username, password, database, optional embed-credential link). `query` consumes the default profile (or one selected by `--credential <name>`) when no `--uri`/`NEO4J_URI`/.env value is set.
+
 Usage: `neo4j-cli credential dbms`
 
 ### neo4j-cli credential dbms add
 
 Adds a dbms credential
+
+Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`.
 
 Usage: `neo4j-cli credential dbms add [flags]`
 
@@ -59,6 +94,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--database-name` | string | neo4j | Database name |
+| `--embed-credential` | string | - | Name of an embed credential to link (must already exist; see `credential embed list`) |
 | `--name` | string | - | (required) Name |
 | `--password` | string | - | (required) Password |
 | `--uri` | string | - | (required) URI |
@@ -68,17 +104,82 @@ Flags:
 
 Lists dbms credentials
 
+List stored Bolt connection profiles. Columns include any linked embed credential (empty when unset). Passwords are never printed.
+
 Usage: `neo4j-cli credential dbms list`
 
 ### neo4j-cli credential dbms remove
 
 Removes a dbms credential
 
+Remove a stored Bolt connection profile by name. Linked embed-credential references on other profiles are not modified.
+
 Usage: `neo4j-cli credential dbms remove <name>`
+
+### neo4j-cli credential dbms set-embed
+
+Links (or clears) an embed credential on a dbms credential
+
+Link a stored dbms credential to an existing embed credential by name. Pass only the dbms name to clear the link. No embed-credential is required for `query` to run plain Cypher; this only links one for downstream embedding via `--param NAME:embed=...` and `query :embed`. With a link in place, `query --credential <dbms-name>` picks up both the connection and the embed config in a single selector.
+
+Usage: `neo4j-cli credential dbms set-embed <dbms-name> [embed-name]`
 
 ### neo4j-cli credential dbms use
 
 Sets the default dbms credential to be used
 
+Set the named dbms credential as the default consumed by `query` when no `--credential <name>` flag and no connection flags / env vars / .env values are present.
+
 Usage: `neo4j-cli credential dbms use <name>`
+
+## neo4j-cli credential embed
+
+Manage and view embed credential values
+
+Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). `query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. Supported providers: openai, ollama, huggingface.
+
+Usage: `neo4j-cli credential embed`
+
+### neo4j-cli credential embed add
+
+Adds an embed credential
+
+Add an embedding-provider credential. Provider must be one of openai, ollama, huggingface. `--api-key` is optional for ollama (no auth required) and may be omitted for openai/huggingface if you intend to provide it via env var (`OPENAI_API_KEY` / `HF_TOKEN` / `NEO4J_EMBED_API_KEY`). The first credential added becomes the default; switch later with `credential embed use <name>`.
+
+Usage: `neo4j-cli credential embed add [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--api-key` | string | - | API key for the provider |
+| `--base-url` | string | - | Base URL for the provider (overrides provider default) |
+| `--dimensions` | int | 0 | Embedding dimensions (provider-specific; 0 means provider default) |
+| `--model` | string | - | (required) Model |
+| `--name` | string | - | (required) Name |
+| `--provider` | string | - | (required) Provider (one of: openai, ollama, huggingface) |
+
+### neo4j-cli credential embed list
+
+Lists embed credentials
+
+List stored embedding-provider credentials. The `api-key` column is never shown — keys are persisted on disk but redacted in every printable form.
+
+Usage: `neo4j-cli credential embed list`
+
+### neo4j-cli credential embed remove
+
+Removes an embed credential
+
+Remove a stored embedding-provider credential by name. Removal is non-cascading: dbms credentials linked to the removed embed credential keep their `embed-credential` field; the stale link is reported lazily at query time. Run `credential dbms list` to find linked profiles or `credential dbms set-embed <dbms-name>` to clear them.
+
+Usage: `neo4j-cli credential embed remove <name>`
+
+### neo4j-cli credential embed use
+
+Sets the default embed credential to be used
+
+Set the named embed credential as the default consumed by `query --param NAME:embed=...` and `query :embed` when no `--embed-credential` flag, no `NEO4J_EMBED_*` env, no `.env` value, and no dbms→embed link resolves first.
+
+Usage: `neo4j-cli credential embed use <name>`
 
