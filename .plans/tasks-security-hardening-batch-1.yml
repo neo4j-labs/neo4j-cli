@@ -30,7 +30,8 @@ tasks:
       link-local unicast, link-local multicast, or multicast. Reject the metadata
       IP 169.254.169.254 explicitly. Reject empty/malformed URLs. Hostnames
       pass through (DNS-rebinding is documented as out of scope).
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T14:35:00Z
     dependencies: []
     acceptance_criteria:
       - "urlcheck.go exists with no third-party dependency (stdlib net only)"
