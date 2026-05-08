@@ -208,6 +208,5 @@ For asynchronous operations (i.e. operations that trigger a job that won't be fi
 
 ## Resources
 
-- [CLI Usage Guide](./docs/usageGuide/A%20Guide%20To%20The%20New%20Aura%20CLI.md).
 - [Neo4j Aura API](https://neo4j.com/docs/aura/platform/api/specification/)
 - https://clig.dev

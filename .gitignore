@@ -29,8 +29,6 @@ bin/
 dist/
 
 test-api/
-docs/usageGuide/.DS_Store
-docs/.DS_Store
 
 # intelij settings
 /.idea
