@@ -19,6 +19,17 @@ import (
 // have to t.Setenv("HOME", ...) for unit tests of unrelated code paths.
 var homeDirFn = os.UserHomeDir
 
+// SetHomeDirFnForTest overrides the internal home-directory resolver for the
+// duration of a test and returns a restore function. Cross-package tests
+// (query/connect_test.go, query/embed/embed_test.go) use it to inject a
+// memFS-friendly $HOME without relying on t.Setenv("HOME"), which is not
+// cross-platform (Windows reads USERPROFILE).
+func SetHomeDirFnForTest(fn func() (string, error)) func() {
+	prev := homeDirFn
+	homeDirFn = fn
+	return func() { homeDirFn = prev }
+}
+
 // Find walks up from startDir looking for a `.env` file. It stops the walk
 // at the first ancestor containing a `.git` entry (file or dir) and at the
 // $HOME directory boundary (never crossing above $HOME). The walk also

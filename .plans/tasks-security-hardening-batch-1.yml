@@ -186,7 +186,8 @@ tasks:
       task-003. Stop the walk at the first .git ancestor or $HOME boundary.
       When a .env is loaded from a directory above CWD, emit `info: loading
       .env from <path>` to stderr. Delete the duplicates.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T16:45:00Z
     dependencies:
       - task-003
     acceptance_criteria:

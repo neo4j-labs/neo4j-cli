@@ -4,6 +4,7 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
@@ -32,7 +34,7 @@ func newTestCmd(t *testing.T) (*cobra.Command, *clicfg.Config) {
 
 func TestLoadEnvFile_NoEnvReturnsEmpty(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	got, err := loadEnvFile(fs, "", "/some/dir")
+	got, err := loadEnvFile(fs, "", "/some/dir", nil)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{}, got)
 }
@@ -44,7 +46,7 @@ func TestLoadEnvFile_WalkUpFindsParent(t *testing.T) {
 	deep := filepath.Join("/work", "deep", "nested")
 	require.NoError(t, fs.MkdirAll(deep, 0755))
 
-	got, err := loadEnvFile(fs, "", deep)
+	got, err := loadEnvFile(fs, "", deep, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "http://walkup:7474", got["NEO4J_URI"])
 	assert.Equal(t, "walker", got["NEO4J_USERNAME"])
@@ -58,16 +60,82 @@ func TestLoadEnvFile_ExplicitPathShortCircuits(t *testing.T) {
 	require.NoError(t, afero.WriteFile(fs, "/cwd/.env",
 		[]byte("NEO4J_PASSWORD=cwd\n"), 0644))
 
-	got, err := loadEnvFile(fs, "/elsewhere/custom.env", "/cwd")
+	got, err := loadEnvFile(fs, "/elsewhere/custom.env", "/cwd", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "fromfile", got["NEO4J_PASSWORD"])
 }
 
 func TestLoadEnvFile_ExplicitMissingErrors(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	_, err := loadEnvFile(fs, "/no/such/file", "/cwd")
+	_, err := loadEnvFile(fs, "/no/such/file", "/cwd", nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/no/such/file")
+}
+
+// TestLoadEnvFile_StopsAtGitBoundary verifies the shared dotenv.Find walk
+// halts at the first .git ancestor — a poison .env above the repo root must
+// NOT be loaded.
+func TestLoadEnvFile_StopsAtGitBoundary(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	// Poison .env above the repo root.
+	require.NoError(t, afero.WriteFile(fs, "/tmp/.env",
+		[]byte("NEO4J_PASSWORD=poison\n"), 0644))
+	// .git marks /tmp/x as the repo root; walk must stop here.
+	require.NoError(t, afero.WriteFile(fs, "/tmp/x/.git", []byte(""), 0644))
+
+	// No HOME constraint needed for this test; use an empty home so only
+	// the .git boundary is exercised.
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "", nil })
+	defer restore()
+
+	got, err := loadEnvFile(fs, "", "/tmp/x", nil)
+	require.NoError(t, err)
+	assert.Empty(t, got, "poison .env above .git boundary must not be loaded")
+}
+
+// TestLoadEnvFile_StopsAtHomeBoundary verifies the walk halts at the $HOME
+// boundary so a system-level .env outside the user's home is never loaded.
+func TestLoadEnvFile_StopsAtHomeBoundary(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/.env",
+		[]byte("NEO4J_PASSWORD=poison\n"), 0644))
+
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "/home/u", nil })
+	defer restore()
+
+	got, err := loadEnvFile(fs, "", "/home/u/proj/sub", nil)
+	require.NoError(t, err)
+	assert.Empty(t, got, "poison /.env above $HOME boundary must not be loaded")
+}
+
+// TestLoadEnvFile_AnnouncesOverlay verifies an info: line appears on stderr
+// when .env lives strictly above the start dir, and stays silent when .env is
+// in the start dir itself.
+func TestLoadEnvFile_AnnouncesOverlay(t *testing.T) {
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "/home/u", nil })
+	defer restore()
+
+	t.Run("above cwd emits info line", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		require.NoError(t, afero.WriteFile(fs, "/home/u/proj/.env",
+			[]byte("NEO4J_USERNAME=walker\n"), 0644))
+
+		var buf bytes.Buffer
+		_, err := loadEnvFile(fs, "", "/home/u/proj/sub", &buf)
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "info: loading .env from /home/u/proj/.env")
+	})
+
+	t.Run("in cwd is silent", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		require.NoError(t, afero.WriteFile(fs, "/home/u/proj/.env",
+			[]byte("NEO4J_USERNAME=walker\n"), 0644))
+
+		var buf bytes.Buffer
+		_, err := loadEnvFile(fs, "", "/home/u/proj", &buf)
+		require.NoError(t, err)
+		assert.Empty(t, buf.String(), "no info line when .env is in cwd")
+	})
 }
 
 func TestResolveConn_Defaults(t *testing.T) {

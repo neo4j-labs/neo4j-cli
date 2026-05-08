@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
@@ -18,6 +18,7 @@ import (
 	"github.com/subosito/gotenv"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/dotenv"
 )
 
 const (
@@ -154,16 +155,16 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query: cannot determine current directory: %w", err)
 	}
-	dotenv, err := loadEnvFile(cfg.Aura.Fs(), envFlag, cwd)
+	dotenvVals, err := loadEnvFile(cfg.Aura.Fs(), envFlag, cwd, cmd.ErrOrStderr())
 	if err != nil {
 		return nil, err
 	}
 
 	// Collect values from dotenv + OS environment (before flags).
-	uri := overlay(dotenv[envURI], os.Getenv(envURI))
-	username := overlay(dotenv[envUsername], os.Getenv(envUsername))
-	password := overlay(dotenv[envPassword], os.Getenv(envPassword))
-	database := overlay(dotenv[envDatabase], os.Getenv(envDatabase))
+	uri := overlay(dotenvVals[envURI], os.Getenv(envURI))
+	username := overlay(dotenvVals[envUsername], os.Getenv(envUsername))
+	password := overlay(dotenvVals[envPassword], os.Getenv(envPassword))
+	database := overlay(dotenvVals[envDatabase], os.Getenv(envDatabase))
 
 	// Apply flags (highest precedence — only when the flag was explicitly set).
 	if f := cmd.Flag("uri"); f != nil && f.Changed {
@@ -275,16 +276,25 @@ func (c *conn) openDriver() error {
 }
 
 // loadEnvFile reads a .env file from explicitPath if non-empty, otherwise walks
-// up from startDir looking for a .env file in the current dir or any parent.
-// Returns an empty (non-nil) map if no file is found and no explicit path was
-// requested. An explicit path that does not exist is an error.
-func loadEnvFile(fs afero.Fs, explicitPath, startDir string) (map[string]string, error) {
+// up from startDir using the shared dotenv.Find helper (stops at the first
+// .git ancestor or the $HOME boundary). Returns an empty (non-nil) map if no
+// file is found and no explicit path was requested. An explicit path that
+// does not exist is an error. When the discovered .env lives in a directory
+// strictly above startDir an `info: loading .env from <path>` line is written
+// to stderr so the overlay isn't silent.
+func loadEnvFile(fs afero.Fs, explicitPath, startDir string, stderr io.Writer) (map[string]string, error) {
 	path := explicitPath
 	if path == "" {
-		var ok bool
-		path, ok = findDotenv(fs, startDir)
+		var (
+			ok       bool
+			aboveCWD bool
+		)
+		path, ok, aboveCWD = dotenv.Find(fs, startDir)
 		if !ok {
 			return map[string]string{}, nil
+		}
+		if aboveCWD && stderr != nil {
+			_, _ = fmt.Fprintf(stderr, "info: loading .env from %s\n", path)
 		}
 	}
 
@@ -300,23 +310,6 @@ func loadEnvFile(fs afero.Fs, explicitPath, startDir string) (map[string]string,
 		out[k] = v
 	}
 	return out, nil
-}
-
-// findDotenv walks up from startDir looking for a `.env` file. Returns the
-// absolute path of the first match, or ("", false) if none is found.
-func findDotenv(fs afero.Fs, startDir string) (string, bool) {
-	dir := startDir
-	for {
-		candidate := filepath.Join(dir, ".env")
-		if exists, _ := afero.Exists(fs, candidate); exists {
-			return candidate, true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
-	}
 }
 
 // overlay applies values left → right with each non-empty entry overriding the
