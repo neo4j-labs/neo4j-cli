@@ -25,6 +25,11 @@ func withHome(t *testing.T, home string) {
 	t.Cleanup(func() { homeDirFn = prev })
 }
 
+// p converts a forward-slash test path to the OS-native separator. Without
+// it, hard-coded `/`-paths fail on Windows because filepath.Join returns
+// backslash-separated paths and string comparisons mismatch.
+func p(s string) string { return filepath.FromSlash(s) }
+
 // writeFile is a tiny convenience over afero.WriteFile for tests; the mode
 // is irrelevant for MemMapFs but kept realistic so tests read close to
 // production usage.
@@ -52,22 +57,22 @@ func TestFind(t *testing.T) {
 		{
 			name: ".env in cwd is found, walkedAboveCWD false",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/proj/.env", "X=1")
+				writeFile(t, fs, p("/home/u/proj/.env"), "X=1")
 			},
-			home:         "/home/u",
-			startDir:     "/home/u/proj",
-			wantPath:     "/home/u/proj/.env",
+			home:         p("/home/u"),
+			startDir:     p("/home/u/proj"),
+			wantPath:     p("/home/u/proj/.env"),
 			wantFound:    true,
 			wantAboveCWD: false,
 		},
 		{
 			name: "ancestor .env is found, walkedAboveCWD true",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/proj/.env", "X=1")
+				writeFile(t, fs, p("/home/u/proj/.env"), "X=1")
 			},
-			home:         "/home/u",
-			startDir:     "/home/u/proj/sub/deeper",
-			wantPath:     "/home/u/proj/.env",
+			home:         p("/home/u"),
+			startDir:     p("/home/u/proj/sub/deeper"),
+			wantPath:     p("/home/u/proj/.env"),
 			wantFound:    true,
 			wantAboveCWD: true,
 		},
@@ -75,23 +80,23 @@ func TestFind(t *testing.T) {
 			name: "stops at .git ancestor before reaching higher .env",
 			setup: func(fs afero.Fs) {
 				// poison .env above the .git boundary
-				writeFile(t, fs, "/home/u/.env", "POISON=1")
+				writeFile(t, fs, p("/home/u/.env"), "POISON=1")
 				// .git marker at /home/u/proj — repo root
-				writeFile(t, fs, "/home/u/proj/.git", "")
+				writeFile(t, fs, p("/home/u/proj/.git"), "")
 			},
-			home:           "/home/u",
-			startDir:       "/home/u/proj/sub",
+			home:           p("/home/u"),
+			startDir:       p("/home/u/proj/sub"),
 			wantNoEnvAtAll: true,
 		},
 		{
 			name: ".env at .git repo root IS picked up (boundary inclusive)",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/proj/.git", "")
-				writeFile(t, fs, "/home/u/proj/.env", "X=1")
+				writeFile(t, fs, p("/home/u/proj/.git"), "")
+				writeFile(t, fs, p("/home/u/proj/.env"), "X=1")
 			},
-			home:         "/home/u",
-			startDir:     "/home/u/proj/sub",
-			wantPath:     "/home/u/proj/.env",
+			home:         p("/home/u"),
+			startDir:     p("/home/u/proj/sub"),
+			wantPath:     p("/home/u/proj/.env"),
 			wantFound:    true,
 			wantAboveCWD: true,
 		},
@@ -99,20 +104,20 @@ func TestFind(t *testing.T) {
 			name: "stops at $HOME boundary, does not load /.env above home",
 			setup: func(fs afero.Fs) {
 				// poison at /
-				writeFile(t, fs, "/.env", "POISON=1")
+				writeFile(t, fs, p("/.env"), "POISON=1")
 			},
-			home:           "/home/u",
-			startDir:       "/home/u/proj/sub",
+			home:           p("/home/u"),
+			startDir:       p("/home/u/proj/sub"),
 			wantNoEnvAtAll: true,
 		},
 		{
 			name: ".env at $HOME IS picked up (boundary inclusive)",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/.env", "X=1")
+				writeFile(t, fs, p("/home/u/.env"), "X=1")
 			},
-			home:         "/home/u",
-			startDir:     "/home/u/proj/sub",
-			wantPath:     "/home/u/.env",
+			home:         p("/home/u"),
+			startDir:     p("/home/u/proj/sub"),
+			wantPath:     p("/home/u/.env"),
 			wantFound:    true,
 			wantAboveCWD: true,
 		},
@@ -121,38 +126,38 @@ func TestFind(t *testing.T) {
 			setup: func(fs afero.Fs) {
 				// nothing
 			},
-			home:           "/home/u",
-			startDir:       "/home/u/proj/sub",
+			home:           p("/home/u"),
+			startDir:       p("/home/u/proj/sub"),
 			wantNoEnvAtAll: true,
 		},
 		{
 			name: "deepest .env wins over ancestor .env",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/proj/.env", "X=ancestor")
-				writeFile(t, fs, "/home/u/proj/sub/.env", "X=child")
+				writeFile(t, fs, p("/home/u/proj/.env"), "X=ancestor")
+				writeFile(t, fs, p("/home/u/proj/sub/.env"), "X=child")
 			},
-			home:         "/home/u",
-			startDir:     "/home/u/proj/sub",
-			wantPath:     "/home/u/proj/sub/.env",
+			home:         p("/home/u"),
+			startDir:     p("/home/u/proj/sub"),
+			wantPath:     p("/home/u/proj/sub/.env"),
 			wantFound:    true,
 			wantAboveCWD: false,
 		},
 		{
 			name: "empty home is tolerated; .git boundary still applies",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/repo/.git", "")
-				writeFile(t, fs, "/repo/.env", "X=1")
+				writeFile(t, fs, p("/repo/.git"), "")
+				writeFile(t, fs, p("/repo/.env"), "X=1")
 			},
 			home:         "",
-			startDir:     "/repo/sub",
-			wantPath:     "/repo/.env",
+			startDir:     p("/repo/sub"),
+			wantPath:     p("/repo/.env"),
 			wantFound:    true,
 			wantAboveCWD: true,
 		},
 		{
 			name:           "empty startDir returns not found",
 			setup:          func(fs afero.Fs) {},
-			home:           "/home/u",
+			home:           p("/home/u"),
 			startDir:       "",
 			wantNoEnvAtAll: true,
 		},
@@ -162,18 +167,18 @@ func TestFind(t *testing.T) {
 				// nothing
 			},
 			home:           "",
-			startDir:       "/some/where",
+			startDir:       p("/some/where"),
 			wantNoEnvAtAll: true,
 		},
 		{
 			name: ".git as a file (worktree/submodule) still acts as boundary",
 			setup: func(fs afero.Fs) {
-				writeFile(t, fs, "/home/u/.env", "POISON=1")
+				writeFile(t, fs, p("/home/u/.env"), "POISON=1")
 				// .git as plain file, not a directory
-				writeFile(t, fs, "/home/u/proj/.git", "gitdir: ../.git/worktrees/foo")
+				writeFile(t, fs, p("/home/u/proj/.git"), "gitdir: ../.git/worktrees/foo")
 			},
-			home:           "/home/u",
-			startDir:       "/home/u/proj/sub",
+			home:           p("/home/u"),
+			startDir:       p("/home/u/proj/sub"),
 			wantNoEnvAtAll: true,
 		},
 	}

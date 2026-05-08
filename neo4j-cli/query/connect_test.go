@@ -78,17 +78,17 @@ func TestLoadEnvFile_ExplicitMissingErrors(t *testing.T) {
 func TestLoadEnvFile_StopsAtGitBoundary(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	// Poison .env above the repo root.
-	require.NoError(t, afero.WriteFile(fs, "/tmp/.env",
+	require.NoError(t, afero.WriteFile(fs, filepath.FromSlash("/tmp/.env"),
 		[]byte("NEO4J_PASSWORD=poison\n"), 0644))
 	// .git marks /tmp/x as the repo root; walk must stop here.
-	require.NoError(t, afero.WriteFile(fs, "/tmp/x/.git", []byte(""), 0644))
+	require.NoError(t, afero.WriteFile(fs, filepath.FromSlash("/tmp/x/.git"), []byte(""), 0644))
 
 	// No HOME constraint needed for this test; use an empty home so only
 	// the .git boundary is exercised.
 	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "", nil })
 	defer restore()
 
-	got, err := loadEnvFile(fs, "", "/tmp/x", nil)
+	got, err := loadEnvFile(fs, "", filepath.FromSlash("/tmp/x"), nil)
 	require.NoError(t, err)
 	assert.Empty(t, got, "poison .env above .git boundary must not be loaded")
 }
@@ -97,13 +97,13 @@ func TestLoadEnvFile_StopsAtGitBoundary(t *testing.T) {
 // boundary so a system-level .env outside the user's home is never loaded.
 func TestLoadEnvFile_StopsAtHomeBoundary(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/.env",
+	require.NoError(t, afero.WriteFile(fs, filepath.FromSlash("/.env"),
 		[]byte("NEO4J_PASSWORD=poison\n"), 0644))
 
-	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "/home/u", nil })
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return filepath.FromSlash("/home/u"), nil })
 	defer restore()
 
-	got, err := loadEnvFile(fs, "", "/home/u/proj/sub", nil)
+	got, err := loadEnvFile(fs, "", filepath.FromSlash("/home/u/proj/sub"), nil)
 	require.NoError(t, err)
 	assert.Empty(t, got, "poison /.env above $HOME boundary must not be loaded")
 }
@@ -112,27 +112,27 @@ func TestLoadEnvFile_StopsAtHomeBoundary(t *testing.T) {
 // when .env lives strictly above the start dir, and stays silent when .env is
 // in the start dir itself.
 func TestLoadEnvFile_AnnouncesOverlay(t *testing.T) {
-	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "/home/u", nil })
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return filepath.FromSlash("/home/u"), nil })
 	defer restore()
 
 	t.Run("above cwd emits info line", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/home/u/proj/.env",
+		require.NoError(t, afero.WriteFile(fs, filepath.FromSlash("/home/u/proj/.env"),
 			[]byte("NEO4J_USERNAME=walker\n"), 0644))
 
 		var buf bytes.Buffer
-		_, err := loadEnvFile(fs, "", "/home/u/proj/sub", &buf)
+		_, err := loadEnvFile(fs, "", filepath.FromSlash("/home/u/proj/sub"), &buf)
 		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "info: loading .env from /home/u/proj/.env")
+		assert.Contains(t, buf.String(), "info: loading .env from "+filepath.FromSlash("/home/u/proj/.env"))
 	})
 
 	t.Run("in cwd is silent", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/home/u/proj/.env",
+		require.NoError(t, afero.WriteFile(fs, filepath.FromSlash("/home/u/proj/.env"),
 			[]byte("NEO4J_USERNAME=walker\n"), 0644))
 
 		var buf bytes.Buffer
-		_, err := loadEnvFile(fs, "", "/home/u/proj", &buf)
+		_, err := loadEnvFile(fs, "", filepath.FromSlash("/home/u/proj"), &buf)
 		require.NoError(t, err)
 		assert.Empty(t, buf.String(), "no info line when .env is in cwd")
 	})
