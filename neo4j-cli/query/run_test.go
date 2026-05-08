@@ -879,6 +879,81 @@ func TestRunQuery_URIPassthroughEmitsNoNotice(t *testing.T) {
 		"neo4j(+s) URIs must pass through without a rewrite notice")
 }
 
+// TestRunQuery_CleartextNonLoopbackWarning verifies that a cleartext bolt or
+// neo4j URI to a non-loopback host emits the cleartext warning to stderr;
+// loopback hosts and encrypted (+s/+ssc) variants stay silent.
+func TestRunQuery_CleartextNonLoopbackWarning(t *testing.T) {
+	cases := []struct {
+		name        string
+		uri         string
+		wantWarning bool
+	}{
+		{name: "neo4j to non-loopback warns", uri: "neo4j://prod.example:7687", wantWarning: true},
+		{name: "bolt to non-loopback warns", uri: "bolt://prod.example:7687", wantWarning: true},
+		{name: "bolt to localhost silent", uri: "bolt://localhost:7687", wantWarning: false},
+		{name: "bolt to 127.0.0.1 silent", uri: "bolt://127.0.0.1:7687", wantWarning: false},
+		{name: "neo4j+s to non-loopback silent", uri: "neo4j+s://prod.example:7687", wantWarning: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newSeamRouter()
+			r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+				resp := makeQueryResponse([]string{"n"}, [][]any{})
+				resp.QueryType = neo4j.QueryTypeReadOnly
+				return resp
+			}()
+			r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+			r.install(t)
+
+			h := newRunHarness(t, "json")
+			err := h.execute(t,
+				"--uri="+tc.uri,
+				"--password=pw",
+				"RETURN 1",
+			)
+			require.NoError(t, err)
+
+			stderr := h.stderr.String()
+			if tc.wantWarning {
+				assert.Contains(t, stderr, "warning:",
+					"stderr must contain the cleartext warning")
+				assert.Contains(t, stderr, "cleartext",
+					"warning must mention cleartext")
+			} else {
+				assert.NotContains(t, stderr, "warning:",
+					"stderr must not contain a cleartext warning")
+			}
+		})
+	}
+}
+
+// TestRunQuery_CleartextWarningRedactsUserinfoPassword verifies the
+// userinfo password embedded in the URI is masked via (*url.URL).Redacted()
+// when the cleartext warning is emitted.
+func TestRunQuery_CleartextWarningRedactsUserinfoPassword(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryType = neo4j.QueryTypeReadOnly
+		return resp
+	}()
+	r.resp["RETURN 1"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://user:supersecret@prod.example:7687",
+		"--password=pw",
+		"RETURN 1",
+	)
+	require.NoError(t, err)
+
+	stderr := h.stderr.String()
+	assert.Contains(t, stderr, "warning:")
+	assert.NotContains(t, stderr, "supersecret",
+		"userinfo password must be masked in the warning")
+}
+
 func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
 	origTTY := stdinIsTTY
 	t.Cleanup(func() { stdinIsTTY = origTTY })

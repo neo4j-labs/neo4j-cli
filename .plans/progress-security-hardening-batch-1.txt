@@ -45,3 +45,8 @@ Decisions: aura sites use clierr.NewUsageError (matches existing in-package styl
 Replaced both findDotenv duplicates (connect.go, embed/embed.go) with shared dotenv.Find helper; loadEnvFile and loadDotenv now take an io.Writer and emit `info: loading .env from <path>` to stderr when the discovered .env lives strictly above startDir/cwd. Added .git-boundary, $HOME-boundary, and overlay-announcement tests at both call sites.
 Files: ~common/clicfg/dotenv/dotenv.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
 Decisions: exported SetHomeDirFnForTest from dotenv pkg for cross-package hermetic tests (cleaner than t.Setenv("HOME") which is non-portable to Windows USERPROFILE); embed-side test uses os.MkdirAll (std lib) for the chdir target to honor AGENTS.md "no afero.NewOsFs in query tests" rule.
+
+## task-011 — 2026-05-08T17:05:00Z
+normalizeURI now returns a 4th value `warning string`: non-empty when resolved scheme is cleartext bolt-family (bolt:// or neo4j://) AND host is not loopback. Warning uses (*url.URL).Redacted() so userinfo password is masked. Both connect.go call sites print via cmd.PrintErrln. Loopback (localhost / 127.0.0.1 / ::1) and encrypted (+s/+ssc) variants stay silent. Existing http→neo4j rewrite to non-loopback now ALSO emits the cleartext warning post-rewrite.
+Files: ~neo4j-cli/query/uri.go, ~neo4j-cli/query/uri_test.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/query/run_test.go
+Decisions: cleartextWarning + isLoopbackHost as private helpers in uri.go (kept small, no new pkg); warning fires post-rewrite too so http://prod.example also warns about the resulting cleartext neo4j://.

@@ -129,11 +129,15 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		}
 
 		uri := cred.URI
-		if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
+		rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
+		if didRewrite {
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 				"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 				displayOrig, rewritten)
 			uri = rewritten
+		}
+		if warning != "" {
+			cmd.PrintErrln(warning)
 		}
 
 		version := cfg.Version
@@ -234,11 +238,15 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		database = defaultDatabase
 	}
 
-	if rewritten, didRewrite, displayOrig := normalizeURI(uri); didRewrite {
+	rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
+	if didRewrite {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
 			displayOrig, rewritten)
 		uri = rewritten
+	}
+	if warning != "" {
+		cmd.PrintErrln(warning)
 	}
 
 	version := cfg.Version

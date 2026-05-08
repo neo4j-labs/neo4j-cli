@@ -205,7 +205,8 @@ tasks:
       return a warning string the caller will print via cmd.PrintErrln. The
       warning must mask userinfo passwords via (*url.URL).Redacted(). bolt://
       to localhost stays silent.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T17:05:00Z
     dependencies: []
     acceptance_criteria:
       - "normalizeURI returns a warning for bolt://prod.example and neo4j://prod.example"
