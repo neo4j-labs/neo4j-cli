@@ -104,6 +104,30 @@ func TestPrintBodyMap_ToonContainsTopLevelKeys(t *testing.T) {
 	assert.Contains(t, toonOut, "data", "toon output should contain the top-level key 'data'")
 }
 
+func TestStripControl(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty string", in: "", want: ""},
+		{name: "no control chars", in: "hello world", want: "hello world"},
+		{name: "preserves tab/newline/CR", in: "a\tb\nc\rd", want: "a\tb\nc\rd"},
+		{name: "ANSI escape redacted", in: "foo\x1b[31mbar", want: "foo?[31mbar"},
+		{name: "DEL redacted", in: "x\x7fy", want: "x?y"},
+		{name: "NUL redacted", in: "x\x00y", want: "x?y"},
+		{name: "BEL redacted", in: "x\x07y", want: "x?y"},
+		{name: "back-cr-zero redacted", in: "\x08\x00", want: "??"},
+		{name: "non-ascii utf8 preserved", in: "café ☃", want: "café ☃"},
+		{name: "high control byte (0x9b CSI) preserved (not C0)", in: "\u009b[31m", want: "\u009b[31m"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, StripControl(tc.in))
+		})
+	}
+}
+
 func TestResolveOutput_Toon(t *testing.T) {
 	// ResolveOutput must return "toon" when cfg.Global.Format() is "toon",
 	// regardless of TTY state.

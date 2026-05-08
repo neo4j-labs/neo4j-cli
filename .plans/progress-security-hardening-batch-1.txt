@@ -54,3 +54,8 @@ Decisions: cleartextWarning + isLoopbackHost as private helpers in uri.go (kept 
 ## task-012 — 2026-05-08T17:25:00Z
 fetchRelPaths now doubles literal backticks in the stripped relType before fmt.Sprintf interpolation (Cypher escape rule), closing the injection vector where a relType containing "`" could close the backtick-quoted identifier and inject statements. Added schema_test.go case feeding the canonical injection payload and asserting doubled-backtick form, balanced wrapper count, and canonical MATCH prefix/suffix shell.
 Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
+
+## task-013 — 2026-05-08T17:50:00Z
+Added commonoutput.StripControl (replace C0 < 0x20 except \t \n \r, plus DEL 0x7F, with "?"); applied in formatCell's string branch and at schema render sites that bypass formatCell (NodeType, PropertyName, RelType in renderNodesTable/renderRelsTable/renderPathsTable). JSON branch left untouched (encoding/json already escapes control bytes). Added unit tests for StripControl, formatCell string vs JSON branches, table render integration, and schema render bypass paths.
+Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query/output.go, ~neo4j-cli/query/output_test.go, ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
+Decisions: fast-path scan-without-alloc preserves the no-control-char common case; non-string formatCell branch deliberately not StripControl'd to avoid double-mutating json.Marshal's already-escaped \u001b form.

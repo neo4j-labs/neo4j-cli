@@ -379,6 +379,46 @@ func TestSchema_FetchHelpersCompose(t *testing.T) {
 	assert.Len(t, idx, 1)
 }
 
+// TestSchema_RenderTablesStripControl asserts the schema render functions
+// scrub C0 / DEL bytes from cells that bypass formatCell (NodeType,
+// PropertyName, RelType). Without the strip a malicious label could inject
+// ANSI escape sequences into the table output.
+func TestSchema_RenderTablesStripControl(t *testing.T) {
+	nodes := []nodeProperty{{
+		NodeType:      "ev\x1bil",
+		NodeLabels:    []string{"L"},
+		PropertyName:  "p\x7fname",
+		PropertyTypes: []string{"String"},
+		Mandatory:     false,
+	}}
+	got := renderNodesTable(nodes)
+	assert.Contains(t, got, "ev?il", "nodeType ANSI escape must be replaced with ?")
+	assert.Contains(t, got, "p?name", "propertyName DEL must be replaced with ?")
+	assert.NotContains(t, got, "\x1b", "no raw ESC may reach the rendered table")
+	assert.NotContains(t, got, "\x7f", "no raw DEL may reach the rendered table")
+
+	rels := []relProperty{{
+		RelType:       ":`A\x1bB`",
+		PropertyName:  "x\x07y",
+		PropertyTypes: []string{"String"},
+		Mandatory:     true,
+	}}
+	got = renderRelsTable(rels)
+	assert.Contains(t, got, "A?B", "relType ESC must be replaced with ?")
+	assert.Contains(t, got, "x?y", "propertyName BEL must be replaced with ?")
+	assert.NotContains(t, got, "\x1b")
+	assert.NotContains(t, got, "\x07")
+
+	paths := []relPath{{
+		RelType: ":`A\x1bB`",
+		From:    []string{"From"},
+		To:      []string{"To"},
+	}}
+	got = renderPathsTable(paths)
+	assert.Contains(t, got, "A?B", "relType ESC must be replaced with ? in paths table")
+	assert.NotContains(t, got, "\x1b")
+}
+
 // TestSchema_FetchRelPathsEscapesBacktick guards the Cypher injection vector
 // where a relType containing a literal backtick could otherwise close the
 // backtick-quoted identifier early and inject statements. The escape rule is

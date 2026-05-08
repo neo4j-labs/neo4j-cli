@@ -19,6 +19,40 @@ import (
 	"golang.org/x/term"
 )
 
+// StripControl replaces C0 control characters (runes < 0x20) and DEL (0x7F)
+// with "?", except for the whitespace runes "\t", "\n", and "\r" which are
+// preserved. This sanitises raw user data before rendering into a terminal
+// table cell so that an embedded ANSI escape (e.g. "\x1b[31m") cannot inject
+// styling, move the cursor, or otherwise corrupt the output. The JSON-marshal
+// path already escapes these bytes via encoding/json so it does NOT need this
+// helper.
+func StripControl(s string) string {
+	if s == "" {
+		return s
+	}
+	// Fast path: scan for any rune that needs replacing before allocating.
+	needs := false
+	for _, r := range s {
+		if (r < 0x20 && r != '\t' && r != '\n' && r != '\r') || r == 0x7F {
+			needs = true
+			break
+		}
+	}
+	if !needs {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if (r < 0x20 && r != '\t' && r != '\n' && r != '\r') || r == 0x7F {
+			b.WriteByte('?')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // StdoutIsTerminal is the package-level test seam for terminal detection.
 // Production initialisation checks whether the writer is an *os.File and, if
 // so, calls term.IsTerminal on its file descriptor. Non-*os.File writers (e.g.

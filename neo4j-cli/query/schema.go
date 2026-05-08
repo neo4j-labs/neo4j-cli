@@ -323,9 +323,9 @@ func renderNodesTable(rows []nodeProperty) string {
 	t.AppendHeader(table.Row{"nodeType", "nodeLabels", "propertyName", "propertyTypes", "mandatory"})
 	for _, r := range rows {
 		t.AppendRow(table.Row{
-			r.NodeType,
+			commonoutput.StripControl(r.NodeType),
 			formatCell(toAnySlice(r.NodeLabels)),
-			r.PropertyName,
+			commonoutput.StripControl(r.PropertyName),
 			formatCell(toAnySlice(r.PropertyTypes)),
 			fmt.Sprintf("%v", r.Mandatory),
 		})
@@ -339,8 +339,8 @@ func renderRelsTable(rows []relProperty) string {
 	t.AppendHeader(table.Row{"relType", "propertyName", "propertyTypes", "mandatory"})
 	for _, r := range rows {
 		t.AppendRow(table.Row{
-			r.RelType,
-			r.PropertyName,
+			commonoutput.StripControl(r.RelType),
+			commonoutput.StripControl(r.PropertyName),
 			formatCell(toAnySlice(r.PropertyTypes)),
 			fmt.Sprintf("%v", r.Mandatory),
 		})
@@ -354,7 +354,7 @@ func renderPathsTable(rows []relPath) string {
 	t.AppendHeader(table.Row{"relType", "from", "to"})
 	for _, r := range rows {
 		t.AppendRow(table.Row{
-			r.RelType,
+			commonoutput.StripControl(r.RelType),
 			formatCell(toAnySlice(r.From)),
 			formatCell(toAnySlice(r.To)),
 		})

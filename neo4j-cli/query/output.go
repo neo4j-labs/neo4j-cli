@@ -115,13 +115,16 @@ func rowsFromValues(columns []string, values [][]any) []map[string]any {
 // formatCell renders a single cell value as text. Strings are emitted as-is
 // (no surrounding quotes) so the table reads naturally; everything else is
 // JSON-stringified so nested objects, arrays, numbers, booleans, and nil
-// remain unambiguous.
+// remain unambiguous. String cells are passed through commonoutput.StripControl
+// so an embedded ANSI escape or other C0 control byte cannot corrupt the
+// terminal table output. The JSON-marshal branch is left untouched: encoding/json
+// already escapes control bytes, so a double-strip would mutate legitimate data.
 func formatCell(v any) string {
 	switch val := v.(type) {
 	case nil:
 		return "null"
 	case string:
-		return val
+		return commonoutput.StripControl(val)
 	default:
 		bytes, err := json.Marshal(val)
 		if err != nil {

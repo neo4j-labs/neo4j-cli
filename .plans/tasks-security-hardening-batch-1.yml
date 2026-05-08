@@ -239,7 +239,8 @@ tasks:
       Apply on the case string branch of formatCell. JSON marshal branch is
       already safe. Mirror the strip at the schema-render site
       neo4j-cli/query/schema.go:325-339 if it bypasses formatCell.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T17:50:00Z
     dependencies: []
     acceptance_criteria:
       - "formatCell input \"foo\\x1b[31mbar\" renders as foo?[31mbar"
