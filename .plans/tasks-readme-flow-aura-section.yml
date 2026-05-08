@@ -36,7 +36,7 @@ tasks:
       example, mention aura tenant list and the auto-stored
       <instance-id>-default dbms credential plus --no-credential-storage opt-out.
       No other sections of README.md may change.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - "Aura section uses literal <tenant-id> placeholder, links to [Credentials](#credentials), and does not duplicate a credential aura-client add command"
       - "Aura section mentions aura tenant list, the auto-stored <instance-id>-default dbms credential, and --no-credential-storage"
       - "Diff is scoped to the deleted Usage block and the new Aura section; no edits to Installation, Credentials, Querying Neo4j, Write operations, Agent skills, or any subsequent section"
-    completed_at: null
+    completed_at: 2026-05-08T11:30:00Z
 
   - id: task-003
     title: "Run final gates and confirm clean scope"
