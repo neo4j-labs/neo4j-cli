@@ -5,11 +5,10 @@
 Pick one. Verify with `neo4j-cli --help`.
 
 - **Install script**: `curl -sSfL https://neo4j.sh/install.sh | bash`.
+- **Homebrew**: `brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
 - **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
 - **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
-- **Python**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`.
-
-Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
+- **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
 
 ## Agent skills
 
@@ -90,7 +89,9 @@ neo4j-cli query 'RETURN 1 AS n'
 echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 ```
 
-Connection settings are resolved with this precedence (highest first): flag → env var → `.env` file (auto-discovered by walking up from cwd) → built-in default.
+**Preferred:** add a `dbms` credential (see [Credentials](#credentials)) and `query` connects with no further config. `aura instance create` auto-stores one for new instances.
+
+Flags, env vars, and `.env` files are optional overrides — useful for one-offs or CI without persisting a credential. When a stored credential exists, an override must supply **all four** of URI/username/password/database (any partial set is rejected). Without a stored credential, resolution is flag → env var → `.env` file (auto-discovered walking up from cwd) → built-in default.
 
 | Setting  | Flag         | Env var          | Default                   |
 | -------- | ------------ | ---------------- | ------------------------- |
