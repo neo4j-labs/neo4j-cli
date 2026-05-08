@@ -206,7 +206,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					resolvedName := resolveCredentialName(cfg.Credentials.Dbms, base)
 					instance["credential_name"] = resolvedName
 
-					if addErr := cfg.Credentials.Dbms.Add(resolvedName, username, password, "neo4j", uri); addErr != nil {
+					if addErr := cfg.Credentials.Dbms.Add(resolvedName, username, password, databaseName(string(_type), username), uri); addErr != nil {
 						if noCredentialPrint {
 							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). The password has been omitted from output; reset it via the Aura Console.\n", addErr) //nolint:errcheck // warning to stderr; write errors are not actionable
 						} else {

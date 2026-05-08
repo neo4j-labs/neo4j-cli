@@ -20,3 +20,24 @@ Key Decisions:
 - Included edge cases in tests: empty instance type and "neo4j" username for free-db
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Use databaseName helper in create.go credential storage
+Date: 2026-05-08T00:05:00Z
+================================================================================
+
+Summary:
+Replaced the hardcoded "neo4j" database name string in the `cfg.Credentials.Dbms.Add`
+call in `create.go` with a call to the `databaseName(string(_type), username)` helper.
+Both `_type` (the CLI flag) and `username` (extracted from the API response) were already
+available at the call site, so no new variables or API calls were needed.
+
+Files Changed:
+- neo4j-cli/aura/internal/subcommands/instance/create.go (modified — replaced hardcoded "neo4j" with databaseName(...) call)
+
+Key Decisions:
+- Used `string(_type)` to convert `flags.InstanceType` (a string alias) to a plain string for the helper
+- No other credential storage logic was touched; the change is exactly one argument substitution
+- make build, make test, make fmt-check, and make lint all pass
+
+Next Task: task-003

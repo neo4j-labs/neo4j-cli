@@ -27,7 +27,7 @@ tasks:
       call in `create.go` with a call to the new `databaseName` helper. Pass the instance type
       (from the CLI flag or the API response map) and the username extracted from the API response.
       No other logic in create.go should change.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -35,7 +35,7 @@ tasks:
       - "instanceType and username are both sourced from values already available at the call site (no new API calls)"
       - "No other credential storage logic is modified"
       - "make build produces a working binary"
-    completed_at: null
+    completed_at: 2026-05-08T00:05:00Z
 
   - id: task-003
     title: "Update and extend tests for database name logic"
