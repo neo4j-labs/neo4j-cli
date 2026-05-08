@@ -37,7 +37,10 @@ jobs:
           # else falls back to the latest published release.
           case "$TAG" in
             v*) ;;
-            *) TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName) ;;
+            # `gh release view` (no args) skips prereleases — all our releases
+            # are prerelease per goreleaser, so use `gh release list --limit 1`
+            # which returns the latest release regardless of prerelease flag.
+            *) TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName') ;;
           esac
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
