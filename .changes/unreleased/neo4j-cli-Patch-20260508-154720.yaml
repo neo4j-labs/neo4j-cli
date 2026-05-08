@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: '`.env` discovery for `query` now stops at the first `.git` ancestor or your `$HOME` boundary instead of walking the whole filesystem; when a `.env` above cwd is loaded, an `info: loading .env from <path>` line is printed to stderr so the overlay is never silent.'
-time: 2026-05-08T15:47:20+00:00

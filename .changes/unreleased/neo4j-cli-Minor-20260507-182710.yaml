@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'instance create: --name flag is now optional; when omitted, the CLI automatically generates the next available InstanceNN name within the tenant'
-time: 2026-05-07T18:27:10.76299+01:00
