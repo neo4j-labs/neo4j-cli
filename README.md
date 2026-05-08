@@ -53,30 +53,30 @@ Check the installation by running neo4j-cli --help
 `credential aura-client` — Aura Console API credentials (client ID + secret). Required for any `aura ...` subcommand that calls the Console API.
 
 ```bash
-./neo4j-cli credential aura-client add --name "my-org" --client-id <id> --client-secret <secret>
-./neo4j-cli credential aura-client list
-./neo4j-cli credential aura-client use my-org
-./neo4j-cli credential aura-client remove my-org
+neo4j-cli credential aura-client add --name "my-org" --client-id <id> --client-secret <secret>
+neo4j-cli credential aura-client list
+neo4j-cli credential aura-client use my-org
+neo4j-cli credential aura-client remove my-org
 ```
 
 `credential dbms` — Neo4j Bolt connection profiles (URI, username, password, database, optional embed-credential link). When a default profile exists, `neo4j-cli query` connects without any connection flags or env vars.
 
 ```bash
-./neo4j-cli credential dbms add --name prod --uri neo4j+s://example.databases.neo4j.io --username neo4j --password '<pw>'
-./neo4j-cli credential dbms list
-./neo4j-cli credential dbms use prod
-./neo4j-cli credential dbms set-embed prod openai-shared    # link an embed credential
-./neo4j-cli credential dbms set-embed prod                  # clear the link
-./neo4j-cli credential dbms remove prod
+neo4j-cli credential dbms add --name prod --uri neo4j+s://example.databases.neo4j.io --username neo4j --password '<pw>'
+neo4j-cli credential dbms list
+neo4j-cli credential dbms use prod
+neo4j-cli credential dbms set-embed prod openai-shared    # link an embed credential
+neo4j-cli credential dbms set-embed prod                  # clear the link
+neo4j-cli credential dbms remove prod
 ```
 
 `credential embed` — Embedding-provider credentials (provider, model, base URL, dimensions, optional API key). Consumed by `query --param NAME:embed=...` and `query :embed`. Supported providers: `openai`, `ollama`, `huggingface`.
 
 ```bash
-./neo4j-cli credential embed add --name openai-shared --provider openai --model text-embedding-3-small --api-key '<key>'
-./neo4j-cli credential embed list                           # api-key is never printed
-./neo4j-cli credential embed use openai-shared
-./neo4j-cli credential embed remove openai-shared
+neo4j-cli credential embed add --name openai-shared --provider openai --model text-embedding-3-small --api-key '<key>'
+neo4j-cli credential embed list                           # api-key is never printed
+neo4j-cli credential embed use openai-shared
+neo4j-cli credential embed remove openai-shared
 ```
 
 ## Aura
@@ -107,8 +107,8 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 `neo4j-cli query` runs Cypher against any Neo4j database via the Bolt protocol. Cypher comes from the positional argument or piped stdin.
 
 ```bash
-./neo4j-cli query 'RETURN 1 AS n'
-echo 'MATCH (n) RETURN count(n)' | ./neo4j-cli query
+neo4j-cli query 'RETURN 1 AS n'
+echo 'MATCH (n) RETURN count(n)' | neo4j-cli query
 ```
 
 Connection settings are resolved with this precedence (highest first): flag → env var → `.env` file (auto-discovered by walking up from cwd) → built-in default.
@@ -125,9 +125,9 @@ Connection settings are resolved with this precedence (highest first): flag → 
 Pass parameters with `--param key=value` (repeatable). Values that parse as JSON are typed; everything else is a string:
 
 ```bash
-./neo4j-cli query 'MATCH (p:Person {name:$name}) RETURN p' --param name=Alice
-./neo4j-cli query 'RETURN $ids' --param 'ids=[1,2,3]'
-echo 'MATCH (p:Person {name:$name}) RETURN p' | ./neo4j-cli query --param name=Alice
+neo4j-cli query 'MATCH (p:Person {name:$name}) RETURN p' --param name=Alice
+neo4j-cli query 'RETURN $ids' --param 'ids=[1,2,3]'
+echo 'MATCH (p:Person {name:$name}) RETURN p' | neo4j-cli query --param name=Alice
 ```
 
 Output is a table by default; pass `--format json` for a stable envelope (`columns`, `rows`, `truncated`, `arrays_truncated`). When stdout is not a terminal (piped or redirected), `--format` defaults to `json`. Applies to both `query` and `:schema`. Large results are capped at 100 rows and arrays inside cells at 100 items — tune with `--max-rows` / `--truncate-arrays-over` (0 = unlimited).
@@ -135,7 +135,7 @@ Output is a table by default; pass `--format json` for a stable envelope (`colum
 Schema introspection:
 
 ```bash
-./neo4j-cli query :schema
+neo4j-cli query :schema
 ```
 
 ### Embedding parameters
@@ -143,11 +143,11 @@ Schema introspection:
 Bind a vector parameter inline by passing `--param NAME:embed=<text>` — the text is sent to the configured embedding provider and the resulting `[]float32` is bound to `$NAME` for both the EXPLAIN preflight and the real run. The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection.
 
 ```bash
-./neo4j-cli query --param q:embed='sci-fi movies' --param k=5 \
+neo4j-cli query --param q:embed='sci-fi movies' --param k=5 \
   "CALL db.index.vector.queryNodes('idx', \$k, \$q) YIELD node, score RETURN node, score"
 
-./neo4j-cli query :embed "hello world" --format json
-echo "hello world" | ./neo4j-cli query :embed --format toon
+neo4j-cli query :embed "hello world" --format json
+echo "hello world" | neo4j-cli query :embed --format toon
 ```
 
 Embedding settings resolve with this precedence (highest first): flag → env var → `.env` file → stored embed credential → provider built-in default.
@@ -172,9 +172,9 @@ Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://l
 Write commands require `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
 
 ```bash
-./neo4j-cli aura instance delete <id> --rw
-./neo4j-cli config set telemetry false --rw
-./neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
+neo4j-cli aura instance delete <id> --rw
+neo4j-cli config set telemetry false --rw
+neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
 ```
 
 ## Agent skills
@@ -197,27 +197,27 @@ Supported agents:
 Install into every detected agent (or pass an agent name to target one):
 
 ```bash
-./neo4j-cli skill install
-./neo4j-cli skill install claude-code
+neo4j-cli skill install
+neo4j-cli skill install claude-code
 ```
 
 List supported agents and per-agent install state:
 
 ```bash
-./neo4j-cli skill list
+neo4j-cli skill list
 ```
 
 Check installed bundles for version drift against the running binary:
 
 ```bash
-./neo4j-cli skill check
+neo4j-cli skill check
 ```
 
 Remove the installed bundle (idempotent):
 
 ```bash
-./neo4j-cli skill remove
-./neo4j-cli skill remove claude-code
+neo4j-cli skill remove
+neo4j-cli skill remove claude-code
 ```
 
 Beta features (commands gated by `AuraBetaEnabled`, e.g. `dataapi`, `import`, `deployment`) are not included in the generated bundle — the bundle reflects the default-config command surface.
