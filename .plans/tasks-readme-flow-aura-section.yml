@@ -14,7 +14,7 @@ tasks:
       flag names. This is a read-only verification step; no files are modified.
       If any flag has been renamed or removed, flag it now so the README edit
       uses correct names rather than shipping stale prose.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "go run ./neo4j-cli credential aura-client add --help confirms --name, --client-id, --client-secret"
@@ -22,7 +22,7 @@ tasks:
       - "go run ./neo4j-cli aura instance create --help confirms --name, --type, --tenant-id, --memory, --region, --cloud-provider, --await, --no-credential-storage, and that the command requires --rw"
       - "go run ./neo4j-cli aura tenant list --help runs successfully (used as the discoverability hint in the new section)"
       - "Any flag-name discrepancies vs the PRD draft are reported back so task-002 uses correct names"
-    completed_at: null
+    completed_at: 2026-05-08T11:15:00Z
 
   - id: task-002
     title: "Replace README Usage section with new Aura quickstart"
