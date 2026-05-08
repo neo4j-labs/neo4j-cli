@@ -1,0 +1,3 @@
+## task-001 — 2026-05-08T14:24:04Z
+Added clievents.RedactArgs single source of truth for secret-flag scrubbing across --flag value, --flag=value, and -flag value shapes; covers password, client-secret, api-key, instance-password.
+Files: +common/clievents/redact.go, +common/clievents/redact_test.go

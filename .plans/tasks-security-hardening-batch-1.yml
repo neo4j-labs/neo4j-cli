@@ -12,7 +12,8 @@ tasks:
       instance-password across three argv shapes: --flag value, --flag=value, and
       defensive -f value form. This helper is the single source of truth for
       "what flag is sensitive" and is reused by telemetry and panic templates.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T14:24:04Z
     dependencies: []
     acceptance_criteria:
       - "redact.go exports RedactArgs with the four hardcoded secret flags"
