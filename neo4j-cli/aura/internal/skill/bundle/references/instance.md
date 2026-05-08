@@ -68,16 +68,16 @@ Examples:
 
 ```
 # Create a free-db instance (no cloud provider, region, or memory required)
-  neo4j aura instance create --name my-free-instance --type free-db --tenant-id 00000000-0000-0000-0000-000000000000
+  neo4j aura instance create --type free-db --await --rw
 
   # Create a professional-db instance on AWS (us-east-1, N. Virginia)
-  neo4j aura instance create --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+  neo4j aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
 
   # Create a professional-db instance on Azure (eastus, Virginia)
-  neo4j aura instance create --name my-azure-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider azure --region eastus --memory 4GB
+  neo4j aura instance create --rw --name my-azure-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider azure --region eastus --memory 4GB
 
   # Create a professional-db instance on GCP (europe-west1, Belgium)
-  neo4j aura instance create --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB
+  neo4j aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB
 
   # Create a business-critical instance on AWS (us-east-1, N. Virginia)
   neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 64GB
