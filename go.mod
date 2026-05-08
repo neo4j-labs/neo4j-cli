@@ -2,6 +2,8 @@ module github.com/neo4j/cli
 
 go 1.25.0
 
+toolchain go1.26.3
+
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/google/go-cmp v0.7.0

@@ -59,3 +59,8 @@ Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
 Added commonoutput.StripControl (replace C0 < 0x20 except \t \n \r, plus DEL 0x7F, with "?"); applied in formatCell's string branch and at schema render sites that bypass formatCell (NodeType, PropertyName, RelType in renderNodesTable/renderRelsTable/renderPathsTable). JSON branch left untouched (encoding/json already escapes control bytes). Added unit tests for StripControl, formatCell string vs JSON branches, table render integration, and schema render bypass paths.
 Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query/output.go, ~neo4j-cli/query/output_test.go, ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
 Decisions: fast-path scan-without-alloc preserves the no-control-char common case; non-string formatCell branch deliberately not StripControl'd to avoid double-mutating json.Marshal's already-escaped \u001b form.
+
+## task-014 — 2026-05-08T18:10:00Z
+Pinned Go toolchain to 1.26.3 via `toolchain go1.26.3` directive in go.mod (kept `go 1.25.0` minimum) and switched all three setup-go workflows (test.yml, release.yml, license.yml) from go-version: "stable"/"1.26.1" to go-version-file: go.mod for single-source-of-truth. Closes govulncheck-reachable stdlib vulns.
+Files: ~go.mod, ~.github/workflows/test.yml, ~.github/workflows/release.yml, ~.github/workflows/license.yml
+Decisions: kept `go 1.25.0` directive (module minimum) and added separate `toolchain` directive (build version) — Go auto-downloads 1.26.3 when local toolchain is older; license.yml previously hardcoded 1.26.1 but go-version-file unifies it.

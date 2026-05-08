@@ -256,7 +256,8 @@ tasks:
       actions/setup-go to use go-version-file: go.mod (single source of truth)
       instead of go-version: "stable". This closes govulncheck-reachable
       stdlib vulns (GO-2026-4918 et al).
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T18:10:00Z
     dependencies: []
     acceptance_criteria:
       - "go.mod contains `toolchain go1.26.3`"
