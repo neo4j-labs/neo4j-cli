@@ -38,7 +38,7 @@ jobs:
           fi
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "*linux*amd64*.tar.gz" \
+            --pattern "*Linux*x86_64*.tar.gz" \
             --dir /tmp/neo4j-cli-release
           tar -xzf /tmp/neo4j-cli-release/*.tar.gz -C /tmp/neo4j-cli-release
           install -m755 /tmp/neo4j-cli-release/neo4j-cli "$HOME/.local/bin/neo4j-cli"

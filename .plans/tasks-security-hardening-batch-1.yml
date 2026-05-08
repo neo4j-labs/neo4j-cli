@@ -381,7 +381,8 @@ tasks:
       amd64 pattern returns "no assets match the file pattern" (exit 1) while
       "*Linux*x86_64*.tar.gz" succeeds. Next release will fail this step and
       block the website sync.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T19:45:00Z
     dependencies: []
     acceptance_criteria:
       - "Pattern updated to *Linux*x86_64*.tar.gz (or equivalent that matches the actual archive name)"
