@@ -10,12 +10,20 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/clicfg/urlcheck"
+	"github.com/neo4j/cli/common/clierr"
 )
 
 const userAgent = "Neo4jCLI/%s"
+
+// httpClientTimeout caps every Aura HTTP request so a slow/silent server cannot
+// stall the CLI indefinitely. Variable rather than const to let tests dial it
+// down (timeout-fires assertion in api_test.go).
+var httpClientTimeout = 60 * time.Second
 
 type Grant struct {
 	AccessToken string `json:"access_token"`
@@ -37,7 +45,7 @@ type RequestConfig struct {
 }
 
 func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
-	client := http.Client{}
+	client := http.Client{Timeout: httpClientTimeout}
 	var method = config.Method
 	if method == "" {
 		panic(fmt.Sprintf("method not set in requests %s", path))
@@ -46,12 +54,18 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	body := createBody(config.PostBody)
 
 	baseUrl := cfg.Aura.BaseUrl()
+	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
+		return responseBody, 0, clierr.NewUsageError("aura base-url rejected: %s", err.Error())
+	}
 	if config.Version == "" {
 		config.Version = AuraApiVersion1
 	}
 	versionPath := getVersionPath(cfg, config.Version)
 
-	u, _ := url.ParseRequestURI(baseUrl)
+	u, err := url.ParseRequestURI(baseUrl)
+	if err != nil {
+		return responseBody, 0, clierr.NewUsageError("aura base-url is invalid: %s", err.Error())
+	}
 	u = u.JoinPath(versionPath)
 	u = u.JoinPath(path)
 

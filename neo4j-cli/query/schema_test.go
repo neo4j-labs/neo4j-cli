@@ -378,3 +378,94 @@ func TestSchema_FetchHelpersCompose(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, idx, 1)
 }
+
+// TestSchema_RenderTablesStripControl asserts the schema render functions
+// scrub C0 / DEL bytes from cells that bypass formatCell (NodeType,
+// PropertyName, RelType). Without the strip a malicious label could inject
+// ANSI escape sequences into the table output.
+func TestSchema_RenderTablesStripControl(t *testing.T) {
+	nodes := []nodeProperty{{
+		NodeType:      "ev\x1bil",
+		NodeLabels:    []string{"L"},
+		PropertyName:  "p\x7fname",
+		PropertyTypes: []string{"String"},
+		Mandatory:     false,
+	}}
+	got := renderNodesTable(nodes)
+	assert.Contains(t, got, "ev?il", "nodeType ANSI escape must be replaced with ?")
+	assert.Contains(t, got, "p?name", "propertyName DEL must be replaced with ?")
+	assert.NotContains(t, got, "\x1b", "no raw ESC may reach the rendered table")
+	assert.NotContains(t, got, "\x7f", "no raw DEL may reach the rendered table")
+
+	rels := []relProperty{{
+		RelType:       ":`A\x1bB`",
+		PropertyName:  "x\x07y",
+		PropertyTypes: []string{"String"},
+		Mandatory:     true,
+	}}
+	got = renderRelsTable(rels)
+	assert.Contains(t, got, "A?B", "relType ESC must be replaced with ?")
+	assert.Contains(t, got, "x?y", "propertyName BEL must be replaced with ?")
+	assert.NotContains(t, got, "\x1b")
+	assert.NotContains(t, got, "\x07")
+
+	paths := []relPath{{
+		RelType: ":`A\x1bB`",
+		From:    []string{"From"},
+		To:      []string{"To"},
+	}}
+	got = renderPathsTable(paths)
+	assert.Contains(t, got, "A?B", "relType ESC must be replaced with ? in paths table")
+	assert.NotContains(t, got, "\x1b")
+}
+
+// TestSchema_FetchRelPathsEscapesBacktick guards the Cypher injection vector
+// where a relType containing a literal backtick could otherwise close the
+// backtick-quoted identifier early and inject statements. The escape rule is
+// to double every backtick inside the identifier; the surrounding wrapper
+// backticks remain a balanced pair.
+func TestSchema_FetchRelPathsEscapesBacktick(t *testing.T) {
+	s := newSchemaSeam()
+	s.install(t)
+
+	c := &conn{
+		uri:       "neo4j://example:7687",
+		username:  "u",
+		password:  "pw",
+		database:  "neo4j",
+		userAgent: "neo4j-cli/vtest",
+	}
+
+	// Driver wrap form: leading ":`" + payload + trailing "`". stripRelTypeWrap
+	// peels the outer wrap, leaving the payload "Foo`]->()-[r:DROP " (note the
+	// internal backtick that must be escaped before interpolation).
+	relType := ":`Foo`]->()-[r:DROP `"
+
+	_, err := fetchRelPaths(context.Background(), c, []string{relType})
+	require.NoError(t, err)
+	require.Len(t, s.calls, 1)
+
+	got := s.calls[0]
+
+	// The doubled-backtick form survives the round-trip.
+	assert.Contains(t, got, "Foo``]->()-[r:DROP ",
+		"internal backtick must be doubled (Cypher escape) inside the identifier")
+
+	// The unescaped payload (single backtick before "]") must NOT appear — that
+	// shape is what an injection would look like.
+	assert.NotContains(t, got, "Foo`]->()-[r:DROP ",
+		"unescaped single-backtick form would close the identifier early")
+
+	// Wrapper backticks must remain a balanced pair around the identifier:
+	// total backtick count = 2 wrapper + 2*(internal-literal-backticks).
+	// One internal literal backtick → 4 total.
+	assert.Equal(t, 4, strings.Count(got, "`"),
+		"wrapper backticks must balance and internal backticks must be doubled")
+
+	// And the standard pattern shell stays intact end-to-end.
+	const wantSuffix = "]->(m) WITH DISTINCT labels(n) AS from, labels(m) AS to RETURN from, to"
+	assert.True(t, strings.HasSuffix(got, wantSuffix),
+		"escaped statement must keep the canonical MATCH suffix; got: %q", got)
+	assert.True(t, strings.HasPrefix(got, "MATCH (n)-[r:`"),
+		"escaped statement must keep the canonical MATCH prefix; got: %q", got)
+}

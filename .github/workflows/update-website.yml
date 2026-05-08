@@ -32,13 +32,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
-          # On workflow_dispatch there may be no release tag; fall back to latest
-          if [ -z "$TAG" ] || [ "$TAG" = "refs/heads/main" ]; then
-            TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
-          fi
+          # On workflow_dispatch ref_name is a branch (e.g. "main"), not a release tag.
+          # Only treat values shaped like a release tag (v*) as authoritative; anything
+          # else falls back to the latest published release.
+          case "$TAG" in
+            v*) ;;
+            *) TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName) ;;
+          esac
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "*linux*amd64*.tar.gz" \
+            --pattern "*Linux*x86_64*.tar.gz" \
             --dir /tmp/neo4j-cli-release
           tar -xzf /tmp/neo4j-cli-release/*.tar.gz -C /tmp/neo4j-cli-release
           install -m755 /tmp/neo4j-cli-release/neo4j-cli "$HOME/.local/bin/neo4j-cli"

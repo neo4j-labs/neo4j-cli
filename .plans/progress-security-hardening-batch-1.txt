@@ -1,0 +1,100 @@
+## task-001 — 2026-05-08T14:24:04Z
+Added clievents.RedactArgs single source of truth for secret-flag scrubbing across --flag value, --flag=value, and -flag value shapes; covers password, client-secret, api-key, instance-password.
+Files: +common/clievents/redact.go, +common/clievents/redact_test.go
+
+## task-002 — 2026-05-08T14:35:00Z
+Added urlcheck.ValidateRemoteURL SSRF allowlist (https any, http loopback only; rejects private/link-local/multicast/metadata-IP/malformed). Stdlib-only (net, net/url, fmt, strings) so any package can import.
+Files: +common/clicfg/urlcheck/urlcheck.go, +common/clicfg/urlcheck/urlcheck_test.go
+Decisions: metadata-IP guard is explicit string match (catches trailing-dot variant); DNS rebinding documented out of scope.
+
+## task-003 — 2026-05-08T14:48:00Z
+Added shared dotenv.Find helper walking up from startDir, stopping at first .git ancestor or $HOME boundary; returns (path, found, walkedAboveCWD). No clicfg/cobra dependency.
+Files: +common/clicfg/dotenv/dotenv.go, +common/clicfg/dotenv/dotenv_test.go
+Decisions: homeDirFn is package-level overridable (cleaner than t.Setenv("HOME") and platform-portable); .git boundary inclusive (repo-root .env still loaded), $HOME boundary inclusive.
+
+## task-004 — 2026-05-08T15:02:00Z
+Wired RedactArgs into aura/skill/default telemetry branches in clievents.Emit; query branch left untouched (already command-name only). Added table-driven Mixpanel-payload test asserting *** present, flag name preserved, secret value never leaked across AURA/SKILL/COMMAND suffixes including --flag=value form.
+Files: ~common/clievents/clievents.go, ~common/clievents/clievents_test.go
+
+## task-005 — 2026-05-08T15:18:00Z
+Wrapped every os.Args[1:] interpolation in panic/error templates with clievents.RedactArgs: 10 sites in api/response.go (handleResponseError + formatAuthorizationError), 1 in allowedorigin/utils.go, 1 each in neo4j-cli/main.go and aura/cmd/main.go panic-recover. Extracted recoverPanic helpers in both binary mains so the format is unit-testable. Added in-package response_test.go (415/502/307/400-malformed/default-status) and main_test.go in both mains; all assert *** present and secret value absent.
+Files: ~neo4j-cli/main.go, +neo4j-cli/main_test.go, ~neo4j-cli/aura/cmd/main.go, +neo4j-cli/aura/cmd/main_test.go, ~neo4j-cli/aura/internal/api/response.go, +neo4j-cli/aura/internal/api/response_test.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/corspolicy/allowedorigin/utils.go
+Decisions: response_test uses package api (in-package) to access private handleResponseError; nil credential/cfg is safe on the panic paths exercised. recoverPanic helper accepts io.Writer so tests don't have to redirect os.Stdout.
+
+## task-006 — 2026-05-08T15:35:00Z
+Atomic credentials.json write: WriteFile now writes <path>.tmp via OpenFile O_CREATE|O_WRONLY|O_TRUNC mode 0600, Sync, Close, Rename; cleanup on any failure. createFile collapses Create→Chmod chain to a single OpenFile (umask race window closed). Both fileutils MkdirAll and clicfg.go config-dir MkdirAll now use 0o700.
+Files: ~common/clicfg/fileutils/fileutils.go, +common/clicfg/fileutils/fileutils_test.go, +common/clicfg/fileutils/umask_unix_test.go, +common/clicfg/fileutils/umask_windows_test.go, ~common/clicfg/clicfg.go
+Decisions: rename-failure test uses an Fs wrapper (renameFailFs) injecting a fixed error rather than reflecting on os internals; OS-fs mode assertions guarded by syscall.Umask(0) on POSIX with a Windows-no-op shim so tests stay cross-platform; Sync errors that wrap os.ErrInvalid are tolerated (some afero backends).
+
+## task-007 — 2026-05-08T15:55:00Z
+load() returns error instead of panicking on Unmarshal failure; on corrupt file backs up to <path>.corrupt-<unix-ts>, resets in-memory + on-disk state to empty creds, returns clierr.NewFatalError naming backup. NewCredentials wraps load() and panics with that error so existing main() recover-and-print flow stays intact (no signature change to 13 call sites).
+Files: ~common/clicfg/credentials/credentials.go, +common/clicfg/credentials/credentials_test.go, +common/clicfg/credentials/export_test.go
+Decisions: package-level nowUnix var + SetNowUnixForTest helper for deterministic backup-path assertions (cleaner than freezing time globally); panic-with-error preserved over signature change to keep blast radius local.
+
+## task-008 — 2026-05-08T16:10:00Z
+Set 60s Timeout on both Aura http.Client constructions (api.go MakeRequest, token.go getToken) via shared httpClientTimeout package var; embed clients untouched per ctx-owned contract. Added timeout-fires test using stalling httptest.Server + recover (MakeRequest panics on client.Do errors).
+Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go, +neo4j-cli/aura/internal/api/export_test.go
+Decisions: httpClientTimeout as package-level var + SetHTTPClientTimeoutForTest seam so test runs in 50ms instead of 60s; handler guarded with 5s fallback per AGENTS.md ctx-propagation-timing rule.
+
+## task-009 — 2026-05-08T16:25:00Z
+Wired urlcheck.ValidateRemoteURL into 5 request sites: aura MakeRequest base-url, getToken auth-url, and the three embed providers (openai, ollama, huggingface) BaseURL pre-flight. Aura sites also propagate the previously-discarded ParseRequestURI error as clierr.NewUsageError. Tests assert SSRF-blocked URLs (metadata IP, RFC1918, link-local, cleartext-non-loopback) error before any HTTP traffic.
+Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/api_test.go, ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/query/embed/openai.go, ~neo4j-cli/query/embed/openai_test.go, ~neo4j-cli/query/embed/ollama.go, ~neo4j-cli/query/embed/ollama_test.go, ~neo4j-cli/query/embed/huggingface.go, ~neo4j-cli/query/embed/huggingface_test.go
+Decisions: aura sites use clierr.NewUsageError (matches existing in-package style); embed sites use fmt.Errorf %w to keep wrapping consistent with surrounding error returns; APIKey check still precedes URL check so missing-key error path stays unchanged.
+
+## task-010 — 2026-05-08T16:45:00Z
+Replaced both findDotenv duplicates (connect.go, embed/embed.go) with shared dotenv.Find helper; loadEnvFile and loadDotenv now take an io.Writer and emit `info: loading .env from <path>` to stderr when the discovered .env lives strictly above startDir/cwd. Added .git-boundary, $HOME-boundary, and overlay-announcement tests at both call sites.
+Files: ~common/clicfg/dotenv/dotenv.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+Decisions: exported SetHomeDirFnForTest from dotenv pkg for cross-package hermetic tests (cleaner than t.Setenv("HOME") which is non-portable to Windows USERPROFILE); embed-side test uses os.MkdirAll (std lib) for the chdir target to honor AGENTS.md "no afero.NewOsFs in query tests" rule.
+
+## task-011 — 2026-05-08T17:05:00Z
+normalizeURI now returns a 4th value `warning string`: non-empty when resolved scheme is cleartext bolt-family (bolt:// or neo4j://) AND host is not loopback. Warning uses (*url.URL).Redacted() so userinfo password is masked. Both connect.go call sites print via cmd.PrintErrln. Loopback (localhost / 127.0.0.1 / ::1) and encrypted (+s/+ssc) variants stay silent. Existing http→neo4j rewrite to non-loopback now ALSO emits the cleartext warning post-rewrite.
+Files: ~neo4j-cli/query/uri.go, ~neo4j-cli/query/uri_test.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/query/run_test.go
+Decisions: cleartextWarning + isLoopbackHost as private helpers in uri.go (kept small, no new pkg); warning fires post-rewrite too so http://prod.example also warns about the resulting cleartext neo4j://.
+
+## task-012 — 2026-05-08T17:25:00Z
+fetchRelPaths now doubles literal backticks in the stripped relType before fmt.Sprintf interpolation (Cypher escape rule), closing the injection vector where a relType containing "`" could close the backtick-quoted identifier and inject statements. Added schema_test.go case feeding the canonical injection payload and asserting doubled-backtick form, balanced wrapper count, and canonical MATCH prefix/suffix shell.
+Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
+
+## task-013 — 2026-05-08T17:50:00Z
+Added commonoutput.StripControl (replace C0 < 0x20 except \t \n \r, plus DEL 0x7F, with "?"); applied in formatCell's string branch and at schema render sites that bypass formatCell (NodeType, PropertyName, RelType in renderNodesTable/renderRelsTable/renderPathsTable). JSON branch left untouched (encoding/json already escapes control bytes). Added unit tests for StripControl, formatCell string vs JSON branches, table render integration, and schema render bypass paths.
+Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query/output.go, ~neo4j-cli/query/output_test.go, ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
+Decisions: fast-path scan-without-alloc preserves the no-control-char common case; non-string formatCell branch deliberately not StripControl'd to avoid double-mutating json.Marshal's already-escaped \u001b form.
+
+## task-014 — 2026-05-08T18:10:00Z
+Pinned Go toolchain to 1.26.3 via `toolchain go1.26.3` directive in go.mod (kept `go 1.25.0` minimum) and switched all three setup-go workflows (test.yml, release.yml, license.yml) from go-version: "stable"/"1.26.1" to go-version-file: go.mod for single-source-of-truth. Closes govulncheck-reachable stdlib vulns.
+Files: ~go.mod, ~.github/workflows/test.yml, ~.github/workflows/release.yml, ~.github/workflows/license.yml
+Decisions: kept `go 1.25.0` directive (module minimum) and added separate `toolchain` directive (build version) — Go auto-downloads 1.26.3 when local toolchain is older; license.yml previously hardcoded 1.26.1 but go-version-file unifies it.
+
+## task-015 — 2026-05-08T18:25:00Z
+Added Govulncheck step to test.yml after Build, gated to ubuntu-latest only; installs govulncheck@latest then runs `govulncheck ./...` with default exit semantics (non-zero only on callable vulns). Local run on pinned 1.26.3 toolchain reports no vulnerabilities.
+Files: ~.github/workflows/test.yml
+Decisions: install via `go install ...@latest` instead of adding a third-party action — matches "future stdlib regressions fail CI" intent and avoids new SHA-pin maintenance; runs before Generate check so a vuln gates the rest of the pipeline early.
+
+## task-016 — 2026-05-08T18:40:00Z
+SHA-pinned both actions in claude.yml: actions/checkout@v4 -> de0fac2e... # v6 (matches rest of repo), anthropics/claude-code-action@v1 -> 939ae9c0... # v1 (resolved via gh api on annotated tag object).
+Files: ~.github/workflows/claude.yml
+
+## task-017 — 2026-05-08T18:55:00Z
+Hardened cla-check.yml: added top-level least-privilege `permissions: { contents: read, pull-requests: read }`; moved PAT from inline `${{ secrets.X }}` positional interpolation to env var GITHUB_TOKEN_PAT forwarded as positional (helper from external whitelist-check repo accepts positional only — wrap pattern).
+Files: ~.github/workflows/cla-check.yml
+Decisions: helper script ./bin/examine-pull-request lives in neo-technology/whitelist-check (checked out at runtime) — couldn't audit env-input support, so used the env-then-forward wrap; closes GHA-rendering exposure even though ps-output exposure of positional remains.
+
+## task-018 — 2026-05-08T18:25:00Z
+Tightened update-website.yml workflow_run guard to mirror publish-pypi.yml pattern: now requires success AND head_branch == default_branch AND event == push (workflow_dispatch still passes). Closes cache-poisoning vector where a non-default-branch "release" run could trigger the contents:write + pull-requests:write job.
+Files: ~.github/workflows/update-website.yml
+
+## task-019 — 2026-05-08T19:10:00Z
+Mirrored publish-pypi.yml verify-checksums step into publish-npm.yml auto path: downloads *_checksums.txt from GH Release into a separate dir (avoids circular trust on the dist artifact's bundled checksums.txt), runs sha256sum -c against the downloaded dist artifact before extraction. Gated to workflow_run + push event + include_neo4j == true so make npm-publish-dry and the workflow_dispatch path stay unaffected.
+Files: ~.github/workflows/publish-npm.yml
+
+## task-020 — 2026-05-08T15:48:00Z
+Documented the .env scope change: README query/connection paragraph now describes the .git/$HOME boundary rule and the stderr `info: loading .env from <path>` overlay announcement; hand-authored changie Patch entry under .changes/unreleased/ since changie isn't installed locally.
+Files: ~README.md, +.changes/unreleased/neo4j-cli-Patch-20260508-154720.yaml
+
+## task-021 — 2026-05-08T19:45:00Z
+Fixed update-website.yml gh release download pattern: lowercase `*linux*amd64*.tar.gz` never matched GoReleaser's `Linux_x86_64` archives (case-sensitive filepath.Match); updated to `*Linux*x86_64*.tar.gz`. Verified against v1.7.0: old pattern exits 1 ("no assets match"), new pattern exits 0 with exactly one archive.
+Files: ~.github/workflows/update-website.yml
+
+## task-022 — 2026-05-08T20:00:00Z
+Replaced update-website.yml install-step fallback guard with a tag-shaped (v*) case so workflow_dispatch from main (where github.ref_name is "main", not "refs/heads/main") falls back to the latest release tag instead of `gh release download "main"` failing.
+Files: ~.github/workflows/update-website.yml

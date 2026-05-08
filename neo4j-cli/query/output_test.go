@@ -92,6 +92,33 @@ func TestRowsFromValues(t *testing.T) {
 	}
 }
 
+func TestFormatCell_StripsControlOnStrings(t *testing.T) {
+	// case string: ANSI escape and DEL are redacted with "?".
+	assert.Equal(t, "foo?[31mbar", formatCell("foo\x1b[31mbar"))
+	assert.Equal(t, "x?y", formatCell("x\x7fy"))
+	// Whitespace runes survive.
+	assert.Equal(t, "a\tb\nc\rd", formatCell("a\tb\nc\rd"))
+}
+
+func TestFormatCell_JSONBranchUnaffected(t *testing.T) {
+	// non-string values flow through json.Marshal which already escapes
+	// control bytes; formatCell must NOT apply StripControl on this branch
+	// (otherwise legitimate JSON-escaped sequences like "\\u001b" would
+	// be double-mutated).
+	got := formatCell([]any{"a\x1bb"})
+	// json.Marshal escapes \x1b as the six-byte literal "\\u001b" inside the array literal.
+	assert.Contains(t, got, `\u001b`, "non-string branch must keep JSON escape; got: %s", got)
+	assert.NotContains(t, got, "?", "non-string branch must not be StripControl'd")
+}
+
+func TestRenderRows_TableStripsControlInStringCell(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "table")
+	renderRows(cmd, cfg, []string{"col"}, []map[string]any{{"col": "foo\x1b[31mbar"}}, false, 0)
+	out := stdout.String()
+	assert.Contains(t, out, "foo?[31mbar")
+	assert.NotContains(t, out, "\x1b[31m", "raw ANSI escape must not reach the rendered table")
+}
+
 func TestRenderRows_JSON(t *testing.T) {
 	tests := []struct {
 		name            string

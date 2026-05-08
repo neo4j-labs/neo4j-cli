@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -69,6 +70,9 @@ func (p *openAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 	base := p.cfg.BaseURL
 	if base == "" {
 		base = defaultOpenAIBaseURL
+	}
+	if err := urlcheck.ValidateRemoteURL(base); err != nil {
+		return nil, fmt.Errorf("openai: base url rejected: %w", err)
 	}
 
 	body := openAIEmbedRequest{

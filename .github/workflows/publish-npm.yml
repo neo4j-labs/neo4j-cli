@@ -106,6 +106,35 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
+      - name: Verify dist archives against release checksums (auto)
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'push' &&
+          steps.meta.outputs.include_neo4j == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DOWNLOADED: ${{ runner.temp }}/downloaded-dist
+          CHECKSUMS_DIR: ${{ runner.temp }}/release-checksums
+        run: |
+          # Defence-in-depth against the workflow_run cache-poisoning class:
+          # verify each archive in the downloaded dist artifact against the
+          # checksums.txt published by GoReleaser to the GitHub Release.
+          # CRITICAL: download checksums.txt to a SEPARATE directory, not
+          # alongside the dist artifact contents — the dist artifact itself
+          # contains its own checksums.txt (GoReleaser writes one to dist/),
+          # but trusting that file would be circular: if the artifact were
+          # tampered with, its bundled checksums.txt could be too. The
+          # GitHub Release is the independent trusted source.
+          mkdir -p "${CHECKSUMS_DIR}"
+          gh release download "v${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*_checksums.txt' \
+            --dir "${CHECKSUMS_DIR}"
+          CHECKSUMS=$(ls "${CHECKSUMS_DIR}"/*_checksums.txt | head -n1)
+          test -f "${CHECKSUMS}"
+          ( cd "${DOWNLOADED}" && sha256sum -c "${CHECKSUMS}" )
+
       - name: Prepare dist from downloaded artifact (auto)
         if: >-
           github.event_name == 'workflow_run' &&

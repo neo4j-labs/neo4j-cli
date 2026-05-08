@@ -4,7 +4,9 @@
 package embed
 
 import (
+	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
 
@@ -411,5 +414,74 @@ func TestResolveSelectedDbmsCred(t *testing.T) {
 		cmd := newTestCmd(t, "--credential=nope")
 		got := resolveSelectedDbmsCred(cmd, cfg)
 		assert.Nil(t, got)
+	})
+}
+
+// TestLoadDotenv_StopsAtGitBoundary verifies the embed-side .env walk halts
+// at the first .git ancestor — a poison .env above the repo root must NOT
+// be loaded into the resolved Config.
+func TestLoadDotenv_StopsAtGitBoundary(t *testing.T) {
+	clearEmbedEnv(t)
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+
+	// Poison .env one level above tmp; tmp itself carries a .git boundary.
+	parent := filepath.Dir(tmp)
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(parent, ".env"),
+		[]byte("NEO4J_EMBED_API_KEY=poison\n"), 0644))
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".git"),
+		[]byte(""), 0644))
+
+	// Empty home so only the .git boundary is exercised.
+	restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "", nil })
+	defer restore()
+
+	got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), nil)
+	assert.Empty(t, got, "poison .env above .git boundary must not be loaded")
+}
+
+// TestLoadDotenv_AnnouncesOverlay verifies an info: line appears on stderr
+// when .env lives strictly above cwd, and stays silent when .env is in cwd.
+func TestLoadDotenv_AnnouncesOverlay(t *testing.T) {
+	clearEmbedEnv(t)
+
+	t.Run("above cwd emits info line", func(t *testing.T) {
+		tmp := t.TempDir()
+		sub := filepath.Join(tmp, "sub")
+		require.NoError(t, os.MkdirAll(sub, 0o755))
+		t.Chdir(sub)
+
+		fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+			[]byte("NEO4J_EMBED_API_KEY=found\n"), 0644))
+
+		// Empty home + no .git so the walk reaches tmp.
+		restore := dotenv.SetHomeDirFnForTest(func() (string, error) { return "", nil })
+		defer restore()
+
+		var buf bytes.Buffer
+		got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), &buf)
+		assert.Equal(t, "found", got["NEO4J_EMBED_API_KEY"])
+		assert.Contains(t, buf.String(), "info: loading .env from")
+		assert.Contains(t, buf.String(), filepath.Join(tmp, ".env"))
+	})
+
+	t.Run("in cwd is silent", func(t *testing.T) {
+		tmp := t.TempDir()
+		t.Chdir(tmp)
+
+		fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+		require.NoError(t, err)
+		require.NoError(t, afero.WriteFile(fs, filepath.Join(tmp, ".env"),
+			[]byte("NEO4J_EMBED_API_KEY=found\n"), 0644))
+
+		var buf bytes.Buffer
+		got := loadDotenv(clicfg.NewConfig(fs, "test", clicfg.QueryScope), &buf)
+		assert.Equal(t, "found", got["NEO4J_EMBED_API_KEY"])
+		assert.Empty(t, buf.String(), "no info line when .env is in cwd")
 	})
 }

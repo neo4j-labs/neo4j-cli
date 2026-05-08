@@ -4,6 +4,8 @@
 package query
 
 import (
+	"fmt"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -20,18 +22,26 @@ import (
 // preserved on the rewritten URI; the displayOrig form is run through
 // (*url.URL).Redacted() so any password is masked before it hits stderr.
 //
+// After the (optional) rewrite, the resolved scheme is inspected: if it is
+// the cleartext bolt-family (bolt:// or neo4j://) AND the host is not a
+// loopback address, a warning string is returned. The caller is expected to
+// print the warning to stderr (e.g. via cmd.PrintErrln). The warning text
+// uses (*url.URL).Redacted() so any userinfo password is masked.
+//
 // Returns:
 //   - rewritten:   the URI to feed to neo4j.NewDriver
 //   - didRewrite:  true if the scheme/port was changed
 //   - displayOrig: redacted form of the input URI suitable for stderr
+//   - warning:     non-empty when the resolved URI is cleartext bolt/neo4j to
+//     a non-loopback host; empty otherwise
 //
-// Inputs that fail to parse, or that use a scheme other than http/https
-// (including bolt-family schemes that are already valid for the driver),
-// pass through with didRewrite=false.
-func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig string) {
+// Inputs that fail to parse pass through with didRewrite=false and warning="".
+// Bolt-family inputs pass through with didRewrite=false but may still produce
+// a warning when cleartext-to-non-loopback.
+func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig, warning string) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return raw, false, ""
+		return raw, false, "", ""
 	}
 
 	scheme := strings.ToLower(u.Scheme)
@@ -41,10 +51,13 @@ func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig st
 		newScheme = "neo4j"
 	case "https":
 		newScheme = "neo4j+s"
+	case "bolt", "neo4j", "bolt+s", "bolt+ssc", "neo4j+s", "neo4j+ssc":
+		// Already a bolt-family scheme — passthrough, but still check whether
+		// the resolved (cleartext) form warrants a warning.
+		return raw, false, "", cleartextWarning(u, scheme)
 	default:
-		// bolt, bolt+s, bolt+ssc, neo4j, neo4j+s, neo4j+ssc, empty,
-		// or anything else — passthrough.
-		return raw, false, ""
+		// Empty scheme, gibberish, or any other unsupported scheme — passthrough.
+		return raw, false, "", ""
 	}
 
 	// Capture the redacted original BEFORE mutating u so password masking is
@@ -60,5 +73,38 @@ func normalizeURI(raw string) (rewritten string, didRewrite bool, displayOrig st
 	u.Fragment = ""
 	u.RawFragment = ""
 
-	return u.String(), true, displayOrig
+	return u.String(), true, displayOrig, cleartextWarning(u, newScheme)
+}
+
+// cleartextWarning returns a non-empty warning when the URI's scheme is the
+// cleartext bolt-family (bolt:// or neo4j://) and the host is NOT a loopback
+// address. Loopback hosts are silent: bolt://localhost, bolt://127.0.0.1,
+// and bolt://[::1] all return "". Encrypted schemes (neo4j+s://, bolt+s://,
+// neo4j+ssc://, bolt+ssc://) always return "". The returned text uses
+// (*url.URL).Redacted() so any userinfo password is masked.
+func cleartextWarning(u *url.URL, scheme string) string {
+	if scheme != "bolt" && scheme != "neo4j" {
+		return ""
+	}
+	host := u.Hostname()
+	if host == "" {
+		return ""
+	}
+	if isLoopbackHost(host) {
+		return ""
+	}
+	return fmt.Sprintf(
+		"warning: connecting to '%s' over cleartext (use %s+s:// for verified TLS or %s+ssc:// for self-signed)",
+		u.Redacted(), scheme, scheme)
+}
+
+// isLoopbackHost reports whether host is loopback. Accepts IP literals
+// (127.0.0.0/8, ::1) via net.ParseIP and the conventional hostname
+// "localhost" (with or without trailing dot, case-insensitive).
+func isLoopbackHost(host string) bool {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	h := strings.TrimSuffix(strings.ToLower(host), ".")
+	return h == "localhost"
 }

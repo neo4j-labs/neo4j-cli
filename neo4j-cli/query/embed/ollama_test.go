@@ -199,6 +199,37 @@ func TestOllama_Embed_CtxCancellationAborts(t *testing.T) {
 	}
 }
 
+// TestOllama_Embed_RejectsBlockedBaseURL asserts that an SSRF-blocked base
+// URL fails before any HTTP traffic. The default localhost endpoint stays
+// permitted (covered by TestOllama_Embed_DefaultBaseURL).
+func TestOllama_Embed_RejectsBlockedBaseURL(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		baseURL string
+	}{
+		{name: "metadata IP", baseURL: "http://169.254.169.254"},
+		{name: "private RFC1918", baseURL: "http://10.0.0.1:11434"},
+		{name: "cleartext non-loopback", baseURL: "http://prod.example.com:11434"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newOllamaProvider(Config{
+				Provider: ProviderOllama,
+				Model:    "m",
+				BaseURL:  tc.baseURL,
+			})
+			p.client = &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				t.Fatalf("transport must not be hit for blocked URL")
+				return nil, nil
+			})}
+
+			_, err := p.Embed(context.Background(), "hello")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "ollama")
+			assert.Contains(t, err.Error(), "rejected")
+		})
+	}
+}
+
 func TestOllama_Embed_DefaultBaseURL(t *testing.T) {
 	// Construct provider with no BaseURL set; assert the default is used at
 	// request time. We swap http.Client.Transport so we never hit a real

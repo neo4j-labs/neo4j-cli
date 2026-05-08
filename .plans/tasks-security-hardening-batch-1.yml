@@ -1,0 +1,407 @@
+feature: security-hardening-batch-1
+prd: ./prd-security-hardening-batch-1.md
+created_at: 2026-05-08T14:14:28Z
+updated_at: 2026-05-08T19:30:00Z
+
+tasks:
+  - id: task-001
+    title: "Add RedactArgs helper for secret-flag scrubbing"
+    description: |
+      Create common/clievents/redact.go exposing func RedactArgs(args []string) string.
+      Mask values of the secret-bearing flags password, client-secret, api-key,
+      instance-password across three argv shapes: --flag value, --flag=value, and
+      defensive -f value form. This helper is the single source of truth for
+      "what flag is sensitive" and is reused by telemetry and panic templates.
+    status: completed
+    completed_at: 2026-05-08T14:24:04Z
+    dependencies: []
+    acceptance_criteria:
+      - "redact.go exports RedactArgs with the four hardcoded secret flags"
+      - "redact_test.go is table-driven and covers --flag X, --flag=X, -f X, multi-flag, secret-as-final-arg, no-secret, value-less flag, mixed positional+flag"
+      - "Each test case asserts the redacted output contains the flag NAME but never the secret value"
+      - "make test, make fmt-check, and make lint stay green"
+
+  - id: task-002
+    title: "Add ValidateRemoteURL SSRF allowlist helper"
+    description: |
+      Create common/clicfg/urlcheck/urlcheck.go with func ValidateRemoteURL(raw string) error.
+      Accept https:// to any host. Accept http:// only when host is loopback
+      (localhost, 127.0.0.1, ::1). Reject IP-literal hosts that are private,
+      link-local unicast, link-local multicast, or multicast. Reject the metadata
+      IP 169.254.169.254 explicitly. Reject empty/malformed URLs. Hostnames
+      pass through (DNS-rebinding is documented as out of scope).
+    status: completed
+    completed_at: 2026-05-08T14:35:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "urlcheck.go exists with no third-party dependency (stdlib net only)"
+      - "urlcheck_test.go is table-driven covering: https://api.neo4j.io OK, http://localhost:8080 OK, http://[::1] OK, http://api.openai.com rejected, http://10.0.0.1 rejected, http://169.254.169.254 rejected, http://[fe80::1] rejected, empty/malformed rejected"
+      - "Helper has no dependency on cobra, viper, or clicfg (so any package can import it)"
+      - "make test passes"
+
+  - id: task-003
+    title: "Extract shared dotenv discovery helper"
+    description: |
+      Create common/clicfg/dotenv/dotenv.go (or similar) holding the single
+      findDotenv implementation. The function takes an afero.Fs and start dir,
+      walks up stopping at the first .git ancestor or $HOME boundary
+      (resolved via os.UserHomeDir()), and returns (path, found, walkedAboveCWD).
+      The two existing duplicates in neo4j-cli/query/connect.go and
+      neo4j-cli/query/embed/embed.go will be deleted in a later task that wires
+      this helper in.
+    status: completed
+    completed_at: 2026-05-08T14:48:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Shared helper package exists with one exported finder function"
+      - "dotenv_test.go uses afero.MemMapFs and t.Setenv(\"HOME\", …) per AGENTS.md hermetic-test rules"
+      - "Tests cover: stop at .git ancestor, stop at $HOME, no walk above $HOME, returns walkedAboveCWD true when ancestor .env, false when CWD .env"
+      - "make test passes; no afero.NewOsFs in tests"
+
+  - id: task-004
+    title: "Wire RedactArgs into clievents telemetry branches"
+    description: |
+      In common/clievents/clievents.go replace strings.Trim(fmt.Sprint(args), "[]")
+      with clievents.RedactArgs(args) on the aura branch (line 77), skill branch
+      (line 95), and default branch (line 101). Leave the already-redacted query
+      branch (lines 82-91) unchanged. Add a clievents-level test that captures the
+      Mixpanel payload via the existing analytics test recorder and asserts the
+      command property contains *** for the three secret flags.
+    status: completed
+    completed_at: 2026-05-08T15:02:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "clievents.go uses RedactArgs in aura, skill, and default branches; query branch untouched"
+      - "Mixpanel-payload test asserts command property contains *** for credential add --client-secret, dbms add --password, embed add --api-key"
+      - "Negative assertion: secret string is not present anywhere in the recorded payload"
+      - "make test, make lint, make fmt-check stay green"
+
+  - id: task-005
+    title: "Apply RedactArgs to panic and error templates"
+    description: |
+      Replace os.Args[1:] interpolation with clievents.RedactArgs(os.Args[1:]) in
+      neo4j-cli/main.go:19, neo4j-cli/aura/cmd/main.go:22, the ten sites in
+      neo4j-cli/aura/internal/api/response.go (lines 44, 51, 71, 83, 97, 111, 121,
+      131, 141, 335), and neo4j-cli/aura/internal/subcommands/dataapi/graphql/
+      corspolicy/allowedorigin/utils.go:42. If a circular import surfaces, lift
+      the helper from common/clievents to common/redact.
+    status: completed
+    completed_at: 2026-05-08T15:18:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Every os.Args[1:] usage in the listed files is wrapped with RedactArgs"
+      - "response_test.go (using testutils.NewAuraTestHelper) mocks 415/502/307/malformed-body responses for credential add --client-secret SECRET, dbms add --password SECRET, dataapi graphql create --instance-password SECRET; captured panic/fatal messages contain *** but never SECRET"
+      - "main_test.go covers the panic-recover path in neo4j-cli/main.go and aura/cmd/main.go: seeded os.Args with secret flags produces redacted stdout"
+      - "make test green"
+
+  - id: task-006
+    title: "Atomic credentials.json write plus mode tightening"
+    description: |
+      In common/clicfg/fileutils/fileutils.go change WriteFile to perform an
+      atomic temp-write+rename: open path+\".tmp\" with O_CREATE|O_WRONLY|O_TRUNC
+      mode 0o600, write, Sync, Close, then Rename over path; remove the temp
+      file on rename failure. Replace createFile's Create→Chmod chain with a
+      single OpenFile so the umask race window is gone. Tighten the MkdirAll
+      mode at fileutils.go:62 and clicfg.go:72 from 0o755 to 0o700.
+    status: completed
+    completed_at: 2026-05-08T15:35:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "WriteFile is atomic (temp+sync+rename); fileutils_test.go injects a Rename failure and asserts the original file is intact and tmp is cleaned up"
+      - "createFile uses a single OpenFile with mode 0o600; no Create→Chmod chain"
+      - "Both MkdirAll sites use 0o700; an integration test confirms the directory mode after first invocation"
+      - "Manual: kill -9 mid-write of credentials.json leaves a valid JSON readable by the next invocation"
+      - "make test, make lint, make fmt-check green on macOS, Linux, and Windows CI"
+
+  - id: task-007
+    title: "Recover from corrupt credentials.json instead of panicking"
+    description: |
+      In common/clicfg/credentials/credentials.go load(), replace the panic on
+      json.Unmarshal failure with a recovery branch: copy credentials.json to
+      credentials.json.corrupt-<unix_ts>, reset to empty in-memory credentials,
+      and return clierr.NewFatalError naming the backup path so the user sees
+      what happened. CLI still fails fast on the current invocation, but the
+      next invocation succeeds with empty credentials.
+    status: completed
+    completed_at: 2026-05-08T15:55:00Z
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "load() no longer panics on Unmarshal error"
+      - "credentials_test.go feeds a 1-byte garbage file, asserts a clierr.FatalError is returned, asserts a credentials.json.corrupt-* sibling exists, and asserts a follow-up load yields empty credentials"
+      - "The fatal-error message contains the backup file path"
+      - "make test green"
+
+  - id: task-008
+    title: "Set 60s Timeout on Aura HTTP clients"
+    description: |
+      Set Timeout: 60 * time.Second on the http.Client{} constructions in
+      neo4j-cli/aura/internal/api/api.go:40 and token.go:43. The three embed
+      clients (openai.go:37, ollama.go:36, huggingface.go:43) are intentionally
+      excluded — they document a ctx-owned cancellation contract and a hard 60s
+      cap would break legitimate long-running local inference (e.g. Ollama on
+      CPU with a large model). --await is unaffected: Poll() issues a fresh
+      MakeRequest per iteration, so the per-request 60s wall does not bound the
+      polling loop. ctx plumbing into MakeRequest/getToken is explicitly out of
+      scope (separate refactor); this task closes the slow-loris vector against
+      Aura calls only.
+    status: completed
+    completed_at: 2026-05-08T16:10:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Both Aura http.Client constructions (api.go:40, token.go:43) have Timeout: 60 * time.Second"
+      - "Test using a httptest.Server that sleeps longer than 60s confirms the request errors with a deadline-exceeded error"
+      - "Embed client constructions (openai.go, ollama.go, huggingface.go) remain unchanged — no Timeout field"
+      - "Existing Aura+embed tests stay green (timeout is well above any unit-test latency)"
+      - "make test green"
+
+  - id: task-009
+    title: "Apply ValidateRemoteURL at Aura and embed request sites"
+    description: |
+      Wire common/clicfg/urlcheck.ValidateRemoteURL into the request paths.
+      In neo4j-cli/aura/internal/api/api.go:54 propagate the validation error
+      instead of dropping the ParseRequestURI error to _. Same for token.go's
+      auth-url usage. In query/embed/openai.go, ollama.go, and huggingface.go,
+      validate BaseURL before issuing the request and return the error from
+      Embed(). Failing fast at request time avoids breaking already-stored
+      configs at load.
+    status: completed
+    completed_at: 2026-05-08T16:25:00Z
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Aura MakeRequest test wired with AURA_BASE_URL=http://169.254.169.254 returns a clear error and does not issue an HTTP request"
+      - "Embed provider tests reject http:// to non-loopback BaseURL"
+      - "https://api.neo4j.io and https://api.openai.com still pass validation"
+      - "ParseRequestURI errors are propagated as user-visible errors, not panics"
+      - "make test green"
+
+  - id: task-010
+    title: "Scope findDotenv to git-root or $HOME and announce overlay"
+    description: |
+      Replace the duplicated findDotenv in neo4j-cli/query/connect.go (307-320)
+      and neo4j-cli/query/embed/embed.go (319-332) with the shared helper from
+      task-003. Stop the walk at the first .git ancestor or $HOME boundary.
+      When a .env is loaded from a directory above CWD, emit `info: loading
+      .env from <path>` to stderr. Delete the duplicates.
+    status: completed
+    completed_at: 2026-05-08T16:45:00Z
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Both call sites use the shared helper; the two duplicates are removed"
+      - "Walk does not cross $HOME and stops at first .git ancestor"
+      - "stderr info: line emitted only when the .env path is above CWD"
+      - "Test: cd /tmp/x with a poison /tmp/.env does not load it; query uses stored credentials"
+      - "make test green"
+
+  - id: task-011
+    title: "Warn on cleartext Bolt URI to non-loopback hosts"
+    description: |
+      In neo4j-cli/query/uri.go normalizeURI, after resolving the final scheme,
+      if the scheme is bolt or neo4j (cleartext) AND the host is not loopback,
+      return a warning string the caller will print via cmd.PrintErrln. The
+      warning must mask userinfo passwords via (*url.URL).Redacted(). bolt://
+      to localhost stays silent.
+    status: completed
+    completed_at: 2026-05-08T17:05:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "normalizeURI returns a warning for bolt://prod.example and neo4j://prod.example"
+      - "normalizeURI is silent for bolt://localhost, bolt://127.0.0.1, neo4j+s://prod.example"
+      - "Warning text uses u.Redacted(); a userinfo password is masked"
+      - "Caller in query path prints the warning via cmd.PrintErrln (stderr)"
+      - "make test green"
+
+  - id: task-012
+    title: "Escape backticks in Cypher relType interpolation"
+    description: |
+      In neo4j-cli/query/schema.go:212-214 escape embedded backticks in the
+      stripped relType per Cypher rules: strings.ReplaceAll(stripped, "`", "``")
+      before fmt.Sprintf interpolation. Add a unit test feeding a relType that
+      contains a backtick and assert it survives the round-trip without
+      breaking out of the backtick wrapper.
+    status: completed
+    completed_at: 2026-05-08T17:25:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Backticks are doubled (Cypher escape) before interpolation"
+      - "schema_test.go feeds a relType such as `Foo`]->()-[r:DROP ` and asserts the resulting query string keeps the relType inside one balanced backtick wrapper"
+      - "make test green"
+
+  - id: task-013
+    title: "Strip C0 and DEL control chars from rendered table cells"
+    description: |
+      Add stripControl(s string) string to common/output/output.go (or a sibling
+      file) that replaces runes < 0x20 except \t \n \r and DEL (0x7F) with ?.
+      Apply on the case string branch of formatCell. JSON marshal branch is
+      already safe. Mirror the strip at the schema-render site
+      neo4j-cli/query/schema.go:325-339 if it bypasses formatCell.
+    status: completed
+    completed_at: 2026-05-08T17:50:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "formatCell input \"foo\\x1b[31mbar\" renders as foo?[31mbar"
+      - "JSON output for the same value remains the existing escaped form (no double-strip)"
+      - "schema row output is sanitised at the same boundary"
+      - "make test green"
+
+  - id: task-014
+    title: "Pin Go toolchain to 1.26.3 in go.mod and CI workflows"
+    description: |
+      Add `toolchain go1.26.3` directive to go.mod after `go 1.25.0`. Update
+      .github/workflows/test.yml, release.yml, and any other workflow using
+      actions/setup-go to use go-version-file: go.mod (single source of truth)
+      instead of go-version: "stable". This closes govulncheck-reachable
+      stdlib vulns (GO-2026-4918 et al).
+    status: completed
+    completed_at: 2026-05-08T18:10:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "go.mod contains `toolchain go1.26.3`"
+      - "All setup-go steps use go-version-file: go.mod"
+      - "make build and make test pass with go 1.26.3"
+      - "CI matrix runs (Linux/macOS/Windows) green"
+
+  - id: task-015
+    title: "Add govulncheck step to CI test workflow"
+    description: |
+      Add a govulncheck ./... step to .github/workflows/test.yml on the Linux
+      runner (sufficient — vulnerabilities are platform-portable). Use the
+      default exit semantics (non-zero only on callable vulns). Future stdlib
+      regressions will fail CI.
+    status: completed
+    completed_at: 2026-05-08T18:25:00Z
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "test.yml has a govulncheck step that runs after build"
+      - "Step is gated to a single OS (Linux) to avoid triplicate"
+      - "Step passes on the current pinned 1.26.3 toolchain"
+      - "Failing the step blocks the workflow"
+
+  - id: task-016
+    title: "SHA-pin actions/checkout and claude-code-action in claude.yml"
+    description: |
+      In .github/workflows/claude.yml replace `actions/checkout@v4` with the SHA
+      already used elsewhere in the repo
+      (de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6) and pin
+      `anthropics/claude-code-action@v1` to its current commit SHA. Resolve
+      via `gh api repos/anthropics/claude-code-action/git/ref/tags/v1` at fix
+      time. Keep the human-readable `# v1` comment.
+    status: completed
+    completed_at: 2026-05-08T18:40:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Both action references in claude.yml are commit SHAs, not tags"
+      - "Inline comment carries the version (# v6, # v1) for human readability"
+      - "Workflow still triggers and runs on a test PR"
+
+  - id: task-017
+    title: "Harden cla-check.yml permissions and PAT plumbing"
+    description: |
+      Add `permissions: { pull-requests: read, contents: read }` to
+      .github/workflows/cla-check.yml at the top level. Pass
+      TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN as an env var to ./bin/examine-pull-request
+      instead of as a positional argument so it doesn't appear in `ps` output.
+      Confirm the helper script accepts env input; if not, wrap the invocation
+      to read $GITHUB_TOKEN_PAT and forward.
+    status: completed
+    completed_at: 2026-05-08T18:55:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "cla-check.yml has explicit top-level (or job-level) permissions block"
+      - "PAT is supplied via env, not as a CLI argument"
+      - "Workflow continues to function on a test PR (CLA check still runs)"
+
+  - id: task-018
+    title: "Guard update-website.yml workflow_run with branch and event check"
+    description: |
+      Add the same `if:` guard pattern from publish-pypi.yml:62-64 to
+      .github/workflows/update-website.yml so the workflow_run trigger only
+      fires for the default branch on a push event (or manual dispatch).
+      Prevents non-default-branch release events from triggering the
+      contents:write + pull-requests:write job.
+    status: completed
+    completed_at: 2026-05-08T18:25:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "update-website.yml `if:` matches the publish-pypi.yml pattern (event == workflow_dispatch OR (conclusion == success AND head_branch == default AND event == push))"
+      - "A non-default-branch release no longer triggers the website update"
+      - "A default-branch release still triggers the website update"
+
+  - id: task-019
+    title: "Verify dist checksums in publish-npm.yml before publish"
+    description: |
+      Mirror the "Verify dist archives against release checksums" step from
+      publish-pypi.yml:130-156 into publish-npm.yml. Download
+      *_checksums.txt from the GitHub Release into a SEPARATE directory (do
+      not trust the dist artifact's bundled checksums.txt — circular trust).
+      Run sha256sum -c against the dist artifact. Gate the step
+      `if: github.event.workflow_run.event == 'push'` so make npm-publish-dry
+      stays green.
+    status: completed
+    completed_at: 2026-05-08T19:10:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "publish-npm.yml has the verify-checksums step matching publish-pypi.yml"
+      - "Step is gated to push-event workflow_run only; dry-run path unaffected"
+      - "make npm-publish-dry passes"
+      - "Step fails the workflow if any sha256 mismatch is detected (manual test by tampering with one archive byte)"
+
+  - id: task-020
+    title: "Document .env scope change in README and changie"
+    description: |
+      Add a 2-3 sentence note to the query / connection section of README.md
+      describing the new .env discovery rule (walk stops at first .git
+      ancestor or $HOME boundary; stderr `info:` line announces an overlay
+      from above CWD). Add a changie entry under --kind Patch for the
+      neo4j-cli project. Use `changie new --projects neo4j-cli --kind Patch
+      --body "..."` or hand-author the YAML if changie isn't installed locally.
+    status: completed
+    completed_at: 2026-05-08T15:48:00Z
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "README.md describes the new .env discovery rule and the info: line"
+      - ".changes/unreleased/neo4j-cli-Patch-*.yaml exists with project: neo4j-cli, kind: Patch, body covering the scope change"
+      - "make test, make fmt-check, make lint stay green"
+      - "make changelog (or changie merge) produces a clean release section"
+
+  - id: task-021
+    title: "Fix update-website.yml gh release download pattern"
+    description: |
+      The `Install neo4j-cli` step in .github/workflows/update-website.yml
+      uses `--pattern "*linux*amd64*.tar.gz"` which never matches GoReleaser's
+      output. Archives are named neo4j-cli_<ver>_Linux_x86_64.tar.gz (capital
+      Linux, x86_64 not amd64) and `gh release download --pattern` uses
+      case-sensitive filepath.Match. Verified against v1.7.0: the lowercase/
+      amd64 pattern returns "no assets match the file pattern" (exit 1) while
+      "*Linux*x86_64*.tar.gz" succeeds. Next release will fail this step and
+      block the website sync.
+    status: completed
+    completed_at: 2026-05-08T19:45:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Pattern updated to *Linux*x86_64*.tar.gz (or equivalent that matches the actual archive name)"
+      - "Verified locally with `gh release download v1.7.0 --pattern <new> --repo neo4j/cli` returns exit 0 and downloads exactly one archive"
+      - "tar/install lines still resolve the extracted neo4j-cli binary"
+
+  - id: task-022
+    title: "Fix update-website.yml workflow_dispatch fallback check"
+    description: |
+      In .github/workflows/update-website.yml the install step's fallback
+      branch tests `[ "$TAG" = "refs/heads/main" ]`, but github.ref_name on
+      a branch dispatch is `main` (not the full ref). For workflow_dispatch
+      from main, $TAG="main" survives the guard and `gh release download
+      "main"` then fails. Replace the guard with a tag-shaped check so any
+      non-tag value falls back to the latest published release.
+    status: completed
+    completed_at: 2026-05-08T20:00:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "Fallback branch triggers when $TAG does not match a release tag (e.g. starts with v) — e.g. `case \"$TAG\" in v*) ;; *) TAG=$(gh release view ... -q .tagName);; esac`"
+      - "release: published path still uses the event tag directly (no fallback)"
+      - "workflow_dispatch from main resolves to the latest release tag without failing the download step"

@@ -4,7 +4,6 @@
 package clievents
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/neo4j/cli/common/analytics"
@@ -73,8 +72,9 @@ func Emit(events analytics.Service, args []string, state bool) {
 			Properties: startupEventProperties{Command: "startup"},
 		})
 	case "aura":
-		// Full command string is safe — Aura commands contain no PII.
-		cliCommand := strings.Trim(fmt.Sprint(args), "[]")
+		// Aura commands generally contain no PII, but defensively redact
+		// secret-bearing flag values (e.g. --client-secret on credential add).
+		cliCommand := RedactArgs(args)
 		events.EmitEvent("AURA", analytics.TrackEvent{
 			Properties: commandEventProperties{Command: cliCommand, Success: state},
 		})
@@ -91,14 +91,15 @@ func Emit(events analytics.Service, args []string, state bool) {
 		})
 
 	case "skill":
-		// Full command string is safe — skill commands contain no PII.
-		cliCommand := strings.Trim(fmt.Sprint(args), "[]")
+		// Skill commands contain no PII, but funnel through RedactArgs so the
+		// secret-flag list stays a single source of truth.
+		cliCommand := RedactArgs(args)
 		events.EmitEvent("SKILL", analytics.TrackEvent{
 			Properties: commandEventProperties{Command: cliCommand, Success: state},
 		})
 
 	default:
-		cliCommand := strings.Trim(fmt.Sprint(args), "[]")
+		cliCommand := RedactArgs(args)
 		events.EmitEvent("COMMAND", analytics.TrackEvent{
 			Properties: commandEventProperties{Command: cliCommand, Success: state},
 		})

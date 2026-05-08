@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/neo4j/cli/common/clicfg/urlcheck"
 )
 
 // defaultOllamaBaseURL is the conventional local Ollama endpoint. Resolve does
@@ -59,6 +61,9 @@ func (p *ollamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 	base := p.cfg.BaseURL
 	if base == "" {
 		base = defaultOllamaBaseURL
+	}
+	if err := urlcheck.ValidateRemoteURL(base); err != nil {
+		return nil, fmt.Errorf("ollama: base url rejected: %w", err)
 	}
 
 	body := ollamaEmbedRequest{

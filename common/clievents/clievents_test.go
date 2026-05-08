@@ -4,6 +4,7 @@
 package clievents
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/analytics"
@@ -158,4 +159,92 @@ func TestEmit_UnknownCommand_EmitsCommandUsed(t *testing.T) {
 		},
 	})
 	Emit(svc, []string{"unknown", "sub"}, true)
+}
+
+// ---- secret-flag redaction ------------------------------------------------
+
+// captureCommand wires the mock to capture the command property emitted by
+// Emit, returning a pointer to the captured string.
+func captureCommand(t *testing.T, expectedSuffix string) (*amocks.MockService, *string) {
+	t.Helper()
+	svc := newMockService(t)
+	captured := new(string)
+	svc.EXPECT().
+		EmitEvent(expectedSuffix, gomock.Any()).
+		Do(func(_ string, ev analytics.TrackEvent) {
+			switch p := ev.Properties.(type) {
+			case commandEventProperties:
+				*captured = p.Command
+			case queryEventProperties:
+				*captured = p.Command
+			default:
+				t.Fatalf("unexpected properties type %T", ev.Properties)
+			}
+		})
+	return svc, captured
+}
+
+func TestEmit_RedactsSecretFlags(t *testing.T) {
+	const secret = "supersecretvalue"
+	tests := []struct {
+		name     string
+		args     []string
+		suffix   string
+		flagName string // flag name we expect to see in the output (without dashes)
+	}{
+		{
+			name:     "aura credential add --client-secret",
+			args:     []string{"aura", "credential", "aura-client", "add", "--client-secret", secret},
+			suffix:   "AURA",
+			flagName: "client-secret",
+		},
+		{
+			name:     "credential dbms add --password (default branch)",
+			args:     []string{"credential", "dbms", "add", "--password", secret},
+			suffix:   "COMMAND",
+			flagName: "password",
+		},
+		{
+			name:     "credential embed add --api-key (default branch)",
+			args:     []string{"credential", "embed", "add", "--api-key", secret},
+			suffix:   "COMMAND",
+			flagName: "api-key",
+		},
+		{
+			name:     "aura dataapi graphql create --instance-password",
+			args:     []string{"aura", "dataapi", "graphql", "create", "--instance-password", secret},
+			suffix:   "AURA",
+			flagName: "instance-password",
+		},
+		{
+			name:     "skill install with stray --password (defensive)",
+			args:     []string{"skill", "install", "--password", secret},
+			suffix:   "SKILL",
+			flagName: "password",
+		},
+		{
+			name:     "equals form --client-secret=value",
+			args:     []string{"aura", "credential", "aura-client", "add", "--client-secret=" + secret},
+			suffix:   "AURA",
+			flagName: "client-secret",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, captured := captureCommand(t, tc.suffix)
+			Emit(svc, tc.args, true)
+			if *captured == "" {
+				t.Fatalf("no command property captured")
+			}
+			if !strings.Contains(*captured, "***") {
+				t.Errorf("expected redaction placeholder *** in command, got %q", *captured)
+			}
+			if !strings.Contains(*captured, tc.flagName) {
+				t.Errorf("expected flag name %q to remain in command, got %q", tc.flagName, *captured)
+			}
+			if strings.Contains(*captured, secret) {
+				t.Errorf("secret value leaked into command property: %q", *captured)
+			}
+		})
+	}
 }

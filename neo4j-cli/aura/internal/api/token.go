@@ -13,6 +13,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -26,6 +27,9 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 	data.Set("grant_type", "client_credentials")
 
 	url := cfg.Aura.AuthUrl()
+	if err := urlcheck.ValidateRemoteURL(url); err != nil {
+		return "", clierr.NewUsageError("aura auth-url rejected: %s", err.Error())
+	}
 
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -40,7 +44,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 	}
 	req.SetBasicAuth(credential.ClientId, credential.ClientSecret)
 
-	client := http.Client{}
+	client := http.Client{Timeout: httpClientTimeout}
 
 	res, err := client.Do(req)
 	if err != nil {

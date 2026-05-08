@@ -11,16 +11,17 @@ package embed
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -173,17 +174,17 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	}
 
 	// 2. .env walk-up (overrides stored cred, loses to env / flags).
-	dotenv := loadDotenv(cfg)
+	dotenvVals := loadDotenv(cfg, cmd.ErrOrStderr())
 
 	apply := func(key string, dst *string) {
-		if v, ok := dotenv[key]; ok && v != "" {
+		if v, ok := dotenvVals[key]; ok && v != "" {
 			*dst = v
 		}
 	}
 	apply(envEmbedProvider, &out.Provider)
 	apply(envEmbedModel, &out.Model)
 	apply(envEmbedBaseURL, &out.BaseURL)
-	if v, ok := dotenv[envEmbedDimensions]; ok && v != "" {
+	if v, ok := dotenvVals[envEmbedDimensions]; ok && v != "" {
 		if n, ok := parseDimensions(v); ok {
 			out.Dimensions = n
 		}
@@ -226,7 +227,7 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	// API key — provider-specific env beats generic embed env beats stored
 	// credential. .env entries override the stored cred but not OS env, so
 	// we read .env first then OS env.
-	out.APIKey = resolveAPIKey(out.Provider, out.APIKey, dotenv)
+	out.APIKey = resolveAPIKey(out.Provider, out.APIKey, dotenvVals)
 
 	// User agent matches the rest of the query package (`neo4j-cli/v<version>`).
 	version := "dev"
@@ -279,12 +280,15 @@ func osEnvSnapshot() map[string]string {
 	}
 }
 
-// loadDotenv walks up from cwd looking for a `.env` file via the same lookup
-// pattern used by query/connect.go. Returns an empty (non-nil) map when no
-// file is found or the FS is unavailable. Errors during read are swallowed —
-// a malformed .env file should not block the embed path; the connection
-// resolver will surface a clearer error if the file is also corrupt.
-func loadDotenv(cfg *clicfg.Config) map[string]string {
+// loadDotenv walks up from cwd looking for a `.env` file via the shared
+// dotenv.Find helper (stops at the first .git ancestor or the $HOME
+// boundary). Returns an empty (non-nil) map when no file is found or the FS
+// is unavailable. Errors during read are swallowed — a malformed .env file
+// should not block the embed path; the connection resolver will surface a
+// clearer error if the file is also corrupt. When the discovered .env lives
+// in a directory strictly above cwd an `info: loading .env from <path>` line
+// is written to stderr so the overlay isn't silent.
+func loadDotenv(cfg *clicfg.Config, stderr io.Writer) map[string]string {
 	if cfg == nil || cfg.Aura == nil {
 		return map[string]string{}
 	}
@@ -296,9 +300,12 @@ func loadDotenv(cfg *clicfg.Config) map[string]string {
 	if err != nil {
 		return map[string]string{}
 	}
-	path, ok := findDotenv(fs, cwd)
+	path, ok, aboveCWD := dotenv.Find(fs, cwd)
 	if !ok {
 		return map[string]string{}
+	}
+	if aboveCWD && stderr != nil {
+		_, _ = fmt.Fprintf(stderr, "info: loading .env from %s\n", path)
 	}
 	f, err := fs.Open(path)
 	if err != nil {
@@ -311,24 +318,6 @@ func loadDotenv(cfg *clicfg.Config) map[string]string {
 		out[k] = v
 	}
 	return out
-}
-
-// findDotenv walks up from startDir looking for a `.env` file. Mirrors the
-// helper of the same name in query/connect.go — duplicated rather than
-// imported to keep the embed package free of cross-package internals.
-func findDotenv(fs afero.Fs, startDir string) (string, bool) {
-	dir := startDir
-	for {
-		candidate := filepath.Join(dir, ".env")
-		if exists, _ := afero.Exists(fs, candidate); exists {
-			return candidate, true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
-	}
 }
 
 // parseDimensions parses a Dimensions value, returning (0, false) on failure
