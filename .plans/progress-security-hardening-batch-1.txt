@@ -6,3 +6,8 @@ Files: +common/clievents/redact.go, +common/clievents/redact_test.go
 Added urlcheck.ValidateRemoteURL SSRF allowlist (https any, http loopback only; rejects private/link-local/multicast/metadata-IP/malformed). Stdlib-only (net, net/url, fmt, strings) so any package can import.
 Files: +common/clicfg/urlcheck/urlcheck.go, +common/clicfg/urlcheck/urlcheck_test.go
 Decisions: metadata-IP guard is explicit string match (catches trailing-dot variant); DNS rebinding documented out of scope.
+
+## task-003 — 2026-05-08T14:48:00Z
+Added shared dotenv.Find helper walking up from startDir, stopping at first .git ancestor or $HOME boundary; returns (path, found, walkedAboveCWD). No clicfg/cobra dependency.
+Files: +common/clicfg/dotenv/dotenv.go, +common/clicfg/dotenv/dotenv_test.go
+Decisions: homeDirFn is package-level overridable (cleaner than t.Setenv("HOME") and platform-portable); .git boundary inclusive (repo-root .env still loaded), $HOME boundary inclusive.

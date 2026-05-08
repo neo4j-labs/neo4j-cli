@@ -49,7 +49,8 @@ tasks:
       The two existing duplicates in neo4j-cli/query/connect.go and
       neo4j-cli/query/embed/embed.go will be deleted in a later task that wires
       this helper in.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T14:48:00Z
     dependencies: []
     acceptance_criteria:
       - "Shared helper package exists with one exported finder function"
