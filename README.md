@@ -45,6 +45,19 @@ uvx -i neo4j-cli YOUR_COMMANDS
 
 Check the installation by running neo4j-cli --help
 
+## Agent skills
+
+`neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops it into each detected agent's skill directory; pass an agent name to target one.
+
+Supported agents: Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.
+
+```bash
+neo4j-cli skill install                  # all detected agents
+neo4j-cli skill install claude-code      # one agent
+neo4j-cli skill list                     # per-agent install state
+neo4j-cli skill check                    # version drift vs running binary
+neo4j-cli skill remove [agent]           # idempotent
+```
 
 ## Credentials
 
@@ -176,51 +189,6 @@ neo4j-cli aura instance delete <id> --rw
 neo4j-cli config set telemetry false --rw
 neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
 ```
-
-## Agent skills
-
-`neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops that bundle into the supported agents' skill directories so the agent picks it up on next run.
-
-Supported agents:
-
--   Claude Code
--   Cursor
--   Windsurf
--   Copilot
--   Gemini CLI
--   Cline
--   Codex
--   Pi
--   OpenCode
--   Junie
-
-Install into every detected agent (or pass an agent name to target one):
-
-```bash
-neo4j-cli skill install
-neo4j-cli skill install claude-code
-```
-
-List supported agents and per-agent install state:
-
-```bash
-neo4j-cli skill list
-```
-
-Check installed bundles for version drift against the running binary:
-
-```bash
-neo4j-cli skill check
-```
-
-Remove the installed bundle (idempotent):
-
-```bash
-neo4j-cli skill remove
-neo4j-cli skill remove claude-code
-```
-
-Beta features (commands gated by `AuraBetaEnabled`, e.g. `dataapi`, `import`, `deployment`) are not included in the generated bundle — the bundle reflects the default-config command surface.
 
 ## Feedback / Issues
 
