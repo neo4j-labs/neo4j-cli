@@ -64,3 +64,24 @@ Key Decisions:
 - Included vector_optimized field in the professional-db mock response to keep the JSON consistent with existing professional-db fixtures
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Run final quality gates
+Date: 2026-05-08T00:20:00Z
+================================================================================
+
+Summary:
+Ran `make test`, `make fmt-check`, and `make lint` as final quality gates.
+All three passed with no failures, no unformatted files, and 0 lint issues.
+The feature is complete: free-db instances now store the tenant-scoped username
+as the database name in the DBMS credential rather than always storing "neo4j".
+
+Files Changed:
+- .plans/tasks-free-instance-database-name.yml (modified — task-004 marked completed)
+- .plans/progress-free-instance-database-name.txt (modified — task-004 entry appended)
+
+Key Decisions:
+- No code changes were needed; this task was purely a quality gate verification
+- All existing and new tests pass on the first run
+
+Next Task: All tasks complete

@@ -60,11 +60,11 @@ tasks:
     description: |
       Run `make test`, `make fmt-check`, and `make lint` to confirm all tests pass, no files need
       formatting, and lint is clean. This is the gate before the task set is considered complete.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "make test exits 0 with no test failures"
       - "make fmt-check exits 0 (no unformatted files)"
       - "make lint exits 0 (no lint errors)"
-    completed_at: null
+    completed_at: 2026-05-08T00:20:00Z
