@@ -291,7 +291,8 @@ tasks:
       `anthropics/claude-code-action@v1` to its current commit SHA. Resolve
       via `gh api repos/anthropics/claude-code-action/git/ref/tags/v1` at fix
       time. Keep the human-readable `# v1` comment.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T18:40:00Z
     dependencies: []
     acceptance_criteria:
       - "Both action references in claude.yml are commit SHAs, not tags"

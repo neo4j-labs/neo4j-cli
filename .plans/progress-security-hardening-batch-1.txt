@@ -69,3 +69,7 @@ Decisions: kept `go 1.25.0` directive (module minimum) and added separate `toolc
 Added Govulncheck step to test.yml after Build, gated to ubuntu-latest only; installs govulncheck@latest then runs `govulncheck ./...` with default exit semantics (non-zero only on callable vulns). Local run on pinned 1.26.3 toolchain reports no vulnerabilities.
 Files: ~.github/workflows/test.yml
 Decisions: install via `go install ...@latest` instead of adding a third-party action — matches "future stdlib regressions fail CI" intent and avoids new SHA-pin maintenance; runs before Generate check so a vuln gates the rest of the pipeline early.
+
+## task-016 — 2026-05-08T18:40:00Z
+SHA-pinned both actions in claude.yml: actions/checkout@v4 -> de0fac2e... # v6 (matches rest of repo), anthropics/claude-code-action@v1 -> 939ae9c0... # v1 (resolved via gh api on annotated tag object).
+Files: ~.github/workflows/claude.yml
