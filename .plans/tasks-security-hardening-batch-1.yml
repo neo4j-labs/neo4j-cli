@@ -147,7 +147,8 @@ tasks:
       polling loop. ctx plumbing into MakeRequest/getToken is explicitly out of
       scope (separate refactor); this task closes the slow-loris vector against
       Aura calls only.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T16:10:00Z
     dependencies: []
     acceptance_criteria:
       - "Both Aura http.Client constructions (api.go:40, token.go:43) have Timeout: 60 * time.Second"

@@ -40,7 +40,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 	}
 	req.SetBasicAuth(credential.ClientId, credential.ClientSecret)
 
-	client := http.Client{}
+	client := http.Client{Timeout: httpClientTimeout}
 
 	res, err := client.Do(req)
 	if err != nil {

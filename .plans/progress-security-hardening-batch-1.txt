@@ -30,3 +30,8 @@ Decisions: rename-failure test uses an Fs wrapper (renameFailFs) injecting a fix
 load() returns error instead of panicking on Unmarshal failure; on corrupt file backs up to <path>.corrupt-<unix-ts>, resets in-memory + on-disk state to empty creds, returns clierr.NewFatalError naming backup. NewCredentials wraps load() and panics with that error so existing main() recover-and-print flow stays intact (no signature change to 13 call sites).
 Files: ~common/clicfg/credentials/credentials.go, +common/clicfg/credentials/credentials_test.go, +common/clicfg/credentials/export_test.go
 Decisions: package-level nowUnix var + SetNowUnixForTest helper for deterministic backup-path assertions (cleaner than freezing time globally); panic-with-error preserved over signature change to keep blast radius local.
+
+## task-008 — 2026-05-08T16:10:00Z
+Set 60s Timeout on both Aura http.Client constructions (api.go MakeRequest, token.go getToken) via shared httpClientTimeout package var; embed clients untouched per ctx-owned contract. Added timeout-fires test using stalling httptest.Server + recover (MakeRequest panics on client.Do errors).
+Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go, +neo4j-cli/aura/internal/api/export_test.go
+Decisions: httpClientTimeout as package-level var + SetHTTPClientTimeoutForTest seam so test runs in 50ms instead of 60s; handler guarded with 5s fallback per AGENTS.md ctx-propagation-timing rule.

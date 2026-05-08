@@ -10,12 +10,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 )
 
 const userAgent = "Neo4jCLI/%s"
+
+// httpClientTimeout caps every Aura HTTP request so a slow/silent server cannot
+// stall the CLI indefinitely. Variable rather than const to let tests dial it
+// down (timeout-fires assertion in api_test.go).
+var httpClientTimeout = 60 * time.Second
 
 type Grant struct {
 	AccessToken string `json:"access_token"`
@@ -37,7 +43,7 @@ type RequestConfig struct {
 }
 
 func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
-	client := http.Client{}
+	client := http.Client{Timeout: httpClientTimeout}
 	var method = config.Method
 	if method == "" {
 		panic(fmt.Sprintf("method not set in requests %s", path))
