@@ -308,7 +308,8 @@ tasks:
       instead of as a positional argument so it doesn't appear in `ps` output.
       Confirm the helper script accepts env input; if not, wrap the invocation
       to read $GITHUB_TOKEN_PAT and forward.
-    status: pending
+    status: completed
+    completed_at: 2026-05-08T18:55:00Z
     dependencies: []
     acceptance_criteria:
       - "cla-check.yml has explicit top-level (or job-level) permissions block"

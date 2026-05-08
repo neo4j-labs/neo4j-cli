@@ -4,6 +4,10 @@ on:
     pull_request_target:
         branches: ["main"]
 
+permissions:
+    contents: read
+    pull-requests: read
+
 jobs:
     cla-check:
         #if: github.event.pull_request.user.login != 'renovate[bot]'
@@ -26,6 +30,7 @@ jobs:
                   owner=$(echo "$GITHUB_REPOSITORY" | cut -d/ -f1)
                   repository=$(echo "$GITHUB_REPOSITORY" | cut -d/ -f2)
 
-                  ./bin/examine-pull-request "$owner" "$repository" "${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}" "$PULL_REQUEST_NUMBER" cla-database.csv
+                  ./bin/examine-pull-request "$owner" "$repository" "$GITHUB_TOKEN_PAT" "$PULL_REQUEST_NUMBER" cla-database.csv
               env:
+                  GITHUB_TOKEN_PAT: ${{ secrets.TEAM_GRAPHQL_PERSONAL_ACCESS_TOKEN }}
                   PULL_REQUEST_NUMBER: ${{ github.event.number }}
