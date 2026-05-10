@@ -110,7 +110,7 @@ tasks:
       Windows: best-effort `os.Remove` of pre-existing `<current>.old`,
       rename current to `.old`, rename new in. On any error after the
       original is renamed away, attempt to restore.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -120,7 +120,7 @@ tasks:
       - "Successful swap leaves the new binary at the original path, mode 0755, with the temp `<current>.new` removed"
       - "Windows code path: pre-existing `<current>.old` is removed at start; rename-current-to-`.old`-then-rename-new dance succeeds (covered via `runtime.GOOS` test seam)"
       - "Restore-on-error: simulated rename failure mid-swap restores the original binary at the original path"
-    completed_at: null
+    completed_at: 2026-05-10T16:00:00Z
 
   - id: task-006
     title: "Implement RunE flow integrating release / install-method / swap"
