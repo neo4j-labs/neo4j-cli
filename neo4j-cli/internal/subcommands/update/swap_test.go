@@ -907,3 +907,131 @@ func TestWithFooHelpers_RestoreAfterTest(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%p", origTempDir), fmt.Sprintf("%p", tempDirFn))
 	assert.Equal(t, fmt.Sprintf("%p", origStdinIsTTY), fmt.Sprintf("%p", stdinIsTTYFn))
 }
+
+func TestElevatedSwap_HappyPath_ArgvShape(t *testing.T) {
+	withLookPath(t, func(file string) (string, error) {
+		switch file {
+		case "sudo":
+			return "/usr/bin/sudo", nil
+		case "install":
+			return "/usr/bin/install", nil
+		}
+		return "", exec.ErrNotFound
+	})
+
+	var capturedArgs []string
+	withRunCommand(t, func(cmd *exec.Cmd) error {
+		capturedArgs = append([]string(nil), cmd.Args...)
+		return nil
+	})
+
+	src := filepath.Join(t.TempDir(), "neo4j-cli.new")
+	dst := filepath.Join(t.TempDir(), "neo4j-cli")
+	require.True(t, filepath.IsAbs(src))
+	require.True(t, filepath.IsAbs(dst))
+
+	err := elevatedSwap(context.Background(), src, dst)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"/usr/bin/sudo", "/usr/bin/install", "-m", "0755", src, dst}, capturedArgs)
+}
+
+func TestElevatedSwap_RejectsMalformedPaths(t *testing.T) {
+	// Build absolute reference paths. On windows tests still run with the
+	// real os.PathSeparator semantics, so use t.TempDir() to get an OS-valid
+	// absolute path and only override the field under test.
+	absSrc := filepath.Join(t.TempDir(), "src")
+	absDst := filepath.Join(t.TempDir(), "dst")
+
+	cases := []struct {
+		name    string
+		src     string
+		dst     string
+		wantSub string
+	}{
+		{"src empty", "", absDst, "src path is empty"},
+		{"dst empty", absSrc, "", "dst path is empty"},
+		{"src NUL", absSrc + "\x00bad", absDst, "src path contains NUL"},
+		{"dst NUL", absSrc, absDst + "\x00bad", "dst path contains NUL"},
+		{"src dash prefix", "-rf", absDst, "starts with '-'"},
+		{"dst dash prefix", absSrc, "-o", "starts with '-'"},
+		{"src non-absolute", "relative/src", absDst, "is not absolute"},
+		{"dst non-absolute", absSrc, "relative/dst", "is not absolute"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Wire fail-the-test fakes to assert runCommandFn / lookPathFn
+			// never fire on malformed input.
+			withLookPath(t, func(string) (string, error) {
+				t.Fatal("lookPathFn must not be called on malformed input")
+				return "", nil
+			})
+			withRunCommand(t, func(*exec.Cmd) error {
+				t.Fatal("runCommandFn must not be called on malformed input")
+				return nil
+			})
+
+			err := elevatedSwap(context.Background(), tc.src, tc.dst)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantSub)
+		})
+	}
+}
+
+func TestElevatedSwap_WrapsRunCommandError(t *testing.T) {
+	withLookPath(t, func(file string) (string, error) {
+		switch file {
+		case "sudo":
+			return "/usr/bin/sudo", nil
+		case "install":
+			return "/usr/bin/install", nil
+		}
+		return "", exec.ErrNotFound
+	})
+
+	innerErr := fmt.Errorf("exit status 1")
+	withRunCommand(t, func(*exec.Cmd) error { return innerErr })
+
+	src := filepath.Join(t.TempDir(), "src")
+	dst := filepath.Join(t.TempDir(), "dst")
+
+	err := elevatedSwap(context.Background(), src, dst)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "sudo install:")
+	assert.True(t, errors.Is(err, innerErr), "expected wrapped error to unwrap to innerErr, got %v", err)
+}
+
+func TestElevatedSwap_SudoMissingReturnsError(t *testing.T) {
+	withLookPath(t, func(string) (string, error) { return "", exec.ErrNotFound })
+	withRunCommand(t, func(*exec.Cmd) error {
+		t.Fatal("runCommandFn must not fire when sudo lookup fails")
+		return nil
+	})
+
+	src := filepath.Join(t.TempDir(), "src")
+	dst := filepath.Join(t.TempDir(), "dst")
+
+	err := elevatedSwap(context.Background(), src, dst)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "locate sudo")
+}
+
+func TestElevatedSwap_InstallMissingReturnsError(t *testing.T) {
+	withLookPath(t, func(file string) (string, error) {
+		if file == "sudo" {
+			return "/usr/bin/sudo", nil
+		}
+		return "", exec.ErrNotFound
+	})
+	withRunCommand(t, func(*exec.Cmd) error {
+		t.Fatal("runCommandFn must not fire when install lookup fails")
+		return nil
+	})
+
+	src := filepath.Join(t.TempDir(), "src")
+	dst := filepath.Join(t.TempDir(), "dst")
+
+	err := elevatedSwap(context.Background(), src, dst)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "locate install")
+}

@@ -11,3 +11,7 @@ Decisions: EROFS detection via `errors.Is(err, syscall.EROFS)` (cross-platform; 
 ## TASK-003 — 2026-05-10T20:44:04Z
 Added `planSwap(abs)` + `swapPlan{elevate, tmpDir}` to swap.go implementing REQ-F-009/REQ-F-010 ordering: writable→same-dir+no-elevate; windows→errPermissionWindows; already-root→non-sentinel permission error; sudo/install missing or non-TTY→errSudoUnavailable; otherwise→{elevate:true, tmpDir:tempDirFn()}. 7 unit tests in swap_test.go drive every branch via task-002 seams; writable test wires fail-the-test fakes for all post-probe seams to enforce the no-side-effect contract. No production call site yet — wiring lands in task-005.
 Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
+
+## TASK-004 — 2026-05-10T23:45:00Z
+Added `elevatedSwap(ctx, src, dst)` + `validateInstallPath(label, p)` to swap.go implementing REQ-F-013/REQ-NF-001. Argv shape `[sudo, install, -m, 0755, src, dst]` via `exec.CommandContext` (no shell), inherits stdio for interactive sudo prompt. Pre-flight rejects empty / NUL / `-`-prefix / non-absolute paths before any seam fires. Errors wrapped with `sudo install:` prefix preserving `errors.Is` chain. 5 test functions: argv shape, 8-case malformed-path table, run-cmd error wrap, sudo-missing, install-missing. No production call site yet — wiring lands in task-005.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go

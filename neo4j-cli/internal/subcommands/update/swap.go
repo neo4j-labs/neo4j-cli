@@ -234,6 +234,68 @@ func planSwap(abs string) (swapPlan, error) {
 	return swapPlan{elevate: true, tmpDir: tempDirFn()}, nil
 }
 
+// elevatedSwap copies src to dst via `sudo install -m 0755 <src> <dst>`,
+// inheriting stdio so the sudo prompt is interactive (REQ-F-013).
+//
+// argv-safety pre-flight (REQ-NF-001): both src and dst MUST be absolute,
+// MUST NOT start with "-" (so they cannot be misinterpreted as flags by sudo
+// or install), and MUST NOT contain NUL bytes. Failure rejects before exec —
+// runCommandFn is never invoked on a malformed input.
+//
+// Sudo and install paths are resolved here even though planSwap already
+// proved them present. The lookup is cheap and keeps the helper safe to call
+// from any future entry point that doesn't go through planSwap.
+//
+// On non-zero exit the underlying error is wrapped with the "sudo install: "
+// prefix so the runUpdate caller can render a stable error shape regardless
+// of the underlying exec.ExitError detail.
+func elevatedSwap(ctx context.Context, src, dst string) error {
+	if err := validateInstallPath("src", src); err != nil {
+		return err
+	}
+	if err := validateInstallPath("dst", dst); err != nil {
+		return err
+	}
+
+	sudoPath, err := lookPathFn("sudo")
+	if err != nil {
+		return fmt.Errorf("locate sudo: %w", err)
+	}
+	installPath, err := lookPathFn("install")
+	if err != nil {
+		return fmt.Errorf("locate install: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, sudoPath, installPath, "-m", "0755", src, dst)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := runCommandFn(cmd); err != nil {
+		return fmt.Errorf("sudo install: %w", err)
+	}
+	return nil
+}
+
+// validateInstallPath rejects paths that would be ambiguous or unsafe to
+// hand to `sudo install`. The check is deliberately strict: absolute path
+// only, no leading "-" (would be parsed as a flag), no NUL bytes (truncation
+// surface in any C-side argv consumer downstream of exec).
+func validateInstallPath(label, p string) error {
+	if p == "" {
+		return fmt.Errorf("%s path is empty", label)
+	}
+	if strings.Contains(p, "\x00") {
+		return fmt.Errorf("%s path contains NUL byte", label)
+	}
+	if strings.HasPrefix(p, "-") {
+		return fmt.Errorf("%s path %q starts with '-' (would be parsed as a flag)", label, p)
+	}
+	if !filepath.IsAbs(p) {
+		return fmt.Errorf("%s path %q is not absolute", label, p)
+	}
+	return nil
+}
+
 // dirWritable probes whether the current process can create a new regular
 // file inside dir. It writes a uniquely-named `.neo4j-cli-probe.<rand>` file
 // with O_EXCL|O_CREATE|O_WRONLY and removes it on success.

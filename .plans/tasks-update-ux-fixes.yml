@@ -92,7 +92,7 @@ tasks:
       `os.Stdin` / `os.Stdout` / `os.Stderr` so the sudo prompt is interactive. Wrap non-nil errors as
       `fmt.Errorf("sudo install: %w", err)`. Add focused unit tests covering argv shape (via
       `withRunCommand` capturing args) and rejection of malformed paths (NUL, `-` prefix, non-absolute).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -102,7 +102,7 @@ tasks:
       - "Rejects non-absolute `src` or `dst` with a clear error; `runCommandFn` not invoked"
       - "Wraps `runCommandFn` non-zero exit as `sudo install: <wrapped>` error"
       - "`make test && make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T23:45:00Z
 
   - id: task-005
     title: "Wire planSwap + elevatedSwap into Swap; add stderr io.Writer arg"
