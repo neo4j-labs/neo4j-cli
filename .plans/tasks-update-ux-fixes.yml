@@ -1,0 +1,217 @@
+feature: update-ux-fixes
+prd: ./prd-update-ux-fixes.md
+created_at: 2026-05-10T20:29:38Z
+updated_at: 2026-05-10T20:29:38Z
+
+tasks:
+  - id: task-001
+    title: "Friendly `update check` output + SilenceUsage on update parent"
+    description: |
+      Implement REQ-F-001..REQ-F-007. Replace the `clierr.NewUsageError(...)` return in the `cmp < 0`
+      branch of `runUpdate` (neo4j-cli/internal/subcommands/update/update.go:373-383) with a plain-text
+      friendly message and `return nil` so `update check` exits 0 when a newer version is available.
+      Add a `buildUpdateCommand(opts runOpts) string` helper that reconstructs the install command from
+      opts (`--pre-releases`, `--version <tag>`). Set `cmd.SilenceUsage = true` at the top of
+      `runUpdate` after the dev-build short-circuit and `--version` validation so swap-time errors do
+      not dump the cobra usage block. Update existing tests in check_test.go (lines 120, 156, 184) and
+      update_test.go (lines 183, 213, 553, 995) that currently assert `require.Error` on the
+      newer-available branch — flip to `require.NoError` and assert stdout shape.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`update check --pre-releases` against a newer pre-release prints `New version available: <current> -> <latest>` and `Run \\`neo4j-cli update --pre-releases\\` to install.` and exits 0"
+      - "`update check` against latest prints `Already on <version>. No update needed.` and exits 0 (unchanged)"
+      - "JSON output for `update check` still emits `check: true`, `updated: false`, etc. (REQ-F-003)"
+      - "`update --bogus` still triggers cobra usage (SilenceUsage gate applied AFTER flag validation, per repo convention)"
+      - "Existing `require.Error` assertions for newer-available cases flip to `require.NoError` and the new stdout shape is verified"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-002
+    title: "Add 6 test seams, sentinel error types, and dirWritable probe helper"
+    description: |
+      Plumbing-only task. Add six new test seams to neo4j-cli/internal/subcommands/update/swap.go
+      following the existing `var fooFn = realImpl` pattern: `geteuidFn` (`os.Geteuid`), `lookPathFn`
+      (`exec.LookPath`), `runCommandFn` (runs an `*exec.Cmd`), `dirWritableFn` (the new probe),
+      `tempDirFn` (`os.TempDir`), `stdinIsTTYFn` (uses `golang.org/x/term`). Implement
+      `dirWritable(dir string) (bool, error)` that creates a `.neo4j-cli-probe.<rand>` file with
+      `O_EXCL | O_CREATE | O_WRONLY` and removes it on success — EACCES/EROFS returns `(false, nil)`,
+      other errors propagate. Add two typed sentinel error types: `errSudoUnavailable{dir string}` and
+      `errPermissionWindows{dir string}` — both satisfy `error` and expose `Dir()`. Add corresponding
+      `withGeteuid`, `withLookPath`, `withRunCommand`, `withDirWritable`, `withTempDir`,
+      `withStdinIsTTY` helpers in swap_test.go matching the existing `withSwapGoos` / `withRename`
+      shape. No behavior changes yet; the seams and helpers are introduced but not called from any
+      production path.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Six new seam vars compile and have working production impls; `golang.org/x/term` import added"
+      - "`dirWritable` returns (true, nil) for a writable `t.TempDir()` and (false, nil) for a non-writable test dir (chmod 0500 in a unit test)"
+      - "`errSudoUnavailable` and `errPermissionWindows` implement `error` and carry the directory; `errors.As` recovers them"
+      - "Six `withFoo` helpers swap and restore the seam via `t.Cleanup`; no test goroutine leaks"
+      - "No production call site invokes the new seams yet (introduction-only step); `make test` still passes"
+      - "`make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement planSwap pre-flight elevation decision"
+    description: |
+      Implement REQ-F-009 and REQ-F-010 — the planning step that decides whether the swap proceeds
+      directly or via sudo. Add `planSwap(abs string) (swapPlan, error)` to
+      neo4j-cli/internal/subcommands/update/swap.go where `swapPlan` is `{elevate bool; tmpDir
+      string}`. Ordering: probe writability with `dirWritableFn(filepath.Dir(abs))`; if writable
+      return `{elevate: false, tmpDir: filepath.Dir(abs)}`. Non-writable + windows → return
+      `errPermissionWindows{dir}`. Non-writable + `geteuidFn() == 0` → surface the raw permission
+      error (sudo cannot help when already root). Non-writable + (`lookPathFn("sudo")` errors OR
+      `lookPathFn("install")` errors OR `stdinIsTTYFn() == false`) → return `errSudoUnavailable{dir}`.
+      Otherwise → `{elevate: true, tmpDir: tempDirFn()}`. Unit tests live in swap_test.go and use the
+      seams from task-002 to drive every branch without touching the host filesystem.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Writable dir returns `{elevate: false, tmpDir: filepath.Dir(abs)}` — `lookPathFn` / `geteuidFn` / `stdinIsTTYFn` NOT called"
+      - "Non-writable + windows returns `errPermissionWindows{dir}` regardless of sudo/TTY"
+      - "Non-writable + linux + `geteuidFn → 0` returns a non-sentinel permission error (NOT `errSudoUnavailable`)"
+      - "Non-writable + linux + `lookPathFn(\"sudo\") → exec.ErrNotFound` returns `errSudoUnavailable{dir}`"
+      - "Non-writable + linux + `stdinIsTTYFn → false` returns `errSudoUnavailable{dir}`"
+      - "Non-writable + linux + sudo available + install available + TTY returns `{elevate: true, tmpDir: tempDirFn()}`"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-004
+    title: "Implement elevatedSwap sudo install runner with argv safety"
+    description: |
+      Implement REQ-F-013 and REQ-NF-001 — the sudo-install execution helper. Add
+      `elevatedSwap(ctx context.Context, src, dst string) error` to
+      neo4j-cli/internal/subcommands/update/swap.go. Pre-validate `src` and `dst`: both MUST pass
+      `filepath.IsAbs`, not start with `-`, and not contain NUL bytes — reject with an error before
+      exec. Resolve sudo and install paths via `lookPathFn("sudo")` / `lookPathFn("install")` (these
+      were already proven available by planSwap, but lookup again here for safety). Build the argv as
+      separate `exec.Cmd` args (NO shell): `[sudoPath, installPath, "-m", "0755", src, dst]`. Inherit
+      `os.Stdin` / `os.Stdout` / `os.Stderr` so the sudo prompt is interactive. Wrap non-nil errors as
+      `fmt.Errorf("sudo install: %w", err)`. Add focused unit tests covering argv shape (via
+      `withRunCommand` capturing args) and rejection of malformed paths (NUL, `-` prefix, non-absolute).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Happy-path test asserts captured argv is exactly `[\"/usr/bin/sudo\", \"/usr/bin/install\", \"-m\", \"0755\", <abs src>, <abs dst>]`"
+      - "Rejects `src` or `dst` containing NUL with a clear error; `runCommandFn` not invoked"
+      - "Rejects `src` or `dst` starting with `-` with a clear error; `runCommandFn` not invoked"
+      - "Rejects non-absolute `src` or `dst` with a clear error; `runCommandFn` not invoked"
+      - "Wraps `runCommandFn` non-zero exit as `sudo install: <wrapped>` error"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-005
+    title: "Wire planSwap + elevatedSwap into Swap; add stderr io.Writer arg"
+    description: |
+      Integration step bringing planSwap and elevatedSwap into the production code path. Change the
+      `Swap` signature to `Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr
+      io.Writer) error` so the "Elevating via sudo…" narrative line can land on the caller's stderr
+      stream. Update the `swapFn` seam declaration in update.go:60 to match. Insert `planSwap(abs)`
+      call between `filepath.Abs` (swap.go:131) and the archive download (swap.go:133); on sentinel
+      errors return them immediately (no download). Use `plan.tmpDir` in the extract block instead of
+      `filepath.Dir(abs)`: `tmpNew := filepath.Join(plan.tmpDir, "neo4j-cli.new")`. In the rename
+      block: if `plan.elevate`, write the elevation-narrative line to `stderr`, call
+      `elevatedSwap(ctx, tmpNew, abs)`, then `os.Remove(tmpNew)` regardless of outcome. If not, the
+      existing `windowsSwap` / `renameFn` branches run unchanged. In update.go, pass
+      `cmd.ErrOrStderr()` as the new `stderr` arg when calling `swapFn`. Update every existing
+      `swapFn` test fake in update_test.go and check_test.go to take the new `io.Writer` parameter
+      (no-op accept is fine).
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`Swap` signature gains `stderr io.Writer`; all production and test callers updated"
+      - "Writable-dir happy path on linux/darwin still calls `os.Rename` exactly once (verify with `withRename` counter) — no behavior diff"
+      - "Writable-dir happy path on windows still calls `windowsSwap` — no behavior diff"
+      - "Non-writable + sudo path extracts to `tempDirFn()`, prints `Cannot write to <dir>…\\nElevating via sudo…` to stderr, calls `elevatedSwap`, then removes `tmpNew`"
+      - "Sentinel errors `errSudoUnavailable` / `errPermissionWindows` propagate from `Swap` unchanged (no wrap)"
+      - "Archive download does NOT occur when planSwap returns a sentinel (assert via `httpDoFn` call counter)"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-006
+    title: "runUpdate sentinel-error recognition and friendly re-run hint"
+    description: |
+      Implement REQ-F-014 — recognise the two sentinel error types returned from `Swap` and convert
+      them into user-friendly fatal-error messages. In `runUpdate` (neo4j-cli/internal/subcommands/
+      update/update.go:416-418), wrap the `swapFn` call in `errors.As` checks. For
+      `*errSudoUnavailable`, build a re-run hint using `cmd.CommandPath()` plus the active flags from
+      `runOpts` (`--pre-releases`, `--version <tag>`, `--force`) and return as `clierr.NewFatalError`.
+      Shape: `cannot write to <dir> (permission denied).\nRe-run with sudo:\n\n    sudo
+      <command-path> update[ --pre-releases][ --version <tag>][ --force]`. For
+      `*errPermissionWindows`, return: `cannot write to <dir> (permission denied).\nRe-run from an
+      Administrator shell.`. Add helper `buildReRunCommand(cmd *cobra.Command, opts runOpts) string`
+      colocated with the existing `buildUpdateCommand` from task-001. Add table-driven tests covering
+      the matrix: bare; `--pre-releases`; `--version v0.1.0-alpha.10`; `--force` — each producing the
+      documented hint shape.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "`*errSudoUnavailable` produces `cannot write to <dir>…\\nRe-run with sudo:\\n\\n    sudo neo4j-cli update <flags>` via `clierr.NewFatalError`"
+      - "`*errPermissionWindows` produces the Administrator-shell hint via `clierr.NewFatalError`"
+      - "Re-run hint includes `--pre-releases` iff `opts.preReleases`; includes `--version <tag>` iff `opts.version != \"\"`; includes `--force` iff `opts.force`"
+      - "Hint uses `cmd.CommandPath()` for the binary name (not hardcoded `neo4j-cli`)"
+      - "No cobra usage block prints in either sentinel case (SilenceUsage from task-001 applies)"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-007
+    title: "End-to-end elevation-path table-driven tests in swap_test.go"
+    description: |
+      Implement REQ-T-004 — table-driven tests at the `Swap` integration level covering every
+      elevation outcome. Build a single `TestSwap_ElevationMatrix` (or split by scenario for
+      readability) with cases: (a) writable dir → `os.Rename` invoked exactly once, `runCommandFn`
+      NOT invoked; (b) non-writable + linux + sudo + TTY → archive downloaded, checksum verified,
+      `tmpNew` lands under `tempDirFn()`, `runCommandFn` invoked with exact argv, `os.Remove(tmpNew)`
+      runs after; (c) non-writable + already-root → no elevation, raw permission error surfaces; (d)
+      non-writable + no sudo → `errSudoUnavailable` returned, archive NOT downloaded; (e) non-writable
+      + non-TTY → `errSudoUnavailable`, no download; (f) non-writable + windows →
+      `errPermissionWindows`; (g) elevation invoked but sudo returns non-zero → error wraps with
+      `sudo install:` prefix, cleanup runs. Use the seams from task-002 to drive each branch
+      hermetically.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "All seven scenarios from REQ-T-004 covered as discrete table rows or subtests"
+      - "Each scenario asserts BOTH the return-value shape AND the `runCommandFn` / `httpDoFn` / `renameFn` call counts"
+      - "Pre-flight skip cases (no sudo, non-TTY) assert zero archive downloads (no network seam invoked)"
+      - "Tests are hermetic — no real `/usr/bin/sudo` / `/usr/local/bin` access; all paths under `t.TempDir()`"
+      - "Tests pass on the existing ubuntu/macos/windows CI matrix"
+      - "`make test && make fmt-check && make lint` clean"
+    completed_at: null
+
+  - id: task-008
+    title: "Doc comments, changie entry, and final verification gates"
+    description: |
+      Polish + ship. Update doc comments in neo4j-cli/internal/subcommands/update/update.go (the
+      `runUpdate` REQ-F-002..REQ-F-016 flow block at lines 271-285) and swap.go (the package doc at
+      lines 4-43 and the `Swap` doc-comment at lines 113-123) to describe the new pre-flight planning
+      step and elevation branch. Add a changie entry via `changie new --projects neo4j-cli --kind
+      Patch --body "Fix 'update check' to print a friendly message instead of an error+usage dump,
+      and auto-elevate via sudo when updating from a non-writable install location like
+      /usr/local/bin."`. Hand-author the YAML under `.changes/unreleased/` if changie isn't
+      installed. Run the full repo gate: `make fmt-check && make test && make lint && make
+      generate-check`. Manual verification: `bin/neo4j-cli update check --pre-releases` (printed
+      shape), `bin/neo4j-cli update --pre-releases` against a writable install location
+      (`INSTALL_DIR=$HOME/bin` direct rename), and `bin/neo4j-cli update --pre-releases` against
+      `/usr/local/bin/neo4j-cli` (sudo prompt + swap succeeds).
+    status: pending
+    dependencies:
+      - task-001
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "Doc-comments in update.go and swap.go reflect the planSwap + elevatedSwap flow"
+      - "Changie entry exists under `.changes/unreleased/neo4j-cli-Patch-*.yaml` with the Patch kind and a user-facing body"
+      - "`make fmt-check && make test && make lint && make generate-check` all clean"
+      - "Manual: `update check --pre-releases` prints the friendly two-line shape; exit 0"
+      - "Manual: `update --pre-releases` against a writable install dir does NOT prompt for sudo and swaps successfully"
+      - "Manual: `update --pre-releases` against `/usr/local/bin/neo4j-cli` shows the elevation narrative, prompts for sudo once, swaps successfully"
+    completed_at: null
