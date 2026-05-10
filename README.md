@@ -6,9 +6,9 @@ Pick one. Verify with `neo4j-cli --help`.
 
 - **Install script**: `curl -sSfL https://neo4j.sh/install.sh | bash`.
 - **Homebrew**: `brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
-- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
 - **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
+- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
 
 ### Self-update
 
@@ -21,9 +21,9 @@ neo4j-cli update --pre-releases          # opt into alpha/beta/rc tags
 neo4j-cli update --version v0.1.0        # pin to a named tag (also the only way to downgrade)
 ```
 
-When the running binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool), `update` refuses to overwrite and prints the channel-correct upgrade command — plus the `curl -sSfL https://neo4j.sh/install.sh | bash` install-script alternative and (optionally) the uninstall command if you'd rather switch to the install-script copy. Pass `--force` to bypass the check and swap in place anyway. See `neo4j-cli update --help` for the full surface.
+If the binary was installed via Homebrew / npm / pipx / uv, `update` prints the channel-correct upgrade command instead of overwriting; pass `--force` to swap in place anyway. See `neo4j-cli update --help`.
 
-After a successful in-place swap, any installed agent skill bundles (Claude Code, Cursor, Windsurf, etc.) are refreshed automatically so AI assistants pick up the new commands without a separate `skill install` step. If no agent has the skill installed, `update` prints a one-line tip suggesting you run `neo4j-cli skill install`.
+Installed agent skill bundles are refreshed automatically after a successful swap; if none are installed, `update` suggests running `neo4j-cli skill install`.
 
 ## Agent skills
 
