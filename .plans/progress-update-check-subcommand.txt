@@ -16,3 +16,7 @@ Files: ~README.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/s
 Update CI workflow e2e step + check_json doc comments / fail messages to reference `update check` subcommand. No struct/assertion changes.
 Files: ~.github/workflows/test.yml, ~test/e2e/check_json/main.go
 Decisions: Also updated check_json package doc + tier-2 comment block (beyond the six listed lines) so no stale `--check` text remains.
+
+## task-005 — 2026-05-10T19:56:00Z
+Add Patch changie entry for `update --check` -> `update check` rename.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260510-195539.yaml
