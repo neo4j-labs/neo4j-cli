@@ -54,7 +54,7 @@ INSTALL_DIR=~/.local/bin bash install-neo4j-cli.sh
 1. Detects the OS (`Darwin` / `Linux`) and CPU architecture (`x86_64` / `arm64` / `i386`).
 2. Queries the GitHub releases page to resolve the latest version (unless `VERSION` is set).
 3. Downloads the matching `.tar.gz` archive and the `checksums.txt` file.
-4. Verifies the SHA256 checksum using `sha256sum` (Linux) or `shasum -a 256` (macOS).
+4. Verifies the SHA256 checksum using `sha256sum` if available, otherwise falls back to `shasum -a 256`. Works with GNU coreutils (Linux), Apple's BSD `sha256sum` (macOS Tahoe and later), and Perl `shasum` (older macOS).
 5. Extracts the binary, sets it executable, and moves it to `INSTALL_DIR`.
 6. If `INSTALL_DIR` is not writable, `sudo` is invoked automatically for that step only.
 7. Confirms the install path and prints the binary version.
