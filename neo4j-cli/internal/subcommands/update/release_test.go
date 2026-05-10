@@ -4,12 +4,15 @@
 package update
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -19,12 +22,21 @@ import (
 )
 
 // withApiBaseURL swaps the package-level apiBaseURL seam for the test's
-// duration, restoring it via t.Cleanup.
+// duration, restoring it via t.Cleanup. It also flips requireHTTPS off and
+// adds the URL's host to allowedDownloadHosts so the REQ-S-001 final-URL
+// host pin in fetchReleases lets the loopback request through. The dedicated
+// TestFetchReleases_RejectsRedirectAwayFromAllowlist test asserts the gate
+// still fires when a redirect goes off-allowlist (it sets requireHTTPS back
+// to true via withRequireHTTPS).
 func withApiBaseURL(t *testing.T, v string) {
 	t.Helper()
 	prev := apiBaseURL
 	apiBaseURL = v
 	t.Cleanup(func() { apiBaseURL = prev })
+	withRequireHTTPS(t, false)
+	if u, err := url.Parse(v); err == nil && u.Hostname() != "" {
+		withAllowedHost(t, u.Hostname())
+	}
 }
 
 // withDlBaseURL swaps the package-level dlBaseURL seam. Used by asset-URL
@@ -55,7 +67,9 @@ func withGoarch(t *testing.T, v string) {
 // releaseListServer spins up an httptest.NewServer that serves the canned
 // release list at /repos/<slug>/releases. Happy-path tests respond
 // immediately; the cancellation test uses a separate handler with the AGENTS
-// "2s safety timeout + 5s test-side fallback" pattern.
+// "2s safety timeout + 5s test-side fallback" pattern. Callers must follow
+// up with withApiBaseURL(t, srv.URL) which also wires the requireHTTPS /
+// allowedDownloadHosts seams for the REQ-S-001 final-URL host pin.
 func releaseListServer(t *testing.T, releases []Release, capture *http.Header) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -480,6 +494,65 @@ func TestLatest_ErrorDoesNotContainAuthSubstring(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, strings.Contains(err.Error(), "Authorization:"), "error should not include Authorization header literal: %v", err)
 	assert.False(t, strings.Contains(err.Error(), "Bearer "), "error should not echo Bearer prefix: %v", err)
+}
+
+// TestFetchReleases_RejectsRedirectAwayFromAllowlist asserts the REQ-S-001
+// host-pin in fetchReleases fires when api.github.com (or its test seam) is
+// redirected to a host that is NOT on the download allowlist. Without this
+// guard, a hijacked GitHub API or DNS-poisoned route could feed the CLI a
+// JSON payload from an unexpected origin.
+//
+// We use the httpDoFn test seam to inject a synthetic response whose
+// resp.Request.URL.Host points at a host NOT on the allowlist — that is
+// exactly the post-redirect state the production code must catch. A real
+// httptest server would also work but adds dial / timeout flake risk on
+// hosts where 127.0.0.x aliases aren't routable.
+func TestFetchReleases_RejectsRedirectAwayFromAllowlist(t *testing.T) {
+	// Set apiBaseURL to a synthetic https URL so the request build succeeds;
+	// we override what httpDoFn returns anyway.
+	withApiBaseURL(t, "https://api.github.com")
+	withHttpDo(t, func(req *http.Request) (*http.Response, error) {
+		// Synthesize a final URL that is foreign to the allowlist (the
+		// post-redirect state). The body is intentionally non-empty so we
+		// can prove fetchReleases rejected it BEFORE decoding.
+		finalURL, _ := url.Parse("https://evil.example.com/repos/neo4j-labs/neo4j-cli/releases")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`[{"tag_name":"v9.9.9-evil","draft":false,"prerelease":false}]`))),
+			Header:     make(http.Header),
+			Request:    &http.Request{URL: finalURL},
+		}, nil
+	})
+
+	_, err := Latest(context.Background(), true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "allowlist")
+}
+
+// TestFetchReleases_RejectsNonHTTPSFinalURL asserts the requireHTTPS gate
+// in assertAllowedHostURL fires on the FINAL URL when a redirect
+// downgrades the scheme. Same httpDoFn-seam pattern as the test above,
+// with requireHTTPS forced on AFTER withApiBaseURL turned it off.
+func TestFetchReleases_RejectsNonHTTPSFinalURL(t *testing.T) {
+	withApiBaseURL(t, "https://api.github.com")
+	withHttpDo(t, func(req *http.Request) (*http.Response, error) {
+		// Synthesize a final URL on an allowlisted host but with a plain
+		// http:// scheme — the requireHTTPS gate must reject this.
+		finalURL, _ := url.Parse("http://api.github.com/repos/neo4j-labs/neo4j-cli/releases")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`[]`))),
+			Header:     make(http.Header),
+			Request:    &http.Request{URL: finalURL},
+		}, nil
+	})
+	// Force the production HTTPS guard on AFTER withApiBaseURL turned it
+	// off — the final URL check should now reject the http:// scheme.
+	withRequireHTTPS(t, true)
+
+	_, err := Latest(context.Background(), true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-https")
 }
 
 // Sanity: ensure the package-level seams are wired up correctly (the symbols

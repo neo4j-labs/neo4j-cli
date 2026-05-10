@@ -242,7 +242,7 @@ tasks:
       / `api.github.com`, semver validation on `--version <X>`, and
       `GH_TOKEN` redaction. Fix any HIGH or MEDIUM findings before declaring
       done.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -252,7 +252,7 @@ tasks:
       - "All eight audit surfaces from the PRD are explicitly covered in the report (tick or remediation)"
       - "Any code change made in response to a finding has matching test coverage"
       - "`make lint` is still clean after security fixes"
-    completed_at: null
+    completed_at: 2026-05-10T09:07:45Z
 
   - id: task-012
     title: "Final gates + end-to-end verification"

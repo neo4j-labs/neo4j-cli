@@ -44,3 +44,7 @@ Files: ~neo4j-cli/internal/skill/description.txt, ~neo4j-cli/internal/skill/addi
 ## TASK-010 — 2026-05-10T08:57:29Z
 Hand-authored Minor changelog entry for self-update command (changie not on PATH); body cites `neo4j-cli update`, `--pre-releases`, `--check`. `make fmt-check` and `make license-check` clean (YAML-only, no Go touched).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260510-085729.yaml, ~.plans/tasks-self-update-command.yml, ~.plans/progress-self-update-command.txt
+
+## TASK-011 — 2026-05-10T09:07:45Z
+Security audit via golang-security skill: 8 surfaces covered, 0 HIGH, 1 MEDIUM (fetchReleases post-redirect host-pin gap) fixed; LOW findings noted. Two new tests assert the host-pin gate fires.
+Files: ~release.go, ~release_test.go

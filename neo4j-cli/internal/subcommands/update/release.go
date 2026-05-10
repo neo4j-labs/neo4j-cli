@@ -152,10 +152,25 @@ func fetchReleases(ctx context.Context) ([]Release, error) {
 	resp, err := httpDoFn(req)
 	if err != nil {
 		// req.URL is the public GitHub API endpoint; no token leakage risk
-		// because Authorization is in headers, not the URL.
+		// because Authorization is in headers, not the URL. Net/http's
+		// *url.Error wrapping does not echo request headers either.
 		return nil, fmt.Errorf("fetch releases: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// REQ-S-001 / defense-in-depth against a hijacked GitHub API: validate the
+	// FINAL URL host after net/http transparently followed any redirects. The
+	// stdlib already strips the Authorization header on cross-host redirects,
+	// but pinning the response host means we never read or decode a JSON
+	// payload from an unexpected origin. Reuses the swap.go allowedDownloadHosts
+	// allowlist (which already includes api.github.com); tests that point
+	// apiBaseURL at httptest.NewServer add the loopback host via
+	// withAllowedHost as they do for the swap path.
+	if resp.Request != nil && resp.Request.URL != nil {
+		if err := assertAllowedHostURL(resp.Request.URL); err != nil {
+			return nil, fmt.Errorf("fetch releases: %w", err)
+		}
+	}
 
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
 		// Drain a small amount of body for diagnostic context but do NOT
