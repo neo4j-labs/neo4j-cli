@@ -402,10 +402,13 @@ func TestNewCmd_FlagsExposed(t *testing.T) {
 	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
 
 	cmd := NewCmd(cfg, nil, "")
-	for _, name := range []string{"pre-releases", "check", "version", "force"} {
+	for _, name := range []string{"pre-releases", "version", "force"} {
 		f := cmd.Flags().Lookup(name)
 		require.NotNil(t, f, "flag --%s should be registered", name)
 	}
+	// `--check` was removed from the parent in favour of the `check`
+	// subcommand. Guard against a future regression that re-registers it.
+	assert.Nil(t, cmd.Flags().Lookup("check"), "--check must NOT be registered on the parent — use the `check` subcommand")
 }
 
 func TestRunUpdate_ChannelLabel_StableVsPreRelease(t *testing.T) {
@@ -734,6 +737,12 @@ func TestPrintableUpdateResult_AsArrayShape(t *testing.T) {
 // TestNewCmd_StubReplacedByRunUpdate ensures cmd.RunE actually dispatches to
 // runUpdate — guards against a future refactor accidentally re-introducing
 // the "not implemented" stub from task-002.
+//
+// Originally drove `cmd.SetArgs([]string{"--check"})` against the parent; the
+// `--check` flag was replaced by the `check` subcommand, so this case now
+// invokes the subcommand path. The equivalent end-to-end check (cobra-arg
+// dispatch through the new subcommand) lives in check_test.go's
+// TestCheckCmd_DispatchesToRunUpdate.
 func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.1.0"}, nil
@@ -753,7 +762,7 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
-	cmd.SetArgs([]string{"--check"})
+	cmd.SetArgs([]string{"check"})
 
 	runErr := cmd.Execute()
 	require.NoError(t, runErr)

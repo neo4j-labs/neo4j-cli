@@ -2,3 +2,8 @@
 Add `update check` subcommand; drop `--check` flag from parent. Doc comments refreshed.
 Files: +neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/internal/versioncheck/cache.go
 Decisions: Kept `runOpts.check` field — runUpdate still branches on it; tests + bundle regen deferred to task-002/003.
+
+## task-002 — 2026-05-10T20:30:00Z
+Migrate update_test.go to drop `--check` parent flag; add colocated check_test.go. Set SilenceUsage on subcommand to keep JSON stream clean on usage-error exit. Bundle regen pulled forward to satisfy `make test`.
+Files: +neo4j-cli/internal/subcommands/update/check_test.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/skill/bundle/references/update.md
+Decisions: SilenceUsage=true on `update check` only — newer-available is REQ-F-011 exit code, not misuse; parent keeps default so bad flags still print Usage.

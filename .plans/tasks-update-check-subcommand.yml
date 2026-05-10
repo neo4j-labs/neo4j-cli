@@ -67,7 +67,7 @@ tasks:
         bearing exit code 1 is returned when newer is available.
       - `--pre-releases` and `--version v0.1.0-alpha.10` reach
         `resolveTarget` correctly.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -76,7 +76,7 @@ tasks:
       - "Tests assert subcommand mounting, registered flags, and absence of `--force` / `--check` on the subcommand"
       - "Tests use the existing `latestFn` / `detectFn` / `swapFn` seams to verify swap is never invoked and JSON sets `check: true`, `updated: false`"
       - "`make test` passes"
-    completed_at: null
+    completed_at: 2026-05-10T20:30:00Z
 
   - id: task-003
     title: "Update README and agent skill artifacts; regenerate bundle"
