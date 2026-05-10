@@ -20,3 +20,8 @@ Decisions: Also updated check_json package doc + tier-2 comment block (beyond th
 ## task-005 — 2026-05-10T19:56:00Z
 Add Patch changie entry for `update --check` -> `update check` rename.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260510-195539.yaml
+
+## task-006 — 2026-05-10T21:10:00Z
+Final verification: build/test/fmt-check/lint/license-check clean; generate-check clean against bundle (only .plans/ status flip diff per AGENTS.md guidance). Manual smoke: `update --help` shows `check` subcommand and no `--check` flag; `update check --help` lists `--pre-releases`/`--version` only; `--force` rejected with `unknown flag`; live JSON against neo4j-labs/neo4j-cli emits documented shape (`check: true`, `updated: false`); e2e check_json harness passes; `--version v0.1.0-alpha.10` resolves named tag.
+Files: ~.plans/tasks-update-check-subcommand.yml, ~.plans/progress-update-check-subcommand.txt
+Decisions: Exit-code 0-on-RunE-error is documented project convention (.github/workflows/test.yml lines 96-107) — JSON shape is the assertion contract, not exit code.

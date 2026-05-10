@@ -184,7 +184,7 @@ tasks:
         `test/e2e/check_json` harness passes against the new entry point.
       - `bin/neo4j-cli update check --pre-releases --version v0.1.0-alpha.10`
         — resolves the named tag and reports comparison.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -198,4 +198,4 @@ tasks:
       - "`bin/neo4j-cli update check --force` errors with `unknown flag`"
       - "`bin/neo4j-cli update check -f json` against the live repo emits the documented JSON shape with `check: true`, `updated: false`"
       - "`test/e2e/check_json` harness passes against the new entry point"
-    completed_at: null
+    completed_at: 2026-05-10T21:10:00Z
