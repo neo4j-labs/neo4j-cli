@@ -10,6 +10,19 @@ Pick one. Verify with `neo4j-cli --help`.
 - **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
 
+### Self-update
+
+`neo4j-cli update` swaps the running binary with the latest GitHub release. By default only stable semver tags are considered.
+
+```bash
+neo4j-cli update                         # update to latest stable
+neo4j-cli update --check                 # report availability, exit 1 if newer; never downloads
+neo4j-cli update --pre-releases          # opt into alpha/beta/rc tags
+neo4j-cli update --version v0.1.0        # pin to a named tag (also the only way to downgrade)
+```
+
+When the running binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool), `update` refuses to overwrite and prints the channel-correct upgrade command — plus the `curl -sSfL https://neo4j.sh/install.sh | bash` install-script alternative and (optionally) the uninstall command if you'd rather switch to the install-script copy. Pass `--force` to bypass the check and swap in place anyway. See `neo4j-cli update --help` for the full surface.
+
 ## Agent skills
 
 `neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops it into each detected agent's skill directory; pass an agent name to target one.

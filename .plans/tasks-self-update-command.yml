@@ -181,7 +181,7 @@ tasks:
       (with the install-script + optional-uninstall hint). Keep the section
       concise — it should orient users; full reference lives in `--help` and
       the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -189,7 +189,7 @@ tasks:
       - "All four flags (`--check`, `--pre-releases`, `--version`, `--force`) are mentioned"
       - "Package-manager-passthrough behaviour is described, including the install-script alternative"
       - "Section is ≤ 25 lines and links to `--help` for the full surface"
-    completed_at: null
+    completed_at: 2026-05-10T18:00:00Z
 
   - id: task-009
     title: "Skill bundle inputs + regenerate (gate via TestGenerator_RoundTrip)"
