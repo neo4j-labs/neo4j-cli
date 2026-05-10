@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Fix install script checksum verification on macOS Tahoe (Darwin 25) by switching to POSIX-compatible sha256 flags that work with both GNU coreutils and BSD/Darwin sha256sum/shasum.'
-time: 2026-05-10T19:14:36+00:00
