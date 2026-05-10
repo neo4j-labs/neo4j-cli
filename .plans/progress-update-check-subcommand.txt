@@ -11,3 +11,8 @@ Decisions: SilenceUsage=true on `update check` only — newer-available is REQ-F
 ## task-003 — 2026-05-10T20:45:00Z
 Update README + additions.md to describe `update check` subcommand; regen SKILL.md. references/update.md was already current from task-002.
 Files: ~README.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
+
+## task-004 — 2026-05-10T20:55:00Z
+Update CI workflow e2e step + check_json doc comments / fail messages to reference `update check` subcommand. No struct/assertion changes.
+Files: ~.github/workflows/test.yml, ~test/e2e/check_json/main.go
+Decisions: Also updated check_json package doc + tier-2 comment block (beyond the six listed lines) so no stale `--check` text remains.

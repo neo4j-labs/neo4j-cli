@@ -125,7 +125,7 @@ tasks:
       97, 102, 105, 107, 110, replace references to "`--check` mode" / "in
       --check mode" with "the `check` subcommand" / "from the `check`
       subcommand". No struct or assertion edits.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -134,7 +134,7 @@ tasks:
       - "`test/e2e/check_json/main.go` comments updated at the six listed line numbers"
       - "No behavioral / struct / assertion changes in `test/e2e/check_json/main.go`"
       - "`go vet ./test/e2e/check_json` clean"
-    completed_at: null
+    completed_at: 2026-05-10T20:55:00Z
 
   - id: task-005
     title: "Add changie entry for the rename"

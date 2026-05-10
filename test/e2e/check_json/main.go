@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Command check_json validates the JSON output of `neo4j-cli update --check`.
+// Command check_json validates the JSON output of `neo4j-cli update check`.
 //
 // It is invoked from the CI tier-1 e2e step (.github/workflows/test.yml). The
 // step runs the freshly-built binary against the real GitHub API, pipes its
@@ -18,7 +18,7 @@
 //	}
 //
 // Optional fields `updated_skills` and `skill_install_suggested` MUST be
-// absent in --check mode (no swap occurred), and the helper enforces that.
+// absent for the `check` subcommand (no swap occurred), and the helper enforces that.
 //
 // Flags:
 //
@@ -41,7 +41,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// resultDoc mirrors the REQ-F-018 JSON shape emitted by `neo4j-cli update --check
+// resultDoc mirrors the REQ-F-018 JSON shape emitted by `neo4j-cli update check
 // -f json`. The optional updated_skills / skill_install_suggested fields are
 // captured as raw json.RawMessage so we can detect "field present" vs "absent":
 // json.Unmarshal of a missing field leaves the RawMessage at its zero value (nil).
@@ -94,20 +94,20 @@ func main() {
 		fail("`install_method` is empty")
 	}
 
-	// --check semantics.
+	// `check` subcommand semantics.
 	if doc.Updated {
-		fail("`updated` must be false in --check mode, got true")
+		fail("`updated` must be false from the `check` subcommand, got true")
 	}
 	if !doc.Check {
-		fail("`check` must be true in --check mode, got false")
+		fail("`check` must be true from the `check` subcommand, got false")
 	}
 
-	// Post-swap-only fields must NOT be present in --check mode (no swap occurred).
+	// Post-swap-only fields must NOT be present from the `check` subcommand (no swap occurred).
 	if len(doc.UpdatedSkills) > 0 {
-		fail("`updated_skills` must be absent in --check mode, got %s", string(doc.UpdatedSkills))
+		fail("`updated_skills` must be absent from the `check` subcommand, got %s", string(doc.UpdatedSkills))
 	}
 	if len(doc.SkillInstallSuggested) > 0 {
-		fail("`skill_install_suggested` must be absent in --check mode, got %s", string(doc.SkillInstallSuggested))
+		fail("`skill_install_suggested` must be absent from the `check` subcommand, got %s", string(doc.SkillInstallSuggested))
 	}
 
 	// Optional flag-driven assertions.
