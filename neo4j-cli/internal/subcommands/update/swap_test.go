@@ -230,7 +230,7 @@ func TestSwap_HappyPath_LinuxTarGz(t *testing.T) {
 		}, nil
 	})
 
-	err := Swap(context.Background(), AssetURLs{Archive: archiveURL, Checksum: checksumURL}, currentBinary)
+	err := Swap(context.Background(), AssetURLs{Archive: archiveURL, Checksum: checksumURL}, currentBinary, io.Discard)
 	require.NoError(t, err)
 
 	// New binary in place
@@ -239,8 +239,8 @@ func TestSwap_HappyPath_LinuxTarGz(t *testing.T) {
 	assert.Equal(t, "NEW-BINARY-BODY", string(got))
 
 	// .new temp file is gone
-	_, statErr := os.Stat(currentBinary + ".new")
-	assert.True(t, os.IsNotExist(statErr), "expected %s.new to be removed", currentBinary)
+	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
+	assert.True(t, os.IsNotExist(statErr), "expected neo4j-cli.new in %s to be removed", tmpDir)
 
 	// Mode is 0755 (Unix only — Windows will report 0666 from chmod due to
 	// the platform's lack of execute bits)
@@ -294,7 +294,7 @@ func TestSwap_TamperedChecksum_AbortsBeforeSwap(t *testing.T) {
 		Archive:  "https://swap-test.local/" + archiveName,
 		Checksum: "https://swap-test.local/neo4j-cli_0.1.0_checksums.txt",
 	}
-	err := Swap(context.Background(), urls, currentBinary)
+	err := Swap(context.Background(), urls, currentBinary, io.Discard)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "checksum mismatch")
 
@@ -304,7 +304,7 @@ func TestSwap_TamperedChecksum_AbortsBeforeSwap(t *testing.T) {
 	assert.Equal(t, string(original), string(got))
 
 	// No .new lingering, no .old lingering
-	_, statErr := os.Stat(currentBinary + ".new")
+	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
 	assert.True(t, os.IsNotExist(statErr))
 	_, statErr = os.Stat(currentBinary + ".old")
 	assert.True(t, os.IsNotExist(statErr))
@@ -429,7 +429,7 @@ func TestSwap_WindowsRenameDance(t *testing.T) {
 		Archive:  "https://swap-test.local/" + archiveName,
 		Checksum: "https://swap-test.local/neo4j-cli_0.1.0_checksums.txt",
 	}
-	err := Swap(context.Background(), urls, currentBinary)
+	err := Swap(context.Background(), urls, currentBinary, io.Discard)
 	require.NoError(t, err)
 
 	// New binary lives at the original path
@@ -442,8 +442,8 @@ func TestSwap_WindowsRenameDance(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ORIGINAL", string(oldBytes))
 
-	// `<current>.new` is gone (consumed by the rename)
-	_, statErr := os.Stat(currentBinary + ".new")
+	// `neo4j-cli.new` (the temp file) is gone (consumed by the rename)
+	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
 	assert.True(t, os.IsNotExist(statErr))
 }
 
@@ -498,7 +498,7 @@ func TestSwap_WindowsRestoreOnError(t *testing.T) {
 		Archive:  "https://swap-test.local/pkg.zip",
 		Checksum: "https://swap-test.local/sums.txt",
 	}
-	err := Swap(context.Background(), urls, currentBinary)
+	err := Swap(context.Background(), urls, currentBinary, io.Discard)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rename new into place", "got: %v", err)
 	assert.Contains(t, err.Error(), "original restored", "got: %v", err)

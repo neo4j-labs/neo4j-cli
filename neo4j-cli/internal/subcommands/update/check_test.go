@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -109,7 +110,7 @@ func TestCheckCmd_DispatchesToRunUpdate(t *testing.T) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -145,7 +146,7 @@ func TestCheckCmd_PreReleasesFlagPropagates(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on `update check`")
 		return nil
 	})
@@ -176,7 +177,7 @@ func TestCheckCmd_VersionFlagPropagates(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on `update check`")
 		return nil
 	})

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"strings"
 	"testing"
@@ -48,7 +49,7 @@ func withDetect(t *testing.T, fn func() (InstallMethod, string, error)) {
 
 // withSwap swaps the swapFn seam. Used by tests that want to assert the
 // swap path is or is not invoked without setting up a real archive.
-func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error) {
+func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error) {
 	t.Helper()
 	prev := swapFn
 	swapFn = fn
@@ -175,7 +176,7 @@ func TestRunUpdate_CheckMode_NewerAvailable_FriendlyHint(t *testing.T) {
 		// Plain binary so the install-method passthrough doesn't intercept.
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -253,7 +254,7 @@ func TestRunUpdate_DowngradeAllowedWithExplicitVersion(t *testing.T) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -274,7 +275,7 @@ func TestRunUpdate_PkgMgrPassthrough_NoForce_ShowsHintAndExits(t *testing.T) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -298,7 +299,7 @@ func TestRunUpdate_ForceBypassesPkgMgrCheck(t *testing.T) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		assert.Equal(t, "/opt/homebrew/bin/neo4j-cli", currentBinaryPath, "swap should target the resolved exe path")
 		return nil
@@ -322,7 +323,7 @@ func TestRunUpdate_HappyPath_BinaryChannel(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		assert.NotEmpty(t, urls.Archive)
 		assert.NotEmpty(t, urls.Checksum)
 		assert.Equal(t, "/tmp/neo4j-cli", currentBinaryPath)
@@ -344,7 +345,7 @@ func TestRunUpdate_PreReleasesFlag_PassedThrough(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -386,7 +387,7 @@ func TestRunUpdate_SwapFailure_PropagatesError(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return errors.New("simulated swap failure")
 	})
 
@@ -489,7 +490,7 @@ func TestPlainTextOutput_GoldenSuccess(t *testing.T) {
 			withDetect(t, func() (InstallMethod, string, error) {
 				return InstallMethodBinary, "/tmp/neo4j-cli", nil
 			})
-			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 				return nil
 			})
 
@@ -525,7 +526,7 @@ func TestJSONOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -590,7 +591,7 @@ func TestJSONOutput_PkgMgrPassthrough(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on pkg-mgr passthrough")
 		return nil
 	})
@@ -617,7 +618,7 @@ func TestJSONOutput_FieldOrderDeterministic(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -654,7 +655,7 @@ func TestTableOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -686,7 +687,7 @@ func TestToonOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -821,7 +822,7 @@ func TestRunUpdate_PostSwap_RefreshesInstalledAgents(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -866,7 +867,7 @@ func TestRunUpdate_PostSwap_NoAgentsInstalled(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -918,7 +919,7 @@ func TestRunUpdate_PostSwap_RefreshFailure_NonFatal(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -1009,7 +1010,7 @@ func TestRunUpdate_PostSwap_NilBundle_SkipsRefresh(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
@@ -1035,7 +1036,7 @@ func TestRunUpdate_PostSwap_JSONHappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}

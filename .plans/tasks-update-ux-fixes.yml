@@ -120,7 +120,7 @@ tasks:
       `cmd.ErrOrStderr()` as the new `stderr` arg when calling `swapFn`. Update every existing
       `swapFn` test fake in update_test.go and check_test.go to take the new `io.Writer` parameter
       (no-op accept is fine).
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -132,7 +132,7 @@ tasks:
       - "Sentinel errors `errSudoUnavailable` / `errPermissionWindows` propagate from `Swap` unchanged (no wrap)"
       - "Archive download does NOT occur when planSwap returns a sentinel (assert via `httpDoFn` call counter)"
       - "`make test && make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T20:50:00Z
 
   - id: task-006
     title: "runUpdate sentinel-error recognition and friendly re-run hint"

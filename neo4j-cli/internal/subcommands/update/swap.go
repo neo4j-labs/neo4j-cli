@@ -323,23 +323,56 @@ func dirWritable(dir string) (bool, error) {
 }
 
 // Swap downloads the archive + checksums for the resolved AssetURLs,
-// verifies the SHA256 of the archive, extracts the binary into the same
-// directory as the running binary, and atomically renames it into place.
+// verifies the SHA256 of the archive, extracts the binary into a directory
+// chosen by planSwap, and either atomically renames it into place or
+// elevates via `sudo install` when the target directory is not writable.
 //
 // `currentBinaryPath` MUST be the resolved (post-EvalSymlinks) absolute path
 // of the running binary; see install_method.go Detect() for the canonical
 // way to obtain it.
 //
+// `stderr` receives the elevation-narrative line ("Cannot write to <dir>…
+// Elevating via sudo…") when planSwap selects the elevated branch. Plain
+// rename branches do not write to stderr.
+//
+// Pre-flight: planSwap probes the target dir and may return one of two
+// sentinel errors before any download occurs (REQ-F-009 / REQ-F-010):
+//
+//   - *errPermissionWindows: target dir is not writable on Windows. The
+//     runUpdate caller turns this into a "re-run from an Administrator
+//     shell" hint.
+//   - *errSudoUnavailable: target dir is not writable AND we cannot
+//     transparently elevate (no sudo, no install, or stdin is not a TTY).
+//     The runUpdate caller turns this into a "re-run with sudo: <command>"
+//     hint.
+//
 // On success, returns nil. On any error, the original binary is left
-// untouched at `currentBinaryPath`; intermediate temp files in the same
-// directory are best-effort cleaned up.
-func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+// untouched at `currentBinaryPath`; intermediate temp files (in the same
+// directory for the direct branch, or in `os.TempDir()` for the elevated
+// branch) are best-effort cleaned up.
+func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 	if currentBinaryPath == "" {
 		return fmt.Errorf("swap: empty current binary path")
 	}
 	abs, err := filepath.Abs(currentBinaryPath)
 	if err != nil {
 		return fmt.Errorf("swap: resolve absolute path: %w", err)
+	}
+
+	// REQ-F-009 / REQ-F-010: pre-flight before any network I/O. Sentinel
+	// errors (*errSudoUnavailable, *errPermissionWindows) propagate
+	// unwrapped so runUpdate can recognise them via errors.As; other
+	// failures (probe error) get the standard "swap: " prefix below.
+	plan, err := planSwap(abs)
+	if err != nil {
+		var (
+			sudoErr *errSudoUnavailable
+			winErr  *errPermissionWindows
+		)
+		if errors.As(err, &sudoErr) || errors.As(err, &winErr) {
+			return err
+		}
+		return fmt.Errorf("swap: %w", err)
 	}
 
 	archiveBytes, err := downloadCapped(ctx, urls.Archive, maxArchiveBytes)
@@ -373,17 +406,19 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
 		binaryEntry = "neo4j-cli.exe"
 	}
 
-	dir := filepath.Dir(abs)
-	tmpNew := abs + ".new"
+	// tmpNew lives under plan.tmpDir: same directory as the running binary
+	// for the direct-rename branch (so os.Rename stays on one filesystem),
+	// or os.TempDir() for the elevated branch (sudo install copies, so
+	// cross-filesystem is fine).
+	tmpNew := filepath.Join(plan.tmpDir, "neo4j-cli.new")
 	// Best-effort remove a stale .new from a previous failed run before we
 	// extract — extractToFile uses O_EXCL so a stale path would block the
 	// fresh write.
 	_ = os.Remove(tmpNew)
 
-	// Extract straight into <current>.new with mode 0600 during write; we
-	// chmod 0755 once the body has fully landed and verified. Same dir as
-	// target so the rename below stays on the same filesystem.
-	if err := extractBinary(archiveBytes, binaryEntry, tmpNew, dir); err != nil {
+	// Extract straight into tmpNew with mode 0600 during write; we chmod
+	// 0755 once the body has fully landed and verified.
+	if err := extractBinary(archiveBytes, binaryEntry, tmpNew, plan.tmpDir); err != nil {
 		_ = os.Remove(tmpNew)
 		return fmt.Errorf("swap: extract: %w", err)
 	}
@@ -393,7 +428,23 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
 		return fmt.Errorf("swap: chmod new binary: %w", err)
 	}
 
-	// Atomic swap.
+	// Elevated branch: hand off to `sudo install` and clean up tmpNew
+	// regardless of outcome. The narrative line lands on the caller's
+	// stderr so structured-output mode (json/table/toon) on stdout stays
+	// uncluttered.
+	if plan.elevate {
+		if stderr != nil {
+			fmt.Fprintf(stderr, "Cannot write to %s; elevation required.\nElevating via sudo...\n", filepath.Dir(abs)) //nolint:errcheck // stderr write errors are not actionable
+		}
+		err := elevatedSwap(ctx, tmpNew, abs)
+		_ = os.Remove(tmpNew)
+		if err != nil {
+			return fmt.Errorf("swap: %w", err)
+		}
+		return nil
+	}
+
+	// Atomic swap (direct branch).
 	if swapGoosFn() == "windows" {
 		if err := windowsSwap(abs, tmpNew); err != nil {
 			_ = os.Remove(tmpNew)

@@ -426,7 +426,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		cmd.Println("Checking for updates to latest version...")
 	}
 
-	if err := swapFn(ctx, urls, currentBinaryPath); err != nil {
+	if err := swapFn(ctx, urls, currentBinaryPath, cmd.ErrOrStderr()); err != nil {
 		return clierr.NewFatalError("update failed: %v", err)
 	}
 
