@@ -316,3 +316,133 @@ tasks:
       - "PR #71 description updated via `gh pr edit` to mention toon alongside json/table"
       - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
     completed_at: 2026-05-10T19:00:00Z
+
+  - id: task-014
+    title: "Background version-availability check (5% sample, silent, cached)"
+    description: |
+      On every neo4j-cli invocation, with 5% probability, fire a background
+      version-availability check. The check reuses the release-lookup module
+      from task-003 (`Latest(ctx, false)` for stable; the cache is stable-only
+      to keep the user-facing nag conservative — power users on prereleases
+      can run `neo4j-cli update --check --pre-releases` themselves).
+
+      Hard requirements:
+      - **Silent on errors.** Never print errors, never write to stderr or
+        stdout from the check itself. Network failure / rate limit / etc must
+        be invisible to the user.
+      - **Non-blocking.** Do not delay the user's actual command. Spin up the
+        check in a goroutine with a short timeout (5s) and let the foreground
+        command continue. If the foreground command exits before the check
+        completes, kill the check (don't await it).
+      - **Cache.** Persist the result to a small JSON file in the OS config
+        dir alongside `config.json` and `credentials.json` — pattern
+        `version-check.json` with shape
+        `{"checked_at": "<ISO8601>", "latest_stable": "vX.Y.Z"}`.
+        TTL = 24h: if the cached value is fresher than 24h, skip the network
+        call entirely (still costs the 5% dice roll though — the dice gates
+        the cache READ too, otherwise we'd nag every invocation).
+
+      Hint surface (REQ — separate from the silent check itself):
+      - Independently of the 5% sample, on EVERY invocation, read the
+        cache. If the cached `latest_stable` is newer than `app.Version`
+        (semver compare), print ONE line to stderr at the very start of the
+        run: `A newer neo4j-cli is available: <cached> (you have <current>).
+        Run \`neo4j-cli update\` to upgrade.` Stderr only — never pollute
+        stdout, since scripts pipe stdout. Suppress the hint on
+        `neo4j-cli update` itself (would be confusing) and on `--version` /
+        `--help`. Suppress when `cfg.Global.Format() == "json"` so JSON
+        consumers stay clean.
+      - Provide an env-var opt-out: `NEO4J_CLI_NO_UPDATE_NAG=1` (or similar)
+        disables both the dice roll and the stderr hint.
+
+      Implementation notes:
+      - New package `neo4j-cli/internal/versioncheck/` with `Schedule(ctx,
+        cfg)` (the goroutine-firing function) and `MaybeHint(cmd, cfg)` (the
+        stderr-print function). Both wired via a `PersistentPreRunE` on the
+        root cobra command in `neo4j-cli/app/app.go`. Reuse `update.Latest`
+        and `update.releaseAuthToken` if exported (or factor a small shared
+        helper).
+      - Use `crypto/rand` (or `math/rand` seeded from time) for the dice
+        roll. 1-in-20 hit.
+      - Tests must use the package-level `randFloat` test seam (per AGENTS.md
+        Package-level test seams) so dice-roll outcomes are deterministic.
+        HTTP via httptest.Server. FS via testfs.GetTestFs.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "Background goroutine fires on ~5% of invocations (table-driven test pinning randFloat)"
+      - "Errors from the goroutine are NEVER surfaced to the user (assertion: stderr stays empty when the upstream returns 500/timeout)"
+      - "Cache file written to OS config dir at `version-check.json` with the documented shape"
+      - "Cache read TTL is 24h: a fresh cache skips the network call even when the dice roll hits"
+      - "On every invocation, if cache shows a newer stable, a single line hint goes to stderr (not stdout) before the user's command runs"
+      - "Hint is suppressed on `neo4j-cli update`, `--version`, `--help`, and `--format json`"
+      - "`NEO4J_CLI_NO_UPDATE_NAG=1` disables both the dice roll and the hint"
+      - "Stdout of every existing command is byte-identical with the env-var set vs unset (regression guard)"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: null
+
+  - id: task-015
+    title: "Post-update skill handling: auto-upgrade installed skills; hint when none"
+    description: |
+      After `neo4j-cli update` completes a successful in-place swap, the
+      embedded skill bundle on disk is stale relative to the new binary.
+      Auto-handle this so the user (and AI agents reading the bundle) see
+      the new version's surface without a manual second step.
+
+      Flow at the END of a successful swap (after the "Successfully updated
+      from X to Y" line, before returning):
+
+      1. Inspect installed agents via `common/skill/`. The package already
+         exposes catalog + per-agent detection (used by `skill list` /
+         `skill check`). Reuse — do NOT shell out to `neo4j-cli skill list`.
+      2. If at least one agent has the skill installed → automatically run
+         the equivalent of `skill install` for ALL detected-installed
+         agents (refresh their bundle). Print one line:
+         "Refreshed skill bundle for: <agent1>, <agent2>, ..." (or, in JSON
+         mode, add an `updated_skills: [...]` field to the result document).
+      3. If no agent has the skill installed → print one line at the end:
+         "Tip: install the agent skill so AI assistants pick up the new
+         commands — run \`neo4j-cli skill install\`." (JSON mode: emit
+         `skill_install_suggested: true` instead.)
+
+      Failures during the skill refresh are non-fatal — the binary update
+      already succeeded. Print a single warning line to stderr if a refresh
+      fails for any agent, and continue. Don't let a skill-refresh error
+      cause `update` to exit non-zero.
+
+      The package-manager passthrough path (REQ-F-009/010) does not reach
+      this code — it never actually swaps the binary, so the skill bundle
+      isn't stale. Confirm via tests.
+
+      Implementation notes:
+      - The `skill install` core lives in `common/skill/install.go`. Find
+        the function that takes a list of agents and refreshes them. If no
+        such function exposes the right granularity, factor one (small
+        refactor — keep the cobra wrapper thin).
+      - Add the orchestration in `neo4j-cli/internal/subcommands/update/
+        update.go` after `swapFn` succeeds.
+      - Update the JSON result document shape in REQ-F-018: add
+        `updated_skills: [<agent_names>]` (omitempty) and
+        `skill_install_suggested: bool` (omitempty). Bump the field-order
+        list passed to `PrintBodyMap`. Update `printableUpdateResult`
+        and `MarshalJSON` accordingly.
+      - Tests: a happy-path test where 2 agents are pre-seeded as
+        installed → assert both get refreshed; a no-agents-installed test
+        → assert the hint fires and `skill_install_suggested: true` in
+        JSON; a refresh-failure test → assert non-fatal warning + binary
+        update still reports `updated: true`.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "After a successful swap, installed agents (per `common/skill/` detection) get their bundle refreshed automatically"
+      - "When no agents have the skill installed, a single-line hint suggests `neo4j-cli skill install`"
+      - "JSON output gains `updated_skills: [...]` (omitempty) and `skill_install_suggested: bool` (omitempty); existing six fields keep their REQ-F-018 order"
+      - "Skill-refresh failure for any agent is non-fatal: stderr warning, binary update still reports `updated: true`"
+      - "Pkg-mgr passthrough path does NOT trigger skill handling (no swap occurred)"
+      - "`--check` mode does NOT trigger skill handling (no swap occurred)"
+      - "Updated `bundle/references/update.md` and skill bundle SKILL.md if needed (run `go generate`)"
+      - "README \"Self-update\" subsection mentions the auto-skill-refresh behaviour"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: null
