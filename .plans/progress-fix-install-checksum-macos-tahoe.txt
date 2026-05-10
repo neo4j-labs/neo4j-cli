@@ -1,0 +1,3 @@
+## task-001 — 2026-05-10T00:00:00Z
+Swap install-script sha256 verify to POSIX `-c -` + stdout-redirect so BSD/Darwin sha256sum on macOS Tahoe works. Verified all 3 branches + tamper case on Darwin 25.
+Files: ~distribution/installation-scripts/install-neo4j-cli.sh

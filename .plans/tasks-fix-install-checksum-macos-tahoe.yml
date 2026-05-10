@@ -14,7 +14,7 @@ tasks:
       and Perl `shasum`. Drop GNU-only `--check`/`--status` long forms.
       Preserve the warn-and-continue fallback when neither tool is present.
       Covers REQ-F-001, REQ-F-002, REQ-F-003, REQ-F-004, REQ-NF-002, REQ-NF-003.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Script block matches REQ-F-002 exactly: `sha256sum -c - >/dev/null` and `shasum -a 256 -c - >/dev/null`, with `||` guard calling `error \"Checksum verification FAILED for ${ARCHIVE}\"`."
@@ -23,7 +23,7 @@ tasks:
       - "Tampering with the downloaded archive between curl and verify (e.g. `echo x >> $TMP_DIR/$ARCHIVE`) makes the script exit non-zero with the `Checksum verification FAILED` message and never reaches the extract step."
       - "Successful run prints only the existing `✔ Checksum OK` success line — no per-file `OK` noise leaks through."
       - "No new external tools are required at install time (still just curl/tar/unzip/grep/sha256sum-or-shasum)."
-    completed_at: null
+    completed_at: 2026-05-10T00:00:00Z
 
   - id: task-002
     title: "Add shellcheck CI gate for install-neo4j-cli.sh"
