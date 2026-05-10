@@ -39,7 +39,7 @@ tasks:
       (fix or annotate with justified `# shellcheck disable=SCxxxx`).
       Scope is install script only — npm/pypi shell scripts are
       explicitly out of scope. Covers REQ-F-005, REQ-F-006, REQ-NF-004.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -49,7 +49,7 @@ tasks:
       - "Job completes in under 30 seconds on a standard ubuntu-latest runner (Renovate-friendly action SHA pinning is preserved if the repo's existing actions are SHA-pinned)."
       - "Patched script (from task-001) passes the new shellcheck job with no errors; any unavoidable warnings are documented inline via `# shellcheck disable=SCxxxx` with a one-line justification comment."
       - "Job is wired into the same PR-trigger paths as existing CI (matches `test.yml` triggers or includes equivalent `pull_request` trigger)."
-    completed_at: null
+    completed_at: 2026-05-10T00:00:00Z
 
   - id: task-003
     title: "Add Patch changelog entry"
