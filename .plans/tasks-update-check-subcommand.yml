@@ -28,7 +28,7 @@ tasks:
 
       License header on the new file must match the rest of the package
       (`// Copyright (c) "Neo4j" / // Neo4j Sweden AB [http://neo4j.com]`).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`check.go` defines `newCheckCmd` with `Use: \"check\"` and the two flags `--pre-releases`, `--version` (and no `--force`)"
@@ -36,7 +36,7 @@ tasks:
       - "`cmd.AddCommand(newCheckCmd(cfg, bundle, skillName))` is wired in `update.go`"
       - "All four doc-comment locations (`update.go` flow + skill-refresh blocks, `install_method.go:72`, `versioncheck/cache.go:10`) reference `update check` instead of `--check`"
       - "New file carries the standard Neo4j copyright header; `make build` succeeds"
-    completed_at: null
+    completed_at: 2026-05-10T20:00:00Z
 
   - id: task-002
     title: "Migrate update_test.go and add colocated check_test.go"

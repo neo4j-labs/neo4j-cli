@@ -1,0 +1,4 @@
+## task-001 — 2026-05-10T20:00:00Z
+Add `update check` subcommand; drop `--check` flag from parent. Doc comments refreshed.
+Files: +neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/internal/versioncheck/cache.go
+Decisions: Kept `runOpts.check` field — runUpdate still branches on it; tests + bundle regen deferred to task-002/003.

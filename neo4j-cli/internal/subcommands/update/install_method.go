@@ -69,11 +69,11 @@ var (
 // Detect inspects the running binary's resolved path and returns the
 // InstallMethod plus the resolved absolute path used for the match.
 //
-// The resolved path is also returned so callers can render it in --check /
-// JSON output (REQ-F-018 channel + binary-path debug hooks). When
-// os.Executable / EvalSymlinks fails, Detect returns InstallMethodBinary and
-// a non-nil error — RunE treats this as "proceed with self-update" because
-// the failure mode is "we can't tell, so don't block".
+// The resolved path is also returned so callers can render it in
+// `update check` / JSON output (REQ-F-018 channel + binary-path debug hooks).
+// When os.Executable / EvalSymlinks fails, Detect returns InstallMethodBinary
+// and a non-nil error — RunE treats this as "proceed with self-update"
+// because the failure mode is "we can't tell, so don't block".
 func Detect() (InstallMethod, string, error) {
 	exe, err := executableFn()
 	if err != nil {

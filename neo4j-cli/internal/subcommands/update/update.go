@@ -79,14 +79,12 @@ var (
 func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	var (
 		preReleases bool
-		check       bool
 		version     string
 		force       bool
 	)
 
 	const (
 		preReleasesFlag = "pre-releases"
-		checkFlag       = "check"
 		versionFlag     = "version"
 		forceFlag       = "force"
 	)
@@ -103,7 +101,6 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(cmd.Context(), cmd, cfg, runOpts{
 				preReleases: preReleases,
-				check:       check,
 				version:     version,
 				force:       force,
 				bundle:      bundle,
@@ -113,9 +110,10 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&preReleases, preReleasesFlag, false, "Include alpha/beta/rc tags when looking up the latest release")
-	cmd.Flags().BoolVar(&check, checkFlag, false, "Report whether a newer version is available without downloading or swapping")
 	cmd.Flags().StringVar(&version, versionFlag, "", "Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0)")
 	cmd.Flags().BoolVar(&force, forceFlag, false, "Bypass the package-manager-managed-binary check and proceed with the in-place swap")
+
+	cmd.AddCommand(newCheckCmd(cfg, bundle, skillName))
 
 	return cmd
 }
@@ -278,7 +276,7 @@ func isStructuredFormat(format string) bool {
 //  3. Compare current vs target via semver.Compare (REQ-F-008).
 //  4. Install-method detection + passthrough hint (REQ-F-009/010/010a),
 //     unless --force.
-//  5. --check branch (REQ-F-011): report and exit without downloading.
+//  5. `update check` branch (REQ-F-011): report and exit without downloading.
 //  6. Download + verify + swap (REQ-F-012/013/014/015/016).
 //
 // The package-manager check is intentionally placed AFTER target resolution
@@ -372,9 +370,9 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	}
 
-	// REQ-F-011: --check mode — report and exit. exit 1 (non-nil error)
-	// when newer is available so CI/scripts can branch on it; exit 0 when
-	// up-to-date (handled above by the cmp == 0 fast-path).
+	// REQ-F-011: `update check` mode — report and exit. exit 1 (non-nil
+	// error) when newer is available so CI/scripts can branch on it; exit 0
+	// when up-to-date (handled above by the cmp == 0 fast-path).
 	if opts.check {
 		printResult(cmd, cfg, result, func() {
 			cmd.Printf("Current version: %s\n", current)
@@ -450,8 +448,9 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 // warning and the loop continues. A nil bundle (e.g. unit tests that don't
 // thread one through NewCmd) skips the entire refresh path silently.
 //
-// The pkg-mgr passthrough and --check branches don't reach this function
-// because no swap occurred — the call site is gated on a successful swap.
+// The pkg-mgr passthrough and `update check` branches don't reach this
+// function because no swap occurred — the call site is gated on a successful
+// swap.
 func refreshSkillBundles(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, version string) ([]string, bool) {
 	if bundle == nil || skillName == "" {
 		return nil, false
