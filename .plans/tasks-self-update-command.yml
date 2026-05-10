@@ -32,7 +32,7 @@ tasks:
       of every new file. Mount the command in `neo4j-cli/app/app.go` next to
       `aura`/`credential`/`config`/`query`/`skill` via a single `cmd.AddCommand`
       line.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "`neo4j-cli/app/app.go` adds the new command via a single `cmd.AddCommand(update.NewCmd(cfg))` line"
       - "`make build` succeeds and `bin/neo4j-cli update` returns the stub error without crashing"
       - "`make fmt-check` and `make license-check` pass on the new file"
-    completed_at: null
+    completed_at: 2026-05-10T13:15:00Z
 
   - id: task-003
     title: "Release lookup module: GitHub API + semver filter + asset URL"

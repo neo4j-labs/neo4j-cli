@@ -26,6 +26,7 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 | [`credential`](references/credential.md) | Manage and view credential values |
 | [`query`](references/query.md) | Run Cypher against a Neo4j database via the Bolt protocol |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
+| [`update`](references/update.md) | Self-update the neo4j-cli binary |
 
 ## Gotchas
 

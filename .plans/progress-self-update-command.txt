@@ -2,3 +2,8 @@
 Promoted `golang.org/x/mod` from indirect to direct require by seeding a stub `release.go` in the new `neo4j-cli/internal/subcommands/update/` package that imports `golang.org/x/mod/semver`. `go mod tidy` no-op on rerun; go.sum unchanged.
 Files: ~go.mod, +neo4j-cli/internal/subcommands/update/release.go, ~.plans/tasks-self-update-command.yml
 Decisions: kept `var _ = isValidSemver` lint shim — gets replaced by real call sites in task-003.
+
+## TASK-002 — 2026-05-10T13:15:00Z
+Scaffolded `update.go` with cobra skeleton (flags `--pre-releases`/`--check`/`--version`/`--force`) and stub RunE returning "not implemented"; mounted via `cmd.AddCommand(update.NewCmd(cfg))` in `app/app.go`. Regenerated skill bundle to clear new-command drift.
+Files: +neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/skill/bundle/SKILL.md, +neo4j-cli/internal/skill/bundle/references/update.md
+Decisions: omitted `write:true` annotation — `--check` is read-only and task-006 will gate the swap path properly.
