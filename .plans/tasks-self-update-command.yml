@@ -201,7 +201,7 @@ tasks:
       `--check`, `--pre-releases`. Run `go generate ./neo4j-cli/internal/skill/...`
       to refresh `bundle/SKILL.md` and produce `bundle/references/update.md`.
       Confirm `TestGenerator_RoundTrip` is green.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -211,7 +211,7 @@ tasks:
       - "`bundle/references/update.md` exists with flag table and `Long` description rendered"
       - "`make generate-check` reports a clean diff after `go generate`"
       - "`TestGenerator_RoundTrip` passes"
-    completed_at: null
+    completed_at: 2026-05-10T18:30:00Z
 
   - id: task-010
     title: "Changelog entry via changie (Minor)"
