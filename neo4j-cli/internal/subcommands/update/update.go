@@ -176,20 +176,36 @@ func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
 }
 
 // printResult renders the structured result to cmd.OutOrStdout using the
-// caller-selected output mode. Plain-text is the default; JSON kicks in when
-// the user passed `--format json` (or set `format: json` in the global
-// config). A "table" format request also routes to JSON because update is a
-// single-document command — there's no meaningful tabular layout.
+// caller-selected output mode. Any explicit `--format` value among the
+// structured set ("json", "table", "toon") routes through PrintBodyMap;
+// the default ("default" or empty) falls through to the plain-text path.
+//
+// The default explicitly does NOT call ResolveOutput — it must stay plain-text
+// even on a TTY, otherwise the running narrative ("Current version → Checking
+// for updates → Successfully updated from X to Y") gets clobbered by an
+// auto-detected table render.
 //
 // The plain-text branch is implemented inline rather than via PrintBodyMap
 // because the reference output (REQ-F-017) is a fixed three-line shape, not
 // a generic body-map.
 func printResult(cmd *cobra.Command, cfg *clicfg.Config, r updateResult, plainText func()) {
-	if cfg.Global.Format() == "json" {
+	if isStructuredFormat(cfg.Global.Format()) {
 		output.PrintBodyMap(cmd, cfg, printableUpdateResult{r: r}, []string{"current", "latest", "updated", "check", "channel", "install_method"})
 		return
 	}
 	plainText()
+}
+
+// isStructuredFormat reports whether the caller asked for one of the explicit
+// structured output modes (json/table/toon). The "default" / empty value is
+// NOT structured — it stays plain-text so the running narrative survives a
+// TTY (auto-detection in ResolveOutput would otherwise pick "table").
+func isStructuredFormat(format string) bool {
+	switch format {
+	case "json", "table", "toon":
+		return true
+	}
+	return false
 }
 
 // runUpdate is the orchestration entry point. It implements the REQ-F-002
@@ -329,10 +345,10 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 
 	// Plain-text path emits the running narrative ("Current version", "Checking
 	// for updates...") inline so the user sees progress before swap completes.
-	// JSON path stays silent until success and emits the full document at the
-	// end (REQ-F-018: scripts get a single deterministic blob).
-	jsonMode := cfg.Global.Format() == "json"
-	if !jsonMode {
+	// Any structured-output mode (json/table/toon) stays silent until success
+	// and emits the full document at the end (REQ-F-018: scripts get a single
+	// deterministic blob).
+	if !isStructuredFormat(cfg.Global.Format()) {
 		cmd.Printf("Current version: %s\n", current)
 		cmd.Println("Checking for updates to latest version...")
 	}

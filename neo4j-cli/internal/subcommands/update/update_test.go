@@ -600,6 +600,76 @@ func TestJSONOutput_FieldOrderDeterministic(t *testing.T) {
 	}
 }
 
+// TestTableOutput_HappyPath asserts --format table produces a structured
+// table (not the plain-text running narrative) with the documented six
+// columns rendered as headers. go-pretty/v6/table upper-cases header text by
+// default, so assertions compare against strings.ToLower for header columns.
+func TestTableOutput_HappyPath(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{}, "table")
+	require.NoError(t, err)
+
+	// The plain-text running narrative must NOT appear when --format table is
+	// in effect — otherwise scripts piping table output get a polluted stream.
+	assert.NotContains(t, out, "Successfully updated", "plain-text narrative must not bleed through structured output")
+	assert.NotContains(t, out, "Checking for updates")
+
+	// Headers (case-insensitive — go-pretty upper-cases by default).
+	lower := strings.ToLower(out)
+	for _, header := range []string{"current", "latest", "updated", "check", "channel", "install_method"} {
+		assert.Contains(t, lower, header, "table output must include header %q", header)
+	}
+	// Body cells (exact case).
+	assert.Contains(t, out, "v0.1.0", "table body must include current version")
+	assert.Contains(t, out, "v0.2.0", "table body must include latest version")
+	assert.Contains(t, out, "binary", "table body must include install_method")
+}
+
+// TestToonOutput_HappyPath asserts --format toon produces a structured toon
+// document (not plain text and not JSON) containing the documented six fields.
+func TestToonOutput_HappyPath(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{}, "toon")
+	require.NoError(t, err)
+
+	// Toon must NOT be the plain-text narrative.
+	assert.NotContains(t, out, "Successfully updated", "plain-text narrative must not bleed through structured output")
+	assert.NotContains(t, out, "Checking for updates")
+
+	// Toon must NOT be valid JSON (sanity guard against accidentally emitting
+	// JSON when the user asked for toon).
+	var v any
+	jsonErr := json.Unmarshal([]byte(out), &v)
+	assert.Error(t, jsonErr, "toon output should not parse as JSON, got: %q", out)
+
+	// All six documented field keys must appear in the toon document.
+	for _, key := range []string{"current", "latest", "updated", "check", "channel", "install_method"} {
+		assert.Contains(t, out, key, "toon output must include key %q", key)
+	}
+	// Body values.
+	assert.Contains(t, out, "v0.1.0")
+	assert.Contains(t, out, "v0.2.0")
+	assert.Contains(t, out, "binary")
+}
+
 // TestPrintableUpdateResult_AsArrayShape covers the table-render shape of
 // printableUpdateResult. We don't ship a "table" output for update (the
 // document isn't list-shaped) but PrintBodyMap insists on AsArray, so the

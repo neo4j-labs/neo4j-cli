@@ -304,7 +304,7 @@ tasks:
       reference output even on a TTY, otherwise the running narrative
       ("Current → Checking → Successfully updated from X to Y") gets
       clobbered by an auto-detected table render.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -315,4 +315,4 @@ tasks:
       - "`AGENTS.md:85` updated to mention toon (\"JSON, table, and toon rendering\" or equivalent)"
       - "PR #71 description updated via `gh pr edit` to mention toon alongside json/table"
       - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-10T19:00:00Z
