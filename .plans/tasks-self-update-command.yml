@@ -137,7 +137,7 @@ tasks:
       up-to-date — never download;
       (6) otherwise: download, verify, swap. Plumb the `channel` and
       `install_method` fields for output (set by upstream modules).
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -149,7 +149,7 @@ tasks:
       - "`--version v9.9.9` (semver-valid, but no such tag) surfaces a clear `tag not found` error and exits 1"
       - "Downgrade attempt without `--version` (current > latest) is rejected with a clear error"
       - "`--force` bypasses install-method detection and proceeds to swap (verified via test seam)"
-    completed_at: null
+    completed_at: 2026-05-10T17:00:00Z
 
   - id: task-007
     title: "Output formatting: plain-text default + JSON via PrintBodyMap"

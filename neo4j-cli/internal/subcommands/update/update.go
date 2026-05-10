@@ -3,17 +3,55 @@
 
 // Package update implements the `neo4j-cli update` self-update command.
 //
-// The current state is a scaffold: flags are wired and visible in `--help`,
-// but `RunE` returns a "not implemented" error. Subsequent tasks will fill in
-// release lookup, install-method detection, atomic swap, and the RunE flow
-// that ties them together.
+// The command compares the running binary's baked-in version against the
+// latest GitHub release at neo4j-labs/neo4j-cli and, when newer, downloads
+// + atomically swaps the binary in place. When the running binary lives
+// under a known package-manager prefix (Homebrew, npm-global, pipx, uv
+// tool), the command refuses to overwrite and prints the channel-correct
+// upgrade command instead.
+//
+// The package is intentionally split across files for testability:
+//
+//   - update.go        — cobra wiring + RunE flow that ties the modules
+//     together. The flow follows REQ-F-002…REQ-F-016 in
+//     prd-self-update-command.md.
+//   - release.go       — GitHub release discovery + asset URL builder.
+//   - install_method.go— is the running binary under a known package-manager
+//     prefix? + the rich passthrough hint.
+//   - swap.go          — download + verify + extract + atomic rename.
 package update
 
 import (
-	"fmt"
+	"context"
+	"errors"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
+)
+
+// devVersion is the sentinel returned by `neo4j-cli --version` for a
+// non-released local build (set by `make build` when ldflags don't bake in
+// a real tag). REQ-F-002: the update flow short-circuits with a friendly
+// message when this is the running version, never contacting GitHub.
+const devVersion = "dev"
+
+// Test seams. Production fills with real impls; tests swap via the
+// withLatest / withGetByTag / withDetect / withSwap helpers in update_test.go.
+//
+// The seams are exposed as package-level vars (per AGENTS.md "Package-level
+// test seams") so the RunE flow can be unit-tested without standing up a
+// real httptest server, fake binary on disk, AND a fake archive simultaneously.
+// The release / install_method / swap modules each have their own
+// finer-grained seams (httpDoFn, executableFn, etc.) for module-level tests;
+// the seams here let RunE assert the orchestration without re-testing the
+// modules' internals.
+var (
+	latestFn   = Latest
+	getByTagFn = GetByTag
+	detectFn   = Detect
+	swapFn     = Swap
 )
 
 // NewCmd returns the `update` cobra command. It is mounted as a top-level
@@ -43,12 +81,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the " +
 			"channel-correct upgrade command instead — pass `--force` to override.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = cfg
-			_ = preReleases
-			_ = check
-			_ = version
-			_ = force
-			return fmt.Errorf("not implemented")
+			return runUpdate(cmd.Context(), cmd, cfg, runOpts{
+				preReleases: preReleases,
+				check:       check,
+				version:     version,
+				force:       force,
+			})
 		},
 	}
 
@@ -58,4 +96,163 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.Flags().BoolVar(&force, forceFlag, false, "Bypass the package-manager-managed-binary check and proceed with the in-place swap")
 
 	return cmd
+}
+
+// runOpts groups the four user-facing flags so runUpdate's signature stays
+// small as the implementation grows. Internal-only — not part of any
+// exported API.
+type runOpts struct {
+	preReleases bool
+	check       bool
+	version     string
+	force       bool
+}
+
+// runUpdate is the orchestration entry point. It implements the REQ-F-002
+// through REQ-F-016 ordering documented in the PRD:
+//
+//  1. Dev-build short-circuit (REQ-F-002).
+//  2. Resolve target version (release lookup or --version <tag>).
+//  3. Compare current vs target via semver.Compare (REQ-F-008).
+//  4. Install-method detection + passthrough hint (REQ-F-009/010/010a),
+//     unless --force.
+//  5. --check branch (REQ-F-011): report and exit without downloading.
+//  6. Download + verify + swap (REQ-F-012/013/014/015/016).
+//
+// The package-manager check is intentionally placed AFTER target resolution
+// so the user gets a meaningful "you're on vX, vY is available — run brew
+// upgrade neo4j-cli" message rather than a content-free "we won't update,
+// run brew upgrade neo4j-cli".
+func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts runOpts) error {
+	current := cfg.Version
+	if current == devVersion || current == "" {
+		// REQ-F-002: dev build — no network call.
+		cmd.Println("running a dev build, nothing to update")
+		return nil
+	}
+
+	// Validate --version up front so a bad value is rejected before we hit
+	// the network. ValidateVersionTag rejects empty too — guard here.
+	if opts.version != "" {
+		if err := ValidateVersionTag(opts.version); err != nil {
+			return clierr.NewUsageError("invalid --version: %v", err)
+		}
+	}
+
+	// Resolve the target release.
+	target, channel, err := resolveTarget(ctx, opts)
+	if err != nil {
+		// REQ-F-006: friendly hint when stable-only filter excludes everything.
+		if errors.Is(err, ErrNoStableRelease) {
+			cmd.Println("no stable release published yet — pass `--pre-releases` to track alpha/beta/rc tags.")
+			return nil
+		}
+		if errors.Is(err, ErrTagNotFound) {
+			return clierr.NewUsageError("release tag %q not found", opts.version)
+		}
+		return clierr.NewUpstreamError("look up release: %v", err)
+	}
+
+	// Compare current vs target. semver.Compare requires both to be valid;
+	// app.Version is generated by the release pipeline so it is, but be
+	// defensive — a malformed current value should produce a clear error
+	// rather than a misleading downgrade refusal.
+	if !semver.IsValid(current) {
+		return clierr.NewFatalError("running binary version %q is not valid semver; cannot compare", current)
+	}
+	cmp := semver.Compare(current, target.TagName)
+
+	// REQ-F-008: same version is "already up-to-date", current > target is
+	// "downgrade" (rejected unless --version explicitly set).
+	if cmp == 0 {
+		cmd.Printf("Already on %s. No update needed.\n", current)
+		return nil
+	}
+	if cmp > 0 && opts.version == "" {
+		return clierr.NewUsageError(
+			"running binary (%s) is newer than the latest %s release (%s); pass --version explicitly to downgrade",
+			current, channel, target.TagName,
+		)
+	}
+
+	// REQ-F-009/010: detect install method and bail out with the rich hint
+	// unless the user passed --force. We do this AFTER discovering the
+	// target so the user knows whether there's anything new before we tell
+	// them to use brew/pipx/uv/npm.
+	if !opts.force {
+		method, _, detectErr := detectFn()
+		// Treat detection error as "fall through to swap" — the function
+		// already returned InstallMethodBinary in that case. We do NOT
+		// surface the err to the user; install_method.go documents this.
+		_ = detectErr
+		if hint := Hint(method); hint != "" {
+			cmd.Printf("%s already on %s; %s available.\n", method, current, target.TagName)
+			cmd.Print(hint)
+			return nil
+		}
+	}
+
+	// REQ-F-011: --check mode — report and exit. exit 1 (non-nil error)
+	// when newer is available so CI/scripts can branch on it; exit 0 when
+	// up-to-date (handled above by the cmp == 0 fast-path).
+	if opts.check {
+		cmd.Printf("Current version: %s\n", current)
+		cmd.Printf("Latest %s version: %s\n", channel, target.TagName)
+		// cmp < 0 — newer available.
+		return clierr.NewUsageError("a newer version is available: %s -> %s", current, target.TagName)
+	}
+
+	// REQ-F-012/013/014/015/016: download → verify → extract → atomic
+	// swap. Build the asset URLs, resolve the running binary's resolved
+	// (post-EvalSymlinks) absolute path, hand off to Swap.
+	urls, err := BuildAssetURLs(target.TagName)
+	if err != nil {
+		return clierr.NewFatalError("build asset URL: %v", err)
+	}
+
+	_, currentBinaryPath, _ := detectFn()
+	if currentBinaryPath == "" {
+		// detectFn returns the resolved exe path even when classification
+		// is "binary"; an empty value here means the executable lookup
+		// failed entirely. Surface a clear error rather than swap a
+		// guessed path.
+		return clierr.NewFatalError("could not locate running binary on disk")
+	}
+
+	cmd.Printf("Current version: %s\n", current)
+	cmd.Println("Checking for updates to latest version...")
+
+	if err := swapFn(ctx, urls, currentBinaryPath); err != nil {
+		return clierr.NewFatalError("update failed: %v", err)
+	}
+
+	cmd.Printf("Successfully updated from %s to %s\n", current, target.TagName)
+	return nil
+}
+
+// resolveTarget discovers the release the user wants to land on and the
+// channel ("stable" / "pre-release") that produced the match. The channel
+// label feeds the JSON output (REQ-F-018) and the user-facing messages.
+func resolveTarget(ctx context.Context, opts runOpts) (*Release, string, error) {
+	if opts.version != "" {
+		r, err := getByTagFn(ctx, opts.version)
+		if err != nil {
+			return nil, "", err
+		}
+		channel := "stable"
+		if semver.Prerelease(r.TagName) != "" {
+			channel = "pre-release"
+		}
+		return r, channel, nil
+	}
+
+	r, err := latestFn(ctx, opts.preReleases)
+	if err != nil {
+		return nil, "", err
+	}
+	channel := "stable"
+	if opts.preReleases && semver.Prerelease(r.TagName) != "" {
+		channel = "pre-release"
+	}
+	return r, channel, nil
 }
