@@ -367,7 +367,7 @@ tasks:
       - Tests must use the package-level `randFloat` test seam (per AGENTS.md
         Package-level test seams) so dice-roll outcomes are deterministic.
         HTTP via httptest.Server. FS via testfs.GetTestFs.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -380,7 +380,7 @@ tasks:
       - "`NEO4J_CLI_NO_UPDATE_NAG=1` disables both the dice roll and the hint"
       - "Stdout of every existing command is byte-identical with the env-var set vs unset (regression guard)"
       - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-10T20:00:00Z
 
   - id: task-015
     title: "Post-update skill handling: auto-upgrade installed skills; hint when none"
