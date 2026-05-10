@@ -2,7 +2,7 @@
 
 Self-update the neo4j-cli binary
 
-Self-update the neo4j-cli binary by downloading the latest GitHub release and atomically swapping it in place. By default only stable semver tags are considered; pass `--pre-releases` to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the channel-correct upgrade command instead — pass `--force` to override.
+Self-update the neo4j-cli binary by downloading the latest GitHub release and atomically swapping it in place. By default only stable semver tags are considered; pass `--pre-releases` to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the channel-correct upgrade command instead — pass `--force` to override. After a successful swap, any installed agent skill bundles are refreshed automatically.
 
 Usage: `neo4j-cli update [flags]`
 

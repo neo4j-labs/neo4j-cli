@@ -9,11 +9,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/neo4j/cli/common/clicfg"
+	commonskill "github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +55,33 @@ func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, current
 	t.Cleanup(func() { swapFn = prev })
 }
 
+// withListSkills swaps the listSkillsFn seam. Returns a mock list of
+// AgentInstall rows so tests can pre-seed installed/uninstalled agents
+// without populating an afero.Fs with the right marker files.
+func withListSkills(t *testing.T, fn func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error)) {
+	t.Helper()
+	prev := listSkillsFn
+	listSkillsFn = fn
+	t.Cleanup(func() { listSkillsFn = prev })
+}
+
+// withInstallSkill swaps the installSkillFn seam. The test version
+// records the per-agent invocation order and can simulate a refresh
+// failure for a specific agent name.
+func withInstallSkill(t *testing.T, fn func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error)) {
+	t.Helper()
+	prev := installSkillFn
+	installSkillFn = fn
+	t.Cleanup(func() { installSkillFn = prev })
+}
+
+// stubBundle is a tiny embed-shaped FS used by the post-swap skill-refresh
+// tests. The content doesn't matter — refreshSkillBundles only checks for
+// non-nil before invoking the seam.
+var stubBundle fs.FS = fstest.MapFS{
+	"SKILL.md": &fstest.MapFile{Data: []byte("stub")},
+}
+
 // runWithOpts builds a fresh cobra command with NewCmd, sets the version on
 // the config, and dispatches RunE with the supplied opts. Returns the
 // stdout buffer and the error (if any).
@@ -65,14 +96,20 @@ func runWithOpts(t *testing.T, current string, opts runOpts) (string, error) {
 // runWithOptsFormat is the format-explicit variant of runWithOpts. Used by
 // the JSON-output golden tests. Pass "json" to seed cfg.Global.Format() with
 // json so printResult routes through PrintBodyMap.
+//
+// `opts.bundle` / `opts.skillName` are left nil/empty by default — the
+// post-swap skill-refresh path is exercised explicitly by the
+// TestRunUpdate_PostSwap_* tests below which seed both. A nil bundle / empty
+// skillName short-circuits refreshSkillBundles, which keeps the existing
+// JSON / plain-text golden tests unchanged.
 func runWithOptsFormat(t *testing.T, current string, opts runOpts, format string) (string, error) {
 	t.Helper()
 	cfgJSON := `{"format":"` + format + `"}`
-	fs, err := testfs.GetTestFs(cfgJSON, "{}")
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, current, clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
 
-	cmd := NewCmd(cfg)
+	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
@@ -360,11 +397,11 @@ func TestRunUpdate_SwapFailure_PropagatesError(t *testing.T) {
 func TestNewCmd_FlagsExposed(t *testing.T) {
 	// Smoke-test that the four user-facing flags are still wired after the
 	// RunE refactor.
-	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
 
-	cmd := NewCmd(cfg)
+	cmd := NewCmd(cfg, nil, "")
 	for _, name := range []string{"pre-releases", "check", "version", "force"} {
 		f := cmd.Flags().Lookup(name)
 		require.NotNil(t, f, "flag --%s should be registered", name)
@@ -708,11 +745,11 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 	// format: "default" so the plain-text "Already on" line is emitted (this
 	// test asserts that the stub from task-002 is replaced by runUpdate, not
 	// the output formatting itself — that lives in TestPlainTextOutput_*).
-	fs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
 
-	cmd := NewCmd(cfg)
+	cmd := NewCmd(cfg, nil, "")
 	out := &bytes.Buffer{}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
@@ -729,12 +766,361 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 // Long string survives the RunE refactor (referenced by the skill bundle).
 // Not strictly required for task-006 but cheap.
 func TestNewCmd_LongDescriptionPreserved(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "v0.1.0", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
 
-	cmd := NewCmd(cfg)
+	cmd := NewCmd(cfg, nil, "")
 	assert.Contains(t, cmd.Long, "Self-update")
 	assert.Contains(t, cmd.Long, "--pre-releases")
 	assert.Contains(t, cmd.Long, "--force")
+}
+
+// runWithBundleFormat is the bundle-aware variant of runWithOptsFormat. The
+// post-swap skill-refresh tests below need NewCmd to receive a non-nil
+// bundle + skillName so refreshSkillBundles fires.
+func runWithBundleFormat(t *testing.T, current string, opts runOpts, format string) (string, string, error) {
+	t.Helper()
+	cfgJSON := `{"format":"` + format + `"}`
+	tfs, err := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, stubBundle, "neo4j-cli")
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	opts.bundle = stubBundle
+	opts.skillName = "neo4j-cli"
+
+	err = runUpdate(context.Background(), cmd, cfg, opts)
+	return out.String(), errOut.String(), err
+}
+
+// TestRunUpdate_PostSwap_RefreshesInstalledAgents covers the happy path:
+// two agents are pre-seeded as installed; both get refreshed via
+// installSkillFn and appear in the user-facing output.
+func TestRunUpdate_PostSwap_RefreshesInstalledAgents(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}
+	cursor := &commonskill.Agent{Name: "cursor", DisplayName: "Cursor"}
+	codex := &commonskill.Agent{Name: "codex", DisplayName: "Codex"}
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{
+			{Agent: claude, Detected: true, Installed: true, InstalledVersion: "v0.1.0"},
+			{Agent: cursor, Detected: true, Installed: true, InstalledVersion: "v0.1.0"},
+			// codex detected but NOT installed — must NOT be refreshed.
+			{Agent: codex, Detected: true, Installed: false},
+		}, nil
+	})
+	var refreshed []string
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		assert.Equal(t, "neo4j-cli", skillName)
+		assert.Equal(t, "v0.2.0", version, "refresh must use the new binary's version, not the old one")
+		assert.NotNil(t, bundle, "bundle must be threaded through to the refresh call")
+		refreshed = append(refreshed, agentFilter)
+		// Pretend the install returned the matched agent.
+		return []*commonskill.Agent{{Name: agentFilter}}, nil
+	})
+
+	out, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"claude-code", "cursor"}, refreshed,
+		"only Installed=true agents must be refreshed, in catalog order")
+	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
+	assert.Contains(t, out, "Refreshed skill bundle for: claude-code, cursor")
+	// The hint for the no-installs branch must NOT fire here.
+	assert.NotContains(t, out, "Tip: install the agent skill")
+}
+
+// TestRunUpdate_PostSwap_NoAgentsInstalled covers the hint branch: no agent
+// has the skill installed, so the user is told to run skill install. The
+// JSON shape gains skill_install_suggested: true.
+func TestRunUpdate_PostSwap_NoAgentsInstalled(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{
+			{Agent: claude, Detected: true, Installed: false},
+		}, nil
+	})
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		t.Fatal("installSkillFn must not be called when no agent has the skill installed")
+		return nil, nil
+	})
+
+	// Plain-text branch: hint line.
+	out, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
+	assert.Contains(t, out, "Tip: install the agent skill")
+	assert.Contains(t, out, "neo4j-cli skill install")
+
+	// JSON branch: skill_install_suggested:true. Reset seams via withX helpers
+	// (they auto-restore on Cleanup; re-applying overrides for the second sub-run).
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{{Agent: claude, Detected: true, Installed: false}}, nil
+	})
+	jsonOut, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "json")
+	require.NoError(t, err)
+
+	var doc struct {
+		Updated               bool     `json:"updated"`
+		UpdatedSkills         []string `json:"updated_skills"`
+		SkillInstallSuggested bool     `json:"skill_install_suggested"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(jsonOut), &doc))
+	assert.True(t, doc.Updated)
+	assert.Empty(t, doc.UpdatedSkills, "updated_skills must be omitted/empty when no agent was refreshed")
+	assert.True(t, doc.SkillInstallSuggested, "skill_install_suggested must be true on the no-installs branch")
+}
+
+// TestRunUpdate_PostSwap_RefreshFailure_NonFatal covers the resilience
+// requirement: a refresh failure for one agent must NOT cause update to
+// exit non-zero, and the binary update must still report updated:true.
+// A stderr warning is the only user-visible signal.
+func TestRunUpdate_PostSwap_RefreshFailure_NonFatal(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}
+	cursor := &commonskill.Agent{Name: "cursor", DisplayName: "Cursor"}
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{
+			{Agent: claude, Detected: true, Installed: true},
+			{Agent: cursor, Detected: true, Installed: true},
+		}, nil
+	})
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		if agentFilter == "claude-code" {
+			return nil, errors.New("simulated refresh failure")
+		}
+		return []*commonskill.Agent{{Name: agentFilter}}, nil
+	})
+
+	out, errOut, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
+	require.NoError(t, err, "refresh failure must NOT fail the binary-update command")
+	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
+	// Only cursor was refreshed (claude failed).
+	assert.Contains(t, out, "Refreshed skill bundle for: cursor")
+	assert.NotContains(t, out, "claude-code")
+	// Stderr carries the warning so the user knows something didn't work.
+	assert.Contains(t, errOut, "Warning")
+	assert.Contains(t, errOut, "claude-code")
+	assert.Contains(t, errOut, "simulated refresh failure")
+}
+
+// TestRunUpdate_PkgMgrPassthrough_DoesNotRefreshSkills asserts the pkg-mgr
+// passthrough branch never reaches refreshSkillBundles — no swap occurred,
+// so the on-disk bundle is not stale and we mustn't pretend it was refreshed.
+func TestRunUpdate_PkgMgrPassthrough_DoesNotRefreshSkills(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
+	})
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		t.Fatal("listSkillsFn must not be called on the pkg-mgr passthrough branch (no swap occurred)")
+		return nil, nil
+	})
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		t.Fatal("installSkillFn must not be called on the pkg-mgr passthrough branch")
+		return nil, nil
+	})
+
+	out, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
+	require.NoError(t, err)
+	assert.Contains(t, out, "brew upgrade neo4j-cli")
+	// And no skill bookkeeping leaked into the message.
+	assert.NotContains(t, out, "Refreshed skill bundle")
+	assert.NotContains(t, out, "Tip: install the agent skill")
+}
+
+// TestRunUpdate_CheckMode_DoesNotRefreshSkills mirrors the pkg-mgr branch
+// for the --check path: no swap occurred, no refresh.
+func TestRunUpdate_CheckMode_DoesNotRefreshSkills(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		t.Fatal("listSkillsFn must not be called on --check (no swap occurred)")
+		return nil, nil
+	})
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		t.Fatal("installSkillFn must not be called on --check")
+		return nil, nil
+	})
+
+	_, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{check: true}, "default")
+	require.Error(t, err, "--check + newer must error to set exit code")
+	assert.Contains(t, err.Error(), "newer version is available")
+}
+
+// TestRunUpdate_PostSwap_NilBundle_SkipsRefresh asserts the bundle-nil
+// short-circuit: tests that don't thread a bundle through must not fire
+// the skill seams (which would otherwise be ambient-noise in unrelated
+// tests).
+func TestRunUpdate_PostSwap_NilBundle_SkipsRefresh(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		t.Fatal("listSkillsFn must not be called when bundle is nil")
+		return nil, nil
+	})
+
+	out, err := runWithOpts(t, "v0.1.0", runOpts{})
+	require.NoError(t, err)
+	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
+	assert.NotContains(t, out, "Refreshed skill bundle")
+	assert.NotContains(t, out, "Tip: install the agent skill")
+}
+
+// TestRunUpdate_PostSwap_JSONHappyPath asserts the structured-output shape
+// when both the binary and (at least one) skill bundle were refreshed:
+// updated_skills lists the agents in catalog order, skill_install_suggested
+// is omitted.
+func TestRunUpdate_PostSwap_JSONHappyPath(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}
+	cursor := &commonskill.Agent{Name: "cursor", DisplayName: "Cursor"}
+	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return []commonskill.AgentInstall{
+			{Agent: claude, Detected: true, Installed: true},
+			{Agent: cursor, Detected: true, Installed: true},
+		}, nil
+	})
+	withInstallSkill(t, func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		return []*commonskill.Agent{{Name: agentFilter}}, nil
+	})
+
+	out, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "json")
+	require.NoError(t, err)
+
+	var doc struct {
+		Current               string   `json:"current"`
+		Latest                string   `json:"latest"`
+		Updated               bool     `json:"updated"`
+		UpdatedSkills         []string `json:"updated_skills"`
+		SkillInstallSuggested bool     `json:"skill_install_suggested"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &doc))
+	assert.Equal(t, "v0.1.0", doc.Current)
+	assert.Equal(t, "v0.2.0", doc.Latest)
+	assert.True(t, doc.Updated)
+	assert.Equal(t, []string{"claude-code", "cursor"}, doc.UpdatedSkills)
+	assert.False(t, doc.SkillInstallSuggested,
+		"skill_install_suggested must be omitted/false when at least one agent was refreshed")
+
+	// Field-order: updated_skills must appear AFTER install_method in the
+	// raw stream so downstream scripts can rely on REQ-F-018 + the new keys.
+	imIdx := strings.Index(out, "\"install_method\"")
+	usIdx := strings.Index(out, "\"updated_skills\"")
+	require.GreaterOrEqual(t, imIdx, 0)
+	require.GreaterOrEqual(t, usIdx, 0)
+	assert.Greater(t, usIdx, imIdx, "updated_skills must follow install_method in JSON output")
+}
+
+// TestPrintableUpdateResult_AsArrayShape_PostSwapFields asserts the table /
+// toon AsArray shape includes updated_skills + skill_install_suggested when
+// (and only when) they're populated.
+func TestPrintableUpdateResult_AsArrayShape_PostSwapFields(t *testing.T) {
+	cases := []struct {
+		name                     string
+		updatedSkills            []string
+		skillInstallSuggested    bool
+		wantUpdatedSkillsKey     bool
+		wantSkillInstallSuggKey  bool
+		wantSkillInstallSuggCell any
+	}{
+		{
+			name:                    "no post-swap fields",
+			updatedSkills:           nil,
+			skillInstallSuggested:   false,
+			wantUpdatedSkillsKey:    false,
+			wantSkillInstallSuggKey: false,
+		},
+		{
+			name:                    "agents refreshed",
+			updatedSkills:           []string{"claude-code", "cursor"},
+			skillInstallSuggested:   false,
+			wantUpdatedSkillsKey:    true,
+			wantSkillInstallSuggKey: false,
+		},
+		{
+			name:                     "no agents — suggest install",
+			updatedSkills:            nil,
+			skillInstallSuggested:    true,
+			wantUpdatedSkillsKey:     false,
+			wantSkillInstallSuggKey:  true,
+			wantSkillInstallSuggCell: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := printableUpdateResult{r: updateResult{
+				current:               "v0.1.0",
+				latest:                "v0.2.0",
+				updated:               true,
+				channel:               "stable",
+				installMethod:         "binary",
+				updatedSkills:         tc.updatedSkills,
+				skillInstallSuggested: tc.skillInstallSuggested,
+			}}
+			rows := p.AsArray()
+			require.Len(t, rows, 1)
+			_, hasUS := rows[0]["updated_skills"]
+			_, hasSIS := rows[0]["skill_install_suggested"]
+			assert.Equal(t, tc.wantUpdatedSkillsKey, hasUS, "updated_skills key presence")
+			assert.Equal(t, tc.wantSkillInstallSuggKey, hasSIS, "skill_install_suggested key presence")
+			if tc.wantSkillInstallSuggKey {
+				assert.Equal(t, tc.wantSkillInstallSuggCell, rows[0]["skill_install_suggested"])
+			}
+		})
+	}
 }

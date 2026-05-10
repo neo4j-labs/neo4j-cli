@@ -432,7 +432,7 @@ tasks:
         → assert the hint fires and `skill_install_suggested: true` in
         JSON; a refresh-failure test → assert non-fatal warning + binary
         update still reports `updated: true`.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -445,4 +445,4 @@ tasks:
       - "Updated `bundle/references/update.md` and skill bundle SKILL.md if needed (run `go generate`)"
       - "README \"Self-update\" subsection mentions the auto-skill-refresh behaviour"
       - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-10T20:30:00Z

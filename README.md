@@ -23,6 +23,8 @@ neo4j-cli update --version v0.1.0        # pin to a named tag (also the only way
 
 When the running binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool), `update` refuses to overwrite and prints the channel-correct upgrade command — plus the `curl -sSfL https://neo4j.sh/install.sh | bash` install-script alternative and (optionally) the uninstall command if you'd rather switch to the install-script copy. Pass `--force` to bypass the check and swap in place anyway. See `neo4j-cli update --help` for the full surface.
 
+After a successful in-place swap, any installed agent skill bundles (Claude Code, Cursor, Windsurf, etc.) are refreshed automatically so AI assistants pick up the new commands without a separate `skill install` step. If no agent has the skill installed, `update` prints a one-line tip suggesting you run `neo4j-cli skill install`.
+
 ## Agent skills
 
 `neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops it into each detected agent's skill directory; pass an agent name to target one.

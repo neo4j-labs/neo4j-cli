@@ -25,10 +25,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/output"
+	commonskill "github.com/neo4j/cli/common/skill"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -54,12 +58,25 @@ var (
 	getByTagFn = GetByTag
 	detectFn   = Detect
 	swapFn     = Swap
+	// listSkillsFn enumerates per-agent skill install state. Production
+	// uses common/skill.List; tests swap to seed installed/uninstalled
+	// agents without touching disk.
+	listSkillsFn = commonskill.List
+	// installSkillFn refreshes a single agent's bundle. Production uses
+	// common/skill.Install with a one-agent filter; tests swap to assert
+	// per-agent invocation order and simulate refresh failures.
+	installSkillFn = commonskill.Install
 )
 
 // NewCmd returns the `update` cobra command. It is mounted as a top-level
 // subcommand on the neo4j-cli tree alongside `aura`, `credential`, `config`,
 // `query`, and `skill`.
-func NewCmd(cfg *clicfg.Config) *cobra.Command {
+//
+// `bundle` and `skillName` are the embedded skill bundle and its on-disk
+// install dir (e.g. "neo4j-cli"); after a successful in-place swap the
+// command refreshes any installed agents' bundles so AI assistants pick up
+// the new binary's surface without a manual `skill install` step.
+func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	var (
 		preReleases bool
 		check       bool
@@ -81,13 +98,16 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"swapping it in place. By default only stable semver tags are considered; pass `--pre-releases` " +
 			"to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager " +
 			"prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the " +
-			"channel-correct upgrade command instead — pass `--force` to override.",
+			"channel-correct upgrade command instead — pass `--force` to override. " +
+			"After a successful swap, any installed agent skill bundles are refreshed automatically.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(cmd.Context(), cmd, cfg, runOpts{
 				preReleases: preReleases,
 				check:       check,
 				version:     version,
 				force:       force,
+				bundle:      bundle,
+				skillName:   skillName,
 			})
 		},
 	}
@@ -100,14 +120,19 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	return cmd
 }
 
-// runOpts groups the four user-facing flags so runUpdate's signature stays
-// small as the implementation grows. Internal-only — not part of any
+// runOpts groups the four user-facing flags plus the embedded skill bundle
+// (so post-swap skill refresh has access to it) so runUpdate's signature
+// stays small as the implementation grows. Internal-only — not part of any
 // exported API.
 type runOpts struct {
 	preReleases bool
 	check       bool
 	version     string
 	force       bool
+	// bundle / skillName are nil/empty for unit tests that don't exercise
+	// the post-swap skill-refresh path. Production wires both via NewCmd.
+	bundle    fs.FS
+	skillName string
 }
 
 // updateResult is the structured representation of an update-command run,
@@ -116,8 +141,9 @@ type runOpts struct {
 // stable-only filter miss) still produce a well-formed JSON document.
 //
 // Field order matches REQ-F-018: current, latest, updated, check, channel,
-// install_method. The JSON path goes through printableUpdateResult below to
-// pin that order via MarshalJSON.
+// install_method, then post-swap-only updated_skills + skill_install_suggested.
+// The JSON path goes through printableUpdateResult below to pin that order
+// via MarshalJSON.
 type updateResult struct {
 	current       string
 	latest        string
@@ -125,6 +151,13 @@ type updateResult struct {
 	check         bool
 	channel       string
 	installMethod string
+	// updatedSkills lists agent names whose skill bundle was refreshed
+	// after a successful swap. omitempty in JSON.
+	updatedSkills []string
+	// skillInstallSuggested is true when no agent was detected as having
+	// the skill installed, so the user is hinted to run
+	// `neo4j-cli skill install`. omitempty in JSON.
+	skillInstallSuggested bool
 }
 
 // printableUpdateResult wraps updateResult and satisfies output.ResponseData
@@ -137,40 +170,54 @@ type printableUpdateResult struct {
 
 // AsArray returns a single-row slice for table rendering. Update output is
 // document-shaped (not list-shaped), so we wrap the one row in a slice as
-// required by the ResponseData interface.
+// required by the ResponseData interface. Post-swap-only fields
+// (updated_skills, skill_install_suggested) are included only when set so
+// table renders stay tight on the more common no-swap branches.
 func (p printableUpdateResult) AsArray() []map[string]any {
-	return []map[string]any{{
+	row := map[string]any{
 		"current":        p.r.current,
 		"latest":         p.r.latest,
 		"updated":        p.r.updated,
 		"check":          p.r.check,
 		"channel":        p.r.channel,
 		"install_method": p.r.installMethod,
-	}}
+	}
+	if len(p.r.updatedSkills) > 0 {
+		row["updated_skills"] = p.r.updatedSkills
+	}
+	if p.r.skillInstallSuggested {
+		row["skill_install_suggested"] = true
+	}
+	return []map[string]any{row}
 }
 
 // MarshalJSON emits a single object (not an array) with the documented
 // REQ-F-018 field order. PrintBodyMap's JSON path calls json.MarshalIndent
 // which honours this; the table/toon paths use AsArray which wraps in a
 // slice for grid rendering.
+//
+// The first six fields keep their REQ-F-018 order; updated_skills /
+// skill_install_suggested follow with omitempty so the JSON shape stays
+// stable for callers on the no-swap branches (passthrough hint, --check).
 func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
-	// json.RawMessage assembled in REQ-F-018 order. Using an ordered slice of
-	// (key, value) pairs would also work; a tiny anonymous struct is the
-	// idiomatic Go form.
 	doc := struct {
-		Current       string `json:"current"`
-		Latest        string `json:"latest"`
-		Updated       bool   `json:"updated"`
-		Check         bool   `json:"check"`
-		Channel       string `json:"channel"`
-		InstallMethod string `json:"install_method"`
+		Current               string   `json:"current"`
+		Latest                string   `json:"latest"`
+		Updated               bool     `json:"updated"`
+		Check                 bool     `json:"check"`
+		Channel               string   `json:"channel"`
+		InstallMethod         string   `json:"install_method"`
+		UpdatedSkills         []string `json:"updated_skills,omitempty"`
+		SkillInstallSuggested bool     `json:"skill_install_suggested,omitempty"`
 	}{
-		Current:       p.r.current,
-		Latest:        p.r.latest,
-		Updated:       p.r.updated,
-		Check:         p.r.check,
-		Channel:       p.r.channel,
-		InstallMethod: p.r.installMethod,
+		Current:               p.r.current,
+		Latest:                p.r.latest,
+		Updated:               p.r.updated,
+		Check:                 p.r.check,
+		Channel:               p.r.channel,
+		InstallMethod:         p.r.installMethod,
+		UpdatedSkills:         p.r.updatedSkills,
+		SkillInstallSuggested: p.r.skillInstallSuggested,
 	}
 	return json.Marshal(doc)
 }
@@ -190,10 +237,25 @@ func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
 // a generic body-map.
 func printResult(cmd *cobra.Command, cfg *clicfg.Config, r updateResult, plainText func()) {
 	if isStructuredFormat(cfg.Global.Format()) {
-		output.PrintBodyMap(cmd, cfg, printableUpdateResult{r: r}, []string{"current", "latest", "updated", "check", "channel", "install_method"})
+		output.PrintBodyMap(cmd, cfg, printableUpdateResult{r: r}, fieldOrder(r))
 		return
 	}
 	plainText()
+}
+
+// fieldOrder produces the column / key ordering passed to PrintBodyMap. The
+// first six entries match REQ-F-018; updated_skills and
+// skill_install_suggested are appended only when populated so table/toon
+// renders stay tight on the no-swap branches (passthrough hint, --check).
+func fieldOrder(r updateResult) []string {
+	keys := []string{"current", "latest", "updated", "check", "channel", "install_method"}
+	if len(r.updatedSkills) > 0 {
+		keys = append(keys, "updated_skills")
+	}
+	if r.skillInstallSuggested {
+		keys = append(keys, "skill_install_suggested")
+	}
+	return keys
 }
 
 // isStructuredFormat reports whether the caller asked for one of the explicit
@@ -358,10 +420,68 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	}
 
 	result.updated = true
+
+	// Post-swap: refresh installed agent skills so AI assistants pick up the
+	// new binary's surface without a manual `skill install` step. Failures
+	// are non-fatal — the binary update already succeeded; surface a stderr
+	// warning and keep `updated: true`.
+	refreshed, suggestInstall := refreshSkillBundles(cmd, cfg, opts.bundle, opts.skillName, target.TagName)
+	result.updatedSkills = refreshed
+	result.skillInstallSuggested = suggestInstall
+
 	printResult(cmd, cfg, result, func() {
 		cmd.Printf("Successfully updated from %s to %s\n", current, target.TagName)
+		switch {
+		case len(refreshed) > 0:
+			cmd.Printf("Refreshed skill bundle for: %s\n", strings.Join(refreshed, ", "))
+		case suggestInstall:
+			cmd.Println("Tip: install the agent skill so AI assistants pick up the new commands — run `neo4j-cli skill install`.")
+		}
 	})
 	return nil
+}
+
+// refreshSkillBundles enumerates installed agents and re-runs Install for
+// each so their bundle reflects the new binary version. Returns the list of
+// refreshed agent names and a "suggest skill install" flag (true when no
+// agent was detected as having the skill installed).
+//
+// All errors are non-fatal: a per-agent refresh failure emits a single stderr
+// warning and the loop continues. A nil bundle (e.g. unit tests that don't
+// thread one through NewCmd) skips the entire refresh path silently.
+//
+// The pkg-mgr passthrough and --check branches don't reach this function
+// because no swap occurred — the call site is gated on a successful swap.
+func refreshSkillBundles(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, version string) ([]string, bool) {
+	if bundle == nil || skillName == "" {
+		return nil, false
+	}
+	rows, err := listSkillsFn(cfg.Aura.Fs(), skillName)
+	if err != nil {
+		// Listing failed (e.g. afero.Fs error) — non-fatal. Don't suggest
+		// install either since we couldn't tell.
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not enumerate installed skills (%s); skipping skill refresh.\n", err) //nolint:errcheck // warning to stderr; write errors are not actionable
+		return nil, false
+	}
+	var installed []*commonskill.Agent
+	for i := range rows {
+		if rows[i].Installed {
+			installed = append(installed, rows[i].Agent)
+		}
+	}
+	if len(installed) == 0 {
+		return nil, true
+	}
+
+	refreshed := make([]string, 0, len(installed))
+	for _, a := range installed {
+		if _, rerr := installSkillFn(cfg.Aura.Fs(), bundle, skillName, version, a.Name); rerr != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to refresh skill bundle for %s (%s); continuing.\n", a.Name, rerr) //nolint:errcheck // warning to stderr; write errors are not actionable
+			continue
+		}
+		refreshed = append(refreshed, a.Name)
+	}
+	return refreshed, false
 }
 
 // resolveTarget discovers the release the user wants to land on and the

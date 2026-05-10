@@ -63,7 +63,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
-	cmd.AddCommand(update.NewCmd(cfg))
+	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 
 	cobra.EnableTraverseRunHooks = true
 
