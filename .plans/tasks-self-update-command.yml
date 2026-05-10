@@ -504,7 +504,7 @@ tasks:
         unified status check. Use a separate step inside the existing
         `build` job rather than a new top-level job — the new job would
         re-run the matrix's setup-go + checkout overhead unnecessarily.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -515,7 +515,7 @@ tasks:
       - "Step uses `GITHUB_TOKEN` to avoid ratelimit and skips gracefully on forks without breaking external PRs"
       - "On a synthetic break (e.g. point the test step at a wrong tag in the cross-check) the step fails loud — verify locally before declaring done"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
-    completed_at: null
+    completed_at: 2026-05-10T21:00:00Z
 
   - id: task-017
     title: "CI tier-2 e2e: real download + swap against an httptest fixture"

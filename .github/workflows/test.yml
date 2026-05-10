@@ -49,3 +49,74 @@ jobs:
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
               run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...
+
+            # Tier-1 e2e: drive the freshly-built binary against the REAL GitHub
+            # API. Catches regressions that mocks miss — filter drift between
+            # release.go's Latest and the head of the API, JSON-shape changes,
+            # cobra-flag wiring breaks. Runs on every matrix OS so a Windows-only
+            # path bug in update can't slip through.
+            #
+            # Auth: GITHUB_TOKEN is the auto-injected workflow token; on fork
+            # PRs it is the target repo's read-only token, which has enough
+            # scope to call /releases (public read) without burning the
+            # unauthenticated 60/h ratelimit across the matrix × forks.
+            #
+            # We build a SEPARATE binary with a low non-"dev" semver baked in
+            # via ldflags. The production `make build` artifact has
+            # `app.Version == "dev"`, which short-circuits the update flow
+            # before any network call (REQ-F-002). The e2e binary uses
+            # v0.0.0-e2e so any real prerelease wins the semver compare and
+            # the --check branch reports a newer version.
+            - name: Build e2e binary (low semver)
+              shell: bash
+              run: go build -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./neo4j-cli
+
+            - name: Update --help smoke test
+              shell: bash
+              run: bin/neo4j-cli-e2e update --help > /dev/null
+
+            - name: Update e2e (--check)
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  # Pull the head of the prerelease list straight from GitHub
+                  # so we can detect filter drift between our Latest() and what
+                  # the API actually says is at the top of the feed.
+                  expected_tag="$(gh release list \
+                      --repo neo4j-labs/neo4j-cli \
+                      --limit 1 \
+                      --exclude-drafts \
+                      --json tagName \
+                      --jq '.[0].tagName')"
+                  echo "expected_tag=${expected_tag}"
+
+                  # Capture stdout. The current neo4j-cli convention is exit 0
+                  # even on RunE errors (cobra prints `Error:` to stderr and
+                  # main() doesn't os.Exit(1)) — semantic correctness is
+                  # asserted via the JSON helper rather than the exit code, so
+                  # this step doesn't break if the project later flips to a
+                  # non-zero exit. We disable `set -e` around the binary call
+                  # specifically so a future exit-code change doesn't fail the
+                  # step before the helper sees the JSON. Cobra also dumps the
+                  # `Usage:` block to stdout AFTER the JSON when RunE returns a
+                  # non-nil error; json.NewDecoder reads the first value and
+                  # the helper ignores trailing bytes, so the polluted tail
+                  # does not break the assertion.
+                  set +e
+                  out="$(bin/neo4j-cli-e2e update --check --pre-releases -f json)"
+                  set -e
+                  echo "--- update --check stdout ---"
+                  printf '%s\n' "$out"
+                  echo "--- end stdout ---"
+
+                  # Validate the six documented fields, semver of `latest`, and
+                  # cross-check against the `gh release list` head. Our e2e
+                  # binary is ldflag'd to v0.0.0-e2e, so any real prerelease
+                  # wins the semver compare and the helper sees
+                  # `updated=false / check=true`.
+                  printf '%s' "$out" | go run ./test/e2e/check_json \
+                      --expect-channel pre-release \
+                      --cross-check "${expected_tag}"
