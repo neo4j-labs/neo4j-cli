@@ -100,7 +100,7 @@ tasks:
       Do NOT edit `neo4j-cli/aura/internal/skill/` — `update` lives under
       the neo4j-cli super-CLI tree, not the aura subtree, and the aura
       template has no `--check` references.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -109,7 +109,7 @@ tasks:
       - "`neo4j-cli/internal/skill/bundle/SKILL.md` regenerated; reflects the new prose"
       - "`neo4j-cli/internal/skill/bundle/references/update.md` regenerated; lists `check` as a subcommand, no `--check` flag row"
       - "`make generate-check` clean; `TestGenerator_RoundTrip` passes"
-    completed_at: null
+    completed_at: 2026-05-10T20:45:00Z
 
   - id: task-004
     title: "Update CI workflow and e2e check_json comments"

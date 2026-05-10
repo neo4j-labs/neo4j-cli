@@ -21,7 +21,7 @@ Verify with `neo4j-cli --help`.
 
 ```bash
 neo4j-cli update                         # update to latest stable
-neo4j-cli update --check                 # report availability, exit 1 if newer; never downloads
+neo4j-cli update check                   # report availability, exit 1 if newer; never downloads
 neo4j-cli update --pre-releases          # opt into alpha/beta/rc tags
 neo4j-cli update --version v0.1.0        # pin to a named tag (also the only way to downgrade)
 ```
