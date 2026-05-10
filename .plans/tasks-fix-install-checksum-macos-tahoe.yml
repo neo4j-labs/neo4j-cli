@@ -1,0 +1,73 @@
+feature: fix-install-checksum-macos-tahoe
+prd: ./prd-fix-install-checksum-macos-tahoe.md
+created_at: 2026-05-10T00:00:00Z
+updated_at: 2026-05-10T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Patch sha256 verification block in install-neo4j-cli.sh"
+    description: |
+      Replace the checksum verification block at lines 110-119 of
+      `distribution/installation-scripts/install-neo4j-cli.sh` with a variant
+      that uses POSIX-compatible flags (`-c -` plus stdout redirect) so it
+      works on GNU coreutils, Apple's BSD `/sbin/sha256sum (Darwin) 1.0`,
+      and Perl `shasum`. Drop GNU-only `--check`/`--status` long forms.
+      Preserve the warn-and-continue fallback when neither tool is present.
+      Covers REQ-F-001, REQ-F-002, REQ-F-003, REQ-F-004, REQ-NF-002, REQ-NF-003.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Script block matches REQ-F-002 exactly: `sha256sum -c - >/dev/null` and `shasum -a 256 -c - >/dev/null`, with `||` guard calling `error \"Checksum verification FAILED for ${ARCHIVE}\"`."
+      - "Manual run of the patched script on macOS Tahoe (Darwin 25, where `/sbin/sha256sum` is BSD-flavoured) completes with `✔ Checksum OK` and installs a working binary."
+      - "Manual run with `PATH=/usr/bin:/bin` (no `sha256sum` available) takes the `shasum` branch and installs successfully."
+      - "Tampering with the downloaded archive between curl and verify (e.g. `echo x >> $TMP_DIR/$ARCHIVE`) makes the script exit non-zero with the `Checksum verification FAILED` message and never reaches the extract step."
+      - "Successful run prints only the existing `✔ Checksum OK` success line — no per-file `OK` noise leaks through."
+      - "No new external tools are required at install time (still just curl/tar/unzip/grep/sha256sum-or-shasum)."
+    completed_at: 2026-05-10T00:00:00Z
+
+  - id: task-002
+    title: "Add shellcheck CI gate for install-neo4j-cli.sh"
+    description: |
+      Add a shellcheck CI job that lints
+      `distribution/installation-scripts/install-neo4j-cli.sh` on every PR.
+      Use `ludeeus/action-shellcheck` (or equivalent stable shellcheck
+      action) with severity gate set to `warning` so style noise stays
+      non-blocking but real portability bugs (the class that triggered
+      this PRD) fail the build. Wire either as a new
+      `.github/workflows/shellcheck.yml` or extended into the existing
+      `test.yml`. Resolve any pre-existing warnings on the patched script
+      (fix or annotate with justified `# shellcheck disable=SCxxxx`).
+      Scope is install script only — npm/pypi shell scripts are
+      explicitly out of scope. Covers REQ-F-005, REQ-F-006, REQ-NF-004.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "CI workflow lints `distribution/installation-scripts/install-neo4j-cli.sh` on every PR that touches the script or the workflow file."
+      - "Severity gate is set so `warning` and above fail the job; `style` and `info` pass."
+      - "Workflow does NOT lint `distribution/npm/**` or `distribution/pypi/**` (out-of-scope per PRD)."
+      - "Job completes in under 30 seconds on a standard ubuntu-latest runner (Renovate-friendly action SHA pinning is preserved if the repo's existing actions are SHA-pinned)."
+      - "Patched script (from task-001) passes the new shellcheck job with no errors; any unavoidable warnings are documented inline via `# shellcheck disable=SCxxxx` with a one-line justification comment."
+      - "Job is wired into the same PR-trigger paths as existing CI (matches `test.yml` triggers or includes equivalent `pull_request` trigger)."
+    completed_at: 2026-05-10T00:00:00Z
+
+  - id: task-003
+    title: "Add Patch changelog entry"
+    description: |
+      Add a `Patch` changie entry describing the install-script fix so it
+      appears in the next neo4j-cli release notes. Use
+      `changie new --projects neo4j-cli --kind Patch --body "Fix install
+      script checksum verification on macOS Tahoe (Darwin 25)"`. If
+      changie is not installed locally, hand-author the YAML at
+      `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`
+      following the schema in AGENTS.md "Changie Notes" (`project / kind
+      / body / time`, single-quoted body, RFC3339 time).
+      Covers REQ-F-007.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "A new file exists under `.changes/unreleased/` matching `neo4j-cli-Patch-*.yaml`."
+      - "File has fields `project: neo4j-cli`, `kind: Patch`, `body` describing the macOS Tahoe install-script checksum fix in user-facing language, and `time` in RFC3339."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass on the branch with task-001 + task-002 + task-003 applied."
+    completed_at: 2026-05-10T19:14:36Z

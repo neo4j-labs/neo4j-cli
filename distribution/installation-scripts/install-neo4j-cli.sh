@@ -108,11 +108,10 @@ info "Verifying checksum…"
 cd "$TMP_DIR"
 
 if command -v sha256sum &>/dev/null; then
-  # Filter to just the line for our archive, then verify
-  grep "${ARCHIVE}" "${CHECKSUM_FILE}" | sha256sum --check --status \
+  grep "${ARCHIVE}" "${CHECKSUM_FILE}" | sha256sum -c - >/dev/null \
     || error "Checksum verification FAILED for ${ARCHIVE}"
 elif command -v shasum &>/dev/null; then
-  grep "${ARCHIVE}" "${CHECKSUM_FILE}" | shasum -a 256 --check --status \
+  grep "${ARCHIVE}" "${CHECKSUM_FILE}" | shasum -a 256 -c - >/dev/null \
     || error "Checksum verification FAILED for ${ARCHIVE}"
 else
   warn "No sha256sum or shasum found — skipping checksum verification"
