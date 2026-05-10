@@ -11,12 +11,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -75,6 +77,63 @@ func withRequireHTTPS(t *testing.T, v bool) {
 	prev := requireHTTPS
 	requireHTTPS = v
 	t.Cleanup(func() { requireHTTPS = prev })
+}
+
+// withGeteuid swaps the geteuidFn seam so tests can simulate running as
+// root (uid 0) or as a regular user without actually being root.
+func withGeteuid(t *testing.T, fn func() int) {
+	t.Helper()
+	prev := geteuidFn
+	geteuidFn = fn
+	t.Cleanup(func() { geteuidFn = prev })
+}
+
+// withLookPath swaps the lookPathFn seam so tests can simulate the presence
+// or absence of an executable on PATH without depending on the host PATH.
+func withLookPath(t *testing.T, fn func(file string) (string, error)) {
+	t.Helper()
+	prev := lookPathFn
+	lookPathFn = fn
+	t.Cleanup(func() { lookPathFn = prev })
+}
+
+// withRunCommand swaps the runCommandFn seam so tests can capture the *exec.Cmd
+// argv that would be executed and return a synthetic exit code without forking
+// a real process.
+func withRunCommand(t *testing.T, fn func(cmd *exec.Cmd) error) {
+	t.Helper()
+	prev := runCommandFn
+	runCommandFn = fn
+	t.Cleanup(func() { runCommandFn = prev })
+}
+
+// withDirWritable swaps the dirWritableFn seam so tests can drive planSwap
+// branches deterministically without relying on chmod (which is unreliable
+// under some CI sandboxes and is a no-op for the calling uid on Windows).
+func withDirWritable(t *testing.T, fn func(dir string) (bool, error)) {
+	t.Helper()
+	prev := dirWritableFn
+	dirWritableFn = fn
+	t.Cleanup(func() { dirWritableFn = prev })
+}
+
+// withTempDir swaps the tempDirFn seam so the elevation-path tmpNew file
+// lands under a t.TempDir() rather than the host's real temp dir.
+func withTempDir(t *testing.T, fn func() string) {
+	t.Helper()
+	prev := tempDirFn
+	tempDirFn = fn
+	t.Cleanup(func() { tempDirFn = prev })
+}
+
+// withStdinIsTTY swaps the stdinIsTTYFn seam so tests can simulate an
+// interactive (or non-interactive) shell without manipulating the real
+// stdin file descriptor.
+func withStdinIsTTY(t *testing.T, v bool) {
+	t.Helper()
+	prev := stdinIsTTYFn
+	stdinIsTTYFn = func() bool { return v }
+	t.Cleanup(func() { stdinIsTTYFn = prev })
 }
 
 // makeTarGz builds an in-memory tar.gz with the given entries. payload of
@@ -570,4 +629,96 @@ func TestExtractBinary_NestedDir_AcceptsByBasename(t *testing.T) {
 func TestRedactURL_StripsQuery(t *testing.T) {
 	got := redactURL("https://github.com/foo?token=secret&x-amz-signature=abc")
 	assert.Equal(t, "https://github.com/foo", got)
+}
+
+func TestDirWritable_Writable(t *testing.T) {
+	dir := t.TempDir()
+	ok, err := dirWritable(dir)
+	require.NoError(t, err)
+	assert.True(t, ok, "freshly created t.TempDir() should be writable")
+
+	// Probe file must have been cleaned up — no residue allowed.
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "dirWritable must clean up its probe file")
+}
+
+func TestDirWritable_NotWritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// On Windows, file mode bits do not produce a permission-denied path
+		// in the same way; the elevation branch is exercised via the
+		// dirWritableFn seam in higher-level tests rather than by real chmod.
+		t.Skip("chmod-based unwritable probe is unix-only")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses unix file mode permissions; cannot exercise unwritable branch")
+	}
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	ok, err := dirWritable(dir)
+	require.NoError(t, err, "EACCES must be reported as (false, nil), not as an error")
+	assert.False(t, ok)
+}
+
+func TestErrSudoUnavailable_ImplementsErrorAndCarriesDir(t *testing.T) {
+	want := "/usr/local/bin"
+	var err error = &errSudoUnavailable{dir: want}
+	assert.Contains(t, err.Error(), want)
+
+	var target *errSudoUnavailable
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, want, target.Dir())
+}
+
+func TestErrPermissionWindows_ImplementsErrorAndCarriesDir(t *testing.T) {
+	want := `C:\Program Files\neo4j-cli`
+	var err error = &errPermissionWindows{dir: want}
+	assert.Contains(t, err.Error(), want)
+
+	var target *errPermissionWindows
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, want, target.Dir())
+}
+
+func TestSeams_ProductionImplsCallable(t *testing.T) {
+	// Smoke-test that each seam's production impl is callable. Behaviour is
+	// platform-dependent (we don't assert specific values) — the test exists
+	// to catch a future refactor that accidentally swaps in a nil function
+	// or a signature mismatch that survives the compiler.
+	_ = geteuidFn()
+	_, _ = lookPathFn("a-binary-that-almost-certainly-does-not-exist-on-this-host")
+	_ = stdinIsTTYFn()
+	_ = tempDirFn()
+	_, _ = dirWritableFn(t.TempDir())
+}
+
+func TestWithFooHelpers_RestoreAfterTest(t *testing.T) {
+	origGeteuid := geteuidFn
+	origLookPath := lookPathFn
+	origRunCmd := runCommandFn
+	origDirWritable := dirWritableFn
+	origTempDir := tempDirFn
+	origStdinIsTTY := stdinIsTTYFn
+
+	t.Run("swap-and-restore", func(t *testing.T) {
+		withGeteuid(t, func() int { return 42 })
+		withLookPath(t, func(string) (string, error) { return "/x", nil })
+		withRunCommand(t, func(*exec.Cmd) error { return nil })
+		withDirWritable(t, func(string) (bool, error) { return false, nil })
+		withTempDir(t, func() string { return "/tmp/test" })
+		withStdinIsTTY(t, false)
+		// Inside the subtest the seams are swapped — re-check after subtest.
+		assert.Equal(t, 42, geteuidFn())
+	})
+
+	// After the subtest's t.Cleanup runs, all seams must have been restored
+	// to their original function pointers.
+	assert.Equal(t, fmt.Sprintf("%p", origGeteuid), fmt.Sprintf("%p", geteuidFn))
+	assert.Equal(t, fmt.Sprintf("%p", origLookPath), fmt.Sprintf("%p", lookPathFn))
+	assert.Equal(t, fmt.Sprintf("%p", origRunCmd), fmt.Sprintf("%p", runCommandFn))
+	assert.Equal(t, fmt.Sprintf("%p", origDirWritable), fmt.Sprintf("%p", dirWritableFn))
+	assert.Equal(t, fmt.Sprintf("%p", origTempDir), fmt.Sprintf("%p", tempDirFn))
+	assert.Equal(t, fmt.Sprintf("%p", origStdinIsTTY), fmt.Sprintf("%p", stdinIsTTYFn))
 }

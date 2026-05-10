@@ -42,7 +42,7 @@ tasks:
       `withStdinIsTTY` helpers in swap_test.go matching the existing `withSwapGoos` / `withRename`
       shape. No behavior changes yet; the seams and helpers are introduced but not called from any
       production path.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Six new seam vars compile and have working production impls; `golang.org/x/term` import added"
@@ -51,7 +51,7 @@ tasks:
       - "Six `withFoo` helpers swap and restore the seam via `t.Cleanup`; no test goroutine leaks"
       - "No production call site invokes the new seams yet (introduction-only step); `make test` still passes"
       - "`make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T23:10:00Z
 
   - id: task-003
     title: "Implement planSwap pre-flight elevation decision"

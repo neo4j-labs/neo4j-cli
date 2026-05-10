@@ -49,6 +49,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -57,10 +58,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
+
+	"golang.org/x/term"
 )
 
 // maxArchiveBytes caps the archive download size to defend against an
@@ -94,7 +99,9 @@ var allowedDownloadHosts = map[string]struct{}{
 }
 
 // Test seams. Production fills with the real impls; tests swap via the
-// withSwapGoos / withRename / withRequireHTTPS helpers in swap_test.go.
+// withSwapGoos / withRename / withRequireHTTPS / withGeteuid / withLookPath /
+// withRunCommand / withDirWritable / withTempDir / withStdinIsTTY helpers in
+// swap_test.go.
 var (
 	// swapGoosFn shadows runtime.GOOS for the swap path specifically. release.go
 	// already exposes goosFn; we want a separate seam so the swap code can be
@@ -108,7 +115,82 @@ var (
 	// (TestAssertAllowedHost_RejectsNonHTTPS) that asserts the production
 	// behaviour with the seam at its default true value.
 	requireHTTPS = true
+	// geteuidFn shadows os.Geteuid so tests can simulate running as root
+	// without actually being root.
+	geteuidFn = os.Geteuid
+	// lookPathFn shadows exec.LookPath so tests can simulate the presence or
+	// absence of sudo / install without relying on the host PATH.
+	lookPathFn = exec.LookPath
+	// runCommandFn shadows the production *exec.Cmd.Run so tests can capture
+	// argv and simulate non-zero exit codes without forking a real process.
+	runCommandFn = func(cmd *exec.Cmd) error { return cmd.Run() }
+	// dirWritableFn shadows dirWritable so tests can drive the planSwap
+	// branches without relying on chmod (which is unreliable in CI).
+	dirWritableFn = dirWritable
+	// tempDirFn shadows os.TempDir so tests can route the elevation-path
+	// temp file into a t.TempDir().
+	tempDirFn = os.TempDir
+	// stdinIsTTYFn shadows golang.org/x/term.IsTerminal on os.Stdin so tests
+	// can simulate a non-interactive shell.
+	stdinIsTTYFn = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 )
+
+// errSudoUnavailable is returned by planSwap when the target directory is not
+// writable AND we cannot transparently elevate (sudo missing, install missing,
+// or stdin not a TTY so the sudo prompt would never get an answer). The
+// runUpdate caller recognises this sentinel and turns it into a "re-run with
+// sudo: <command>" hint.
+type errSudoUnavailable struct {
+	dir string
+}
+
+func (e *errSudoUnavailable) Error() string {
+	return fmt.Sprintf("cannot write to %s and sudo elevation is unavailable", e.dir)
+}
+
+// Dir returns the target directory whose write was rejected.
+func (e *errSudoUnavailable) Dir() string { return e.dir }
+
+// errPermissionWindows is returned by planSwap on Windows when the target
+// directory is not writable. Windows has no sudo equivalent in scope for this
+// CLI; the runUpdate caller turns this sentinel into a "re-run from an
+// Administrator shell" hint.
+type errPermissionWindows struct {
+	dir string
+}
+
+func (e *errPermissionWindows) Error() string {
+	return fmt.Sprintf("cannot write to %s (administrator privileges required)", e.dir)
+}
+
+// Dir returns the target directory whose write was rejected.
+func (e *errPermissionWindows) Dir() string { return e.dir }
+
+// dirWritable probes whether the current process can create a new regular
+// file inside dir. It writes a uniquely-named `.neo4j-cli-probe.<rand>` file
+// with O_EXCL|O_CREATE|O_WRONLY and removes it on success.
+//
+// Returns (true, nil) when the probe succeeded. Returns (false, nil) when the
+// probe was rejected by a permission-class error (EACCES / EROFS) — these are
+// expected outcomes that drive the elevation branch, not unexpected failures.
+// Returns (false, err) on any other error so the caller can surface it.
+func dirWritable(dir string) (bool, error) {
+	var randBytes [8]byte
+	if _, err := rand.Read(randBytes[:]); err != nil {
+		return false, fmt.Errorf("dirWritable: generate probe name: %w", err)
+	}
+	probe := filepath.Join(dir, ".neo4j-cli-probe."+hex.EncodeToString(randBytes[:]))
+	f, err := os.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS) {
+			return false, nil
+		}
+		return false, err
+	}
+	_ = f.Close()
+	_ = os.Remove(probe)
+	return true, nil
+}
 
 // Swap downloads the archive + checksums for the resolved AssetURLs,
 // verifies the SHA256 of the archive, extracts the binary into the same

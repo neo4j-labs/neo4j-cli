@@ -2,3 +2,8 @@
 `update check` newer-available branch now exits 0 with a two-line friendly hint (`New version available: X -> Y` + `Run \`neo4j-cli update[ --pre-releases][ --version <tag>]\` to install.`) instead of `clierr.NewUsageError`. Added `buildUpdateCommand(opts)` helper. Set `cmd.SilenceUsage = true` after `--version` validation so runtime/swap errors don't dump the help block (genuine flag misuse still surfaces help via cobra's pre-RunE flag-parse path).
 Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~neo4j-cli/internal/subcommands/update/check_test.go, ~.github/workflows/test.yml
 Decisions: Updated CI test.yml comment that explained the now-removed cobra Usage-block-on-stdout behaviour. `--force` deliberately not in `buildUpdateCommand` (check doesn't register it).
+
+## TASK-002 — 2026-05-10T23:10:00Z
+Introduced 6 new seams in swap.go (`geteuidFn`, `lookPathFn`, `runCommandFn`, `dirWritableFn`, `tempDirFn`, `stdinIsTTYFn`), the `dirWritable(dir)` probe (O_EXCL|O_CREATE|O_WRONLY with EACCES/EROFS → (false,nil)), and pointer-receiver sentinel errors `errSudoUnavailable{dir}` / `errPermissionWindows{dir}` each exposing `Dir()`. Added matching `withFoo(t, ...)` helpers in swap_test.go. No production call site yet — introduction-only step per task-002 contract.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
+Decisions: EROFS detection via `errors.Is(err, syscall.EROFS)` (cross-platform; syscall.EROFS exists on Windows too). Probe uses `crypto/rand` 8-byte hex suffix to avoid collisions with concurrent invocations.
