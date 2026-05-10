@@ -66,7 +66,7 @@ tasks:
       `lookPathFn("install")` errors OR `stdinIsTTYFn() == false`) → return `errSudoUnavailable{dir}`.
       Otherwise → `{elevate: true, tmpDir: tempDirFn()}`. Unit tests live in swap_test.go and use the
       seams from task-002 to drive every branch without touching the host filesystem.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -77,7 +77,7 @@ tasks:
       - "Non-writable + linux + `stdinIsTTYFn → false` returns `errSudoUnavailable{dir}`"
       - "Non-writable + linux + sudo available + install available + TTY returns `{elevate: true, tmpDir: tempDirFn()}`"
       - "`make test && make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T20:44:04Z
 
   - id: task-004
     title: "Implement elevatedSwap sudo install runner with argv safety"

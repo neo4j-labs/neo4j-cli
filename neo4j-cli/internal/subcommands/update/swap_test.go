@@ -694,6 +694,191 @@ func TestSeams_ProductionImplsCallable(t *testing.T) {
 	_, _ = dirWritableFn(t.TempDir())
 }
 
+func TestPlanSwap_WritableSkipsAllOtherSeams(t *testing.T) {
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "neo4j-cli")
+
+	// dirWritable returns true → planSwap MUST NOT consult any other seam.
+	// Wire each one to a fail-the-test fake so accidental calls explode.
+	withDirWritable(t, func(probed string) (bool, error) {
+		assert.Equal(t, dir, probed)
+		return true, nil
+	})
+	withGeteuid(t, func() int { t.Fatal("geteuidFn must not be called on writable branch"); return -1 })
+	withLookPath(t, func(string) (string, error) {
+		t.Fatal("lookPathFn must not be called on writable branch")
+		return "", nil
+	})
+	prev := stdinIsTTYFn
+	stdinIsTTYFn = func() bool {
+		t.Fatal("stdinIsTTYFn must not be called on writable branch")
+		return false
+	}
+	t.Cleanup(func() { stdinIsTTYFn = prev })
+	withTempDir(t, func() string {
+		t.Fatal("tempDirFn must not be called on writable branch")
+		return ""
+	})
+
+	plan, err := planSwap(abs)
+	require.NoError(t, err)
+	assert.False(t, plan.elevate)
+	assert.Equal(t, dir, plan.tmpDir)
+}
+
+func TestPlanSwap_NonWritableWindowsReturnsErrPermissionWindows(t *testing.T) {
+	withSwapGoos(t, "windows")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	// Sudo / TTY seams must not gate the windows decision — wire them to
+	// fail-the-test fakes to assert that.
+	withGeteuid(t, func() int { t.Fatal("geteuidFn must not be called on windows branch"); return -1 })
+	withLookPath(t, func(string) (string, error) {
+		t.Fatal("lookPathFn must not be called on windows branch")
+		return "", nil
+	})
+	withStdinIsTTY(t, true)
+
+	dir := `C:\Program Files\neo4j-cli`
+	abs := filepath.Join(dir, "neo4j-cli.exe")
+
+	_, err := planSwap(abs)
+	require.Error(t, err)
+	var target *errPermissionWindows
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, filepath.Dir(abs), target.Dir())
+}
+
+func TestPlanSwap_NonWritableAlreadyRootSurfacesPermissionError(t *testing.T) {
+	withSwapGoos(t, "linux")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 0 })
+	// sudo / install / tty seams must not be consulted once we know we're
+	// already root.
+	withLookPath(t, func(string) (string, error) {
+		t.Fatal("lookPathFn must not be called on already-root branch")
+		return "", nil
+	})
+
+	abs := filepath.Join(t.TempDir(), "neo4j-cli")
+	_, err := planSwap(abs)
+	require.Error(t, err)
+
+	// MUST NOT be the sudo-unavailable sentinel — runUpdate's hint would be
+	// misleading ("re-run with sudo" when you're already root).
+	var sudoTarget *errSudoUnavailable
+	assert.False(t, errors.As(err, &sudoTarget), "already-root must NOT surface as errSudoUnavailable: %v", err)
+	var winTarget *errPermissionWindows
+	assert.False(t, errors.As(err, &winTarget))
+}
+
+func TestPlanSwap_NonWritableSudoMissingReturnsErrSudoUnavailable(t *testing.T) {
+	withSwapGoos(t, "linux")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 1000 })
+	withLookPath(t, func(file string) (string, error) {
+		// sudo missing; install lookup MAY happen depending on order — short-
+		// circuit either way.
+		return "", exec.ErrNotFound
+	})
+	withStdinIsTTY(t, true)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "neo4j-cli")
+	_, err := planSwap(abs)
+	require.Error(t, err)
+	var target *errSudoUnavailable
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, dir, target.Dir())
+}
+
+func TestPlanSwap_NonWritableInstallMissingReturnsErrSudoUnavailable(t *testing.T) {
+	withSwapGoos(t, "linux")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 1000 })
+	withLookPath(t, func(file string) (string, error) {
+		if file == "sudo" {
+			return "/usr/bin/sudo", nil
+		}
+		return "", exec.ErrNotFound
+	})
+	withStdinIsTTY(t, true)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "neo4j-cli")
+	_, err := planSwap(abs)
+	require.Error(t, err)
+	var target *errSudoUnavailable
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, dir, target.Dir())
+}
+
+func TestPlanSwap_NonWritableNonTTYReturnsErrSudoUnavailable(t *testing.T) {
+	withSwapGoos(t, "linux")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 1000 })
+	withLookPath(t, func(file string) (string, error) {
+		switch file {
+		case "sudo":
+			return "/usr/bin/sudo", nil
+		case "install":
+			return "/usr/bin/install", nil
+		}
+		return "", exec.ErrNotFound
+	})
+	withStdinIsTTY(t, false)
+
+	dir := t.TempDir()
+	abs := filepath.Join(dir, "neo4j-cli")
+	_, err := planSwap(abs)
+	require.Error(t, err)
+	var target *errSudoUnavailable
+	require.True(t, errors.As(err, &target))
+	assert.Equal(t, dir, target.Dir())
+}
+
+func TestPlanSwap_NonWritableElevateHappyPath(t *testing.T) {
+	withSwapGoos(t, "linux")
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 1000 })
+	withLookPath(t, func(file string) (string, error) {
+		switch file {
+		case "sudo":
+			return "/usr/bin/sudo", nil
+		case "install":
+			return "/usr/bin/install", nil
+		}
+		return "", exec.ErrNotFound
+	})
+	withStdinIsTTY(t, true)
+	tmpStub := t.TempDir()
+	withTempDir(t, func() string { return tmpStub })
+
+	abs := filepath.Join(t.TempDir(), "neo4j-cli")
+	plan, err := planSwap(abs)
+	require.NoError(t, err)
+	assert.True(t, plan.elevate)
+	assert.Equal(t, tmpStub, plan.tmpDir)
+}
+
+func TestPlanSwap_DirWritableFnErrorPropagates(t *testing.T) {
+	// dirWritableFn returning a non-EACCES/non-EROFS error must surface as
+	// a fatal planSwap error (NOT one of the sentinels) — the caller has no
+	// way to recover from a probe that hit an unexpected failure.
+	withDirWritable(t, func(string) (bool, error) {
+		return false, fmt.Errorf("disk on fire")
+	})
+
+	abs := filepath.Join(t.TempDir(), "neo4j-cli")
+	_, err := planSwap(abs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "disk on fire")
+
+	var sudoTarget *errSudoUnavailable
+	assert.False(t, errors.As(err, &sudoTarget))
+	var winTarget *errPermissionWindows
+	assert.False(t, errors.As(err, &winTarget))
+}
+
 func TestWithFooHelpers_RestoreAfterTest(t *testing.T) {
 	origGeteuid := geteuidFn
 	origLookPath := lookPathFn

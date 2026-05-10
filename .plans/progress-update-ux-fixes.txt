@@ -7,3 +7,7 @@ Decisions: Updated CI test.yml comment that explained the now-removed cobra Usag
 Introduced 6 new seams in swap.go (`geteuidFn`, `lookPathFn`, `runCommandFn`, `dirWritableFn`, `tempDirFn`, `stdinIsTTYFn`), the `dirWritable(dir)` probe (O_EXCL|O_CREATE|O_WRONLY with EACCES/EROFS → (false,nil)), and pointer-receiver sentinel errors `errSudoUnavailable{dir}` / `errPermissionWindows{dir}` each exposing `Dir()`. Added matching `withFoo(t, ...)` helpers in swap_test.go. No production call site yet — introduction-only step per task-002 contract.
 Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
 Decisions: EROFS detection via `errors.Is(err, syscall.EROFS)` (cross-platform; syscall.EROFS exists on Windows too). Probe uses `crypto/rand` 8-byte hex suffix to avoid collisions with concurrent invocations.
+
+## TASK-003 — 2026-05-10T20:44:04Z
+Added `planSwap(abs)` + `swapPlan{elevate, tmpDir}` to swap.go implementing REQ-F-009/REQ-F-010 ordering: writable→same-dir+no-elevate; windows→errPermissionWindows; already-root→non-sentinel permission error; sudo/install missing or non-TTY→errSudoUnavailable; otherwise→{elevate:true, tmpDir:tempDirFn()}. 7 unit tests in swap_test.go drive every branch via task-002 seams; writable test wires fail-the-test fakes for all post-probe seams to enforce the no-side-effect contract. No production call site yet — wiring lands in task-005.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go

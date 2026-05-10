@@ -166,6 +166,74 @@ func (e *errPermissionWindows) Error() string {
 // Dir returns the target directory whose write was rejected.
 func (e *errPermissionWindows) Dir() string { return e.dir }
 
+// swapPlan describes the result of the planSwap pre-flight: whether the swap
+// must be elevated via sudo, and which directory should hold the temporary
+// extracted binary. When elevate is false, tmpDir is the same directory as
+// the running binary so the final `os.Rename` stays on one filesystem. When
+// elevate is true, tmpDir is `os.TempDir()` because `sudo install` copies
+// (not renames) and cross-filesystem is fine.
+type swapPlan struct {
+	elevate bool
+	tmpDir  string
+}
+
+// planSwap probes the target directory's writability and decides whether the
+// swap can proceed directly or must be elevated via sudo (REQ-F-009 /
+// REQ-F-010). abs MUST be the resolved (post-EvalSymlinks) absolute path of
+// the running binary.
+//
+// Ordering (the "(not called)" comments document the contract that lets the
+// happy-path tests assert the seams stay untouched on the writable branch):
+//
+//  1. dirWritableFn(filepath.Dir(abs)) — probe.
+//  2. Writable → return {elevate: false, tmpDir: filepath.Dir(abs)}. (no
+//     further seams called.)
+//  3. Not writable + windows → return *errPermissionWindows{dir}. (sudo not
+//     applicable on Windows.)
+//  4. Not writable + already root (geteuidFn() == 0) → surface the raw
+//     permission error; sudo cannot help (e.g. SIP, immutable bit, read-only
+//     filesystem).
+//  5. Not writable + sudo missing OR install missing OR stdin is not a TTY →
+//     return *errSudoUnavailable{dir}. The runUpdate caller turns this into a
+//     "re-run with sudo: <cmd>" hint.
+//  6. Otherwise → return {elevate: true, tmpDir: tempDirFn()}.
+func planSwap(abs string) (swapPlan, error) {
+	dir := filepath.Dir(abs)
+	writable, err := dirWritableFn(dir)
+	if err != nil {
+		return swapPlan{}, fmt.Errorf("planSwap: probe %s: %w", dir, err)
+	}
+	if writable {
+		return swapPlan{elevate: false, tmpDir: dir}, nil
+	}
+
+	// Not writable from here on.
+
+	if swapGoosFn() == "windows" {
+		return swapPlan{}, &errPermissionWindows{dir: dir}
+	}
+
+	// Already-root on a non-writable dir means the FS itself is rejecting
+	// the write (immutable bit, SIP, read-only mount). sudo cannot help —
+	// surface the underlying permission error so the caller logs the real
+	// reason rather than a misleading "re-run with sudo" hint.
+	if geteuidFn() == 0 {
+		return swapPlan{}, fmt.Errorf("planSwap: cannot write to %s as root (read-only filesystem or protected location)", dir)
+	}
+
+	if _, err := lookPathFn("sudo"); err != nil {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+	if _, err := lookPathFn("install"); err != nil {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+	if !stdinIsTTYFn() {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+
+	return swapPlan{elevate: true, tmpDir: tempDirFn()}, nil
+}
+
 // dirWritable probes whether the current process can create a new regular
 // file inside dir. It writes a uniquely-named `.neo4j-cli-probe.<rand>` file
 // with O_EXCL|O_CREATE|O_WRONLY and removes it on success.
