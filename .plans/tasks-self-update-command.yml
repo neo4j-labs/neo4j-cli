@@ -279,3 +279,40 @@ tasks:
       - "If `brew` is available locally: a Homebrew-installed binary triggers the rich pkg-mgr hint and does NOT download"
     status: completed
     completed_at: 2026-05-10T09:30:00Z
+
+  - id: task-013
+    title: "Wire toon + table format support for update output; fix AGENTS.md gap"
+    description: |
+      Follow-up on PR #71 review: `update --format toon` and `--format table`
+      both fall through to plain text because `printResult` only branches on
+      `"json"`. The CLI's `ValidFormatValues` is `default | json | table | toon`
+      (`common/clicfg/clicfg.go:36`) and `output.PrintBodyMap` already handles
+      all three structured formats, so the fix is a one-liner in
+      `neo4j-cli/internal/subcommands/update/update.go::printResult` plus tests.
+
+      Root cause for the miss: `AGENTS.md:103` documents the convention as
+      `--format json|table` (no toon) and `AGENTS.md:85` describes
+      `output/` as "JSON + table rendering". Toon is the third supported
+      format; future agents reading the convention statement will keep
+      omitting it. Update both lines to `--format json|table|toon` and "JSON,
+      table, and toon rendering" so this doesn't recur.
+
+      Also update PR #71 body via `gh pr edit 71 --body` to mention toon
+      alongside json/table.
+
+      Default behaviour ("default" / empty `Format()`) must remain plain-text
+      reference output even on a TTY, otherwise the running narrative
+      ("Current → Checking → Successfully updated from X to Y") gets
+      clobbered by an auto-detected table render.
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`printResult` routes `json`, `table`, and `toon` through `output.PrintBodyMap`; default/empty falls through to plain text"
+      - "Two new tests assert toon and table outputs are NOT plain text and contain the documented six fields"
+      - "Existing JSON happy-path test still green; existing plain-text golden test still green"
+      - "`AGENTS.md:103` updated to `--format json|table|toon`"
+      - "`AGENTS.md:85` updated to mention toon (\"JSON, table, and toon rendering\" or equivalent)"
+      - "PR #71 description updated via `gh pr edit` to mention toon alongside json/table"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: null
