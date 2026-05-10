@@ -603,7 +603,7 @@ tasks:
         future RCE vector), redesign so the override is only honored
         when the binary's path matches `$RUNNER_TEMP` — but start
         simple; build tags are a strong gate.
-    status: pending
+    status: completed
     dependencies:
       - task-016
     acceptance_criteria:
@@ -615,4 +615,4 @@ tasks:
       - "Fixture server is torn down cleanly even on test failure (use `defer` / `trap` patterns)"
       - "No new entries in `go.mod`'s direct require for the fixture/harness"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
-    completed_at: null
+    completed_at: 2026-05-10T22:00:00Z

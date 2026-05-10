@@ -120,3 +120,121 @@ jobs:
                   printf '%s' "$out" | go run ./test/e2e/check_json \
                       --expect-channel pre-release \
                       --cross-check "${expected_tag}"
+
+            # Tier-2 e2e: real download + atomic-swap against a local fixture
+            # server. Tier-1 (above) covers the --check read path against
+            # real GitHub; this exercises the WRITE path — archive download,
+            # SHA256 verification, extraction, and the same-dir atomic
+            # rename — without publishing throwaway tags upstream.
+            #
+            # The e2e_seams build tag (see seams_e2e.go) lets the binary
+            # honor NEO4J_CLI_UPDATE_E2E_* env vars to point at the fixture
+            # server. The default `make build` artifact does NOT include
+            # this file, so production binaries can't be tricked into
+            # talking to a non-GitHub host via env vars (asserted in
+            # TestE2ESeams_NotCompiledByDefault).
+            #
+            # On Windows the runner's bash is Git-Bash; $RUNNER_TEMP is a
+            # native Windows path under there. The harness deliberately
+            # uses `cygpath -u` to convert it for shell ops and falls back
+            # to a relative form when cygpath isn't available (linux/macos).
+            - name: Build e2e_seams binary (tier-2)
+              shell: bash
+              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e2 ./neo4j-cli
+
+            - name: Update e2e (tier-2 download + swap)
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  # Stage area: same-dir-as-target rename means swap.go's
+                  # os.Rename stays on a single filesystem.
+                  stage="${RUNNER_TEMP:-/tmp}/n4j-e2e"
+                  rm -rf "${stage}"
+                  mkdir -p "${stage}"
+
+                  # Pick the right binary name for the host so the swap path
+                  # (which targets neo4j-cli or neo4j-cli.exe based on
+                  # runtime.GOOS) finds the same shape on disk.
+                  case "${RUNNER_OS:-}" in
+                    Windows) target_name="neo4j-cli.exe"; src_name="bin/neo4j-cli-e2e2.exe" ;;
+                    *)       target_name="neo4j-cli";     src_name="bin/neo4j-cli-e2e2" ;;
+                  esac
+                  # `go build -o bin/neo4j-cli-e2e2 ./neo4j-cli` emits
+                  # `bin/neo4j-cli-e2e2.exe` on Windows automatically.
+                  if [ ! -f "${src_name}" ] && [ -f "bin/neo4j-cli-e2e2" ]; then
+                    src_name="bin/neo4j-cli-e2e2"
+                  fi
+                  cp "${src_name}" "${stage}/${target_name}"
+                  chmod +x "${stage}/${target_name}" || true
+
+                  # Build the fixture once so we have a single PID to kill on
+                  # cleanup. `go run` spawns an intermediate process that's
+                  # awkward to clean up reliably on Windows.
+                  fixture_bin="${stage}/update_fixture"
+                  case "${RUNNER_OS:-}" in
+                    Windows) fixture_bin="${fixture_bin}.exe" ;;
+                  esac
+                  go build -o "${fixture_bin}" ./test/e2e/update_fixture
+
+                  # Spawn fixture server. It prints `listening on
+                  # http://127.0.0.1:<port>` to its FIRST stdout line.
+                  fixture_log="${stage}/fixture.log"
+                  : > "${fixture_log}"
+                  "${fixture_bin}" > "${fixture_log}" 2>&1 &
+                  fixture_pid=$!
+                  trap 'kill "${fixture_pid}" 2>/dev/null || true' EXIT
+
+                  # Wait up to 60s for the fixture to print its port (cold
+                  # `go run` + fakebin builds can take a while on Windows).
+                  port=""
+                  for i in $(seq 1 60); do
+                    if [ -s "${fixture_log}" ]; then
+                      port="$(grep -oE 'listening on http://127\.0\.0\.1:[0-9]+' "${fixture_log}" | head -1 | sed -E 's|.*:([0-9]+)$|\1|')"
+                      if [ -n "${port}" ]; then break; fi
+                    fi
+                    sleep 1
+                  done
+                  if [ -z "${port}" ]; then
+                    echo "fixture failed to start; log:"
+                    cat "${fixture_log}"
+                    exit 1
+                  fi
+                  echo "fixture listening on 127.0.0.1:${port}"
+
+                  base="http://127.0.0.1:${port}"
+
+                  # Drive the swap. Stable tag is v9.9.0, prerelease is
+                  # v9.9.1-alpha.1; --pre-releases picks the prerelease.
+                  set +e
+                  NEO4J_CLI_UPDATE_E2E_API_URL="${base}" \
+                  NEO4J_CLI_UPDATE_E2E_DL_URL="${base}" \
+                  NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 \
+                      "${stage}/${target_name}" update --pre-releases > "${stage}/swap.out" 2> "${stage}/swap.err"
+                  swap_rc=$?
+                  set -e
+                  echo "--- swap stdout ---"
+                  cat "${stage}/swap.out"
+                  echo "--- swap stderr ---"
+                  cat "${stage}/swap.err"
+                  echo "--- swap rc=${swap_rc} ---"
+
+                  # Assertion 1: the running narrative reached the success
+                  # line (REQ-F-017). This is the byte-for-byte plain-text
+                  # success message.
+                  if ! grep -q "Successfully updated from" "${stage}/swap.out"; then
+                    echo "ASSERTION FAILED: missing 'Successfully updated from' in stdout"
+                    exit 1
+                  fi
+
+                  # Assertion 2: the swapped binary actually runs and
+                  # reports the new tag. fakebin prints `swapped: <TAG>` on
+                  # any invocation; we expect the prerelease tag.
+                  swapped_out="$("${stage}/${target_name}")"
+                  echo "swapped binary output: ${swapped_out}"
+                  if [ "${swapped_out}" != "swapped: v9.9.1-alpha.1" ]; then
+                    echo "ASSERTION FAILED: swapped binary did not print 'swapped: v9.9.1-alpha.1' (got '${swapped_out}')"
+                    exit 1
+                  fi
+
+                  echo "tier-2 e2e: OK"
