@@ -57,7 +57,7 @@ tasks:
       `GH_TOKEN` / `GITHUB_TOKEN` for ratelimit relief — never echo the token
       in errors. Expose package-level test seams (`var apiBaseURL`, `var dlBaseURL`,
       `var goosFn`, `var goarchFn`) per AGENTS.md "Package-level test seams".
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -67,7 +67,7 @@ tasks:
       - "`--version <tag>` path validates input via `semver.IsValid` and rejects `..`, `/`, `\\`, NUL, and shell metacharacters before any URL interpolation"
       - "Tests use `httptest.NewServer` with a 2s safety timeout on handlers and a 5s test-side fallback per AGENTS.md"
       - "`GH_TOKEN` / `GITHUB_TOKEN` is never present in any error string (assertion in tests)"
-    completed_at: null
+    completed_at: 2026-05-10T14:00:00Z
 
   - id: task-004
     title: "Install-method detection + rich passthrough hint message"

@@ -7,3 +7,8 @@ Decisions: kept `var _ = isValidSemver` lint shim — gets replaced by real call
 Scaffolded `update.go` with cobra skeleton (flags `--pre-releases`/`--check`/`--version`/`--force`) and stub RunE returning "not implemented"; mounted via `cmd.AddCommand(update.NewCmd(cfg))` in `app/app.go`. Regenerated skill bundle to clear new-command drift.
 Files: +neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/skill/bundle/SKILL.md, +neo4j-cli/internal/skill/bundle/references/update.md
 Decisions: omitted `write:true` annotation — `--check` is read-only and task-006 will gate the swap path properly.
+
+## TASK-003 — 2026-05-10T14:00:00Z
+Implemented release-lookup module: `Latest` (stable/prerelease semver filter via `golang.org/x/mod/semver`), `GetByTag` (named-tag lookup), `BuildAssetURLs` (GoReleaser archive + checksum URL builder mirroring install-neo4j-cli.sh OS/arch maps), `ValidateVersionTag` (strict allowlist rejecting `..`, `/`, `\`, NUL, shell metacharacters before URL interpolation). Honors `GH_TOKEN`/`GITHUB_TOKEN` for ratelimit relief; sentinel-token assertion guards against leakage in error paths. Test seams: `apiBaseURL`, `dlBaseURL`, `goosFn`, `goarchFn`, `httpDoFn`.
+Files: ~neo4j-cli/internal/subcommands/update/release.go, +neo4j-cli/internal/subcommands/update/release_test.go
+Decisions: 2s-safety-timeout handler pattern reserved for the cancellation test only — applying it to every handler made the suite take 36s; happy-path handlers respond immediately so the suite finishes in <2s.
