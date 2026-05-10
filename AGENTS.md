@@ -82,7 +82,7 @@ neo4j-cli/
     internal/
       api/                 # HTTP client for Neo4j Aura REST API
       flags/               # Custom reusable flag types
-      output/              # JSON + table rendering
+      output/              # JSON, table, and toon rendering
       skill/               # per-binary skill template (mirrors neo4j-cli/internal/skill)
       subcommands/         # One directory per resource, one file per action
         instance/, tenant/, credential/, config/,
@@ -100,7 +100,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
 - `<resource> <action>` form (`instance list`, not `list-instance`)
 - One positional argument max; extras become flags
-- `--format json|table` (shorthand `-f`) for all read commands
+- `--format json|table|toon` (shorthand `-f`) for all read commands
 - `--await` flag for async operations
 - Follow CLI best practices from https://clig.dev/ — source at https://github.com/cli-guidelines/cli-guidelines/blob/main/content/_index.md (fetch the raw markdown for token-efficient reference)
 

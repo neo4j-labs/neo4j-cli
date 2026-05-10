@@ -16,6 +16,8 @@ import (
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/update"
+	"github.com/neo4j/cli/neo4j-cli/internal/versioncheck"
 	"github.com/neo4j/cli/neo4j-cli/query"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +37,24 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
-	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
+
+	// Compose the root PersistentPreRunE: bind --format, enforce --rw,
+	// then schedule the silent background version-check (5% sample, cached
+	// in version-check.json under cfg.Aura.Fs()) and print the
+	// stderr nag if the cache shows a newer stable. Both versioncheck
+	// surfaces are no-ops when NEO4J_CLI_NO_UPDATE_NAG is set; the dice
+	// roll can also short-circuit before any network call. None of this
+	// is allowed to fail the foreground command — if any of it errors,
+	// versioncheck swallows silently.
+	formatAndRw := flags.ComposeRootPersistentPreRunE(cfg)
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if err := formatAndRw(cmd, args); err != nil {
+			return err
+		}
+		versioncheck.MaybeHint(cmd, cfg, Version)
+		versioncheck.Schedule(cmd.Context(), cfg, Version)
+		return nil
+	}
 
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
@@ -44,6 +63,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
+	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 
 	cobra.EnableTraverseRunHooks = true
 

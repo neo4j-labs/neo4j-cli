@@ -1,0 +1,618 @@
+feature: self-update-command
+prd: ./prd-self-update-command.md
+created_at: 2026-05-10T12:00:00Z
+updated_at: 2026-05-10T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Promote golang.org/x/mod to a direct require"
+    description: |
+      `golang.org/x/mod` is currently an indirect dep in `go.mod` (v0.27.0). The
+      update package needs `golang.org/x/mod/semver` for `IsValid`, `Prerelease`,
+      and `Compare`. Add an import in any new package file (e.g. release.go) and
+      run `go mod tidy` so the require line moves out of the indirect block.
+      Verify no other dependency changes leaked in.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`golang.org/x/mod` appears in the direct require block in go.mod"
+      - "`go.sum` is updated and `go mod tidy` is a no-op on a fresh run"
+      - "No other third-party deps were added"
+      - "`make test` still passes after the dep promotion"
+    completed_at: 2026-05-10T12:30:00Z
+
+  - id: task-002
+    title: "Scaffold update package, cobra skeleton, and mount in root tree"
+    description: |
+      Create `neo4j-cli/internal/subcommands/update/` with a single
+      `update.go` exposing `NewCmd(cfg *clicfg.Config) *cobra.Command`.
+      Declare flags `--pre-releases`, `--check`, `--version`, `--force`. Use a
+      stub `RunE` that returns a "not implemented" error (just enough so the
+      command shows up in `--help`). Add the Neo4j copyright header at the top
+      of every new file. Mount the command in `neo4j-cli/app/app.go` next to
+      `aura`/`credential`/`config`/`query`/`skill` via a single `cmd.AddCommand`
+      line.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`neo4j-cli/internal/subcommands/update/update.go` exists with the Neo4j license header and `NewCmd(cfg)` signature"
+      - "All four flags (`--pre-releases`, `--check`, `--version`, `--force`) are declared and visible in `bin/neo4j-cli update --help`"
+      - "`neo4j-cli/app/app.go` adds the new command via a single `cmd.AddCommand(update.NewCmd(cfg))` line"
+      - "`make build` succeeds and `bin/neo4j-cli update` returns the stub error without crashing"
+      - "`make fmt-check` and `make license-check` pass on the new file"
+    completed_at: 2026-05-10T13:15:00Z
+
+  - id: task-003
+    title: "Release lookup module: GitHub API + semver filter + asset URL"
+    description: |
+      Add `release.go` (and `release_test.go`) implementing the GitHub release
+      discovery: fetch `https://api.github.com/repos/neo4j-labs/neo4j-cli/releases?per_page=30`,
+      skip drafts, filter by `--pre-releases` using
+      `golang.org/x/mod/semver.Prerelease`, and return the head match. Build
+      asset URLs per the GoReleaser pattern (`neo4j-cli_<VER>_<TitleOS>_<unameArch>.<ext>`)
+      with OS map (linux→Linux, darwin→Darwin, windows→Windows) and arch map
+      (amd64→x86_64, 386→i386, arm64→arm64) mirroring
+      `distribution/installation-scripts/install-neo4j-cli.sh`. Honor
+      `GH_TOKEN` / `GITHUB_TOKEN` for ratelimit relief — never echo the token
+      in errors. Expose package-level test seams (`var apiBaseURL`, `var dlBaseURL`,
+      `var goosFn`, `var goarchFn`) per AGENTS.md "Package-level test seams".
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Stable-only filter excludes any tag where `semver.Prerelease(tag) != \"\"`"
+      - "Returns a clear sentinel/error when stable filter yields zero releases (consumed by REQ-F-006 in RunE)"
+      - "Asset URL builder produces correct paths for linux/amd64, darwin/arm64, windows/amd64 (table-driven test)"
+      - "`--version <tag>` path validates input via `semver.IsValid` and rejects `..`, `/`, `\\`, NUL, and shell metacharacters before any URL interpolation"
+      - "Tests use `httptest.NewServer` with a 2s safety timeout on handlers and a 5s test-side fallback per AGENTS.md"
+      - "`GH_TOKEN` / `GITHUB_TOKEN` is never present in any error string (assertion in tests)"
+    completed_at: 2026-05-10T14:00:00Z
+
+  - id: task-004
+    title: "Install-method detection + rich passthrough hint message"
+    description: |
+      Add `install_method.go` (and test) detecting whether the running binary
+      lives under a known package-manager prefix. Resolve `os.Executable()`
+      via `filepath.EvalSymlinks` and match against Homebrew (`/opt/homebrew/`,
+      `/usr/local/Cellar/`, `/home/linuxbrew/.linuxbrew/`), npm
+      (`/node_modules/@neo4j-labs/cli/` substring), pipx
+      (`~/.local/pipx/venvs/neo4j-cli/`, `~/.local/share/pipx/`,
+      `~/.local/bin/neo4j-cli` symlinking into pipx), uv tool
+      (`~/.local/share/uv/tools/neo4j-cli/`). Build the rich hint per REQ-F-010a:
+      pkg-mgr upgrade command, install-script command
+      (`curl -sSfL https://neo4j.sh/install.sh | bash`), and an OPTIONAL
+      uninstall command marked with the PATH-order rationale. Expose a test seam
+      for `os.Executable()`.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Returns `homebrew` / `npm` / `pipx` / `uv` / `binary` from a table-driven test covering each prefix shape on linux + darwin + windows path forms"
+      - "Symlink resolution: a symlink at `~/.local/bin/neo4j-cli` pointing into a pipx venv is detected as `pipx` (not `binary`)"
+      - "Hint message includes ALL THREE blocks: pkg-mgr upgrade command, install-script command, AND optional uninstall command with the PATH-order rationale comment"
+      - "Detection is hermetic: tests use the `os.Executable()` seam and `t.Setenv(\"HOME\", ...)` per AGENTS.md hermetic-test rules"
+      - "Path matching uses OS-native separators (no mixed `/` + `\\` on Windows) per AGENTS.md Windows CI gotchas"
+    completed_at: 2026-05-10T15:00:00Z
+
+  - id: task-005
+    title: "Atomic swap: extract, SHA256 verify, rename (with zip-slip guard)"
+    description: |
+      Add `swap.go` (and test) implementing the download → verify → extract →
+      atomic rename flow. Download archive in-memory (or to a temp file in
+      the same dir as the running binary), download the matching
+      `_checksums.txt` from the same release, compute SHA256 and abort on
+      mismatch BEFORE any extraction. Extract `tar.gz` (linux/darwin) or `zip`
+      (windows) into the target dir. Reject any entry whose cleaned path
+      escapes the destination (zip-slip / tar-slip), reject symlinks /
+      hardlinks / devices — only regular files allowed. Write to
+      `<current>.new` with mode 0755, then `os.Rename` to `<current>`. On
+      Windows: best-effort `os.Remove` of pre-existing `<current>.old`,
+      rename current to `.old`, rename new in. On any error after the
+      original is renamed away, attempt to restore.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Tampered checksum (a single byte flipped in the test fixture) causes the swap to abort with a clear error, no file written outside the temp dir"
+      - "tar / zip entry with `../escape` path is rejected with the offending path in the error; no file written outside the destination"
+      - "Symlink / hardlink / device entries in the archive are rejected"
+      - "Successful swap leaves the new binary at the original path, mode 0755, with the temp `<current>.new` removed"
+      - "Windows code path: pre-existing `<current>.old` is removed at start; rename-current-to-`.old`-then-rename-new dance succeeds (covered via `runtime.GOOS` test seam)"
+      - "Restore-on-error: simulated rename failure mid-swap restores the original binary at the original path"
+    completed_at: 2026-05-10T16:00:00Z
+
+  - id: task-006
+    title: "Implement RunE flow integrating release / install-method / swap"
+    description: |
+      Wire the three modules together in `update.go` `RunE`. Order:
+      (1) handle `app.Version == \"dev\"` with friendly message + exit 0;
+      (2) detect install method, on match (and no `--force`) print the rich
+      hint and exit 0;
+      (3) resolve target version (release lookup or `--version <tag>`);
+      (4) compare via `semver.Compare` — already up-to-date returns 0,
+      no-stable-yet returns 0 with the `--pre-releases` hint, downgrade
+      requires explicit `--version`;
+      (5) `--check` branches: print + exit 1 if newer available, exit 0 if
+      up-to-date — never download;
+      (6) otherwise: download, verify, swap. Plumb the `channel` and
+      `install_method` fields for output (set by upstream modules).
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "`app.Version == \"dev\"` exits 0 without any HTTP call (assertion via test seam)"
+      - "Stable-only filter with zero matching releases prints the `--pre-releases` hint and exits 0"
+      - "`--check` with a newer version available exits 1; with equal versions exits 0; never invokes the swap path"
+      - "`--version v9.9.9` (semver-valid, but no such tag) surfaces a clear `tag not found` error and exits 1"
+      - "Downgrade attempt without `--version` (current > latest) is rejected with a clear error"
+      - "`--force` bypasses install-method detection and proceeds to swap (verified via test seam)"
+    completed_at: 2026-05-10T17:00:00Z
+
+  - id: task-007
+    title: "Output formatting: plain-text default + JSON via PrintBodyMap"
+    description: |
+      Wire output rendering through `output.ResolveOutput` /
+      `output.PrintBodyMap` from `common/output/output.go`. Default plain-text
+      output must match the reference exactly:
+      `Current version: <v>\nChecking for updates to latest version...\nSuccessfully updated from <v> to <v>\n`.
+      JSON output emits `{current, latest, updated, check, channel, install_method}`.
+      The plain-text path is implemented inline (the example isn't a body-map
+      shape); JSON path uses `PrintBodyMap` with the documented field order.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "Plain-text success output is byte-for-byte equal to the reference (table-driven golden test)"
+      - "`--format json` emits valid JSON with all six documented fields"
+      - "`--check` mode JSON sets `\"updated\": false` and `\"check\": true`"
+      - "Pkg-mgr passthrough JSON includes `\"install_method\"` set to the detected channel and `\"updated\": false`"
+      - "JSON ordering matches the field order documented in REQ-F-018 (deterministic for downstream scripts)"
+    completed_at: 2026-05-10T17:45:00Z
+
+  - id: task-008
+    title: "README: Self-update subsection under Installation"
+    description: |
+      Edit `README.md` Installation section (lines 3-12) to add a "Self-update"
+      subsection covering `neo4j-cli update`, `--check`, `--pre-releases`,
+      `--version`, `--force`, and the package-manager-passthrough behaviour
+      (with the install-script + optional-uninstall hint). Keep the section
+      concise — it should orient users; full reference lives in `--help` and
+      the skill bundle.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`README.md` contains a new \"Self-update\" subsection under Installation"
+      - "All four flags (`--check`, `--pre-releases`, `--version`, `--force`) are mentioned"
+      - "Package-manager-passthrough behaviour is described, including the install-script alternative"
+      - "Section is ≤ 25 lines and links to `--help` for the full surface"
+    completed_at: 2026-05-10T18:00:00Z
+
+  - id: task-009
+    title: "Skill bundle inputs + regenerate (gate via TestGenerator_RoundTrip)"
+    description: |
+      Update `neo4j-cli/internal/skill/description.txt` to mention
+      "self-update via `neo4j-cli update`" in the third-person capability list
+      (keep total ≤ 1024 chars). Add an "Updating the CLI" paragraph to
+      `neo4j-cli/internal/skill/additions.md` pointing at `update`,
+      `--check`, `--pre-releases`. Run `go generate ./neo4j-cli/internal/skill/...`
+      to refresh `bundle/SKILL.md` and produce `bundle/references/update.md`.
+      Confirm `TestGenerator_RoundTrip` is green.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`description.txt` mentions self-update and stays ≤ 1024 chars"
+      - "`additions.md` includes a one-paragraph \"Updating the CLI\" section"
+      - "`bundle/SKILL.md` subcommand table contains an `update` row"
+      - "`bundle/references/update.md` exists with flag table and `Long` description rendered"
+      - "`make generate-check` reports a clean diff after `go generate`"
+      - "`TestGenerator_RoundTrip` passes"
+    completed_at: 2026-05-10T18:30:00Z
+
+  - id: task-010
+    title: "Changelog entry via changie (Minor)"
+    description: |
+      Add a `Minor` changelog entry. If `changie` is on PATH:
+      `changie new --projects neo4j-cli --kind Minor --body "Add 'neo4j-cli update' to self-update the binary; --pre-releases opts into alpha/beta/rc, --check reports availability without installing."`.
+      If not, hand-author a YAML at
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per
+      AGENTS.md "Changie Notes".
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "A `.changes/unreleased/neo4j-cli-Minor-*.yaml` file exists"
+      - "Body mentions the new command, the `--pre-releases` flag, and the `--check` flag"
+      - "Fields `project`, `kind`, `body`, `time` are present and well-formed"
+    completed_at: 2026-05-10T08:57:29Z
+
+  - id: task-011
+    title: "Security review via golang-security skill + fix findings"
+    description: |
+      Invoke the `golang-security` skill against the new package
+      (`neo4j-cli/internal/subcommands/update/`). Review the audit list from
+      the PRD: TLS validation (no `InsecureSkipVerify`), checksum enforcement
+      (no swap path bypasses verify), zip-slip / tar-slip rejection, file
+      perms (0755 binary, 0600 temp), symlink resolution before swap, HTTP
+      redirect host pinning to `github.com` / `objects.githubusercontent.com`
+      / `api.github.com`, semver validation on `--version <X>`, and
+      `GH_TOKEN` redaction. Fix any HIGH or MEDIUM findings before declaring
+      done.
+    status: completed
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`golang-security` skill report attached to the task with no HIGH or MEDIUM findings outstanding"
+      - "All eight audit surfaces from the PRD are explicitly covered in the report (tick or remediation)"
+      - "Any code change made in response to a finding has matching test coverage"
+      - "`make lint` is still clean after security fixes"
+    completed_at: 2026-05-10T09:07:45Z
+
+  - id: task-012
+    title: "Final gates + end-to-end verification"
+    description: |
+      Run the full gate set: `make fmt-check`, `make lint`, `make test`,
+      `make generate-check`, `make license-check`. Then end-to-end verify
+      against a sandbox copy of the binary: `bin/neo4j-cli update --check`,
+      `bin/neo4j-cli update --check --pre-releases`,
+      `bin/neo4j-cli update --check --pre-releases -f json`, and a real
+      update against `/tmp/n4j-test` confirming `--version` reports the new
+      tag afterwards. If `brew` is available, also confirm the
+      pkg-mgr-passthrough hint fires for `$(brew --prefix)/bin/neo4j-cli update`.
+    dependencies:
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+    acceptance_criteria:
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+      - "`bin/neo4j-cli update --check` (no flags) prints the no-stable-yet hint and exits 0"
+      - "`bin/neo4j-cli update --check --pre-releases` reports a real prerelease tag and exits 1"
+      - "`bin/neo4j-cli update --check --pre-releases -f json` emits valid JSON matching REQ-F-018 shape"
+      - "Real update against `/tmp/n4j-test` succeeds; running the swapped binary with `--version` reports the new tag"
+      - "If `brew` is available locally: a Homebrew-installed binary triggers the rich pkg-mgr hint and does NOT download"
+    status: completed
+    completed_at: 2026-05-10T09:30:00Z
+
+  - id: task-013
+    title: "Wire toon + table format support for update output; fix AGENTS.md gap"
+    description: |
+      Follow-up on PR #71 review: `update --format toon` and `--format table`
+      both fall through to plain text because `printResult` only branches on
+      `"json"`. The CLI's `ValidFormatValues` is `default | json | table | toon`
+      (`common/clicfg/clicfg.go:36`) and `output.PrintBodyMap` already handles
+      all three structured formats, so the fix is a one-liner in
+      `neo4j-cli/internal/subcommands/update/update.go::printResult` plus tests.
+
+      Root cause for the miss: `AGENTS.md:103` documents the convention as
+      `--format json|table` (no toon) and `AGENTS.md:85` describes
+      `output/` as "JSON + table rendering". Toon is the third supported
+      format; future agents reading the convention statement will keep
+      omitting it. Update both lines to `--format json|table|toon` and "JSON,
+      table, and toon rendering" so this doesn't recur.
+
+      Also update PR #71 body via `gh pr edit 71 --body` to mention toon
+      alongside json/table.
+
+      Default behaviour ("default" / empty `Format()`) must remain plain-text
+      reference output even on a TTY, otherwise the running narrative
+      ("Current → Checking → Successfully updated from X to Y") gets
+      clobbered by an auto-detected table render.
+    status: completed
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`printResult` routes `json`, `table`, and `toon` through `output.PrintBodyMap`; default/empty falls through to plain text"
+      - "Two new tests assert toon and table outputs are NOT plain text and contain the documented six fields"
+      - "Existing JSON happy-path test still green; existing plain-text golden test still green"
+      - "`AGENTS.md:103` updated to `--format json|table|toon`"
+      - "`AGENTS.md:85` updated to mention toon (\"JSON, table, and toon rendering\" or equivalent)"
+      - "PR #71 description updated via `gh pr edit` to mention toon alongside json/table"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: 2026-05-10T19:00:00Z
+
+  - id: task-014
+    title: "Background version-availability check (5% sample, silent, cached)"
+    description: |
+      On every neo4j-cli invocation, with 5% probability, fire a background
+      version-availability check. The check reuses the release-lookup module
+      from task-003 (`Latest(ctx, false)` for stable; the cache is stable-only
+      to keep the user-facing nag conservative — power users on prereleases
+      can run `neo4j-cli update --check --pre-releases` themselves).
+
+      Hard requirements:
+      - **Silent on errors.** Never print errors, never write to stderr or
+        stdout from the check itself. Network failure / rate limit / etc must
+        be invisible to the user.
+      - **Non-blocking.** Do not delay the user's actual command. Spin up the
+        check in a goroutine with a short timeout (5s) and let the foreground
+        command continue. If the foreground command exits before the check
+        completes, kill the check (don't await it).
+      - **Cache.** Persist the result to a small JSON file in the OS config
+        dir alongside `config.json` and `credentials.json` — pattern
+        `version-check.json` with shape
+        `{"checked_at": "<ISO8601>", "latest_stable": "vX.Y.Z"}`.
+        TTL = 24h: if the cached value is fresher than 24h, skip the network
+        call entirely (still costs the 5% dice roll though — the dice gates
+        the cache READ too, otherwise we'd nag every invocation).
+
+      Hint surface (REQ — separate from the silent check itself):
+      - Independently of the 5% sample, on EVERY invocation, read the
+        cache. If the cached `latest_stable` is newer than `app.Version`
+        (semver compare), print ONE line to stderr at the very start of the
+        run: `A newer neo4j-cli is available: <cached> (you have <current>).
+        Run \`neo4j-cli update\` to upgrade.` Stderr only — never pollute
+        stdout, since scripts pipe stdout. Suppress the hint on
+        `neo4j-cli update` itself (would be confusing) and on `--version` /
+        `--help`. Suppress when `cfg.Global.Format() == "json"` so JSON
+        consumers stay clean.
+      - Provide an env-var opt-out: `NEO4J_CLI_NO_UPDATE_NAG=1` (or similar)
+        disables both the dice roll and the stderr hint.
+
+      Implementation notes:
+      - New package `neo4j-cli/internal/versioncheck/` with `Schedule(ctx,
+        cfg)` (the goroutine-firing function) and `MaybeHint(cmd, cfg)` (the
+        stderr-print function). Both wired via a `PersistentPreRunE` on the
+        root cobra command in `neo4j-cli/app/app.go`. Reuse `update.Latest`
+        and `update.releaseAuthToken` if exported (or factor a small shared
+        helper).
+      - Use `crypto/rand` (or `math/rand` seeded from time) for the dice
+        roll. 1-in-20 hit.
+      - Tests must use the package-level `randFloat` test seam (per AGENTS.md
+        Package-level test seams) so dice-roll outcomes are deterministic.
+        HTTP via httptest.Server. FS via testfs.GetTestFs.
+    status: completed
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "Background goroutine fires on ~5% of invocations (table-driven test pinning randFloat)"
+      - "Errors from the goroutine are NEVER surfaced to the user (assertion: stderr stays empty when the upstream returns 500/timeout)"
+      - "Cache file written to OS config dir at `version-check.json` with the documented shape"
+      - "Cache read TTL is 24h: a fresh cache skips the network call even when the dice roll hits"
+      - "On every invocation, if cache shows a newer stable, a single line hint goes to stderr (not stdout) before the user's command runs"
+      - "Hint is suppressed on `neo4j-cli update`, `--version`, `--help`, and `--format json`"
+      - "`NEO4J_CLI_NO_UPDATE_NAG=1` disables both the dice roll and the hint"
+      - "Stdout of every existing command is byte-identical with the env-var set vs unset (regression guard)"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: 2026-05-10T20:00:00Z
+
+  - id: task-015
+    title: "Post-update skill handling: auto-upgrade installed skills; hint when none"
+    description: |
+      After `neo4j-cli update` completes a successful in-place swap, the
+      embedded skill bundle on disk is stale relative to the new binary.
+      Auto-handle this so the user (and AI agents reading the bundle) see
+      the new version's surface without a manual second step.
+
+      Flow at the END of a successful swap (after the "Successfully updated
+      from X to Y" line, before returning):
+
+      1. Inspect installed agents via `common/skill/`. The package already
+         exposes catalog + per-agent detection (used by `skill list` /
+         `skill check`). Reuse — do NOT shell out to `neo4j-cli skill list`.
+      2. If at least one agent has the skill installed → automatically run
+         the equivalent of `skill install` for ALL detected-installed
+         agents (refresh their bundle). Print one line:
+         "Refreshed skill bundle for: <agent1>, <agent2>, ..." (or, in JSON
+         mode, add an `updated_skills: [...]` field to the result document).
+      3. If no agent has the skill installed → print one line at the end:
+         "Tip: install the agent skill so AI assistants pick up the new
+         commands — run \`neo4j-cli skill install\`." (JSON mode: emit
+         `skill_install_suggested: true` instead.)
+
+      Failures during the skill refresh are non-fatal — the binary update
+      already succeeded. Print a single warning line to stderr if a refresh
+      fails for any agent, and continue. Don't let a skill-refresh error
+      cause `update` to exit non-zero.
+
+      The package-manager passthrough path (REQ-F-009/010) does not reach
+      this code — it never actually swaps the binary, so the skill bundle
+      isn't stale. Confirm via tests.
+
+      Implementation notes:
+      - The `skill install` core lives in `common/skill/install.go`. Find
+        the function that takes a list of agents and refreshes them. If no
+        such function exposes the right granularity, factor one (small
+        refactor — keep the cobra wrapper thin).
+      - Add the orchestration in `neo4j-cli/internal/subcommands/update/
+        update.go` after `swapFn` succeeds.
+      - Update the JSON result document shape in REQ-F-018: add
+        `updated_skills: [<agent_names>]` (omitempty) and
+        `skill_install_suggested: bool` (omitempty). Bump the field-order
+        list passed to `PrintBodyMap`. Update `printableUpdateResult`
+        and `MarshalJSON` accordingly.
+      - Tests: a happy-path test where 2 agents are pre-seeded as
+        installed → assert both get refreshed; a no-agents-installed test
+        → assert the hint fires and `skill_install_suggested: true` in
+        JSON; a refresh-failure test → assert non-fatal warning + binary
+        update still reports `updated: true`.
+    status: completed
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "After a successful swap, installed agents (per `common/skill/` detection) get their bundle refreshed automatically"
+      - "When no agents have the skill installed, a single-line hint suggests `neo4j-cli skill install`"
+      - "JSON output gains `updated_skills: [...]` (omitempty) and `skill_install_suggested: bool` (omitempty); existing six fields keep their REQ-F-018 order"
+      - "Skill-refresh failure for any agent is non-fatal: stderr warning, binary update still reports `updated: true`"
+      - "Pkg-mgr passthrough path does NOT trigger skill handling (no swap occurred)"
+      - "`--check` mode does NOT trigger skill handling (no swap occurred)"
+      - "Updated `bundle/references/update.md` and skill bundle SKILL.md if needed (run `go generate`)"
+      - "README \"Self-update\" subsection mentions the auto-skill-refresh behaviour"
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+    completed_at: 2026-05-10T20:30:00Z
+
+  - id: task-016
+    title: "CI tier-1 e2e: real GitHub --check on the OS matrix"
+    description: |
+      Add a CI job that runs the BUILT binary against the real GitHub API on
+      ubuntu/windows/macos and asserts the user-facing surface, not just that
+      the unit tests pass with mocks.
+
+      What to add to `.github/workflows/test.yml`:
+      - New step (or new job, sharing the matrix) named "Update e2e
+        (--check)". Depends on the existing Build step.
+      - Runs `bin/neo4j-cli update --check --pre-releases -f json` and
+        captures stdout. Honors `GITHUB_TOKEN` (already in scope on the
+        runner) so we don't burn the unauthenticated 60/h ratelimit
+        across the matrix × forks.
+      - Asserts:
+        * Exit code is 1 (newer prerelease available — current is "dev"
+          or whatever ldflags set; test version on a built CI binary is
+          ldflag'd to "dev" so any real prerelease wins the compare).
+        * stdout parses as JSON with the documented six keys: `current`,
+          `latest`, `updated`, `check`, `channel`, `install_method`.
+          (Plus optional `updated_skills` / `skill_install_suggested`
+          that should be ABSENT in `--check` mode.)
+        * `updated == false` and `check == true`.
+        * `latest` is non-empty AND `golang.org/x/mod/semver.IsValid` —
+          do this assertion in a tiny Go helper (`./test/e2e/check_json.go`
+          or similar) rather than jq/grep so we get free semver
+          validation.
+        * `channel == "pre-release"` (we asked for `--pre-releases` and
+          all current releases are prerelease semver tags).
+      - Cross-check (light): also run `gh release list --limit 1
+        --exclude-drafts --json tagName --jq '.[0].tagName'` and assert
+        it equals the `latest` field from the JSON output. Catches
+        drift between `Latest` filtering and what GitHub actually has at
+        the head.
+      - Skip cleanly on forks where `GITHUB_TOKEN` lacks scope or where
+        the secret isn't set (`if: github.event.pull_request.head.repo.fork == false`
+        or equivalent — be permissive, don't block external contributor PRs).
+
+      Also add `bin/neo4j-cli update --help` invocation as a smoke test
+      (catches accidental panics in cobra wiring or flag-binding regressions
+      that the build step alone can miss on Windows when test seams aren't
+      properly initialized — cheap insurance).
+
+      Out of scope for this task:
+      - Real download / swap (that's task-017).
+      - Pkg-mgr passthrough (no realistic way to install via brew/npm/pipx
+        in the same job without huge runtime cost).
+
+      Notes:
+      - The Go helper (`test/e2e/check_json.go`) should be a `package main`
+        binary, not a test. Keep it small (<100 lines). Build it on the
+        fly with `go run ./test/e2e/check_json.go` so we don't need to
+        version a separate binary in the repo.
+      - The job should be in the same workflow as `Test` so PRs see one
+        unified status check. Use a separate step inside the existing
+        `build` job rather than a new top-level job — the new job would
+        re-run the matrix's setup-go + checkout overhead unnecessarily.
+    status: completed
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "`.github/workflows/test.yml` has a new step running `bin/neo4j-cli update --check --pre-releases -f json` and `bin/neo4j-cli update --help` on each matrix OS"
+      - "Step parses JSON, asserts the six documented fields, types, and `updated == false / check == true` via a small Go helper"
+      - "`latest` is asserted to be valid semver via `golang.org/x/mod/semver.IsValid`"
+      - "`latest` is cross-checked against `gh release list --limit 1` to catch filter drift"
+      - "Step uses `GITHUB_TOKEN` to avoid ratelimit and skips gracefully on forks without breaking external PRs"
+      - "On a synthetic break (e.g. point the test step at a wrong tag in the cross-check) the step fails loud — verify locally before declaring done"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
+    completed_at: 2026-05-10T21:00:00Z
+
+  - id: task-017
+    title: "CI tier-2 e2e: real download + swap against an httptest fixture"
+    description: |
+      Tier-1 (task-016) covers the `--check` read path against real GitHub.
+      This task covers the WRITE path — actual archive download, SHA256
+      verification, and atomic binary swap — without touching real GitHub
+      release assets (we don't want CI publishing throwaway tags).
+
+      Approach: build the production binary with a build tag that wires
+      env-var overrides for the API + download base URLs, then drive an
+      end-to-end swap against a Go-based fixture server.
+
+      Work split:
+
+      1. **Build tag `e2e_seams`** — new file
+         `neo4j-cli/internal/subcommands/update/seams_e2e.go` (and a
+         `// +build e2e_seams` constraint) that, on init, reads:
+         - `NEO4J_CLI_UPDATE_E2E_API_URL`  → overrides `apiBaseURL`
+         - `NEO4J_CLI_UPDATE_E2E_DL_URL`   → overrides `dlBaseURL`
+         - `NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP` → if set, drops `requireHTTPS`
+           and adds the loopback host to `allowedDownloadHosts`
+         The default build (no `-tags e2e_seams`) does NOT compile this
+         file, so production binaries can't be tricked via env vars.
+         Document this in `swap.go` near the existing `requireHTTPS` var.
+
+      2. **Fixture server** —
+         `test/e2e/update_fixture/main.go` that:
+         - Stands up an `httptest.Server` (or just `net/http` on a free
+           port).
+         - Serves `/repos/neo4j-labs/neo4j-cli/releases?per_page=30` with
+           a hand-rolled JSON containing two synthetic releases (one
+           stable like `v9.9.0`, one prerelease like `v9.9.1-alpha.1`).
+         - Serves `/neo4j-labs/neo4j-cli/releases/download/<TAG>/...` with
+           a real tar.gz / zip containing a fake `neo4j-cli` binary
+           (small Go program that prints "swapped: <TAG>") and the
+           matching `neo4j-cli_<VER>_checksums.txt` with correct SHA256.
+         - The fake binary inside the archive should print a
+           recognizable string so the post-swap assertion can run it and
+           confirm the swap actually happened.
+         - Prints the listening port to stdout so the harness can pick
+           it up.
+
+      3. **CI harness step** — runs after the production build:
+         - Builds an additional `bin/neo4j-cli-e2e` with `-tags
+           e2e_seams`. Don't replace the production binary; the
+           tier-1 step still uses that one.
+         - Copies `bin/neo4j-cli-e2e` to `$RUNNER_TEMP/n4j-e2e/neo4j-cli`
+           (same-dir-as-target rename works on the runner's filesystem).
+         - Spins up the fixture server in the background (`go run
+           ./test/e2e/update_fixture &`), captures the port.
+         - `NEO4J_CLI_UPDATE_E2E_API_URL=http://127.0.0.1:<port>
+            NEO4J_CLI_UPDATE_E2E_DL_URL=http://127.0.0.1:<port>
+            NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1
+            $RUNNER_TEMP/n4j-e2e/neo4j-cli update --pre-releases`
+         - Asserts the swap worked:
+           * Command exits 0.
+           * Stdout contains "Successfully updated from".
+           * Running the swapped binary (`$RUNNER_TEMP/n4j-e2e/neo4j-cli`)
+             prints the recognizable "swapped: v9.9.1-alpha.1" string.
+         - Tear down the fixture server cleanly.
+
+      4. **Windows path** — confirm the rename-to-`.old` dance works on
+         the real Windows runner (this is the bit unit tests cover only
+         via the `runtime.GOOS` seam). Same harness, with a `.zip`
+         fixture instead of `.tar.gz`. Use a `.bat`-style shim binary
+         OR a tiny Go program built for windows-amd64 — whichever is
+         simpler in CI.
+
+      Out of scope:
+      - Pkg-mgr install matrix.
+      - Real GitHub download (tier 1 already covers the read path).
+      - Multi-arch (we only need amd64 on each OS — arm64 macOS happens
+        via the matrix automatically since macos-latest is arm64).
+
+      Notes:
+      - Keep the fixture server PURE stdlib + `golang.org/x/mod/semver`
+        to avoid pulling new deps into a tooling-only path. Tests
+        directory should NOT add anything to `go.mod`'s direct require
+        list.
+      - The fixture binary lives at `test/e2e/` not in
+        `neo4j-cli/internal/...` — it's a CI tooling artifact, not part
+        of the shipping binary.
+      - If the build-tag override surface ends up looking risky (e.g. a
+        future RCE vector), redesign so the override is only honored
+        when the binary's path matches `$RUNNER_TEMP` — but start
+        simple; build tags are a strong gate.
+    status: completed
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "Build tag `e2e_seams` adds a new file that wires `NEO4J_CLI_UPDATE_E2E_*` env-var overrides; default build does NOT include it"
+      - "Production `make build` artifact does NOT honor the e2e env vars (verified via a small unit test that asserts the seam values when the tag is OFF)"
+      - "`test/e2e/update_fixture/main.go` serves a synthetic releases JSON + a real signed tar.gz + matching checksums.txt"
+      - "CI step builds `bin/neo4j-cli-e2e` with `-tags e2e_seams`, drives the fixture, and asserts a real swap occurred (post-swap binary prints the expected string)"
+      - "CI step runs on ubuntu, macos, AND windows — Windows uses the .zip path and the rename-to-`.old` dance"
+      - "Fixture server is torn down cleanly even on test failure (use `defer` / `trap` patterns)"
+      - "No new entries in `go.mod`'s direct require for the fixture/harness"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
+    completed_at: 2026-05-10T22:00:00Z

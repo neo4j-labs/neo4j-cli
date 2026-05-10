@@ -6,9 +6,24 @@ Pick one. Verify with `neo4j-cli --help`.
 
 - **Install script**: `curl -sSfL https://neo4j.sh/install.sh | bash`.
 - **Homebrew**: `brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
-- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
 - **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
+- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
+
+### Self-update
+
+`neo4j-cli update` swaps the running binary with the latest GitHub release. By default only stable semver tags are considered.
+
+```bash
+neo4j-cli update                         # update to latest stable
+neo4j-cli update --check                 # report availability, exit 1 if newer; never downloads
+neo4j-cli update --pre-releases          # opt into alpha/beta/rc tags
+neo4j-cli update --version v0.1.0        # pin to a named tag (also the only way to downgrade)
+```
+
+If the binary was installed via Homebrew / npm / pipx / uv, `update` prints the channel-correct upgrade command instead of overwriting; pass `--force` to swap in place anyway. See `neo4j-cli update --help`.
+
+Installed agent skill bundles are refreshed automatically after a successful swap; if none are installed, `update` suggests running `neo4j-cli skill install`.
 
 ## Agent skills
 
