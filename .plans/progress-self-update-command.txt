@@ -40,3 +40,7 @@ Files: ~README.md, ~.plans/tasks-self-update-command.yml, ~.plans/progress-self-
 ## TASK-009 — 2026-05-10T18:30:00Z
 Skill bundle: extended `description.txt` to mention self-update via `neo4j-cli update` (611 chars, well under 1024); added "Updating the CLI" gotcha to `additions.md` covering `update`/`--check`/`--pre-releases`/`--force` and pkg-mgr passthrough behaviour. `go generate ./neo4j-cli/internal/skill/...` refreshed SKILL.md; bundle is idempotent (no drift on rerun); `TestGenerator_RoundTrip` green; `make test`/`fmt-check`/`lint`/`license-check` clean.
 Files: ~neo4j-cli/internal/skill/description.txt, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~.plans/tasks-self-update-command.yml, ~.plans/progress-self-update-command.txt
+
+## TASK-010 — 2026-05-10T08:57:29Z
+Hand-authored Minor changelog entry for self-update command (changie not on PATH); body cites `neo4j-cli update`, `--pre-releases`, `--check`. `make fmt-check` and `make license-check` clean (YAML-only, no Go touched).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260510-085729.yaml, ~.plans/tasks-self-update-command.yml, ~.plans/progress-self-update-command.txt

@@ -221,14 +221,14 @@ tasks:
       If not, hand-author a YAML at
       `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per
       AGENTS.md "Changie Notes".
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
       - "A `.changes/unreleased/neo4j-cli-Minor-*.yaml` file exists"
       - "Body mentions the new command, the `--pre-releases` flag, and the `--check` flag"
       - "Fields `project`, `kind`, `body`, `time` are present and well-formed"
-    completed_at: null
+    completed_at: 2026-05-10T08:57:29Z
 
   - id: task-011
     title: "Security review via golang-security skill + fix findings"
