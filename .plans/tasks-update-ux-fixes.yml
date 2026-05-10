@@ -175,7 +175,7 @@ tasks:
       `errPermissionWindows`; (g) elevation invoked but sudo returns non-zero → error wraps with
       `sudo install:` prefix, cleanup runs. Use the seams from task-002 to drive each branch
       hermetically.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -185,7 +185,7 @@ tasks:
       - "Tests are hermetic — no real `/usr/bin/sudo` / `/usr/local/bin` access; all paths under `t.TempDir()`"
       - "Tests pass on the existing ubuntu/macos/windows CI matrix"
       - "`make test && make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T21:25:00Z
 
   - id: task-008
     title: "Doc comments, changie entry, and final verification gates"

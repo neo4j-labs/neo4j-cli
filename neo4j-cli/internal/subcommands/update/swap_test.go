@@ -1035,3 +1035,398 @@ func TestElevatedSwap_InstallMissingReturnsError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "locate install")
 }
+
+// elevationCounters is the per-scenario state for TestSwap_ElevationMatrix.
+// Each scenario gets its own instance so the seam-driven assertions (http
+// call count, rename count, runCommandFn count, captured sudo argv) stay
+// hermetic across subtests.
+type elevationCounters struct {
+	httpCalls   int
+	renameCalls int
+	runCalls    int
+	capturedCmd *exec.Cmd
+}
+
+// TestSwap_ElevationMatrix is the REQ-T-004 table-driven end-to-end test
+// covering every elevation outcome via Swap. Each row is hermetic — no real
+// /usr/bin/sudo, /usr/local/bin, or network access — and asserts both the
+// return-value shape AND the call counts for the relevant seams.
+func TestSwap_ElevationMatrix(t *testing.T) {
+	// Build a single tar.gz the writable / elevated scenarios can reuse. The
+	// pre-flight-skip scenarios still wire httpDoFn to count calls (must be 0)
+	// but never reach the parser.
+	archive := makeTarGz(t, []tarEntry{
+		{name: "neo4j-cli", typeflag: tar.TypeReg, mode: 0o755, body: []byte("MATRIX-PAYLOAD")},
+	})
+	archiveName := "neo4j-cli_0.1.0_Linux_x86_64.tar.gz"
+	checksumBody := func(content []byte) []byte {
+		sum := sha256.Sum256(content)
+		return []byte(fmt.Sprintf("%s  %s\n", hex.EncodeToString(sum[:]), archiveName))
+	}
+	archiveURL := "https://swap-test.local/" + archiveName
+	checksumURL := "https://swap-test.local/neo4j-cli_0.1.0_checksums.txt"
+	urls := AssetURLs{Archive: archiveURL, Checksum: checksumURL}
+
+	// Default httpDoFn factory — counts calls and serves the archive +
+	// checksum. Each scenario gets its own counter so concurrent t.Run rows
+	// don't share state.
+	makeHTTPDo := func(counters *elevationCounters) func(req *http.Request) (*http.Response, error) {
+		return func(req *http.Request) (*http.Response, error) {
+			counters.httpCalls++
+			body := archive
+			if strings.HasSuffix(req.URL.Path, "_checksums.txt") {
+				body = checksumBody(archive)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+				Request:    req,
+			}, nil
+		}
+	}
+
+	type scenario struct {
+		name string
+		run  func(t *testing.T)
+	}
+
+	scenarios := []scenario{
+		{
+			name: "writable_dir_direct_rename_no_elevation",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("direct-rename branch on unix; windows variant has its own scenario")
+				}
+				withSwapGoos(t, "linux")
+
+				tmpDir := t.TempDir()
+				currentBinary := filepath.Join(tmpDir, "neo4j-cli")
+				require.NoError(t, os.WriteFile(currentBinary, []byte("OLD"), 0o755))
+
+				var counters elevationCounters
+				withDirWritable(t, func(string) (bool, error) { return true, nil })
+				withGeteuid(t, func() int {
+					t.Fatal("geteuidFn must not fire on writable branch")
+					return -1
+				})
+				withLookPath(t, func(string) (string, error) {
+					t.Fatal("lookPathFn must not fire on writable branch")
+					return "", nil
+				})
+				withRunCommand(t, func(*exec.Cmd) error {
+					counters.runCalls++
+					t.Fatal("runCommandFn must not fire on writable branch")
+					return nil
+				})
+				withRename(t, func(oldPath, newPath string) error {
+					counters.renameCalls++
+					return os.Rename(oldPath, newPath)
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.NoError(t, err)
+
+				assert.Equal(t, 1, counters.renameCalls, "writable branch must call os.Rename exactly once")
+				assert.Equal(t, 0, counters.runCalls, "writable branch must NOT invoke runCommandFn")
+				assert.Equal(t, 2, counters.httpCalls, "writable branch downloads archive + checksum")
+
+				// New binary is in place, no leftover .new.
+				got, err := os.ReadFile(currentBinary)
+				require.NoError(t, err)
+				assert.Equal(t, "MATRIX-PAYLOAD", string(got))
+				_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
+				assert.True(t, os.IsNotExist(statErr), "tmpNew must be removed by rename")
+			},
+		},
+		{
+			name: "non_writable_linux_sudo_tty_elevates",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("elevation path is unix-only")
+				}
+				withSwapGoos(t, "linux")
+
+				// Install location (non-writable) — we DO NOT chmod it, the
+				// dirWritableFn seam reports unwritable directly.
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli")
+				require.NoError(t, os.WriteFile(currentBinary, []byte("OLD"), 0o755))
+
+				// elevation tmp dir — tmpNew lives here.
+				elevTmpDir := t.TempDir()
+
+				var counters elevationCounters
+				withDirWritable(t, func(dir string) (bool, error) {
+					assert.Equal(t, installDir, dir)
+					return false, nil
+				})
+				withGeteuid(t, func() int { return 1000 })
+				withLookPath(t, func(file string) (string, error) {
+					switch file {
+					case "sudo":
+						return "/usr/bin/sudo", nil
+					case "install":
+						return "/usr/bin/install", nil
+					}
+					return "", exec.ErrNotFound
+				})
+				withStdinIsTTY(t, true)
+				withTempDir(t, func() string { return elevTmpDir })
+				withRunCommand(t, func(cmd *exec.Cmd) error {
+					counters.runCalls++
+					counters.capturedCmd = cmd
+					return nil
+				})
+				withRename(t, func(oldPath, newPath string) error {
+					counters.renameCalls++
+					return os.Rename(oldPath, newPath)
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				var stderr bytes.Buffer
+				err := Swap(context.Background(), urls, currentBinary, &stderr)
+				require.NoError(t, err)
+
+				// Exact argv shape.
+				require.NotNil(t, counters.capturedCmd)
+				expectedTmpNew := filepath.Join(elevTmpDir, "neo4j-cli.new")
+				assert.Equal(t, []string{
+					"/usr/bin/sudo", "/usr/bin/install", "-m", "0755", expectedTmpNew, currentBinary,
+				}, counters.capturedCmd.Args)
+
+				assert.Equal(t, 1, counters.runCalls, "elevated branch must call runCommandFn exactly once")
+				assert.Equal(t, 0, counters.renameCalls, "elevated branch must NOT call os.Rename")
+				assert.Equal(t, 2, counters.httpCalls, "elevated branch downloads archive + checksum")
+
+				// Elevation narrative on stderr.
+				assert.Contains(t, stderr.String(), "Cannot write to "+installDir)
+				assert.Contains(t, stderr.String(), "Elevating via sudo")
+
+				// tmpNew cleanup runs regardless of stub outcome.
+				_, statErr := os.Stat(expectedTmpNew)
+				assert.True(t, os.IsNotExist(statErr), "tmpNew under tempDirFn() must be removed after elevation")
+			},
+		},
+		{
+			name: "non_writable_already_root_surfaces_raw_error",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("already-root branch is unix-only (windows has its own scenario)")
+				}
+				withSwapGoos(t, "linux")
+
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli")
+
+				var counters elevationCounters
+				withDirWritable(t, func(string) (bool, error) { return false, nil })
+				withGeteuid(t, func() int { return 0 })
+				withLookPath(t, func(string) (string, error) {
+					t.Fatal("lookPathFn must not fire on already-root branch")
+					return "", nil
+				})
+				withRunCommand(t, func(*exec.Cmd) error {
+					counters.runCalls++
+					t.Fatal("runCommandFn must not fire on already-root branch")
+					return nil
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.Error(t, err)
+
+				// MUST NOT be one of the sentinels — already-root should not
+				// produce a misleading "re-run with sudo" hint.
+				var sudoTarget *errSudoUnavailable
+				assert.False(t, errors.As(err, &sudoTarget))
+				var winTarget *errPermissionWindows
+				assert.False(t, errors.As(err, &winTarget))
+
+				assert.Equal(t, 0, counters.runCalls)
+				assert.Equal(t, 0, counters.httpCalls, "no download when pre-flight rejects")
+			},
+		},
+		{
+			name: "non_writable_no_sudo_returns_errSudoUnavailable_no_download",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("sudo-missing branch is unix-only")
+				}
+				withSwapGoos(t, "linux")
+
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli")
+
+				var counters elevationCounters
+				withDirWritable(t, func(string) (bool, error) { return false, nil })
+				withGeteuid(t, func() int { return 1000 })
+				withLookPath(t, func(string) (string, error) {
+					return "", exec.ErrNotFound
+				})
+				withStdinIsTTY(t, true)
+				withRunCommand(t, func(*exec.Cmd) error {
+					counters.runCalls++
+					t.Fatal("runCommandFn must not fire when sudo missing")
+					return nil
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.Error(t, err)
+
+				var sudoTarget *errSudoUnavailable
+				require.True(t, errors.As(err, &sudoTarget), "expected *errSudoUnavailable, got %v", err)
+				assert.Equal(t, installDir, sudoTarget.Dir())
+
+				assert.Equal(t, 0, counters.httpCalls, "REQ-F-009: pre-flight aborts before any network I/O")
+				assert.Equal(t, 0, counters.runCalls)
+			},
+		},
+		{
+			name: "non_writable_non_tty_returns_errSudoUnavailable_no_download",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("non-tty branch is unix-only")
+				}
+				withSwapGoos(t, "linux")
+
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli")
+
+				var counters elevationCounters
+				withDirWritable(t, func(string) (bool, error) { return false, nil })
+				withGeteuid(t, func() int { return 1000 })
+				withLookPath(t, func(file string) (string, error) {
+					switch file {
+					case "sudo":
+						return "/usr/bin/sudo", nil
+					case "install":
+						return "/usr/bin/install", nil
+					}
+					return "", exec.ErrNotFound
+				})
+				withStdinIsTTY(t, false)
+				withRunCommand(t, func(*exec.Cmd) error {
+					counters.runCalls++
+					t.Fatal("runCommandFn must not fire on non-TTY branch")
+					return nil
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.Error(t, err)
+
+				var sudoTarget *errSudoUnavailable
+				require.True(t, errors.As(err, &sudoTarget))
+				assert.Equal(t, installDir, sudoTarget.Dir())
+
+				assert.Equal(t, 0, counters.httpCalls, "REQ-F-009: pre-flight aborts before any network I/O")
+				assert.Equal(t, 0, counters.runCalls)
+			},
+		},
+		{
+			name: "non_writable_windows_returns_errPermissionWindows",
+			run: func(t *testing.T) {
+				withSwapGoos(t, "windows")
+
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli.exe")
+
+				var counters elevationCounters
+				withDirWritable(t, func(string) (bool, error) { return false, nil })
+				withGeteuid(t, func() int {
+					t.Fatal("geteuidFn must not fire on windows branch")
+					return -1
+				})
+				withLookPath(t, func(string) (string, error) {
+					t.Fatal("lookPathFn must not fire on windows branch")
+					return "", nil
+				})
+				withRunCommand(t, func(*exec.Cmd) error {
+					counters.runCalls++
+					t.Fatal("runCommandFn must not fire on windows branch")
+					return nil
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.Error(t, err)
+
+				var target *errPermissionWindows
+				require.True(t, errors.As(err, &target), "expected *errPermissionWindows, got %v", err)
+				assert.Equal(t, installDir, target.Dir())
+
+				assert.Equal(t, 0, counters.httpCalls, "windows pre-flight aborts before download")
+				assert.Equal(t, 0, counters.runCalls)
+			},
+		},
+		{
+			name: "elevation_sudo_non_zero_wraps_error_and_cleans_up",
+			run: func(t *testing.T) {
+				if runtime.GOOS == "windows" {
+					t.Skip("elevation path is unix-only")
+				}
+				withSwapGoos(t, "linux")
+
+				installDir := t.TempDir()
+				currentBinary := filepath.Join(installDir, "neo4j-cli")
+				require.NoError(t, os.WriteFile(currentBinary, []byte("OLD"), 0o755))
+
+				elevTmpDir := t.TempDir()
+				expectedTmpNew := filepath.Join(elevTmpDir, "neo4j-cli.new")
+
+				var counters elevationCounters
+				innerErr := fmt.Errorf("simulated sudo decline")
+				withDirWritable(t, func(string) (bool, error) { return false, nil })
+				withGeteuid(t, func() int { return 1000 })
+				withLookPath(t, func(file string) (string, error) {
+					switch file {
+					case "sudo":
+						return "/usr/bin/sudo", nil
+					case "install":
+						return "/usr/bin/install", nil
+					}
+					return "", exec.ErrNotFound
+				})
+				withStdinIsTTY(t, true)
+				withTempDir(t, func() string { return elevTmpDir })
+				withRunCommand(t, func(cmd *exec.Cmd) error {
+					counters.runCalls++
+					counters.capturedCmd = cmd
+					return innerErr
+				})
+				withAllowedHost(t, "swap-test.local")
+				withHttpDo(t, makeHTTPDo(&counters))
+
+				err := Swap(context.Background(), urls, currentBinary, io.Discard)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "sudo install:")
+				assert.True(t, errors.Is(err, innerErr), "wrapped error must unwrap to runCommandFn return; got %v", err)
+
+				assert.Equal(t, 1, counters.runCalls, "runCommandFn fires exactly once even when it returns non-zero")
+				assert.Equal(t, 2, counters.httpCalls, "archive + checksum still downloaded before elevation")
+
+				// Cleanup runs regardless of outcome.
+				_, statErr := os.Stat(expectedTmpNew)
+				assert.True(t, os.IsNotExist(statErr), "tmpNew must be removed even on elevation failure")
+
+				// Original binary untouched on disk.
+				got, err := os.ReadFile(currentBinary)
+				require.NoError(t, err)
+				assert.Equal(t, "OLD", string(got))
+			},
+		},
+	}
+
+	for _, sc := range scenarios {
+		t.Run(sc.name, sc.run)
+	}
+}
