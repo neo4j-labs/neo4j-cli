@@ -446,3 +446,173 @@ tasks:
       - "README \"Self-update\" subsection mentions the auto-skill-refresh behaviour"
       - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
     completed_at: 2026-05-10T20:30:00Z
+
+  - id: task-016
+    title: "CI tier-1 e2e: real GitHub --check on the OS matrix"
+    description: |
+      Add a CI job that runs the BUILT binary against the real GitHub API on
+      ubuntu/windows/macos and asserts the user-facing surface, not just that
+      the unit tests pass with mocks.
+
+      What to add to `.github/workflows/test.yml`:
+      - New step (or new job, sharing the matrix) named "Update e2e
+        (--check)". Depends on the existing Build step.
+      - Runs `bin/neo4j-cli update --check --pre-releases -f json` and
+        captures stdout. Honors `GITHUB_TOKEN` (already in scope on the
+        runner) so we don't burn the unauthenticated 60/h ratelimit
+        across the matrix × forks.
+      - Asserts:
+        * Exit code is 1 (newer prerelease available — current is "dev"
+          or whatever ldflags set; test version on a built CI binary is
+          ldflag'd to "dev" so any real prerelease wins the compare).
+        * stdout parses as JSON with the documented six keys: `current`,
+          `latest`, `updated`, `check`, `channel`, `install_method`.
+          (Plus optional `updated_skills` / `skill_install_suggested`
+          that should be ABSENT in `--check` mode.)
+        * `updated == false` and `check == true`.
+        * `latest` is non-empty AND `golang.org/x/mod/semver.IsValid` —
+          do this assertion in a tiny Go helper (`./test/e2e/check_json.go`
+          or similar) rather than jq/grep so we get free semver
+          validation.
+        * `channel == "pre-release"` (we asked for `--pre-releases` and
+          all current releases are prerelease semver tags).
+      - Cross-check (light): also run `gh release list --limit 1
+        --exclude-drafts --json tagName --jq '.[0].tagName'` and assert
+        it equals the `latest` field from the JSON output. Catches
+        drift between `Latest` filtering and what GitHub actually has at
+        the head.
+      - Skip cleanly on forks where `GITHUB_TOKEN` lacks scope or where
+        the secret isn't set (`if: github.event.pull_request.head.repo.fork == false`
+        or equivalent — be permissive, don't block external contributor PRs).
+
+      Also add `bin/neo4j-cli update --help` invocation as a smoke test
+      (catches accidental panics in cobra wiring or flag-binding regressions
+      that the build step alone can miss on Windows when test seams aren't
+      properly initialized — cheap insurance).
+
+      Out of scope for this task:
+      - Real download / swap (that's task-017).
+      - Pkg-mgr passthrough (no realistic way to install via brew/npm/pipx
+        in the same job without huge runtime cost).
+
+      Notes:
+      - The Go helper (`test/e2e/check_json.go`) should be a `package main`
+        binary, not a test. Keep it small (<100 lines). Build it on the
+        fly with `go run ./test/e2e/check_json.go` so we don't need to
+        version a separate binary in the repo.
+      - The job should be in the same workflow as `Test` so PRs see one
+        unified status check. Use a separate step inside the existing
+        `build` job rather than a new top-level job — the new job would
+        re-run the matrix's setup-go + checkout overhead unnecessarily.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "`.github/workflows/test.yml` has a new step running `bin/neo4j-cli update --check --pre-releases -f json` and `bin/neo4j-cli update --help` on each matrix OS"
+      - "Step parses JSON, asserts the six documented fields, types, and `updated == false / check == true` via a small Go helper"
+      - "`latest` is asserted to be valid semver via `golang.org/x/mod/semver.IsValid`"
+      - "`latest` is cross-checked against `gh release list --limit 1` to catch filter drift"
+      - "Step uses `GITHUB_TOKEN` to avoid ratelimit and skips gracefully on forks without breaking external PRs"
+      - "On a synthetic break (e.g. point the test step at a wrong tag in the cross-check) the step fails loud — verify locally before declaring done"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
+    completed_at: null
+
+  - id: task-017
+    title: "CI tier-2 e2e: real download + swap against an httptest fixture"
+    description: |
+      Tier-1 (task-016) covers the `--check` read path against real GitHub.
+      This task covers the WRITE path — actual archive download, SHA256
+      verification, and atomic binary swap — without touching real GitHub
+      release assets (we don't want CI publishing throwaway tags).
+
+      Approach: build the production binary with a build tag that wires
+      env-var overrides for the API + download base URLs, then drive an
+      end-to-end swap against a Go-based fixture server.
+
+      Work split:
+
+      1. **Build tag `e2e_seams`** — new file
+         `neo4j-cli/internal/subcommands/update/seams_e2e.go` (and a
+         `// +build e2e_seams` constraint) that, on init, reads:
+         - `NEO4J_CLI_UPDATE_E2E_API_URL`  → overrides `apiBaseURL`
+         - `NEO4J_CLI_UPDATE_E2E_DL_URL`   → overrides `dlBaseURL`
+         - `NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP` → if set, drops `requireHTTPS`
+           and adds the loopback host to `allowedDownloadHosts`
+         The default build (no `-tags e2e_seams`) does NOT compile this
+         file, so production binaries can't be tricked via env vars.
+         Document this in `swap.go` near the existing `requireHTTPS` var.
+
+      2. **Fixture server** —
+         `test/e2e/update_fixture/main.go` that:
+         - Stands up an `httptest.Server` (or just `net/http` on a free
+           port).
+         - Serves `/repos/neo4j-labs/neo4j-cli/releases?per_page=30` with
+           a hand-rolled JSON containing two synthetic releases (one
+           stable like `v9.9.0`, one prerelease like `v9.9.1-alpha.1`).
+         - Serves `/neo4j-labs/neo4j-cli/releases/download/<TAG>/...` with
+           a real tar.gz / zip containing a fake `neo4j-cli` binary
+           (small Go program that prints "swapped: <TAG>") and the
+           matching `neo4j-cli_<VER>_checksums.txt` with correct SHA256.
+         - The fake binary inside the archive should print a
+           recognizable string so the post-swap assertion can run it and
+           confirm the swap actually happened.
+         - Prints the listening port to stdout so the harness can pick
+           it up.
+
+      3. **CI harness step** — runs after the production build:
+         - Builds an additional `bin/neo4j-cli-e2e` with `-tags
+           e2e_seams`. Don't replace the production binary; the
+           tier-1 step still uses that one.
+         - Copies `bin/neo4j-cli-e2e` to `$RUNNER_TEMP/n4j-e2e/neo4j-cli`
+           (same-dir-as-target rename works on the runner's filesystem).
+         - Spins up the fixture server in the background (`go run
+           ./test/e2e/update_fixture &`), captures the port.
+         - `NEO4J_CLI_UPDATE_E2E_API_URL=http://127.0.0.1:<port>
+            NEO4J_CLI_UPDATE_E2E_DL_URL=http://127.0.0.1:<port>
+            NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1
+            $RUNNER_TEMP/n4j-e2e/neo4j-cli update --pre-releases`
+         - Asserts the swap worked:
+           * Command exits 0.
+           * Stdout contains "Successfully updated from".
+           * Running the swapped binary (`$RUNNER_TEMP/n4j-e2e/neo4j-cli`)
+             prints the recognizable "swapped: v9.9.1-alpha.1" string.
+         - Tear down the fixture server cleanly.
+
+      4. **Windows path** — confirm the rename-to-`.old` dance works on
+         the real Windows runner (this is the bit unit tests cover only
+         via the `runtime.GOOS` seam). Same harness, with a `.zip`
+         fixture instead of `.tar.gz`. Use a `.bat`-style shim binary
+         OR a tiny Go program built for windows-amd64 — whichever is
+         simpler in CI.
+
+      Out of scope:
+      - Pkg-mgr install matrix.
+      - Real GitHub download (tier 1 already covers the read path).
+      - Multi-arch (we only need amd64 on each OS — arm64 macOS happens
+        via the matrix automatically since macos-latest is arm64).
+
+      Notes:
+      - Keep the fixture server PURE stdlib + `golang.org/x/mod/semver`
+        to avoid pulling new deps into a tooling-only path. Tests
+        directory should NOT add anything to `go.mod`'s direct require
+        list.
+      - The fixture binary lives at `test/e2e/` not in
+        `neo4j-cli/internal/...` — it's a CI tooling artifact, not part
+        of the shipping binary.
+      - If the build-tag override surface ends up looking risky (e.g. a
+        future RCE vector), redesign so the override is only honored
+        when the binary's path matches `$RUNNER_TEMP` — but start
+        simple; build tags are a strong gate.
+    status: pending
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "Build tag `e2e_seams` adds a new file that wires `NEO4J_CLI_UPDATE_E2E_*` env-var overrides; default build does NOT include it"
+      - "Production `make build` artifact does NOT honor the e2e env vars (verified via a small unit test that asserts the seam values when the tag is OFF)"
+      - "`test/e2e/update_fixture/main.go` serves a synthetic releases JSON + a real signed tar.gz + matching checksums.txt"
+      - "CI step builds `bin/neo4j-cli-e2e` with `-tags e2e_seams`, drives the fixture, and asserts a real swap occurred (post-swap binary prints the expected string)"
+      - "CI step runs on ubuntu, macos, AND windows — Windows uses the .zip path and the rename-to-`.old` dance"
+      - "Fixture server is torn down cleanly even on test failure (use `defer` / `trap` patterns)"
+      - "No new entries in `go.mod`'s direct require for the fixture/harness"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check`, `make license-check` still pass"
+    completed_at: null
