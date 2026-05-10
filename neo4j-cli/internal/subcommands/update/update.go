@@ -302,6 +302,13 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	}
 
+	// REQ-F-006: silence the cobra Usage block on RunE error AFTER flag
+	// validation has run. Genuine flag misuse (`update --bogus`) still
+	// surfaces the help via cobra's normal pre-RunE flag-parse path; from
+	// here on, any error is a runtime failure (network, swap, sudo) and
+	// dumping `--help` over the failure adds noise without helping the user.
+	cmd.SilenceUsage = true
+
 	// Resolve the target release.
 	target, channel, err := resolveTarget(ctx, opts)
 	if err != nil {
@@ -370,16 +377,22 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	}
 
-	// REQ-F-011: `update check` mode — report and exit. exit 1 (non-nil
-	// error) when newer is available so CI/scripts can branch on it; exit 0
-	// when up-to-date (handled above by the cmp == 0 fast-path).
+	// REQ-F-001/002: `update check` mode — report and exit 0 (no error)
+	// regardless of whether a newer version exists. Finding a new version
+	// is the success case for `check`; CI/scripts that want to branch on
+	// drift compare `current != latest` from the JSON output. The plain-text
+	// branch prints both the existing two-line "Current/Latest" header AND
+	// the new "New version available" + install-command hint so users see
+	// exactly what to run next.
 	if opts.check {
 		printResult(cmd, cfg, result, func() {
 			cmd.Printf("Current version: %s\n", current)
 			cmd.Printf("Latest %s version: %s\n", channel, target.TagName)
+			// cmp < 0 — newer available.
+			cmd.Printf("New version available: %s -> %s\n", current, target.TagName)
+			cmd.Printf("Run `%s` to install.\n", buildUpdateCommand(opts))
 		})
-		// cmp < 0 — newer available.
-		return clierr.NewUsageError("a newer version is available: %s -> %s", current, target.TagName)
+		return nil
 	}
 
 	// REQ-F-012/013/014/015/016: download → verify → extract → atomic
@@ -437,6 +450,26 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	})
 	return nil
+}
+
+// buildUpdateCommand reconstructs the install command suggested by the
+// `update check` newer-available hint. Reads the active flags out of opts so
+// the suggestion mirrors what the user passed to `check` — e.g. a check run
+// with `--pre-releases` produces `neo4j-cli update --pre-releases`.
+//
+// Maintenance note: if a new install-time flag is added to runOpts, mirror it
+// here so the hint stays accurate. `--force` is intentionally NOT included
+// because `update check` does not register `--force` (the install-method
+// passthrough is irrelevant when nothing is being installed).
+func buildUpdateCommand(opts runOpts) string {
+	parts := []string{"neo4j-cli update"}
+	if opts.preReleases {
+		parts = append(parts, "--pre-releases")
+	}
+	if opts.version != "" {
+		parts = append(parts, "--version "+opts.version)
+	}
+	return strings.Join(parts, " ")
 }
 
 // refreshSkillBundles enumerates installed agents and re-runs Install for

@@ -163,9 +163,10 @@ func TestRunUpdate_NoStableYet_PreReleasesHint(t *testing.T) {
 	assert.Contains(t, out, "--pre-releases")
 }
 
-func TestRunUpdate_CheckMode_NewerAvailable_ReturnsError(t *testing.T) {
-	// REQ-F-011 / acceptance criterion 3: --check + newer available exits 1
-	// (non-nil error). The swap path must not be invoked.
+func TestRunUpdate_CheckMode_NewerAvailable_FriendlyHint(t *testing.T) {
+	// REQ-F-001/002: `update check` + newer available exits 0 with a
+	// two-line friendly hint pointing at the install command. The swap
+	// path must not be invoked.
 	swapCalled := false
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.2.0"}, nil
@@ -180,10 +181,11 @@ func TestRunUpdate_CheckMode_NewerAvailable_ReturnsError(t *testing.T) {
 	})
 
 	out, err := runWithOpts(t, "v0.1.0", runOpts{check: true})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "newer version is available")
-	assert.Contains(t, out, "v0.1.0")
-	assert.Contains(t, out, "v0.2.0")
+	require.NoError(t, err, "`update check` + newer must NOT error — finding a new version is the success case")
+	assert.Contains(t, out, "Current version: v0.1.0")
+	assert.Contains(t, out, "Latest stable version: v0.2.0")
+	assert.Contains(t, out, "New version available: v0.1.0 -> v0.2.0")
+	assert.Contains(t, out, "Run `neo4j-cli update` to install.")
 	assert.False(t, swapCalled, "--check must never invoke swap")
 }
 
@@ -436,9 +438,9 @@ func TestRunUpdate_ChannelLabel_StableVsPreRelease(t *testing.T) {
 			})
 
 			out, err := runWithOpts(t, tc.current, runOpts{check: true, preReleases: tc.preReleases})
-			// --check + newer always errors — we just want to inspect the
-			// channel string in the printed lines.
-			require.Error(t, err)
+			// `update check` exits 0 even when newer is available — we
+			// just want to inspect the channel string in the printed lines.
+			require.NoError(t, err)
 			assert.Contains(t, out, "Latest "+tc.wantChannel+" version:", "out=%q", out)
 		})
 	}
@@ -540,8 +542,9 @@ func TestJSONOutput_HappyPath(t *testing.T) {
 }
 
 func TestJSONOutput_CheckMode_NewerAvailable(t *testing.T) {
-	// REQ-F-018 / acceptance criterion 3: --check JSON sets updated:false,
-	// check:true. Error still propagates so exit code is non-zero.
+	// REQ-F-003 / REQ-F-018: `update check` + newer available exits 0 with
+	// JSON sets updated:false, check:true. Scripts compare current!=latest
+	// to detect drift rather than relying on a non-zero exit.
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.2.0"}, nil
 	})
@@ -550,7 +553,7 @@ func TestJSONOutput_CheckMode_NewerAvailable(t *testing.T) {
 	})
 
 	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{check: true}, "json")
-	require.Error(t, err, "--check + newer must still error to set exit code")
+	require.NoError(t, err, "`update check` + newer must NOT error — finding a new version is the success case")
 
 	doc := parseJSONOutput(t, out)
 	assert.Equal(t, "v0.1.0", doc.Current)
@@ -992,8 +995,7 @@ func TestRunUpdate_CheckMode_DoesNotRefreshSkills(t *testing.T) {
 	})
 
 	_, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{check: true}, "default")
-	require.Error(t, err, "--check + newer must error to set exit code")
-	assert.Contains(t, err.Error(), "newer version is available")
+	require.NoError(t, err, "`update check` + newer exits 0 — refresh path is gated on a successful swap, not on the error/non-error split")
 }
 
 // TestRunUpdate_PostSwap_NilBundle_SkipsRefresh asserts the bundle-nil
