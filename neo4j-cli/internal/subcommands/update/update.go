@@ -427,6 +427,23 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	}
 
 	if err := swapFn(ctx, urls, currentBinaryPath, cmd.ErrOrStderr()); err != nil {
+		// REQ-F-014: surface friendly, actionable hints for the two
+		// permission-class sentinels. Both turn into FatalError so the
+		// exit code stays non-zero while the printed shape is stable.
+		var sudoErr *errSudoUnavailable
+		if errors.As(err, &sudoErr) {
+			return clierr.NewFatalError(
+				"cannot write to %s (permission denied).\nRe-run with sudo:\n\n    sudo %s",
+				sudoErr.Dir(), buildReRunCommand(cmd, opts),
+			)
+		}
+		var winErr *errPermissionWindows
+		if errors.As(err, &winErr) {
+			return clierr.NewFatalError(
+				"cannot write to %s (permission denied).\nRe-run from an Administrator shell.",
+				winErr.Dir(),
+			)
+		}
 		return clierr.NewFatalError("update failed: %v", err)
 	}
 
@@ -468,6 +485,29 @@ func buildUpdateCommand(opts runOpts) string {
 	}
 	if opts.version != "" {
 		parts = append(parts, "--version "+opts.version)
+	}
+	return strings.Join(parts, " ")
+}
+
+// buildReRunCommand reconstructs the FULL command the user originally typed —
+// used inside the "Re-run with sudo:" hint surfaced from the `*errSudoUnavailable`
+// branch of runUpdate. Uses cmd.CommandPath() so the hint reflects however the
+// user invoked the binary (e.g. `/usr/local/bin/neo4j-cli update` or just
+// `neo4j-cli update`).
+//
+// Unlike buildUpdateCommand, this DOES include `--force` because the failing
+// invocation is the install path (`update`, not `update check`) where force is
+// a valid flag and the user may have set it.
+func buildReRunCommand(cmd *cobra.Command, opts runOpts) string {
+	parts := []string{cmd.CommandPath()}
+	if opts.preReleases {
+		parts = append(parts, "--pre-releases")
+	}
+	if opts.version != "" {
+		parts = append(parts, "--version "+opts.version)
+	}
+	if opts.force {
+		parts = append(parts, "--force")
 	}
 	return strings.Join(parts, " ")
 }

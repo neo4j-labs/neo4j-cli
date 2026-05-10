@@ -149,7 +149,7 @@ tasks:
       colocated with the existing `buildUpdateCommand` from task-001. Add table-driven tests covering
       the matrix: bare; `--pre-releases`; `--version v0.1.0-alpha.10`; `--force` — each producing the
       documented hint shape.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -159,7 +159,7 @@ tasks:
       - "Hint uses `cmd.CommandPath()` for the binary name (not hardcoded `neo4j-cli`)"
       - "No cobra usage block prints in either sentinel case (SilenceUsage from task-001 applies)"
       - "`make test && make fmt-check && make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-10T21:05:00Z
 
   - id: task-007
     title: "End-to-end elevation-path table-driven tests in swap_test.go"

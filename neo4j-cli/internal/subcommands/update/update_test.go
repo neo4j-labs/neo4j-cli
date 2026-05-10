@@ -19,6 +19,7 @@ import (
 	commonskill "github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -395,6 +396,155 @@ func TestRunUpdate_SwapFailure_PropagatesError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update failed")
 	assert.Contains(t, err.Error(), "simulated swap failure")
+}
+
+// runWithOptsParented mirrors runWithOptsFormat but mounts the `update` cobra
+// command under a synthetic `neo4j-cli` root so `cmd.CommandPath()` returns
+// the production-realistic `neo4j-cli update` rather than the bare `update`
+// you'd get from an unparented sub-cobra. Used by the sentinel-error hint
+// tests because the hint relies on CommandPath().
+func runWithOptsParented(t *testing.T, current string, opts runOpts) (string, error) {
+	t.Helper()
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+
+	root := &cobra.Command{Use: "neo4j-cli"}
+	updateCmd := NewCmd(cfg, nil, "")
+	root.AddCommand(updateCmd)
+
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	updateCmd.SetOut(out)
+	updateCmd.SetErr(out)
+
+	err = runUpdate(context.Background(), updateCmd, cfg, opts)
+	return out.String(), err
+}
+
+// TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix verifies REQ-F-014: a
+// `*errSudoUnavailable` returned from Swap turns into a clear two-line fatal
+// error with a "Re-run with sudo: <full command>" hint that reflects the
+// flags actually passed to the current invocation. The cobra usage block must
+// NOT print (SilenceUsage is set by task-001 BEFORE swapFn is invoked).
+func TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix(t *testing.T) {
+	cases := []struct {
+		name     string
+		opts     runOpts
+		wantHint string
+	}{
+		{
+			name:     "bare",
+			opts:     runOpts{},
+			wantHint: "sudo neo4j-cli update",
+		},
+		{
+			name:     "pre-releases",
+			opts:     runOpts{preReleases: true},
+			wantHint: "sudo neo4j-cli update --pre-releases",
+		},
+		{
+			name:     "version tag",
+			opts:     runOpts{version: "v0.1.0-alpha.10"},
+			wantHint: "sudo neo4j-cli update --version v0.1.0-alpha.10",
+		},
+		{
+			name:     "force",
+			opts:     runOpts{force: true},
+			wantHint: "sudo neo4j-cli update --force",
+		},
+		{
+			name:     "pre-releases and force",
+			opts:     runOpts{preReleases: true, force: true},
+			wantHint: "sudo neo4j-cli update --pre-releases --force",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			latestTag := "v0.2.0"
+			withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+				return &Release{TagName: latestTag}, nil
+			})
+			withGetByTag(t, func(ctx context.Context, tag string) (*Release, error) {
+				return &Release{TagName: tag}, nil
+			})
+			withDetect(t, func() (InstallMethod, string, error) {
+				return InstallMethodBinary, "/usr/local/bin/neo4j-cli", nil
+			})
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+				return &errSudoUnavailable{dir: "/usr/local/bin"}
+			})
+
+			out, err := runWithOptsParented(t, "v0.1.0", tc.opts)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "cannot write to /usr/local/bin (permission denied).")
+			assert.Contains(t, err.Error(), "Re-run with sudo:")
+			assert.Contains(t, err.Error(), tc.wantHint)
+			// SilenceUsage gate from task-001 must prevent the cobra Usage
+			// block from leaking into stdout/stderr.
+			assert.NotContains(t, out, "Usage:")
+		})
+	}
+}
+
+// TestRunUpdate_SwapErrPermissionWindows_AdminShellHint verifies REQ-F-014: a
+// `*errPermissionWindows` returned from Swap turns into a clear two-line fatal
+// error with an "Administrator shell" hint. Same SilenceUsage assertion as the
+// sudo branch.
+func TestRunUpdate_SwapErrPermissionWindows_AdminShellHint(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, `C:\Program Files\neo4j-cli\neo4j-cli.exe`, nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return &errPermissionWindows{dir: `C:\Program Files\neo4j-cli`}
+	})
+
+	out, err := runWithOptsParented(t, "v0.1.0", runOpts{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `cannot write to C:\Program Files\neo4j-cli (permission denied).`)
+	assert.Contains(t, err.Error(), "Re-run from an Administrator shell.")
+	assert.NotContains(t, err.Error(), "Re-run with sudo")
+	assert.NotContains(t, out, "Usage:")
+}
+
+// TestBuildReRunCommand verifies the flag-reconstruction helper in isolation,
+// independent of the runUpdate flow. Mirrors the matrix in
+// TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix. Mounts `update` under
+// a synthetic `neo4j-cli` parent so CommandPath returns the production form.
+func TestBuildReRunCommand(t *testing.T) {
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+
+	root := &cobra.Command{Use: "neo4j-cli"}
+	updateCmd := NewCmd(cfg, nil, "")
+	root.AddCommand(updateCmd)
+
+	cases := []struct {
+		name string
+		opts runOpts
+		want string
+	}{
+		{"bare", runOpts{}, "neo4j-cli update"},
+		{"pre-releases", runOpts{preReleases: true}, "neo4j-cli update --pre-releases"},
+		{"version", runOpts{version: "v0.1.0-alpha.10"}, "neo4j-cli update --version v0.1.0-alpha.10"},
+		{"force", runOpts{force: true}, "neo4j-cli update --force"},
+		{
+			"all flags",
+			runOpts{preReleases: true, version: "v1.0.0", force: true},
+			"neo4j-cli update --pre-releases --version v1.0.0 --force",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := buildReRunCommand(updateCmd, tc.opts)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestNewCmd_FlagsExposed(t *testing.T) {
