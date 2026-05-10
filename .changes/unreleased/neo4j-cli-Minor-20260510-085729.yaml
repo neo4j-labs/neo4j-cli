@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Add ''neo4j-cli update'' to self-update the binary; --pre-releases opts into alpha/beta/rc, --check reports availability without installing.'
-time: 2026-05-10T08:57:29+00:00
