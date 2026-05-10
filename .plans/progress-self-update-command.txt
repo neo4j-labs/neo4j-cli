@@ -1,0 +1,4 @@
+## TASK-001 — 2026-05-10T12:30:00Z
+Promoted `golang.org/x/mod` from indirect to direct require by seeding a stub `release.go` in the new `neo4j-cli/internal/subcommands/update/` package that imports `golang.org/x/mod/semver`. `go mod tidy` no-op on rerun; go.sum unchanged.
+Files: ~go.mod, +neo4j-cli/internal/subcommands/update/release.go, ~.plans/tasks-self-update-command.yml
+Decisions: kept `var _ = isValidSemver` lint shim — gets replaced by real call sites in task-003.

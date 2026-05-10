@@ -12,14 +12,14 @@ tasks:
       and `Compare`. Add an import in any new package file (e.g. release.go) and
       run `go mod tidy` so the require line moves out of the indirect block.
       Verify no other dependency changes leaked in.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`golang.org/x/mod` appears in the direct require block in go.mod"
       - "`go.sum` is updated and `go mod tidy` is a no-op on a fresh run"
       - "No other third-party deps were added"
       - "`make test` still passes after the dep promotion"
-    completed_at: null
+    completed_at: 2026-05-10T12:30:00Z
 
   - id: task-002
     title: "Scaffold update package, cobra skeleton, and mount in root tree"
