@@ -1,0 +1,281 @@
+feature: self-update-command
+prd: ./prd-self-update-command.md
+created_at: 2026-05-10T12:00:00Z
+updated_at: 2026-05-10T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Promote golang.org/x/mod to a direct require"
+    description: |
+      `golang.org/x/mod` is currently an indirect dep in `go.mod` (v0.27.0). The
+      update package needs `golang.org/x/mod/semver` for `IsValid`, `Prerelease`,
+      and `Compare`. Add an import in any new package file (e.g. release.go) and
+      run `go mod tidy` so the require line moves out of the indirect block.
+      Verify no other dependency changes leaked in.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`golang.org/x/mod` appears in the direct require block in go.mod"
+      - "`go.sum` is updated and `go mod tidy` is a no-op on a fresh run"
+      - "No other third-party deps were added"
+      - "`make test` still passes after the dep promotion"
+    completed_at: null
+
+  - id: task-002
+    title: "Scaffold update package, cobra skeleton, and mount in root tree"
+    description: |
+      Create `neo4j-cli/internal/subcommands/update/` with a single
+      `update.go` exposing `NewCmd(cfg *clicfg.Config) *cobra.Command`.
+      Declare flags `--pre-releases`, `--check`, `--version`, `--force`. Use a
+      stub `RunE` that returns a "not implemented" error (just enough so the
+      command shows up in `--help`). Add the Neo4j copyright header at the top
+      of every new file. Mount the command in `neo4j-cli/app/app.go` next to
+      `aura`/`credential`/`config`/`query`/`skill` via a single `cmd.AddCommand`
+      line.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`neo4j-cli/internal/subcommands/update/update.go` exists with the Neo4j license header and `NewCmd(cfg)` signature"
+      - "All four flags (`--pre-releases`, `--check`, `--version`, `--force`) are declared and visible in `bin/neo4j-cli update --help`"
+      - "`neo4j-cli/app/app.go` adds the new command via a single `cmd.AddCommand(update.NewCmd(cfg))` line"
+      - "`make build` succeeds and `bin/neo4j-cli update` returns the stub error without crashing"
+      - "`make fmt-check` and `make license-check` pass on the new file"
+    completed_at: null
+
+  - id: task-003
+    title: "Release lookup module: GitHub API + semver filter + asset URL"
+    description: |
+      Add `release.go` (and `release_test.go`) implementing the GitHub release
+      discovery: fetch `https://api.github.com/repos/neo4j-labs/neo4j-cli/releases?per_page=30`,
+      skip drafts, filter by `--pre-releases` using
+      `golang.org/x/mod/semver.Prerelease`, and return the head match. Build
+      asset URLs per the GoReleaser pattern (`neo4j-cli_<VER>_<TitleOS>_<unameArch>.<ext>`)
+      with OS map (linux→Linux, darwin→Darwin, windows→Windows) and arch map
+      (amd64→x86_64, 386→i386, arm64→arm64) mirroring
+      `distribution/installation-scripts/install-neo4j-cli.sh`. Honor
+      `GH_TOKEN` / `GITHUB_TOKEN` for ratelimit relief — never echo the token
+      in errors. Expose package-level test seams (`var apiBaseURL`, `var dlBaseURL`,
+      `var goosFn`, `var goarchFn`) per AGENTS.md "Package-level test seams".
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Stable-only filter excludes any tag where `semver.Prerelease(tag) != \"\"`"
+      - "Returns a clear sentinel/error when stable filter yields zero releases (consumed by REQ-F-006 in RunE)"
+      - "Asset URL builder produces correct paths for linux/amd64, darwin/arm64, windows/amd64 (table-driven test)"
+      - "`--version <tag>` path validates input via `semver.IsValid` and rejects `..`, `/`, `\\`, NUL, and shell metacharacters before any URL interpolation"
+      - "Tests use `httptest.NewServer` with a 2s safety timeout on handlers and a 5s test-side fallback per AGENTS.md"
+      - "`GH_TOKEN` / `GITHUB_TOKEN` is never present in any error string (assertion in tests)"
+    completed_at: null
+
+  - id: task-004
+    title: "Install-method detection + rich passthrough hint message"
+    description: |
+      Add `install_method.go` (and test) detecting whether the running binary
+      lives under a known package-manager prefix. Resolve `os.Executable()`
+      via `filepath.EvalSymlinks` and match against Homebrew (`/opt/homebrew/`,
+      `/usr/local/Cellar/`, `/home/linuxbrew/.linuxbrew/`), npm
+      (`/node_modules/@neo4j-labs/cli/` substring), pipx
+      (`~/.local/pipx/venvs/neo4j-cli/`, `~/.local/share/pipx/`,
+      `~/.local/bin/neo4j-cli` symlinking into pipx), uv tool
+      (`~/.local/share/uv/tools/neo4j-cli/`). Build the rich hint per REQ-F-010a:
+      pkg-mgr upgrade command, install-script command
+      (`curl -sSfL https://neo4j.sh/install.sh | bash`), and an OPTIONAL
+      uninstall command marked with the PATH-order rationale. Expose a test seam
+      for `os.Executable()`.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Returns `homebrew` / `npm` / `pipx` / `uv` / `binary` from a table-driven test covering each prefix shape on linux + darwin + windows path forms"
+      - "Symlink resolution: a symlink at `~/.local/bin/neo4j-cli` pointing into a pipx venv is detected as `pipx` (not `binary`)"
+      - "Hint message includes ALL THREE blocks: pkg-mgr upgrade command, install-script command, AND optional uninstall command with the PATH-order rationale comment"
+      - "Detection is hermetic: tests use the `os.Executable()` seam and `t.Setenv(\"HOME\", ...)` per AGENTS.md hermetic-test rules"
+      - "Path matching uses OS-native separators (no mixed `/` + `\\` on Windows) per AGENTS.md Windows CI gotchas"
+    completed_at: null
+
+  - id: task-005
+    title: "Atomic swap: extract, SHA256 verify, rename (with zip-slip guard)"
+    description: |
+      Add `swap.go` (and test) implementing the download → verify → extract →
+      atomic rename flow. Download archive in-memory (or to a temp file in
+      the same dir as the running binary), download the matching
+      `_checksums.txt` from the same release, compute SHA256 and abort on
+      mismatch BEFORE any extraction. Extract `tar.gz` (linux/darwin) or `zip`
+      (windows) into the target dir. Reject any entry whose cleaned path
+      escapes the destination (zip-slip / tar-slip), reject symlinks /
+      hardlinks / devices — only regular files allowed. Write to
+      `<current>.new` with mode 0755, then `os.Rename` to `<current>`. On
+      Windows: best-effort `os.Remove` of pre-existing `<current>.old`,
+      rename current to `.old`, rename new in. On any error after the
+      original is renamed away, attempt to restore.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Tampered checksum (a single byte flipped in the test fixture) causes the swap to abort with a clear error, no file written outside the temp dir"
+      - "tar / zip entry with `../escape` path is rejected with the offending path in the error; no file written outside the destination"
+      - "Symlink / hardlink / device entries in the archive are rejected"
+      - "Successful swap leaves the new binary at the original path, mode 0755, with the temp `<current>.new` removed"
+      - "Windows code path: pre-existing `<current>.old` is removed at start; rename-current-to-`.old`-then-rename-new dance succeeds (covered via `runtime.GOOS` test seam)"
+      - "Restore-on-error: simulated rename failure mid-swap restores the original binary at the original path"
+    completed_at: null
+
+  - id: task-006
+    title: "Implement RunE flow integrating release / install-method / swap"
+    description: |
+      Wire the three modules together in `update.go` `RunE`. Order:
+      (1) handle `app.Version == \"dev\"` with friendly message + exit 0;
+      (2) detect install method, on match (and no `--force`) print the rich
+      hint and exit 0;
+      (3) resolve target version (release lookup or `--version <tag>`);
+      (4) compare via `semver.Compare` — already up-to-date returns 0,
+      no-stable-yet returns 0 with the `--pre-releases` hint, downgrade
+      requires explicit `--version`;
+      (5) `--check` branches: print + exit 1 if newer available, exit 0 if
+      up-to-date — never download;
+      (6) otherwise: download, verify, swap. Plumb the `channel` and
+      `install_method` fields for output (set by upstream modules).
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "`app.Version == \"dev\"` exits 0 without any HTTP call (assertion via test seam)"
+      - "Stable-only filter with zero matching releases prints the `--pre-releases` hint and exits 0"
+      - "`--check` with a newer version available exits 1; with equal versions exits 0; never invokes the swap path"
+      - "`--version v9.9.9` (semver-valid, but no such tag) surfaces a clear `tag not found` error and exits 1"
+      - "Downgrade attempt without `--version` (current > latest) is rejected with a clear error"
+      - "`--force` bypasses install-method detection and proceeds to swap (verified via test seam)"
+    completed_at: null
+
+  - id: task-007
+    title: "Output formatting: plain-text default + JSON via PrintBodyMap"
+    description: |
+      Wire output rendering through `output.ResolveOutput` /
+      `output.PrintBodyMap` from `common/output/output.go`. Default plain-text
+      output must match the reference exactly:
+      `Current version: <v>\nChecking for updates to latest version...\nSuccessfully updated from <v> to <v>\n`.
+      JSON output emits `{current, latest, updated, check, channel, install_method}`.
+      The plain-text path is implemented inline (the example isn't a body-map
+      shape); JSON path uses `PrintBodyMap` with the documented field order.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "Plain-text success output is byte-for-byte equal to the reference (table-driven golden test)"
+      - "`--format json` emits valid JSON with all six documented fields"
+      - "`--check` mode JSON sets `\"updated\": false` and `\"check\": true`"
+      - "Pkg-mgr passthrough JSON includes `\"install_method\"` set to the detected channel and `\"updated\": false`"
+      - "JSON ordering matches the field order documented in REQ-F-018 (deterministic for downstream scripts)"
+    completed_at: null
+
+  - id: task-008
+    title: "README: Self-update subsection under Installation"
+    description: |
+      Edit `README.md` Installation section (lines 3-12) to add a "Self-update"
+      subsection covering `neo4j-cli update`, `--check`, `--pre-releases`,
+      `--version`, `--force`, and the package-manager-passthrough behaviour
+      (with the install-script + optional-uninstall hint). Keep the section
+      concise — it should orient users; full reference lives in `--help` and
+      the skill bundle.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`README.md` contains a new \"Self-update\" subsection under Installation"
+      - "All four flags (`--check`, `--pre-releases`, `--version`, `--force`) are mentioned"
+      - "Package-manager-passthrough behaviour is described, including the install-script alternative"
+      - "Section is ≤ 25 lines and links to `--help` for the full surface"
+    completed_at: null
+
+  - id: task-009
+    title: "Skill bundle inputs + regenerate (gate via TestGenerator_RoundTrip)"
+    description: |
+      Update `neo4j-cli/internal/skill/description.txt` to mention
+      "self-update via `neo4j-cli update`" in the third-person capability list
+      (keep total ≤ 1024 chars). Add an "Updating the CLI" paragraph to
+      `neo4j-cli/internal/skill/additions.md` pointing at `update`,
+      `--check`, `--pre-releases`. Run `go generate ./neo4j-cli/internal/skill/...`
+      to refresh `bundle/SKILL.md` and produce `bundle/references/update.md`.
+      Confirm `TestGenerator_RoundTrip` is green.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`description.txt` mentions self-update and stays ≤ 1024 chars"
+      - "`additions.md` includes a one-paragraph \"Updating the CLI\" section"
+      - "`bundle/SKILL.md` subcommand table contains an `update` row"
+      - "`bundle/references/update.md` exists with flag table and `Long` description rendered"
+      - "`make generate-check` reports a clean diff after `go generate`"
+      - "`TestGenerator_RoundTrip` passes"
+    completed_at: null
+
+  - id: task-010
+    title: "Changelog entry via changie (Minor)"
+    description: |
+      Add a `Minor` changelog entry. If `changie` is on PATH:
+      `changie new --projects neo4j-cli --kind Minor --body "Add 'neo4j-cli update' to self-update the binary; --pre-releases opts into alpha/beta/rc, --check reports availability without installing."`.
+      If not, hand-author a YAML at
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per
+      AGENTS.md "Changie Notes".
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "A `.changes/unreleased/neo4j-cli-Minor-*.yaml` file exists"
+      - "Body mentions the new command, the `--pre-releases` flag, and the `--check` flag"
+      - "Fields `project`, `kind`, `body`, `time` are present and well-formed"
+    completed_at: null
+
+  - id: task-011
+    title: "Security review via golang-security skill + fix findings"
+    description: |
+      Invoke the `golang-security` skill against the new package
+      (`neo4j-cli/internal/subcommands/update/`). Review the audit list from
+      the PRD: TLS validation (no `InsecureSkipVerify`), checksum enforcement
+      (no swap path bypasses verify), zip-slip / tar-slip rejection, file
+      perms (0755 binary, 0600 temp), symlink resolution before swap, HTTP
+      redirect host pinning to `github.com` / `objects.githubusercontent.com`
+      / `api.github.com`, semver validation on `--version <X>`, and
+      `GH_TOKEN` redaction. Fix any HIGH or MEDIUM findings before declaring
+      done.
+    status: pending
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`golang-security` skill report attached to the task with no HIGH or MEDIUM findings outstanding"
+      - "All eight audit surfaces from the PRD are explicitly covered in the report (tick or remediation)"
+      - "Any code change made in response to a finding has matching test coverage"
+      - "`make lint` is still clean after security fixes"
+    completed_at: null
+
+  - id: task-012
+    title: "Final gates + end-to-end verification"
+    description: |
+      Run the full gate set: `make fmt-check`, `make lint`, `make test`,
+      `make generate-check`, `make license-check`. Then end-to-end verify
+      against a sandbox copy of the binary: `bin/neo4j-cli update --check`,
+      `bin/neo4j-cli update --check --pre-releases`,
+      `bin/neo4j-cli update --check --pre-releases -f json`, and a real
+      update against `/tmp/n4j-test` confirming `--version` reports the new
+      tag afterwards. If `brew` is available, also confirm the
+      pkg-mgr-passthrough hint fires for `$(brew --prefix)/bin/neo4j-cli update`.
+    status: pending
+    dependencies:
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+    acceptance_criteria:
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass"
+      - "`bin/neo4j-cli update --check` (no flags) prints the no-stable-yet hint and exits 0"
+      - "`bin/neo4j-cli update --check --pre-releases` reports a real prerelease tag and exits 1"
+      - "`bin/neo4j-cli update --check --pre-releases -f json` emits valid JSON matching REQ-F-018 shape"
+      - "Real update against `/tmp/n4j-test` succeeds; running the swapped binary with `--version` reports the new tag"
+      - "If `brew` is available locally: a Homebrew-installed binary triggers the rich pkg-mgr hint and does NOT download"
+    completed_at: null
