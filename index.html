@@ -936,7 +936,7 @@
         <div class="step-num">2</div>
         <h3>Install the skill</h3>
         <p>Teaches Claude Code, Codex, Cursor, and all others how to drive the CLI. <a href="#examples" data-activate-tab="skill" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli skill install"><span class="prompt">$</span><span> neo4j-cli skill install</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        <div class="step-cmd" data-copy="neo4j-cli skill install --rw"><span class="prompt">$</span><span> neo4j-cli skill install <span class="flag">--rw</span></span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
       <!-- Step 3 -->
@@ -953,8 +953,8 @@
         <div class="step-num">4</div>
         <h3>Create an instance</h3>
         <p>Provision a new Aura instance. Free tier needs no credit card. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --cloud-provider aws --region us-east-1 --tier free"><span class="agentic-line"><span class="agentic-comment"># Create a free Aura instance called movies-dev in us-east-1</span>
-</span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --tier <span style="color:var(--code-keyword)">free</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --type free-db --tenant-id &lt;tenant-id&gt; --rw"><span class="agentic-line"><span class="agentic-comment"># Create a free Aura instance called movies-dev in us-east-1</span>
+</span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --type <span style="color:var(--code-keyword)">free-db</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
       <!-- Step 5 -->
@@ -1038,8 +1038,8 @@
 <span class="ok">✓</span> credential <span class="string">"prod"</span> saved · set as default
 
 <span class="comment"># create a free instance</span>
-<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> <span class="string">"movies-dev"</span> \
-    <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--tier</span> <span class="keyword">free</span>
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> <span class="string">"movies-dev"</span> <span class="flag">--rw</span> \
+    <span class="flag">--type</span> <span class="keyword">free-db</span> <span class="flag">--tenant-id</span> <span class="string">&lt;tenant-id&gt;</span>
 
 <span class="info">▸</span> instance creating… (may take ~60s)
 <span class="ok">✓</span> movies-dev (<span class="string">f1ab2c34</span>) · <span class="keyword">free</span> · <span class="info">us-east-1</span> · <span class="ok">running</span>
@@ -1179,7 +1179,7 @@
           </button>
         </div>
 <pre><span class="agentic-line"><span class="agentic-comment"># Install the neo4j skill for all my agents, then verify it's up to date everywhere</span>
-</span><span class="prompt">$</span> neo4j-cli skill install
+</span><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
 
 <span class="info">▸</span> detecting installed agents…
 <span class="ok">✓</span> claude-code     installed (v1.4.0)
@@ -1196,10 +1196,10 @@
 
 <span class="ok">✓</span> claude-code     v1.4.0  up to date
 <span class="ok">✓</span> cursor          v1.4.0  up to date
-<span class="info">!</span> windsurf        v1.3.2  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf
+<span class="info">!</span> windsurf        v1.3.2  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
 
 <span class="comment"># update the outdated one</span>
-<span class="prompt">$</span> neo4j-cli skill install windsurf
+<span class="prompt">$</span> neo4j-cli skill install windsurf <span class="flag">--rw</span>
 
 <span class="ok">✓</span> windsurf        updated to v1.4.0
 </pre>
@@ -1307,8 +1307,8 @@
     },
     pipx: {
       prompt: '$',
-      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a9</span>',
-      raw: 'pipx install neo4j-cli==0.1.0a9',
+      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a10</span>',
+      raw: 'pipx install neo4j-cli==0.1.0a10',
       label: 'via pipx',
     },
     npm: {

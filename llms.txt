@@ -7,7 +7,7 @@ neo4j-cli is an open-source command-line tool for managing Neo4j resources, exec
 ## Installation
 
 ```bash
-pipx install neo4j-cli==0.1.0a9
+pipx install neo4j-cli==0.1.0a10
 ```
 
 or via npm:
@@ -34,6 +34,7 @@ npm install -g @neo4j-labs/cli@alpha
 - `neo4j-cli skill check` — verify installed bundles for version drift
 - `neo4j-cli skill print` — preview the embedded SKILL.md before installing
 - `neo4j-cli skill remove` — remove an installed bundle (idempotent)
+- `neo4j-cli update` — self-update the binary to the latest GitHub release (`--check` to report only, `--pre-releases` for alpha/beta/rc, `--version <tag>` to pin)
 
 ## Connection
 
