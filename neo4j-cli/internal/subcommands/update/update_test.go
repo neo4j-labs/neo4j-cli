@@ -6,6 +6,7 @@ package update
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -53,9 +54,21 @@ func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, current
 // runWithOpts builds a fresh cobra command with NewCmd, sets the version on
 // the config, and dispatches RunE with the supplied opts. Returns the
 // stdout buffer and the error (if any).
+//
+// Defaults to plain-text output (format="default"); JSON-output tests use
+// runWithOptsFormat to override.
 func runWithOpts(t *testing.T, current string, opts runOpts) (string, error) {
 	t.Helper()
-	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	return runWithOptsFormat(t, current, opts, "default")
+}
+
+// runWithOptsFormat is the format-explicit variant of runWithOpts. Used by
+// the JSON-output golden tests. Pass "json" to seed cfg.Global.Format() with
+// json so printResult routes through PrintBodyMap.
+func runWithOptsFormat(t *testing.T, current string, opts runOpts, format string) (string, error) {
+	t.Helper()
+	cfgJSON := `{"format":"` + format + `"}`
+	fs, err := testfs.GetTestFs(cfgJSON, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, current, clicfg.GlobalScope)
 
@@ -400,6 +413,217 @@ func TestSeams_Update_Smoke(t *testing.T) {
 	require.NotNil(t, swapFn)
 }
 
+// TestPlainTextOutput_GoldenSuccess verifies the byte-for-byte plain-text
+// success output per REQ-F-017 acceptance criterion 1.
+func TestPlainTextOutput_GoldenSuccess(t *testing.T) {
+	cases := []struct {
+		name    string
+		current string
+		latest  string
+		want    string
+	}{
+		{
+			name:    "alpha tag",
+			current: "v0.1.0-alpha.9",
+			latest:  "v0.1.0-alpha.10",
+			want: "Current version: v0.1.0-alpha.9\n" +
+				"Checking for updates to latest version...\n" +
+				"Successfully updated from v0.1.0-alpha.9 to v0.1.0-alpha.10\n",
+		},
+		{
+			name:    "stable bump",
+			current: "v1.0.0",
+			latest:  "v1.1.0",
+			want: "Current version: v1.0.0\n" +
+				"Checking for updates to latest version...\n" +
+				"Successfully updated from v1.0.0 to v1.1.0\n",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+				return &Release{TagName: tc.latest}, nil
+			})
+			withDetect(t, func() (InstallMethod, string, error) {
+				return InstallMethodBinary, "/tmp/neo4j-cli", nil
+			})
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+				return nil
+			})
+
+			out, err := runWithOpts(t, tc.current, runOpts{})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, out, "plain-text output must be byte-for-byte equal to the reference")
+		})
+	}
+}
+
+// parseJSONOutput parses an update-command JSON document into a typed struct.
+// Helper reused across the JSON-output test cases below.
+type updateJSON struct {
+	Current       string `json:"current"`
+	Latest        string `json:"latest"`
+	Updated       bool   `json:"updated"`
+	Check         bool   `json:"check"`
+	Channel       string `json:"channel"`
+	InstallMethod string `json:"install_method"`
+}
+
+func parseJSONOutput(t *testing.T, raw string) updateJSON {
+	t.Helper()
+	var doc updateJSON
+	require.NoError(t, json.Unmarshal([]byte(raw), &doc), "stdout must be valid JSON: %q", raw)
+	return doc
+}
+
+func TestJSONOutput_HappyPath(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{}, "json")
+	require.NoError(t, err)
+
+	doc := parseJSONOutput(t, out)
+	assert.Equal(t, "v0.1.0", doc.Current)
+	assert.Equal(t, "v0.2.0", doc.Latest)
+	assert.True(t, doc.Updated)
+	assert.False(t, doc.Check)
+	assert.Equal(t, "stable", doc.Channel)
+	assert.Equal(t, "binary", doc.InstallMethod)
+}
+
+func TestJSONOutput_CheckMode_NewerAvailable(t *testing.T) {
+	// REQ-F-018 / acceptance criterion 3: --check JSON sets updated:false,
+	// check:true. Error still propagates so exit code is non-zero.
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{check: true}, "json")
+	require.Error(t, err, "--check + newer must still error to set exit code")
+
+	doc := parseJSONOutput(t, out)
+	assert.Equal(t, "v0.1.0", doc.Current)
+	assert.Equal(t, "v0.2.0", doc.Latest)
+	assert.False(t, doc.Updated, "--check must never set updated=true")
+	assert.True(t, doc.Check, "--check JSON must set check=true")
+	assert.Equal(t, "binary", doc.InstallMethod)
+}
+
+func TestJSONOutput_CheckMode_UpToDate(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.1.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{check: true}, "json")
+	require.NoError(t, err)
+
+	doc := parseJSONOutput(t, out)
+	assert.Equal(t, "v0.1.0", doc.Current)
+	assert.Equal(t, "v0.1.0", doc.Latest)
+	assert.False(t, doc.Updated)
+	assert.True(t, doc.Check)
+}
+
+func TestJSONOutput_PkgMgrPassthrough(t *testing.T) {
+	// REQ-F-018 / acceptance criterion 4: passthrough JSON includes
+	// install_method=<channel> and updated=false.
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		t.Fatal("swap must not run on pkg-mgr passthrough")
+		return nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{}, "json")
+	require.NoError(t, err)
+
+	doc := parseJSONOutput(t, out)
+	assert.Equal(t, "v0.1.0", doc.Current)
+	assert.Equal(t, "v0.2.0", doc.Latest)
+	assert.False(t, doc.Updated)
+	assert.False(t, doc.Check)
+	assert.Equal(t, "homebrew", doc.InstallMethod, "install_method must reflect detected pkg-mgr channel")
+}
+
+// TestJSONOutput_FieldOrderDeterministic asserts the documented REQ-F-018
+// order (current, latest, updated, check, channel, install_method) is
+// preserved in the rendered JSON byte stream so downstream scripts can rely
+// on it.
+func TestJSONOutput_FieldOrderDeterministic(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/tmp/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+		return nil
+	})
+
+	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{}, "json")
+	require.NoError(t, err)
+
+	// Substring positions in the raw stdout — earlier-listed fields must
+	// appear earlier in the JSON output.
+	keys := []string{
+		"\"current\"",
+		"\"latest\"",
+		"\"updated\"",
+		"\"check\"",
+		"\"channel\"",
+		"\"install_method\"",
+	}
+	prev := -1
+	for _, k := range keys {
+		idx := strings.Index(out, k)
+		require.GreaterOrEqual(t, idx, 0, "key %s missing from JSON output", k)
+		assert.Greater(t, idx, prev, "key %s appears before its predecessor — REQ-F-018 order broken", k)
+		prev = idx
+	}
+}
+
+// TestPrintableUpdateResult_AsArrayShape covers the table-render shape of
+// printableUpdateResult. We don't ship a "table" output for update (the
+// document isn't list-shaped) but PrintBodyMap insists on AsArray, so the
+// data must round-trip cleanly even via the table branch.
+func TestPrintableUpdateResult_AsArrayShape(t *testing.T) {
+	p := printableUpdateResult{r: updateResult{
+		current:       "v0.1.0",
+		latest:        "v0.2.0",
+		updated:       true,
+		check:         false,
+		channel:       "stable",
+		installMethod: "binary",
+	}}
+	rows := p.AsArray()
+	require.Len(t, rows, 1, "AsArray must wrap the single document in a one-row slice")
+	row := rows[0]
+	assert.Equal(t, "v0.1.0", row["current"])
+	assert.Equal(t, "v0.2.0", row["latest"])
+	assert.Equal(t, true, row["updated"])
+	assert.Equal(t, false, row["check"])
+	assert.Equal(t, "stable", row["channel"])
+	assert.Equal(t, "binary", row["install_method"])
+}
+
 // TestNewCmd_StubReplacedByRunUpdate ensures cmd.RunE actually dispatches to
 // runUpdate — guards against a future refactor accidentally re-introducing
 // the "not implemented" stub from task-002.
@@ -411,7 +635,10 @@ func TestNewCmd_StubReplacedByRunUpdate(t *testing.T) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
 
-	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	// format: "default" so the plain-text "Already on" line is emitted (this
+	// test asserts that the stub from task-002 is replaced by runUpdate, not
+	// the output formatting itself — that lives in TestPlainTextOutput_*).
+	fs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "v0.1.0", clicfg.GlobalScope)
 

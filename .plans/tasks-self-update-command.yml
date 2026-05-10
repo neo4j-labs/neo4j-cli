@@ -161,7 +161,7 @@ tasks:
       JSON output emits `{current, latest, updated, check, channel, install_method}`.
       The plain-text path is implemented inline (the example isn't a body-map
       shape); JSON path uses `PrintBodyMap` with the documented field order.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -170,7 +170,7 @@ tasks:
       - "`--check` mode JSON sets `\"updated\": false` and `\"check\": true`"
       - "Pkg-mgr passthrough JSON includes `\"install_method\"` set to the detected channel and `\"updated\": false`"
       - "JSON ordering matches the field order documented in REQ-F-018 (deterministic for downstream scripts)"
-    completed_at: null
+    completed_at: 2026-05-10T17:45:00Z
 
   - id: task-008
     title: "README: Self-update subsection under Installation"

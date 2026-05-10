@@ -23,10 +23,12 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -108,6 +110,88 @@ type runOpts struct {
 	force       bool
 }
 
+// updateResult is the structured representation of an update-command run,
+// used to render JSON output per REQ-F-018. The fields are populated as the
+// flow progresses; partial results (e.g. install-method passthrough,
+// stable-only filter miss) still produce a well-formed JSON document.
+//
+// Field order matches REQ-F-018: current, latest, updated, check, channel,
+// install_method. The JSON path goes through printableUpdateResult below to
+// pin that order via MarshalJSON.
+type updateResult struct {
+	current       string
+	latest        string
+	updated       bool
+	check         bool
+	channel       string
+	installMethod string
+}
+
+// printableUpdateResult wraps updateResult and satisfies output.ResponseData
+// (via AsArray) plus json.Marshaler. The custom MarshalJSON path emits the
+// fields in the REQ-F-018 documented order so downstream scripts can rely on
+// stable JSON regardless of map iteration randomness.
+type printableUpdateResult struct {
+	r updateResult
+}
+
+// AsArray returns a single-row slice for table rendering. Update output is
+// document-shaped (not list-shaped), so we wrap the one row in a slice as
+// required by the ResponseData interface.
+func (p printableUpdateResult) AsArray() []map[string]any {
+	return []map[string]any{{
+		"current":        p.r.current,
+		"latest":         p.r.latest,
+		"updated":        p.r.updated,
+		"check":          p.r.check,
+		"channel":        p.r.channel,
+		"install_method": p.r.installMethod,
+	}}
+}
+
+// MarshalJSON emits a single object (not an array) with the documented
+// REQ-F-018 field order. PrintBodyMap's JSON path calls json.MarshalIndent
+// which honours this; the table/toon paths use AsArray which wraps in a
+// slice for grid rendering.
+func (p printableUpdateResult) MarshalJSON() ([]byte, error) {
+	// json.RawMessage assembled in REQ-F-018 order. Using an ordered slice of
+	// (key, value) pairs would also work; a tiny anonymous struct is the
+	// idiomatic Go form.
+	doc := struct {
+		Current       string `json:"current"`
+		Latest        string `json:"latest"`
+		Updated       bool   `json:"updated"`
+		Check         bool   `json:"check"`
+		Channel       string `json:"channel"`
+		InstallMethod string `json:"install_method"`
+	}{
+		Current:       p.r.current,
+		Latest:        p.r.latest,
+		Updated:       p.r.updated,
+		Check:         p.r.check,
+		Channel:       p.r.channel,
+		InstallMethod: p.r.installMethod,
+	}
+	return json.Marshal(doc)
+}
+
+// printResult renders the structured result to cmd.OutOrStdout using the
+// caller-selected output mode. Plain-text is the default; JSON kicks in when
+// the user passed `--format json` (or set `format: json` in the global
+// config). A "table" format request also routes to JSON because update is a
+// single-document command — there's no meaningful tabular layout.
+//
+// The plain-text branch is implemented inline rather than via PrintBodyMap
+// because the reference output (REQ-F-017) is a fixed three-line shape, not
+// a generic body-map.
+func printResult(cmd *cobra.Command, cfg *clicfg.Config, r updateResult, plainText func()) {
+	if cfg.Global.Format() == "json" {
+		output.PrintBodyMap(cmd, cfg, printableUpdateResult{r: r}, []string{"current", "latest", "updated", "check", "channel", "install_method"})
+		return
+	}
+	plainText()
+}
+
 // runUpdate is the orchestration entry point. It implements the REQ-F-002
 // through REQ-F-016 ordering documented in the PRD:
 //
@@ -126,7 +210,10 @@ type runOpts struct {
 func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts runOpts) error {
 	current := cfg.Version
 	if current == devVersion || current == "" {
-		// REQ-F-002: dev build — no network call.
+		// REQ-F-002: dev build — no network call. Plain-text only; the JSON
+		// shape requires a `latest` field which we never resolve in this
+		// branch, so emitting partial JSON here would be more confusing than
+		// the friendly text.
 		cmd.Println("running a dev build, nothing to update")
 		return nil
 	}
@@ -162,10 +249,22 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	}
 	cmp := semver.Compare(current, target.TagName)
 
+	// Initial result skeleton. Specific branches below fill in `updated`,
+	// `check`, and `install_method` as appropriate.
+	result := updateResult{
+		current:       current,
+		latest:        target.TagName,
+		check:         opts.check,
+		channel:       channel,
+		installMethod: string(InstallMethodBinary),
+	}
+
 	// REQ-F-008: same version is "already up-to-date", current > target is
 	// "downgrade" (rejected unless --version explicitly set).
 	if cmp == 0 {
-		cmd.Printf("Already on %s. No update needed.\n", current)
+		printResult(cmd, cfg, result, func() {
+			cmd.Printf("Already on %s. No update needed.\n", current)
+		})
 		return nil
 	}
 	if cmp > 0 && opts.version == "" {
@@ -186,8 +285,11 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		// surface the err to the user; install_method.go documents this.
 		_ = detectErr
 		if hint := Hint(method); hint != "" {
-			cmd.Printf("%s already on %s; %s available.\n", method, current, target.TagName)
-			cmd.Print(hint)
+			result.installMethod = string(method)
+			printResult(cmd, cfg, result, func() {
+				cmd.Printf("%s already on %s; %s available.\n", method, current, target.TagName)
+				cmd.Print(hint)
+			})
 			return nil
 		}
 	}
@@ -196,8 +298,10 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	// when newer is available so CI/scripts can branch on it; exit 0 when
 	// up-to-date (handled above by the cmp == 0 fast-path).
 	if opts.check {
-		cmd.Printf("Current version: %s\n", current)
-		cmd.Printf("Latest %s version: %s\n", channel, target.TagName)
+		printResult(cmd, cfg, result, func() {
+			cmd.Printf("Current version: %s\n", current)
+			cmd.Printf("Latest %s version: %s\n", channel, target.TagName)
+		})
 		// cmp < 0 — newer available.
 		return clierr.NewUsageError("a newer version is available: %s -> %s", current, target.TagName)
 	}
@@ -210,7 +314,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		return clierr.NewFatalError("build asset URL: %v", err)
 	}
 
-	_, currentBinaryPath, _ := detectFn()
+	method, currentBinaryPath, _ := detectFn()
 	if currentBinaryPath == "" {
 		// detectFn returns the resolved exe path even when classification
 		// is "binary"; an empty value here means the executable lookup
@@ -218,15 +322,29 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		// guessed path.
 		return clierr.NewFatalError("could not locate running binary on disk")
 	}
+	// Reflect the detected channel in the JSON output even when --force
+	// proceeded past the passthrough hint (so users can audit "I forced an
+	// update on top of a homebrew binary"). Plain-text path is unaffected.
+	result.installMethod = string(method)
 
-	cmd.Printf("Current version: %s\n", current)
-	cmd.Println("Checking for updates to latest version...")
+	// Plain-text path emits the running narrative ("Current version", "Checking
+	// for updates...") inline so the user sees progress before swap completes.
+	// JSON path stays silent until success and emits the full document at the
+	// end (REQ-F-018: scripts get a single deterministic blob).
+	jsonMode := cfg.Global.Format() == "json"
+	if !jsonMode {
+		cmd.Printf("Current version: %s\n", current)
+		cmd.Println("Checking for updates to latest version...")
+	}
 
 	if err := swapFn(ctx, urls, currentBinaryPath); err != nil {
 		return clierr.NewFatalError("update failed: %v", err)
 	}
 
-	cmd.Printf("Successfully updated from %s to %s\n", current, target.TagName)
+	result.updated = true
+	printResult(cmd, cfg, result, func() {
+		cmd.Printf("Successfully updated from %s to %s\n", current, target.TagName)
+	})
 	return nil
 }
 
