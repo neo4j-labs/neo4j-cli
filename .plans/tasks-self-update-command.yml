@@ -265,7 +265,6 @@ tasks:
       update against `/tmp/n4j-test` confirming `--version` reports the new
       tag afterwards. If `brew` is available, also confirm the
       pkg-mgr-passthrough hint fires for `$(brew --prefix)/bin/neo4j-cli update`.
-    status: pending
     dependencies:
       - task-008
       - task-009
@@ -278,4 +277,5 @@ tasks:
       - "`bin/neo4j-cli update --check --pre-releases -f json` emits valid JSON matching REQ-F-018 shape"
       - "Real update against `/tmp/n4j-test` succeeds; running the swapped binary with `--version` reports the new tag"
       - "If `brew` is available locally: a Homebrew-installed binary triggers the rich pkg-mgr hint and does NOT download"
-    completed_at: null
+    status: completed
+    completed_at: 2026-05-10T09:30:00Z
