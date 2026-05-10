@@ -202,7 +202,7 @@ tasks:
       shape), `bin/neo4j-cli update --pre-releases` against a writable install location
       (`INSTALL_DIR=$HOME/bin` direct rename), and `bin/neo4j-cli update --pre-releases` against
       `/usr/local/bin/neo4j-cli` (sudo prompt + swap succeeds).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-006
@@ -214,4 +214,4 @@ tasks:
       - "Manual: `update check --pre-releases` prints the friendly two-line shape; exit 0"
       - "Manual: `update --pre-releases` against a writable install dir does NOT prompt for sudo and swaps successfully"
       - "Manual: `update --pre-releases` against `/usr/local/bin/neo4j-cli` shows the elevation narrative, prompts for sudo once, swaps successfully"
-    completed_at: null
+    completed_at: 2026-05-10T21:04:27Z

@@ -276,8 +276,17 @@ func isStructuredFormat(format string) bool {
 //  3. Compare current vs target via semver.Compare (REQ-F-008).
 //  4. Install-method detection + passthrough hint (REQ-F-009/010/010a),
 //     unless --force.
-//  5. `update check` branch (REQ-F-011): report and exit without downloading.
-//  6. Download + verify + swap (REQ-F-012/013/014/015/016).
+//  5. `update check` branch (REQ-F-011): report and exit 0 with a friendly
+//     "New version available" + install-command hint when one exists
+//     (REQ-F-001..REQ-F-007). No error/usage dump.
+//  6. Download + verify + swap (REQ-F-012/013/014/015/016). Swap pre-flights
+//     the target dir via planSwap and, when it is not writable, transparently
+//     elevates via `sudo install` (REQ-F-009/010 in swap.go). The two
+//     permission-class sentinels (*errSudoUnavailable / *errPermissionWindows)
+//     are recognised here via errors.As and turned into actionable
+//     "Re-run with sudo: <cmd>" / "Re-run from an Administrator shell" hints
+//     (REQ-F-014). cmd.SilenceUsage is set after flag validation so these
+//     runtime errors do NOT print the cobra usage block.
 //
 // The package-manager check is intentionally placed AFTER target resolution
 // so the user gets a meaningful "you're on vX, vY is available — run brew

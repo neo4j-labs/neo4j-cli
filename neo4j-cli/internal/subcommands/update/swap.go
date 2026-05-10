@@ -1,35 +1,53 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Package update — swap.go owns the download → verify → extract → atomic
-// rename flow that replaces the running binary with a freshly downloaded
-// release archive.
+// Package update — swap.go owns the pre-flight → download → verify → extract
+// → atomic rename (or elevated install) flow that replaces the running binary
+// with a freshly downloaded release archive.
 //
 // Trust model and ordering:
 //
-//  1. Download the release archive (tar.gz on linux/darwin, zip on windows)
+//  1. Pre-flight (planSwap, REQ-F-009 / REQ-F-010): probe the target
+//     directory's writability via `dirWritable` BEFORE any network I/O. The
+//     decision tree picks one of three branches: direct rename (writable),
+//     transparent sudo elevation (non-writable + sudo + install + TTY +
+//     non-root + non-windows), or sentinel error (`*errSudoUnavailable` /
+//     `*errPermissionWindows`) which the runUpdate caller turns into an
+//     actionable "Re-run with sudo: <cmd>" or "Re-run from an Administrator
+//     shell" hint. Sentinel branches short-circuit the rest of the flow so
+//     no archive is downloaded when the swap could never succeed.
+//  2. Download the release archive (tar.gz on linux/darwin, zip on windows)
 //     and the matching `_checksums.txt` from the same release tag. Both are
 //     fetched over HTTPS with a redirect host pin (REQ-S-001) so a malicious
 //     redirect cannot send the request to an attacker-controlled host that
 //     might leak a token or serve a poisoned archive.
-//  2. Compute SHA256 of the downloaded archive in memory and look up the
+//  3. Compute SHA256 of the downloaded archive in memory and look up the
 //     expected hash in the checksums file. **No swap may occur if checksum
 //     verification has not succeeded** (REQ-F-013). The verification happens
 //     before any extraction so a tampered archive never touches disk under
 //     the target directory.
-//  3. Extract the binary entry from the archive into a temp file at
-//     `<current>.new` (same directory as the running binary so `os.Rename`
-//     stays on the same filesystem). Reject any entry whose cleaned path
+//  4. Extract the binary entry from the archive into a temp file at
+//     `<plan.tmpDir>/neo4j-cli.new` — same directory as the running binary
+//     for the direct branch (so `os.Rename` stays on one filesystem), or
+//     `os.TempDir()` for the elevated branch (`sudo install` copies, so
+//     cross-filesystem is fine). Reject any entry whose cleaned path
 //     escapes the destination (zip-slip / tar-slip per REQ-F-014). Reject
 //     symlinks, hardlinks, and devices — only regular files allowed.
-//  4. Atomic swap: on linux/darwin, `os.Rename(<current>.new, <current>)`.
-//     On Windows: best-effort `os.Remove(<current>.old)`, then
-//     `os.Rename(<current>, <current>.old)`, then
-//     `os.Rename(<current>.new, <current>)` — Windows can't replace a running
+//  5. Swap into place:
+//     - Direct branch on linux/darwin: `os.Rename(tmpNew, <current>)`.
+//     - Direct branch on Windows: best-effort `os.Remove(<current>.old)`,
+//     then `os.Rename(<current>, <current>.old)`, then
+//     `os.Rename(tmpNew, <current>)` — Windows can't replace a running
 //     executable but can rename it out of the way (REQ-F-015).
-//  5. Restore-on-error: if any step after the original is renamed away
-//     fails, attempt to restore the original by renaming `.old` back into
-//     place (REQ-F-016).
+//     - Elevated branch (linux/darwin only): `sudo install -m 0755 <tmpNew>
+//     <current>` via `elevatedSwap`, with stdio inherited so the sudo
+//     prompt is interactive. Argv is built with separate exec.Cmd args
+//     (no shell) and both src/dst are pre-validated absolute, NUL-free,
+//     non-flag paths (REQ-NF-001). tmpNew is removed regardless of the
+//     install result.
+//  6. Restore-on-error (Windows direct branch only): if any step after the
+//     original is renamed away fails, attempt to restore the original by
+//     renaming `.old` back into place (REQ-F-016).
 //
 // Test seams:
 //
@@ -37,9 +55,13 @@
 //     checksum downloads so tests can drive the full flow against an
 //     httptest server without touching real GitHub.
 //   - swapGoosFn shadows runtime.GOOS so tests can exercise the Windows
-//     rename-to-`.old` dance from a non-Windows host.
+//     rename-to-`.old` dance and the windows-permission sentinel from a
+//     non-Windows host.
 //   - renameFn shadows os.Rename so tests can simulate a mid-swap failure
 //     and assert restore-on-error behaviour.
+//   - dirWritableFn / geteuidFn / lookPathFn / runCommandFn / tempDirFn /
+//     stdinIsTTYFn drive every planSwap and elevatedSwap branch
+//     hermetically without touching /usr/local/bin or invoking real sudo.
 package update
 
 import (
