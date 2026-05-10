@@ -84,7 +84,7 @@ tasks:
       (`curl -sSfL https://neo4j.sh/install.sh | bash`), and an OPTIONAL
       uninstall command marked with the PATH-order rationale. Expose a test seam
       for `os.Executable()`.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -93,7 +93,7 @@ tasks:
       - "Hint message includes ALL THREE blocks: pkg-mgr upgrade command, install-script command, AND optional uninstall command with the PATH-order rationale comment"
       - "Detection is hermetic: tests use the `os.Executable()` seam and `t.Setenv(\"HOME\", ...)` per AGENTS.md hermetic-test rules"
       - "Path matching uses OS-native separators (no mixed `/` + `\\` on Windows) per AGENTS.md Windows CI gotchas"
-    completed_at: null
+    completed_at: 2026-05-10T15:00:00Z
 
   - id: task-005
     title: "Atomic swap: extract, SHA256 verify, rename (with zip-slip guard)"
