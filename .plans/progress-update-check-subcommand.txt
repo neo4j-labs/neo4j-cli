@@ -1,0 +1,27 @@
+## task-001 — 2026-05-10T20:00:00Z
+Add `update check` subcommand; drop `--check` flag from parent. Doc comments refreshed.
+Files: +neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/internal/versioncheck/cache.go
+Decisions: Kept `runOpts.check` field — runUpdate still branches on it; tests + bundle regen deferred to task-002/003.
+
+## task-002 — 2026-05-10T20:30:00Z
+Migrate update_test.go to drop `--check` parent flag; add colocated check_test.go. Set SilenceUsage on subcommand to keep JSON stream clean on usage-error exit. Bundle regen pulled forward to satisfy `make test`.
+Files: +neo4j-cli/internal/subcommands/update/check_test.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/skill/bundle/references/update.md
+Decisions: SilenceUsage=true on `update check` only — newer-available is REQ-F-011 exit code, not misuse; parent keeps default so bad flags still print Usage.
+
+## task-003 — 2026-05-10T20:45:00Z
+Update README + additions.md to describe `update check` subcommand; regen SKILL.md. references/update.md was already current from task-002.
+Files: ~README.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
+
+## task-004 — 2026-05-10T20:55:00Z
+Update CI workflow e2e step + check_json doc comments / fail messages to reference `update check` subcommand. No struct/assertion changes.
+Files: ~.github/workflows/test.yml, ~test/e2e/check_json/main.go
+Decisions: Also updated check_json package doc + tier-2 comment block (beyond the six listed lines) so no stale `--check` text remains.
+
+## task-005 — 2026-05-10T19:56:00Z
+Add Patch changie entry for `update --check` -> `update check` rename.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260510-195539.yaml
+
+## task-006 — 2026-05-10T21:10:00Z
+Final verification: build/test/fmt-check/lint/license-check clean; generate-check clean against bundle (only .plans/ status flip diff per AGENTS.md guidance). Manual smoke: `update --help` shows `check` subcommand and no `--check` flag; `update check --help` lists `--pre-releases`/`--version` only; `--force` rejected with `unknown flag`; live JSON against neo4j-labs/neo4j-cli emits documented shape (`check: true`, `updated: false`); e2e check_json harness passes; `--version v0.1.0-alpha.10` resolves named tag.
+Files: ~.plans/tasks-update-check-subcommand.yml, ~.plans/progress-update-check-subcommand.txt
+Decisions: Exit-code 0-on-RunE-error is documented project convention (.github/workflows/test.yml lines 96-107) — JSON shape is the assertion contract, not exit code.

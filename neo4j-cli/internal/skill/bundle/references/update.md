@@ -10,8 +10,22 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--check` | bool | false | Report whether a newer version is available without downloading or swapping |
 | `--force` | bool | false | Bypass the package-manager-managed-binary check and proceed with the in-place swap |
 | `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
 | `--version` | string | - | Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
+
+## neo4j-cli update check
+
+Report whether a newer neo4j-cli release is available without swapping
+
+Compares the running binary's version against the latest GitHub release at neo4j-labs/neo4j-cli and reports the result without downloading or swapping. By default only stable semver tags are considered; pass `--pre-releases` to opt into alpha/beta/rc tags. Exits non-zero when a newer version is available so CI/scripts can branch on it.
+
+Usage: `neo4j-cli update check [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
+| `--version` | string | - | Compare against the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
 

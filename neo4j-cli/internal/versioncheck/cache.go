@@ -7,7 +7,7 @@
 // cache.go owns the on-disk cache (JSON file in the OS config dir alongside
 // config.json / credentials.json). The cache is intentionally tiny and
 // stable-only: power users on prerelease tags can still run
-// `neo4j-cli update --check --pre-releases` themselves.
+// `neo4j-cli update check --pre-releases` themselves.
 package versioncheck
 
 import (

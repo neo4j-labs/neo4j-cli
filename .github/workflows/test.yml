@@ -66,7 +66,7 @@ jobs:
             # `app.Version == "dev"`, which short-circuits the update flow
             # before any network call (REQ-F-002). The e2e binary uses
             # v0.0.0-e2e so any real prerelease wins the semver compare and
-            # the --check branch reports a newer version.
+            # the `check` subcommand reports a newer version.
             - name: Build e2e binary (low semver)
               shell: bash
               run: go build -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./neo4j-cli
@@ -75,7 +75,7 @@ jobs:
               shell: bash
               run: bin/neo4j-cli-e2e update --help > /dev/null
 
-            - name: Update e2e (--check)
+            - name: Update e2e (check subcommand)
               shell: bash
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,9 +106,9 @@ jobs:
                   # the helper ignores trailing bytes, so the polluted tail
                   # does not break the assertion.
                   set +e
-                  out="$(bin/neo4j-cli-e2e update --check --pre-releases -f json)"
+                  out="$(bin/neo4j-cli-e2e update check --pre-releases -f json)"
                   set -e
-                  echo "--- update --check stdout ---"
+                  echo "--- update check stdout ---"
                   printf '%s\n' "$out"
                   echo "--- end stdout ---"
 
@@ -122,8 +122,8 @@ jobs:
                       --cross-check "${expected_tag}"
 
             # Tier-2 e2e: real download + atomic-swap against a local fixture
-            # server. Tier-1 (above) covers the --check read path against
-            # real GitHub; this exercises the WRITE path — archive download,
+            # server. Tier-1 (above) covers the `check` subcommand read path
+            # against real GitHub; this exercises the WRITE path — archive download,
             # SHA256 verification, extraction, and the same-dir atomic
             # rename — without publishing throwaway tags upstream.
             #
