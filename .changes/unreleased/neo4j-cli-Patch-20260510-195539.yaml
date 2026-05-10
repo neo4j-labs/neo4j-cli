@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Replace ''neo4j-cli update --check'' flag with ''neo4j-cli update check'' subcommand for consistency with ''skill check''.'
-time: 2026-05-10T19:55:39+00:00
