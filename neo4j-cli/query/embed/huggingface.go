@@ -21,9 +21,12 @@ import (
 // a dedicated endpoint overrides cleanly.
 //
 // When Config.BaseURL equals this default the provider is in "serverless mode"
-// and POSTs to {BaseURL}/{Model}; when overridden the provider is in
-// "dedicated endpoint mode" and POSTs to {BaseURL} verbatim (the model is
-// already encoded in the dedicated endpoint URL).
+// and POSTs to {BaseURL}/{Model}/pipeline/feature-extraction; when overridden
+// the provider is in "dedicated endpoint mode" and POSTs to {BaseURL} verbatim
+// (the model and pipeline are already encoded in the dedicated endpoint URL).
+// The /pipeline/feature-extraction suffix is required for sentence-transformers
+// models whose default task on HF's router is sentence-similarity — without it
+// the router routes to the wrong pipeline and rejects {"inputs": text}.
 const defaultHuggingFaceBaseURL = "https://router.huggingface.co/hf-inference/models"
 
 // huggingFaceProvider implements Provider against the HuggingFace inference
@@ -72,12 +75,12 @@ func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32
 		return nil, fmt.Errorf("huggingface: base url rejected: %w", err)
 	}
 
-	// Serverless mode: append the model to the base URL. Dedicated mode: post
-	// to the base URL verbatim (the dedicated endpoint URL already encodes the
-	// model).
+	// Serverless mode: append {model}/pipeline/feature-extraction to the base
+	// URL. Dedicated mode: post to the base URL verbatim (the dedicated
+	// endpoint URL already encodes the model and pipeline).
 	url := base
 	if base == defaultHuggingFaceBaseURL {
-		url = base + "/" + p.cfg.Model
+		url = base + "/" + p.cfg.Model + "/pipeline/feature-extraction"
 	}
 
 	body := huggingFaceEmbedRequest{Inputs: text}
