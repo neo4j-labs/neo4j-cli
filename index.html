@@ -682,14 +682,16 @@
      content (green `> ...` prompt + faint loading cue) stays visible, the
      .out blocks keep their table-art token colors, and the quickstart
      .copy-icon affordance keeps its hover state. .cli-mode rules below
-     override this and restore full syntax highlighting. */
-  #quickstartSteps:not(.cli-mode) .step-cmd,
-  #quickstartSteps:not(.cli-mode) .step-cmd *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
+     override this and restore full syntax highlighting.
+     Scoped with :has(.agentic-line) so blocks WITHOUT an agent prompt
+     (e.g. install commands in Quickstart steps 1–2) keep full color. */
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line),
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
     color: var(--fg-faint) !important;
   }
 
-  #examplesSection .examples:not(.cli-mode) .example-pane pre,
-  #examplesSection .examples:not(.cli-mode) .example-pane pre *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
+  #examplesSection .examples:not(.cli-mode) .example-pane pre:has(.agentic-line),
+  #examplesSection .examples:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
     color: var(--fg-faint) !important;
   }
 
