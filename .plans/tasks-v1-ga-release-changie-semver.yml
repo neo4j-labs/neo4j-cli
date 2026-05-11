@@ -1,0 +1,56 @@
+feature: v1-ga-release-changie-semver
+prd: ./prd-v1-ga-release-changie-semver.md
+created_at: 2026-05-11T12:00:00Z
+updated_at: 2026-05-11T13:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Set release.prerelease to false in .goreleaser.yaml"
+    description: |
+      Change the `release.prerelease` field in `.goreleaser.yaml` from `true` to
+      `false` so that every GitHub Release produced by GoReleaser is marked as a
+      GA (Latest) release rather than a pre-release. This affects all future
+      releases, not just v1.0.0.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`.goreleaser.yaml` `release.prerelease` is `false`"
+      - "No other fields in the `release:` block are changed"
+    completed_at: null
+
+  - id: task-002
+    title: "Refactor changie.yml to use batch auto instead of hardcoded alpha version"
+    description: |
+      Remove the 'Compute next pre-release versions' step from `changie.yml`
+      entirely — it parses `alpha.[0-9]*` filenames and emits `steps.prerelease`
+      output that is no longer needed. Change the `changie batch` invocation from
+      `batch v0.1.0 --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}`
+      to `batch auto --project neo4j-cli`. Update any downstream references to
+      `steps.prerelease` so the workflow remains valid YAML.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`changie.yml` contains no references to `alpha`, `prerelease`, or the hardcoded string `v0.1.0`"
+      - "The `changie batch` step uses `args: batch auto --project neo4j-cli`"
+      - "The workflow YAML is valid (no references to the removed `steps.prerelease` output)"
+      - "The 'Detect unreleased changes', 'Batch', 'Merge', 'Get latest version', 'Extract version numbers', 'Compute PR metadata', and 'Create Pull Request' steps are otherwise unchanged"
+    completed_at: null
+
+  - id: task-003
+    title: "Author Major-kind changie entry for the v1.0.0 GA release"
+    description: |
+      Create a changie change fragment under `.changes/unreleased/` with
+      `project: neo4j-cli`, `kind: Major`, and an appropriate body (e.g.
+      "GA release of neo4j-cli"). This entry is what causes `changie batch auto`
+      to resolve `v0.1.0-alpha.12` → `v1.0.0`. Per the sequencing requirement
+      this entry must be committed in the same PR as tasks 001 and 002 (or after
+      those changes have already landed on main).
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "A file matching `.changes/unreleased/neo4j-cli-Major-*.yaml` exists with `project: neo4j-cli`, `kind: Major`, and a non-empty `body`"
+      - "Running `changie batch auto --project neo4j-cli --dry-run` locally resolves to `v1.0.0` (already verified — this criterion confirms the entry is well-formed)"
+      - "No existing `.changes/unreleased/` files are removed or modified"
+    completed_at: null
