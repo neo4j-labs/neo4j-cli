@@ -7,7 +7,6 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 
 REPO="neo4j-labs/neo4j-cli"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="neo4j-cli"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -71,6 +70,22 @@ require tar
 
 OS="$(detect_os)"
 ARCH="$(detect_arch)"
+
+# On macOS prefer ~/.local/bin (user-writable, no sudo needed).
+# On other platforms fall back to /usr/local/bin.
+# Both can be overridden by setting INSTALL_DIR before running the script.
+if [ -z "${INSTALL_DIR:-}" ]; then
+  if [ "$OS" = "Darwin" ]; then
+    INSTALL_DIR="${HOME}/.local/bin"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
+fi
+
+# Create the install directory if it doesn't exist (safe for user-owned dirs).
+if [ ! -d "$INSTALL_DIR" ]; then
+  mkdir -p "$INSTALL_DIR"
+fi
 
 # Allow version override via env var
 VERSION="${VERSION:-}"
