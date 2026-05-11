@@ -8,7 +8,7 @@ tasks:
     title: "Add step 5b agentic-mode rendering invariants to website-update prompt"
     description: |
       Insert a new step labelled "5b. Enforce agentic-mode rendering invariants" into `.github/prompts/website-update.md`, positioned between the existing step 5 ("Make surgical updates") and step 6 ("Validate the examples"). The new step must encode every rule the next prompt run will enforce on `gh-pages/index.html`: the `> ` agent-prompt prefix (replacing `# `), the one-per-prompt `→ loading skill neo4j-cli` line inside the existing `.agentic-line` wrapper using a new `.agentic-loading` span (Unicode U+2192 arrow, no ellipsis, no `->` fallback), the CSS block that dims `#quickstartSteps .step-cmd` and `#examplesSection .examples .example-pane pre` content to `var(--fg-faint)` when the parent toggle container lacks `.cli-mode` (with `.out` and `.copy-icon` excluded and `.agentic-line` exempt), explicit preservation of existing `.cli-mode` behaviour, a symmetric-treatment note covering both toggles, and a post-edit visual verification instruction. The section must be self-contained so a fresh agent reading only this prompt can enforce every invariant in a single pass.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A new heading `### 5b. Enforce agentic-mode rendering invariants` exists between steps 5 and 6 in `.github/prompts/website-update.md`."
@@ -16,7 +16,7 @@ tasks:
       - "The section specifies exactly one `<span class=\"agentic-loading\">→ loading skill neo4j-cli</span>` per agent prompt, inside `.agentic-line`, with the literal Unicode arrow `→` (U+2192) and no ellipsis."
       - "The section embeds a CSS block defining `.agentic-loading` (display:block, color:var(--fg-faint), font-style:italic, opacity:0.85) and `:not(.cli-mode)` dim-sweep rules for both `#quickstartSteps .step-cmd` and `.examples .example-pane pre`, excluding `.agentic-line`, `.copy-icon` (quickstart), and `.out` (examples)."
       - "The section explicitly notes that `.cli-mode` behaviour and `.agentic-line` hiding stay untouched, that both toggles must be updated symmetrically, and that the runner must visually verify the result before finishing."
-    completed_at: null
+    completed_at: 2026-05-11T07:30:00Z
 
   - id: task-002
     title: "Add Website (neo4j.sh) workflow section to AGENTS.md"
