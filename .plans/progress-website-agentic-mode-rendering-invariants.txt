@@ -5,3 +5,7 @@ Files: ~.github/prompts/website-update.md
 ## TASK-002 — 2026-05-11T07:45:00Z
 Added `## Website (neo4j.sh)` section to AGENTS.md between Repo Doc Notes and Repo Layout Notes, documenting gh-pages-served files, prompt-driven update model, 4-step worktree workflow, and rendering-invariant warning.
 Files: ~AGENTS.md
+
+## TASK-003 — 2026-05-11T08:00:00Z
+Verified PR scope (only `.github/prompts/website-update.md` + `AGENTS.md`; no gh-pages/, bundle/, or Go files) and ran final gates: `make fmt-check`, `make lint`, `make test` all pass; `make generate-check` shows only the expected `.plans/tasks-*.yml` in_progress flip (no `internal/skill/bundle/**` drift), which is the documented ignorable case. No `.changes/unreleased/` entries added.
+Files: ~.plans/tasks-website-agentic-mode-rendering-invariants.yml, ~.plans/progress-website-agentic-mode-rendering-invariants.txt

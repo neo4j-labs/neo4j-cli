@@ -37,7 +37,7 @@ tasks:
     title: "Verify scope and run gate commands"
     description: |
       Confirm the PR diff is exactly two tracked files (`.github/prompts/website-update.md` and `AGENTS.md`) with no unintended drift, then run the project's standard final gates: `make fmt-check`, `make lint`, `make test`, and `make generate-check`. None of these should change behaviour or output since no Go source or skill-bundle inputs were touched; any unexpected failure or generated-content drift means task-001 or task-002 over-reached and must be revisited before this task can be marked complete.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -48,4 +48,4 @@ tasks:
       - "`make test` passes."
       - "`make generate-check` passes (no `git diff` after `go generate ./...`)."
       - "No changelog entry was added under `.changes/unreleased/`."
-    completed_at: null
+    completed_at: 2026-05-11T08:00:00Z
