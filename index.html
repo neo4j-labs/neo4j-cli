@@ -915,6 +915,10 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 11 4v8H3V5.5zM12 4l9-1.4V12h-9V4zM3 13h8v7L3 18.5V13zm9 0h9v8.4L12 20v-7z"></path></svg>
           <span>Windows</span>
         </button>
+        <button class="install-tab" data-os="homebrew" role="tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h10v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8z"></path><path d="M16 11h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"></path><path d="M7 5c.5-1 1.5-2 3-2s2 1 2 1 1-1 2.5-1 2.5 1 3 2"></path></svg>
+          <span>Homebrew</span>
+        </button>
         <button class="install-tab" data-os="pipx" role="tab">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"></path></svg>
           <span>pipx</span>
@@ -967,7 +971,7 @@
         <div class="step-num">1</div>
         <h3>Install the CLI</h3>
         <p>Pick your platform from the <a href="#install" class="step-link">install tabs</a> above, or use the one-liner for your OS.</p>
-        <div class="step-cmd" id="quickstartInstallCmd" data-copy="curl -sSfL https://neo4j.sh/install.sh | bash"><span class="prompt" id="quickstartPrompt">$</span><span id="quickstartCmdText"> curl <span class="flag">-sSfL</span> https://neo4j.sh/install.sh | bash</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        <div class="step-cmd" id="quickstartInstallCmd" data-copy="curl -sSfL https://neo4j.sh/install.sh | bash"><span class="prompt" id="quickstartPrompt">$</span> <span id="quickstartCmdText">curl <span class="flag">-sSfL</span> https://neo4j.sh/install.sh | bash</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
       <!-- Step 2: always CLI -->
@@ -1321,6 +1325,12 @@
       html: 'irm https://neo4j.sh/install.ps1 | iex',
       raw: 'irm https://neo4j.sh/install.ps1 | iex',
       label: 'detected Windows',
+    },
+    homebrew: {
+      prompt: '$',
+      html: 'brew install neo4j-labs/tap/neo4j-cli',
+      raw: 'brew install neo4j-labs/tap/neo4j-cli',
+      label: 'via Homebrew',
     },
     pipx: {
       prompt: '$',
