@@ -7,7 +7,6 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 
 REPO="neo4j-labs/neo4j-cli"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="neo4j-cli"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -71,6 +70,22 @@ require tar
 
 OS="$(detect_os)"
 ARCH="$(detect_arch)"
+
+# On macOS prefer ~/.local/bin (user-writable, no sudo needed).
+# On other platforms fall back to /usr/local/bin.
+# Both can be overridden by setting INSTALL_DIR before running the script.
+if [ -z "${INSTALL_DIR:-}" ]; then
+  if [ "$OS" = "Darwin" ]; then
+    INSTALL_DIR="${HOME}/.local/bin"
+  else
+    INSTALL_DIR="/usr/local/bin"
+  fi
+fi
+
+# Create the install directory if it doesn't exist (safe for user-owned dirs).
+if [ ! -d "$INSTALL_DIR" ]; then
+  mkdir -p "$INSTALL_DIR"
+fi
 
 # Allow version override via env var
 VERSION="${VERSION:-}"
@@ -149,10 +164,36 @@ fi
 INSTALLED_PATH="${INSTALL_DIR}/${BINARY_NAME}"
 success "Installed → ${BOLD}${INSTALLED_PATH}${RESET}"
 
-if command -v "$BINARY_NAME" &>/dev/null; then
-  echo ""
-  "$BINARY_NAME" --version 2>/dev/null || true
-else
-  warn "${INSTALL_DIR} may not be on your PATH. Add it with:"
-  echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
-fi
+echo ""
+"$INSTALLED_PATH" --version 2>/dev/null || true
+
+# ── PATH check ────────────────────────────────
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*)
+    ;;
+  *)
+    echo ""
+    warn "${INSTALL_DIR} is not in your PATH."
+    # Suggest the right rc file and command for the running shell
+    case "${SHELL:-}" in
+      */fish)
+        echo "  Add it permanently with:"
+        echo "    fish_add_path ${INSTALL_DIR}"
+        ;;
+      */zsh)
+        echo "  Add it to ~/.zshrc with:"
+        echo "    echo 'export PATH=\"${INSTALL_DIR}:\$PATH\"' >> ~/.zshrc"
+        echo "  Then reload: source ~/.zshrc"
+        ;;
+      */bash)
+        echo "  Add it to ~/.bash_profile with:"
+        echo "    echo 'export PATH=\"${INSTALL_DIR}:\$PATH\"' >> ~/.bash_profile"
+        echo "  Then reload: source ~/.bash_profile"
+        ;;
+      *)
+        echo "  Add it to your shell rc file with:"
+        echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
+        ;;
+    esac
+    ;;
+esac
