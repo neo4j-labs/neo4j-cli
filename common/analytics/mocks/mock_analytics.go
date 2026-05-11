@@ -10,7 +10,6 @@
 package analytics_mocks
 
 import (
-	io "io"
 	http "net/http"
 	reflect "reflect"
 
@@ -174,41 +173,41 @@ func (m *MockHTTPClient) EXPECT() *MockHTTPClientMockRecorder {
 	return m.recorder
 }
 
-// Post mocks base method.
-func (m *MockHTTPClient) Post(url, contentType string, body io.Reader) (*http.Response, error) {
+// Do mocks base method.
+func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Post", url, contentType, body)
+	ret := m.ctrl.Call(m, "Do", req)
 	ret0, _ := ret[0].(*http.Response)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Post indicates an expected call of Post.
-func (mr *MockHTTPClientMockRecorder) Post(url, contentType, body any) *MockHTTPClientPostCall {
+// Do indicates an expected call of Do.
+func (mr *MockHTTPClientMockRecorder) Do(req any) *MockHTTPClientDoCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Post", reflect.TypeOf((*MockHTTPClient)(nil).Post), url, contentType, body)
-	return &MockHTTPClientPostCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*MockHTTPClient)(nil).Do), req)
+	return &MockHTTPClientDoCall{Call: call}
 }
 
-// MockHTTPClientPostCall wrap *gomock.Call
-type MockHTTPClientPostCall struct {
+// MockHTTPClientDoCall wrap *gomock.Call
+type MockHTTPClientDoCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockHTTPClientPostCall) Return(arg0 *http.Response, arg1 error) *MockHTTPClientPostCall {
+func (c *MockHTTPClientDoCall) Return(arg0 *http.Response, arg1 error) *MockHTTPClientDoCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockHTTPClientPostCall) Do(f func(string, string, io.Reader) (*http.Response, error)) *MockHTTPClientPostCall {
+func (c *MockHTTPClientDoCall) Do(f func(*http.Request) (*http.Response, error)) *MockHTTPClientDoCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockHTTPClientPostCall) DoAndReturn(f func(string, string, io.Reader) (*http.Response, error)) *MockHTTPClientPostCall {
+func (c *MockHTTPClientDoCall) DoAndReturn(f func(*http.Request) (*http.Response, error)) *MockHTTPClientDoCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

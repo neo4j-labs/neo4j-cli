@@ -90,7 +90,7 @@ func TestEmitEvent_Enabled(t *testing.T) {
 	mockClient := amocks.NewMockHTTPClient(ctrl)
 
 	mockClient.EXPECT().
-		Post(gomock.Any(), gomock.Any(), gomock.Any()).
+		Do(gomock.Any()).
 		Return(&http.Response{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader("1")),
@@ -118,11 +118,16 @@ func TestEmitEvent_CorrectURL(t *testing.T) {
 			mockClient := amocks.NewMockHTTPClient(ctrl)
 
 			mockClient.EXPECT().
-				Post(tc.wantURL, gomock.Any(), gomock.Any()).
-				Return(&http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("1")),
-				}, nil)
+				Do(gomock.Any()).
+				DoAndReturn(func(req *http.Request) (*http.Response, error) {
+					if req.URL.String() != tc.wantURL {
+						t.Errorf("URL: got %s, want %s", req.URL.String(), tc.wantURL)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("1")),
+					}, nil
+				})
 
 			svc := analytics.NewAnalyticsWithClient("test-token", tc.endpoint, mockClient, "", "1.2.3", nil)
 			t.Cleanup(svc.Flush)
@@ -137,9 +142,9 @@ func TestEmitEvent_CorrectBody(t *testing.T) {
 	mockClient := amocks.NewMockHTTPClient(ctrl)
 
 	mockClient.EXPECT().
-		Post(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_, _ string, body io.Reader) (*http.Response, error) {
-			b, _ := io.ReadAll(body)
+		Do(gomock.Any()).
+		DoAndReturn(func(req *http.Request) (*http.Response, error) {
+			b, _ := io.ReadAll(req.Body)
 			var events []analytics.TrackEvent
 			if err := json.Unmarshal(b, &events); err != nil {
 				t.Fatalf("unmarshal body: %v", err)
@@ -188,9 +193,9 @@ func TestEmitEvent_IncludesBaseProperties(t *testing.T) {
 	mockClient := amocks.NewMockHTTPClient(ctrl)
 
 	mockClient.EXPECT().
-		Post(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_, _ string, body io.Reader) (*http.Response, error) {
-			b, _ := io.ReadAll(body)
+		Do(gomock.Any()).
+		DoAndReturn(func(req *http.Request) (*http.Response, error) {
+			b, _ := io.ReadAll(req.Body)
 			// The Mixpanel SDK wraps events in a JSON array.
 			var payload []struct {
 				Event      string                 `json:"event"`

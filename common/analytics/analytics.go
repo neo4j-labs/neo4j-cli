@@ -30,11 +30,16 @@ type httpClientTransport struct {
 
 func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	path := strings.TrimLeft(req.URL.Path, "/")
-	url := t.endpoint + "/" + path
+	rawURL := t.endpoint + "/" + path
 	if req.URL.RawQuery != "" {
-		url += "?" + req.URL.RawQuery
+		rawURL += "?" + req.URL.RawQuery
 	}
-	return t.client.Post(url, req.Header.Get("Content-Type"), req.Body)
+	inner, err := http.NewRequestWithContext(req.Context(), http.MethodPost, rawURL, req.Body)
+	if err != nil {
+		return nil, err
+	}
+	inner.Header.Set("Content-Type", req.Header.Get("Content-Type"))
+	return t.client.Do(inner)
 }
 
 type analyticsConfig struct {
@@ -87,13 +92,15 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 	var mpClient *mixpanel.ApiClient
 
 	if client != nil {
-		httpClient := &http.Client{Transport: &httpClientTransport{client: client, endpoint: endpoint}}
+		httpClient := &http.Client{Transport: &httpClientTransport{client: client, endpoint: endpoint}, Timeout: 2 * time.Second}
 		mpClient = mixpanel.NewApiClient(mixPanelToken,
 			mixpanel.HttpClient(httpClient),
 		)
 	} else {
+		httpClient := &http.Client{Timeout: 2 * time.Second}
 		mpClient = mixpanel.NewApiClient(mixPanelToken,
 			mixpanel.ProxyApiLocation(endpoint),
+			mixpanel.HttpClient(httpClient),
 		)
 	}
 
@@ -156,7 +163,7 @@ func (a *Analytics) worker() {
 	defer a.wg.Done()
 	for event := range a.eventCh {
 		if err := a.sendTrackEvent([]TrackEvent{event}); err != nil {
-			a.logError("error sending analytics event", "event", slog.StringValue(event.Event), "error", err.Error())
+			a.logDebug("error sending analytics event", "event", slog.StringValue(event.Event), "error", err.Error())
 		}
 	}
 }
@@ -219,7 +226,7 @@ func (a *Analytics) logInfo(msg string, fields ...any) {
 	}
 }
 
-// logError logs at error level if a logger has been injected.
+//nolint:unused
 func (a *Analytics) logError(msg string, fields ...any) {
 	if a.log != nil {
 		a.log.Error(msg, fields...)
