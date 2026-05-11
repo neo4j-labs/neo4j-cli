@@ -22,7 +22,7 @@ tasks:
     title: "Add Website (neo4j.sh) workflow section to AGENTS.md"
     description: |
       Add a new `## Website (neo4j.sh)` section to `AGENTS.md` (the canonical file; `CLAUDE.md` is a symlink and must not be edited directly). Place it after the existing `## Repo Doc Notes` section and before `## Repo Layout Notes`. The section must (a) name the four served files under `gh-pages/` (`index.html`, `llms.txt`, `install.sh`, `install.ps1`), (b) state the site is prompt-driven by `.github/prompts/website-update.md` and not generated from Go code in `main`, (c) lay out the 4-step update workflow (`git worktree add gh-pages gh-pages` → run the prompt against an agent → review the gh-pages diff → commit & push on `gh-pages`), and (d) state that rendering invariants live in the prompt and must not be regressed by hand-edits to `gh-pages/index.html`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`AGENTS.md` contains a new `## Website (neo4j.sh)` heading positioned immediately after `## Repo Doc Notes` and immediately before `## Repo Layout Notes`."
@@ -31,7 +31,7 @@ tasks:
       - "The section documents the 4-step update workflow including `git worktree add gh-pages gh-pages` and the review/commit/push loop on the `gh-pages` branch."
       - "The section warns that rendering invariants are enforced via the prompt and that `gh-pages/index.html` must not be hand-edited in ways that violate them."
       - "`CLAUDE.md` is unchanged on disk (still a symlink to `AGENTS.md`) and was not edited directly."
-    completed_at: null
+    completed_at: 2026-05-11T07:45:00Z
 
   - id: task-003
     title: "Verify scope and run gate commands"

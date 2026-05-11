@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-11T07:30:00Z
 Added step 5b "Enforce agentic-mode rendering invariants" to the website-update prompt covering `> ` prompt prefix, single `→ loading skill neo4j-cli` line per agent prompt inside `.agentic-line`, CSS block dimming command content to `var(--fg-faint)` when parent toggle lacks `.cli-mode` (excluding `.agentic-line`, `.copy-icon`, `.out`), `.cli-mode` preservation, symmetric treatment, and post-edit visual verification.
 Files: ~.github/prompts/website-update.md
+
+## TASK-002 — 2026-05-11T07:45:00Z
+Added `## Website (neo4j.sh)` section to AGENTS.md between Repo Doc Notes and Repo Layout Notes, documenting gh-pages-served files, prompt-driven update model, 4-step worktree workflow, and rendering-invariant warning.
+Files: ~AGENTS.md
