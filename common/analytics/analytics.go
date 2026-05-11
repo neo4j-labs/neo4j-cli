@@ -92,12 +92,12 @@ func NewAnalyticsWithClient(mixPanelToken string, mixpanelEndpoint string, clien
 	var mpClient *mixpanel.ApiClient
 
 	if client != nil {
-		httpClient := &http.Client{Transport: &httpClientTransport{client: client, endpoint: endpoint}, Timeout: 1 * time.Second}
+		httpClient := &http.Client{Transport: &httpClientTransport{client: client, endpoint: endpoint}, Timeout: 2 * time.Second}
 		mpClient = mixpanel.NewApiClient(mixPanelToken,
 			mixpanel.HttpClient(httpClient),
 		)
 	} else {
-		httpClient := &http.Client{Timeout: 1 * time.Second}
+		httpClient := &http.Client{Timeout: 2 * time.Second}
 		mpClient = mixpanel.NewApiClient(mixPanelToken,
 			mixpanel.ProxyApiLocation(endpoint),
 			mixpanel.HttpClient(httpClient),
