@@ -52,8 +52,8 @@ func TestHuggingFace_Embed_ServerlessMode_HappyPath_NestedShape(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []float32{0.1, 0.2, 0.3}, got)
 
-	// Path on the test server reflects {default-base-host-stripped}/{Model}.
-	assert.Equal(t, "/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2", gotPath)
+	// Path on the test server reflects {default-base-host-stripped}/{Model}/pipeline/feature-extraction.
+	assert.Equal(t, "/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction", gotPath)
 	assert.Equal(t, "Bearer hf_test", gotAuth)
 	assert.Equal(t, "neo4j-cli/vtest", gotUA)
 	assert.Equal(t, "hello", gotBody["inputs"])
@@ -303,8 +303,9 @@ func TestHuggingFace_Embed_RejectsBlockedBaseURL(t *testing.T) {
 
 func TestHuggingFace_Embed_DefaultBaseURL_AppendsModelToServerlessBase(t *testing.T) {
 	// Construct provider with no BaseURL set; assert the default is used at
-	// request time AND the model is appended (serverless mode). We swap
-	// http.Client.Transport so we never hit a real network.
+	// request time AND the model + /pipeline/feature-extraction suffix is
+	// appended (serverless mode). We swap http.Client.Transport so we never
+	// hit a real network.
 	captured := captureRoundTripper{}
 	p := newHuggingFaceProvider(Config{
 		Provider: ProviderHuggingFace,
@@ -316,7 +317,7 @@ func TestHuggingFace_Embed_DefaultBaseURL_AppendsModelToServerlessBase(t *testin
 	_, _ = p.Embed(context.Background(), "hello") // err expected (no real response)
 	require.NotNil(t, captured.req)
 	assert.Equal(t,
-		"https://router.huggingface.co/hf-inference/models/BAAI/bge-large-en-v1.5",
+		"https://router.huggingface.co/hf-inference/models/BAAI/bge-large-en-v1.5/pipeline/feature-extraction",
 		captured.req.URL.String(),
 	)
 }
