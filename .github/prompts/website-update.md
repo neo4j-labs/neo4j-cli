@@ -59,7 +59,7 @@ Do **not**:
 
 ### 5b. Enforce agentic-mode rendering invariants
 
-The `gh-pages/index.html` page has two `agentic | cli` toggles — one above the Quickstart cards (`#quickstartSteps`) and one above the Examples grid (`#examplesSection .examples`). Toggling adds/removes the `.cli-mode` class on the respective container. In agentic mode (the default — `.cli-mode` absent) the rendering MUST follow the three invariants below. These rules apply to BOTH toggles symmetrically; any change to one MUST be mirrored on the other in the same run. Audit the file, fix any drift, and verify visually before continuing.
+The `gh-pages/index.html` page has two `agentic | cli` toggles — one above the Quickstart cards (`#quickstartSteps`) and one above the Examples grid (`#examplesSection`, the same `<div>` that also has `class="examples"`). Toggling adds/removes the `.cli-mode` class on the respective container. The id and class live on a single element, so write the selector as `#examplesSection:not(.cli-mode)` — `#examplesSection .examples` is a descendant selector that never matches anything. In agentic mode (the default — `.cli-mode` absent) the rendering MUST follow the three invariants below. These rules apply to BOTH toggles symmetrically; any change to one MUST be mirrored on the other in the same run. Audit the file, fix any drift, and verify visually before continuing.
 
 **Invariant 1 — Agent prompt prefix is `> `, not `# `.**
 Every `.agentic-comment` span MUST start with `> ` (greater-than U+003E + ASCII space). Replace any `# ` prefix you find. The `.agentic-comment` color stays bound to `var(--terminal-prompt)` (terminal-green) — do not change that binding. The agent prompt is the visual hero in agentic mode.
@@ -86,22 +86,37 @@ Ensure the following CSS block is present inside `gh-pages/index.html`'s `<style
     opacity: 0.85;
 }
 
+.agentic-result {
+    display: block;
+    color: var(--terminal-prompt);
+}
+
 #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line),
 #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
     color: var(--fg-faint) !important;
 }
 
-#examplesSection .examples:not(.cli-mode) .example-pane pre:has(.agentic-line),
-#examplesSection .examples:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
+#examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line),
+#examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
     color: var(--fg-faint) !important;
 }
 ```
+
+**Optional pattern — agent result summary.**
+An example pane MAY end with a one-sentence agent-side wrap-up describing what the run accomplished. Use this markup so it inherits the dim exemption and cli-mode hiding:
+```html
+<span class="agentic-line"><span class="agentic-result">One-sentence summary of the agent's outcome.</span></span>
+```
+Keep it under ~75 characters so it doesn't horizontally overflow the `<pre>`. No `> ` prefix — that's the prompt convention; `.agentic-result` is the answer.
+
+**Optional pattern — high-contrast multi-line CLI result.**
+When a `$` command's result is multi-line ASCII art / structured output (e.g. `:schema`'s `▸ section` blocks), wrap the whole result in `<span class="out">…</span>` so it stays sharp in agentic mode like the table-art results in other panes. Without the `.out` wrapper the dim sweep folds the result into the grey command block, which is misleading because real CLI output is not dimmed in the terminal.
 
 **Preserve existing `.cli-mode` behaviour.**
 Do NOT weaken or remove any existing `.cli-mode` rules. Adding `.cli-mode` to a toggle container MUST continue to restore full-color syntax highlighting and hide `.agentic-line` exactly as today. The `:not(.cli-mode)` dim sweep above is purely additive — it kicks in only when the toggle is in agentic mode, and the existing `.cli-mode` rules override it when the toggle flips.
 
 **Symmetric treatment.**
-Quickstart (`#quickstartSteps`) and Examples (`#examplesSection .examples`) MUST follow all three invariants. If you adjust the prompt prefix, the loading line, or the CSS for one section, mirror the same change to the other in the same edit pass.
+Quickstart (`#quickstartSteps`) and Examples (`#examplesSection`) MUST follow all three invariants. If you adjust the prompt prefix, the loading line, or the CSS for one section, mirror the same change to the other in the same edit pass.
 
 **Post-edit visual verification.**
 After editing, open `gh-pages/index.html` in a browser (or render it mentally from the markup) and confirm that in default agentic mode the ONLY colored content above each `.out` block is (a) the `> ` agent prompt in terminal-green and (b) the italic faint `→ loading skill neo4j-cli` line; the `$` prompt and every command, flag, string, keyword below them render in the same grey (`var(--fg-faint)`). Also confirm that any code block WITHOUT an `.agentic-line` (Quickstart steps 1–2: `$ curl … | bash` and `$ neo4j-cli skill install --rw`) renders in full color — the `:has(.agentic-line)` scope must keep the dim off these. Toggle to `cli` mode and confirm full syntax highlighting returns everywhere and `.agentic-line` is hidden. Do not finish this run until all three states render correctly in both toggles.
