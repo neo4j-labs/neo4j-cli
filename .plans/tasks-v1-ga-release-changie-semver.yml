@@ -27,14 +27,14 @@ tasks:
       `batch v0.1.0 --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}`
       to `batch auto --project neo4j-cli`. Update any downstream references to
       `steps.prerelease` so the workflow remains valid YAML.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`changie.yml` contains no references to `alpha`, `prerelease`, or the hardcoded string `v0.1.0`"
       - "The `changie batch` step uses `args: batch auto --project neo4j-cli`"
       - "The workflow YAML is valid (no references to the removed `steps.prerelease` output)"
       - "The 'Detect unreleased changes', 'Batch', 'Merge', 'Get latest version', 'Extract version numbers', 'Compute PR metadata', and 'Create Pull Request' steps are otherwise unchanged"
-    completed_at: null
+    completed_at: 2026-05-11T14:00:00Z
 
   - id: task-003
     title: "Author Major-kind changie entry for the v1.0.0 GA release"
