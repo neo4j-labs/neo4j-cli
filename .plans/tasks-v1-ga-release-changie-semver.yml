@@ -11,12 +11,12 @@ tasks:
       `false` so that every GitHub Release produced by GoReleaser is marked as a
       GA (Latest) release rather than a pre-release. This affects all future
       releases, not just v1.0.0.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.goreleaser.yaml` `release.prerelease` is `false`"
       - "No other fields in the `release:` block are changed"
-    completed_at: null
+    completed_at: 2026-05-11T13:00:00Z
 
   - id: task-002
     title: "Refactor changie.yml to use batch auto instead of hardcoded alpha version"

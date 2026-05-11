@@ -1,0 +1,17 @@
+================================================================================
+TASK-001: Set release.prerelease to false in .goreleaser.yaml
+Date: 2026-05-11T13:00:00Z
+================================================================================
+
+Summary:
+Changed `release.prerelease` from `true` to `false` in `.goreleaser.yaml` so
+all future GoReleaser GitHub Releases are marked as GA (Latest) rather than
+pre-release.
+
+Files Changed:
+- .goreleaser.yaml (modified: release.prerelease true → false)
+
+Key Decisions:
+- Single field change only; no other release block fields touched.
+
+Next Task: task-002
