@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'Fix HuggingFace serverless embed URL to append /pipeline/feature-extraction, so sentence-transformers/* models route to feature-extraction instead of sentence-similarity (CLI-69)'
-time: 2026-05-11T09:05:29+00:00

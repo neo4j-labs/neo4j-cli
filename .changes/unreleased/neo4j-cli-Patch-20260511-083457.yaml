@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Fix analytics HTTP timeout not being enforced when Mixpanel is unavailable — the RoundTrip adapter was calling http.Client.Post which discards the incoming request context, causing the inner client's 10-second timeout to apply instead of the configured 2-second one
-time: 2026-05-11T08:34:57.672866+01:00
