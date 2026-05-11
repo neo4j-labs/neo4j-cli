@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Major
+body: GA release of neo4j-cli
+time: 2026-05-11T15:00:00Z

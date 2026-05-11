@@ -11,17 +11,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Compute next pre-release versions
-        id: prerelease
-        run: |
-          LAST_NEO=$(ls .changes/neo4j-cli/v*-alpha.[0-9]*.md 2>/dev/null \
-            | grep -oE 'alpha\.[0-9]+\.md' | grep -oE '[0-9]+' | sort -n | tail -1)
-          if [ -z "$LAST_NEO" ]; then
-            echo "neo4j=alpha.0" >> $GITHUB_OUTPUT
-          else
-            echo "neo4j=alpha.$((LAST_NEO + 1))" >> $GITHUB_OUTPUT
-          fi
-
       - name: Detect unreleased changes per project
         id: detect
         run: |
@@ -41,7 +30,7 @@ jobs:
         uses: miniscruff/changie-action@6dcc2533cac0495148ed4046c438487e4dceaa23 # v2
         with:
           version: latest
-          args: batch v0.1.0 --project neo4j-cli --prerelease ${{ steps.prerelease.outputs.neo4j }}
+          args: batch auto --project neo4j-cli
 
       - name: Merge changelogs
         if: steps.detect.outputs.has_neo4j == 'true'

@@ -49,7 +49,7 @@ archives:
           - zip
 
 release:
-  prerelease: true
+  prerelease: false
   extra_files:
     - glob: CHANGELOG-neo4j.md
 
