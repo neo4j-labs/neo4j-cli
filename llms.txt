@@ -7,13 +7,13 @@ neo4j-cli is an open-source command-line tool for managing Neo4j resources, exec
 ## Installation
 
 ```bash
-pipx install neo4j-cli==0.1.0a13
+pipx install neo4j-cli
 ```
 
 or via npm:
 
 ```bash
-npm install -g @neo4j-labs/cli@alpha
+npm install -g @neo4j-labs/cli
 ```
 
 ## Command surface

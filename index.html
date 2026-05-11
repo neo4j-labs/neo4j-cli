@@ -1202,9 +1202,9 @@
 <span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
 
 <span class="info">▸</span> detecting installed agents…
-<span class="ok">✓</span> claude-code     installed (v1.4.0)
-<span class="ok">✓</span> cursor          installed (v1.4.0)
-<span class="ok">✓</span> windsurf        installed (v1.4.0)
+<span class="ok">✓</span> claude-code     installed (v1.0.0)
+<span class="ok">✓</span> cursor          installed (v1.0.0)
+<span class="ok">✓</span> windsurf        installed (v1.0.0)
 <span class="info">○</span> copilot         not detected — skipped
 <span class="info">○</span> gemini-cli      not detected — skipped
 <span class="info">○</span> codex           not detected — skipped
@@ -1214,16 +1214,16 @@
 <span class="comment"># check for version drift across all agents</span>
 <span class="prompt">$</span> neo4j-cli skill check
 
-<span class="ok">✓</span> claude-code     v1.4.0  up to date
-<span class="ok">✓</span> cursor          v1.4.0  up to date
-<span class="info">!</span> windsurf        v1.3.2  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
+<span class="ok">✓</span> claude-code     v1.0.0  up to date
+<span class="ok">✓</span> cursor          v1.0.0  up to date
+<span class="info">!</span> windsurf        v0.1.0-alpha.13  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
 
 <span class="comment"># update the outdated one</span>
 <span class="prompt">$</span> neo4j-cli skill install windsurf <span class="flag">--rw</span>
 
-<span class="ok">✓</span> windsurf        updated to v1.4.0
+<span class="ok">✓</span> windsurf        updated to v1.0.0
 
-<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.4.0.</span></span></pre>
+<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.0.0.</span></span></pre>
       </div>
     </div>
   </div>
@@ -1334,14 +1334,14 @@
     },
     pipx: {
       prompt: '$',
-      html: 'pipx install neo4j-cli<span class="flag">==0.1.0a13</span>',
-      raw: 'pipx install neo4j-cli==0.1.0a13',
+      html: 'pipx install neo4j-cli',
+      raw: 'pipx install neo4j-cli',
       label: 'via pipx',
     },
     npm: {
       prompt: '$',
-      html: 'npm install <span class="flag">-g</span> @neo4j-labs/cli<span class="flag">@alpha</span>',
-      raw: 'npm install -g @neo4j-labs/cli@alpha',
+      html: 'npm install <span class="flag">-g</span> @neo4j-labs/cli',
+      raw: 'npm install -g @neo4j-labs/cli',
       label: 'via npm',
     },
   };
