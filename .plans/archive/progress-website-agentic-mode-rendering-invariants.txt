@@ -1,0 +1,11 @@
+## TASK-001 — 2026-05-11T07:30:00Z
+Added step 5b "Enforce agentic-mode rendering invariants" to the website-update prompt covering `> ` prompt prefix, single `→ loading skill neo4j-cli` line per agent prompt inside `.agentic-line`, CSS block dimming command content to `var(--fg-faint)` when parent toggle lacks `.cli-mode` (excluding `.agentic-line`, `.copy-icon`, `.out`), `.cli-mode` preservation, symmetric treatment, and post-edit visual verification.
+Files: ~.github/prompts/website-update.md
+
+## TASK-002 — 2026-05-11T07:45:00Z
+Added `## Website (neo4j.sh)` section to AGENTS.md between Repo Doc Notes and Repo Layout Notes, documenting gh-pages-served files, prompt-driven update model, 4-step worktree workflow, and rendering-invariant warning.
+Files: ~AGENTS.md
+
+## TASK-003 — 2026-05-11T08:00:00Z
+Verified PR scope (only `.github/prompts/website-update.md` + `AGENTS.md`; no gh-pages/, bundle/, or Go files) and ran final gates: `make fmt-check`, `make lint`, `make test` all pass; `make generate-check` shows only the expected `.plans/tasks-*.yml` in_progress flip (no `internal/skill/bundle/**` drift), which is the documented ignorable case. No `.changes/unreleased/` entries added.
+Files: ~.plans/tasks-website-agentic-mode-rendering-invariants.yml, ~.plans/progress-website-agentic-mode-rendering-invariants.txt

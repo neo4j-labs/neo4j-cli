@@ -140,6 +140,26 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - `CLAUDE.md` is a symlink to `AGENTS.md` (`ls -la` confirms). Edit `AGENTS.md` once — both surfaces update. Don't write to `CLAUDE.md` directly.
 - Contributor-facing workflows (e.g. `make generate` / add-new-CLI procedure) live in `CONTRIBUTING.md` "Development" subsections. AGENTS.md Architecture orients readers and links to CONTRIBUTING.md for the procedure rather than duplicating it.
 
+## Website (neo4j.sh)
+
+The public marketing/install site at https://neo4j.sh is served from the `gh-pages` branch, NOT from `main`. Four files are served:
+
+- `gh-pages/index.html` — landing page (quickstart + examples toggles, CLI vs agentic mode).
+- `gh-pages/llms.txt` — LLM-discoverable site summary.
+- `gh-pages/install.sh` — POSIX install script (curl | sh target).
+- `gh-pages/install.ps1` — Windows install script.
+
+The site is **prompt-driven**, not generated from Go code in `main`. The source of truth for content updates is `.github/prompts/website-update.md`; running that prompt against an agent rewrites `gh-pages/index.html` (and adjacent files) in place.
+
+Update workflow:
+
+1. `git worktree add gh-pages gh-pages` from the repo root to get a working tree on the `gh-pages` branch.
+2. Run `.github/prompts/website-update.md` against an agent inside that worktree.
+3. Review the resulting `gh-pages` diff (especially `index.html`) before committing.
+4. Commit and push on the `gh-pages` branch — GitHub Pages serves it automatically.
+
+Rendering invariants (e.g. `> ` agent-prompt prefix, single `→ loading skill neo4j-cli` line per agent prompt, `:not(.cli-mode)` dim sweep over command content) are enforced inside the prompt. Do **not** hand-edit `gh-pages/index.html` in ways that violate them — re-run the prompt instead so the invariants stay encoded in one place.
+
 ## Repo Layout Notes
 
 See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill subsystem layout, embed roots, mount points, and bundle regen.

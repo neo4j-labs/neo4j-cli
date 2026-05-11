@@ -1,0 +1,51 @@
+feature: website-agentic-mode-rendering-invariants
+prd: ./prd-website-agentic-mode-rendering-invariants.md
+created_at: 2026-05-11T07:00:00Z
+updated_at: 2026-05-11T07:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add step 5b agentic-mode rendering invariants to website-update prompt"
+    description: |
+      Insert a new step labelled "5b. Enforce agentic-mode rendering invariants" into `.github/prompts/website-update.md`, positioned between the existing step 5 ("Make surgical updates") and step 6 ("Validate the examples"). The new step must encode every rule the next prompt run will enforce on `gh-pages/index.html`: the `> ` agent-prompt prefix (replacing `# `), the one-per-prompt `→ loading skill neo4j-cli` line inside the existing `.agentic-line` wrapper using a new `.agentic-loading` span (Unicode U+2192 arrow, no ellipsis, no `->` fallback), the CSS block that dims `#quickstartSteps .step-cmd` and `#examplesSection .examples .example-pane pre` content to `var(--fg-faint)` when the parent toggle container lacks `.cli-mode` (with `.out` and `.copy-icon` excluded and `.agentic-line` exempt), explicit preservation of existing `.cli-mode` behaviour, a symmetric-treatment note covering both toggles, and a post-edit visual verification instruction. The section must be self-contained so a fresh agent reading only this prompt can enforce every invariant in a single pass.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A new heading `### 5b. Enforce agentic-mode rendering invariants` exists between steps 5 and 6 in `.github/prompts/website-update.md`."
+      - "The section states the `> ` prompt prefix invariant for every `.agentic-comment` and pins `.agentic-comment` color to `var(--terminal-prompt)`."
+      - "The section specifies exactly one `<span class=\"agentic-loading\">→ loading skill neo4j-cli</span>` per agent prompt, inside `.agentic-line`, with the literal Unicode arrow `→` (U+2192) and no ellipsis."
+      - "The section embeds a CSS block defining `.agentic-loading` (display:block, color:var(--fg-faint), font-style:italic, opacity:0.85) and `:not(.cli-mode)` dim-sweep rules for both `#quickstartSteps .step-cmd` and `.examples .example-pane pre`, excluding `.agentic-line`, `.copy-icon` (quickstart), and `.out` (examples)."
+      - "The section explicitly notes that `.cli-mode` behaviour and `.agentic-line` hiding stay untouched, that both toggles must be updated symmetrically, and that the runner must visually verify the result before finishing."
+    completed_at: 2026-05-11T07:30:00Z
+
+  - id: task-002
+    title: "Add Website (neo4j.sh) workflow section to AGENTS.md"
+    description: |
+      Add a new `## Website (neo4j.sh)` section to `AGENTS.md` (the canonical file; `CLAUDE.md` is a symlink and must not be edited directly). Place it after the existing `## Repo Doc Notes` section and before `## Repo Layout Notes`. The section must (a) name the four served files under `gh-pages/` (`index.html`, `llms.txt`, `install.sh`, `install.ps1`), (b) state the site is prompt-driven by `.github/prompts/website-update.md` and not generated from Go code in `main`, (c) lay out the 4-step update workflow (`git worktree add gh-pages gh-pages` → run the prompt against an agent → review the gh-pages diff → commit & push on `gh-pages`), and (d) state that rendering invariants live in the prompt and must not be regressed by hand-edits to `gh-pages/index.html`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`AGENTS.md` contains a new `## Website (neo4j.sh)` heading positioned immediately after `## Repo Doc Notes` and immediately before `## Repo Layout Notes`."
+      - "The section names `gh-pages/index.html`, `gh-pages/llms.txt`, `gh-pages/install.sh`, and `gh-pages/install.ps1` as the served files."
+      - "The section states explicitly that the site is prompt-driven by `.github/prompts/website-update.md`, not generated from Go code in `main`."
+      - "The section documents the 4-step update workflow including `git worktree add gh-pages gh-pages` and the review/commit/push loop on the `gh-pages` branch."
+      - "The section warns that rendering invariants are enforced via the prompt and that `gh-pages/index.html` must not be hand-edited in ways that violate them."
+      - "`CLAUDE.md` is unchanged on disk (still a symlink to `AGENTS.md`) and was not edited directly."
+    completed_at: 2026-05-11T07:45:00Z
+
+  - id: task-003
+    title: "Verify scope and run gate commands"
+    description: |
+      Confirm the PR diff is exactly two tracked files (`.github/prompts/website-update.md` and `AGENTS.md`) with no unintended drift, then run the project's standard final gates: `make fmt-check`, `make lint`, `make test`, and `make generate-check`. None of these should change behaviour or output since no Go source or skill-bundle inputs were touched; any unexpected failure or generated-content drift means task-001 or task-002 over-reached and must be revisited before this task can be marked complete.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`git status` and `git diff --stat` show changes only in `.github/prompts/website-update.md` and `AGENTS.md` (no `gh-pages/`, no `internal/skill/bundle/**`, no Go files)."
+      - "`make fmt-check` passes with no output."
+      - "`make lint` passes."
+      - "`make test` passes."
+      - "`make generate-check` passes (no `git diff` after `go generate ./...`)."
+      - "No changelog entry was added under `.changes/unreleased/`."
+    completed_at: 2026-05-11T08:00:00Z
