@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	commonskill "github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +50,7 @@ func withDetect(t *testing.T, fn func() (InstallMethod, string, error)) {
 
 // withSwap swaps the swapFn seam. Used by tests that want to assert the
 // swap path is or is not invoked without setting up a real archive.
-func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error) {
+func withSwap(t *testing.T, fn func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error) {
 	t.Helper()
 	prev := swapFn
 	swapFn = fn
@@ -163,9 +165,10 @@ func TestRunUpdate_NoStableYet_PreReleasesHint(t *testing.T) {
 	assert.Contains(t, out, "--pre-releases")
 }
 
-func TestRunUpdate_CheckMode_NewerAvailable_ReturnsError(t *testing.T) {
-	// REQ-F-011 / acceptance criterion 3: --check + newer available exits 1
-	// (non-nil error). The swap path must not be invoked.
+func TestRunUpdate_CheckMode_NewerAvailable_FriendlyHint(t *testing.T) {
+	// REQ-F-001/002: `update check` + newer available exits 0 with a
+	// two-line friendly hint pointing at the install command. The swap
+	// path must not be invoked.
 	swapCalled := false
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.2.0"}, nil
@@ -174,16 +177,17 @@ func TestRunUpdate_CheckMode_NewerAvailable_ReturnsError(t *testing.T) {
 		// Plain binary so the install-method passthrough doesn't intercept.
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
 
 	out, err := runWithOpts(t, "v0.1.0", runOpts{check: true})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "newer version is available")
-	assert.Contains(t, out, "v0.1.0")
-	assert.Contains(t, out, "v0.2.0")
+	require.NoError(t, err, "`update check` + newer must NOT error — finding a new version is the success case")
+	assert.Contains(t, out, "Current version: v0.1.0")
+	assert.Contains(t, out, "Latest stable version: v0.2.0")
+	assert.Contains(t, out, "New version available: v0.1.0 -> v0.2.0")
+	assert.Contains(t, out, "Run `neo4j-cli update` to install.")
 	assert.False(t, swapCalled, "--check must never invoke swap")
 }
 
@@ -251,7 +255,7 @@ func TestRunUpdate_DowngradeAllowedWithExplicitVersion(t *testing.T) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -272,7 +276,7 @@ func TestRunUpdate_PkgMgrPassthrough_NoForce_ShowsHintAndExits(t *testing.T) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -296,7 +300,7 @@ func TestRunUpdate_ForceBypassesPkgMgrCheck(t *testing.T) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		assert.Equal(t, "/opt/homebrew/bin/neo4j-cli", currentBinaryPath, "swap should target the resolved exe path")
 		return nil
@@ -320,7 +324,7 @@ func TestRunUpdate_HappyPath_BinaryChannel(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		assert.NotEmpty(t, urls.Archive)
 		assert.NotEmpty(t, urls.Checksum)
 		assert.Equal(t, "/tmp/neo4j-cli", currentBinaryPath)
@@ -342,7 +346,7 @@ func TestRunUpdate_PreReleasesFlag_PassedThrough(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -384,7 +388,7 @@ func TestRunUpdate_SwapFailure_PropagatesError(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return errors.New("simulated swap failure")
 	})
 
@@ -392,6 +396,155 @@ func TestRunUpdate_SwapFailure_PropagatesError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update failed")
 	assert.Contains(t, err.Error(), "simulated swap failure")
+}
+
+// runWithOptsParented mirrors runWithOptsFormat but mounts the `update` cobra
+// command under a synthetic `neo4j-cli` root so `cmd.CommandPath()` returns
+// the production-realistic `neo4j-cli update` rather than the bare `update`
+// you'd get from an unparented sub-cobra. Used by the sentinel-error hint
+// tests because the hint relies on CommandPath().
+func runWithOptsParented(t *testing.T, current string, opts runOpts) (string, error) {
+	t.Helper()
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+
+	root := &cobra.Command{Use: "neo4j-cli"}
+	updateCmd := NewCmd(cfg, nil, "")
+	root.AddCommand(updateCmd)
+
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	updateCmd.SetOut(out)
+	updateCmd.SetErr(out)
+
+	err = runUpdate(context.Background(), updateCmd, cfg, opts)
+	return out.String(), err
+}
+
+// TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix verifies REQ-F-014: a
+// `*errSudoUnavailable` returned from Swap turns into a clear two-line fatal
+// error with a "Re-run with sudo: <full command>" hint that reflects the
+// flags actually passed to the current invocation. The cobra usage block must
+// NOT print (SilenceUsage is set by task-001 BEFORE swapFn is invoked).
+func TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix(t *testing.T) {
+	cases := []struct {
+		name     string
+		opts     runOpts
+		wantHint string
+	}{
+		{
+			name:     "bare",
+			opts:     runOpts{},
+			wantHint: "sudo neo4j-cli update",
+		},
+		{
+			name:     "pre-releases",
+			opts:     runOpts{preReleases: true},
+			wantHint: "sudo neo4j-cli update --pre-releases",
+		},
+		{
+			name:     "version tag",
+			opts:     runOpts{version: "v0.1.0-alpha.10"},
+			wantHint: "sudo neo4j-cli update --version v0.1.0-alpha.10",
+		},
+		{
+			name:     "force",
+			opts:     runOpts{force: true},
+			wantHint: "sudo neo4j-cli update --force",
+		},
+		{
+			name:     "pre-releases and force",
+			opts:     runOpts{preReleases: true, force: true},
+			wantHint: "sudo neo4j-cli update --pre-releases --force",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			latestTag := "v0.2.0"
+			withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+				return &Release{TagName: latestTag}, nil
+			})
+			withGetByTag(t, func(ctx context.Context, tag string) (*Release, error) {
+				return &Release{TagName: tag}, nil
+			})
+			withDetect(t, func() (InstallMethod, string, error) {
+				return InstallMethodBinary, "/usr/local/bin/neo4j-cli", nil
+			})
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+				return &errSudoUnavailable{dir: "/usr/local/bin"}
+			})
+
+			out, err := runWithOptsParented(t, "v0.1.0", tc.opts)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "cannot write to /usr/local/bin (permission denied).")
+			assert.Contains(t, err.Error(), "Re-run with sudo:")
+			assert.Contains(t, err.Error(), tc.wantHint)
+			// SilenceUsage gate from task-001 must prevent the cobra Usage
+			// block from leaking into stdout/stderr.
+			assert.NotContains(t, out, "Usage:")
+		})
+	}
+}
+
+// TestRunUpdate_SwapErrPermissionWindows_AdminShellHint verifies REQ-F-014: a
+// `*errPermissionWindows` returned from Swap turns into a clear two-line fatal
+// error with an "Administrator shell" hint. Same SilenceUsage assertion as the
+// sudo branch.
+func TestRunUpdate_SwapErrPermissionWindows_AdminShellHint(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, `C:\Program Files\neo4j-cli\neo4j-cli.exe`, nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return &errPermissionWindows{dir: `C:\Program Files\neo4j-cli`}
+	})
+
+	out, err := runWithOptsParented(t, "v0.1.0", runOpts{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `cannot write to C:\Program Files\neo4j-cli (permission denied).`)
+	assert.Contains(t, err.Error(), "Re-run from an Administrator shell.")
+	assert.NotContains(t, err.Error(), "Re-run with sudo")
+	assert.NotContains(t, out, "Usage:")
+}
+
+// TestBuildReRunCommand verifies the flag-reconstruction helper in isolation,
+// independent of the runUpdate flow. Mirrors the matrix in
+// TestRunUpdate_SwapErrSudoUnavailable_RerunHintMatrix. Mounts `update` under
+// a synthetic `neo4j-cli` parent so CommandPath returns the production form.
+func TestBuildReRunCommand(t *testing.T) {
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+
+	root := &cobra.Command{Use: "neo4j-cli"}
+	updateCmd := NewCmd(cfg, nil, "")
+	root.AddCommand(updateCmd)
+
+	cases := []struct {
+		name string
+		opts runOpts
+		want string
+	}{
+		{"bare", runOpts{}, "neo4j-cli update"},
+		{"pre-releases", runOpts{preReleases: true}, "neo4j-cli update --pre-releases"},
+		{"version", runOpts{version: "v0.1.0-alpha.10"}, "neo4j-cli update --version v0.1.0-alpha.10"},
+		{"force", runOpts{force: true}, "neo4j-cli update --force"},
+		{
+			"all flags",
+			runOpts{preReleases: true, version: "v1.0.0", force: true},
+			"neo4j-cli update --pre-releases --version v1.0.0 --force",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := buildReRunCommand(updateCmd, tc.opts)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestNewCmd_FlagsExposed(t *testing.T) {
@@ -436,9 +589,9 @@ func TestRunUpdate_ChannelLabel_StableVsPreRelease(t *testing.T) {
 			})
 
 			out, err := runWithOpts(t, tc.current, runOpts{check: true, preReleases: tc.preReleases})
-			// --check + newer always errors — we just want to inspect the
-			// channel string in the printed lines.
-			require.Error(t, err)
+			// `update check` exits 0 even when newer is available — we
+			// just want to inspect the channel string in the printed lines.
+			require.NoError(t, err)
 			assert.Contains(t, out, "Latest "+tc.wantChannel+" version:", "out=%q", out)
 		})
 	}
@@ -487,7 +640,7 @@ func TestPlainTextOutput_GoldenSuccess(t *testing.T) {
 			withDetect(t, func() (InstallMethod, string, error) {
 				return InstallMethodBinary, "/tmp/neo4j-cli", nil
 			})
-			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 				return nil
 			})
 
@@ -523,7 +676,7 @@ func TestJSONOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -540,8 +693,9 @@ func TestJSONOutput_HappyPath(t *testing.T) {
 }
 
 func TestJSONOutput_CheckMode_NewerAvailable(t *testing.T) {
-	// REQ-F-018 / acceptance criterion 3: --check JSON sets updated:false,
-	// check:true. Error still propagates so exit code is non-zero.
+	// REQ-F-003 / REQ-F-018: `update check` + newer available exits 0 with
+	// JSON sets updated:false, check:true. Scripts compare current!=latest
+	// to detect drift rather than relying on a non-zero exit.
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.2.0"}, nil
 	})
@@ -550,7 +704,7 @@ func TestJSONOutput_CheckMode_NewerAvailable(t *testing.T) {
 	})
 
 	out, err := runWithOptsFormat(t, "v0.1.0", runOpts{check: true}, "json")
-	require.Error(t, err, "--check + newer must still error to set exit code")
+	require.NoError(t, err, "`update check` + newer must NOT error — finding a new version is the success case")
 
 	doc := parseJSONOutput(t, out)
 	assert.Equal(t, "v0.1.0", doc.Current)
@@ -587,7 +741,7 @@ func TestJSONOutput_PkgMgrPassthrough(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on pkg-mgr passthrough")
 		return nil
 	})
@@ -614,7 +768,7 @@ func TestJSONOutput_FieldOrderDeterministic(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -651,7 +805,7 @@ func TestTableOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -683,7 +837,7 @@ func TestToonOutput_HappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -818,7 +972,7 @@ func TestRunUpdate_PostSwap_RefreshesInstalledAgents(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -863,7 +1017,7 @@ func TestRunUpdate_PostSwap_NoAgentsInstalled(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -915,7 +1069,7 @@ func TestRunUpdate_PostSwap_RefreshFailure_NonFatal(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 
@@ -992,8 +1146,7 @@ func TestRunUpdate_CheckMode_DoesNotRefreshSkills(t *testing.T) {
 	})
 
 	_, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{check: true}, "default")
-	require.Error(t, err, "--check + newer must error to set exit code")
-	assert.Contains(t, err.Error(), "newer version is available")
+	require.NoError(t, err, "`update check` + newer exits 0 — refresh path is gated on a successful swap, not on the error/non-error split")
 }
 
 // TestRunUpdate_PostSwap_NilBundle_SkipsRefresh asserts the bundle-nil
@@ -1007,7 +1160,7 @@ func TestRunUpdate_PostSwap_NilBundle_SkipsRefresh(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 	withListSkills(t, func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
@@ -1033,7 +1186,7 @@ func TestRunUpdate_PostSwap_JSONHappyPath(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		return nil
 	})
 	claude := &commonskill.Agent{Name: "claude-code", DisplayName: "Claude Code"}

@@ -1,0 +1,37 @@
+## TASK-001 — 2026-05-10T22:35:00Z
+`update check` newer-available branch now exits 0 with a two-line friendly hint (`New version available: X -> Y` + `Run \`neo4j-cli update[ --pre-releases][ --version <tag>]\` to install.`) instead of `clierr.NewUsageError`. Added `buildUpdateCommand(opts)` helper. Set `cmd.SilenceUsage = true` after `--version` validation so runtime/swap errors don't dump the help block (genuine flag misuse still surfaces help via cobra's pre-RunE flag-parse path).
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~neo4j-cli/internal/subcommands/update/check_test.go, ~.github/workflows/test.yml
+Decisions: Updated CI test.yml comment that explained the now-removed cobra Usage-block-on-stdout behaviour. `--force` deliberately not in `buildUpdateCommand` (check doesn't register it).
+
+## TASK-002 — 2026-05-10T23:10:00Z
+Introduced 6 new seams in swap.go (`geteuidFn`, `lookPathFn`, `runCommandFn`, `dirWritableFn`, `tempDirFn`, `stdinIsTTYFn`), the `dirWritable(dir)` probe (O_EXCL|O_CREATE|O_WRONLY with EACCES/EROFS → (false,nil)), and pointer-receiver sentinel errors `errSudoUnavailable{dir}` / `errPermissionWindows{dir}` each exposing `Dir()`. Added matching `withFoo(t, ...)` helpers in swap_test.go. No production call site yet — introduction-only step per task-002 contract.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
+Decisions: EROFS detection via `errors.Is(err, syscall.EROFS)` (cross-platform; syscall.EROFS exists on Windows too). Probe uses `crypto/rand` 8-byte hex suffix to avoid collisions with concurrent invocations.
+
+## TASK-003 — 2026-05-10T20:44:04Z
+Added `planSwap(abs)` + `swapPlan{elevate, tmpDir}` to swap.go implementing REQ-F-009/REQ-F-010 ordering: writable→same-dir+no-elevate; windows→errPermissionWindows; already-root→non-sentinel permission error; sudo/install missing or non-TTY→errSudoUnavailable; otherwise→{elevate:true, tmpDir:tempDirFn()}. 7 unit tests in swap_test.go drive every branch via task-002 seams; writable test wires fail-the-test fakes for all post-probe seams to enforce the no-side-effect contract. No production call site yet — wiring lands in task-005.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
+
+## TASK-004 — 2026-05-10T23:45:00Z
+Added `elevatedSwap(ctx, src, dst)` + `validateInstallPath(label, p)` to swap.go implementing REQ-F-013/REQ-NF-001. Argv shape `[sudo, install, -m, 0755, src, dst]` via `exec.CommandContext` (no shell), inherits stdio for interactive sudo prompt. Pre-flight rejects empty / NUL / `-`-prefix / non-absolute paths before any seam fires. Errors wrapped with `sudo install:` prefix preserving `errors.Is` chain. 5 test functions: argv shape, 8-case malformed-path table, run-cmd error wrap, sudo-missing, install-missing. No production call site yet — wiring lands in task-005.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/swap_test.go
+
+## TASK-005 — 2026-05-10T20:50:00Z
+Wired planSwap + elevatedSwap into Swap. Signature gains `stderr io.Writer`; runUpdate passes `cmd.ErrOrStderr()`. planSwap runs before any network I/O — sentinel errors (`*errSudoUnavailable`, `*errPermissionWindows`) propagate unwrapped via `errors.As`; non-sentinel probe errors get the standard `swap:` prefix. tmpNew is now `filepath.Join(plan.tmpDir, "neo4j-cli.new")` (single name regardless of GOOS). Elevated branch prints `Cannot write to <dir>; elevation required.\nElevating via sudo...` to stderr, calls elevatedSwap, then `os.Remove(tmpNew)` regardless of outcome. All 21 `withSwap` fakes updated for new signature; 4 direct `Swap(...)` test callers pass `io.Discard`.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/swap_test.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~neo4j-cli/internal/subcommands/update/check_test.go
+Decisions: Windows tmp file dropped `.exe.new` suffix (now plain `neo4j-cli.new`) per task spec; cosmetic, no behavior change since rename takes any source name.
+
+## TASK-006 — 2026-05-10T21:05:00Z
+runUpdate now `errors.As`-recognises `*errSudoUnavailable` / `*errPermissionWindows` from swapFn and renders REQ-F-014 friendly fatal hints (`cannot write to <dir> (permission denied).\nRe-run with sudo:\n\n    sudo <cmd>` / `\nRe-run from an Administrator shell.`). Added `buildReRunCommand(cmd, opts)` colocated with `buildUpdateCommand`; uses `cmd.CommandPath()` and includes `--pre-releases`/`--version`/`--force` per flag state. Matrix tests + isolated helper test; SilenceUsage gate (task-001) verified for both sentinels.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go
+Decisions: Tests use a synthetic `neo4j-cli` parent cobra root (`runWithOptsParented`) so `CommandPath()` returns the production form rather than bare `update` you'd get from an unparented NewCmd.
+
+## TASK-007 — 2026-05-10T21:25:00Z
+Added `TestSwap_ElevationMatrix` covering all 7 REQ-T-004 scenarios as subtests: writable (rename=1, run=0), elevation happy-path (exact sudo argv, tmpNew under tempDirFn, cleanup, stderr narrative), already-root (raw error, no sentinel), no-sudo / non-TTY (errSudoUnavailable, httpCalls=0), windows (errPermissionWindows, no download), elevation sudo-non-zero (sudo install: wrap + errors.Is unwrap + tmpNew cleanup). Each scenario owns an `elevationCounters` struct counting httpDoFn / renameFn / runCommandFn calls so call-count regressions surface loudly. Non-windows scenarios `t.Skip` on windows; windows-fake scenario uses `withSwapGoos("windows")` and runs on all 3 OS matrices.
+Files: ~neo4j-cli/internal/subcommands/update/swap_test.go
+Decisions: Pre-flight-skip scenarios still wire `httpDoFn` (counting only) rather than a fail-the-test fake — clearer assertion via `assert.Equal(0, counters.httpCalls)` than a panic.
+
+## TASK-008 — 2026-05-10T21:04:27Z
+Polish + ship. Updated runUpdate doc block (planSwap + sentinel-recognition + SilenceUsage), swap.go package doc (6-step trust model with pre-flight + elevated branch + new seam list), and check.go Long/SilenceUsage comment to reflect exit-0 behavior. Bundle regenerated (`update.md`). Changie Patch entry added. Full gate clean: fmt-check, test, lint, generate (no bundle drift beyond the intentional check.go Long edit).
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/swap.go, ~neo4j-cli/internal/subcommands/update/check.go, ~neo4j-cli/internal/skill/bundle/references/update.md, +.changes/unreleased/neo4j-cli-Patch-20260510-210239.yaml
+Decisions: Manual verifications (real GitHub API + /usr/local/bin sudo prompt) deferred to human user per task spec — agent shell cannot exercise the network/sudo paths against a release binary.

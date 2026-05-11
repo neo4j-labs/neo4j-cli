@@ -276,8 +276,17 @@ func isStructuredFormat(format string) bool {
 //  3. Compare current vs target via semver.Compare (REQ-F-008).
 //  4. Install-method detection + passthrough hint (REQ-F-009/010/010a),
 //     unless --force.
-//  5. `update check` branch (REQ-F-011): report and exit without downloading.
-//  6. Download + verify + swap (REQ-F-012/013/014/015/016).
+//  5. `update check` branch (REQ-F-011): report and exit 0 with a friendly
+//     "New version available" + install-command hint when one exists
+//     (REQ-F-001..REQ-F-007). No error/usage dump.
+//  6. Download + verify + swap (REQ-F-012/013/014/015/016). Swap pre-flights
+//     the target dir via planSwap and, when it is not writable, transparently
+//     elevates via `sudo install` (REQ-F-009/010 in swap.go). The two
+//     permission-class sentinels (*errSudoUnavailable / *errPermissionWindows)
+//     are recognised here via errors.As and turned into actionable
+//     "Re-run with sudo: <cmd>" / "Re-run from an Administrator shell" hints
+//     (REQ-F-014). cmd.SilenceUsage is set after flag validation so these
+//     runtime errors do NOT print the cobra usage block.
 //
 // The package-manager check is intentionally placed AFTER target resolution
 // so the user gets a meaningful "you're on vX, vY is available — run brew
@@ -301,6 +310,13 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 			return clierr.NewUsageError("invalid --version: %v", err)
 		}
 	}
+
+	// REQ-F-006: silence the cobra Usage block on RunE error AFTER flag
+	// validation has run. Genuine flag misuse (`update --bogus`) still
+	// surfaces the help via cobra's normal pre-RunE flag-parse path; from
+	// here on, any error is a runtime failure (network, swap, sudo) and
+	// dumping `--help` over the failure adds noise without helping the user.
+	cmd.SilenceUsage = true
 
 	// Resolve the target release.
 	target, channel, err := resolveTarget(ctx, opts)
@@ -370,16 +386,22 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	}
 
-	// REQ-F-011: `update check` mode — report and exit. exit 1 (non-nil
-	// error) when newer is available so CI/scripts can branch on it; exit 0
-	// when up-to-date (handled above by the cmp == 0 fast-path).
+	// REQ-F-001/002: `update check` mode — report and exit 0 (no error)
+	// regardless of whether a newer version exists. Finding a new version
+	// is the success case for `check`; CI/scripts that want to branch on
+	// drift compare `current != latest` from the JSON output. The plain-text
+	// branch prints both the existing two-line "Current/Latest" header AND
+	// the new "New version available" + install-command hint so users see
+	// exactly what to run next.
 	if opts.check {
 		printResult(cmd, cfg, result, func() {
 			cmd.Printf("Current version: %s\n", current)
 			cmd.Printf("Latest %s version: %s\n", channel, target.TagName)
+			// cmp < 0 — newer available.
+			cmd.Printf("New version available: %s -> %s\n", current, target.TagName)
+			cmd.Printf("Run `%s` to install.\n", buildUpdateCommand(opts))
 		})
-		// cmp < 0 — newer available.
-		return clierr.NewUsageError("a newer version is available: %s -> %s", current, target.TagName)
+		return nil
 	}
 
 	// REQ-F-012/013/014/015/016: download → verify → extract → atomic
@@ -413,7 +435,24 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		cmd.Println("Checking for updates to latest version...")
 	}
 
-	if err := swapFn(ctx, urls, currentBinaryPath); err != nil {
+	if err := swapFn(ctx, urls, currentBinaryPath, cmd.ErrOrStderr()); err != nil {
+		// REQ-F-014: surface friendly, actionable hints for the two
+		// permission-class sentinels. Both turn into FatalError so the
+		// exit code stays non-zero while the printed shape is stable.
+		var sudoErr *errSudoUnavailable
+		if errors.As(err, &sudoErr) {
+			return clierr.NewFatalError(
+				"cannot write to %s (permission denied).\nRe-run with sudo:\n\n    sudo %s",
+				sudoErr.Dir(), buildReRunCommand(cmd, opts),
+			)
+		}
+		var winErr *errPermissionWindows
+		if errors.As(err, &winErr) {
+			return clierr.NewFatalError(
+				"cannot write to %s (permission denied).\nRe-run from an Administrator shell.",
+				winErr.Dir(),
+			)
+		}
 		return clierr.NewFatalError("update failed: %v", err)
 	}
 
@@ -437,6 +476,49 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		}
 	})
 	return nil
+}
+
+// buildUpdateCommand reconstructs the install command suggested by the
+// `update check` newer-available hint. Reads the active flags out of opts so
+// the suggestion mirrors what the user passed to `check` — e.g. a check run
+// with `--pre-releases` produces `neo4j-cli update --pre-releases`.
+//
+// Maintenance note: if a new install-time flag is added to runOpts, mirror it
+// here so the hint stays accurate. `--force` is intentionally NOT included
+// because `update check` does not register `--force` (the install-method
+// passthrough is irrelevant when nothing is being installed).
+func buildUpdateCommand(opts runOpts) string {
+	parts := []string{"neo4j-cli update"}
+	if opts.preReleases {
+		parts = append(parts, "--pre-releases")
+	}
+	if opts.version != "" {
+		parts = append(parts, "--version "+opts.version)
+	}
+	return strings.Join(parts, " ")
+}
+
+// buildReRunCommand reconstructs the FULL command the user originally typed —
+// used inside the "Re-run with sudo:" hint surfaced from the `*errSudoUnavailable`
+// branch of runUpdate. Uses cmd.CommandPath() so the hint reflects however the
+// user invoked the binary (e.g. `/usr/local/bin/neo4j-cli update` or just
+// `neo4j-cli update`).
+//
+// Unlike buildUpdateCommand, this DOES include `--force` because the failing
+// invocation is the install path (`update`, not `update check`) where force is
+// a valid flag and the user may have set it.
+func buildReRunCommand(cmd *cobra.Command, opts runOpts) string {
+	parts := []string{cmd.CommandPath()}
+	if opts.preReleases {
+		parts = append(parts, "--pre-releases")
+	}
+	if opts.version != "" {
+		parts = append(parts, "--version "+opts.version)
+	}
+	if opts.force {
+		parts = append(parts, "--force")
+	}
+	return strings.Join(parts, " ")
 }
 
 // refreshSkillBundles enumerates installed agents and re-runs Install for

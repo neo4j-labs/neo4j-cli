@@ -12,8 +12,9 @@ import (
 
 // newCheckCmd returns the `update check` cobra subcommand. It reports whether
 // a newer release is available without downloading or swapping the running
-// binary, mirroring the `skill check` shape: read-only, exits non-zero on
-// drift so CI/scripts can branch on it.
+// binary, mirroring the `skill check` shape: read-only, exits 0 whether or
+// not drift exists. CI/scripts that want to branch on drift compare
+// `current != latest` in the JSON output (REQ-F-001..REQ-F-007 / REQ-F-018).
 //
 // The subcommand registers `--pre-releases` and `--version`. It deliberately
 // does NOT register `--force` — a check has no swap path to bypass, so the
@@ -37,16 +38,15 @@ func newCheckCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Comm
 		Long: "Compares the running binary's version against the latest GitHub release at " +
 			"neo4j-labs/neo4j-cli and reports the result without downloading or swapping. " +
 			"By default only stable semver tags are considered; pass `--pre-releases` to " +
-			"opt into alpha/beta/rc tags. Exits non-zero when a newer version is available " +
-			"so CI/scripts can branch on it.",
-		// Silence the cobra Usage block on RunE error — `update check`
-		// returns clierr.NewUsageError when a newer release is available
-		// (REQ-F-011) to set a non-zero exit code, but that "newer
-		// version is available" outcome is NOT a misuse and shouldn't
-		// dump a Usage block over the structured-output stream. The
-		// parent `update` command leaves SilenceUsage at its cobra
-		// default (false) so genuine misuse (`update --bogus`) still
-		// gets the help shown.
+			"opt into alpha/beta/rc tags. Exits 0 whether or not a newer version exists; " +
+			"scripts that want to branch on drift compare `current != latest` in the JSON " +
+			"output.",
+		// Silence the cobra Usage block on RunE error — runUpdate sets
+		// SilenceUsage on the parent after flag validation too, but
+		// keeping it here defends against any future RunE that returns
+		// before that point (e.g. flag-shape errors caught inside runUpdate
+		// itself). Genuine flag misuse (`update check --bogus`) still
+		// surfaces help via cobra's pre-RunE flag-parse path.
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(cmd.Context(), cmd, cfg, runOpts{

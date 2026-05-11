@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'Fix ''update check'' to print a friendly message instead of an error+usage dump, and auto-elevate via sudo when updating from a non-writable install location like /usr/local/bin.'
+time: 2026-05-10T21:02:41+00:00

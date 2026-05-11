@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -98,8 +99,9 @@ func TestCheckCmd_UnknownForceFlag(t *testing.T) {
 
 // TestCheckCmd_DispatchesToRunUpdate drives the subcommand via cobra.SetArgs
 // and asserts RunE plumbs through to runUpdate with check=true: swap is never
-// invoked, JSON sets check:true / updated:false, and the error returned for
-// "newer available" is a clierr.NewUsageError carrying the comparison.
+// invoked, JSON sets check:true / updated:false, and `update check` exits 0
+// even when a newer version is available (REQ-F-001 — the friendly check
+// output).
 func TestCheckCmd_DispatchesToRunUpdate(t *testing.T) {
 	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
 		return &Release{TagName: "v0.2.0"}, nil
@@ -108,7 +110,7 @@ func TestCheckCmd_DispatchesToRunUpdate(t *testing.T) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
 	swapCalled := false
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		swapCalled = true
 		return nil
 	})
@@ -117,8 +119,7 @@ func TestCheckCmd_DispatchesToRunUpdate(t *testing.T) {
 	parent.SetArgs([]string{"check"})
 
 	err := parent.Execute()
-	require.Error(t, err, "newer available must surface a usage error so exit code is non-zero")
-	assert.Contains(t, err.Error(), "newer version is available")
+	require.NoError(t, err, "newer available must NOT error — `update check` is informational and exits 0")
 	assert.False(t, swapCalled, "`update check` must never invoke swap")
 
 	var doc struct {
@@ -145,16 +146,19 @@ func TestCheckCmd_PreReleasesFlagPropagates(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on `update check`")
 		return nil
 	})
 
-	parent, _, _ := newUpdateCmdForTest(t, "v0.1.0", "default")
+	parent, out, _ := newUpdateCmdForTest(t, "v0.1.0", "default")
 	parent.SetArgs([]string{"check", "--pre-releases"})
 	err := parent.Execute()
-	require.Error(t, err, "newer pre-release available — usage error expected")
+	require.NoError(t, err, "newer pre-release available — `update check` exits 0 with a friendly hint")
 	assert.True(t, preReleasesSeen, "--pre-releases must propagate from the subcommand into latestFn")
+	// REQ-F-002: install-command hint mirrors the user's `--pre-releases` flag.
+	assert.Contains(t, out.String(), "New version available: v0.1.0 -> v0.2.0-alpha.1")
+	assert.Contains(t, out.String(), "Run `neo4j-cli update --pre-releases` to install.")
 }
 
 // TestCheckCmd_VersionFlagPropagates asserts `--version <tag>` reaches
@@ -173,14 +177,17 @@ func TestCheckCmd_VersionFlagPropagates(t *testing.T) {
 	withDetect(t, func() (InstallMethod, string, error) {
 		return InstallMethodBinary, "/tmp/neo4j-cli", nil
 	})
-	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 		t.Fatal("swap must not run on `update check`")
 		return nil
 	})
 
-	parent, _, _ := newUpdateCmdForTest(t, "v0.1.0-alpha.9", "default")
+	parent, out, _ := newUpdateCmdForTest(t, "v0.1.0-alpha.9", "default")
 	parent.SetArgs([]string{"check", "--version", "v0.1.0-alpha.10"})
 	err := parent.Execute()
-	require.Error(t, err, "newer tagged version — usage error expected")
+	require.NoError(t, err, "newer tagged version — `update check` exits 0 with a friendly hint")
 	assert.Equal(t, "v0.1.0-alpha.10", gotTag, "--version must propagate from the subcommand into getByTagFn")
+	// REQ-F-002: install-command hint mirrors the user's `--version <tag>` flag.
+	assert.Contains(t, out.String(), "New version available: v0.1.0-alpha.9 -> v0.1.0-alpha.10")
+	assert.Contains(t, out.String(), "Run `neo4j-cli update --version v0.1.0-alpha.10` to install.")
 }

@@ -1,35 +1,53 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-// Package update — swap.go owns the download → verify → extract → atomic
-// rename flow that replaces the running binary with a freshly downloaded
-// release archive.
+// Package update — swap.go owns the pre-flight → download → verify → extract
+// → atomic rename (or elevated install) flow that replaces the running binary
+// with a freshly downloaded release archive.
 //
 // Trust model and ordering:
 //
-//  1. Download the release archive (tar.gz on linux/darwin, zip on windows)
+//  1. Pre-flight (planSwap, REQ-F-009 / REQ-F-010): probe the target
+//     directory's writability via `dirWritable` BEFORE any network I/O. The
+//     decision tree picks one of three branches: direct rename (writable),
+//     transparent sudo elevation (non-writable + sudo + install + TTY +
+//     non-root + non-windows), or sentinel error (`*errSudoUnavailable` /
+//     `*errPermissionWindows`) which the runUpdate caller turns into an
+//     actionable "Re-run with sudo: <cmd>" or "Re-run from an Administrator
+//     shell" hint. Sentinel branches short-circuit the rest of the flow so
+//     no archive is downloaded when the swap could never succeed.
+//  2. Download the release archive (tar.gz on linux/darwin, zip on windows)
 //     and the matching `_checksums.txt` from the same release tag. Both are
 //     fetched over HTTPS with a redirect host pin (REQ-S-001) so a malicious
 //     redirect cannot send the request to an attacker-controlled host that
 //     might leak a token or serve a poisoned archive.
-//  2. Compute SHA256 of the downloaded archive in memory and look up the
+//  3. Compute SHA256 of the downloaded archive in memory and look up the
 //     expected hash in the checksums file. **No swap may occur if checksum
 //     verification has not succeeded** (REQ-F-013). The verification happens
 //     before any extraction so a tampered archive never touches disk under
 //     the target directory.
-//  3. Extract the binary entry from the archive into a temp file at
-//     `<current>.new` (same directory as the running binary so `os.Rename`
-//     stays on the same filesystem). Reject any entry whose cleaned path
+//  4. Extract the binary entry from the archive into a temp file at
+//     `<plan.tmpDir>/neo4j-cli.new` — same directory as the running binary
+//     for the direct branch (so `os.Rename` stays on one filesystem), or
+//     `os.TempDir()` for the elevated branch (`sudo install` copies, so
+//     cross-filesystem is fine). Reject any entry whose cleaned path
 //     escapes the destination (zip-slip / tar-slip per REQ-F-014). Reject
 //     symlinks, hardlinks, and devices — only regular files allowed.
-//  4. Atomic swap: on linux/darwin, `os.Rename(<current>.new, <current>)`.
-//     On Windows: best-effort `os.Remove(<current>.old)`, then
-//     `os.Rename(<current>, <current>.old)`, then
-//     `os.Rename(<current>.new, <current>)` — Windows can't replace a running
+//  5. Swap into place:
+//     - Direct branch on linux/darwin: `os.Rename(tmpNew, <current>)`.
+//     - Direct branch on Windows: best-effort `os.Remove(<current>.old)`,
+//     then `os.Rename(<current>, <current>.old)`, then
+//     `os.Rename(tmpNew, <current>)` — Windows can't replace a running
 //     executable but can rename it out of the way (REQ-F-015).
-//  5. Restore-on-error: if any step after the original is renamed away
-//     fails, attempt to restore the original by renaming `.old` back into
-//     place (REQ-F-016).
+//     - Elevated branch (linux/darwin only): `sudo install -m 0755 <tmpNew>
+//     <current>` via `elevatedSwap`, with stdio inherited so the sudo
+//     prompt is interactive. Argv is built with separate exec.Cmd args
+//     (no shell) and both src/dst are pre-validated absolute, NUL-free,
+//     non-flag paths (REQ-NF-001). tmpNew is removed regardless of the
+//     install result.
+//  6. Restore-on-error (Windows direct branch only): if any step after the
+//     original is renamed away fails, attempt to restore the original by
+//     renaming `.old` back into place (REQ-F-016).
 //
 // Test seams:
 //
@@ -37,9 +55,13 @@
 //     checksum downloads so tests can drive the full flow against an
 //     httptest server without touching real GitHub.
 //   - swapGoosFn shadows runtime.GOOS so tests can exercise the Windows
-//     rename-to-`.old` dance from a non-Windows host.
+//     rename-to-`.old` dance and the windows-permission sentinel from a
+//     non-Windows host.
 //   - renameFn shadows os.Rename so tests can simulate a mid-swap failure
 //     and assert restore-on-error behaviour.
+//   - dirWritableFn / geteuidFn / lookPathFn / runCommandFn / tempDirFn /
+//     stdinIsTTYFn drive every planSwap and elevatedSwap branch
+//     hermetically without touching /usr/local/bin or invoking real sudo.
 package update
 
 import (
@@ -49,6 +71,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -57,10 +80,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
+
+	"golang.org/x/term"
 )
 
 // maxArchiveBytes caps the archive download size to defend against an
@@ -94,7 +121,9 @@ var allowedDownloadHosts = map[string]struct{}{
 }
 
 // Test seams. Production fills with the real impls; tests swap via the
-// withSwapGoos / withRename / withRequireHTTPS helpers in swap_test.go.
+// withSwapGoos / withRename / withRequireHTTPS / withGeteuid / withLookPath /
+// withRunCommand / withDirWritable / withTempDir / withStdinIsTTY helpers in
+// swap_test.go.
 var (
 	// swapGoosFn shadows runtime.GOOS for the swap path specifically. release.go
 	// already exposes goosFn; we want a separate seam so the swap code can be
@@ -108,26 +137,264 @@ var (
 	// (TestAssertAllowedHost_RejectsNonHTTPS) that asserts the production
 	// behaviour with the seam at its default true value.
 	requireHTTPS = true
+	// geteuidFn shadows os.Geteuid so tests can simulate running as root
+	// without actually being root.
+	geteuidFn = os.Geteuid
+	// lookPathFn shadows exec.LookPath so tests can simulate the presence or
+	// absence of sudo / install without relying on the host PATH.
+	lookPathFn = exec.LookPath
+	// runCommandFn shadows the production *exec.Cmd.Run so tests can capture
+	// argv and simulate non-zero exit codes without forking a real process.
+	runCommandFn = func(cmd *exec.Cmd) error { return cmd.Run() }
+	// dirWritableFn shadows dirWritable so tests can drive the planSwap
+	// branches without relying on chmod (which is unreliable in CI).
+	dirWritableFn = dirWritable
+	// tempDirFn shadows os.TempDir so tests can route the elevation-path
+	// temp file into a t.TempDir().
+	tempDirFn = os.TempDir
+	// stdinIsTTYFn shadows golang.org/x/term.IsTerminal on os.Stdin so tests
+	// can simulate a non-interactive shell.
+	stdinIsTTYFn = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 )
 
+// errSudoUnavailable is returned by planSwap when the target directory is not
+// writable AND we cannot transparently elevate (sudo missing, install missing,
+// or stdin not a TTY so the sudo prompt would never get an answer). The
+// runUpdate caller recognises this sentinel and turns it into a "re-run with
+// sudo: <command>" hint.
+type errSudoUnavailable struct {
+	dir string
+}
+
+func (e *errSudoUnavailable) Error() string {
+	return fmt.Sprintf("cannot write to %s and sudo elevation is unavailable", e.dir)
+}
+
+// Dir returns the target directory whose write was rejected.
+func (e *errSudoUnavailable) Dir() string { return e.dir }
+
+// errPermissionWindows is returned by planSwap on Windows when the target
+// directory is not writable. Windows has no sudo equivalent in scope for this
+// CLI; the runUpdate caller turns this sentinel into a "re-run from an
+// Administrator shell" hint.
+type errPermissionWindows struct {
+	dir string
+}
+
+func (e *errPermissionWindows) Error() string {
+	return fmt.Sprintf("cannot write to %s (administrator privileges required)", e.dir)
+}
+
+// Dir returns the target directory whose write was rejected.
+func (e *errPermissionWindows) Dir() string { return e.dir }
+
+// swapPlan describes the result of the planSwap pre-flight: whether the swap
+// must be elevated via sudo, and which directory should hold the temporary
+// extracted binary. When elevate is false, tmpDir is the same directory as
+// the running binary so the final `os.Rename` stays on one filesystem. When
+// elevate is true, tmpDir is `os.TempDir()` because `sudo install` copies
+// (not renames) and cross-filesystem is fine.
+type swapPlan struct {
+	elevate bool
+	tmpDir  string
+}
+
+// planSwap probes the target directory's writability and decides whether the
+// swap can proceed directly or must be elevated via sudo (REQ-F-009 /
+// REQ-F-010). abs MUST be the resolved (post-EvalSymlinks) absolute path of
+// the running binary.
+//
+// Ordering (the "(not called)" comments document the contract that lets the
+// happy-path tests assert the seams stay untouched on the writable branch):
+//
+//  1. dirWritableFn(filepath.Dir(abs)) — probe.
+//  2. Writable → return {elevate: false, tmpDir: filepath.Dir(abs)}. (no
+//     further seams called.)
+//  3. Not writable + windows → return *errPermissionWindows{dir}. (sudo not
+//     applicable on Windows.)
+//  4. Not writable + already root (geteuidFn() == 0) → surface the raw
+//     permission error; sudo cannot help (e.g. SIP, immutable bit, read-only
+//     filesystem).
+//  5. Not writable + sudo missing OR install missing OR stdin is not a TTY →
+//     return *errSudoUnavailable{dir}. The runUpdate caller turns this into a
+//     "re-run with sudo: <cmd>" hint.
+//  6. Otherwise → return {elevate: true, tmpDir: tempDirFn()}.
+func planSwap(abs string) (swapPlan, error) {
+	dir := filepath.Dir(abs)
+	writable, err := dirWritableFn(dir)
+	if err != nil {
+		return swapPlan{}, fmt.Errorf("planSwap: probe %s: %w", dir, err)
+	}
+	if writable {
+		return swapPlan{elevate: false, tmpDir: dir}, nil
+	}
+
+	// Not writable from here on.
+
+	if swapGoosFn() == "windows" {
+		return swapPlan{}, &errPermissionWindows{dir: dir}
+	}
+
+	// Already-root on a non-writable dir means the FS itself is rejecting
+	// the write (immutable bit, SIP, read-only mount). sudo cannot help —
+	// surface the underlying permission error so the caller logs the real
+	// reason rather than a misleading "re-run with sudo" hint.
+	if geteuidFn() == 0 {
+		return swapPlan{}, fmt.Errorf("planSwap: cannot write to %s as root (read-only filesystem or protected location)", dir)
+	}
+
+	if _, err := lookPathFn("sudo"); err != nil {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+	if _, err := lookPathFn("install"); err != nil {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+	if !stdinIsTTYFn() {
+		return swapPlan{}, &errSudoUnavailable{dir: dir}
+	}
+
+	return swapPlan{elevate: true, tmpDir: tempDirFn()}, nil
+}
+
+// elevatedSwap copies src to dst via `sudo install -m 0755 <src> <dst>`,
+// inheriting stdio so the sudo prompt is interactive (REQ-F-013).
+//
+// argv-safety pre-flight (REQ-NF-001): both src and dst MUST be absolute,
+// MUST NOT start with "-" (so they cannot be misinterpreted as flags by sudo
+// or install), and MUST NOT contain NUL bytes. Failure rejects before exec —
+// runCommandFn is never invoked on a malformed input.
+//
+// Sudo and install paths are resolved here even though planSwap already
+// proved them present. The lookup is cheap and keeps the helper safe to call
+// from any future entry point that doesn't go through planSwap.
+//
+// On non-zero exit the underlying error is wrapped with the "sudo install: "
+// prefix so the runUpdate caller can render a stable error shape regardless
+// of the underlying exec.ExitError detail.
+func elevatedSwap(ctx context.Context, src, dst string) error {
+	if err := validateInstallPath("src", src); err != nil {
+		return err
+	}
+	if err := validateInstallPath("dst", dst); err != nil {
+		return err
+	}
+
+	sudoPath, err := lookPathFn("sudo")
+	if err != nil {
+		return fmt.Errorf("locate sudo: %w", err)
+	}
+	installPath, err := lookPathFn("install")
+	if err != nil {
+		return fmt.Errorf("locate install: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, sudoPath, installPath, "-m", "0755", src, dst)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := runCommandFn(cmd); err != nil {
+		return fmt.Errorf("sudo install: %w", err)
+	}
+	return nil
+}
+
+// validateInstallPath rejects paths that would be ambiguous or unsafe to
+// hand to `sudo install`. The check is deliberately strict: absolute path
+// only, no leading "-" (would be parsed as a flag), no NUL bytes (truncation
+// surface in any C-side argv consumer downstream of exec).
+func validateInstallPath(label, p string) error {
+	if p == "" {
+		return fmt.Errorf("%s path is empty", label)
+	}
+	if strings.Contains(p, "\x00") {
+		return fmt.Errorf("%s path contains NUL byte", label)
+	}
+	if strings.HasPrefix(p, "-") {
+		return fmt.Errorf("%s path %q starts with '-' (would be parsed as a flag)", label, p)
+	}
+	if !filepath.IsAbs(p) {
+		return fmt.Errorf("%s path %q is not absolute", label, p)
+	}
+	return nil
+}
+
+// dirWritable probes whether the current process can create a new regular
+// file inside dir. It writes a uniquely-named `.neo4j-cli-probe.<rand>` file
+// with O_EXCL|O_CREATE|O_WRONLY and removes it on success.
+//
+// Returns (true, nil) when the probe succeeded. Returns (false, nil) when the
+// probe was rejected by a permission-class error (EACCES / EROFS) — these are
+// expected outcomes that drive the elevation branch, not unexpected failures.
+// Returns (false, err) on any other error so the caller can surface it.
+func dirWritable(dir string) (bool, error) {
+	var randBytes [8]byte
+	if _, err := rand.Read(randBytes[:]); err != nil {
+		return false, fmt.Errorf("dirWritable: generate probe name: %w", err)
+	}
+	probe := filepath.Join(dir, ".neo4j-cli-probe."+hex.EncodeToString(randBytes[:]))
+	f, err := os.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS) {
+			return false, nil
+		}
+		return false, err
+	}
+	_ = f.Close()
+	_ = os.Remove(probe)
+	return true, nil
+}
+
 // Swap downloads the archive + checksums for the resolved AssetURLs,
-// verifies the SHA256 of the archive, extracts the binary into the same
-// directory as the running binary, and atomically renames it into place.
+// verifies the SHA256 of the archive, extracts the binary into a directory
+// chosen by planSwap, and either atomically renames it into place or
+// elevates via `sudo install` when the target directory is not writable.
 //
 // `currentBinaryPath` MUST be the resolved (post-EvalSymlinks) absolute path
 // of the running binary; see install_method.go Detect() for the canonical
 // way to obtain it.
 //
+// `stderr` receives the elevation-narrative line ("Cannot write to <dir>…
+// Elevating via sudo…") when planSwap selects the elevated branch. Plain
+// rename branches do not write to stderr.
+//
+// Pre-flight: planSwap probes the target dir and may return one of two
+// sentinel errors before any download occurs (REQ-F-009 / REQ-F-010):
+//
+//   - *errPermissionWindows: target dir is not writable on Windows. The
+//     runUpdate caller turns this into a "re-run from an Administrator
+//     shell" hint.
+//   - *errSudoUnavailable: target dir is not writable AND we cannot
+//     transparently elevate (no sudo, no install, or stdin is not a TTY).
+//     The runUpdate caller turns this into a "re-run with sudo: <command>"
+//     hint.
+//
 // On success, returns nil. On any error, the original binary is left
-// untouched at `currentBinaryPath`; intermediate temp files in the same
-// directory are best-effort cleaned up.
-func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
+// untouched at `currentBinaryPath`; intermediate temp files (in the same
+// directory for the direct branch, or in `os.TempDir()` for the elevated
+// branch) are best-effort cleaned up.
+func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
 	if currentBinaryPath == "" {
 		return fmt.Errorf("swap: empty current binary path")
 	}
 	abs, err := filepath.Abs(currentBinaryPath)
 	if err != nil {
 		return fmt.Errorf("swap: resolve absolute path: %w", err)
+	}
+
+	// REQ-F-009 / REQ-F-010: pre-flight before any network I/O. Sentinel
+	// errors (*errSudoUnavailable, *errPermissionWindows) propagate
+	// unwrapped so runUpdate can recognise them via errors.As; other
+	// failures (probe error) get the standard "swap: " prefix below.
+	plan, err := planSwap(abs)
+	if err != nil {
+		var (
+			sudoErr *errSudoUnavailable
+			winErr  *errPermissionWindows
+		)
+		if errors.As(err, &sudoErr) || errors.As(err, &winErr) {
+			return err
+		}
+		return fmt.Errorf("swap: %w", err)
 	}
 
 	archiveBytes, err := downloadCapped(ctx, urls.Archive, maxArchiveBytes)
@@ -161,17 +428,19 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
 		binaryEntry = "neo4j-cli.exe"
 	}
 
-	dir := filepath.Dir(abs)
-	tmpNew := abs + ".new"
+	// tmpNew lives under plan.tmpDir: same directory as the running binary
+	// for the direct-rename branch (so os.Rename stays on one filesystem),
+	// or os.TempDir() for the elevated branch (sudo install copies, so
+	// cross-filesystem is fine).
+	tmpNew := filepath.Join(plan.tmpDir, "neo4j-cli.new")
 	// Best-effort remove a stale .new from a previous failed run before we
 	// extract — extractToFile uses O_EXCL so a stale path would block the
 	// fresh write.
 	_ = os.Remove(tmpNew)
 
-	// Extract straight into <current>.new with mode 0600 during write; we
-	// chmod 0755 once the body has fully landed and verified. Same dir as
-	// target so the rename below stays on the same filesystem.
-	if err := extractBinary(archiveBytes, binaryEntry, tmpNew, dir); err != nil {
+	// Extract straight into tmpNew with mode 0600 during write; we chmod
+	// 0755 once the body has fully landed and verified.
+	if err := extractBinary(archiveBytes, binaryEntry, tmpNew, plan.tmpDir); err != nil {
 		_ = os.Remove(tmpNew)
 		return fmt.Errorf("swap: extract: %w", err)
 	}
@@ -181,7 +450,23 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string) error {
 		return fmt.Errorf("swap: chmod new binary: %w", err)
 	}
 
-	// Atomic swap.
+	// Elevated branch: hand off to `sudo install` and clean up tmpNew
+	// regardless of outcome. The narrative line lands on the caller's
+	// stderr so structured-output mode (json/table/toon) on stdout stays
+	// uncluttered.
+	if plan.elevate {
+		if stderr != nil {
+			fmt.Fprintf(stderr, "Cannot write to %s; elevation required.\nElevating via sudo...\n", filepath.Dir(abs)) //nolint:errcheck // stderr write errors are not actionable
+		}
+		err := elevatedSwap(ctx, tmpNew, abs)
+		_ = os.Remove(tmpNew)
+		if err != nil {
+			return fmt.Errorf("swap: %w", err)
+		}
+		return nil
+	}
+
+	// Atomic swap (direct branch).
 	if swapGoosFn() == "windows" {
 		if err := windowsSwap(abs, tmpNew); err != nil {
 			_ = os.Remove(tmpNew)

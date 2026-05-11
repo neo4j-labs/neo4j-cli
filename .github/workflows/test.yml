@@ -97,14 +97,11 @@ jobs:
                   # even on RunE errors (cobra prints `Error:` to stderr and
                   # main() doesn't os.Exit(1)) — semantic correctness is
                   # asserted via the JSON helper rather than the exit code, so
-                  # this step doesn't break if the project later flips to a
-                  # non-zero exit. We disable `set -e` around the binary call
-                  # specifically so a future exit-code change doesn't fail the
-                  # step before the helper sees the JSON. Cobra also dumps the
-                  # `Usage:` block to stdout AFTER the JSON when RunE returns a
-                  # non-nil error; json.NewDecoder reads the first value and
-                  # the helper ignores trailing bytes, so the polluted tail
-                  # does not break the assertion.
+                  # `update check` exits 0 in both up-to-date and
+                  # newer-available cases (REQ-F-001 — the friendly check
+                  # output); we keep `set +e` here as defense in depth so a
+                  # future exit-code change can't fail the step before the
+                  # helper sees the JSON.
                   set +e
                   out="$(bin/neo4j-cli-e2e update check --pre-releases -f json)"
                   set -e
