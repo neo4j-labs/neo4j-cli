@@ -677,19 +677,32 @@
     opacity: 0.85;
   }
 
+  /* Agent-side result/summary line. Sits inside an .agentic-line wrapper
+     (so the dim sweep skips it and cli-mode hides it). Green like the
+     opening prompt to read as "the agent talking back". */
+  .agentic-result {
+    display: block;
+    color: var(--terminal-prompt);
+  }
+
   /* Dim-sweep: in agentic mode, every command/flag/string/keyword under the
      agent prompt renders in a single low-contrast grey. The .agentic-line
      content (green `> ...` prompt + faint loading cue) stays visible, the
      .out blocks keep their table-art token colors, and the quickstart
      .copy-icon affordance keeps its hover state. .cli-mode rules below
-     override this and restore full syntax highlighting. */
-  #quickstartSteps:not(.cli-mode) .step-cmd,
-  #quickstartSteps:not(.cli-mode) .step-cmd *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
+     override this and restore full syntax highlighting.
+     Scoped with :has(.agentic-line) so blocks WITHOUT an agent prompt
+     (e.g. install commands in Quickstart steps 1–2) keep full color. */
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line),
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
     color: var(--fg-faint) !important;
   }
 
-  #examplesSection .examples:not(.cli-mode) .example-pane pre,
-  #examplesSection .examples:not(.cli-mode) .example-pane pre *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
+  /* #examplesSection IS the .examples element (id+class on same div), so the
+     :not(.cli-mode) check goes on the id selector directly — not a descendant
+     match. Earlier `#examplesSection .examples` looked for a child and never fired. */
+  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line),
+  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
     color: var(--fg-faint) !important;
   }
 
@@ -1087,26 +1100,23 @@
             copy
           </button>
         </div>
-<pre><span class="agentic-line"><span class="agentic-comment">&gt; Who are the top 3 directors by movie count? List their movies sorted by year.</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; Top 3 directors by movie count — show how many films they directed and the year of their most recent one.</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
 <span class="comment"># check structure first</span>
 <span class="prompt">$</span> neo4j-cli query :schema
 
 <span class="comment"># find top directors</span>
 <span class="prompt">$</span> neo4j-cli query \
     <span class="string">'MATCH (d:Person)-[:DIRECTED]-&gt;(m:Movie)
-     WITH d, collect(m) AS movies ORDER BY size(movies) DESC LIMIT 3
-     UNWIND movies AS m
-     RETURN d.name AS director, m.title AS movie, m.released AS year
-     ORDER BY director, year'</span>
+     RETURN d.name AS director, count(m) AS movies, max(m.released) AS year
+     ORDER BY movies DESC LIMIT 3'</span>
 
-<span class="out">┌────────────────────┬──────────────────────────────┬──────┐
-│ director           │ movie                        │ year │
-├────────────────────┼──────────────────────────────┼──────┤
-│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Close Encounters"</span>           │ <span class="num">1977</span> │
-│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Raiders of the Lost Ark"</span>    │ <span class="num">1981</span> │
-│ <span class="string">"Steven Spielberg"</span> │ <span class="string">"Schindler's List"</span>           │ <span class="num">1993</span> │
-│ <span class="string">"Martin Scorsese"</span>  │ <span class="string">"Goodfellas"</span>                 │ <span class="num">1990</span> │
-└────────────────────┴──────────────────────────────┴──────┘</span>
+<span class="out">┌───────────────────┬────────┬──────┐
+│ director          │ movies │ year │
+├───────────────────┼────────┼──────┤
+│ <span class="string">"Lilly Wachowski"</span> │ <span class="num">5</span>      │ <span class="num">2012</span> │
+│ <span class="string">"Lana Wachowski"</span>  │ <span class="num">5</span>      │ <span class="num">2012</span> │
+│ <span class="string">"Rob Reiner"</span>      │ <span class="num">3</span>      │ <span class="num">1998</span> │
+└───────────────────┴────────┴──────┘</span>
 
 <span class="comment"># typed params, writes (--rw), and env-based connection all supported</span>
 <span class="prompt">$</span> neo4j-cli query <span class="string">'RETURN $ids'</span> <span class="flag">--param</span> <span class="string">'ids=[1,2,3]'</span>
@@ -1123,35 +1133,19 @@
             copy
           </button>
         </div>
-<pre><span class="agentic-line"><span class="agentic-comment">&gt; What's in my database? Show all labels, relationships, indexes, and count per type.</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; What's in my database? Show all labels, relationships, and indexes.</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
 <span class="prompt">$</span> neo4j-cli query :schema
 
-<span class="info">▸</span> <span class="keyword">node labels</span>
-   :Movie  (<span class="num">38</span>)   :Person  (<span class="num">133</span>)   :Genre  (<span class="num">13</span>)
+<span class="out"><span class="info">▸</span> <span class="keyword">node labels</span>
+   :Movie   :Person   :Genre
 
 <span class="info">▸</span> <span class="keyword">relationship types</span>
-   ACTED_IN  (<span class="num">172</span>)   DIRECTED  (<span class="num">44</span>)   IN_GENRE  (<span class="num">94</span>)
+   ACTED_IN   DIRECTED   IN_GENRE
 
 <span class="info">▸</span> <span class="keyword">indexes</span>
    <span class="ok">●</span> Movie(title)        RANGE        <span class="ok">ONLINE</span>
    <span class="ok">●</span> Person(name)        RANGE        <span class="ok">ONLINE</span>
-   <span class="ok">●</span> Movie(plot)         FULLTEXT     <span class="ok">ONLINE</span>
-
-<span class="info">▸</span> <span class="keyword">constraints</span>
-   <span class="ok">●</span> Movie.id  IS UNIQUE
-   <span class="ok">●</span> Person.id IS UNIQUE
-
-<span class="comment"># count nodes per label</span>
-<span class="prompt">$</span> neo4j-cli query \
-    <span class="string">'MATCH (n) RETURN labels(n)[0] AS label, count(n) AS cnt ORDER BY cnt DESC'</span>
-
-<span class="out">┌──────────┬─────┐
-│ label    │ cnt │
-├──────────┼─────┤
-│ <span class="string">Person</span>   │ <span class="num">133</span> │
-│ <span class="string">Movie</span>    │  <span class="num">38</span> │
-│ <span class="string">Genre</span>    │  <span class="num">13</span> │
-└──────────┴─────┘</span>
+   <span class="ok">●</span> Movie(plot)         FULLTEXT     <span class="ok">ONLINE</span></span>
 </pre>
       </div>
 
@@ -1224,7 +1218,8 @@
 <span class="prompt">$</span> neo4j-cli skill install windsurf <span class="flag">--rw</span>
 
 <span class="ok">✓</span> windsurf        updated to v1.4.0
-</pre>
+
+<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.4.0.</span></span></pre>
       </div>
     </div>
   </div>
@@ -1449,8 +1444,8 @@
   };
   const panePrompts = {
     aura: 'Set up my Aura environment — add credentials, create a free movies instance, then list all',
-    query: 'Who are the top 3 directors by movie count? List their movies sorted by year.',
-    schema: "What's in my database? Show all labels, relationships, indexes, and count per type.",
+    query: 'Top 3 directors by movie count — show how many films they directed and the year of their most recent one.',
+    schema: "What's in my database? Show all labels, relationships, and indexes.",
     pipe: 'Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON',
     skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
   };
