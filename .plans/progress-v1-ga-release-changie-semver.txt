@@ -37,3 +37,23 @@ Key Decisions:
 - `batch auto` is sufficient — changie resolves the next version from existing version files and the kind of unreleased entries.
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Author Major-kind changie entry for the v1.0.0 GA release
+Date: 2026-05-11T15:00:00Z
+================================================================================
+
+Summary:
+Created `.changes/unreleased/neo4j-cli-Major-20260511-150000.yaml` with
+`project: neo4j-cli`, `kind: Major`, and `body: GA release of neo4j-cli`.
+This entry causes `changie batch auto --project neo4j-cli` to bump the major
+version from `v0.1.0-alpha.12` → `v1.0.0`.
+
+Files Changed:
+- .changes/unreleased/neo4j-cli-Major-20260511-150000.yaml (created)
+
+Key Decisions:
+- Used the standard changie YAML fragment format matching existing entries.
+- No existing unreleased files were removed or modified.
+
+Next Task: All tasks complete

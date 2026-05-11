@@ -45,7 +45,7 @@ tasks:
       to resolve `v0.1.0-alpha.12` → `v1.0.0`. Per the sequencing requirement
       this entry must be committed in the same PR as tasks 001 and 002 (or after
       those changes have already landed on main).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -53,4 +53,4 @@ tasks:
       - "A file matching `.changes/unreleased/neo4j-cli-Major-*.yaml` exists with `project: neo4j-cli`, `kind: Major`, and a non-empty `body`"
       - "Running `changie batch auto --project neo4j-cli --dry-run` locally resolves to `v1.0.0` (already verified — this criterion confirms the entry is well-formed)"
       - "No existing `.changes/unreleased/` files are removed or modified"
-    completed_at: null
+    completed_at: 2026-05-11T15:00:00Z
