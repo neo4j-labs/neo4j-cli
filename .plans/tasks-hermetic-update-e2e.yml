@@ -1,0 +1,86 @@
+feature: hermetic-update-e2e
+prd: ./prd-hermetic-update-e2e.md
+created_at: 2026-05-12T08:26:27Z
+updated_at: 2026-05-12T08:26:27Z
+
+tasks:
+  - id: task-001
+    title: "Author release_fixture binary + canned releases JSON for both scenarios"
+    description: |
+      Create a new minimal HTTP fixture under `test/e2e/release_fixture/main.go` (~80 LoC, pure stdlib) that serves `/repos/neo4j-labs/neo4j-cli/releases` from a committed JSON file selected by `--scenario {stable-head | pre-release-head}`. Mirror `test/e2e/update_fixture/main.go`'s harness handshake: listen on 127.0.0.1:0, print `listening on http://127.0.0.1:<port>` as the FIRST stdout line, shut down cleanly on SIGINT/SIGTERM.
+      Also commit `test/e2e/release_fixture/testdata/releases-stable-head.json` and `releases-pre-release-head.json` using the slim shape `release.go` decodes (`tag_name`, `draft`, `prerelease`). Encode semver so each scenario produces its named channel under `update check --pre-releases`: stable tag MUST outrank prerelease tag in stable-head; prerelease tag MUST outrank stable tag in pre-release-head. Verify by running `bin/neo4j-cli-e2e update check --pre-releases -f json` (built with `-tags e2e_seams`) against each fixture and inspecting the `channel` field manually.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`test/e2e/release_fixture/main.go` exists, uses only stdlib, listens on 127.0.0.1:0, prints port handshake on first stdout line, handles SIGINT/SIGTERM cleanly"
+      - "`--scenario` flag accepts exactly `stable-head` and `pre-release-head`; any other value exits non-zero with a clear stderr message"
+      - "Both JSON files committed under `test/e2e/release_fixture/testdata/`, LF-terminated, slim shape (`tag_name`, `draft`, `prerelease`)"
+      - "Manual smoke: with `NEO4J_CLI_UPDATE_E2E_API_URL=http://127.0.0.1:<port>` pointed at each fixture, the e2e-seams binary reports the expected channel (stable for stable-head, pre-release for pre-release-head) under `update check --pre-releases`"
+      - "Neo4j copyright header on the new `.go` file; `make license-check` clean"
+    completed_at: 2026-05-12T08:30:51Z
+
+  - id: task-002
+    title: "Extend check_json with --schema-only mode"
+    description: |
+      Add a `--schema-only` boolean flag to `test/e2e/check_json/main.go`. In that mode the helper still enforces shape (six documented keys present, type checks, `latest` parses as semver, `check`-subcommand invariants: `updated=false`, `check=true`, no `updated_skills` / `skill_install_suggested`) AND enum membership (`channel ∈ {stable, pre-release}`, `install_method ∈ {binary, homebrew, npm, pipx, uv}` per `neo4j-cli/internal/subcommands/update/install_method.go:45-49`), but skips the value-coupling assertions.
+      Passing both `--schema-only` and `--expect-channel` or `--cross-check` should fail before any JSON parsing. Update the package comment to document the new mode. No new module deps; reuse `golang.org/x/mod/semver` already imported.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`--schema-only` flag exists; package comment documents it and the enum sets"
+      - "Schema-only mode passes on a valid `check` JSON regardless of channel/install_method value within the enums"
+      - "Schema-only mode fails (exit 1) on: malformed JSON, missing key, wrong type, non-semver `latest`, out-of-enum `channel`, out-of-enum `install_method`, present `updated_skills` or `skill_install_suggested`"
+      - "Passing `--schema-only` with `--expect-channel` or `--cross-check` errors before parsing input"
+      - "`make fmt-check` and `make lint` clean"
+    completed_at: 2026-05-12T08:33:18Z
+
+  - id: task-003
+    title: "Rewrite Tier-1 workflow step to hermetic two-scenario block"
+    description: |
+      Rewrite the existing "Update e2e (check subcommand)" step in `.github/workflows/test.yml` (~lines 78–119). Build `bin/neo4j-cli-e2e` with `-tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e'`. Pattern-match the existing Tier-2 step's launch handshake (background fixture, scrape first stdout line for `http://127.0.0.1:<port>`, export `NEO4J_CLI_UPDATE_E2E_API_URL`).
+      Run both scenarios serially in one step: (1) launch `release_fixture --scenario stable-head`, run `update check --pre-releases -f json | check_json --expect-channel stable --cross-check <stable-tag>`; (2) tear down; (3) launch `release_fixture --scenario pre-release-head`, run `update check --pre-releases -f json | check_json --expect-channel pre-release --cross-check <prerelease-tag>`; (4) tear down. Cross-check tag values come from the fixture authors' choices in task-001.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Workflow step builds Tier-1 binary with `-tags e2e_seams`"
+      - "No `gh release list` call, no `--expect-channel pre-release` value-coupling to live API state"
+      - "Both `stable-head` and `pre-release-head` scenarios execute sequentially; each value-asserts its channel via `check_json --expect-channel`"
+      - "Each fixture process is launched in background, port scraped from first stdout line, torn down between scenarios"
+      - "Step works on ubuntu / macos / windows runners (bash + stdlib only; no host-specific deps)"
+    completed_at: 2026-05-12T08:36:28Z
+
+  - id: task-004
+    title: "Add schema-only live smoke workflow step"
+    description: |
+      Add a new step to `.github/workflows/test.yml` named "Update e2e (schema-only live smoke)". It uses the SAME `bin/neo4j-cli-e2e` binary built in task-003, but does NOT set `NEO4J_CLI_UPDATE_E2E_API_URL` — so the binary talks to real `api.github.com`. Pipe `update check --pre-releases -f json` to `check_json --schema-only`. No `--expect-channel`, no `--cross-check`. The step is calendar-immune: it catches GitHub API contract drift but doesn't assert which channel happens to be at the head.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "New workflow step named `Update e2e (schema-only live smoke)` exists immediately after the hermetic Tier-1 step"
+      - "Step calls real api.github.com (no seam env var set)"
+      - "Asserts via `check_json --schema-only`; no value-coupling flags passed"
+      - "Step runs on ubuntu / macos / windows"
+      - "Step passes against current state of GitHub (v1.0.0 stable at head)"
+    completed_at: 2026-05-12T08:38:41Z
+
+  - id: task-005
+    title: "Add AGENTS.md note + run final gates"
+    description: |
+      Append a short line under the existing `## Hermetic Test Notes` section in `AGENTS.md` documenting the new Tier-1 hermetic flow and the schema-only live smoke. Then run all four mandatory gates per AGENTS.md "Feedback Instructions": `make test`, `make fmt-check`, `make lint`, `make generate-check`. All must exit 0. Eyeball the workflow YAML for indentation / quoting issues.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "AGENTS.md `Hermetic Test Notes` section has a one-line entry describing the Tier-1 hermetic flow and schema-only live smoke"
+      - "`make test` exits 0"
+      - "`make fmt-check` exits 0"
+      - "`make lint` exits 0"
+      - "`make generate-check` exits 0 (clean working tree after `go generate ./...`)"
+    completed_at: 2026-05-12T08:40:44Z

@@ -3,10 +3,9 @@
 
 // Command check_json validates the JSON output of `neo4j-cli update check`.
 //
-// It is invoked from the CI tier-1 e2e step (.github/workflows/test.yml). The
-// step runs the freshly-built binary against the real GitHub API, pipes its
-// stdout into this helper, and the helper asserts the documented REQ-F-018
-// shape:
+// It is invoked from the CI e2e steps (.github/workflows/test.yml). The step
+// pipes the freshly-built binary's stdout into this helper and the helper
+// asserts the documented REQ-F-018 shape:
 //
 //	{
 //	  "current": "<string>",
@@ -18,14 +17,31 @@
 //	}
 //
 // Optional fields `updated_skills` and `skill_install_suggested` MUST be
-// absent for the `check` subcommand (no swap occurred), and the helper enforces that.
+// absent for the `check` subcommand (no swap occurred), and the helper
+// enforces that.
+//
+// Modes:
+//
+//   - Default: shape + types + post-swap-absence + optional value coupling
+//     via --expect-channel / --cross-check. Used by the hermetic Tier-1 step
+//     where the canned fixture pins both channel and latest tag.
+//   - --schema-only: shape + types + post-swap-absence + enum membership
+//     (channel ∈ {stable, pre-release}, install_method ∈
+//     {binary, homebrew, npm, pipx, uv} per
+//     neo4j-cli/internal/subcommands/update/install_method.go). Skips
+//     value-coupling so the live-API smoke step is calendar-immune.
 //
 // Flags:
 //
 //	--expect-channel <string>   Asserts the channel field equals the value (e.g. "pre-release").
+//	                            Mutually exclusive with --schema-only.
 //	--cross-check    <tag>      Asserts the latest field equals the value (the tag fetched
 //	                            via `gh release list --limit 1`). Detects filter drift between
 //	                            release.go's Latest and the head of GitHub's API.
+//	                            Mutually exclusive with --schema-only.
+//	--schema-only               Skip value-coupling assertions; enforce shape + enum
+//	                            membership only. Mutually exclusive with the two flags
+//	                            above; passing them together exits 1 before reading stdin.
 //
 // Exit codes: 0 on success, 1 on any assertion failure (with a clear stderr
 // message). Reads JSON from stdin.
@@ -40,6 +56,26 @@ import (
 
 	"golang.org/x/mod/semver"
 )
+
+// validChannels is the enum used by schema-only mode to assert `channel`
+// membership. The values mirror release.go's documented channel labels and
+// are stable across the production binary's JSON output (REQ-F-018).
+var validChannels = map[string]struct{}{
+	"stable":      {},
+	"pre-release": {},
+}
+
+// validInstallMethods is the enum used by schema-only mode to assert
+// `install_method` membership. The values mirror the InstallMethod constants
+// declared in neo4j-cli/internal/subcommands/update/install_method.go:45-49
+// and are stable across the production binary's JSON output (REQ-F-018).
+var validInstallMethods = map[string]struct{}{
+	"binary":   {},
+	"homebrew": {},
+	"npm":      {},
+	"pipx":     {},
+	"uv":       {},
+}
 
 // resultDoc mirrors the REQ-F-018 JSON shape emitted by `neo4j-cli update check
 // -f json`. The optional updated_skills / skill_install_suggested fields are
@@ -57,9 +93,16 @@ type resultDoc struct {
 }
 
 func main() {
-	expectChannel := flag.String("expect-channel", "", "Assert the channel field equals this value (e.g. 'pre-release')")
-	crossCheck := flag.String("cross-check", "", "Assert the latest field equals this tag (cross-check against `gh release list`)")
+	expectChannel := flag.String("expect-channel", "", "Assert the channel field equals this value (e.g. 'pre-release'). Mutually exclusive with --schema-only.")
+	crossCheck := flag.String("cross-check", "", "Assert the latest field equals this tag (cross-check against `gh release list`). Mutually exclusive with --schema-only.")
+	schemaOnly := flag.Bool("schema-only", false, "Skip value-coupling; enforce shape + enum membership only. Mutually exclusive with --expect-channel / --cross-check.")
 	flag.Parse()
+
+	// Mutex check BEFORE reading stdin so misuse is caught regardless of
+	// pipeline state.
+	if *schemaOnly && (*expectChannel != "" || *crossCheck != "") {
+		fail("--schema-only is mutually exclusive with --expect-channel and --cross-check")
+	}
 
 	raw, err := io.ReadAll(os.Stdin)
 	if err != nil {
@@ -110,12 +153,25 @@ func main() {
 		fail("`skill_install_suggested` must be absent from the `check` subcommand, got %s", string(doc.SkillInstallSuggested))
 	}
 
-	// Optional flag-driven assertions.
-	if *expectChannel != "" && doc.Channel != *expectChannel {
-		fail("expected channel %q, got %q", *expectChannel, doc.Channel)
-	}
-	if *crossCheck != "" && doc.Latest != *crossCheck {
-		fail("expected latest %q (cross-checked from `gh release list`), got %q — filter drift", *crossCheck, doc.Latest)
+	if *schemaOnly {
+		// Schema-only: enforce enum membership but no value coupling. The
+		// hermetic Tier-1 step exercises specific values via --expect-channel
+		// / --cross-check; this branch is for the live-API smoke that runs
+		// against a moving release feed.
+		if _, ok := validChannels[doc.Channel]; !ok {
+			fail("`channel` %q not in enum {stable, pre-release}", doc.Channel)
+		}
+		if _, ok := validInstallMethods[doc.InstallMethod]; !ok {
+			fail("`install_method` %q not in enum {binary, homebrew, npm, pipx, uv}", doc.InstallMethod)
+		}
+	} else {
+		// Optional flag-driven value assertions.
+		if *expectChannel != "" && doc.Channel != *expectChannel {
+			fail("expected channel %q, got %q", *expectChannel, doc.Channel)
+		}
+		if *crossCheck != "" && doc.Latest != *crossCheck {
+			fail("expected latest %q (cross-checked from `gh release list`), got %q — filter drift", *crossCheck, doc.Latest)
+		}
 	}
 
 	fmt.Fprintf(os.Stderr, "ok: current=%s latest=%s channel=%s install_method=%s\n",
