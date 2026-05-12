@@ -1,0 +1,143 @@
+feature: route-status-text-to-stderr
+prd: ./prd-route-status-text-to-stderr.md
+created_at: 2026-05-12T15:30:00Z
+updated_at: 2026-05-12T15:30:00Z
+
+tasks:
+  - id: task-001
+    title: "Add AssertErrContainsStrings and AssertOutIsValidJSON helpers to AuraTestHelper"
+    description: |
+      In `neo4j-cli/aura/internal/test/testutils/auratesthelper.go`, add two methods on
+      `AuraTestHelper`: `AssertErrContainsStrings(expected []string)` mirroring the
+      existing `AssertOutContainsStrings` at line 146, and `AssertOutIsValidJSON()` which
+      reads stdout, calls `json.Unmarshal(out, &v)` into `var v any`, and asserts
+      `err == nil` with the offending stdout quoted in the failure message. These
+      helpers are the foundation for the CLI-82 regression-pinning tests — pre-fix,
+      `AssertOutIsValidJSON` fails for affected commands because stdout has narration
+      mixed with the JSON body; post-fix it passes.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "AssertErrContainsStrings exists on AuraTestHelper, reads helper.err via io.ReadAll, and asserts each expected substring is present via assert.Contains"
+      - "AssertOutIsValidJSON exists on AuraTestHelper, reads helper.out, calls json.Unmarshal into a var, and asserts err is nil with the stdout content quoted in the failure message"
+      - "encoding/json import added if not already present"
+      - "Both helpers follow the existing pattern (io.ReadAll error checked via assert.Nil)"
+      - "make fmt-check, make lint, make test all pass with no existing tests broken"
+
+  - id: task-002
+    title: "Pattern A — route --await polling narration to stderr across 13 commands"
+    description: |
+      Replace `cmd.Println("Waiting for ... to be ready...")` and `cmd.Println("<Resource> Status:", ...)`
+      with `fmt.Fprintln(cmd.ErrOrStderr(), ...)` in the 13 await-supporting commands
+      listed under "Pattern A" in the PRD. Wording is preserved verbatim — only the
+      destination changes. Update each colocated `*_test.go` to (a) drop the moved
+      lines from `AssertOut(...)` expected text and (b) add an
+      `AssertErrContainsStrings(...)` assertion for the narration. Add ONE regression
+      test (e.g. `TestCreateFreeInstanceWithAwait_StdoutIsValidJSON` in
+      `instance/create_test.go`) that runs the await command with `--format json` and
+      calls `AssertOutIsValidJSON()` — this test MUST fail if any of the 13 fmt.Fprintln
+      replacements is reverted to cmd.Println.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All 13 source files (instance/create.go, instance/resume.go, instance/snapshot/create.go, instance/overwrite.go, dataapi/graphql/create.go, dataapi/graphql/resume.go, dataapi/graphql/update.go, dataapi/graphql/pause.go, dataapi/graphql/authprovider/create.go, dataapi/graphql/corspolicy/allowedorigin/add.go, dataapi/graphql/corspolicy/allowedorigin/remove.go, customermanagedkey/create.go, graphanalytics/session/create.go) write polling narration via fmt.Fprintln(cmd.ErrOrStderr(), ...) instead of cmd.Println"
+      - "Narration wording is unchanged (verbatim 'Waiting for ... to be ready...' and '<Resource> Status: ...')"
+      - "Each colocated *_test.go that asserts await text via AssertOut is updated to drop those lines and add AssertErrContainsStrings for them"
+      - "A new regression test (e.g. TestCreateFreeInstanceWithAwait_StdoutIsValidJSON) uses AssertOutIsValidJSON to pin that stdout is parseable JSON for at least one await command under --format json"
+      - "Manual sanity: reverting one fmt.Fprintln back to cmd.Println causes the regression test to fail with a clear message"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-003
+    title: "Pattern B — convert 3 delete commands to structured JSON stdout + human stderr line"
+    description: |
+      In `customermanagedkey/delete.go:35`, `deployment/delete.go:55`, and
+      `deployment/token/delete.go:57`, replace the bare `cmd.Println("Operation Successful")`
+      / `cmd.Println("... deleted successfully ...")` with two calls: (1) a stderr
+      `fmt.Fprintf(cmd.ErrOrStderr(), "<resource> %s deleted\n", id)` human line, and
+      (2) a stdout structured confirmation via
+      `output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"deleted": true, "<key>": <value>}), []string{"deleted", "<key>"})`.
+      The identifier key matches each resource's existing list/get/create convention:
+      `"id"` for customermanagedkey and deployment, `"deployment_id"` for
+      deployment-token (per PRD "Delete-confirmation field keys"). Update colocated
+      delete tests to switch `AssertOut("Operation Successful\n")` →
+      `AssertOutJson(...)` and add `AssertErrContainsStrings([]string{...})` for the
+      human line. Add one regression test using `AssertOutIsValidJSON()` on a delete
+      command under `--format json`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "customermanagedkey/delete.go emits stderr 'customer-managed-key <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"id\":\"<id>\"}} via output.PrintBodyMap"
+      - "deployment/delete.go emits stderr 'deployment <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"id\":\"<id>\"}}"
+      - "deployment/token/delete.go emits stderr 'deployment-token for deployment <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"deployment_id\":\"<id>\"}}"
+      - "TestDeleteCustomerManagedKey, TestDeleteDeployment (and its org/project-from-config variant), and the deployment-token delete test are updated to assert stdout JSON via AssertOutJson and stderr text via AssertErrContainsStrings"
+      - "At least one regression test calls AssertOutIsValidJSON after a delete with --format json"
+      - "Output respects --format table and --format toon (table renders deleted/id columns, toon renders correspondingly); verify by adding or extending one --format table assertion in a delete test"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-004
+    title: "Pattern C — route banners and origin-echo plain-text to stderr"
+    description: |
+      Replace `cmd.Println(...)` / `cmd.Printf(...)` with
+      `fmt.Fprintln(cmd.ErrOrStderr(), ...)` / `fmt.Fprintf(cmd.ErrOrStderr(), ...)`
+      in: (a) `dataapi/graphql/create.go:86-88` (3-line banner about storing the API
+      key), (b) `dataapi/graphql/authprovider/create.go:87-89` (same banner), (c)
+      `dataapi/graphql/corspolicy/allowedorigin/add.go:77` (plain-text `New allowed
+      origins: [...]`), and (d) `dataapi/graphql/corspolicy/allowedorigin/remove.go:92,94`
+      (same in empty-list and populated-list branches). Wording preserved verbatim.
+      Update colocated tests to drop these lines from AssertOut expected text and add
+      AssertErrContainsStrings assertions. Add two regression tests using
+      AssertOutIsValidJSON: one for a banner command (e.g. graphql/create with --format
+      json) and one for an origin-echo command (e.g. allowedorigin/add with --format
+      json).
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "graphql/create.go L86-88 banner and graphql/authprovider/create.go L87-89 banner write to cmd.ErrOrStderr() with the existing wording preserved"
+      - "graphql/corspolicy/allowedorigin/add.go L77 and remove.go L92,L94 write the 'New allowed origins: ...' text to cmd.ErrOrStderr()"
+      - "Colocated *_test.go for these four files are updated to drop the moved lines from AssertOut and add AssertErrContainsStrings for them"
+      - "Two new regression tests use AssertOutIsValidJSON: one for a banner-emitting command under --format json, one for an origin-echo command under --format json"
+      - "Manual sanity: reverting one fmt.Fprintln back to cmd.Println causes the corresponding regression test to fail"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-005
+    title: "Pattern D — route config/project/use confirmation to stderr (with missing newline fix)"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/config/project/use.go:23`, replace
+      `cmd.Printf("Set %s as default project ...", ...)` with
+      `fmt.Fprintf(cmd.ErrOrStderr(), "Set %s as default project ... \n", ...)` —
+      same format string, but terminated with `\n` (the original lacked one — fix
+      incidentally). Update the colocated `use_test.go` to assert the message via
+      AssertErrContainsStrings instead of AssertOut. No regression-pinning
+      AssertOutIsValidJSON test is required for this command because it has no JSON
+      body in any format; the test instead asserts stdout is empty after the call.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "config/project/use.go:23 writes via fmt.Fprintf(cmd.ErrOrStderr(), ...) with \\n appended"
+      - "Format-string arguments and order unchanged"
+      - "use_test.go asserts the confirmation appears on stderr via AssertErrContainsStrings and stdout is empty via AssertOut(\"\")"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-006
+    title: "Add Patch-kind changie entry for CLI-82 stdout/stderr fix"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route
+      progress/status text to stderr so --format json output stays jq-parseable
+      (CLI-82)"`, or hand-author the YAML under `.changes/unreleased/` following the
+      `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` convention if changie is unavailable.
+      Body single-quoted, time in RFC3339, project field set to `neo4j-cli`.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "A file exists under .changes/unreleased/ with project: neo4j-cli, kind: Patch, and the documented body"
+      - "Filename matches the neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml convention"
+      - "Body single-quoted, time in RFC3339"
+      - "make test stays green"
