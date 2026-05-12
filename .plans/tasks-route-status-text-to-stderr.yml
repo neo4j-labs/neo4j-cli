@@ -1,7 +1,7 @@
 feature: route-status-text-to-stderr
 prd: ./prd-route-status-text-to-stderr.md
 created_at: 2026-05-12T15:30:00Z
-updated_at: 2026-05-12T18:10:00Z
+updated_at: 2026-05-12T18:45:00Z
 
 tasks:
   - id: task-001
@@ -183,4 +183,62 @@ tasks:
       - "tenant/get_test.go is updated so the warning is asserted on stderr via AssertErrContainsStrings, not on stdout"
       - "A regression test pins that --format table emits no warning on stdout AND the warning IS emitted on stderr"
       - "Changie Patch entry body mentions both CLI-82 and CLI-95"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-008
+    title: "Pattern F (CLI-94) — TTY-gate :schema H2 headers in table mode"
+    description: |
+      In `neo4j-cli/query/schema.go`, function `printSchemaTables` at L296-318, wrap
+      each of the five `cmd.Println("## <Section>")` calls in a TTY check via
+      `commonoutput.StdoutIsTerminal(cmd.OutOrStdout())`. When stdout is a TTY (the
+      package's TestMain default and real interactive use), the H2 headers print to
+      stdout as today. When stdout is NOT a TTY (piped, redirected, file output), the
+      H2 lines are suppressed entirely — table rows and the blank-line separators
+      still flow to stdout unchanged.
+
+      Reference fix shape (audit-prescribed):
+      ```go
+      if commonoutput.StdoutIsTerminal(cmd.OutOrStdout()) {
+          cmd.Println("## Nodes")
+      }
+      cmd.Println(renderNodesTable(r.Nodes))
+      cmd.Println()
+      ```
+      Apply to all five H2 sites: Nodes, Relationships, Relationship Paths, Indexes,
+      Constraints.
+
+      Update `neo4j-cli/query/schema_test.go`:
+      - `TestSchema_HappyPath_Table` (L199+) already passes because TestMain seeds
+        `StdoutIsTerminal=true` (see `testseam_test.go:22`); leave it alone OR add a
+        belt-and-suspenders `withStdoutIsTerminal(t, true)` line at the top to make
+        the TTY expectation explicit at the test level.
+      - Add a NEW test `TestSchema_TableNonTTYSuppressesHeaders` that calls
+        `withStdoutIsTerminal(t, false)`, runs `--format table`, and asserts:
+        * stdout does NOT contain any of `## Nodes`, `## Relationships`,
+          `## Relationship Paths`, `## Indexes`, `## Constraints`.
+        * stdout DOES still contain the rendered table rows for each section (use
+          existing `assertSectionsInOrder` with non-H2 substrings, or substring
+          asserts on column headers from the rendered tables).
+      - Manual sanity: revert the TTY gate on one H2 site and confirm the new test
+        fails with a clear message.
+
+      Update the changie body from task-006/task-007 to also mention CLI-94. The
+      existing body says `(CLI-82, CLI-95)`; change it to
+      `keep stdout clean for --format json consumers — route narration to stderr (CLI-82, CLI-95), TTY-gate :schema H2 headers (CLI-94)`
+      (or equivalent wording that credits all three Linear issues). Edit the
+      existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body in place rather
+      than creating a new entry.
+
+      No bundle regen needed (no cobra `Long` / `Use` / flag-description edits) —
+      but run `make generate-check` as a gate anyway.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "schema.go printSchemaTables wraps each of the 5 H2 cmd.Println calls with `if commonoutput.StdoutIsTerminal(cmd.OutOrStdout())`"
+      - "Table rows (renderXxxTable) and blank-line separators still print unconditionally to stdout"
+      - "New TestSchema_TableNonTTYSuppressesHeaders asserts stdout does NOT contain ## Nodes/Relationships/etc. when TTY=false under --format table, while table rows still render"
+      - "Existing TestSchema_HappyPath_Table continues to pass (TestMain seeds TTY=true)"
+      - "Manual sanity: reverting one H2 gate causes the new non-TTY test to fail"
+      - "Changie Patch entry body credits CLI-82, CLI-95, AND CLI-94"
       - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
