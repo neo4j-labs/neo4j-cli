@@ -57,7 +57,7 @@ tasks:
       neo4j-cli/aura/internal/skill/bundle/. Verify TestGenerator_RoundTrip
       passes and `make generate-check` is clean (no further diff after
       regenerating).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -66,7 +66,7 @@ tasks:
       - "neo4j-cli/aura/internal/skill/bundle/references/skill.md reflects the new Long + Example for install AND remove"
       - "TestGenerator_RoundTrip passes inside `make test`"
       - "`make generate-check` exits clean (no diff) after the regen commit"
-    completed_at: null
+    completed_at: 2026-05-12T00:00:00Z
 
   - id: task-004
     title: "Add Minor changelog entry for CLI-74"
