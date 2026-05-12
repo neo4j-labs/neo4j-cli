@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -130,6 +131,9 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	logger := slog.Default()
 
 	events := analytics.NewAnalytics(DefaultmixpanelToken, DefaultmixpanelEndpoint, "NEO4J-CLI", version, logger)
+	if shouldDisableTelemetry(Viper, os.Getenv) {
+		events.Disable()
+	}
 	globalConfig := &GlobalConfig{
 		fs:              fs,
 		viper:           Viper,

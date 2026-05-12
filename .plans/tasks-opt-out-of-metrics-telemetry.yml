@@ -45,7 +45,7 @@ tasks:
       `common/clicfg/clicfg_test.go` (or a sibling `telemetry_test.go`)
       covering: default, telemetry=false, DO_NOT_TRACK=1, DO_NOT_TRACK=0,
       DO_NOT_TRACK="", DO_NOT_TRACK=true (only literal "1" disables).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -55,7 +55,7 @@ tasks:
       - "NewConfig calls events.Disable() synchronously before returning when the helper signals disable"
       - "Default install (no telemetry key, no DO_NOT_TRACK) keeps events enabled — no regression in existing event-emission tests"
       - "All `common/clicfg` package tests pass"
-    completed_at: null
+    completed_at: 2026-05-12T12:18:00Z
 
   - id: task-003
     title: "Document DO_NOT_TRACK in user-facing READMEs"

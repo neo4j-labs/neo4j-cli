@@ -2,3 +2,8 @@
 Added `telemetry` as a valid global config key with bool-value validation. SetDefault("telemetry", true), Set() rejects non-bool with usage error. Updated set/list test tables; also patched aura standalone list JSON (AuraScope inherits globals).
 Files: ~common/clicfg/clicfg.go, ~neo4j-cli/internal/subcommands/config/set_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go
 Decisions: standalone aura `config list` JSON also needed `"telemetry": true` (AuraScope appends globals to AuraConfig.ValidConfigKeys).
+
+## task-002 — 2026-05-12T12:18:00Z
+Wired telemetry opt-out into NewConfig. New unexported helper `shouldDisableTelemetry(v, getenv)` returns true on telemetry=false OR literal DO_NOT_TRACK="1"; NewConfig calls events.Disable() synchronously before returning so STARTUP event in main.go is already gated.
+Files: +common/clicfg/telemetry.go, +common/clicfg/telemetry_test.go, ~common/clicfg/clicfg.go
+Decisions: helper test lives in package `clicfg` (not `_test`) for unexported access; getenv injected as a closure so tests don't touch process env.
