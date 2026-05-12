@@ -117,7 +117,8 @@ tasks:
       AssertErrContainsStrings instead of AssertOut. No regression-pinning
       AssertOutIsValidJSON test is required for this command because it has no JSON
       body in any format; the test instead asserts stdout is empty after the call.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T17:55:00Z
     dependencies:
       - task-001
     acceptance_criteria:

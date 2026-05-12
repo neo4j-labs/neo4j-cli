@@ -20,6 +20,8 @@ func TestUseProject(t *testing.T) {
 	helper.ExecuteCommand("config project use test --rw")
 
 	helper.AssertConfigValue("aura-projects.default", "test")
+	helper.AssertOut("")
+	helper.AssertErrContainsStrings([]string{"Set test as default project with organization ID testorganizationid and project ID testprojectid"})
 }
 
 func TestUseProjectIfDoesNotExist(t *testing.T) {

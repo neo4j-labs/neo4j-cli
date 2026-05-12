@@ -4,6 +4,8 @@
 package project
 
 import (
+	"fmt"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/spf13/cobra"
 )
@@ -20,11 +22,7 @@ func NewUseCmd(cfg *clicfg.Config) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.Printf("Set %s as default project with organization ID %s and project ID %s",
-				args[0],
-				defaultProject.OrganizationId,
-				defaultProject.ProjectId,
-			)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Set %s as default project with organization ID %s and project ID %s\n", args[0], defaultProject.OrganizationId, defaultProject.ProjectId) //nolint:errcheck // narration to stderr; write errors are not actionable
 			return nil
 		},
 	}
