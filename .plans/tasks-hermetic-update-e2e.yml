@@ -24,7 +24,7 @@ tasks:
     description: |
       Add a `--schema-only` boolean flag to `test/e2e/check_json/main.go`. In that mode the helper still enforces shape (six documented keys present, type checks, `latest` parses as semver, `check`-subcommand invariants: `updated=false`, `check=true`, no `updated_skills` / `skill_install_suggested`) AND enum membership (`channel ∈ {stable, pre-release}`, `install_method ∈ {binary, homebrew, npm, pipx, uv}` per `neo4j-cli/internal/subcommands/update/install_method.go:45-49`), but skips the value-coupling assertions.
       Passing both `--schema-only` and `--expect-channel` or `--cross-check` should fail before any JSON parsing. Update the package comment to document the new mode. No new module deps; reuse `golang.org/x/mod/semver` already imported.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`--schema-only` flag exists; package comment documents it and the enum sets"
@@ -32,7 +32,7 @@ tasks:
       - "Schema-only mode fails (exit 1) on: malformed JSON, missing key, wrong type, non-semver `latest`, out-of-enum `channel`, out-of-enum `install_method`, present `updated_skills` or `skill_install_suggested`"
       - "Passing `--schema-only` with `--expect-channel` or `--cross-check` errors before parsing input"
       - "`make fmt-check` and `make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-12T08:33:18Z
 
   - id: task-003
     title: "Rewrite Tier-1 workflow step to hermetic two-scenario block"

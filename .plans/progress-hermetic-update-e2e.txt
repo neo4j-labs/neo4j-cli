@@ -2,3 +2,8 @@
 Authored release_fixture binary + canned releases JSON for both scenarios. Pure stdlib HTTP fixture serving /repos/neo4j-labs/neo4j-cli/releases from go:embed'd testdata; --scenario {stable-head|pre-release-head} required. Smoke-verified e2e-seams CLI returns channel=stable+latest=v9.9.0 for stable-head and channel=pre-release+latest=v9.9.1-alpha.1 for pre-release-head (both with --pre-releases). NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 required at runtime alongside the API_URL seam (HTTPS-pin off + 127.0.0.1 allowlist) — workflow step in task-003 must set both.
 Files: +test/e2e/release_fixture/main.go, +test/e2e/release_fixture/testdata/releases-stable-head.json, +test/e2e/release_fixture/testdata/releases-pre-release-head.json
 Decisions: Embed via //go:embed (cwd-independent, single binary). Reviewer phase skipped — Task/subagent tool unavailable in this harness.
+
+## TASK-002 — 2026-05-12T08:33:18Z
+Added --schema-only mode to check_json: enforces shape + types + post-swap-absence + enum membership (channel∈{stable,pre-release}, install_method∈{binary,homebrew,npm,pipx,uv}) without value coupling. Mutex with --expect-channel/--cross-check checked before stdin read. Updated package comment with new Modes section. Smoke-verified 10 cases (valid stable, valid prerelease, malformed JSON, non-semver latest, bad channel enum, bad install_method enum, missing key, stray updated_skills, two mutex violations, legacy default-mode regression). All four mandatory gates clean.
+Files: ~test/e2e/check_json/main.go
+Decisions: Map-based enum sets (lookup readability over slice scan). Reviewer phase: self-review (Task/subagent tool unavailable).
