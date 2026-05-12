@@ -89,7 +89,7 @@ tasks:
       --credential; show only the focused error message."` (or hand-author the YAML
       file under `.changes/unreleased/` if changie is unavailable, following the
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` filename convention).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -97,4 +97,4 @@ tasks:
       - "File follows the neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml naming convention"
       - "Body single-quoted, time field in RFC3339 format"
       - "make test stays green"
-    completed_at: null
+    completed_at: 2026-05-12T12:51:43Z
