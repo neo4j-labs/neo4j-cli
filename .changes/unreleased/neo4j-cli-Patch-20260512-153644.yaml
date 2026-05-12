@@ -1,4 +1,4 @@
 project: neo4j-cli
-kind: Minor
+kind: Patch
 body: skill install/remove --help now lists every supported agent (CLI-74)
 time: 2026-05-12T15:36:44.748656+02:00
