@@ -237,6 +237,15 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - README's "Aura API Credentials" example uses `credential aura-client add` (canonical neo4j-cli path), NOT the standalone-aura `aura credential add` form. The standalone aura binary is no longer built/shipped, so README must lead with commands the shipped binary actually has.
 - Skill bundle `description.txt` (frontmatter description) is single-paragraph, ≤1024 chars, third-person. When adding new top-level capability to it, list every credential subtree explicitly ("Aura, Neo4j connection (dbms), and embedding-provider credentials") rather than collapsing them — the agent-side trigger phrasing matches user wording better when each subtree is named.
 
+## Agent Context Notes
+
+- `neo4j-cli agent-context` emits the full CLI shape as JSON for AI-agent discovery (Layer 2 per `agent-cli-auditor.md` §7.2). Reflected from the live cobra tree at runtime — no static artifact to keep in sync.
+- Adding a new command/flag automatically surfaces in the next `agent-context` invocation. No regen step, no `make generate-check` involvement for the JSON itself. (Skill-bundle `references/<cmd>.md` still needs `go generate` per the existing rules.)
+- Hand-coded constants live in `neo4j-cli/internal/subcommands/agentcontext/build.go`: `schemaVersion`, `exitCodes`, `errorCodes`, `asyncFlag`. Update these when adding a new error category, exit code, or async-flag convention.
+- `output_formats` is sourced from `clicfg.ValidFormatValues`; do NOT duplicate the list in agent-context.
+- Bump `schemaVersion` on breaking JSON-shape changes (rename a top-level key, change a field type, drop a documented code).
+- Tests in `agentcontext_test.go` lock the envelope shape, output-format parity, and tree coverage. Adding a new top-level command will trip the coverage test until the JSON includes it — the failure message tells you what's missing.
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._

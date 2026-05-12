@@ -160,14 +160,14 @@ tasks:
       TreeCoverage test will trip if a new command is added but not
       reflected. AGENTS.md is a symlink target — edit AGENTS.md (not
       CLAUDE.md) per AGENTS.md "Repo Doc Notes".
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "AGENTS.md contains a new `## Agent Context Notes` heading after the 'Cobra Help / Skill Bundle Rendering Notes' section"
       - "Section contains all six bullets per REQ-F-017 (runtime reflection note, no-regen note, build.go constants list, output_formats source note, schemaVersion bump rules, test-coverage note)"
       - "Edits are to AGENTS.md only (not CLAUDE.md, which is a symlink)"
       - "File ends with the existing trailing footer/HTML comment markers preserved"
-    completed_at: null
+    completed_at: 2026-05-12T15:30:00Z
 
   - id: task-007
     title: "Ignore agent-cli-auditor.md and add Minor changelog entry"
