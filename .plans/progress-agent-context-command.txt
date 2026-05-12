@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-12T14:20:00Z
+Added pure-function walker + Context/Command/Flag types in new agentcontext package. Closed-set constants (schemaVersion=1, exitCodes, errorCodes, asyncFlag) hand-coded; output_formats sourced live from clicfg.ValidFormatValues.
+Files: +neo4j-cli/internal/subcommands/agentcontext/build.go

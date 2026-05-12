@@ -24,7 +24,7 @@ tasks:
       recursion depth at 10 defensively. Map keys for commands and
       subcommands are the first-Use-token (lowercased). File must start
       with the Neo4j copyright header (license-check gate).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/internal/subcommands/agentcontext/build.go exists with Neo4j copyright header"
@@ -34,7 +34,7 @@ tasks:
       - "Walker visits LocalFlags + InheritedFlags, skips Hidden, dedupes by name (local wins), sorts by name, marks inherited flags with inherited:true"
       - "Recursion uses cmd.IsAvailableCommand() filter; map keys are first-Use-token lowercased"
       - "`go build ./neo4j-cli/internal/subcommands/agentcontext/...` succeeds"
-    completed_at: null
+    completed_at: 2026-05-12T14:20:00Z
 
   - id: task-002
     title: "Add build_test.go hermetic walker tests on synthetic cobra tree"
