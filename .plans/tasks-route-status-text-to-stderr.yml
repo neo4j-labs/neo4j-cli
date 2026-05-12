@@ -1,7 +1,7 @@
 feature: route-status-text-to-stderr
 prd: ./prd-route-status-text-to-stderr.md
 created_at: 2026-05-12T15:30:00Z
-updated_at: 2026-05-12T18:45:00Z
+updated_at: 2026-05-12T19:15:00Z
 
 tasks:
   - id: task-001
@@ -242,4 +242,63 @@ tasks:
       - "Existing TestSchema_HappyPath_Table continues to pass (TestMain seeds TTY=true)"
       - "Manual sanity: reverting one H2 gate causes the new non-TTY test to fail"
       - "Changie Patch entry body credits CLI-82, CLI-95, AND CLI-94"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-009
+    title: "Pattern G (CLI-96) — route update command status lines to stderr"
+    description: |
+      In `neo4j-cli/internal/subcommands/update/update.go`, replace 5 `cmd.Println` /
+      `cmd.Printf` sites with `fmt.Fprintln` / `fmt.Fprintf` against `cmd.ErrOrStderr()`.
+      Wording preserved verbatim.
+
+      Sites to change:
+      - L302: `cmd.Println("running a dev build, nothing to update")` (top-level dev-build
+        early return; fires regardless of format → fixes a real `--format json` pollution).
+      - L326: `cmd.Println("no stable release published yet — pass \`--pre-releases\` to track alpha/beta/rc tags.")`
+        (ErrNoStableRelease recovery; fires regardless of format → fixes `--format json` pollution).
+      - L434: `cmd.Printf("Current version: %s\n", current)` (pre-swap narrative; already
+        gated to `!isStructuredFormat(cfg.Global.Format())`; moved for status-noise consistency).
+      - L435: `cmd.Println("Checking for updates to latest version...")` (same block).
+      - L475: `cmd.Println("Tip: install the agent skill so AI assistants pick up the new commands — run \`neo4j-cli skill install\`.")`
+        (inside post-swap printResult plain-text closure; moved for consistency).
+
+      Leave UNCHANGED (these are plain-text-mode data, not narration):
+      - L358: `Already on %s. No update needed.`
+      - L382: `<method> already on %s; <target> available.`
+      - L398-402: 4-line `update check` block (Current version / Latest / New version
+        available / Run to install).
+      - L470: `Successfully updated from %s to %s`.
+      - L473: `Refreshed skill bundle for: %s`.
+
+      Existing tests at `neo4j-cli/internal/subcommands/update/update_test.go:115-117`
+      set both `cmd.SetOut(out)` AND `cmd.SetErr(out)` to the same combined buffer, so
+      assertions like `assert.Contains(t, out, "Checking for updates to latest version...")`
+      keep passing because the text still flows into `out` (just via the err writer
+      instead of the out writer). The 13-row dev-build / no-stable-release / `update check`
+      tests at L164 / L622-623 / L1007-1175 stay green.
+
+      Add ONE new regression test `TestUpdate_StatusLinesGoToStderr` that:
+      - Uses SEPARATE `outBuf` and `errBuf` buffers (`cmd.SetOut(outBuf); cmd.SetErr(errBuf)`).
+      - Exercises the dev-build branch (current = devVersion) → asserts:
+        * `outBuf.String() == ""` (or doesn't contain "running a dev build").
+        * `errBuf.String()` contains `"running a dev build, nothing to update"`.
+      - Bonus: a sub-case for the ErrNoStableRelease branch with the same shape.
+      - Sanity-check: reverting L302 back to `cmd.Println` makes the new test fail.
+
+      Update the changie body from the prior tasks (currently mentions CLI-82, CLI-95,
+      CLI-94) to also credit CLI-96. New body per PRD REQ-F-010:
+      `keep stdout clean for --format json consumers — route narration to stderr (CLI-82, CLI-95, CLI-96), TTY-gate :schema H2 headers (CLI-94)`.
+      Edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body in place.
+
+      No bundle regen expected; run `make generate-check` as a gate.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "update.go L302, L326, L434, L435, L475 all write via fmt.Fprintln/Fprintf(cmd.ErrOrStderr(), ...) with verbatim wording"
+      - "Plain-text-data lines (L358, L382, L398-402, L470, L473) are NOT changed"
+      - "Existing update_test.go assertions keep passing (combined out/err buffer)"
+      - "New TestUpdate_StatusLinesGoToStderr uses split buffers and asserts dev-build text appears on stderr ONLY (and similarly for the no-stable-release branch)"
+      - "Manual sanity: reverting one of the 5 sites causes the new split-buffer test to fail"
+      - "Changie Patch entry body credits CLI-82, CLI-95, CLI-94, AND CLI-96"
       - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
