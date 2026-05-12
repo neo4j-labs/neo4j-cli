@@ -11,3 +11,7 @@ Decisions: Deprecated surfaces via direct walkCommand call (IsAvailableCommand f
 Added agentcontext.go leaf cobra command + render.go with --format dispatch. RunE uses commonoutput.ResolveOutput (canonical "json"/"table"/"toon" resolver; "default" -> json when non-TTY). Toon path mirrors common/output (json -> any -> toon.Marshal). Table path flattens nested Commands map into rows sorted lexicographically with a 3-line footer.
 Files: +neo4j-cli/internal/subcommands/agentcontext/agentcontext.go, +neo4j-cli/internal/subcommands/agentcontext/render.go
 Decisions: Split render helpers into render.go to keep agentcontext.go ≤80 lines (42 lines actual). Used ResolveOutput rather than the PRD-suggested cfg.Aura.Output() — the canonical accessor is cfg.Global.Format() and ResolveOutput already encodes the TTY-detection semantics REQ-F-013 specifies.
+
+## TASK-004 — 2026-05-12T15:00:00Z
+Mounted agent-context in neo4j-cli root by importing the agentcontext package and adding one AddCommand line. Manual smoke confirmed bin/neo4j-cli --help lists agent-context and `agent-context --format json | jq .schema_version` returns 1. make build/fmt-check/lint and targeted go test all green; TestGenerator_RoundTrip is expected to fail until task-008 regenerates the skill bundle.
+Files: ~neo4j-cli/app/app.go

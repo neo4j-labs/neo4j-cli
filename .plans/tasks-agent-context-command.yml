@@ -96,7 +96,7 @@ tasks:
       62-66. Pass app.Version explicitly (the package does not import
       "app" to avoid a cycle). Verify `bin/neo4j-cli --help` lists
       agent-context as a subcommand after `make build`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -105,7 +105,7 @@ tasks:
       - "agentcontext package does NOT import the app package (no cycle)"
       - "`make build` succeeds; `bin/neo4j-cli --help` lists agent-context"
       - "`bin/neo4j-cli agent-context --format json | jq '.schema_version'` returns 1"
-    completed_at: null
+    completed_at: 2026-05-12T15:00:00Z
 
   - id: task-005
     title: "Add agentcontext_test.go end-to-end tests via app.NewCmd"

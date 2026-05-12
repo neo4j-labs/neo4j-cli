@@ -14,6 +14,7 @@ import (
 	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/update"
@@ -64,6 +65,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(query.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
+	cmd.AddCommand(agentcontext.NewCmd(cfg, Version))
 
 	cobra.EnableTraverseRunHooks = true
 
