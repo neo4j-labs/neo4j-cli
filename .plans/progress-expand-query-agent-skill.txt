@@ -25,3 +25,10 @@ Files: ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill
 ## task-007 — 2026-05-12T07:46:24Z
 Ran `changie new --projects neo4j-cli --kind Patch --body "..."` (changie installed at /opt/homebrew/bin/changie). Produced .changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml with project/kind/body/time fields; body covers schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and query-additions.md. Native changie output uses unquoted scalar body vs AGENTS.md hand-author single-quoted form — both valid YAML, identical string. fmt-check + lint clean.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml
+
+## task-008 — 2026-05-12T07:48:30Z
+Final gates: `make test` PASS (all packages green incl. neo4j-cli/internal/skill/gen TestGenerator_RoundTrip), `make fmt-check` PASS, `make lint` PASS (0 issues), `make generate-check` clean for bundle/source paths — only diff is the expected mid-task tasks-yml in_progress flip (AGENTS.md notes this is benign). Manual eyeball: bundle/SKILL.md line 31 reads `## Tips & Gotchas`, line 35 has new query-additions.md pre-read bullet (bold); bundle/query-additions.md is 146 LF lines with 18 balanced code fences and no `-P`/bare-schema/bare-embed/defaultCypherVersion artifacts. Inline feature-diff review (7 commits vs main) clean; minor stale "Gotchas" wording inside additions.md HTML comments + embed.go doc noted but out of task-008 scope (cosmetic, invisible).
+Files: (none — gate-only task)
+
+## FINAL — 2026-05-12T07:48:30Z
+All 8 tasks complete. Feature `expand-query-agent-skill` ready for merge. Gates green: test/fmt-check/lint/generate-check. Branch `oskar/cli-77-query-skill` has 8 commits ahead of main (1 PRD/tasks + 7 task commits).

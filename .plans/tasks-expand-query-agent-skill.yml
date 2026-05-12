@@ -119,7 +119,7 @@ tasks:
     description: |
       Run the project's mandatory gates per CLAUDE.md as the final pre-commit check. Treat any failure as blocking — do not mark this task complete until all four are clean.
       Specifically: `make test`, `make fmt-check`, `make lint`, `make generate-check`. If a render-side golden lags, fix it under task-001's scope; if a roundtrip test fails on the new bundle file, fix it under task-005's scope; otherwise debug the failure.
-    status: pending
+    status: completed
     dependencies:
       - task-006
       - task-007
@@ -129,4 +129,4 @@ tasks:
       - "`make lint` exits 0 (golangci-lint clean)"
       - "`make generate-check` exits 0 (no diff after `go generate ./...`)"
       - "Manual eyeball of `neo4j-cli/internal/skill/bundle/SKILL.md` and `bundle/query-additions.md` shows clean rendering, intact code fences, no source-form artifacts"
-    completed_at: null
+    completed_at: 2026-05-12T07:48:30Z
