@@ -185,14 +185,14 @@ tasks:
       .changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml
       with fields project: neo4j-cli, kind: Minor, body: <text>, time:
       RFC3339, per AGENTS.md "Changie Notes".
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - ".gitignore contains a line `/agent-cli-auditor.md`"
       - "`git status --short` no longer shows agent-cli-auditor.md (file is ignored)"
       - "A new file under .changes/unreleased/ matching neo4j-cli-Minor-*.yaml exists with project: neo4j-cli, kind: Minor, body mentioning CLI-83 and agent-context"
       - "The changelog YAML parses as valid changie input (RFC3339 time)"
-    completed_at: null
+    completed_at: 2026-05-12T16:36:00Z
 
   - id: task-008
     title: "Regenerate skill bundle to include references/agent-context.md"

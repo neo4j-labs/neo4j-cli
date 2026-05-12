@@ -24,3 +24,7 @@ Decisions: External test package (agentcontext_test) required to avoid import cy
 ## TASK-006 — 2026-05-12T15:30:00Z
 Added `## Agent Context Notes` section to AGENTS.md after the "Cobra Help / Skill Bundle Rendering Notes" section. Six bullets verbatim from REQ-F-017: runtime-reflection note, no-regen note, hand-coded constants location, output_formats source, schemaVersion bump rules, TreeCoverage test gate. fmt-check clean.
 Files: ~AGENTS.md
+
+## TASK-007 — 2026-05-12T16:36:00Z
+Housekeeping: appended `/agent-cli-auditor.md` to .gitignore (file no longer in `git status`); changie generated a Minor entry for CLI-83 (neo4j-cli-Minor-20260512-163550.yaml). YAML parses; RFC3339 timestamp.
+Files: ~.gitignore, +.changes/unreleased/neo4j-cli-Minor-20260512-163550.yaml
