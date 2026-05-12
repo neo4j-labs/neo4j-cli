@@ -71,7 +71,7 @@ tasks:
     title: "Add AGENTS.md note + run final gates"
     description: |
       Append a short line under the existing `## Hermetic Test Notes` section in `AGENTS.md` documenting the new Tier-1 hermetic flow and the schema-only live smoke. Then run all four mandatory gates per AGENTS.md "Feedback Instructions": `make test`, `make fmt-check`, `make lint`, `make generate-check`. All must exit 0. Eyeball the workflow YAML for indentation / quoting issues.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -83,4 +83,4 @@ tasks:
       - "`make fmt-check` exits 0"
       - "`make lint` exits 0"
       - "`make generate-check` exits 0 (clean working tree after `go generate ./...`)"
-    completed_at: null
+    completed_at: 2026-05-12T08:40:44Z
