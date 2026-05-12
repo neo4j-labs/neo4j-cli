@@ -38,7 +38,8 @@ tasks:
       `instance/create_test.go`) that runs the await command with `--format json` and
       calls `AssertOutIsValidJSON()` — this test MUST fail if any of the 13 fmt.Fprintln
       replacements is reverted to cmd.Println.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T16:15:00Z
     dependencies:
       - task-001
     acceptance_criteria:

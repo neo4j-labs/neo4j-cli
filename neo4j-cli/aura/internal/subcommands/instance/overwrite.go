@@ -65,13 +65,13 @@ If only --source-instance-id is provided, a new snapshot of that instance is cre
 			}
 
 			if await {
-				cmd.Println("Waiting for instance to be ready...")
+				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 				pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusOverwriting)
 				if err != nil {
 					return err
 				}
 
-				cmd.Println("Instance Status:", pollResponse.Data.Status)
+				fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
 			return nil

@@ -90,7 +90,7 @@ If you lose your API key, you will need to create a new Authentication provider.
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url", "authentication_providers"})
 
 				if await {
-					cmd.Println("Waiting for GraphQL Data API to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateGraphQLDataApiResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
 						return err
@@ -101,7 +101,7 @@ If you lose your API key, you will need to create a new Authentication provider.
 						return err
 					}
 
-					cmd.Println("GraphQL Data API Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 			return nil

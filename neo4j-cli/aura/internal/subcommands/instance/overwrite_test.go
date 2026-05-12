@@ -139,8 +139,6 @@ func TestOverwriteWithAwait(t *testing.T) {
 
 	getMock.AssertCalledTimes(2)
 
-	helper.AsssertOk()
-
 	helper.AssertOut(`{
 	"data": {
 		"cloud_provider": "gcp",
@@ -154,7 +152,9 @@ func TestOverwriteWithAwait(t *testing.T) {
 		"type": "enterprise-db"
 	}
 }
-Waiting for instance to be ready...
-Instance Status: ready
 	  `)
+	helper.AssertErrContainsStrings([]string{
+		"Waiting for instance to be ready...",
+		"Instance Status: ready",
+	})
 }

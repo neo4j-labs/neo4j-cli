@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-05-12T15:45:00Z
 Added AssertErrContainsStrings and AssertOutIsValidJSON helpers to AuraTestHelper; foundation for CLI-82 regression-pinning tests.
 Files: ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+
+## TASK-002 — 2026-05-12T16:15:00Z
+Routed --await polling narration to stderr across 13 commands via fmt.Fprintln(cmd.ErrOrStderr(), ...); wording preserved verbatim. Updated affected tests; added TestCreateFreeInstanceWithAwait_StdoutIsValidJSON regression pin (sanity-checked: fails when reverted).
+Files: ~instance/{create,resume,overwrite}.go, ~instance/snapshot/create.go, ~dataapi/graphql/{create,resume,update,pause}.go, ~dataapi/graphql/authprovider/create.go, ~dataapi/graphql/corspolicy/allowedorigin/{add,remove}.go, ~customermanagedkey/create.go, ~graphanalytics/session/create.go, ~instance/{create,overwrite}_test.go, ~instance/snapshot/create_test.go, ~graphanalytics/session/create_test.go
+Decisions: added //nolint:errcheck on each new fmt.Fprintln call (matches existing convention in create.go warning lines).
