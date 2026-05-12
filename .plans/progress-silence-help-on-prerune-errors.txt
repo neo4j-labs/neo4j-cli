@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-12T14:35:00Z
 Added private silenceUsageOnError helper in common/flags/flags.go and wrapped the three PreRunE return sites (RegisterOutputFlag, ComposeRootPersistentPreRunE, RegisterAuraCredentialFlag) so cobra suppresses the usage block on PreRunE errors.
 Files: ~common/flags/flags.go
+
+## task-002 — 2026-05-12T14:45:00Z
+Added table-driven unit tests pinning silenceUsageOnError behavior across all three PreRunE wrappers (RegisterOutputFlag, ComposeRootPersistentPreRunE, RegisterAuraCredentialFlag).
+Files: ~common/flags/flags_test.go

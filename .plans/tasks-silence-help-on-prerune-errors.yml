@@ -33,7 +33,7 @@ tasks:
       on the happy path. Cover the write-gate error, invalid --format error, and missing
       --credential error. Extend the existing `TestRegisterAuraCredentialFlag_CredentialNotFound`
       table rather than duplicating its fixture.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -43,7 +43,7 @@ tasks:
       - "Existing TestEnforceWriteGate stays unchanged (direct calls do not mutate SilenceUsage)"
       - "Tests use the existing buildConfig and executeWithArgs helpers from flags_test.go where applicable"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-05-12T14:45:00Z
 
   - id: task-003
     title: "Pin focused-error behavior in neo4j-cli config set integration test"
