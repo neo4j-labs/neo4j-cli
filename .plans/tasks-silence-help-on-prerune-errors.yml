@@ -73,13 +73,13 @@ tasks:
       write-gate error. Pins the existing `cmd.SilenceUsage = true` at
       `neo4j-cli/query/run.go:50` so a future refactor cannot silently regress the
       query path.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution asserts h.stdout.String() is empty in addition to the existing err.Error() substring check"
       - "Test passes against the current implementation (pins existing correct behavior)"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-05-12T15:15:00Z
 
   - id: task-005
     title: "Add Patch-kind changie entry for the focused-error UX fix"
