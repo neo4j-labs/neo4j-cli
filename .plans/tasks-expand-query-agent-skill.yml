@@ -88,7 +88,7 @@ tasks:
       - `neo4j-cli/internal/skill/bundle/query-additions.md` — new file, byte-equal to source.
       - `neo4j-cli/aura/internal/skill/bundle/SKILL.md` — heading-only change (`## Tips & Gotchas`), no content drift.
       Commit all three diffs together with the source-side changes.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -99,7 +99,7 @@ tasks:
       - "`neo4j-cli/internal/skill/bundle/query-additions.md` exists and is byte-equal to `neo4j-cli/internal/skill/query-additions.md`"
       - "`neo4j-cli/aura/internal/skill/bundle/SKILL.md` heading reads `## Tips & Gotchas`; no other content changes vs prior commit"
       - "`make generate-check` (i.e. `git diff --exit-code` after `go generate ./...`) reports a clean tree"
-    completed_at: null
+    completed_at: 2026-05-12T07:45:02Z
 
   - id: task-007
     title: "Add changie Patch entry for skill enrichment"

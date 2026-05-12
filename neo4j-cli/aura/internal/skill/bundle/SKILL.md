@@ -28,7 +28,7 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
 | [`tenant`](references/tenant.md) | Relates to an Aura Tenant |
 
-## Gotchas
+## Tips & Gotchas
 
 <!-- Hand-written gotchas inlined into the generated SKILL.md "Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
 
