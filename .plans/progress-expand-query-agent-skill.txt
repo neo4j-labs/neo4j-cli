@@ -9,3 +9,7 @@ Files: +neo4j-cli/internal/skill/query-additions.md
 ## task-003 — 2026-05-12T07:39:19Z
 Wired neo4j-cli/internal/skill/gen/main.go to read sibling query-additions.md (same pattern as description.txt/additions.md) and inject it into render.Bundle's output map under key "query-additions.md" so the existing write loop persists bundle/query-additions.md. render.Options untouched; aura gen untouched. fmt-check/lint clean. Expected pre-task-006 drift: aura TestGenerator_RoundTrip flags `## Tips & Gotchas` heading (task-006 regen). Expected pre-task-005 drift: neo4j-cli TestGenerator_RoundTrip errors because its test fixture stages only description.txt+additions.md into tmpRoot — task-005 will extend it to also stage query-additions.md.
 Files: ~neo4j-cli/internal/skill/gen/main.go
+
+## task-004 — 2026-05-12T07:41:12Z
+Prepended the query-additions.md pre-reading bullet as the first list item in neo4j-cli/internal/skill/additions.md (after the HTML comment header). Exact REQ-F-004 wording; existing bullets untouched; LF preserved. Markdown-only change; fmt-check+lint clean. Bundle regen deferred to task-006.
+Files: ~neo4j-cli/internal/skill/additions.md
