@@ -15,3 +15,7 @@ Files: ~README.md, ~distribution/npm/cli/README.md
 ## task-004 — 2026-05-12T14:08:00Z
 Added changie Minor entry for telemetry opt-out via `changie new --projects neo4j-cli --kind Minor`. Validated with `changie batch --dry-run`.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260512-140646.yaml
+
+## TASK-005 — 2026-05-12T12:08:26Z
+Final gates green: fmt-check, lint, test, generate-check. generate-check only diff was the planning YAML status flip — no skill bundle drift.
+Files: ~.plans/tasks-opt-out-of-metrics-telemetry.yml, ~.plans/progress-opt-out-of-metrics-telemetry.txt

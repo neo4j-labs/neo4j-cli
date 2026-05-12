@@ -106,7 +106,7 @@ tasks:
       `telemetry` should not cause bundle drift; if it does, run
       `make generate` and include the regenerated bundle files in the
       same commit.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -117,4 +117,4 @@ tasks:
       - "`make lint` exits 0"
       - "`make test` exits 0 across all packages"
       - "`make generate-check` exits 0 (or any regenerated bundle files are committed in the same change)"
-    completed_at: null
+    completed_at: 2026-05-12T12:08:26Z
