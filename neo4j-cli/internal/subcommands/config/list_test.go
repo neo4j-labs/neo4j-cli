@@ -27,7 +27,8 @@ func TestConfigList(t *testing.T) {
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-tenant": null,
-	"format": "default"
+	"format": "default",
+	"telemetry": true
 }`,
 		},
 		{
@@ -40,7 +41,8 @@ func TestConfigList(t *testing.T) {
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-tenant": null,
-	"format": "json"
+	"format": "json",
+	"telemetry": true
 }`,
 		},
 		{

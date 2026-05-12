@@ -179,6 +179,8 @@ neo4j-cli config set telemetry false --rw
 neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
 ```
 
+Set `DO_NOT_TRACK=1` to disable telemetry without writing config.
+
 ## Feedback / Issues
 
 Please use [GitHub issues](https://github.com/neo4j-labs/neo4j-cli/issues) to provide feedback and report any issues that you have encountered.

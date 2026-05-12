@@ -80,6 +80,29 @@ func TestConfigSet(t *testing.T) {
 			command: "config set --rw aura.unknown value",
 			wantErr: `Error: invalid config key: "aura.unknown"`,
 		},
+		// Telemetry opt-out
+		{
+			name:            "set telemetry to false with rw writes false at root",
+			command:         "config set --rw telemetry false",
+			wantConfigKey:   "telemetry",
+			wantConfigValue: "false",
+		},
+		{
+			name:            "set telemetry to true with rw writes true at root",
+			command:         "config set --rw telemetry true",
+			wantConfigKey:   "telemetry",
+			wantConfigValue: "true",
+		},
+		{
+			name:    "set telemetry to invalid value with rw returns error",
+			command: "config set --rw telemetry maybe",
+			wantErr: "Error: invalid value for 'telemetry': maybe (valid values: true, false)",
+		},
+		{
+			name:    "set telemetry to false without rw errors",
+			command: "config set telemetry false",
+			wantErr: "Error: this command writes; pass --rw to allow it",
+		},
 	}
 
 	for _, tc := range tests {
