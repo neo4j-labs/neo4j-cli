@@ -1,7 +1,7 @@
 feature: route-status-text-to-stderr
 prd: ./prd-route-status-text-to-stderr.md
 created_at: 2026-05-12T15:30:00Z
-updated_at: 2026-05-12T15:30:00Z
+updated_at: 2026-05-12T18:10:00Z
 
 tasks:
   - id: task-001
@@ -147,3 +147,39 @@ tasks:
       - "Filename matches the neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml convention"
       - "Body single-quoted, time in RFC3339"
       - "make test stays green"
+
+  - id: task-007
+    title: "Pattern E (CLI-95) — route tenant get table-format warning to stderr"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/tenant/get.go:42`, replace
+      `cmd.Println("instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")`
+      with `fmt.Fprintln(cmd.ErrOrStderr(), "instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")`.
+      Wording unchanged (per the no-rewording convention used for every other CLI-82 case).
+      The conditional gate `cfg.Global.Format() == "table" || cfg.Global.Format() == "default"`
+      is preserved — under json/toon the field is included so the warning is irrelevant.
+
+      Update `tenant/get_test.go` (the test at L145+ currently asserts the warning via
+      `AssertOut`): split assertions so stdout contains only the table body
+      (`AssertOut(<table>)` or `AssertOutContainsStrings`) and the warning is asserted
+      via `AssertErrContainsStrings([]string{"instance configurations are not visible"})`.
+      Add a regression test `TestGetTenant_StdoutIsValidJSON` that runs `tenant get`
+      under `--format json` and calls `AssertOutIsValidJSON()` — pre-fix this passes
+      because the warning is gated to table/default, but the new test pins that
+      `--format table` does not pollute stdout either (use the existing table assertion
+      pattern plus assert stderr contains the warning).
+
+      Also update the changie entry from task-006: append `(CLI-95)` to the existing
+      `(CLI-82)` reference in the body so the changelog line credits both Linear
+      issues. Either run `changie new` again with the combined body and remove the old
+      entry, or edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body
+      string in place.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "tenant/get.go:42 writes the warning via fmt.Fprintln(cmd.ErrOrStderr(), ...) with the existing wording verbatim"
+      - "The format conditional (table|default only) is preserved unchanged"
+      - "tenant/get_test.go is updated so the warning is asserted on stderr via AssertErrContainsStrings, not on stdout"
+      - "A regression test pins that --format table emits no warning on stdout AND the warning IS emitted on stderr"
+      - "Changie Patch entry body mentions both CLI-82 and CLI-95"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"

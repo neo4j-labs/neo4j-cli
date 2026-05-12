@@ -12,6 +12,7 @@ Categories of offender (per `agent-cli-audit-2026-05-011.md` §3.1, §3.8):
 2. **Delete success confirmations** — 3 commands print `"Operation Successful"` / `"<Resource> deleted successfully ..."` on stdout, with no JSON body.
 3. **Decorative banners / plain-text before JSON body** — 3+ commands print `###` banners or `"New allowed origins: ..."` on stdout before the actual data.
 4. **One-off success confirmation** — `config project use` prints `"Set X as default project ..."` on stdout (no newline).
+5. **`tenant get` table-format warning** — when `--format table|default`, `tenant get` prints a warning explaining instance_configurations is hidden, on stdout (CLI-95).
 
 Existing patterns already used elsewhere in the repo:
 
@@ -31,7 +32,7 @@ Test harness: `neo4j-cli/aura/internal/test/testutils/auratesthelper.go` exposes
 ## Non-Goals
 
 - F9 / CLI-94 — `query :schema` markdown headers on stdout. Separate Linear issue, separate PR.
-- F10 / CLI-95 — `tenant get` warning on stdout. Separate Linear issue.
+- ~~F10 / CLI-95 — `tenant get` warning on stdout.~~ Pulled into this PRD as Pattern E (see REQ-F-011).
 - F11 / CLI-96 — `update` command status lines on stdout. Separate Linear issue.
 - F12 / CLI-97 — error-message structure. Separate Linear issue.
 - Renaming `--await` → `--wait` (CLI-87 / F2), `--format json` → `--json` (CLI-86 / F1), or any verb canonicalisation (CLI-88 / F3, CLI-89 / F4). Out of scope.
@@ -56,7 +57,8 @@ Test harness: `neo4j-cli/aura/internal/test/testutils/auratesthelper.go` exposes
   - New `AssertErrContainsStrings([]string{...})` assertions cover the stderr narration.
   - Delete-command tests switch from `AssertOut("Operation Successful\n")` (and equivalents) to `AssertOutJson(\`{"data":{"deleted":true,"id":"<id>"}}\`)` plus stderr assertions for the human line.
 - REQ-F-009: Regression-pinning tests — for every affected command that supports `--format json`, add a test that runs the command with `--format json`, captures stdout, and asserts `json.Unmarshal(stdout, &v)` succeeds (where `v` is `map[string]any` or the response struct). These tests MUST fail on the pre-fix codebase (because stdout contained narration mixed with the JSON body) and pass after the fix. Implementation: a small helper `AssertOutIsValidJSON()` on `AuraTestHelper` that reads `helper.out` and calls `json.Unmarshal`, asserting `err == nil` and quoting the offending stdout in the failure message. Apply to at minimum one test per offender category: one await command (e.g. `instance create --await`), one delete command (e.g. `customer-managed-key delete`), one banner command (e.g. `dataapi graphql create`), one origin-echo command (e.g. `corspolicy allowed-origin add`).
-- REQ-F-010: A `Patch`-kind changelog entry is recorded via `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82)"`.
+- REQ-F-010: A `Patch`-kind changelog entry is recorded via `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82, CLI-95)"`.
+- REQ-F-011 (CLI-95): `tenant get` writes its table-format warning (`"instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these"`) to stderr via `fmt.Fprintln(cmd.ErrOrStderr(), ...)` instead of `cmd.Println(...)`. The conditional gate (`cfg.Global.Format() == "table" || cfg.Global.Format() == "default"`) is preserved — the warning is irrelevant under `--format json|toon` where the field is included. Wording is preserved verbatim per the no-rewording convention used for every other case in this PRD. Source: `neo4j-cli/aura/internal/subcommands/tenant/get.go:42` (audit cited L44 — line drifted slightly). The colocated test at `tenant/get_test.go` currently asserts the warning via `AssertOut` (L145+) and must be updated to assert it via `AssertErrContainsStrings` plus `AssertOutJson` for the actual data body.
 
 ### Non-Functional Requirements
 
@@ -139,6 +141,21 @@ fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status)
 
 All `cmd.Println` / `cmd.Printf` → `fmt.Fprintln` / `fmt.Fprintf` against `cmd.ErrOrStderr()`. Wording preserved.
 
+**Pattern E: table-format warning → stderr** (1 file, CLI-95)
+
+- `neo4j-cli/aura/internal/subcommands/tenant/get.go` — L42.
+  ```go
+  // before
+  if cfg.Global.Format() == "table" || cfg.Global.Format() == "default" {
+      cmd.Println("instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")
+  }
+  // after
+  if cfg.Global.Format() == "table" || cfg.Global.Format() == "default" {
+      fmt.Fprintln(cmd.ErrOrStderr(), "instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")
+  }
+  ```
+  Wording and conditional gate unchanged.
+
 **Pattern D: one-off confirmation → stderr** (1 file)
 
 - `neo4j-cli/aura/internal/subcommands/config/project/use.go` — L23.
@@ -199,7 +216,7 @@ Concrete tests requiring updates (non-exhaustive; the real gate is `make test`):
 
 ### Files touched — changelog
 
-- `.changes/unreleased/neo4j-cli-Patch-<ts>.yaml` via `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82)"`.
+- `.changes/unreleased/neo4j-cli-Patch-<ts>.yaml` via `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82, CLI-95)"`.
 
 ### Cobra error/output contract (already verified)
 
@@ -221,6 +238,7 @@ The change does not touch any cobra `Long`, `Use`, `Example`, or flag-descriptio
 - [ ] `neo4j-cli aura dataapi graphql corspolicy allowed-origin add ... --format json 2>/dev/null | jq .` and `remove ...` exit 0, jq prints valid JSON, no `"New allowed origins: ..."` on stdout.
 - [ ] `neo4j-cli aura config project use foo --format json 2>/dev/null | jq -n .` — stdout empty, narration on stderr terminated with `\n`.
 - [ ] `neo4j-cli aura instance overwrite --instance-id <x> --source-instance-id <y> --await --format json 2>/dev/null | jq .` exits 0, jq prints valid JSON, no narration on stdout.
+- [ ] `neo4j-cli aura tenant get <id> --format table 2>/dev/null` prints only the table on stdout; the "instance configurations are not visible..." warning is on stderr. Under `--format json` the warning is not emitted (gate preserved) and stdout is valid JSON.
 - [ ] Stderr still contains the human narration for all of the above (verifiable via `2>&1 1>/dev/null`).
 - [ ] Per REQ-F-009, at least one `AssertOutIsValidJSON()` test exists per offender category (await, delete, banner, origin-echo). Each of these tests demonstrably FAILS when the corresponding source-side fix is reverted (manual sanity check during implementation — flip one `fmt.Fprintln(cmd.ErrOrStderr(), ...)` back to `cmd.Println(...)` and confirm the regression test catches it).
 - [ ] `make test` passes including new `AssertErrContainsStrings`, `AssertOutIsValidJSON`, and `AssertOutJson` assertions across the affected `*_test.go` files.
