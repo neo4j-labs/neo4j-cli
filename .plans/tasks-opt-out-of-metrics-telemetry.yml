@@ -18,7 +18,7 @@ tasks:
       Update `set_test.go` table with the new rows (true, false, invalid,
       no-rw) and patch the two exact-match JSON `wantOut` blocks in
       `list_test.go` to include `"telemetry": true`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`config set --rw telemetry false` persists `telemetry` to config.json and exits 0"
@@ -27,7 +27,7 @@ tasks:
       - "`config get telemetry` returns `true` by default"
       - "`config list` (both default and `--format json` cases in list_test.go) includes `\"telemetry\": true` and the table-format `wantContains` case still passes"
       - "`make test` is green for the touched packages"
-    completed_at: null
+    completed_at: 2026-05-12T12:05:00Z
 
   - id: task-002
     title: "Disable analytics in NewConfig when telemetry is opted out"

@@ -1,0 +1,4 @@
+## task-001 — 2026-05-12T12:05:00Z
+Added `telemetry` as a valid global config key with bool-value validation. SetDefault("telemetry", true), Set() rejects non-bool with usage error. Updated set/list test tables; also patched aura standalone list JSON (AuraScope inherits globals).
+Files: ~common/clicfg/clicfg.go, ~neo4j-cli/internal/subcommands/config/set_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go
+Decisions: standalone aura `config list` JSON also needed `"telemetry": true` (AuraScope appends globals to AuraConfig.ValidConfigKeys).

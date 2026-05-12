@@ -181,7 +181,8 @@ func TestStandaloneConfigList(t *testing.T) {
 	"auth-url": "%s",
 	"base-url": "%s",
 	"default-tenant": null,
-	"format": "json"
+	"format": "json",
+	"telemetry": true
 }`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl),
 		},
 		{
