@@ -97,7 +97,7 @@ tasks:
       'Supported agents:' line and Examples block; confirm
       `bin/neo4j-cli aura skill install claude` still errors with
       'unknown agent ... valid agents: ...'.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -109,4 +109,4 @@ tasks:
       - "`make lint` exits 0"
       - "`make generate-check` exits 0"
       - "Manual smoke confirms 'Supported agents:' + Examples in install/remove --help; unknown-agent error path unchanged"
-    completed_at: null
+    completed_at: 2026-05-12T16:05:00+02:00
