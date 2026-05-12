@@ -66,7 +66,8 @@ tasks:
       `AssertOutJson(...)` and add `AssertErrContainsStrings([]string{...})` for the
       human line. Add one regression test using `AssertOutIsValidJSON()` on a delete
       command under `--format json`.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T17:00:00Z
     dependencies:
       - task-001
     acceptance_criteria:
