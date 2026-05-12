@@ -39,7 +39,7 @@ tasks:
     description: |
       Rewrite the existing "Update e2e (check subcommand)" step in `.github/workflows/test.yml` (~lines 78–119). Build `bin/neo4j-cli-e2e` with `-tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e'`. Pattern-match the existing Tier-2 step's launch handshake (background fixture, scrape first stdout line for `http://127.0.0.1:<port>`, export `NEO4J_CLI_UPDATE_E2E_API_URL`).
       Run both scenarios serially in one step: (1) launch `release_fixture --scenario stable-head`, run `update check --pre-releases -f json | check_json --expect-channel stable --cross-check <stable-tag>`; (2) tear down; (3) launch `release_fixture --scenario pre-release-head`, run `update check --pre-releases -f json | check_json --expect-channel pre-release --cross-check <prerelease-tag>`; (4) tear down. Cross-check tag values come from the fixture authors' choices in task-001.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -49,7 +49,7 @@ tasks:
       - "Both `stable-head` and `pre-release-head` scenarios execute sequentially; each value-asserts its channel via `check_json --expect-channel`"
       - "Each fixture process is launched in background, port scraped from first stdout line, torn down between scenarios"
       - "Step works on ubuntu / macos / windows runners (bash + stdlib only; no host-specific deps)"
-    completed_at: null
+    completed_at: 2026-05-12T08:36:28Z
 
   - id: task-004
     title: "Add schema-only live smoke workflow step"

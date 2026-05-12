@@ -50,73 +50,143 @@ jobs:
               if: matrix.os == 'ubuntu-latest'
               run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...
 
-            # Tier-1 e2e: drive the freshly-built binary against the REAL GitHub
-            # API. Catches regressions that mocks miss — filter drift between
-            # release.go's Latest and the head of the API, JSON-shape changes,
-            # cobra-flag wiring breaks. Runs on every matrix OS so a Windows-only
-            # path bug in update can't slip through.
+            # Tier-1 e2e: drive the freshly-built binary against a LOCAL
+            # fixture server that serves canned `/releases` payloads. Catches
+            # regressions that pure unit mocks miss — filter drift between
+            # release.go's Latest() and a realistic ordered release list,
+            # JSON-shape changes, cobra-flag wiring breaks, channel/install_method
+            # rendering. Runs on every matrix OS so a Windows-only path bug
+            # in update can't slip through.
             #
-            # Auth: GITHUB_TOKEN is the auto-injected workflow token; on fork
-            # PRs it is the target repo's read-only token, which has enough
-            # scope to call /releases (public read) without burning the
-            # unauthenticated 60/h ratelimit across the matrix × forks.
+            # Hermetic by design: the previous flavor of this step queried
+            # the real GitHub API and cross-checked the `update check`
+            # output against `gh release list` head. That made the step
+            # calendar-coupled — the expected channel flipped between
+            # `stable` and `pre-release` depending on which tag happened to
+            # be at the head on a given day, and a stale release would
+            # break unrelated PRs. The hermetic flow asserts BOTH channels
+            # in every run by serving two canned scenarios in sequence.
             #
-            # We build a SEPARATE binary with a low non-"dev" semver baked in
-            # via ldflags. The production `make build` artifact has
-            # `app.Version == "dev"`, which short-circuits the update flow
-            # before any network call (REQ-F-002). The e2e binary uses
-            # v0.0.0-e2e so any real prerelease wins the semver compare and
-            # the `check` subcommand reports a newer version.
-            - name: Build e2e binary (low semver)
+            # We build a SEPARATE binary with -tags e2e_seams and a low
+            # non-"dev" semver baked in via ldflags. The production
+            # `make build` artifact has `app.Version == "dev"`, which
+            # short-circuits the update flow before any network call
+            # (REQ-F-002). The e2e binary uses v0.0.0-e2e so any real
+            # release wins the semver compare and the `check` subcommand
+            # reports a newer version. The e2e_seams tag wires the
+            # NEO4J_CLI_UPDATE_E2E_API_URL / NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP
+            # env vars so the binary talks to the local fixture (see
+            # neo4j-cli/internal/subcommands/update/seams_e2e.go).
+            #
+            # Live GitHub-API coverage moved to the schema-only live smoke
+            # step below: it runs the SAME binary against real
+            # api.github.com without the seam env vars and asserts shape +
+            # enum membership only — no value coupling.
+            - name: Build e2e binary (low semver, e2e_seams)
               shell: bash
-              run: go build -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./neo4j-cli
+              run: go build -tags e2e_seams -ldflags='-X github.com/neo4j/cli/neo4j-cli/app.Version=v0.0.0-e2e' -o bin/neo4j-cli-e2e ./neo4j-cli
 
             - name: Update --help smoke test
               shell: bash
               run: bin/neo4j-cli-e2e update --help > /dev/null
 
-            - name: Update e2e (check subcommand)
+            - name: Update e2e (check subcommand, hermetic two-scenario)
               shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
-                  # Pull the head of the prerelease list straight from GitHub
-                  # so we can detect filter drift between our Latest() and what
-                  # the API actually says is at the top of the feed.
-                  expected_tag="$(gh release list \
-                      --repo neo4j-labs/neo4j-cli \
-                      --limit 1 \
-                      --exclude-drafts \
-                      --json tagName \
-                      --jq '.[0].tagName')"
-                  echo "expected_tag=${expected_tag}"
 
-                  # Capture stdout. The current neo4j-cli convention is exit 0
-                  # even on RunE errors (cobra prints `Error:` to stderr and
-                  # main() doesn't os.Exit(1)) — semantic correctness is
-                  # asserted via the JSON helper rather than the exit code, so
-                  # `update check` exits 0 in both up-to-date and
-                  # newer-available cases (REQ-F-001 — the friendly check
-                  # output); we keep `set +e` here as defense in depth so a
-                  # future exit-code change can't fail the step before the
-                  # helper sees the JSON.
-                  set +e
-                  out="$(bin/neo4j-cli-e2e update check --pre-releases -f json)"
-                  set -e
-                  echo "--- update check stdout ---"
-                  printf '%s\n' "$out"
-                  echo "--- end stdout ---"
+                  stage="${RUNNER_TEMP:-/tmp}/n4j-e2e-tier1"
+                  rm -rf "${stage}"
+                  mkdir -p "${stage}"
 
-                  # Validate the six documented fields, semver of `latest`, and
-                  # cross-check against the `gh release list` head. Our e2e
-                  # binary is ldflag'd to v0.0.0-e2e, so any real prerelease
-                  # wins the semver compare and the helper sees
-                  # `updated=false / check=true`.
-                  printf '%s' "$out" | go run ./test/e2e/check_json \
-                      --expect-channel pre-release \
-                      --cross-check "${expected_tag}"
+                  # Build the fixture once so we have a single PID to kill on
+                  # cleanup. `go run` spawns an intermediate process that's
+                  # awkward to clean up reliably on Windows.
+                  fixture_bin="${stage}/release_fixture"
+                  case "${RUNNER_OS:-}" in
+                    Windows) fixture_bin="${fixture_bin}.exe" ;;
+                  esac
+                  go build -o "${fixture_bin}" ./test/e2e/release_fixture
+
+                  # Pick the e2e binary name for the host. `go build -o
+                  # bin/neo4j-cli-e2e ./neo4j-cli` emits `.exe` on Windows.
+                  case "${RUNNER_OS:-}" in
+                    Windows) cli_bin="bin/neo4j-cli-e2e.exe" ;;
+                    *)       cli_bin="bin/neo4j-cli-e2e" ;;
+                  esac
+                  if [ ! -f "${cli_bin}" ] && [ -f "bin/neo4j-cli-e2e" ]; then
+                    cli_bin="bin/neo4j-cli-e2e"
+                  fi
+
+                  # Scenarios: (channel, cross-check tag). Tags MUST match
+                  # the fixture testdata under
+                  # test/e2e/release_fixture/testdata/.
+                  scenarios="stable-head:stable:v9.9.0 pre-release-head:pre-release:v9.9.1-alpha.1"
+
+                  for sc in ${scenarios}; do
+                    name="${sc%%:*}"
+                    rest="${sc#*:}"
+                    expect_channel="${rest%%:*}"
+                    expect_tag="${rest#*:}"
+                    echo "=== scenario: ${name} (channel=${expect_channel}, tag=${expect_tag}) ==="
+
+                    fixture_log="${stage}/${name}.log"
+                    : > "${fixture_log}"
+                    "${fixture_bin}" --scenario "${name}" > "${fixture_log}" 2>&1 &
+                    fixture_pid=$!
+                    # Ensure the fixture is reaped even if the step aborts
+                    # mid-scenario. Stable scenario sets pid=$fixture_pid;
+                    # prerelease re-traps with its own pid below.
+                    trap 'kill "${fixture_pid}" 2>/dev/null || true' EXIT
+
+                    # Wait up to 60s for the fixture to print its port.
+                    port=""
+                    for i in $(seq 1 60); do
+                      if [ -s "${fixture_log}" ]; then
+                        port="$(grep -oE 'listening on http://127\.0\.0\.1:[0-9]+' "${fixture_log}" | head -1 | sed -E 's|.*:([0-9]+)$|\1|')"
+                        if [ -n "${port}" ]; then break; fi
+                      fi
+                      sleep 1
+                    done
+                    if [ -z "${port}" ]; then
+                      echo "fixture failed to start; log:"
+                      cat "${fixture_log}"
+                      exit 1
+                    fi
+                    echo "fixture listening on 127.0.0.1:${port}"
+
+                    base="http://127.0.0.1:${port}"
+
+                    # Capture stdout. The current neo4j-cli convention is
+                    # exit 0 even on RunE errors (cobra prints `Error:` to
+                    # stderr and main() doesn't os.Exit(1)) — semantic
+                    # correctness is asserted via check_json rather than
+                    # the exit code, so `update check` exits 0 in both
+                    # up-to-date and newer-available cases (REQ-F-001).
+                    # `set +e` here is defense in depth so a future
+                    # exit-code change can't fail the step before the
+                    # helper sees the JSON.
+                    set +e
+                    out="$(NEO4J_CLI_UPDATE_E2E_API_URL="${base}" \
+                           NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 \
+                           "${cli_bin}" update check --pre-releases -f json)"
+                    set -e
+                    echo "--- update check stdout (${name}) ---"
+                    printf '%s\n' "$out"
+                    echo "--- end stdout ---"
+
+                    printf '%s' "$out" | go run ./test/e2e/check_json \
+                        --expect-channel "${expect_channel}" \
+                        --cross-check "${expect_tag}"
+
+                    # Tear down before the next scenario so the next port
+                    # bind is clean and the trap PID stays accurate.
+                    kill "${fixture_pid}" 2>/dev/null || true
+                    wait "${fixture_pid}" 2>/dev/null || true
+                    trap - EXIT
+                  done
+
+                  echo "tier-1 hermetic e2e: OK"
 
             # Tier-2 e2e: real download + atomic-swap against a local fixture
             # server. Tier-1 (above) covers the `check` subcommand read path
