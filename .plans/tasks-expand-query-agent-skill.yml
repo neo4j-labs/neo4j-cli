@@ -37,7 +37,7 @@ tasks:
     description: |
       After `render.Bundle(...)` returns its `map[string][]byte` in `neo4j-cli/internal/skill/gen/main.go`, read the new `query-additions.md` source file from the skill source directory and add it to the output map under key `query-additions.md`. The existing write loop persists it to `neo4j-cli/internal/skill/bundle/query-additions.md`.
       Do NOT change `render.Options`. Do NOT touch the aura-side `gen/main.go`. Source dir resolution should mirror how `additions.md` and `description.txt` are read (same path pattern).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - "Running `go run ./neo4j-cli/internal/skill/gen` writes `neo4j-cli/internal/skill/bundle/query-additions.md` with bytes byte-equal to the source file"
       - "`common/skill/render/render.go` and `common/skill/render/render.Options` are NOT modified"
       - "`neo4j-cli/aura/internal/skill/gen/main.go` is NOT modified"
-    completed_at: null
+    completed_at: 2026-05-12T07:39:19Z
 
   - id: task-004
     title: "Add top-of-list link bullet to neo4j-cli/internal/skill/additions.md"

@@ -5,3 +5,7 @@ Files: ~common/skill/render/render.go, ~common/skill/render/testdata/SKILL.md
 ## task-002 — 2026-05-12T07:36:51Z
 Authored neo4j-cli/internal/skill/query-additions.md (146 LF lines) with all 8 required sections, adapted to neo4j-cli surface (--param, :schema, :embed, --credential, -f toon, --rw). Schema description matches schemaResult struct (databaseInfo{Name,Versions[],Edition,DefaultLanguage}, flat nodes/relationships, separate relationship_paths). No -P / bare schema/embed / defaultCypherVersion refs. No source code touched — bundle wiring lives in task-003.
 Files: +neo4j-cli/internal/skill/query-additions.md
+
+## task-003 — 2026-05-12T07:39:19Z
+Wired neo4j-cli/internal/skill/gen/main.go to read sibling query-additions.md (same pattern as description.txt/additions.md) and inject it into render.Bundle's output map under key "query-additions.md" so the existing write loop persists bundle/query-additions.md. render.Options untouched; aura gen untouched. fmt-check/lint clean. Expected pre-task-006 drift: aura TestGenerator_RoundTrip flags `## Tips & Gotchas` heading (task-006 regen). Expected pre-task-005 drift: neo4j-cli TestGenerator_RoundTrip errors because its test fixture stages only description.txt+additions.md into tmpRoot — task-005 will extend it to also stage query-additions.md.
+Files: ~neo4j-cli/internal/skill/gen/main.go
