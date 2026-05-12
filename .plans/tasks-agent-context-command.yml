@@ -1,0 +1,253 @@
+feature: agent-context-command
+prd: ./prd-agent-context-command.md
+created_at: 2026-05-12T14:08:18Z
+updated_at: 2026-05-12T14:08:18Z
+
+tasks:
+  - id: task-001
+    title: "Add build.go walker and types in agentcontext package"
+    description: |
+      Create the new package neo4j-cli/internal/subcommands/agentcontext/
+      with a pure-function walker in build.go. No cobra side effects.
+      Exports BuildContext(root *cobra.Command, cliVersion string) Context
+      and the Context / Command / Flag types with snake_case json: tags.
+      Includes the closed-set constants schemaVersion=1, exitCodes (only
+      "0":"success" and "1":"general error"), errorCodes (the three
+      clierr categories: usage_error / upstream_error / fatal_error with
+      the wording from REQ-F-009), asyncFlag="--await". output_formats is
+      sourced live from clicfg.ValidFormatValues[:] inside BuildContext —
+      do NOT duplicate the list. Walker mirrors common/skill/render/
+      render.go:281-293: VisitAll over LocalFlags + InheritedFlags, skip
+      Hidden, dedupe by name (local wins), sort by name. Inherited flags
+      carry "inherited": true. Recurse via cmd.Commands() filtering on
+      IsAvailableCommand() (cobra's own visibility predicate). Cap
+      recursion depth at 10 defensively. Map keys for commands and
+      subcommands are the first-Use-token (lowercased). File must start
+      with the Neo4j copyright header (license-check gate).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/agentcontext/build.go exists with Neo4j copyright header"
+      - "Exports Context, Command, Flag structs with snake_case json: tags matching REQ-F-001/F-004/F-005"
+      - "BuildContext(root, cliVersion) sets schema_version=1, binary=\"neo4j-cli\", output_formats=clicfg.ValidFormatValues[:], async_flag=\"--await\""
+      - "exitCodes equals {\"0\":\"success\",\"1\":\"general error\"} and errorCodes equals the three clierr categories per REQ-F-009"
+      - "Walker visits LocalFlags + InheritedFlags, skips Hidden, dedupes by name (local wins), sorts by name, marks inherited flags with inherited:true"
+      - "Recursion uses cmd.IsAvailableCommand() filter; map keys are first-Use-token lowercased"
+      - "`go build ./neo4j-cli/internal/subcommands/agentcontext/...` succeeds"
+    completed_at: null
+
+  - id: task-002
+    title: "Add build_test.go hermetic walker tests on synthetic cobra tree"
+    description: |
+      Write build_test.go in the agentcontext package with table-driven
+      tests against a synthetic cobra tree (root + nested subcommands +
+      mix of local and persistent flags + one hidden flag + one hidden
+      subcommand). Asserts per REQ-V-005: flags sorted alphabetically;
+      hidden flags skipped; hidden subcommands skipped; persistent
+      parent flags appear on child with inherited:true; aliases captured;
+      Deprecated field surfaces. Build the tree inline — no app.NewCmd,
+      no clicfg dependency. Use require.* / assert.* per repo testify
+      idioms.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "build_test.go exists colocated with build.go with Neo4j copyright header"
+      - "Synthetic tree constructed inline (no app dependency, no clicfg)"
+      - "Asserts flag-sort, hidden-flag skip, hidden-subcmd skip, inherited:true marking, aliases captured, Deprecated surfaces"
+      - "`go test ./neo4j-cli/internal/subcommands/agentcontext/...` passes"
+    completed_at: null
+
+  - id: task-003
+    title: "Add agentcontext.go cobra command with --format dispatch"
+    description: |
+      Create agentcontext.go with NewCmd(cfg *clicfg.Config, version
+      string) *cobra.Command. Use="agent-context", Short ~"Emit the full
+      CLI shape as JSON for AI-agent discovery", Long explaining the v1
+      schema honestly (no aspirational fields) and pointing to AGENTS.md
+      "Agent Context Notes". Example field flush-left with three lines
+      per REQ-F-016: bare invocation, --format json piped to jq for
+      command keys, --format json piped to jq -e for a 3-level-deep flag
+      reach. RunE reads cfg.Aura.Output() (the existing root --format
+      accessor wired at app.go:38) and dispatches: json/default →
+      json.NewEncoder(out).Encode(ctx); toon → existing project toon
+      path; table → flat command-list table with columns path | aliases
+      | short, sorted by cmd.CommandPath() lexicographically, plus
+      footer block of cli_version / schema_version / async_flag. Body
+      ≤80 lines per the one-file-per-leaf rule. Neo4j copyright header.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "agentcontext.go exists with Neo4j copyright header and is ≤80 lines"
+      - "NewCmd(cfg, version) returns a cobra.Command with Use=\"agent-context\", non-empty Short/Long/Example"
+      - "Example field is flush-left (no leading 2-space indent) and contains ≥3 realistic invocations"
+      - "RunE dispatches on cfg.Aura.Output() — json (default piped), toon, table — each path writes non-empty output"
+      - "Table mode renders a flat command-list (path | aliases | short) sorted by CommandPath, plus footer with cli_version/schema_version/async_flag"
+      - "`go build ./neo4j-cli/internal/subcommands/agentcontext/...` succeeds"
+    completed_at: null
+
+  - id: task-004
+    title: "Register agent-context in neo4j-cli/app/app.go"
+    description: |
+      Edit neo4j-cli/app/app.go: add the import for the new agentcontext
+      package and add one line `cmd.AddCommand(agentcontext.NewCmd(cfg,
+      Version))` adjacent to the existing AddCommand block at lines
+      62-66. Pass app.Version explicitly (the package does not import
+      "app" to avoid a cycle). Verify `bin/neo4j-cli --help` lists
+      agent-context as a subcommand after `make build`.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "neo4j-cli/app/app.go imports github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
+      - "Exactly one new cmd.AddCommand(agentcontext.NewCmd(cfg, Version)) line is added"
+      - "agentcontext package does NOT import the app package (no cycle)"
+      - "`make build` succeeds; `bin/neo4j-cli --help` lists agent-context"
+      - "`bin/neo4j-cli agent-context --format json | jq '.schema_version'` returns 1"
+    completed_at: null
+
+  - id: task-005
+    title: "Add agentcontext_test.go end-to-end tests via app.NewCmd"
+    description: |
+      Write agentcontext_test.go colocated with the source. Tests build
+      the full app via app.NewCmd(cfg) with a testfs-backed config and
+      invoke cmd.SetArgs([]string{"agent-context", "--format", "json"}).
+      Cover REQ-V-001 through V-004 + V-006:
+      - TestAgentContext_Envelope: decode stdout into Context, assert
+        schema_version==1, cli_version!="", binary=="neo4j-cli",
+        len(commands)>0, len(exit_codes)==2, len(error_codes)==3,
+        output_formats==clicfg.ValidFormatValues[:],
+        async_flag=="--await".
+      - TestAgentContext_OutputFormatsParity: assert emitted
+        output_formats slice is reflect.DeepEqual to
+        clicfg.ValidFormatValues[:].
+      - TestAgentContext_TreeCoverage: walk app.NewCmd(cfg) live in the
+        test collecting every IsAvailableCommand path; walk the emitted
+        JSON commands tree collecting the same; assert set equality.
+        Failure msg names missing/extra paths.
+      - TestAgentContext_FormatRoundTrip: table-driven over
+        {json,toon,table}. Each path exits without error and stdout is
+        non-empty; for json round-trip back to Context via
+        json.Unmarshal.
+      - TestAgentContext_HelpExamples: assert leaf cmd.Example is
+        non-empty and the first line has no leading two-space indent.
+      Use clicfg.NewConfig(testfs.GetTestFs(...), version) per AGENTS.md
+      "Hermetic Test Notes" (lightweight cobra tests don't need the
+      heavier aura test helper). Neo4j copyright header.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "agentcontext_test.go exists with Neo4j copyright header, uses testfs-backed clicfg"
+      - "All five tests (Envelope, OutputFormatsParity, TreeCoverage, FormatRoundTrip, HelpExamples) exist and pass"
+      - "TreeCoverage walks the live cobra tree and asserts set equality with the JSON tree; failure mode names missing/extra paths"
+      - "FormatRoundTrip covers json, toon, table — none panic, all write non-empty stdout"
+      - "`make test` passes including all new agentcontext tests"
+    completed_at: null
+
+  - id: task-006
+    title: "Add 'Agent Context Notes' section to AGENTS.md"
+    description: |
+      Insert a new `## Agent Context Notes` section in AGENTS.md
+      immediately after the existing "Cobra Help / Skill Bundle
+      Rendering Notes" section, with the six bullets verbatim from
+      REQ-F-017. Body reminds contributors: JSON is reflected at
+      runtime (no regen for the tree); hand-coded constants live in
+      build.go and DO need manual updates (schemaVersion, exitCodes,
+      errorCodes, asyncFlag); output_formats is sourced from
+      clicfg.ValidFormatValues; schemaVersion bump rules; the
+      TreeCoverage test will trip if a new command is added but not
+      reflected. AGENTS.md is a symlink target — edit AGENTS.md (not
+      CLAUDE.md) per AGENTS.md "Repo Doc Notes".
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "AGENTS.md contains a new `## Agent Context Notes` heading after the 'Cobra Help / Skill Bundle Rendering Notes' section"
+      - "Section contains all six bullets per REQ-F-017 (runtime reflection note, no-regen note, build.go constants list, output_formats source note, schemaVersion bump rules, test-coverage note)"
+      - "Edits are to AGENTS.md only (not CLAUDE.md, which is a symlink)"
+      - "File ends with the existing trailing footer/HTML comment markers preserved"
+    completed_at: null
+
+  - id: task-007
+    title: "Ignore agent-cli-auditor.md and add Minor changelog entry"
+    description: |
+      Two tiny housekeeping edits:
+      (1) Append `/agent-cli-auditor.md` to /Users/oskarhane/Development/
+      neo4j-cli/.gitignore so the auditor skill file the user left at
+      repo root for this session is not committed. After the edit,
+      `git status` should no longer show agent-cli-auditor.md as
+      untracked-and-listed.
+      (2) Add a Minor changie entry: prefer `changie new --projects
+      neo4j-cli --kind Minor --body "Add neo4j-cli agent-context
+      command emitting the full CLI shape as JSON for AI-agent
+      discovery (CLI-83)"`. If changie is not on PATH, hand-author
+      .changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml
+      with fields project: neo4j-cli, kind: Minor, body: <text>, time:
+      RFC3339, per AGENTS.md "Changie Notes".
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - ".gitignore contains a line `/agent-cli-auditor.md`"
+      - "`git status --short` no longer shows agent-cli-auditor.md (file is ignored)"
+      - "A new file under .changes/unreleased/ matching neo4j-cli-Minor-*.yaml exists with project: neo4j-cli, kind: Minor, body mentioning CLI-83 and agent-context"
+      - "The changelog YAML parses as valid changie input (RFC3339 time)"
+    completed_at: null
+
+  - id: task-008
+    title: "Regenerate skill bundle to include references/agent-context.md"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to refresh the
+      committed skill bundle. The renderer (common/skill/render/
+      render.go) walks cmd.Commands() from app.NewCmd(cfg) and produces
+      one reference markdown file per top-level subcommand, so the new
+      agent-context command will produce a new
+      neo4j-cli/internal/skill/bundle/references/agent-context.md
+      automatically plus a SKILL.md table-of-contents row update. No
+      code changes to the renderer. Per AGENTS.md "Makefile Notes",
+      omitting this step causes TestGenerator_RoundTrip to fail in
+      `make test` with a "references/agent-context.md differs" message.
+      Commit both regenerated files.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "neo4j-cli/internal/skill/bundle/references/agent-context.md exists and contains the new command's Long + Example + flags"
+      - "neo4j-cli/internal/skill/bundle/SKILL.md has been updated with an agent-context table-of-contents row"
+      - "TestGenerator_RoundTrip passes inside `make test`"
+      - "`make generate-check` exits clean (no diff) after committing the regenerated files"
+    completed_at: null
+
+  - id: task-009
+    title: "Final gates: make test, fmt-check, lint, generate-check, license-check + manual smoke"
+    description: |
+      Run the full local gate suite as the closing step before handoff:
+      `make test`, `make fmt-check`, `make lint`, `make generate-check`,
+      `make license-check`. All five must pass clean. Then `make build`
+      and run the manual smoke commands from the PRD verification
+      section:
+      - `bin/neo4j-cli agent-context --format json | jq -e
+        '.schema_version, .cli_version, (.commands | keys),
+        .output_formats, .async_flag'`
+      - `bin/neo4j-cli agent-context --format json | jq -e
+        '.commands.aura.subcommands.instance.subcommands.list.flags'`
+        (≥3-level recursion check)
+      - `bin/neo4j-cli agent-context --format json | jq -e
+        '.commands."agent-context"'` (self-documenting check)
+      - `bin/neo4j-cli agent-context --format toon | head -40`
+      - `bin/neo4j-cli agent-context` (table on TTY)
+    status: pending
+    dependencies:
+      - task-002
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "`make test` exits 0 with all new agentcontext tests and TestGenerator_RoundTrip passing"
+      - "`make fmt-check` exits 0"
+      - "`make lint` exits 0"
+      - "`make generate-check` exits 0"
+      - "`make license-check` exits 0 (Neo4j copyright header present on every new .go file)"
+      - "Manual smoke: all five jq probes return non-empty, exit 0; toon and table renders produce non-empty output"
+    completed_at: null
