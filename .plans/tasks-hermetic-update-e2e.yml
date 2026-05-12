@@ -9,7 +9,7 @@ tasks:
     description: |
       Create a new minimal HTTP fixture under `test/e2e/release_fixture/main.go` (~80 LoC, pure stdlib) that serves `/repos/neo4j-labs/neo4j-cli/releases` from a committed JSON file selected by `--scenario {stable-head | pre-release-head}`. Mirror `test/e2e/update_fixture/main.go`'s harness handshake: listen on 127.0.0.1:0, print `listening on http://127.0.0.1:<port>` as the FIRST stdout line, shut down cleanly on SIGINT/SIGTERM.
       Also commit `test/e2e/release_fixture/testdata/releases-stable-head.json` and `releases-pre-release-head.json` using the slim shape `release.go` decodes (`tag_name`, `draft`, `prerelease`). Encode semver so each scenario produces its named channel under `update check --pre-releases`: stable tag MUST outrank prerelease tag in stable-head; prerelease tag MUST outrank stable tag in pre-release-head. Verify by running `bin/neo4j-cli-e2e update check --pre-releases -f json` (built with `-tags e2e_seams`) against each fixture and inspecting the `channel` field manually.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`test/e2e/release_fixture/main.go` exists, uses only stdlib, listens on 127.0.0.1:0, prints port handshake on first stdout line, handles SIGINT/SIGTERM cleanly"
@@ -17,7 +17,7 @@ tasks:
       - "Both JSON files committed under `test/e2e/release_fixture/testdata/`, LF-terminated, slim shape (`tag_name`, `draft`, `prerelease`)"
       - "Manual smoke: with `NEO4J_CLI_UPDATE_E2E_API_URL=http://127.0.0.1:<port>` pointed at each fixture, the e2e-seams binary reports the expected channel (stable for stable-head, pre-release for pre-release-head) under `update check --pre-releases`"
       - "Neo4j copyright header on the new `.go` file; `make license-check` clean"
-    completed_at: null
+    completed_at: 2026-05-12T08:30:51Z
 
   - id: task-002
     title: "Extend check_json with --schema-only mode"

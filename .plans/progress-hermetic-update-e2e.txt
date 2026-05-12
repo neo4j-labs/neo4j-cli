@@ -1,0 +1,4 @@
+## TASK-001 — 2026-05-12T08:30:51Z
+Authored release_fixture binary + canned releases JSON for both scenarios. Pure stdlib HTTP fixture serving /repos/neo4j-labs/neo4j-cli/releases from go:embed'd testdata; --scenario {stable-head|pre-release-head} required. Smoke-verified e2e-seams CLI returns channel=stable+latest=v9.9.0 for stable-head and channel=pre-release+latest=v9.9.1-alpha.1 for pre-release-head (both with --pre-releases). NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 required at runtime alongside the API_URL seam (HTTPS-pin off + 127.0.0.1 allowlist) — workflow step in task-003 must set both.
+Files: +test/e2e/release_fixture/main.go, +test/e2e/release_fixture/testdata/releases-stable-head.json, +test/e2e/release_fixture/testdata/releases-pre-release-head.json
+Decisions: Embed via //go:embed (cwd-independent, single binary). Reviewer phase skipped — Task/subagent tool unavailable in this harness.
