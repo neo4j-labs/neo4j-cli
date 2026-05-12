@@ -7,3 +7,7 @@ Decisions: standalone aura `config list` JSON also needed `"telemetry": true` (A
 Wired telemetry opt-out into NewConfig. New unexported helper `shouldDisableTelemetry(v, getenv)` returns true on telemetry=false OR literal DO_NOT_TRACK="1"; NewConfig calls events.Disable() synchronously before returning so STARTUP event in main.go is already gated.
 Files: +common/clicfg/telemetry.go, +common/clicfg/telemetry_test.go, ~common/clicfg/clicfg.go
 Decisions: helper test lives in package `clicfg` (not `_test`) for unexported access; getenv injected as a closure so tests don't touch process env.
+
+## task-003 — 2026-05-12T12:30:00Z
+Added one-sentence DO_NOT_TRACK=1 note to both user-facing READMEs, immediately after the existing `config set telemetry false --rw` example.
+Files: ~README.md, ~distribution/npm/cli/README.md

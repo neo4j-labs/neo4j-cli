@@ -68,14 +68,14 @@ tasks:
       telemetry without writing config." Do not introduce a new section
       heading — keep the change to one sentence in each README so the
       diff stays tiny.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`README.md` mentions `DO_NOT_TRACK=1` in the Write-operations / telemetry block"
       - "`distribution/npm/cli/README.md` mentions `DO_NOT_TRACK=1` in the same block"
       - "Existing `config set telemetry false --rw` example remains intact"
       - "No new section headings or unrelated reflow"
-    completed_at: null
+    completed_at: 2026-05-12T12:30:00Z
 
   - id: task-004
     title: "Add changie entry for telemetry opt-out"
