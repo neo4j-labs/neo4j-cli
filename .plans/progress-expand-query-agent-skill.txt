@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-12T07:34:25Z
 Renamed `## Gotchas` -> `## Tips & Gotchas` in render.go (line 151) + 4 comments. Updated testdata golden. Render pkg tests pass. TestGenerator_RoundTrip on neo4j-cli bundle expected to fail until task-006 regen.
 Files: ~common/skill/render/render.go, ~common/skill/render/testdata/SKILL.md
+
+## task-002 — 2026-05-12T07:36:51Z
+Authored neo4j-cli/internal/skill/query-additions.md (146 LF lines) with all 8 required sections, adapted to neo4j-cli surface (--param, :schema, :embed, --credential, -f toon, --rw). Schema description matches schemaResult struct (databaseInfo{Name,Versions[],Edition,DefaultLanguage}, flat nodes/relationships, separate relationship_paths). No -P / bare schema/embed / defaultCypherVersion refs. No source code touched — bundle wiring lives in task-003.
+Files: +neo4j-cli/internal/skill/query-additions.md

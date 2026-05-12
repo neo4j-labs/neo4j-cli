@@ -1,7 +1,7 @@
 feature: expand-query-agent-skill
 prd: ./prd-expand-query-agent-skill.md
 created_at: 2026-05-12T07:30:43Z
-updated_at: 2026-05-12T07:30:43Z
+updated_at: 2026-05-12T07:36:51Z
 
 tasks:
   - id: task-001
@@ -23,14 +23,14 @@ tasks:
     description: |
       Create the new file `neo4j-cli/internal/skill/query-additions.md` with all eight sections from REQ-F-002: H1 intro, Schema-first workflow, What `:schema` returns, Running queries, Handling user requests, Parameters, Embeddings & vector search, Cypher 25 vs Cypher 5 syntax, Tips.
       Adapt every example from the source SKILL.md (`../neo4j-query/skills/neo4j-query/SKILL.md`) to neo4j-cli flags: `--param` (no `-P`), `query :schema` (no plain `schema`), `query :embed` (no plain `embed`), Bolt URIs, `--credential`, `--format toon` default, `--rw`/EXPLAIN preflight for writes. The `:schema` section MUST describe neo4j-cli's actual struct shape from `neo4j-cli/query/schema.go` (`database{name, versions[], edition, default_language}`, flat `nodes`/`relationships`, separate `relationship_paths`, `indexes`, `constraints`). Do NOT mention `defaultCypherVersion` — point agents at `database.default_language` instead. Skip Ollama/HF env-var setup examples (gotcha #11 covers them) and `--env` walk-up. File must be LF-terminated.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`neo4j-cli/internal/skill/query-additions.md` exists with all eight sections in order: H1 intro, Schema-first workflow, What `:schema` returns, Running queries, Handling user requests, Parameters, Embeddings & vector search, Cypher 25 vs Cypher 5 syntax, Tips"
       - "No occurrence of `-P ` (the source's shorthand), bare `schema` subcommand reference, bare `embed` subcommand reference, or `defaultCypherVersion` in the file"
       - "Cypher 25 vs Cypher 5 section contrasts `CALL db.index.vector.queryNodes` (Cypher 5) with `SEARCH n IN (VECTOR INDEX ...)` (Cypher 25) and tells agents to read `database.default_language` from `:schema`"
       - "File is LF-line-ended (`file` reports ASCII / no CRLF) and ≤ ~250 lines"
-    completed_at: null
+    completed_at: 2026-05-12T07:36:51Z
 
   - id: task-003
     title: "Wire neo4j-cli/internal/skill/gen/main.go to emit bundle/query-additions.md"
