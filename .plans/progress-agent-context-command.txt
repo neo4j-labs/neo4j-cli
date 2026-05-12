@@ -6,3 +6,8 @@ Files: +neo4j-cli/internal/subcommands/agentcontext/build.go
 Added build_test.go with hermetic walker tests on a synthetic cobra tree: envelope check, hidden-subcmd skip, deprecated-subcmd skip via IsAvailableCommand, alphabetical flag sort over merged local+inherited set, hidden-flag skip, inherited:true marking, aliases non-nil, firstToken cases.
 Files: +neo4j-cli/internal/subcommands/agentcontext/build_test.go
 Decisions: Deprecated surfaces via direct walkCommand call (IsAvailableCommand filters Deprecated commands out of recursion per cobra contract — REQ-F-007 vs REQ-V-005 resolved by testing the field at the walkCommand layer).
+
+## TASK-003 — 2026-05-12T14:50:00Z
+Added agentcontext.go leaf cobra command + render.go with --format dispatch. RunE uses commonoutput.ResolveOutput (canonical "json"/"table"/"toon" resolver; "default" -> json when non-TTY). Toon path mirrors common/output (json -> any -> toon.Marshal). Table path flattens nested Commands map into rows sorted lexicographically with a 3-line footer.
+Files: +neo4j-cli/internal/subcommands/agentcontext/agentcontext.go, +neo4j-cli/internal/subcommands/agentcontext/render.go
+Decisions: Split render helpers into render.go to keep agentcontext.go ≤80 lines (42 lines actual). Used ResolveOutput rather than the PRD-suggested cfg.Aura.Output() — the canonical accessor is cfg.Global.Format() and ResolveOutput already encodes the TTY-detection semantics REQ-F-013 specifies.

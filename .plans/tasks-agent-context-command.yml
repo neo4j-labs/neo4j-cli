@@ -75,7 +75,7 @@ tasks:
       | short, sorted by cmd.CommandPath() lexicographically, plus
       footer block of cli_version / schema_version / async_flag. Body
       ≤80 lines per the one-file-per-leaf rule. Neo4j copyright header.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -85,7 +85,7 @@ tasks:
       - "RunE dispatches on cfg.Aura.Output() — json (default piped), toon, table — each path writes non-empty output"
       - "Table mode renders a flat command-list (path | aliases | short) sorted by CommandPath, plus footer with cli_version/schema_version/async_flag"
       - "`go build ./neo4j-cli/internal/subcommands/agentcontext/...` succeeds"
-    completed_at: null
+    completed_at: 2026-05-12T14:50:00Z
 
   - id: task-004
     title: "Register agent-context in neo4j-cli/app/app.go"
