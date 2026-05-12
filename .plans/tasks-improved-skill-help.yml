@@ -17,7 +17,7 @@ tasks:
       runs --help via the existing newFixture harness and asserts the
       output contains "Supported agents:" plus every name iterated from the
       skill.AGENTS slice.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "install.go Long appends '\\n\\nSupported agents: ' + strings.Join(agentNames(), ', ')"
@@ -25,7 +25,7 @@ tasks:
       - "Args stays cobra.MaximumNArgs(1); no ValidArgs field added"
       - "TestInstallCmd_HelpListsAgents exists, runs '--help' through newFixture, asserts 'Supported agents:' substring AND iterates skill.AGENTS asserting each Name appears"
       - "Existing TestInstallCmd_UnknownAgent still passes unchanged"
-    completed_at: null
+    completed_at: 2026-05-12T00:00:00Z
 
   - id: task-002
     title: "Enrich skill remove --help with supported-agents list and Example"

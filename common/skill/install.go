@@ -22,7 +22,10 @@ func newInstallCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Co
 		Long: "Without an argument, installs into every detected agent. " +
 			"With an [agent] argument (case-insensitive), installs into that " +
 			"single agent. Unknown agent names exit non-zero with the list " +
-			"of valid names.",
+			"of valid names." +
+			"\n\nSupported agents: " + strings.Join(agentNames(), ", "),
+		Example: "skill install            # install into every detected agent\n" +
+			"skill install claude-code  # install into a single agent",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

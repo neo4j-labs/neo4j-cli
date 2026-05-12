@@ -72,3 +72,19 @@ func TestInstallCmd_NoAgentsDetected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no supported agents detected")
 }
+
+func TestInstallCmd_HelpListsAgents(t *testing.T) {
+	f := newFixture(t, "/home/alice", "default")
+
+	require.NoError(t, f.exec(t, "install", "--help"))
+
+	out := f.stdout.String()
+	assert.Contains(t, out, "Supported agents:")
+	for _, a := range skill.AGENTS {
+		assert.Contains(t, out, a.Name, "help output must list agent %q", a.Name)
+	}
+	// Example block surfaces both forms.
+	assert.Contains(t, out, "Examples:")
+	assert.Contains(t, out, "skill install")
+	assert.Contains(t, out, "skill install claude-code")
+}
