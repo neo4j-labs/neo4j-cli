@@ -15,7 +15,7 @@
 //
 // Inputs (sibling files under neo4j-cli/aura/internal/skill/):
 //   - description.txt: frontmatter `description` (third-person, ≤1024 chars).
-//   - additions.md:    gotchas inlined under SKILL.md's "Gotchas" heading.
+//   - additions.md:    gotchas inlined under SKILL.md's "Tips & Gotchas" heading.
 //
 // Invocation:
 //   - `go generate ./neo4j-cli/aura/internal/skill/...` (preferred — runs

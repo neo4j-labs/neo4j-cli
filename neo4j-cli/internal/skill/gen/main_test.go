@@ -23,9 +23,9 @@ func TestGenerator_RoundTrip(t *testing.T) {
 	committedBundle := filepath.Join(pkgDir, "bundle")
 
 	tmpRoot := t.TempDir()
-	// Copy description.txt and additions.md into the staging dir so
-	// generate() reads them from the same package layout.
-	for _, name := range []string{"description.txt", "additions.md"} {
+	// Copy description.txt, additions.md, and query-additions.md into the
+	// staging dir so generate() reads them from the same package layout.
+	for _, name := range []string{"description.txt", "additions.md", "query-additions.md"} {
 		data, err := os.ReadFile(filepath.Join(pkgDir, name))
 		require.NoErrorf(t, err, "read %s", name)
 		require.NoError(t, os.WriteFile(filepath.Join(tmpRoot, name), data, 0644))

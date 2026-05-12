@@ -9,8 +9,10 @@
 // embedded into the binary via embed.go.
 //
 // Inputs (sibling files under neo4j-cli/internal/skill/):
-//   - description.txt: frontmatter `description` (third-person, ≤1024 chars).
-//   - additions.md:    gotchas inlined under SKILL.md's "Gotchas" heading.
+//   - description.txt:     frontmatter `description` (third-person, ≤1024 chars).
+//   - additions.md:        gotchas inlined under SKILL.md's "Tips & Gotchas" heading.
+//   - query-additions.md:  companion pre-reading for `neo4j-cli query`; copied
+//     verbatim into bundle/query-additions.md alongside SKILL.md.
 //
 // Invocation:
 //   - `go generate ./neo4j-cli/internal/skill/...` (preferred — runs
@@ -64,6 +66,7 @@ func packageDir() (string, error) {
 func generate(pkgDir string) error {
 	descPath := filepath.Join(pkgDir, "description.txt")
 	additionsPath := filepath.Join(pkgDir, "additions.md")
+	queryAdditionsPath := filepath.Join(pkgDir, "query-additions.md")
 
 	desc, err := os.ReadFile(descPath)
 	if err != nil {
@@ -72,6 +75,10 @@ func generate(pkgDir string) error {
 	additions, err := os.ReadFile(additionsPath)
 	if err != nil {
 		return fmt.Errorf("read additions.md: %w", err)
+	}
+	queryAdditions, err := os.ReadFile(queryAdditionsPath)
+	if err != nil {
+		return fmt.Errorf("read query-additions.md: %w", err)
 	}
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), app.Version, clicfg.GlobalScope)
@@ -85,6 +92,11 @@ func generate(pkgDir string) error {
 	if err != nil {
 		return fmt.Errorf("render bundle: %w", err)
 	}
+
+	// Companion pre-reading for `neo4j-cli query`, linked from SKILL.md's
+	// top bullet. Copied verbatim into bundle/ so install/check write it
+	// alongside SKILL.md.
+	files["query-additions.md"] = queryAdditions
 
 	bundleDir := filepath.Join(pkgDir, "bundle")
 	if err := os.RemoveAll(bundleDir); err != nil {

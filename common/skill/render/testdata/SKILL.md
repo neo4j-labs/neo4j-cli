@@ -27,7 +27,7 @@ subcommands, hidden subcommands, nested subcommands, and flag tables.
 | [`instance`](references/instance.md) | Manage instances |
 | [`zebra`](references/zebra.md) | Last alphabetical sub — verifies sort order |
 
-## Gotchas
+## Tips & Gotchas
 
 - One gotcha line.
 - Another gotcha line.

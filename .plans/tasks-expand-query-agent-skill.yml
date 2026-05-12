@@ -1,0 +1,132 @@
+feature: expand-query-agent-skill
+prd: ./prd-expand-query-agent-skill.md
+created_at: 2026-05-12T07:30:43Z
+updated_at: 2026-05-12T07:36:51Z
+
+tasks:
+  - id: task-001
+    title: "Rename `## Gotchas` heading to `## Tips & Gotchas` in render.go and refresh goldens"
+    description: |
+      Update `common/skill/render/render.go:151` to emit `## Tips & Gotchas` instead of `## Gotchas`. Update the matching documentation comments at lines 6, 50-52, 105, 149 (they describe the section semantics).
+      Then grep `common/skill/render/testdata/**` and any `*_test.go` files in the same package for the literal `## Gotchas` and update golden files / test assertions to match. Goldens must stay LF-pinned.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`common/skill/render/render.go:151` writes the literal `## Tips & Gotchas\\n\\n`"
+      - "Comments at render.go lines 6, 50-52, 105, 149 reference `Tips & Gotchas` (or equivalent wording) instead of `Gotchas`"
+      - "All `common/skill/render/testdata/**` files referencing the heading are updated; `go test ./common/skill/render/...` passes"
+      - "No remaining occurrences of bare `## Gotchas` in `common/skill/render/**` and `common/skill/**/*_test.go`"
+    completed_at: 2026-05-12T07:34:25Z
+
+  - id: task-002
+    title: "Author neo4j-cli/internal/skill/query-additions.md (ported from neo4j-query SKILL.md)"
+    description: |
+      Create the new file `neo4j-cli/internal/skill/query-additions.md` with all eight sections from REQ-F-002: H1 intro, Schema-first workflow, What `:schema` returns, Running queries, Handling user requests, Parameters, Embeddings & vector search, Cypher 25 vs Cypher 5 syntax, Tips.
+      Adapt every example from the source SKILL.md (`../neo4j-query/skills/neo4j-query/SKILL.md`) to neo4j-cli flags: `--param` (no `-P`), `query :schema` (no plain `schema`), `query :embed` (no plain `embed`), Bolt URIs, `--credential`, `--format toon` default, `--rw`/EXPLAIN preflight for writes. The `:schema` section MUST describe neo4j-cli's actual struct shape from `neo4j-cli/query/schema.go` (`database{name, versions[], edition, default_language}`, flat `nodes`/`relationships`, separate `relationship_paths`, `indexes`, `constraints`). Do NOT mention `defaultCypherVersion` — point agents at `database.default_language` instead. Skip Ollama/HF env-var setup examples (gotcha #11 covers them) and `--env` walk-up. File must be LF-terminated.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli/internal/skill/query-additions.md` exists with all eight sections in order: H1 intro, Schema-first workflow, What `:schema` returns, Running queries, Handling user requests, Parameters, Embeddings & vector search, Cypher 25 vs Cypher 5 syntax, Tips"
+      - "No occurrence of `-P ` (the source's shorthand), bare `schema` subcommand reference, bare `embed` subcommand reference, or `defaultCypherVersion` in the file"
+      - "Cypher 25 vs Cypher 5 section contrasts `CALL db.index.vector.queryNodes` (Cypher 5) with `SEARCH n IN (VECTOR INDEX ...)` (Cypher 25) and tells agents to read `database.default_language` from `:schema`"
+      - "File is LF-line-ended (`file` reports ASCII / no CRLF) and ≤ ~250 lines"
+    completed_at: 2026-05-12T07:36:51Z
+
+  - id: task-003
+    title: "Wire neo4j-cli/internal/skill/gen/main.go to emit bundle/query-additions.md"
+    description: |
+      After `render.Bundle(...)` returns its `map[string][]byte` in `neo4j-cli/internal/skill/gen/main.go`, read the new `query-additions.md` source file from the skill source directory and add it to the output map under key `query-additions.md`. The existing write loop persists it to `neo4j-cli/internal/skill/bundle/query-additions.md`.
+      Do NOT change `render.Options`. Do NOT touch the aura-side `gen/main.go`. Source dir resolution should mirror how `additions.md` and `description.txt` are read (same path pattern).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`neo4j-cli/internal/skill/gen/main.go` reads `query-additions.md` from the same directory it reads `additions.md` / `description.txt`"
+      - "The output map (post-`render.Bundle`) contains an entry `query-additions.md` with the file's bytes"
+      - "Running `go run ./neo4j-cli/internal/skill/gen` writes `neo4j-cli/internal/skill/bundle/query-additions.md` with bytes byte-equal to the source file"
+      - "`common/skill/render/render.go` and `common/skill/render/render.Options` are NOT modified"
+      - "`neo4j-cli/aura/internal/skill/gen/main.go` is NOT modified"
+    completed_at: 2026-05-12T07:39:19Z
+
+  - id: task-004
+    title: "Add top-of-list link bullet to neo4j-cli/internal/skill/additions.md"
+    description: |
+      Prepend ONE new bullet to the existing list in `neo4j-cli/internal/skill/additions.md` flagging `query-additions.md` as required pre-reading before using `neo4j-cli query`. Exact wording per REQ-F-004:
+      `- **Before using \`neo4j-cli query\`, read [query-additions.md](query-additions.md) — required pre-reading covering schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and tips.**`
+      The bullet must be the first list item (placed after the existing HTML comment header). Do NOT reorder or modify the existing 16 bullets.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "First bullet in `neo4j-cli/internal/skill/additions.md` (after the HTML comment) is the new `query-additions.md` reference"
+      - "Bullet text is exactly as specified in REQ-F-004 (bold, with markdown link `[query-additions.md](query-additions.md)`)"
+      - "Existing 16 gotcha bullets are untouched (same order, same wording)"
+      - "File stays LF-line-ended"
+    completed_at: 2026-05-12T07:41:12Z
+
+  - id: task-005
+    title: "Verify .gitattributes LF coverage for query-additions.md and audit TestGenerator_RoundTrip"
+    description: |
+      Two pre-regen verification steps:
+      (a) Inspect repo-root `.gitattributes`: confirm the existing glob `**/internal/skill/additions.md` does NOT match `query-additions.md` (it won't — it's a literal filename). Add an explicit entry `**/internal/skill/query-additions.md text eol=lf` if no broader glob already covers it, so Windows checkouts don't rewrite to CRLF. Verify `common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` walks `**/internal/skill/bundle/**` — the new `bundle/query-additions.md` should already be covered there.
+      (b) Read `TestGenerator_RoundTrip` (find it via grep). Determine whether it walks the file map returned by `render.Bundle()` only, or compares the full `bundle/` tree against a regenerated tree. If it walks the map only, extend it (or add a sibling test) to assert `bundle/query-additions.md` byte-equals `neo4j-cli/internal/skill/query-additions.md` after a generator run. If it already compares the full tree, no test change is needed.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Repo-root `.gitattributes` ensures `neo4j-cli/internal/skill/query-additions.md` is LF-pinned (either via existing glob or new explicit entry)"
+      - "TestGenerator_RoundTrip behavior is documented in commit/PR (which path: map-walk or tree-compare)"
+      - "If map-walk: a test asserts `bundle/query-additions.md` matches the source file after `go generate`"
+      - "`common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` (or equivalent) passes against the new file"
+    completed_at: 2026-05-12T07:42:59Z
+
+  - id: task-006
+    title: "Regenerate both bundles via go generate"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`. Expected committed diffs:
+      - `neo4j-cli/internal/skill/bundle/SKILL.md` — new top bullet linking `query-additions.md`, heading reads `## Tips & Gotchas`.
+      - `neo4j-cli/internal/skill/bundle/query-additions.md` — new file, byte-equal to source.
+      - `neo4j-cli/aura/internal/skill/bundle/SKILL.md` — heading-only change (`## Tips & Gotchas`), no content drift.
+      Commit all three diffs together with the source-side changes.
+    status: completed
+    dependencies:
+      - task-001
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` exits 0 with no errors"
+      - "`neo4j-cli/internal/skill/bundle/SKILL.md` contains both `## Tips & Gotchas` AND the new top bullet linking `query-additions.md`"
+      - "`neo4j-cli/internal/skill/bundle/query-additions.md` exists and is byte-equal to `neo4j-cli/internal/skill/query-additions.md`"
+      - "`neo4j-cli/aura/internal/skill/bundle/SKILL.md` heading reads `## Tips & Gotchas`; no other content changes vs prior commit"
+      - "`make generate-check` (i.e. `git diff --exit-code` after `go generate ./...`) reports a clean tree"
+    completed_at: 2026-05-12T07:45:02Z
+
+  - id: task-007
+    title: "Add changie Patch entry for skill enrichment"
+    description: |
+      Add a changie entry via `changie new --projects neo4j-cli --kind Patch --body "Expand the query subcommand's agent skill with schema-first workflow, parameter usage, embeddings, and Cypher 25 vs Cypher 5 syntax guidance via a new query-additions.md companion document."`.
+      If `changie` is not installed locally, hand-author the YAML at `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project: neo4j-cli`, `kind: Patch`, `body: '<single-quoted body>'`, `time: <RFC3339>`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A file matching `.changes/unreleased/neo4j-cli-Patch-*.yaml` exists"
+      - "YAML contains `project: neo4j-cli`, `kind: Patch`, RFC3339 `time`, and the required body text"
+      - "Body mentions schema-first workflow, embeddings, Cypher 25 vs Cypher 5, and `query-additions.md`"
+    completed_at: 2026-05-12T07:46:24Z
+
+  - id: task-008
+    title: "Run final gates: make test, fmt-check, lint, generate-check"
+    description: |
+      Run the project's mandatory gates per CLAUDE.md as the final pre-commit check. Treat any failure as blocking — do not mark this task complete until all four are clean.
+      Specifically: `make test`, `make fmt-check`, `make lint`, `make generate-check`. If a render-side golden lags, fix it under task-001's scope; if a roundtrip test fails on the new bundle file, fix it under task-005's scope; otherwise debug the failure.
+    status: completed
+    dependencies:
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`make test` exits 0 (all tests pass on the dev machine)"
+      - "`make fmt-check` exits 0 (no files need gofmt)"
+      - "`make lint` exits 0 (golangci-lint clean)"
+      - "`make generate-check` exits 0 (no diff after `go generate ./...`)"
+      - "Manual eyeball of `neo4j-cli/internal/skill/bundle/SKILL.md` and `bundle/query-additions.md` shows clean rendering, intact code fences, no source-form artifacts"
+    completed_at: 2026-05-12T07:48:30Z

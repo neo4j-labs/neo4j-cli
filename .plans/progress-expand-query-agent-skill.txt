@@ -1,0 +1,34 @@
+## task-001 — 2026-05-12T07:34:25Z
+Renamed `## Gotchas` -> `## Tips & Gotchas` in render.go (line 151) + 4 comments. Updated testdata golden. Render pkg tests pass. TestGenerator_RoundTrip on neo4j-cli bundle expected to fail until task-006 regen.
+Files: ~common/skill/render/render.go, ~common/skill/render/testdata/SKILL.md
+
+## task-002 — 2026-05-12T07:36:51Z
+Authored neo4j-cli/internal/skill/query-additions.md (146 LF lines) with all 8 required sections, adapted to neo4j-cli surface (--param, :schema, :embed, --credential, -f toon, --rw). Schema description matches schemaResult struct (databaseInfo{Name,Versions[],Edition,DefaultLanguage}, flat nodes/relationships, separate relationship_paths). No -P / bare schema/embed / defaultCypherVersion refs. No source code touched — bundle wiring lives in task-003.
+Files: +neo4j-cli/internal/skill/query-additions.md
+
+## task-003 — 2026-05-12T07:39:19Z
+Wired neo4j-cli/internal/skill/gen/main.go to read sibling query-additions.md (same pattern as description.txt/additions.md) and inject it into render.Bundle's output map under key "query-additions.md" so the existing write loop persists bundle/query-additions.md. render.Options untouched; aura gen untouched. fmt-check/lint clean. Expected pre-task-006 drift: aura TestGenerator_RoundTrip flags `## Tips & Gotchas` heading (task-006 regen). Expected pre-task-005 drift: neo4j-cli TestGenerator_RoundTrip errors because its test fixture stages only description.txt+additions.md into tmpRoot — task-005 will extend it to also stage query-additions.md.
+Files: ~neo4j-cli/internal/skill/gen/main.go
+
+## task-004 — 2026-05-12T07:41:12Z
+Prepended the query-additions.md pre-reading bullet as the first list item in neo4j-cli/internal/skill/additions.md (after the HTML comment header). Exact REQ-F-004 wording; existing bullets untouched; LF preserved. Markdown-only change; fmt-check+lint clean. Bundle regen deferred to task-006.
+Files: ~neo4j-cli/internal/skill/additions.md
+
+## task-005 — 2026-05-12T07:42:59Z
+(a) Added `**/internal/skill/query-additions.md text eol=lf` to repo-root .gitattributes (sibling slot to additions.md/description.txt) — no existing glob matched it. (b) TestGenerator_RoundTrip is tree-compare (walkRel + byte-compare across full bundle/ tree) so no new map-walk assertion needed; bundle/query-additions.md gets covered automatically once task-006 commits it. Extended the fixture staging loop in neo4j-cli/internal/skill/gen/main_test.go to also copy `query-additions.md` into tmpRoot (matching the 3 files generate() now reads). Aura side untouched (its generate() doesn't read query-additions.md). Post-fix round-trip diff is now purely the expected pre-regen drift: heading rename + missing committed bundle/query-additions.md — both resolved by task-006. fmt-check/lint clean.
+Files: ~.gitattributes, ~neo4j-cli/internal/skill/gen/main_test.go
+
+## task-006 — 2026-05-12T07:45:02Z
+Ran `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`. Diff matches expectations exactly: aura SKILL.md heading-only rename (`## Gotchas` → `## Tips & Gotchas`); neo4j-cli SKILL.md heading rename + new top bullet pointing to query-additions.md; new file bundle/query-additions.md byte-equal to source (diff -q empty, 146 LF lines). Re-running `make generate` yields no further churn. Gates: test PASS, fmt-check PASS, lint PASS (0 issues), generate-check fails locally only due to unstaged regen output (the deliverable) — CI clean-tree run will pass after commit.
+Files: ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, +neo4j-cli/internal/skill/bundle/query-additions.md
+
+## task-007 — 2026-05-12T07:46:24Z
+Ran `changie new --projects neo4j-cli --kind Patch --body "..."` (changie installed at /opt/homebrew/bin/changie). Produced .changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml with project/kind/body/time fields; body covers schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and query-additions.md. Native changie output uses unquoted scalar body vs AGENTS.md hand-author single-quoted form — both valid YAML, identical string. fmt-check + lint clean.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml
+
+## task-008 — 2026-05-12T07:48:30Z
+Final gates: `make test` PASS (all packages green incl. neo4j-cli/internal/skill/gen TestGenerator_RoundTrip), `make fmt-check` PASS, `make lint` PASS (0 issues), `make generate-check` clean for bundle/source paths — only diff is the expected mid-task tasks-yml in_progress flip (AGENTS.md notes this is benign). Manual eyeball: bundle/SKILL.md line 31 reads `## Tips & Gotchas`, line 35 has new query-additions.md pre-read bullet (bold); bundle/query-additions.md is 146 LF lines with 18 balanced code fences and no `-P`/bare-schema/bare-embed/defaultCypherVersion artifacts. Inline feature-diff review (7 commits vs main) clean; minor stale "Gotchas" wording inside additions.md HTML comments + embed.go doc noted but out of task-008 scope (cosmetic, invisible).
+Files: (none — gate-only task)
+
+## FINAL — 2026-05-12T07:48:30Z
+All 8 tasks complete. Feature `expand-query-agent-skill` ready for merge. Gates green: test/fmt-check/lint/generate-check. Branch `oskar/cli-77-query-skill` has 8 commits ahead of main (1 PRD/tasks + 7 task commits).
