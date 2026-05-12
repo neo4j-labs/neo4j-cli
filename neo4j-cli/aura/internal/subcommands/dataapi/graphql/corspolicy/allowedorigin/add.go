@@ -74,7 +74,7 @@ Adding a new allowed origin to the CORS policy of a GraphQL Data API allows brow
 
 			// NOTE: Update should not return OK (200), it always returns 202, checking both just in case
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				cmd.Printf("New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \""))
+				fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
 				if await {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

@@ -11,3 +11,8 @@ Decisions: added //nolint:errcheck on each new fmt.Fprintln call (matches existi
 Converted 3 delete commands (customer-managed-key, deployment, deployment token) to emit structured JSON on stdout via output.PrintBodyMap and human confirmation on stderr; switched delete tests to AssertOutJson + AssertErrContainsStrings; added regression pins (cmk + deployment) and a --format table assertion. Pins sanity-checked: fail when reverted.
 Files: ~customermanagedkey/delete.go, ~customermanagedkey/delete_test.go, ~deployment/delete.go, ~deployment/delete_test.go, ~deployment/token/delete.go, ~deployment/token/delete_test.go
 Decisions: field keys per PRD ("id" for cmk/deployment, "deployment_id" for token); table-format coverage added only on cmk to avoid duplication.
+
+## TASK-004 — 2026-05-12T17:30:00Z
+Routed banner (graphql/create, authprovider/create) and origin-echo (allowedorigin/add, allowedorigin/remove) plain-text to stderr via fmt.Fprintln/Fprintf; wording preserved verbatim. Updated colocated tests: dropped moved lines from AssertOut, added AssertErrContainsStrings. Added TestCreateGraphQLDataApi_StdoutIsValidJSON (banner) and TestAddAllowedOrigin_StdoutIsValidJSON (origin echo) regression pins; both sanity-checked: fail when reverted.
+Files: ~dataapi/graphql/create.go, ~dataapi/graphql/create_test.go, ~dataapi/graphql/authprovider/create.go, ~dataapi/graphql/authprovider/create_test.go, ~dataapi/graphql/corspolicy/allowedorigin/add.go, ~dataapi/graphql/corspolicy/allowedorigin/add_test.go, ~dataapi/graphql/corspolicy/allowedorigin/remove.go, ~dataapi/graphql/corspolicy/allowedorigin/remove_test.go
+Decisions: authprovider banner only fires for api-key type; used a table-driven expectedErrContains field so jwks rows assert empty stderr.

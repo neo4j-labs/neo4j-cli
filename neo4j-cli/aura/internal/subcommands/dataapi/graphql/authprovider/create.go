@@ -84,9 +84,9 @@ If you lose your API key, you will need to create a new Authentication provider.
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 
 				if _type == api.GraphQLDataApiAuthProviderTypeApiKey {
-					cmd.Println("###############################")
-					cmd.Println("# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.")
-					cmd.Println("###############################")
+					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+					fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "key", "url"})

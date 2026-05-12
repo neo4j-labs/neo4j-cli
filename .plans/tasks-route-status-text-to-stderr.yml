@@ -94,7 +94,8 @@ tasks:
       AssertOutIsValidJSON: one for a banner command (e.g. graphql/create with --format
       json) and one for an origin-echo command (e.g. allowedorigin/add with --format
       json).
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T17:30:00Z
     dependencies:
       - task-001
     acceptance_criteria:
