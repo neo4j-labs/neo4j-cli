@@ -177,6 +177,7 @@ See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill 
 - Package-level test seams (e.g. `stdinIsTTY` at `neo4j-cli/query/run.go`, `stdoutIsTerminal` at `neo4j-cli/query/output.go`) are `var <name> = func(...) ...` declarations that production fills with the real impl. For TTY-related seams in the `query` package, `TestMain` in `testseam_test.go` seeds the seam to the most-common-existing-assertion value (e.g. TTY=true) so legacy tests stay green without per-test edits; tests that need the other branch use a small `withX(t, val)` helper that swaps the seam and registers `t.Cleanup` to restore it.
 - `httptest.NewServer` server-side `r.Context().Done()` propagation from a closed client connection is best-effort and timing-dependent — when testing client ctx-cancellation paths, ALWAYS guard the handler with a short safety timeout (`select { case <-r.Context().Done(): case <-time.After(2*time.Second): }`) AND wrap the test-side wait on `errCh` in a `select` with a 5s fallback `t.Fatal`. Without these, a propagation miss hangs the handler until `-test.timeout` (default 10m), looking exactly like an infinite go-test loop. Symptom: `pkill -QUIT <pid>` shows the handler's goroutine blocked on `chanrecv` at `<-r.Context().Done()` while the client side has long returned.
 - Tier-1 e2e for `update check` uses the `e2e_seams` build tag + `test/e2e/release_fixture` to cover both `channel: stable` and `channel: pre-release` deterministically (two scenarios, sequential restarts); a sibling `Update e2e (schema-only live smoke)` step pipes real-api.github.com output through `check_json --schema-only` as a calendar-immune contract canary.
+- Cobra lazily injects its built-in `completion` subcommand (and four children) on the FIRST `Execute()` call via `InitDefaultCompletionCmd`. Tests that walk the live cobra tree AND a post-execute artifact (e.g. `agent-context` JSON, skill bundle) must build ONE tree, run `Execute()`, then walk THAT same instance — building a fresh `app.NewCmd` for the walk and a separate one for Execute yields a phantom diff of `[completion, completion bash, completion fish, completion powershell, completion zsh]` in the post-execute side.
 
 ## Windows CI Gotchas
 
@@ -235,6 +236,15 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - `--param` flag Usage on the `query` parent now mentions the `:embed` modifier (`key:embed=<text>`) — keeping the modifier discoverable in `--help` was cheaper than a separate flag. The full rule (JSON-array rejection, empty-text accepted) lives in README and the bundle additions.md, not the flag Usage.
 - README's "Aura API Credentials" example uses `credential aura-client add` (canonical neo4j-cli path), NOT the standalone-aura `aura credential add` form. The standalone aura binary is no longer built/shipped, so README must lead with commands the shipped binary actually has.
 - Skill bundle `description.txt` (frontmatter description) is single-paragraph, ≤1024 chars, third-person. When adding new top-level capability to it, list every credential subtree explicitly ("Aura, Neo4j connection (dbms), and embedding-provider credentials") rather than collapsing them — the agent-side trigger phrasing matches user wording better when each subtree is named.
+
+## Agent Context Notes
+
+- `neo4j-cli agent-context` emits the full CLI shape as JSON for AI-agent discovery (Layer 2 per `agent-cli-auditor.md` §7.2). Reflected from the live cobra tree at runtime — no static artifact to keep in sync.
+- Adding a new command/flag automatically surfaces in the next `agent-context` invocation. No regen step, no `make generate-check` involvement for the JSON itself. (Skill-bundle `references/<cmd>.md` still needs `go generate` per the existing rules.)
+- Hand-coded constants live in `neo4j-cli/internal/subcommands/agentcontext/build.go`: `schemaVersion`, `exitCodes`, `errorCodes`, `asyncFlag`. Update these when adding a new error category, exit code, or async-flag convention.
+- `output_formats` is sourced from `clicfg.ValidFormatValues`; do NOT duplicate the list in agent-context.
+- Bump `schemaVersion` on breaking JSON-shape changes (rename a top-level key, change a field type, drop a documented code).
+- Tests in `agentcontext_test.go` lock the envelope shape, output-format parity, and tree coverage. Adding a new top-level command will trip the coverage test until the JSON includes it — the failure message tells you what's missing.
 
 ---
 
