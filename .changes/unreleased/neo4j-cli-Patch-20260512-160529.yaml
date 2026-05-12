@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82)'
+time: 2026-05-12T16:05:29.003861+02:00

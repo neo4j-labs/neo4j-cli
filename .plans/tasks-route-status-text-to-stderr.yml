@@ -135,7 +135,8 @@ tasks:
       (CLI-82)"`, or hand-author the YAML under `.changes/unreleased/` following the
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` convention if changie is unavailable.
       Body single-quoted, time in RFC3339, project field set to `neo4j-cli`.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T16:06:00Z
     dependencies:
       - task-002
       - task-003

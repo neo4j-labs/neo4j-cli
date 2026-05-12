@@ -21,3 +21,7 @@ Decisions: authprovider banner only fires for api-key type; used a table-driven 
 Routed config/project/use confirmation to stderr via fmt.Fprintf(cmd.ErrOrStderr(), ...) and added missing trailing \n. Updated use_test.go to assert stderr message via AssertErrContainsStrings and stdout empty via AssertOut("").
 Files: ~config/project/use.go, ~config/project/use_test.go
 Decisions: collapsed multi-line Printf to single-line Fprintf so //nolint:errcheck trailing comment fits existing convention.
+
+## TASK-006 — 2026-05-12T16:06:00Z
+Added Patch-kind changie entry for CLI-82 via `changie new`; body matches PRD wording, time RFC3339, project: neo4j-cli.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
