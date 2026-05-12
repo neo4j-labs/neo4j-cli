@@ -70,7 +70,7 @@ tasks:
       Two pre-regen verification steps:
       (a) Inspect repo-root `.gitattributes`: confirm the existing glob `**/internal/skill/additions.md` does NOT match `query-additions.md` (it won't — it's a literal filename). Add an explicit entry `**/internal/skill/query-additions.md text eol=lf` if no broader glob already covers it, so Windows checkouts don't rewrite to CRLF. Verify `common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` walks `**/internal/skill/bundle/**` — the new `bundle/query-additions.md` should already be covered there.
       (b) Read `TestGenerator_RoundTrip` (find it via grep). Determine whether it walks the file map returned by `render.Bundle()` only, or compares the full `bundle/` tree against a regenerated tree. If it walks the map only, extend it (or add a sibling test) to assert `bundle/query-additions.md` byte-equals `neo4j-cli/internal/skill/query-additions.md` after a generator run. If it already compares the full tree, no test change is needed.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -78,7 +78,7 @@ tasks:
       - "TestGenerator_RoundTrip behavior is documented in commit/PR (which path: map-walk or tree-compare)"
       - "If map-walk: a test asserts `bundle/query-additions.md` matches the source file after `go generate`"
       - "`common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` (or equivalent) passes against the new file"
-    completed_at: null
+    completed_at: 2026-05-12T07:42:59Z
 
   - id: task-006
     title: "Regenerate both bundles via go generate"

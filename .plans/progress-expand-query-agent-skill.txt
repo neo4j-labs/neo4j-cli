@@ -13,3 +13,7 @@ Files: ~neo4j-cli/internal/skill/gen/main.go
 ## task-004 — 2026-05-12T07:41:12Z
 Prepended the query-additions.md pre-reading bullet as the first list item in neo4j-cli/internal/skill/additions.md (after the HTML comment header). Exact REQ-F-004 wording; existing bullets untouched; LF preserved. Markdown-only change; fmt-check+lint clean. Bundle regen deferred to task-006.
 Files: ~neo4j-cli/internal/skill/additions.md
+
+## task-005 — 2026-05-12T07:42:59Z
+(a) Added `**/internal/skill/query-additions.md text eol=lf` to repo-root .gitattributes (sibling slot to additions.md/description.txt) — no existing glob matched it. (b) TestGenerator_RoundTrip is tree-compare (walkRel + byte-compare across full bundle/ tree) so no new map-walk assertion needed; bundle/query-additions.md gets covered automatically once task-006 commits it. Extended the fixture staging loop in neo4j-cli/internal/skill/gen/main_test.go to also copy `query-additions.md` into tmpRoot (matching the 3 files generate() now reads). Aura side untouched (its generate() doesn't read query-additions.md). Post-fix round-trip diff is now purely the expected pre-regen drift: heading rename + missing committed bundle/query-additions.md — both resolved by task-006. fmt-check/lint clean.
+Files: ~.gitattributes, ~neo4j-cli/internal/skill/gen/main_test.go
