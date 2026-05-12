@@ -30,7 +30,7 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 
 ## Tips & Gotchas
 
-<!-- Hand-written gotchas inlined into the generated SKILL.md "Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
+<!-- Hand-written tips & gotchas inlined into the generated SKILL.md "Tips & Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
 
 - `aura-cli` is the standalone binary; the same surface is also reachable via `neo4j-cli aura ...` (the super-CLI re-mounts this tree under `aura`). Use whichever binary the user has installed.
 - `credential` lives at the top level of aura-cli; client credentials are required before any command that talks to Aura's API.

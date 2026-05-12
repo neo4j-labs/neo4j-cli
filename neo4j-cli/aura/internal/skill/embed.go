@@ -9,7 +9,7 @@
 // shipped in the binary; CI runs `make generate-check` to fail on drift.
 //
 // Edit description.txt and additions.md (sibling files) to change the
-// frontmatter description and the SKILL.md "Gotchas" section. The
+// frontmatter description and the SKILL.md "Tips & Gotchas" section. The
 // remainder of SKILL.md and every references/<sub>.md is derived from
 // the cobra tree built by aura.NewStandaloneCmd.
 package skill
