@@ -21,6 +21,7 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 
 | Command | Description |
 |---------|-------------|
+| [`agent-context`](references/agent-context.md) | Emit the full CLI shape as JSON for AI-agent discovery |
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |

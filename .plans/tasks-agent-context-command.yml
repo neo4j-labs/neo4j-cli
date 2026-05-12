@@ -208,7 +208,7 @@ tasks:
       omitting this step causes TestGenerator_RoundTrip to fail in
       `make test` with a "references/agent-context.md differs" message.
       Commit both regenerated files.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -216,7 +216,7 @@ tasks:
       - "neo4j-cli/internal/skill/bundle/SKILL.md has been updated with an agent-context table-of-contents row"
       - "TestGenerator_RoundTrip passes inside `make test`"
       - "`make generate-check` exits clean (no diff) after committing the regenerated files"
-    completed_at: null
+    completed_at: 2026-05-12T16:45:00Z
 
   - id: task-009
     title: "Final gates: make test, fmt-check, lint, generate-check, license-check + manual smoke"
