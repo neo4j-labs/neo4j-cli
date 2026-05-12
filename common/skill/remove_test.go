@@ -60,3 +60,19 @@ func TestRemoveCmd_UnknownAgent(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown agent")
 }
+
+func TestRemoveCmd_HelpListsAgents(t *testing.T) {
+	f := newFixture(t, "/home/alice", "default")
+
+	require.NoError(t, f.exec(t, "remove", "--help"))
+
+	out := f.stdout.String()
+	assert.Contains(t, out, "Supported agents:")
+	for _, a := range skill.AGENTS {
+		assert.Contains(t, out, a.Name, "help output must list agent %q", a.Name)
+	}
+	// Example block surfaces both forms.
+	assert.Contains(t, out, "Examples:")
+	assert.Contains(t, out, "skill remove")
+	assert.Contains(t, out, "skill remove claude-code")
+}

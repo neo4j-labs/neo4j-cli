@@ -2,3 +2,7 @@
 Enrich `skill install --help` with `Supported agents:` line (joined from agentNames()) + flush-left Example block; added TestInstallCmd_HelpListsAgents iterating skill.AGENTS.
 Files: ~common/skill/install.go, ~common/skill/install_test.go
 Decisions: bundle regen deferred to task-003 per plan dependency chain; `make test` will fail TestGenerator_RoundTrip until then (expected drift).
+
+## TASK-002 — 2026-05-12T00:00:00Z
+Mirror task-001 on remove: append `Supported agents:` line to Long + flush-left Example, added TestRemoveCmd_HelpListsAgents.
+Files: ~common/skill/remove.go, ~common/skill/remove_test.go

@@ -4,6 +4,8 @@
 package skill
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -17,7 +19,10 @@ func newRemoveCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 		Long: "Without an argument, removes from every detected agent. " +
 			"With an [agent] argument (case-insensitive), removes from that " +
 			"single agent. Idempotent: a second run on a clean target is a " +
-			"no-op.",
+			"no-op." +
+			"\n\nSupported agents: " + strings.Join(agentNames(), ", "),
+		Example: "skill remove            # remove from every detected agent\n" +
+			"skill remove claude-code  # remove from a single agent",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

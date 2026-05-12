@@ -36,7 +36,7 @@ tasks:
       TestRemoveCmd_HelpListsAgents to the existing
       common/skill/remove_test.go using the same assertion pattern as the
       install twin.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "remove.go Long appends '\\n\\nSupported agents: ' + strings.Join(agentNames(), ', ')"
@@ -44,7 +44,7 @@ tasks:
       - "Args stays cobra.MaximumNArgs(1); no ValidArgs field added"
       - "TestRemoveCmd_HelpListsAgents exists in common/skill/remove_test.go, asserts 'Supported agents:' substring AND iterates skill.AGENTS"
       - "Existing remove tests still pass unchanged"
-    completed_at: null
+    completed_at: 2026-05-12T00:00:00Z
 
   - id: task-003
     title: "Regenerate skill bundles for both binaries"
