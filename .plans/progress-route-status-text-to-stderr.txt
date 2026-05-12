@@ -30,3 +30,8 @@ Files: +.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
 Routed tenant get table-format warning to stderr (CLI-95) via fmt.Fprintln(cmd.ErrOrStderr(), ...); wording + table/default gate preserved. Updated TestGetTenantWithTableOutput to assert stdout has only the table and stderr contains the warning; added TestGetTenant_StdoutIsValidJSON regression pin under --format json. Appended CLI-95 to existing changie body.
 Files: ~tenant/get.go, ~tenant/get_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
 Decisions: edited changie body in place (vs new entry + delete) per task hint.
+
+## TASK-008 — 2026-05-12T19:15:00Z
+TTY-gated the five :schema H2 section markers (CLI-94) via commonoutput.StdoutIsTerminal(cmd.OutOrStdout()) — interactive stdout still shows labels, piped/redirected stdout gets table rows only. Added TestSchema_TableNonTTYSuppressesHeaders pin (sanity-checked: fails when reverted) plus explicit withStdoutIsTerminal(t,true) on TestSchema_HappyPath_Table. Updated changie body to credit CLI-82, CLI-95, CLI-94.
+Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: assertSectionsInOrder anchors use upper-case column headers (go-pretty default) — five unique-per-section column names give stronger coverage than just table-presence.

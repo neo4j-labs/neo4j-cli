@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Patch
-body: 'fix(cli): route progress/status text to stderr so --format json output stays jq-parseable (CLI-82, CLI-95)'
+body: 'fix(cli): keep stdout clean for --format json consumers — route narration to stderr (CLI-82, CLI-95), TTY-gate :schema H2 headers (CLI-94)'
 time: 2026-05-12T16:05:29.003861+02:00

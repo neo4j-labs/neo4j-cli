@@ -231,7 +231,8 @@ tasks:
 
       No bundle regen needed (no cobra `Long` / `Use` / flag-description edits) —
       but run `make generate-check` as a gate anyway.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T19:15:00Z
     dependencies:
       - task-007
     acceptance_criteria:
