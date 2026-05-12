@@ -14,7 +14,7 @@ tasks:
       `RegisterAuraCredentialFlag`'s PreRunE silences cobra's usage-block print. Keep the
       leaf functions (`BindFormatFromFlag`, `EnforceWriteGate`) pure — no SilenceUsage
       writes inside them — so direct-call tests stay semantically unchanged.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "silenceUsageOnError helper exists in common/flags/flags.go with the documented signature and no exported visibility"
@@ -23,7 +23,7 @@ tasks:
       - "RegisterAuraCredentialFlag's PersistentPreRunE wraps the prior-hook error and the credential-not-found error via silenceUsageOnError"
       - "BindFormatFromFlag and EnforceWriteGate bodies are unchanged — no SilenceUsage mutations inside them"
       - "make fmt-check, make lint, and make test all pass with no other tests broken"
-    completed_at: null
+    completed_at: 2026-05-12T14:35:00Z
 
   - id: task-002
     title: "Add unit tests for silenceUsageOnError wrappers in common/flags/flags_test.go"

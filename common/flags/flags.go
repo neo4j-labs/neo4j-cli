@@ -24,8 +24,18 @@ func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 	)
 
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		return BindFormatFromFlag(cmd, cfg)
+		return silenceUsageOnError(cmd, BindFormatFromFlag(cmd, cfg))
 	}
+}
+
+// silenceUsageOnError sets cmd.SilenceUsage=true when err is non-nil so
+// cobra prints the focused error without appending the full --help block.
+// Returns err unchanged so call sites can `return silenceUsageOnError(cmd, x())`.
+func silenceUsageOnError(cmd *cobra.Command, err error) error {
+	if err != nil {
+		cmd.SilenceUsage = true
+	}
+	return err
 }
 
 // RegisterRwFlag adds a persistent --rw flag to cmd.
@@ -83,9 +93,9 @@ func EnforceWriteGate(cmd *cobra.Command) error {
 func ComposeRootPersistentPreRunE(cfg *clicfg.Config) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if err := BindFormatFromFlag(cmd, cfg); err != nil {
-			return err
+			return silenceUsageOnError(cmd, err)
 		}
-		return EnforceWriteGate(cmd)
+		return silenceUsageOnError(cmd, EnforceWriteGate(cmd))
 	}
 }
 
@@ -112,7 +122,7 @@ func RegisterAuraCredentialFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if prior != nil {
 			if err := prior(cmd, args); err != nil {
-				return err
+				return silenceUsageOnError(cmd, err)
 			}
 		}
 
@@ -131,7 +141,7 @@ func RegisterAuraCredentialFlag(cmd *cobra.Command, cfg *clicfg.Config) {
 			} else {
 				hint = "aura-cli credential list"
 			}
-			return clierr.NewUsageError("credential %q not found, run `%s` to see available credentials", name, hint)
+			return silenceUsageOnError(cmd, clierr.NewUsageError("credential %q not found, run `%s` to see available credentials", name, hint))
 		}
 
 		cfg.Aura.SetActiveCredential(cred)
