@@ -245,6 +245,8 @@ tasks:
       - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
 
   - id: task-009
+    status: completed
+    completed_at: 2026-05-12T19:30:00Z
     title: "Pattern G (CLI-96) — route update command status lines to stderr"
     description: |
       In `neo4j-cli/internal/subcommands/update/update.go`, replace 5 `cmd.Println` /
@@ -291,7 +293,6 @@ tasks:
       Edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body in place.
 
       No bundle regen expected; run `make generate-check` as a gate.
-    status: pending
     dependencies:
       - task-008
     acceptance_criteria:

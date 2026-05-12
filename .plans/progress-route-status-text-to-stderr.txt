@@ -35,3 +35,8 @@ Decisions: edited changie body in place (vs new entry + delete) per task hint.
 TTY-gated the five :schema H2 section markers (CLI-94) via commonoutput.StdoutIsTerminal(cmd.OutOrStdout()) — interactive stdout still shows labels, piped/redirected stdout gets table rows only. Added TestSchema_TableNonTTYSuppressesHeaders pin (sanity-checked: fails when reverted) plus explicit withStdoutIsTerminal(t,true) on TestSchema_HappyPath_Table. Updated changie body to credit CLI-82, CLI-95, CLI-94.
 Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
 Decisions: assertSectionsInOrder anchors use upper-case column headers (go-pretty default) — five unique-per-section column names give stronger coverage than just table-presence.
+
+## TASK-009 — 2026-05-12T19:30:00Z
+Routed 5 update-command status lines (CLI-96) to stderr via fmt.Fprintln/Fprintf(cmd.ErrOrStderr(), ...): dev-build early return, no-stable-release recovery, pre-swap Current/Checking narrative, post-swap skill-install tip. Wording verbatim. Added TestUpdate_StatusLinesGoToStderr with split outBuf/errBuf for dev-build + no-stable branches (sanity-checked: fails when reverted); fixed TestRunUpdate_PostSwap_NoAgentsInstalled to assert Tip on errOut. Appended CLI-96 to changie body.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: split-buffer test covers dev-build (required) + no-stable (bonus); L434/L435/L475 covered implicitly by existing runWithBundleFormat tests that read errOut.
