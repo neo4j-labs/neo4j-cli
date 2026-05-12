@@ -55,7 +55,7 @@ tasks:
     title: "Add schema-only live smoke workflow step"
     description: |
       Add a new step to `.github/workflows/test.yml` named "Update e2e (schema-only live smoke)". It uses the SAME `bin/neo4j-cli-e2e` binary built in task-003, but does NOT set `NEO4J_CLI_UPDATE_E2E_API_URL` — so the binary talks to real `api.github.com`. Pipe `update check --pre-releases -f json` to `check_json --schema-only`. No `--expect-channel`, no `--cross-check`. The step is calendar-immune: it catches GitHub API contract drift but doesn't assert which channel happens to be at the head.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -65,7 +65,7 @@ tasks:
       - "Asserts via `check_json --schema-only`; no value-coupling flags passed"
       - "Step runs on ubuntu / macos / windows"
       - "Step passes against current state of GitHub (v1.0.0 stable at head)"
-    completed_at: null
+    completed_at: 2026-05-12T08:38:41Z
 
   - id: task-005
     title: "Add AGENTS.md note + run final gates"

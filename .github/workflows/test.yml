@@ -188,6 +188,43 @@ jobs:
 
                   echo "tier-1 hermetic e2e: OK"
 
+            # Schema-only live smoke: reuse the Tier-1 e2e binary against
+            # the real api.github.com (no NEO4J_CLI_UPDATE_E2E_API_URL set,
+            # so the e2e_seams shim falls through to the production base
+            # URL). We assert shape + enum membership only via
+            # `check_json --schema-only` — no `--expect-channel`, no
+            # `--cross-check` — so this step is calendar-immune. Its job
+            # is to catch GitHub API contract drift (renamed/removed JSON
+            # fields, new install_method enum value, semver-invalid
+            # `latest`) WITHOUT coupling CI green to whichever tag is at
+            # the head of the release feed on a given day. The hermetic
+            # block above covers value assertions for both channels.
+            - name: Update e2e (schema-only live smoke)
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  case "${RUNNER_OS:-}" in
+                    Windows) cli_bin="bin/neo4j-cli-e2e.exe" ;;
+                    *)       cli_bin="bin/neo4j-cli-e2e" ;;
+                  esac
+                  if [ ! -f "${cli_bin}" ] && [ -f "bin/neo4j-cli-e2e" ]; then
+                    cli_bin="bin/neo4j-cli-e2e"
+                  fi
+
+                  # Capture stdout. Defense in depth around exit code (see
+                  # the hermetic block above for the rationale).
+                  set +e
+                  out="$("${cli_bin}" update check --pre-releases -f json)"
+                  set -e
+                  echo "--- update check stdout (live) ---"
+                  printf '%s\n' "$out"
+                  echo "--- end stdout ---"
+
+                  printf '%s' "$out" | go run ./test/e2e/check_json --schema-only
+
+                  echo "schema-only live smoke: OK"
+
             # Tier-2 e2e: real download + atomic-swap against a local fixture
             # server. Tier-1 (above) covers the `check` subcommand read path
             # against real GitHub; this exercises the WRITE path — archive download,
