@@ -1,4 +1,4 @@
 project: neo4j-cli
-kind: Minor
+kind: Patch
 body: Add telemetry opt-out via 'config set telemetry false' and the DO_NOT_TRACK=1 environment variable
 time: 2026-05-12T14:06:46.598126+02:00
