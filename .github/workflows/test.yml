@@ -201,6 +201,12 @@ jobs:
             # block above covers value assertions for both channels.
             - name: Update e2e (schema-only live smoke)
               shell: bash
+              # Authenticate api.github.com to dodge the 60 req/h unauth limit
+              # shared across the runner pool's egress IPs (a flake source on
+              # macOS in particular). Step-scoped so the token never leaks
+              # into other build steps.
+              env:
+                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   set -euo pipefail
 
