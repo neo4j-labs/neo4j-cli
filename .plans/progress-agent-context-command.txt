@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-05-12T14:20:00Z
 Added pure-function walker + Context/Command/Flag types in new agentcontext package. Closed-set constants (schemaVersion=1, exitCodes, errorCodes, asyncFlag) hand-coded; output_formats sourced live from clicfg.ValidFormatValues.
 Files: +neo4j-cli/internal/subcommands/agentcontext/build.go
+
+## TASK-002 — 2026-05-12T14:35:00Z
+Added build_test.go with hermetic walker tests on a synthetic cobra tree: envelope check, hidden-subcmd skip, deprecated-subcmd skip via IsAvailableCommand, alphabetical flag sort over merged local+inherited set, hidden-flag skip, inherited:true marking, aliases non-nil, firstToken cases.
+Files: +neo4j-cli/internal/subcommands/agentcontext/build_test.go
+Decisions: Deprecated surfaces via direct walkCommand call (IsAvailableCommand filters Deprecated commands out of recursion per cobra contract — REQ-F-007 vs REQ-V-005 resolved by testing the field at the walkCommand layer).

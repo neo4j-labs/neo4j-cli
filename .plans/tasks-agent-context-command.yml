@@ -48,7 +48,7 @@ tasks:
       Deprecated field surfaces. Build the tree inline — no app.NewCmd,
       no clicfg dependency. Use require.* / assert.* per repo testify
       idioms.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -56,7 +56,7 @@ tasks:
       - "Synthetic tree constructed inline (no app dependency, no clicfg)"
       - "Asserts flag-sort, hidden-flag skip, hidden-subcmd skip, inherited:true marking, aliases captured, Deprecated surfaces"
       - "`go test ./neo4j-cli/internal/subcommands/agentcontext/...` passes"
-    completed_at: null
+    completed_at: 2026-05-12T14:35:00Z
 
   - id: task-003
     title: "Add agentcontext.go cobra command with --format dispatch"
