@@ -15,3 +15,8 @@ Decisions: Split render helpers into render.go to keep agentcontext.go ≤80 lin
 ## TASK-004 — 2026-05-12T15:00:00Z
 Mounted agent-context in neo4j-cli root by importing the agentcontext package and adding one AddCommand line. Manual smoke confirmed bin/neo4j-cli --help lists agent-context and `agent-context --format json | jq .schema_version` returns 1. make build/fmt-check/lint and targeted go test all green; TestGenerator_RoundTrip is expected to fail until task-008 regenerates the skill bundle.
 Files: ~neo4j-cli/app/app.go
+
+## TASK-005 — 2026-05-12T15:15:00Z
+Added end-to-end tests in external test package agentcontext_test exercising the live app tree via app.NewCmd(cfg). Five tests cover REQ-V-001..V-006: Envelope (all 8 top-level fields), OutputFormatsParity (reflect.DeepEqual to clicfg.ValidFormatValues), TreeCoverage (set-equality between live IsAvailableCommand walk and emitted JSON), FormatRoundTrip (json/toon/table table-driven), HelpExamples (non-empty, flush-left first line). All gates green except TestGenerator_RoundTrip (still pending task-008 bundle regen).
+Files: +neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go
+Decisions: External test package (agentcontext_test) required to avoid import cycle on app. TreeCoverage walks the live tree AFTER cmd.Execute() so cobra's lazy-injected `completion` subtree appears on both sides — building a fresh app.NewCmd for the live walk and a separate one for the JSON-emit run yields a false-positive diff. Single shared cmd instance, single Execute(), walk both halves from there.

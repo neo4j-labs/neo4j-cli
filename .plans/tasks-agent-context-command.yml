@@ -135,7 +135,7 @@ tasks:
       Use clicfg.NewConfig(testfs.GetTestFs(...), version) per AGENTS.md
       "Hermetic Test Notes" (lightweight cobra tests don't need the
       heavier aura test helper). Neo4j copyright header.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -144,7 +144,7 @@ tasks:
       - "TreeCoverage walks the live cobra tree and asserts set equality with the JSON tree; failure mode names missing/extra paths"
       - "FormatRoundTrip covers json, toon, table — none panic, all write non-empty stdout"
       - "`make test` passes including all new agentcontext tests"
-    completed_at: null
+    completed_at: 2026-05-12T15:15:00Z
 
   - id: task-006
     title: "Add 'Agent Context Notes' section to AGENTS.md"
