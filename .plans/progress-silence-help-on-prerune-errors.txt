@@ -1,0 +1,20 @@
+## task-001 — 2026-05-12T14:35:00Z
+Added private silenceUsageOnError helper in common/flags/flags.go and wrapped the three PreRunE return sites (RegisterOutputFlag, ComposeRootPersistentPreRunE, RegisterAuraCredentialFlag) so cobra suppresses the usage block on PreRunE errors.
+Files: ~common/flags/flags.go
+
+## task-002 — 2026-05-12T14:45:00Z
+Added table-driven unit tests pinning silenceUsageOnError behavior across all three PreRunE wrappers (RegisterOutputFlag, ComposeRootPersistentPreRunE, RegisterAuraCredentialFlag).
+Files: ~common/flags/flags_test.go
+
+## task-003 — 2026-05-12T15:00:00Z
+Added wantOutEmpty field to TestConfigSet table; the no-rw and --rw format invalid rows now assert stdout is empty. Required source change in set.go to set cmd.SilenceUsage=true on RunE errors (ResolveConfigKey + Global.Set), because the --rw format invalid path goes through RunE (clicfg.Set), not the PreRunE wrappers covered by task-001.
+Files: ~neo4j-cli/internal/subcommands/config/set.go, ~neo4j-cli/internal/subcommands/config/set_test.go
+Decisions: extended scope beyond pure test changes (task-001 only covered PreRunE) to make the documented acceptance criterion pass; aligns with PRD focused-error intent.
+
+## task-004 — 2026-05-12T15:15:00Z
+Extended TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution to assert h.stdout is empty after the write-gate rejection, pinning the existing cmd.SilenceUsage=true at neo4j-cli/query/run.go:50.
+Files: ~neo4j-cli/query/run_test.go
+
+## task-005 — 2026-05-12T12:51:43Z
+Added Patch-kind changie entry documenting the focused-error UX fix (suppresses --help block on missing --rw / invalid --format / unknown --credential).
+Files: +.changes/unreleased/neo4j-cli-Patch-20260512-145143.yaml

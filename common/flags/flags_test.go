@@ -124,6 +124,103 @@ func TestRegisterAuraCredentialFlag_CredentialNotFound(t *testing.T) {
 			if tc.wantNotContains != "" {
 				assert.NotContains(t, err.Error(), tc.wantNotContains)
 			}
+			assert.True(t, cmd.SilenceUsage,
+				"credential-not-found error must set SilenceUsage on the leaf so cobra does not print the full --help block")
+		})
+	}
+}
+
+func TestRegisterOutputFlag_SilencesUsageOnError(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		args             []string
+		wantErr          bool
+		wantSilenceUsage bool
+	}{
+		{
+			name:             "invalid --format errors and silences usage",
+			args:             []string{"resource", "--format", "bogus"},
+			wantErr:          true,
+			wantSilenceUsage: true,
+		},
+		{
+			name:             "valid --format succeeds without silencing usage",
+			args:             []string{"resource", "--format", "json"},
+			wantErr:          false,
+			wantSilenceUsage: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
+			cmd := &cobra.Command{
+				Use:  "resource",
+				RunE: func(cmd *cobra.Command, args []string) error { return nil },
+			}
+			RegisterOutputFlag(cmd, cfg)
+
+			err := executeWithArgs(t, "neo4j-cli", cmd, tc.args)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantSilenceUsage, cmd.SilenceUsage)
+		})
+	}
+}
+
+func TestComposeRootPersistentPreRunE_SilencesUsageOnError(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		annotations      map[string]string
+		args             []string
+		wantErrContains  string
+		wantSilenceUsage bool
+	}{
+		{
+			name:             "write leaf without --rw errors and silences usage",
+			annotations:      map[string]string{"write": "true"},
+			args:             []string{"resource"},
+			wantErrContains:  "this command writes; pass --rw to allow it",
+			wantSilenceUsage: true,
+		},
+		{
+			name:             "invalid --format errors and silences usage",
+			args:             []string{"resource", "--format", "bogus"},
+			wantErrContains:  "invalid format value specified: bogus",
+			wantSilenceUsage: true,
+		},
+		{
+			name:             "happy path does not silence usage",
+			args:             []string{"resource", "--format", "json"},
+			wantErrContains:  "",
+			wantSilenceUsage: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
+			cmd := &cobra.Command{
+				Use:         "resource",
+				Annotations: tc.annotations,
+				RunE:        func(cmd *cobra.Command, args []string) error { return nil },
+			}
+			RegisterOutputFlag(cmd, cfg)
+			RegisterRwFlag(cmd)
+
+			root := &cobra.Command{Use: "neo4j-cli"}
+			root.PersistentPreRunE = ComposeRootPersistentPreRunE(cfg)
+			root.AddCommand(cmd)
+			cobra.EnableTraverseRunHooks = true
+			root.SetArgs(tc.args)
+
+			err := root.Execute()
+			if tc.wantErrContains == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContains)
+			}
+			assert.Equal(t, tc.wantSilenceUsage, cmd.SilenceUsage)
 		})
 	}
 }

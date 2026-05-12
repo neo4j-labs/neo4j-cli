@@ -29,6 +29,7 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 
 			scope, bareKey, err := clicfg.ResolveConfigKey(key, cfg)
 			if err != nil {
+				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -37,7 +38,11 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 				cfg.Aura.Set(bareKey, value)
 				return nil
 			default:
-				return cfg.Global.Set(bareKey, value)
+				if err := cfg.Global.Set(bareKey, value); err != nil {
+					cmd.SilenceUsage = true
+					return err
+				}
+				return nil
 			}
 		},
 	}

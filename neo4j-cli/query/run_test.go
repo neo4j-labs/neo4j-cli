@@ -240,6 +240,9 @@ func TestRunQuery_WriteCypherWithoutRwErrorsBeforeExecution(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
 	assert.Equal(t, []string{"EXPLAIN CREATE (n)"}, r.calls)
+	// Pin focused-error behavior: write-gate rejection must NOT leak cobra's
+	// usage block to stdout — cmd.SilenceUsage=true at run.go:50 guarantees this.
+	assert.Equal(t, "", h.stdout.String(), "write-gate rejection must not print usage block to stdout")
 }
 
 func TestRunQuery_WriteCypherWithRwSkipsPreflight(t *testing.T) {
