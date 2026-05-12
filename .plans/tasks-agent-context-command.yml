@@ -236,7 +236,7 @@ tasks:
         '.commands."agent-context"'` (self-documenting check)
       - `bin/neo4j-cli agent-context --format toon | head -40`
       - `bin/neo4j-cli agent-context` (table on TTY)
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-005
@@ -250,4 +250,4 @@ tasks:
       - "`make generate-check` exits 0"
       - "`make license-check` exits 0 (Neo4j copyright header present on every new .go file)"
       - "Manual smoke: all five jq probes return non-empty, exit 0; toon and table renders produce non-empty output"
-    completed_at: null
+    completed_at: 2026-05-12T17:00:00Z
