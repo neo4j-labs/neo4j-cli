@@ -3,9 +3,9 @@
 
 // Package render walks a cobra command tree and produces a deterministic,
 // agent-skill bundle: a top-level SKILL.md (frontmatter + overview + global
-// flag table + subcommand index + gotchas) plus one references/<sub>.md per
-// top-level subcommand (recursive flag tables and examples, TOC if >100
-// lines).
+// flag table + subcommand index + tips & gotchas) plus one
+// references/<sub>.md per top-level subcommand (recursive flag tables and
+// examples, TOC if >100 lines).
 //
 // The frontmatter `version` field is the literal `{{VERSION}}` placeholder;
 // the installer substitutes it with the runtime binary version when the
@@ -48,8 +48,8 @@ type Options struct {
 	Description string
 
 	// Additions is the raw markdown that appears under the SKILL.md
-	// "Gotchas" heading. Sourced from each binary's additions.md. May be
-	// empty.
+	// "Tips & Gotchas" heading. Sourced from each binary's additions.md.
+	// May be empty.
 	Additions string
 }
 
@@ -102,7 +102,7 @@ func visibleSubcommands(root *cobra.Command) []*cobra.Command {
 //   - Heading (root.Name) and short/long overview
 //   - Global Flags table (root persistent flags)
 //   - Subcommands index (links to references/<name>.md)
-//   - Gotchas (Options.Additions verbatim)
+//   - Tips & Gotchas (Options.Additions verbatim)
 func renderSkill(root *cobra.Command, subs []*cobra.Command, opts Options) []byte {
 	var buf bytes.Buffer
 
@@ -146,9 +146,9 @@ func renderSkill(root *cobra.Command, subs []*cobra.Command, opts Options) []byt
 		buf.WriteString("\n")
 	}
 
-	// Gotchas — verbatim from additions.md, normalised to a single
+	// Tips & Gotchas — verbatim from additions.md, normalised to a single
 	// trailing newline.
-	buf.WriteString("## Gotchas\n\n")
+	buf.WriteString("## Tips & Gotchas\n\n")
 	body := strings.TrimRight(opts.Additions, "\n")
 	if body != "" {
 		buf.WriteString(body)

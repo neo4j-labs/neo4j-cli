@@ -1,0 +1,3 @@
+## task-001 — 2026-05-12T07:34:25Z
+Renamed `## Gotchas` -> `## Tips & Gotchas` in render.go (line 151) + 4 comments. Updated testdata golden. Render pkg tests pass. TestGenerator_RoundTrip on neo4j-cli bundle expected to fail until task-006 regen.
+Files: ~common/skill/render/render.go, ~common/skill/render/testdata/SKILL.md

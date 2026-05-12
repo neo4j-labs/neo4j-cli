@@ -9,14 +9,14 @@ tasks:
     description: |
       Update `common/skill/render/render.go:151` to emit `## Tips & Gotchas` instead of `## Gotchas`. Update the matching documentation comments at lines 6, 50-52, 105, 149 (they describe the section semantics).
       Then grep `common/skill/render/testdata/**` and any `*_test.go` files in the same package for the literal `## Gotchas` and update golden files / test assertions to match. Goldens must stay LF-pinned.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`common/skill/render/render.go:151` writes the literal `## Tips & Gotchas\\n\\n`"
       - "Comments at render.go lines 6, 50-52, 105, 149 reference `Tips & Gotchas` (or equivalent wording) instead of `Gotchas`"
       - "All `common/skill/render/testdata/**` files referencing the heading are updated; `go test ./common/skill/render/...` passes"
       - "No remaining occurrences of bare `## Gotchas` in `common/skill/render/**` and `common/skill/**/*_test.go`"
-    completed_at: null
+    completed_at: 2026-05-12T07:34:25Z
 
   - id: task-002
     title: "Author neo4j-cli/internal/skill/query-additions.md (ported from neo4j-query SKILL.md)"
