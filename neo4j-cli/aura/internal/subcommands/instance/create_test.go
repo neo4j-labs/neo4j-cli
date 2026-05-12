@@ -493,9 +493,50 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 		"username": "neo4j"
 	}
 }
-Waiting for instance to be ready...
-Instance Status: ready
 	`)
+	helper.AssertErrContainsStrings([]string{
+		"Waiting for instance to be ready...",
+		"Instance Status: ready",
+	})
+}
+
+// TestCreateFreeInstanceWithAwait_StdoutIsValidJSON is the CLI-82 regression-pin
+// for the await narration: pre-fix, stdout had narration mixed with the JSON
+// body and would fail to unmarshal. Reverting any of the Pattern A fmt.Fprintln
+// replacements to cmd.Println causes this test to fail.
+func TestCreateFreeInstanceWithAwait_StdoutIsValidJSON(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("POST /v1/instances", http.StatusAccepted, `{
+			"data": {
+				"id": "db1d1234",
+				"connection_url": "YOUR_CONNECTION_URL",
+				"username": "neo4j",
+				"password": "letMeIn123!",
+				"tenant_id": "YOUR_TENANT_ID",
+				"cloud_provider": "gcp",
+				"region": "europe-west1",
+				"type": "free-db",
+				"name": "Instance01"
+			}
+		}`)
+
+	helper.NewRequestHandlerMock("GET /v1/instances/db1d1234", http.StatusOK, `{
+			"data": {
+				"id": "db1d1234",
+				"status": "creating"
+			}
+		}`).AddResponse(http.StatusOK, `{
+			"data": {
+				"id": "db1d1234",
+				"status": "ready"
+			}
+		}`)
+
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw --format json")
+
+	helper.AssertOutIsValidJSON()
 }
 
 func TestCreateCredentialFlagValidation(t *testing.T) {
@@ -918,7 +959,10 @@ func TestCreateCredentialStoredBeforeAwait(t *testing.T) {
 
 	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw")
 
-	helper.AssertErr("")
+	helper.AssertErrContainsStrings([]string{
+		"Waiting for instance to be ready...",
+		"Instance Status: ready",
+	})
 
 	// Credential must be stored even though --await polling followed.
 	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")

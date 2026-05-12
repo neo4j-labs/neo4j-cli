@@ -61,8 +61,7 @@ func TestRemoveAllowedOriginWithRemainingOrigins(t *testing.T) {
 			}
 		}
 	}`, allowedOrigin)
-	expectedResponse := `New allowed origins: ["https://test1.com", "https://test2.com"]
-{
+	expectedResponse := `{
 	"data": {
 		"id": "2f49c2b3",
 		"name": "my-data-api-1",
@@ -88,6 +87,9 @@ func TestRemoveAllowedOriginWithRemainingOrigins(t *testing.T) {
 	mockHandler.AssertCalledWithBody("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"https://test1.com\",\"https://test2.com\"]}}}")
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		`New allowed origins: ["https://test1.com", "https://test2.com"]`,
+	})
 }
 
 func TestRemoveAllowedOriginWithNoExistingOrigins(t *testing.T) {
@@ -135,8 +137,7 @@ func TestRemoveAllowedOriginLastAllowedOrigin(t *testing.T) {
 			}
 		}
 	}`, allowedOrigin)
-	expectedResponse := `New allowed origins: []
-{
+	expectedResponse := `{
 	"data": {
 		"id": "2f49c2b3",
 		"name": "my-data-api-1",
@@ -162,6 +163,9 @@ func TestRemoveAllowedOriginLastAllowedOrigin(t *testing.T) {
 	mockHandler.AssertCalledWithBody("{\"security\":{\"cors_policy\":{\"allowed_origins\":[]}},\"test\":\"ignore me\"}")
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		"New allowed origins: []",
+	})
 }
 
 func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
@@ -178,8 +182,7 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 			}
 		}
 	}`, allowedOrigin)
-	expectedResponse := `New allowed origins: ["https://test1.com", "https://test2.com"]
-┌──────────┬───────────────┬────────┬────────────────────────────────────────────────────────────────────────────────┐
+	expectedResponse := `┌──────────┬───────────────┬────────┬────────────────────────────────────────────────────────────────────────────────┐
 │ ID       │ NAME          │ STATUS │ URL                                                                            │
 ├──────────┼───────────────┼────────┼────────────────────────────────────────────────────────────────────────────────┤
 │ 2f49c2b3 │ my-data-api-1 │ ready  │ https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql │
@@ -203,4 +206,7 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 	mockHandler.AssertCalledWithBody("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"https://test1.com\",\"https://test2.com\"]}}}")
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		`New allowed origins: ["https://test1.com", "https://test2.com"]`,
+	})
 }

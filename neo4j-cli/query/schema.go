@@ -293,26 +293,42 @@ func renderSchema(cmd *cobra.Command, cfg *clicfg.Config, r schemaResult) {
 // Relationship Paths, Indexes, Constraints) separated by H2 markers in the
 // documented order. The optional `database` info is JSON-only — table mode
 // has no natural tabular shape for the single-record metadata payload.
+//
+// The H2 markers (`## <Section>`) are decorative labels for interactive use; a
+// non-TTY consumer (`--format table | cat`, redirected to a file) gets the
+// table rows only so the output stays cleanly machine-readable. CLI-94.
 func printSchemaTables(cmd *cobra.Command, r schemaResult) {
-	cmd.Println("## Nodes")
+	isTTY := commonoutput.StdoutIsTerminal(cmd.OutOrStdout())
+
+	if isTTY {
+		cmd.Println("## Nodes")
+	}
 	cmd.Println(renderNodesTable(r.Nodes))
 	cmd.Println()
 
-	cmd.Println("## Relationships")
+	if isTTY {
+		cmd.Println("## Relationships")
+	}
 	cmd.Println(renderRelsTable(r.Relationships))
 	cmd.Println()
 
-	cmd.Println("## Relationship Paths")
+	if isTTY {
+		cmd.Println("## Relationship Paths")
+	}
 	cmd.Println(renderPathsTable(r.RelationshipPaths))
 	cmd.Println()
 
-	cmd.Println("## Indexes")
+	if isTTY {
+		cmd.Println("## Indexes")
+	}
 	cmd.Println(renderMapsTable(
 		[]string{"name", "type", "entityType", "labelsOrTypes", "properties", "state", "owningConstraint", "options"},
 		r.Indexes))
 	cmd.Println()
 
-	cmd.Println("## Constraints")
+	if isTTY {
+		cmd.Println("## Constraints")
+	}
 	cmd.Println(renderMapsTable(
 		[]string{"name", "type", "entityType", "labelsOrTypes", "properties", "ownedIndex", "propertyType"},
 		r.Constraints))

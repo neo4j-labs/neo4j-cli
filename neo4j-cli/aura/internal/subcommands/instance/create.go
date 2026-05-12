@@ -231,7 +231,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(instance), fields)
 
 				if await {
-					cmd.Println("Waiting for instance to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
 					pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusCreating)
@@ -239,7 +239,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 						return err
 					}
 
-					cmd.Println("Instance Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 

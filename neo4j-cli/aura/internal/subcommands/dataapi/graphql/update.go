@@ -86,13 +86,13 @@ Updating a GraphQL Data API is an asynchronous operation. Use the --await flag t
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
 
 				if await {
-					cmd.Println("Waiting for GraphQL Data API to be updated...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, args[0], api.GraphQLDataApiStatusUpdating)
 					if err != nil {
 						return err
 					}
 
-					cmd.Println("GraphQL Data API Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 			return nil

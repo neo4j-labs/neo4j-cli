@@ -41,7 +41,7 @@ The time taken to complete a snapshot depends on the amount of data stored in th
 				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id"})
 
 				if await {
-					cmd.Println("Waiting for snapshot to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateSnapshotResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
 						return err
@@ -53,7 +53,7 @@ The time taken to complete a snapshot depends on the amount of data stored in th
 						return err
 					}
 
-					cmd.Println("Snapshot Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "Snapshot Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 			return nil

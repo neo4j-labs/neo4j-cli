@@ -166,7 +166,9 @@ func TestCreateSessionWithAwait(t *testing.T) {
 		"user_id": "YOUR_USER_ID"
 	}
 }
-Waiting for session to be ready...
-Session Status: Ready
 	`)
+	helper.AssertErrContainsStrings([]string{
+		"Waiting for session to be ready...",
+		"Session Status: Ready",
+	})
 }

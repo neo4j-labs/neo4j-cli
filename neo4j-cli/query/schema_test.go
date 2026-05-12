@@ -196,6 +196,12 @@ func TestSchema_DefaultOutputTTYIsTables(t *testing.T) {
 }
 
 func TestSchema_HappyPath_Table(t *testing.T) {
+	// Belt-and-suspenders: TestMain seeds StdoutIsTerminal=true, but make the
+	// TTY expectation explicit here since the H2 markers are now TTY-gated
+	// (CLI-94). Without TTY=true this test would lose its `## <Section>`
+	// assertions to the new gate.
+	withStdoutIsTerminal(t, true)
+
 	s := happySchemaSeam()
 	s.install(t)
 
@@ -221,6 +227,55 @@ func TestSchema_HappyPath_Table(t *testing.T) {
 	assert.NotContains(t, out, "## Database")
 
 	// Spot-check that body content from the canned data made it to stdout.
+	assert.Contains(t, out, "Person")
+	assert.Contains(t, out, "ACTED_IN")
+	assert.Contains(t, out, "idx_person_name")
+	assert.Contains(t, out, "uq_person_name")
+}
+
+// TestSchema_TableNonTTYSuppressesHeaders pins the CLI-94 behaviour: under
+// `--format table` with a non-TTY stdout (piped, redirected), the H2 section
+// markers (`## Nodes`, `## Relationships`, etc.) are suppressed. The table
+// rows themselves still render unconditionally — only the decorative labels
+// are TTY-gated.
+func TestSchema_TableNonTTYSuppressesHeaders(t *testing.T) {
+	withStdoutIsTerminal(t, false)
+
+	s := happySchemaSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "table")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":schema",
+	)
+	require.NoError(t, err)
+
+	out := h.stdout.String()
+
+	// None of the five H2 markers should appear in non-TTY stdout.
+	assert.NotContains(t, out, "## Nodes")
+	assert.NotContains(t, out, "## Relationships")
+	assert.NotContains(t, out, "## Relationship Paths")
+	assert.NotContains(t, out, "## Indexes")
+	assert.NotContains(t, out, "## Constraints")
+
+	// Table rows still render. Spot-check the canonical column headers in
+	// canonical render order — confirms each section's table reached stdout
+	// even with the H2 labels suppressed. go-pretty upper-cases header text
+	// by default, so anchors are matched against the upper-case form. Each
+	// anchor is unique to one of the five section tables (or the first
+	// occurrence in canonical order).
+	assertSectionsInOrder(t, out,
+		"NODETYPE",         // renderNodesTable header (only)
+		"RELTYPE",          // renderRelsTable header (first; also in paths)
+		"FROM",             // renderPathsTable header (only)
+		"OWNINGCONSTRAINT", // renderMapsTable indexes header (only)
+		"OWNEDINDEX",       // renderMapsTable constraints header (only)
+	)
+
+	// Body content from the canned data still made it to stdout.
 	assert.Contains(t, out, "Person")
 	assert.Contains(t, out, "ACTED_IN")
 	assert.Contains(t, out, "idx_person_name")

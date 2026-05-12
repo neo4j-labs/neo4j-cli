@@ -68,14 +68,15 @@ func TestCreateSnapshotWithAwait(t *testing.T) {
 	getMock.AssertCalledTimes(3)
 	getMock.AssertCalledWithMethod(http.MethodGet)
 
-	helper.AssertErr("")
 	helper.AssertOut(`
 {
 	"data": {
 		"snapshot_id": "snap123"
 	}
 }
-Waiting for snapshot to be ready...
-Snapshot Status: Completed
 	`)
+	helper.AssertErrContainsStrings([]string{
+		"Waiting for snapshot to be ready...",
+		"Snapshot Status: Completed",
+	})
 }

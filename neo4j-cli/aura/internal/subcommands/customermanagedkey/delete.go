@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -32,8 +33,10 @@ Note that you can only delete a Key if it is not being used by any instances, ot
 			}
 
 			if statusCode == http.StatusNoContent {
-				cmd.Println("Operation Successful")
-
+				fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", args[0]) //nolint:errcheck // narration to stderr; write errors are not actionable
+				output.PrintBodyMap(cmd, cfg,
+					api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": args[0]}),
+					[]string{"deleted", "id"})
 			}
 
 			return nil

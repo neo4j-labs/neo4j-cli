@@ -49,7 +49,7 @@ If another operation is being performed on the instance you are trying to resume
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
 				if await {
-					cmd.Println("Waiting for instance to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateInstanceResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
 						return err
@@ -60,7 +60,7 @@ If another operation is being performed on the instance you are trying to resume
 						return err
 					}
 
-					cmd.Println("Instance Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "Instance Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 			return nil

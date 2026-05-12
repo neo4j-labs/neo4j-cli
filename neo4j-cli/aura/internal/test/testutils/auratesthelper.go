@@ -5,6 +5,7 @@ package testutils
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -150,6 +151,28 @@ func (helper *AuraTestHelper) AssertOutContainsStrings(expected []string) {
 	for _, exp := range expected {
 		assert.Contains(helper.t, string(out), exp)
 	}
+}
+
+func (helper *AuraTestHelper) AssertErrContainsStrings(expected []string) {
+	out, err := io.ReadAll(helper.err)
+	assert.Nil(helper.t, err)
+
+	for _, exp := range expected {
+		assert.Contains(helper.t, string(out), exp)
+	}
+}
+
+// AssertOutIsValidJSON parses stdout via json.Unmarshal and fails the test
+// if stdout is empty or not valid JSON. This is the regression-pinning
+// assertion for CLI-82 — pre-fix, stdout had narration mixed with the JSON
+// body and would fail to unmarshal.
+func (helper *AuraTestHelper) AssertOutIsValidJSON() {
+	out, err := io.ReadAll(helper.out)
+	assert.Nil(helper.t, err)
+
+	var v any
+	assert.NoErrorf(helper.t, json.Unmarshal(out, &v),
+		"stdout is not valid JSON; got: %q", string(out))
 }
 
 func (helper *AuraTestHelper) AssertConfig(expected string) {

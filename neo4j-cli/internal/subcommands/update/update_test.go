@@ -1032,12 +1032,13 @@ func TestRunUpdate_PostSwap_NoAgentsInstalled(t *testing.T) {
 		return nil, nil
 	})
 
-	// Plain-text branch: hint line.
-	out, _, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
+	// Plain-text branch: hint line. The success line stays on stdout; the
+	// install-skill tip moved to stderr per CLI-96.
+	out, errOut, err := runWithBundleFormat(t, "v0.1.0", runOpts{}, "default")
 	require.NoError(t, err)
 	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
-	assert.Contains(t, out, "Tip: install the agent skill")
-	assert.Contains(t, out, "neo4j-cli skill install")
+	assert.Contains(t, errOut, "Tip: install the agent skill")
+	assert.Contains(t, errOut, "neo4j-cli skill install")
 
 	// JSON branch: skill_install_suggested:true. Reset seams via withX helpers
 	// (they auto-restore on Cleanup; re-applying overrides for the second sub-run).
@@ -1285,4 +1286,49 @@ func TestPrintableUpdateResult_AsArrayShape_PostSwapFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUpdate_StatusLinesGoToStderr pins CLI-96: the five plain-text status
+// lines in runUpdate (dev-build, no-stable-release, pre-swap narrative,
+// skill-install tip) must land on stderr, not stdout. Existing tests use a
+// combined buffer so they cannot catch a regression here; this one uses
+// SPLIT buffers and asserts stdout stays clean for the narration lines.
+//
+// Sanity-checked during implementation: reverting any of the moved sites
+// back to cmd.Println/cmd.Printf causes the matching sub-case to fail.
+func TestUpdate_StatusLinesGoToStderr(t *testing.T) {
+	t.Run("dev-build branch", func(t *testing.T) {
+		outBuf, errBuf := runWithSplitBuffers(t, "dev", runOpts{})
+		assert.NotContains(t, outBuf, "running a dev build", "dev-build line must NOT be on stdout")
+		assert.Contains(t, errBuf, "running a dev build, nothing to update", "dev-build line must be on stderr")
+	})
+
+	t.Run("no-stable-release branch", func(t *testing.T) {
+		withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+			return nil, ErrNoStableRelease
+		})
+		outBuf, errBuf := runWithSplitBuffers(t, "v0.1.0", runOpts{})
+		assert.NotContains(t, outBuf, "no stable release published yet", "no-stable line must NOT be on stdout")
+		assert.Contains(t, errBuf, "no stable release published yet", "no-stable line must be on stderr")
+		assert.Contains(t, errBuf, "--pre-releases", "hint must be on stderr")
+	})
+}
+
+// runWithSplitBuffers mirrors runWithOpts but binds stdout and stderr to
+// separate buffers so tests can assert which stream a line lands on.
+// Returns (stdout, stderr).
+func runWithSplitBuffers(t *testing.T, current string, opts runOpts) (string, string) {
+	t.Helper()
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	cmd.SetOut(outBuf)
+	cmd.SetErr(errBuf)
+
+	_ = runUpdate(context.Background(), cmd, cfg, opts)
+	return outBuf.String(), errBuf.String()
 }

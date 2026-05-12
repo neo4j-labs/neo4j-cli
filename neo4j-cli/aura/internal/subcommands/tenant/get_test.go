@@ -148,6 +148,37 @@ func TestGetTenantWithTableOutput(t *testing.T) {
 ├──────────────────────────────────────┼────────────┤
 │ 6981ace7-efe8-4f5c-b7c5-267b5162ce91 │ Production │
 └──────────────────────────────────────┴────────────┘
-instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these
 `)
+	helper.AssertErrContainsStrings([]string{"instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these"})
+}
+
+func TestGetTenant_StdoutIsValidJSON(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	tenantId := "6981ace7-efe8-4f5c-b7c5-267b5162ce91"
+
+	getMockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/tenants/%s", tenantId), http.StatusOK, `{
+			"data": {
+				"id": "6981ace7-efe8-4f5c-b7c5-267b5162ce91",
+				"name": "Production",
+				"instance_configurations": []
+			}
+		}`)
+
+	metricsIntegrationMockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/tenants/%s/metrics-integration", tenantId), http.StatusBadRequest, `{
+			"errors": [
+				{
+					"message": "This tenant has no instances eligible for metrics integration",
+					"reason": "tenant-incapable-of-action"
+				}
+			]
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("tenant get %s --format json", tenantId))
+
+	getMockHandler.AssertCalledTimes(1)
+	metricsIntegrationMockHandler.AssertCalledTimes(1)
+
+	helper.AssertOutIsValidJSON()
 }
