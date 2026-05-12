@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Suppress full --help output when a command is rejected for missing --rw, invalid --format, or unknown --credential; show only the focused error message.
-time: 2026-05-12T14:51:43.206704+02:00
