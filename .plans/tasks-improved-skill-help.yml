@@ -78,13 +78,13 @@ tasks:
       .changes/unreleased/ named
       `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` with fields project /
       kind / body / time (RFC3339), per CLAUDE.md "Changie Notes".
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A new file exists under .changes/unreleased/ matching neo4j-cli-Minor-*.yaml"
       - "File body mentions 'skill install', 'skill remove', and 'supported agents' (or close equivalent referencing CLI-74)"
       - "File parses as valid changie YAML (project: neo4j-cli, kind: Minor, body: <text>, time: RFC3339)"
-    completed_at: null
+    completed_at: 2026-05-12T15:36:44+02:00
 
   - id: task-005
     title: "Final-gate verification: test, fmt, lint, generate-check"
