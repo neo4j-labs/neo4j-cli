@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add neo4j-cli agent-context command emitting the full CLI shape as JSON for AI-agent discovery (CLI-83)
-time: 2026-05-12T16:35:50.270116+02:00
