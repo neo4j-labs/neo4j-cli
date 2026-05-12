@@ -106,13 +106,13 @@ tasks:
     description: |
       Add a changie entry via `changie new --projects neo4j-cli --kind Patch --body "Expand the query subcommand's agent skill with schema-first workflow, parameter usage, embeddings, and Cypher 25 vs Cypher 5 syntax guidance via a new query-additions.md companion document."`.
       If `changie` is not installed locally, hand-author the YAML at `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project: neo4j-cli`, `kind: Patch`, `body: '<single-quoted body>'`, `time: <RFC3339>`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A file matching `.changes/unreleased/neo4j-cli-Patch-*.yaml` exists"
       - "YAML contains `project: neo4j-cli`, `kind: Patch`, RFC3339 `time`, and the required body text"
       - "Body mentions schema-first workflow, embeddings, Cypher 25 vs Cypher 5, and `query-additions.md`"
-    completed_at: null
+    completed_at: 2026-05-12T07:46:24Z
 
   - id: task-008
     title: "Run final gates: make test, fmt-check, lint, generate-check"

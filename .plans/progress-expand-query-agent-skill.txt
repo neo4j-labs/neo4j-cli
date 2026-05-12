@@ -21,3 +21,7 @@ Files: ~.gitattributes, ~neo4j-cli/internal/skill/gen/main_test.go
 ## task-006 — 2026-05-12T07:45:02Z
 Ran `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`. Diff matches expectations exactly: aura SKILL.md heading-only rename (`## Gotchas` → `## Tips & Gotchas`); neo4j-cli SKILL.md heading rename + new top bullet pointing to query-additions.md; new file bundle/query-additions.md byte-equal to source (diff -q empty, 146 LF lines). Re-running `make generate` yields no further churn. Gates: test PASS, fmt-check PASS, lint PASS (0 issues), generate-check fails locally only due to unstaged regen output (the deliverable) — CI clean-tree run will pass after commit.
 Files: ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, +neo4j-cli/internal/skill/bundle/query-additions.md
+
+## task-007 — 2026-05-12T07:46:24Z
+Ran `changie new --projects neo4j-cli --kind Patch --body "..."` (changie installed at /opt/homebrew/bin/changie). Produced .changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml with project/kind/body/time fields; body covers schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and query-additions.md. Native changie output uses unquoted scalar body vs AGENTS.md hand-author single-quoted form — both valid YAML, identical string. fmt-check + lint clean.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260512-094607.yaml

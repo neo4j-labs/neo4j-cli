@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Expand the query subcommand's agent skill with schema-first workflow, parameter usage, embeddings, and Cypher 25 vs Cypher 5 syntax guidance via a new query-additions.md companion document.
+time: 2026-05-12T09:46:07.774486+02:00
