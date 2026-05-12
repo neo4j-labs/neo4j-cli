@@ -87,13 +87,13 @@ tasks:
       under `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`
       per the project's changie conventions (project + kind + body +
       time fields, RFC3339 time).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A file `.changes/unreleased/neo4j-cli-Minor-*.yaml` exists"
       - "The YAML lists `project: neo4j-cli`, `kind: Minor`, and a body mentioning both the config key and DO_NOT_TRACK"
       - "The file validates with `changie batch` dry-run or equivalent"
-    completed_at: null
+    completed_at: 2026-05-12T14:08:00Z
 
   - id: task-005
     title: "Run final repo gates"

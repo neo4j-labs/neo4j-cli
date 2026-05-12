@@ -11,3 +11,7 @@ Decisions: helper test lives in package `clicfg` (not `_test`) for unexported ac
 ## task-003 — 2026-05-12T12:30:00Z
 Added one-sentence DO_NOT_TRACK=1 note to both user-facing READMEs, immediately after the existing `config set telemetry false --rw` example.
 Files: ~README.md, ~distribution/npm/cli/README.md
+
+## task-004 — 2026-05-12T14:08:00Z
+Added changie Minor entry for telemetry opt-out via `changie new --projects neo4j-cli --kind Minor`. Validated with `changie batch --dry-run`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260512-140646.yaml
