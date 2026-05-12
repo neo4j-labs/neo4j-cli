@@ -54,7 +54,7 @@ tasks:
       is wired. Also extend the existing `config set --rw format invalid` row (line 46-49)
       to assert stdout is empty. Uses the existing `assertOut` helper at
       `helpers_test.go:82`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -63,7 +63,7 @@ tasks:
       - "No usage block leaks to stdout in any failing-row case"
       - "All existing TestConfigSet rows still pass"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-05-12T15:00:00Z
 
   - id: task-004
     title: "Pin focused-error behavior in neo4j-cli query write-rejection test"

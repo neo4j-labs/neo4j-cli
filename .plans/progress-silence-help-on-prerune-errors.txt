@@ -5,3 +5,8 @@ Files: ~common/flags/flags.go
 ## task-002 — 2026-05-12T14:45:00Z
 Added table-driven unit tests pinning silenceUsageOnError behavior across all three PreRunE wrappers (RegisterOutputFlag, ComposeRootPersistentPreRunE, RegisterAuraCredentialFlag).
 Files: ~common/flags/flags_test.go
+
+## task-003 — 2026-05-12T15:00:00Z
+Added wantOutEmpty field to TestConfigSet table; the no-rw and --rw format invalid rows now assert stdout is empty. Required source change in set.go to set cmd.SilenceUsage=true on RunE errors (ResolveConfigKey + Global.Set), because the --rw format invalid path goes through RunE (clicfg.Set), not the PreRunE wrappers covered by task-001.
+Files: ~neo4j-cli/internal/subcommands/config/set.go, ~neo4j-cli/internal/subcommands/config/set_test.go
+Decisions: extended scope beyond pure test changes (task-001 only covered PreRunE) to make the documented acceptance criterion pass; aligns with PRD focused-error intent.

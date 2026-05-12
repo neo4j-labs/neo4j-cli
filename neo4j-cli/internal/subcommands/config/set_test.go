@@ -18,11 +18,13 @@ func TestConfigSet(t *testing.T) {
 		wantConfigValue  string
 		wantErr          string
 		wantErrSubstring string
+		wantOutEmpty     bool
 	}{
 		{
-			name:    "set format to json without rw errors",
-			command: "config set format json",
-			wantErr: "Error: this command writes; pass --rw to allow it",
+			name:         "set format to json without rw errors",
+			command:      "config set format json",
+			wantErr:      "Error: this command writes; pass --rw to allow it",
+			wantOutEmpty: true,
 		},
 		{
 			name:            "set format to json with rw writes json at root",
@@ -43,9 +45,10 @@ func TestConfigSet(t *testing.T) {
 			wantConfigValue: "default",
 		},
 		{
-			name:    "set format to invalid value with rw returns error",
-			command: "config set --rw format invalid",
-			wantErr: "Error: invalid value for 'format': invalid (valid values: default, json, table, toon)",
+			name:         "set format to invalid value with rw returns error",
+			command:      "config set --rw format invalid",
+			wantErr:      "Error: invalid value for 'format': invalid (valid values: default, json, table, toon)",
+			wantOutEmpty: true,
 		},
 		{
 			name:    "set unknown key with rw returns error",
@@ -99,9 +102,10 @@ func TestConfigSet(t *testing.T) {
 			wantErr: "Error: invalid value for 'telemetry': maybe (valid values: true, false)",
 		},
 		{
-			name:    "set telemetry to false without rw errors",
-			command: "config set telemetry false",
-			wantErr: "Error: this command writes; pass --rw to allow it",
+			name:         "set telemetry to false without rw errors",
+			command:      "config set telemetry false",
+			wantErr:      "Error: this command writes; pass --rw to allow it",
+			wantOutEmpty: true,
 		},
 	}
 
@@ -113,6 +117,9 @@ func TestConfigSet(t *testing.T) {
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
+				if tc.wantOutEmpty {
+					h.assertOut("")
+				}
 				return
 			}
 			if tc.wantErrSubstring != "" {
