@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-12T15:45:00Z
+Added AssertErrContainsStrings and AssertOutIsValidJSON helpers to AuraTestHelper; foundation for CLI-82 regression-pinning tests.
+Files: ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go

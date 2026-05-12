@@ -15,7 +15,8 @@ tasks:
       helpers are the foundation for the CLI-82 regression-pinning tests — pre-fix,
       `AssertOutIsValidJSON` fails for affected commands because stdout has narration
       mixed with the JSON body; post-fix it passes.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T15:45:00Z
     dependencies: []
     acceptance_criteria:
       - "AssertErrContainsStrings exists on AuraTestHelper, reads helper.err via io.ReadAll, and asserts each expected substring is present via assert.Contains"
