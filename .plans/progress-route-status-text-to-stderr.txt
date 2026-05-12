@@ -25,3 +25,8 @@ Decisions: collapsed multi-line Printf to single-line Fprintf so //nolint:errche
 ## TASK-006 — 2026-05-12T16:06:00Z
 Added Patch-kind changie entry for CLI-82 via `changie new`; body matches PRD wording, time RFC3339, project: neo4j-cli.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+
+## TASK-007 — 2026-05-12T18:30:00Z
+Routed tenant get table-format warning to stderr (CLI-95) via fmt.Fprintln(cmd.ErrOrStderr(), ...); wording + table/default gate preserved. Updated TestGetTenantWithTableOutput to assert stdout has only the table and stderr contains the warning; added TestGetTenant_StdoutIsValidJSON regression pin under --format json. Appended CLI-95 to existing changie body.
+Files: ~tenant/get.go, ~tenant/get_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: edited changie body in place (vs new entry + delete) per task hint.

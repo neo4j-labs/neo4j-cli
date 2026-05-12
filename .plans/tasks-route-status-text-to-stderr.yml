@@ -173,7 +173,8 @@ tasks:
       issues. Either run `changie new` again with the combined body and remove the old
       entry, or edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body
       string in place.
-    status: pending
+    status: completed
+    completed_at: 2026-05-12T18:30:00Z
     dependencies:
       - task-001
     acceptance_criteria:
