@@ -32,7 +32,7 @@
 
 Allows you to programmatically provision and manage your Aura resources
 
-Allows you to programmatically provision and manage your Aura resources. Write operations require --rw. `query run` under neo4j-cli runs EXPLAIN first when --rw is not set and blocks statements classified as writes.
+Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.
 
 Usage: `neo4j-cli aura`
 

@@ -33,7 +33,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "neo4j-cli",
 		Short:   "Allows you to manage Neo4j resources",
-		Long:    "Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli query` runs EXPLAIN first when --rw is not set and blocks statements classified as writes.",
+		Long:    "Allows you to manage Neo4j resources. Write operations require --rw.",
 		Version: Version,
 	}
 

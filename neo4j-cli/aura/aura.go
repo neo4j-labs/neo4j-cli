@@ -26,7 +26,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "aura-cli",
 		Short:   "Allows you to programmatically provision and manage your Aura resources",
-		Long:    "Allows you to programmatically provision and manage your Aura resources. Write operations require --rw. `query run` under neo4j-cli runs EXPLAIN first when --rw is not set and blocks statements classified as writes.",
+		Long:    "Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.",
 		Version: cfg.Version,
 	}
 

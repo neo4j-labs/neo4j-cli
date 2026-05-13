@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'fix(cli): scope query/EXPLAIN --rw note to `query --help` only (CLI-104)'
+time: 2026-05-13T14:43:34.683069+02:00

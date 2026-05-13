@@ -8,7 +8,7 @@ version: {{VERSION}}
 
 Allows you to manage Neo4j resources
 
-Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli query` runs EXPLAIN first when --rw is not set and blocks statements classified as writes.
+Allows you to manage Neo4j resources. Write operations require --rw.
 
 ## Global Flags
 

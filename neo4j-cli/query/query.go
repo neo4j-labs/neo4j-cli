@@ -26,7 +26,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"(text is sent to the configured embedding provider, the resulting vector " +
 			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
 			"The sibling `query :embed [text]` leaf computes a vector standalone " +
-			"without opening a Bolt connection.",
+			"without opening a Bolt connection. " +
+			"Write operations require `--rw`; without `--rw`, an EXPLAIN preflight " +
+			"runs first and statements classified as writes are blocked.",
 		Example: `# Run inline Cypher (read-only — no --rw needed)
 neo4j-cli query "MATCH (n) RETURN count(n) AS n" --format json
 
