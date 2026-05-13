@@ -36,7 +36,7 @@ tasks:
       Use long-form `--format` (not `-f`); leave other bullets and the existing
       `-f` references in this file alone (out of scope per PR #111).
       See PRD REQ-F-002, REQ-NF-001.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "First bullet contains the literal command `neo4j-cli query :schema --format toon`"
@@ -44,7 +44,7 @@ tasks:
       - "First bullet uses bold (`**…**`) on the directive sentence"
       - "Long-form `--format toon` (not `-f toon`) in the new bullet"
       - "No other bullets are reordered or modified"
-    completed_at: null
+    completed_at: 2026-05-13T00:00:00Z
 
   - id: task-003
     title: "Edit `query.go` Short, Long, and Example to lead with `:schema`"

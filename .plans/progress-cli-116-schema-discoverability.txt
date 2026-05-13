@@ -2,3 +2,7 @@
 Strengthened `description.txt` to name `neo4j-cli query :schema` explicitly and cover trigger phrases "inspect/view/introspect the schema" and "data model from the schema". 774 chars, single paragraph, third-person.
 Files: ~neo4j-cli/internal/skill/description.txt
 Decisions: Dropped "graph data modeling" from the Skip list — contradicts the new "data model from the schema" trigger in the Use clause.
+
+## task-002 — 2026-05-13T00:00:00Z
+Replaced first Tips & Gotchas bullet in `additions.md` with the schema-first directive showing the literal command `neo4j-cli query :schema --format toon`; kept link to query-additions.md.
+Files: ~neo4j-cli/internal/skill/additions.md
