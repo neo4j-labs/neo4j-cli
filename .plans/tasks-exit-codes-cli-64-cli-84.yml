@@ -1,0 +1,222 @@
+feature: exit-codes-cli-64-cli-84
+prd: ./prd-exit-codes-cli-64-cli-84.md
+created_at: 2026-05-13T06:48:59Z
+updated_at: 2026-05-13T06:48:59Z
+
+tasks:
+  - id: task-001
+    title: "Introduce CLIError type and 8 typed constructors in common/clierr"
+    description: |
+      Replace the three identical `fmt.Errorf` wrappers in
+      `common/clierr/error.go` with a `CLIError` struct that carries an exit
+      code, plus eight constructors covering the audit §4.1 closed set.
+      Existing constructor names (`NewUsageError`, `NewUpstreamError`,
+      `NewFatalError`) keep their signatures and start returning `*CLIError`
+      with codes 2, 8, 1. Five new constructors (`NewNotFoundError`,
+      `NewAuthError`, `NewConflictError`, `NewValidationError`,
+      `NewRateLimitError`) cover codes 3-7. `NewRateLimitError` has an extra
+      leading `retryAfter string` arg that lands on `CLIError.RetryAfter`.
+      Add `common/clierr/error_test.go` with table-driven coverage of each
+      constructor's exit code, `errors.As` extraction through one or more
+      `fmt.Errorf(": %w", ...)` wraps, and `Error()`/`Unwrap()` semantics.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`CLIError` struct has fields `Code int`, `Message string`, `Err error`, `RetryAfter string` and implements `Error()` + `Unwrap()`."
+      - "Eight constructors return `*CLIError` with codes 1/2/3/4/5/6/7/8 matching the PRD table."
+      - "`NewRateLimitError(retryAfter, msg, args...)` populates the struct field; message body still mentions the value."
+      - "`common/clierr/error_test.go` exists with table-driven tests asserting code, Error() text, and `errors.As` extraction through `%w` wrapping."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-002
+    title: "Map HTTP status codes to typed errors in handleResponseError"
+    description: |
+      Update `neo4j-cli/aura/internal/api/response.go` `handleResponseError`
+      so each HTTP branch returns the right typed constructor: 400 →
+      `NewValidationError`, 401 → `NewAuthError` (via
+      `formatAuthorizationError`), 403 → `NewAuthError` on both branches,
+      404 → `NewNotFoundError`, 405 → `NewUpstreamError` (unchanged), 409 →
+      `NewConflictError`, 429 → `NewRateLimitError` with the `Retry-After`
+      header on the struct field, 5xx → `NewUpstreamError` (unchanged).
+      `formatAuthorizationError` returns `NewAuthError` on both success and
+      unmarshal-failure paths. Extend or add a table-driven test in
+      `neo4j-cli/aura/internal/api/response_test.go` (create if missing)
+      that feeds a synthetic `*http.Response` per interesting status code
+      and asserts `errors.As(err, &ce)` extracts the right `Code`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Each HTTP status branch in `handleResponseError` returns the constructor named in REQ-F-004."
+      - "429 path puts `res.Header.Get(\"Retry-After\")` on `CLIError.RetryAfter` and still mentions it in the message body."
+      - "`formatAuthorizationError` returns `NewAuthError` on both branches."
+      - "Table-driven test covers 400/401/403/404/409/429/500/503 and asserts the extracted exit code."
+      - "`make test` passes."
+    completed_at: null
+
+  - id: task-003
+    title: "Categorise Cypher and Bolt errors in query/run.go"
+    description: |
+      In `neo4j-cli/query/run.go`, identify where Bolt-driver errors are
+      returned to the user and split the mapping: `Neo.ClientError.*`
+      (cypher syntax/semantic errors) → `NewValidationError` (exit 6);
+      transport-level failures and `Neo.TransientError.*` /
+      `Neo.DatabaseError.*` → `NewUpstreamError` (exit 8). Mirror the
+      pattern used elsewhere in the file for error wrapping. Add a test in
+      the existing `query` test setup (real-neo4j integration or a mock,
+      whichever fits the surrounding suite) that asserts both branches map
+      to the right exit code via `errors.As`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Cypher `ClientError`-class failures from the Bolt driver surface as `*CLIError` with `Code == 6`."
+      - "Bolt transport / `TransientError` / `DatabaseError` failures surface as `*CLIError` with `Code == 8`."
+      - "A test in the `query` package locks both mappings via `errors.As`."
+      - "`make test` passes, including any neo4j-docker integration tests already wired."
+    completed_at: null
+
+  - id: task-004
+    title: "Sweep remaining clierr call sites for auth/validation reclassification"
+    description: |
+      Walk the ~100 existing `clierr.New*` call sites outside
+      `response.go` and `run.go` (covered in earlier tasks). Reclassify:
+      auth-flow errors in `neo4j-cli/aura/internal/api/token.go` and any
+      credential-loading site that means "auth missing/invalid" switch to
+      `NewAuthError`; any `NewUpstreamError` that is really a structural
+      validation rejection switches to `NewValidationError`. Leave
+      everything else as-is — flag validation stays on `NewUsageError`,
+      unrecoverable internal failures stay on `NewFatalError`. Run
+      `grep -n "clierr.New" -r` after the sweep to confirm nothing
+      regressed and the call distribution matches the intent.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All auth-flow sites in `neo4j-cli/aura/internal/api/token.go` use `NewAuthError`."
+      - "Validation-style `NewUpstreamError` sites (input rejected, not transient) switch to `NewValidationError`."
+      - "Flag/usage and fatal sites remain unchanged."
+      - "Sweep documented in the commit message (which sites moved, which stayed)."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-005
+    title: "Wrap cobra flag-parse errors via FlagErrorFunc on both root commands"
+    description: |
+      In `neo4j-cli/app/app.go` and `neo4j-cli/aura/aura.go`, call
+      `cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+      return clierr.NewUsageError("%v", err) })` on the root command.
+      Cobra walks up to root for `FlagErrorFunc`, so one registration per
+      tree covers every subcommand. Add a unit test (in
+      `neo4j-cli/app/app_test.go` or similar) that builds the tree, calls
+      `Execute` with `--bad-flag`, captures the returned error, and
+      asserts it's a `*CLIError` with `Code == 2`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Root `app.NewCmd` registers a `FlagErrorFunc` that wraps in `NewUsageError`."
+      - "Standalone `aura.NewStandaloneCmd` does the same on its root."
+      - "A unit test asserts `--bad-flag` returns `*CLIError` with `Code == 2` from `Execute`."
+      - "`make test` passes."
+    completed_at: null
+
+  - id: task-006
+    title: "Propagate typed exit codes from cmd.Execute in both main.go files"
+    description: |
+      In `neo4j-cli/main.go`, after `cmd.Execute()` and the existing
+      `clievents.Emit` + `cfg.Events.Flush()` calls, extract the exit code
+      via `errors.As(err, &ce)` and call `os.Exit(ce.Code)`; fall back to
+      `os.Exit(1)` if the error is not a `*CLIError`. Preserve the existing
+      `recoverPanic` defer. Mirror the same change in
+      `neo4j-cli/aura/cmd/main.go`, replacing its bare `os.Exit(1)`. Add a
+      tiny unit test for any helper extracted to avoid testing `main`
+      directly (or skip if the logic stays inline); the end-to-end
+      verification lives in task-008.
+    status: pending
+    dependencies:
+      - task-001
+      - task-005
+    acceptance_criteria:
+      - "`neo4j-cli/main.go` exits with the typed code from `*CLIError` and falls back to 1 for untyped errors."
+      - "`neo4j-cli/aura/cmd/main.go` does the same."
+      - "`cfg.Events.Flush()` runs before `os.Exit` in both."
+      - "`recoverPanic` defers remain intact and panic propagation still produces a non-zero exit."
+      - "`make test`, `make fmt-check`, `make lint` pass."
+    completed_at: null
+
+  - id: task-007
+    title: "Extend agent-context exitCodes and errorCodes maps"
+    description: |
+      In `neo4j-cli/internal/subcommands/agentcontext/build.go`, extend
+      `exitCodes` with entries `"2"` through `"8"` (descriptions matching
+      the PRD closed-set table) and extend `errorCodes` with
+      `not_found`, `auth_error`, `conflict`, `validation_error`,
+      `rate_limited`. Keep `schemaVersion = 1` (additions are
+      non-breaking). Update fixtures in
+      `neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go`
+      (and any locked-test golden file) to assert the new keys are present
+      and the existing keys still are.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`exitCodes` includes entries `0`-`8` with PRD-aligned descriptions."
+      - "`errorCodes` includes all eight code strings."
+      - "`schemaVersion` stays at 1."
+      - "Locked agent-context tests pass with updated fixtures."
+      - "`neo4j-cli agent-context | jq '.exit_codes, .error_codes'` (manual) shows the full set."
+    completed_at: null
+
+  - id: task-008
+    title: "Add test/e2e/exitcodes/ end-to-end suite for all exit codes"
+    description: |
+      Create a new e2e package under `test/e2e/exitcodes/` that mirrors
+      `test/e2e/release_fixture/`'s build-tag pattern. The suite runs the
+      compiled `neo4j-cli` binary as a subprocess against a fixture HTTP
+      server returning specific statuses, asserting `cmd.ProcessState`
+      exit codes for the scenarios: `--bad-flag` → 2; 404 → 3; 401 → 4;
+      409 → 5; 400 → 6; 429 (with `Retry-After: 30`, message contains
+      `30`) → 7; 503 → 8; happy path → 0; no-arg help → 0. Build the
+      binary via the existing test helper or `go build` into a tempdir.
+    status: pending
+    dependencies:
+      - task-002
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`test/e2e/exitcodes/` package exists with build-tag gating consistent with `test/e2e/release_fixture/`."
+      - "Each scenario in REQ-F-004 / Acceptance Criteria of the PRD has a corresponding subtest asserting the exit code."
+      - "429 subtest also asserts the message body contains the Retry-After value."
+      - "Suite passes locally and in CI; flake-free."
+      - "Neo4j copyright header on every new `.go` file (so `make license-check` passes)."
+    completed_at: null
+
+  - id: task-009
+    title: "Add changie entries and run final gates"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "Fix
+      neo4j-cli exiting 0 on command errors (CLI-64)."` and `changie new
+      --projects neo4j-cli --kind Minor --body "Differentiate exit codes
+      by error category: usage (2), not-found (3), auth (4), conflict
+      (5), validation (6), rate-limit (7), upstream (8). See neo4j-cli
+      agent-context for the closed set. (CLI-84)"`. Commit both yaml
+      files. Run the full local gate set (`make test`, `make fmt-check`,
+      `make lint`, `make generate-check`) and the manual smoke commands
+      from the PRD verification section.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "Two yaml files under `.changes/unreleased/` (`neo4j-cli-Patch-*.yaml`, `neo4j-cli-Minor-*.yaml`) with the PRD-specified bodies."
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all green."
+      - "Manual smoke: `--bad-flag` → 2, `--version` → 0, no-arg → 0."
+      - "PR description references both CLI-64 and CLI-84 and notes the new exit codes 2-8 as a behaviour change."
+    completed_at: null
