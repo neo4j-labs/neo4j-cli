@@ -2,3 +2,7 @@
 Introduced *CLIError struct (Code, Message, Err, RetryAfter) and 8 typed constructors in common/clierr; existing constructor signatures preserved.
 Files: ~common/clierr/error.go, +common/clierr/error_test.go
 Decisions: unwrapFormatted seeds CLIError.Err from %w-formatted inner so errors.Is reaches sentinels through CLIError.Unwrap.
+
+## task-002 — 2026-05-13T07:05:00Z
+Mapped handleResponseError HTTP branches to typed constructors: 400→Validation, 401/403→Auth, 404→NotFound, 409→Conflict, 429→RateLimit (with Retry-After on struct), 5xx/405→Upstream. formatAuthorizationError now returns NewAuthError on both branches. Added table-driven ExitCodeMapping test.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go

@@ -44,7 +44,7 @@ tasks:
       `neo4j-cli/aura/internal/api/response_test.go` (create if missing)
       that feeds a synthetic `*http.Response` per interesting status code
       and asserts `errors.As(err, &ce)` extracts the right `Code`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -53,7 +53,7 @@ tasks:
       - "`formatAuthorizationError` returns `NewAuthError` on both branches."
       - "Table-driven test covers 400/401/403/404/409/429/500/503 and asserts the extracted exit code."
       - "`make test` passes."
-    completed_at: null
+    completed_at: 2026-05-13T07:05:00Z
 
   - id: task-003
     title: "Categorise Cypher and Bolt errors in query/run.go"
