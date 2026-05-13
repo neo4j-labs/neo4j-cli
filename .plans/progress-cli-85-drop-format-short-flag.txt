@@ -21,3 +21,7 @@ Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bund
 ## task-006 — 2026-05-13T15:58:00Z
 Added Minor-kind changelog entry via `changie new --projects neo4j-cli --kind Minor --body "Remove '-f' shorthand from '--format'; '-f' is now the shorthand for 'neo4j-cli update --force' (CLI-85)."`. Body covers both removal of `-f` from `--format` and new binding on `update --force`. YAML loads cleanly. `make fmt-check`, `make lint`, `make test` all green.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260513-155653.yaml
+
+## task-007 — 2026-05-13T17:45:00Z
+Ran final gates: `make build`, `make test`, `make fmt-check`, `make lint` all clean (0 issues). `make generate-check` only flagged the expected hone in_progress flip in .plans/tasks-*.yml (no bundle drift). Manual sanity sweep on built binary: `aura instance list --help` shows `--format` only (no `-f`); `aura instance list -f json` rejected with cobra `unknown shorthand flag: 'f'`; `aura instance list --format json` returns JSON; `update --help` shows `-f, --force`; `update check -f` rejected. All acceptance criteria met.
+Files: (no source changes)

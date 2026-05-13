@@ -149,7 +149,8 @@ tasks:
       (golangci-lint v2). Also run a final manual `--help` sweep to confirm
       the user-visible outcome on the built binary. See PRD acceptance
       checklist and REQ-NF-001 / REQ-NF-002.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T17:45:00Z
     dependencies:
       - task-001
       - task-002
