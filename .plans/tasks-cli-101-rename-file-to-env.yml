@@ -73,11 +73,11 @@ tasks:
       Use `changie new --projects neo4j-cli --kind Minor --body '...'` if changie is installed locally; otherwise hand-author the YAML at the path above (filename pattern: `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`, single-quoted body, RFC3339 time). Kind = Minor (visible CLI surface change in alpha; matches the precedent for the `--output` → `--format` rename in v0.1.0-alpha.2).
 
       Implements PRD REQ-F-008.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "Exactly one new YAML file under `.changes/unreleased/` with the filename pattern `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`"
       - "Fields: `project: neo4j-cli`, `kind: Minor`, body mentions the rename + both affected commands + CLI-101, `time` is a valid RFC3339 timestamp"
       - "`make test`, `make fmt-check`, `make lint` still green"
-    completed_at: null
+    completed_at: 2026-05-13T12:48:00Z
