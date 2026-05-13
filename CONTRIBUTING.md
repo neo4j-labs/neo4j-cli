@@ -167,7 +167,7 @@ To avoid confusion, this guide uses the term **flags** to refer to any named arg
 
 #### Output
 
-- Read operations should support the following `--format` options (shorthand `-f`):
+- Read operations should support the following `--format` options:
     - `json`: Provides the raw JSON output of the API, formatted to be human-readable.
     - `table`: Provides a subset of the output, formatted to be human readable on a table. Try to keep the table output below 120 characters to avoid overflowing the screen.
 

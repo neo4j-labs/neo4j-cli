@@ -58,7 +58,8 @@ tasks:
       `CONTRIBUTING.md:170`, `.agents/architecture.md:45`, and
       `.agents/repo-layout.md:12`. Do NOT edit `CLAUDE.md` (it's a symlink to
       `AGENTS.md`). See PRD REQ-F-007 through REQ-F-013.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T17:00:00Z
     dependencies: []
     acceptance_criteria:
       - "`grep -rn '\\-f toon\\|\\-f json\\|\\-f table' neo4j-cli/internal/skill/ neo4j-cli/aura/internal/skill/` returns no hits in `additions.md` or `query-additions.md`"
