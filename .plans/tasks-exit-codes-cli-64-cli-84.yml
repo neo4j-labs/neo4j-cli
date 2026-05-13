@@ -180,7 +180,7 @@ tasks:
       409 → 5; 400 → 6; 429 (with `Retry-After: 30`, message contains
       `30`) → 7; 503 → 8; happy path → 0; no-arg help → 0. Build the
       binary via the existing test helper or `go build` into a tempdir.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-005
@@ -191,7 +191,7 @@ tasks:
       - "429 subtest also asserts the message body contains the Retry-After value."
       - "Suite passes locally and in CI; flake-free."
       - "Neo4j copyright header on every new `.go` file (so `make license-check` passes)."
-    completed_at: null
+    completed_at: 2026-05-13T08:05:00Z
 
   - id: task-009
     title: "Add changie entries and run final gates"
