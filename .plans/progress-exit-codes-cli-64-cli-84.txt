@@ -6,3 +6,8 @@ Decisions: unwrapFormatted seeds CLIError.Err from %w-formatted inner so errors.
 ## task-002 — 2026-05-13T07:05:00Z
 Mapped handleResponseError HTTP branches to typed constructors: 400→Validation, 401/403→Auth, 404→NotFound, 409→Conflict, 429→RateLimit (with Retry-After on struct), 5xx/405→Upstream. formatAuthorizationError now returns NewAuthError on both branches. Added table-driven ExitCodeMapping test.
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+
+## task-003 — 2026-05-13T07:03:34Z
+Categorised Bolt-driver errors at the query-package boundary: Neo.ClientError.* → NewValidationError (exit 6); Neo.TransientError.* / Neo.DatabaseError.* / transport failures → NewUpstreamError (exit 8). Wrapping happens in runStatementResponse (dispatch layer that prod + test seam both flow through) and openDriver, so schema.go callers get typed errors for free without per-site edits.
+Files: +neo4j-cli/query/errors.go, +neo4j-cli/query/errors_test.go, ~neo4j-cli/query/connect.go
+Decisions: dual-mode classifier (typed *neo4j.Neo4jError via errors.As, plus string-prefix fallback) so tests injecting plain errors.New("Neo.ClientError…") via the seam still classify correctly without constructing real driver structs.

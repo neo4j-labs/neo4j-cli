@@ -67,7 +67,7 @@ tasks:
       the existing `query` test setup (real-neo4j integration or a mock,
       whichever fits the surrounding suite) that asserts both branches map
       to the right exit code via `errors.As`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -75,7 +75,7 @@ tasks:
       - "Bolt transport / `TransientError` / `DatabaseError` failures surface as `*CLIError` with `Code == 8`."
       - "A test in the `query` package locks both mappings via `errors.As`."
       - "`make test` passes, including any neo4j-docker integration tests already wired."
-    completed_at: null
+    completed_at: 2026-05-13T07:03:34Z
 
   - id: task-004
     title: "Sweep remaining clierr call sites for auth/validation reclassification"

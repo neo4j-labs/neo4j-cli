@@ -268,6 +268,10 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 // stores it on c.driver. Idempotent when already opened. Caller is
 // responsible for closing the driver via c.driver.Close(ctx) (typically
 // `defer`).
+//
+// Driver-construction errors (connectivity, malformed URI, TLS handshake)
+// surface as upstream errors so the process exits with code 8 — they are
+// transport-level failures, not user-input validation.
 func (c *conn) openDriver() error {
 	if c == nil {
 		return errors.New("query: nil connection")
@@ -277,7 +281,7 @@ func (c *conn) openDriver() error {
 	}
 	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent)
 	if err != nil {
-		return fmt.Errorf("query: open driver: %w", err)
+		return categorizeBoltError(fmt.Errorf("query: open driver: %w", err))
 	}
 	c.driver = d
 	return nil
@@ -349,8 +353,18 @@ func flagString(cmd *cobra.Command, name string) string {
 // flag drives ExecuteRead vs ExecuteWrite selection inside the production
 // impl; preflight EXPLAIN and read-only execution pass true, post-classified
 // write execution passes false.
+//
+// Driver errors are categorised here (the single dispatch boundary that both
+// production and the test seam flow through) so callers further up never have
+// to deal with raw Bolt-driver errors: Cypher ClientError-class failures map
+// to validation errors (exit 6); transport / TransientError / DatabaseError
+// failures map to upstream errors (exit 8).
 func runStatementResponse(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
-	return runStatementResponseFn(ctx, c, statement, params, readOnly)
+	resp, err := runStatementResponseFn(ctx, c, statement, params, readOnly)
+	if err != nil {
+		return nil, categorizeBoltError(err)
+	}
+	return resp, nil
 }
 
 // runStatementResponseImpl is the real Bolt-backed implementation. Opens a
