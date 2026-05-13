@@ -158,7 +158,7 @@ tasks:
       `neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go`
       (and any locked-test golden file) to assert the new keys are present
       and the existing keys still are.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -167,7 +167,7 @@ tasks:
       - "`schemaVersion` stays at 1."
       - "Locked agent-context tests pass with updated fixtures."
       - "`neo4j-cli agent-context | jq '.exit_codes, .error_codes'` (manual) shows the full set."
-    completed_at: null
+    completed_at: 2026-05-13T07:22:08Z
 
   - id: task-008
     title: "Add test/e2e/exitcodes/ end-to-end suite for all exit codes"

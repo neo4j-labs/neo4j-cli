@@ -25,3 +25,7 @@ Files: ~neo4j-cli/app/app.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/app/app_test.g
 Propagated typed exit codes from cmd.Execute in both main.go files via an extracted exitCodeFor helper (errors.As → CLIError.Code, fallback 1, nil → 0). neo4j-cli/main.go now calls os.Exit(exitCodeFor(err)) after cfg.Events.Flush(); aura/cmd/main.go replaces its bare os.Exit(1) with the same call. recoverPanic defers untouched.
 Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go, ~neo4j-cli/aura/cmd/main.go, ~neo4j-cli/aura/cmd/main_test.go
 Decisions: extracted exitCodeFor as a free function (mirrors recoverPanic extraction pattern) so it is unit-testable without invoking main; duplicated across the two main packages rather than introducing a shared helper, matching how recoverPanic is already duplicated.
+
+## task-007 — 2026-05-13T07:22:08Z
+Extended agentcontext.exitCodes to 9 entries (0-8) and errorCodes to 8 entries (fatal_error, usage_error, not_found, auth_error, conflict, validation_error, rate_limited, upstream_error) with PRD-aligned descriptions. schemaVersion stays at 1 (additive). Updated both envelope tests (build_test.go hermetic, agentcontext_test.go live tree) to assert new cardinality and key set.
+Files: ~neo4j-cli/internal/subcommands/agentcontext/build.go, ~neo4j-cli/internal/subcommands/agentcontext/build_test.go, ~neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go

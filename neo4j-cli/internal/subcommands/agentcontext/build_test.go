@@ -86,13 +86,24 @@ func TestBuildContext_Envelope(t *testing.T) {
 	assert.Equal(t, "neo4j-cli", ctx.Binary)
 	assert.Equal(t, "--await", ctx.AsyncFlag)
 	assert.Equal(t, clicfg.ValidFormatValues[:], ctx.OutputFormats)
-	assert.Len(t, ctx.ExitCodes, 2)
+	assert.Len(t, ctx.ExitCodes, 9, "exit_codes must list entries 0-8 (closed set per agent-cli-auditor §4.1)")
 	assert.Equal(t, "success", ctx.ExitCodes["0"])
-	assert.Equal(t, "general error", ctx.ExitCodes["1"])
-	assert.Len(t, ctx.ErrorCodes, 3)
-	assert.Contains(t, ctx.ErrorCodes, "usage_error")
-	assert.Contains(t, ctx.ErrorCodes, "upstream_error")
-	assert.Contains(t, ctx.ErrorCodes, "fatal_error")
+	for _, code := range []string{"1", "2", "3", "4", "5", "6", "7", "8"} {
+		assert.NotEmpty(t, ctx.ExitCodes[code], "exit_codes[%q] must have a description", code)
+	}
+	assert.Len(t, ctx.ErrorCodes, 8, "error_codes must list all eight clierr categories")
+	for _, code := range []string{
+		"fatal_error",
+		"usage_error",
+		"not_found",
+		"auth_error",
+		"conflict",
+		"validation_error",
+		"rate_limited",
+		"upstream_error",
+	} {
+		assert.Contains(t, ctx.ErrorCodes, code, "error_codes must include %q", code)
+	}
 }
 
 func TestBuildContext_HidesHiddenAndDeprecatedSubcommands(t *testing.T) {
