@@ -13,3 +13,7 @@ Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bund
 ## task-004 — 2026-05-13T14:43:34Z
 Added Patch-kind changelog entry via `changie new --projects neo4j-cli --kind Patch --body "..."`. YAML loads cleanly; body references CLI-104 and scopes change to `query --help`. fmt-check + lint clean.
 Files: ~.changes/unreleased/neo4j-cli-Patch-20260513-144334.yaml
+
+## task-005 — 2026-05-13T12:45:55Z
+Final gates sweep. make test (cached, all green incl. TestGenerator_RoundTrip), make fmt-check (silent), make lint (0 issues). Help sweep: root/aura/tenant/instance --help all show 0 EXPLAIN hits; query --help shows 1 "EXPLAIN preflight" hit. Reviewer pass vs PRD: all REQ-F-001..007 + REQ-NF-001 satisfied; only leftover "runs EXPLAIN first when --rw" hits are in .plans/ docs (expected — PRD quotes the original). No code changes.
+Files: (none — task-status + progress only)

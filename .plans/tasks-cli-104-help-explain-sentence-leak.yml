@@ -90,7 +90,7 @@ tasks:
       detector); `make fmt-check` mirrors CI's gofmt linter; `make lint` runs
       golangci-lint v2. All three must pass before the change is considered done.
       Also run a final `--help` sweep to confirm the user-visible outcome.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -102,4 +102,4 @@ tasks:
       - "`make lint` exits 0 (no golangci-lint issues)"
       - "`go run ./neo4j-cli --help`, `… aura --help`, `… aura tenant --help`, `… aura instance --help` all show no `EXPLAIN` substring"
       - "`go run ./neo4j-cli query --help` shows the EXPLAIN gate sentence"
-    completed_at: null
+    completed_at: 2026-05-13T12:45:55Z
