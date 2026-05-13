@@ -122,3 +122,51 @@ tasks:
       - "Manual verification: piped invocation (no TTY, no agent) fails with the same usage error"
       - "Manual verification: --rw=true succeeds across all three contexts"
     completed_at: 2026-05-13T13:20:00Z
+
+  - id: task-007
+    title: "Add real-binary E2E test for the write gate (agent-detect end-to-end)"
+    description: |
+      Add an automated E2E smoke test that boots the real binary and proves the gate behaves
+      correctly end-to-end. Today the gate is only tested through `detectAgent` / `stdoutIsTerminal`
+      seams; this leaves a small gap where an env-var-name typo or a future decoupling of the seams
+      from production wiring would slip through CI. The test closes that gap for the dangerous
+      direction (agent slips through gate).
+
+      Place the new test in a new package at the repo root (e.g. `e2e/writegate_test.go`). The test
+      MUST be self-contained:
+      - `TestMain` (or a `sync.Once` helper) runs `go build -o $TMPDIR/neo4j-cli ./neo4j-cli` so the
+        test doesn't depend on a pre-existing `bin/neo4j-cli`. Use `t.TempDir()` for the binary path.
+      - Three subtests, each running the built binary via `exec.Command`:
+          - `agent_blocks`: env includes `CLAUDECODE=1`, command `credential dbms add --name e2e-test
+            --uri neo4j+s://example --username u --password p`. Assert exit code 2 (`*exec.ExitError`
+            with `ExitCode() == 2`) AND stderr contains the canonical string
+            `this command writes; pass --rw to allow it`.
+          - `piped_blocks`: no agent env (explicitly unset CLAUDECODE / CLAUDE_CODE / etc. for the
+            child); `exec.Command` already gives the child a non-TTY stdout, which is exactly the
+            "no agent, no TTY" branch. Same exit + stderr assertions as agent_blocks.
+          - `agent_with_rw_succeeds`: env includes `CLAUDECODE=1`, command adds `--rw=true`. Assert
+            exit code 0. To avoid mutating the dev machine's real credentials store, redirect the
+            credentials path for this subtest — investigate existing seams: clicfg likely supports an
+            env var like `NEO4J_CLI_CONFIG_DIR` or honours `XDG_CONFIG_HOME` / `HOME` overrides. If
+            no such seam exists, set `HOME=$TMPDIR` for the child process and verify the file lands
+            under `$TMPDIR/...` (cross-check the platform-specific path in `common/clicfg/`).
+      - The TTY-success path (REQ-F-006 row 5) is intentionally OUT OF SCOPE for this E2E because
+        synthesising a PTY in pure Go test requires a new dependency (`creack/pty`). The gate matrix
+        test already covers `stdoutIsTerminal == true`; the E2E focuses on the regression-dangerous
+        paths.
+      - Test must work on linux + macOS in CI. Windows: gate with `runtime.GOOS != "windows"` skip
+        if `exec` + path handling proves awkward, or fix as you go; mirror what other tests in the
+        repo do for cross-platform binary invocation.
+
+      Ensure no persistent state leaks: any temp credential written goes under `t.TempDir()`; no
+      `~/Library/Preferences/...` mutations.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "New e2e/writegate_test.go (or equivalent path) exists and runs as part of go test ./..."
+      - "Test builds the binary into t.TempDir() — no reliance on pre-existing bin/neo4j-cli"
+      - "agent_blocks subtest asserts exit 2 + stderr contains the canonical error string"
+      - "piped_blocks subtest asserts exit 2 + canonical error (without agent env vars)"
+      - "agent_with_rw_succeeds subtest asserts exit 0 with --rw, AND does not mutate any state outside t.TempDir()"
+      - "make test passes including the new e2e package; make fmt-check, make lint, make generate-check all green"
+    completed_at: null
