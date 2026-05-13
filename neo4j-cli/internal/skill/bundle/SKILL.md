@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Runs Cypher and manages Neo4j Aura, Neo4j connection (dbms) credentials, and embedding-provider credentials from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, embed text inline as a Cypher parameter, introspect a schema, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura/dbms/embed credentials, install/remove the neo4j-cli skill in an agent, or self-update the neo4j-cli binary via `neo4j-cli update`. Skip for Cypher syntax questions, graph data modeling, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
+description: Runs Cypher, inspects the database schema / data model via `neo4j-cli query :schema`, and manages Neo4j Aura, Neo4j connection (dbms) credentials, and embedding-provider credentials from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, inspect/view/introspect the schema or generate a data model from the schema (labels, relationship types, properties) via `:schema`, embed text inline as a Cypher parameter, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura/dbms/embed credentials, install/remove the neo4j-cli skill in an agent, or self-update the neo4j-cli binary via `neo4j-cli update`. Skip for Cypher syntax questions, Neo4j drivers, Docker/Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
@@ -25,7 +25,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
-| [`query`](references/query.md) | Run Cypher against a Neo4j database via the Bolt protocol |
+| [`query`](references/query.md) | Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
 | [`update`](references/update.md) | Self-update the neo4j-cli binary |
 
@@ -33,7 +33,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 
 <!-- Hand-written tips & gotchas inlined into the generated SKILL.md "Tips & Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
 
-- **Before using `neo4j-cli query`, read [query-additions.md](query-additions.md) — required pre-reading covering schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and tips.**
+- **Before generating ANY Cypher: run `neo4j-cli query :schema --format toon` first to discover the real labels, relationship types, and properties. Do not guess the schema.** Read [query-additions.md](query-additions.md) for the full schema-first workflow, parameters, embeddings, and Cypher 25 vs 5.
 - The `aura` subcommand under neo4j-cli mirrors the standalone aura-cli surface but does NOT carry a duplicate `skill` group — install agent skills via `neo4j-cli skill install` at the top level.
 - `credential` lives at the top level of neo4j-cli (not nested under `aura`) so credentials apply across every subcommand that talks to Aura.
 - All read commands accept `--format json|table|toon`. Write commands print confirmation text only; pipe-friendly output requires explicit `--format json` where supported.

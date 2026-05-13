@@ -18,8 +18,9 @@ import (
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query [cypher]",
-		Short: "Run Cypher against a Neo4j database via the Bolt protocol",
-		Long: "Run a Cypher statement against a Neo4j database via the Bolt " +
+		Short: "Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol",
+		Long: "Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. " +
+			"Run a Cypher statement against a Neo4j database via the Bolt " +
 			"protocol. Cypher is taken from the positional argument, or from " +
 			"stdin when no argument is provided and stdin is piped. " +
 			"Use `--param NAME:embed=<text>` to inject an embedding vector inline " +
@@ -29,7 +30,10 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"without opening a Bolt connection. " +
 			"Write operations require `--rw`; without `--rw`, an EXPLAIN preflight " +
 			"runs first and statements classified as writes are blocked.",
-		Example: `# Run inline Cypher (read-only — no --rw needed)
+		Example: `# Introspect the schema before writing Cypher (always do this first)
+neo4j-cli query :schema --format toon
+
+# Run inline Cypher (read-only — no --rw needed)
 neo4j-cli query "MATCH (n) RETURN count(n) AS n" --format json
 
 # Pipe Cypher from stdin
