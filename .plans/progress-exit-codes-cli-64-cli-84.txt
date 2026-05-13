@@ -20,3 +20,8 @@ Decisions: AuraCredentials.GetDefault has only one call site (api.go MakeRequest
 ## task-005 — 2026-05-13T07:13:12Z
 Registered FlagErrorFunc on neo4j-cli root (app.NewCmd) and aura standalone root (NewStandaloneCmd) wrapping cobra flag-parse errors into clierr.NewUsageError (exit 2). Cobra walks up to root so one registration per tree covers all subcommands. Added table-driven tests asserting *CLIError with Code==2 for both root-level and subcommand-level --bad-flag.
 Files: ~neo4j-cli/app/app.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/app/app_test.go, ~neo4j-cli/aura/aura_test.go
+
+## task-006 — 2026-05-13T07:50:00Z
+Propagated typed exit codes from cmd.Execute in both main.go files via an extracted exitCodeFor helper (errors.As → CLIError.Code, fallback 1, nil → 0). neo4j-cli/main.go now calls os.Exit(exitCodeFor(err)) after cfg.Events.Flush(); aura/cmd/main.go replaces its bare os.Exit(1) with the same call. recoverPanic defers untouched.
+Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go, ~neo4j-cli/aura/cmd/main.go, ~neo4j-cli/aura/cmd/main_test.go
+Decisions: extracted exitCodeFor as a free function (mirrors recoverPanic extraction pattern) so it is unit-testable without invoking main; duplicated across the two main packages rather than introducing a shared helper, matching how recoverPanic is already duplicated.

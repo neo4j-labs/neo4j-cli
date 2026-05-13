@@ -134,7 +134,7 @@ tasks:
       tiny unit test for any helper extracted to avoid testing `main`
       directly (or skip if the logic stays inline); the end-to-end
       verification lives in task-008.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-005
@@ -144,7 +144,7 @@ tasks:
       - "`cfg.Events.Flush()` runs before `os.Exit` in both."
       - "`recoverPanic` defers remain intact and panic propagation still produces a non-zero exit."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-05-13T07:50:00Z
 
   - id: task-007
     title: "Extend agent-context exitCodes and errorCodes maps"
