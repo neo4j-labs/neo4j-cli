@@ -18,3 +18,39 @@ Files: ~README.md
 ## TASK-005 — 2026-05-13T13:11:00Z
 Added Minor changie entry for CLI-76 via `changie new --projects neo4j-cli --kind Minor`.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260513-130959.yaml
+
+## Verification — 2026-05-13T13:20:00Z
+
+Gates:
+- `make test` — green across all packages (full ok., no FAIL).
+- `make fmt-check` — clean (no output).
+- `make lint` — `0 issues.`
+- `make generate-check` — only diff is the harness's task-status flip (`pending` → `in_progress`); no `internal/skill/bundle/**` drift. Per AGENTS.md note, only bundle paths matter for the gate.
+
+Manual verification (against `bin/neo4j-cli` built from this branch; TTY simulated via `script -q /dev/null`; cleaned up `test-cli76-*` dbms entries afterwards so the dev creds file is unchanged):
+
+(a) Interactive TTY, no agent, no --rw:
+    `script -q /dev/null env -u CLAUDECODE … TERM_PROGRAM=plain bin/neo4j-cli credential dbms add --name test-cli76-a …`
+    EXIT=0; credential row written (grep -c 'test-cli76-a' = 1).
+
+(b) `CLAUDECODE=1`, no --rw:
+    `CLAUDECODE=1 bin/neo4j-cli credential dbms add --name test-cli76-b …`
+    stderr: `Error: this command writes; pass --rw to allow it`
+    EXIT=2.
+
+(c) Piped (`</dev/null`), no TTY, no agent, no --rw:
+    `bin/neo4j-cli credential dbms add --name test-cli76-c … </dev/null`
+    stderr: `Error: this command writes; pass --rw to allow it`
+    EXIT=2.
+
+(d) `--rw=true` in agent + piped contexts:
+    `CLAUDECODE=1 bin/neo4j-cli credential dbms add --name test-cli76-d1 … --rw=true` → EXIT=0
+    `bin/neo4j-cli credential dbms add --name test-cli76-d2 … --rw=true </dev/null` → EXIT=0
+    Both writes landed in credentials.json; subsequently removed via `credential dbms remove … --rw=true`.
+
+Post-verification cleanup: `grep -c 'test-cli76' ~/Library/Preferences/neo4j/cli/credentials.json` = 0.
+
+## TASK-006 — 2026-05-13T13:20:00Z
+Final gates + manual verification. All four gates green; PRD acceptance scenarios (a)-(d) reproduced against the built binary and proof captured above; dev credentials file left unmodified.
+Files: ~progress
+Decisions: TTY simulation used `script -q /dev/null env -u <agent-vars> TERM_PROGRAM=plain …` to (1) allocate a real pty for stdout and (2) strip stray agent vars from the parent shell so `Detect()` returns false. Cleaner than relying on the agent's own shell, which carries `CLAUDECODE=1`.

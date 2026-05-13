@@ -109,7 +109,7 @@ tasks:
       against the integrated branch and capture the manual verification from the PRD Acceptance
       Criteria: (a) interactive write succeeds without `--rw`; (b) `CLAUDECODE=1` write fails the
       gate; (c) non-TTY write fails the gate; (d) `--rw=true` succeeds in all three paths.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -121,4 +121,4 @@ tasks:
       - "Manual verification: CLAUDECODE=1 bin/neo4j-cli credential dbms add ... fails with the existing usage error"
       - "Manual verification: piped invocation (no TTY, no agent) fails with the same usage error"
       - "Manual verification: --rw=true succeeds across all three contexts"
-    completed_at: null
+    completed_at: 2026-05-13T13:20:00Z
