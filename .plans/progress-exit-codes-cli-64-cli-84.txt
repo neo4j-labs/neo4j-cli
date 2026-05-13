@@ -1,0 +1,4 @@
+## task-001 — 2026-05-13T06:54:16Z
+Introduced *CLIError struct (Code, Message, Err, RetryAfter) and 8 typed constructors in common/clierr; existing constructor signatures preserved.
+Files: ~common/clierr/error.go, +common/clierr/error_test.go
+Decisions: unwrapFormatted seeds CLIError.Err from %w-formatted inner so errors.Is reaches sentinels through CLIError.Unwrap.

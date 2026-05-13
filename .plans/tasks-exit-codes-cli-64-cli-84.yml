@@ -19,7 +19,7 @@ tasks:
       Add `common/clierr/error_test.go` with table-driven coverage of each
       constructor's exit code, `errors.As` extraction through one or more
       `fmt.Errorf(": %w", ...)` wraps, and `Error()`/`Unwrap()` semantics.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`CLIError` struct has fields `Code int`, `Message string`, `Err error`, `RetryAfter string` and implements `Error()` + `Unwrap()`."
@@ -27,7 +27,7 @@ tasks:
       - "`NewRateLimitError(retryAfter, msg, args...)` populates the struct field; message body still mentions the value."
       - "`common/clierr/error_test.go` exists with table-driven tests asserting code, Error() text, and `errors.As` extraction through `%w` wrapping."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-05-13T06:54:16Z
 
   - id: task-002
     title: "Map HTTP status codes to typed errors in handleResponseError"
