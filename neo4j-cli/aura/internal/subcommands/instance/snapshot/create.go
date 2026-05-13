@@ -25,6 +25,14 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This subcommand starts the on-demand snapshot creation process for an Aura instance.
 Creating a snapshot is an asynchronous operation. You can poll the current status of this operation by periodically getting the snapshots details for the instance ID using the get subcommand.
 The time taken to complete a snapshot depends on the amount of data stored in the instance; larger quantities of data will take longer. The exact time this will take is dependent on the size of your data store.`,
+		Example: `# Take an on-demand snapshot of an instance
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Take a snapshot and wait until it is ready
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Take a snapshot and emit JSON for scripting
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/snapshots", instanceId)

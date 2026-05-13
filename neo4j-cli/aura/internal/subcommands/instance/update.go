@@ -31,6 +31,14 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This command allows you to rename and/or resize an Aura instance.
 
 Resizing an instance is an asynchronous operation. The instance remains available throughout.`,
+		Example: `# Rename an Aura instance
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --rw
+
+# Resize an Aura instance to 8GB of memory
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB --rw
+
+# Rename and resize, emitting JSON for scripting
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{}

@@ -21,6 +21,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This subcommand returns a list containing a summary of each of your Aura instances. To find out more about a specific instance, retrieve the details using the get subcommand.
 
 You can filter instances in a particular tenant using --tenant-id. If the tenant flag is not specified, this subcommand lists all instances a user has access to across all tenants.`,
+		Example: `# List all instances the current user has access to
+neo4j-cli aura instance list
+
+# List instances in a specific tenant
+neo4j-cli aura instance list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance list --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := "/instances"
 

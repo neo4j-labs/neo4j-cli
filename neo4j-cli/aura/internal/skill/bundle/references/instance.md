@@ -68,19 +68,13 @@ Examples:
 
 ```
 # Create a free-db instance (no cloud provider, region, or memory required)
-  neo4j aura instance create --type free-db --await --rw
+neo4j-cli aura instance create --type free-db --await --rw
 
-  # Create a professional-db instance on AWS (us-east-1, N. Virginia)
-  neo4j aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+# Create a professional-db instance on AWS (us-east-1, N. Virginia)
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
 
-  # Create a professional-db instance on Azure (eastus, Virginia)
-  neo4j aura instance create --rw --name my-azure-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider azure --region eastus --memory 4GB
-
-  # Create a professional-db instance on GCP (europe-west1, Belgium)
-  neo4j aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB
-
-  # Create a business-critical instance on AWS (us-east-1, N. Virginia)
-  neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 64GB
+# Create a professional-db instance on GCP and emit JSON for scripting
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
 ```
 
 ## aura-cli instance delete
@@ -95,6 +89,19 @@ If another operation is being performed on the instance you are trying to delete
 
 Usage: `aura-cli instance delete <id>`
 
+Examples:
+
+```
+# Delete an instance by ID
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete an instance and emit the response as JSON
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and pipe the response status through jq
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'
+```
+
 ## aura-cli instance get
 
 Returns instance details
@@ -102,6 +109,19 @@ Returns instance details
 This endpoint returns details about a specific Aura Instance.
 
 Usage: `aura-cli instance get <id>`
+
+Examples:
+
+```
+# Get details of an instance by ID
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the connection URL
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.connection_url'
+```
 
 ## aura-cli instance list
 
@@ -118,6 +138,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--tenant-id` | string | - | An optional Tenant ID to filter instances in a tenant |
+
+Examples:
+
+```
+# List all instances the current user has access to
+neo4j-cli aura instance list
+
+# List instances in a specific tenant
+neo4j-cli aura instance list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance list --format json
+```
 
 ## aura-cli instance overwrite
 
@@ -139,6 +172,19 @@ Flags:
 | `--source-instance-id` | string | - | The ID of the instance to overwrite with, from the source snapshot ID if provided, otherwise takes a new snapshot and overwrites |
 | `--source-snapshot-id` | string | - | The ID of the snapshot to overwrite with, which must be exportable, from the source instance ID if provided, otherwise the argument provided instance |
 
+Examples:
+
+```
+# Overwrite an instance with a fresh snapshot of a source instance
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Overwrite using a specific exportable snapshot and wait until ready
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --await --rw
+
+# Overwrite and emit JSON for scripting
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json
+```
+
 ## aura-cli instance pause
 
 Pauses an instance
@@ -152,6 +198,19 @@ The pause time depends on the amount of data stored in the instance; larger quan
 If another operation is being performed on the instance you are trying to pause, an error will be returned that indicates that the pause operation cannot be performed.
 
 Usage: `aura-cli instance pause <id>`
+
+Examples:
+
+```
+# Pause an Aura instance
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw
+
+# Pause an instance and emit the response as JSON
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Pause and pipe the response status through jq
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'
+```
 
 ## aura-cli instance resume
 
@@ -170,6 +229,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--await` | bool | false | Waits until resumed instance is ready. |
+
+Examples:
+
+```
+# Resume a paused Aura instance
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
+
+# Resume and wait until the instance is ready
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Resume and emit the response as JSON for scripting
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json
+```
 
 ## aura-cli instance snapshot
 
@@ -194,6 +266,19 @@ Flags:
 | `--await` | bool | false | Waits until created snapshot is ready. |
 | `--instance-id` | string | - | (required) The ID of the instance to create a snapshot of |
 
+Examples:
+
+```
+# Take an on-demand snapshot of an instance
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Take a snapshot and wait until it is ready
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Take a snapshot and emit JSON for scripting
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
 ### aura-cli instance snapshot get
 
 Get details of a snapshot
@@ -207,6 +292,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | The ID of the instance to get the snapshot details of |
+
+Examples:
+
+```
+# Get details of a snapshot by its ID
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json
+
+# Check whether a snapshot is exportable via jq
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.exportable'
+```
 
 ### aura-cli instance snapshot list
 
@@ -222,6 +320,19 @@ Flags:
 |------|------|---------|-------------|
 | `--date` | string | - | An optional date to list snapshots for a given day, defaults to today. Must be formatted with an ISO formatted date string (YYYY-MM-DD) |
 | `--instance-id` | string | - | The ID of the instance to list the snapshots of |
+
+Examples:
+
+```
+# List today's snapshots for an instance
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000
+
+# List snapshots for a specific date
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --date 2025-01-15
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --format json
+```
 
 ## aura-cli instance update
 
@@ -239,4 +350,17 @@ Flags:
 |------|------|---------|-------------|
 | `--memory` | string | - | The size of the instance memory in GB. |
 | `--name` | string | - | The name of the instance (any UTF-8 characters with no trailing or leading whitespace). |
+
+Examples:
+
+```
+# Rename an Aura instance
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --rw
+
+# Resize an Aura instance to 8GB of memory
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB --rw
+
+# Rename and resize, emitting JSON for scripting
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json
+```
 

@@ -12,7 +12,7 @@ tasks:
       (create, list, get). Normalise the existing `create.go` Example to the
       target style (flush-left, backtick raw string, `neo4j-cli` binary prefix).
       Regenerate the skill bundle and confirm gates pass.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Each of the 10 leaves has a non-empty Example: field with >=3 invocations, each preceded by a '# comment' line and separated by blank lines"
@@ -20,7 +20,7 @@ tasks:
       - "All invocations use the `neo4j-cli` binary prefix; write leaves (create/delete/pause/resume/update/overwrite/snapshot create) include `--rw` on every invocation; read leaves (list/get/snapshot list/snapshot get) include at least one `--format json` invocation and no `--rw`"
       - "Existing `instance create` Example is normalised in-place: flush-left and uses `neo4j-cli` (was `neo4j`)"
       - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces no further diff after running once; `make test`, `make fmt-check`, `make lint` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:10:59Z
 
   - id: task-002
     title: "Aura tenant / credential / config / customer-managed-key: add Example blocks"

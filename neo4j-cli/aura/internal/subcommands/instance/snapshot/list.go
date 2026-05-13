@@ -21,6 +21,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns a list of snapshots",
 		Long:  `This subcommand returns a list of available snapshots from the current day.`,
+		Example: `# List today's snapshots for an instance
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000
+
+# List snapshots for a specific date
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --date 2025-01-15
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/snapshots", instanceId)

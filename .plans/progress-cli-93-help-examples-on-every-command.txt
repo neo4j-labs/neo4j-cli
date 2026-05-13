@@ -1,0 +1,3 @@
+## task-001 — 2026-05-13T11:10:59Z
+Added Example blocks to 9 aura instance leaves (list/get/delete/pause/resume/update/overwrite + snapshot.create/list/get); normalised existing create.go Example flush-left + neo4j-cli prefix. Regenerated bundles.
+Files: ~create.go ~list.go ~get.go ~delete.go ~pause.go ~resume.go ~update.go ~overwrite.go ~snapshot/create.go ~snapshot/list.go ~snapshot/get.go ~bundle/references/instance.md ~bundle/references/aura.md
