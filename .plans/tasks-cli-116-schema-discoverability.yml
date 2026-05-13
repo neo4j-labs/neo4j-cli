@@ -147,7 +147,7 @@ tasks:
       v2. All three must pass. Also do a final `--help` sweep to confirm the
       user-visible outcome on `query --help` and `query :schema --help`.
       See PRD REQ-NF-002, REQ-NF-003, REQ-NF-004.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -157,4 +157,4 @@ tasks:
       - "`make lint` exits 0"
       - "`go run ./neo4j-cli query --help` Long lede mentions `:schema`; first example is `:schema --format toon`"
       - "`go run ./neo4j-cli query :schema --help` Long lede starts with `Run this BEFORE generating Cypher`; first example is `:schema --format toon`"
-    completed_at: null
+    completed_at: 2026-05-13T14:26:00Z

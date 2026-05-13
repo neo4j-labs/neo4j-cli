@@ -22,3 +22,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260513-162347.yaml
 ## task-005 — 2026-05-13T14:25:00Z
 Regenerated `neo4j-cli/internal/skill/bundle/` via `go generate`. Aura bundle untouched (diff clean). SKILL.md description, Subcommands row, first Tips & Gotchas bullet, and references/query.md Long + first Example all now lead with `:schema`.
 Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/query.md
+
+## task-007 — 2026-05-13T14:26:00Z
+Ran final gates: `make fmt-check` clean, `make test` all pass (TestGenerator_RoundTrip + TestAllLeafCommands_HaveExamples included), `make lint` 0 issues. `query --help` and `query :schema --help` both lead with the new `:schema` directive and example.
+Files: (no code changes)
