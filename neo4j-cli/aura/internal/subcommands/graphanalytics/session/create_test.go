@@ -105,7 +105,7 @@ func TestCreateStandAloneSession(t *testing.T) {
 }`)
 }
 
-func TestCreateSessionWithAwait(t *testing.T) {
+func TestCreateSessionWithWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -139,7 +139,7 @@ func TestCreateSessionWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --await --rw")
+	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --wait --rw")
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)

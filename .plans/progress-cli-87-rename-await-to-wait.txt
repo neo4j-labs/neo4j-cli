@@ -1,0 +1,39 @@
+## task-001 — 2026-05-13T13:26:00Z
+Created Linear issue CLI-111 (parent CLI-71, project Neo4j-CLI, team neo4j-cli-workinggroup, due 2026-06-03) to track --await alias removal after one release.
+Files: ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: PRD's "team Neo4j, project CLI" = team neo4j-cli-workinggroup (key CLI) + project Neo4j-CLI. Recorded follow_up_issue_id: CLI-111 in YAML for task-008.
+
+## task-002 — 2026-05-13T13:35:00Z
+Added flags.RegisterWait helper that binds --wait and deprecated --await alias to same *bool via cobra MarkDeprecated; covered four behavioural cases in table-driven test plus help-hiding check.
+Files: +neo4j-cli/aura/internal/flags/wait.go, +neo4j-cli/aura/internal/flags/wait_test.go, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: pflag's FlagSet writes deprecation warnings to its own Output() (os.Stderr by default), independent of cmd.SetErr; test sets cmd.Flags().SetOutput(buf) explicitly to capture. MarkDeprecated err handled via panic since only programmer-error conditions trigger it.
+
+## task-003 — 2026-05-13T13:55:00Z
+Refactored 13 async leaf commands to use flags.RegisterWait; renamed local `await` var to `wait`, dropped awaitFlag consts, updated Example/Long strings, added flags import where missing.
+Files: ~neo4j-cli/aura/internal/subcommands/{customermanagedkey/create.go, dataapi/graphql/{create,update,resume,pause}.go, dataapi/graphql/authprovider/create.go, dataapi/graphql/corspolicy/allowedorigin/{add,remove}.go, graphanalytics/session/create.go, instance/{create,resume,overwrite}.go, instance/snapshot/create.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: existing *_test.go failures (TestCreate*WithAwait etc.) and TestGenerator_RoundTrip diffs left for task-004/task-007 per dependency order.
+
+## task-004 — 2026-05-13T14:05:00Z
+Renamed 6 test functions (WithAwait/BeforeAwait → WithWait/BeforeWait) across 4 test files and replaced 6 `--await` invocations with `--wait`. Tests pass. TestGenerator_RoundTrip still fails as expected (owned by task-007); agentcontext --await assertions left for task-005.
+Files: ~neo4j-cli/aura/internal/subcommands/{graphanalytics/session/create_test.go, instance/create_test.go, instance/overwrite_test.go, instance/snapshot/create_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-005 — 2026-05-13T14:15:00Z
+Flipped agentcontext asyncFlag constant "--await" → "--wait", trimmed audit-item comment to one line, updated two test assertions. Built binary confirms `agent-context | jq -r .async_flag` returns "--wait".
+Files: ~neo4j-cli/internal/subcommands/agentcontext/{build.go, build_test.go, agentcontext_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-006 — 2026-05-13T14:25:00Z
+Updated doc surfaces: CONTRIBUTING.md §3.5 documents --wait canonical + deprecated alias sentence; README.md/AGENTS.md/.agents/architecture.md replaced --await→--wait. Historical CHANGELOG-aura.md and .changes/aura-cli/* untouched. lint+fmt pass; only TestGenerator_RoundTrip fails (owned by task-007).
+Files: ~CONTRIBUTING.md, ~README.md, ~AGENTS.md, ~.agents/architecture.md, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-007 — 2026-05-13T14:45:00Z
+Regenerated both skill bundles; --wait replaces --await everywhere and deprecated alias is elided by cobra MarkDeprecated. Also flipped hand-written `--await` line in both additions.md (else SKILL.md would still mention --await). All gates pass (test/lint/fmt-check/license-check); generate-check meaningful only on clean tree per AGENTS.md.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/aura.md, ~neo4j-cli/aura/internal/skill/bundle/references/{customer-managed-key,graph-analytics,instance}.md, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-008 — 2026-05-13T15:56:00Z
+Added changie Minor entry for neo4j-cli referencing CLI-87 and follow-up CLI-111; verified via `changie batch --dry-run`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-155521.yaml, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-009 — 2026-05-13T16:10:00Z
+Final gates green (fmt-check/lint/test/generate-check/license-check) and e2e binary verified: --wait golden path, --await emits cobra deprecation to stderr, --help hides --await, agent-context async_flag returns "--wait".
+Files: ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: generate-check meaningful only against clean tree — stashed task-yaml edit before running, popped after.

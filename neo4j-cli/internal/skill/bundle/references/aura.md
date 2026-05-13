@@ -68,13 +68,13 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created customer managed key is ready. |
 | `--cloud-provider` | cloud-provider | - | (required) The cloud provider hosting the instance. |
 | `--key-id` | string | - | (required) Encryption Key ARN |
 | `--name` | string | - | (required) The name of the customer managed key (any UTF-8 characters with no trailing or leading whitespace). |
 | `--region` | string | - | (required) The region where the instance is hosted. |
 | `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. |
+| `--wait` | bool | false | Waits until created customer managed key is ready. |
 
 Examples:
 
@@ -83,7 +83,7 @@ Examples:
 neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
 
 # Create a key and wait until it is ready before returning
-neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Create a key and emit JSON for scripting
 neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json
@@ -194,7 +194,7 @@ Flags:
 Creates a new Aura Graph Analytics Serverless session
 
 This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
-				Creating a session is an asynchronous operation that can be awaited with --await.
+				Creating a session is an asynchronous operation that can be waited for with --wait.
 
 Usage: `neo4j-cli aura graph-analytics session create [flags]`
 
@@ -202,7 +202,6 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created session is ready. |
 | `--cloud-provider` | string | - | The cloud provider hosting the session. |
 | `--instance-id` | string | - | The ID of the instance to create the session for. |
 | `--memory` | string | - | (required) The size of the session memory in GB. |
@@ -210,6 +209,7 @@ Flags:
 | `--region` | string | - | The region where the session is hosted. |
 | `--tenant-id` | string | - | The Aura project/tenant ID |
 | `--ttl` | string | - | This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration. |
+| `--wait` | bool | false | Waits until created session is ready. |
 
 Examples:
 
@@ -218,7 +218,7 @@ Examples:
 neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
 
 # Create a session attached to an existing Aura instance and wait until ready
-neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --await
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --wait
 
 # Create a session with a TTL and emit JSON for scripting
 neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json
@@ -324,7 +324,7 @@ Region identifiers follow each cloud provider's own naming convention: AWS uses 
 
 If you're unsure of possible configurations, run 'tenant get' to discover the full list of supported configurations for your tenant. The output lists every valid combination of --cloud-provider, --region, --type, and --memory.
 
-Creating an instance is an asynchronous operation that can be awaited with --await. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
+Creating an instance is an asynchronous operation that can be waited for with --wait. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
 This subcommand returns your instance ID, initial credentials, connection URL along with your tenant id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
 
@@ -336,7 +336,6 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created instance is ready. |
 | `--cloud-provider` | cloud-provider | - | The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp". |
 | `--credential-name` | string | - | The name to use when storing the credentials locally. Defaults to <instance-id>-default. |
 | `--customer-managed-key-id` | string | - | An optional customer managed key to be used for instance creation. |
@@ -350,12 +349,13 @@ Flags:
 | `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. |
+| `--wait` | bool | false | Waits until created instance is ready. |
 
 Examples:
 
 ```
 # Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --type free-db --await --rw
+neo4j-cli aura instance create --type free-db --wait --rw
 
 # Create a professional-db instance on AWS (us-east-1, N. Virginia)
 neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
@@ -455,9 +455,9 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created snapshot is ready |
 | `--source-instance-id` | string | - | The ID of the instance to overwrite with, from the source snapshot ID if provided, otherwise takes a new snapshot and overwrites |
 | `--source-snapshot-id` | string | - | The ID of the snapshot to overwrite with, which must be exportable, from the source instance ID if provided, otherwise the argument provided instance |
+| `--wait` | bool | false | Waits until created snapshot is ready |
 
 Examples:
 
@@ -466,7 +466,7 @@ Examples:
 neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Overwrite using a specific exportable snapshot and wait until ready
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --await --rw
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
 
 # Overwrite and emit JSON for scripting
 neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json
@@ -515,7 +515,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until resumed instance is ready. |
+| `--wait` | bool | false | Waits until resumed instance is ready. |
 
 Examples:
 
@@ -524,7 +524,7 @@ Examples:
 neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
 
 # Resume and wait until the instance is ready
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Resume and emit the response as JSON for scripting
 neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json
@@ -550,8 +550,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created snapshot is ready. |
 | `--instance-id` | string | - | (required) The ID of the instance to create a snapshot of |
+| `--wait` | bool | false | Waits until created snapshot is ready. |
 
 Examples:
 
@@ -560,7 +560,7 @@ Examples:
 neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
 
 # Take a snapshot and wait until it is ready
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Take a snapshot and emit JSON for scripting
 neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json

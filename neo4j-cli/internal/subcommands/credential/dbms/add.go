@@ -18,7 +18,7 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		databaseName    string
 		uri             string
 		embedCredential string
-		filePath        string
+		envPath         string
 	)
 
 	const (
@@ -28,7 +28,7 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		databaseNameFlag    = "database-name"
 		uriFlag             = "uri"
 		embedCredentialFlag = "embed-credential"
-		fileFlag            = "file"
+		envFlag             = "env"
 
 		envURI          = "NEO4J_URI"
 		envUsername     = "NEO4J_USERNAME"
@@ -43,9 +43,9 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add a Neo4j Bolt connection profile. The first credential added becomes the default. " +
 			"Pass `--embed-credential <name>` to link this profile to an existing embed credential — " +
 			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. " +
-			"Pass `--file <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.",
+			"Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.",
 		Example: `# Add a dbms credential from an Aura-exported credentials file
-neo4j-cli credential dbms add --file ./Neo4j-12345-Created-2025-01-01.txt --rw
+neo4j-cli credential dbms add --env ./Neo4j-12345-Created-2025-01-01.txt --rw
 
 # Add a dbms credential with explicit flags (becomes the default if it is the first one)
 neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --rw
@@ -54,15 +54,15 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --embed-credential openai-small --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse the optional --file before applying any defaults so we can
+			// Parse the optional --env before applying any defaults so we can
 			// distinguish "file had the key but with empty value" (error) from
 			// "file didn't have the key" (fall through to flag/default).
 			var (
 				fileVals    = map[string]string{}
 				filePresent = map[string]bool{}
 			)
-			if filePath != "" {
-				vals, present, err := envfile.Parse(cfg.Aura.Fs(), filePath)
+			if envPath != "" {
+				vals, present, err := envfile.Parse(cfg.Aura.Fs(), envPath)
 				if err != nil {
 					return err
 				}
@@ -122,7 +122,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				{envDatabase, databaseNameFlag},
 			} {
 				if filePresent[c.envKey] && fileVals[c.envKey] == "" && !changed(c.flagName) {
-					return clierr.NewUsageError("--file %q: %s has an empty value", filePath, c.envKey)
+					return clierr.NewUsageError("--env %q: %s has an empty value", envPath, c.envKey)
 				}
 			}
 
@@ -138,7 +138,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				{uriFlag, uri, envURI},
 			} {
 				if req.value == "" {
-					return clierr.NewUsageError("--%s is required (provide via --file as %s, or pass --%s)", req.flag, req.envKey, req.flag)
+					return clierr.NewUsageError("--%s is required (provide via --env as %s, or pass --%s)", req.flag, req.envKey, req.flag)
 				}
 			}
 
@@ -163,7 +163,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 	cmd.Flags().StringVar(&uri, uriFlag, "", "(required) URI")
 	cmd.Flags().StringVar(&databaseName, databaseNameFlag, "neo4j", "Database name")
 	cmd.Flags().StringVar(&embedCredential, embedCredentialFlag, "", "Name of an embed credential to link (must already exist; see `credential embed list`)")
-	cmd.Flags().StringVar(&filePath, fileFlag, "", "Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values.")
+	cmd.Flags().StringVar(&envPath, envFlag, "", "Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values.")
 
 	return cmd
 }

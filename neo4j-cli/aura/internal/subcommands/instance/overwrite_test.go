@@ -97,7 +97,7 @@ func TestOverwriteFromSnapshot(t *testing.T) {
 	}`)
 }
 
-func TestOverwriteWithAwait(t *testing.T) {
+func TestOverwriteWithWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -130,7 +130,7 @@ func TestOverwriteWithAwait(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --await --rw", instanceId, sourceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance overwrite %s --source-instance-id %s --wait --rw", instanceId, sourceId))
 
 	postMock.AssertCalledTimes(1)
 	postMock.AssertCalledWithBody(`{

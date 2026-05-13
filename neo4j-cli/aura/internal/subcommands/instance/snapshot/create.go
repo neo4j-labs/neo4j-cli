@@ -10,13 +10,14 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var instanceId string
-	var await bool
+	var wait bool
 
 	cmd := &cobra.Command{
 		Annotations: map[string]string{"write": "true"},
@@ -29,7 +30,7 @@ The time taken to complete a snapshot depends on the amount of data stored in th
 neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
 
 # Take a snapshot and wait until it is ready
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Take a snapshot and emit JSON for scripting
 neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
@@ -48,7 +49,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-00
 			if statusCode == http.StatusAccepted {
 				output.PrintBody(cmd, cfg, resBody, []string{"snapshot_id"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for snapshot to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateSnapshotResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
@@ -71,7 +72,7 @@ neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-00
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to create a snapshot of")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().BoolVar(&await, "await", false, "Waits until created snapshot is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready.")
 
 	return cmd
 }

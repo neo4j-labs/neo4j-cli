@@ -52,14 +52,14 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 		name         string
 		clientId     string
 		clientSecret string
-		filePath     string
+		envPath      string
 	)
 
 	const (
 		nameFlag         = "name"
 		clientIdFlag     = "client-id"
 		clientSecretFlag = "client-secret"
-		fileFlag         = "file"
+		envFlag          = "env"
 
 		envClientId     = "CLIENT_ID"
 		envClientSecret = "CLIENT_SECRET"
@@ -72,27 +72,27 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add an Aura Console API client credential (client ID + secret). " +
 			"The first credential added becomes the default; switch later with " +
 			"`credential aura-client use <name>`. " +
-			"Pass `--file <path>` to import an Aura console–exported aura-client credentials file " +
+			"Pass `--env <path>` to import an Aura console–exported aura-client credentials file " +
 			"(recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.",
 		Example: `# Add the first aura-client credential (becomes the default)
 neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
 
 # Import an Aura console–exported aura-client credentials file
-neo4j-cli credential aura-client add --name work --file ~/Downloads/aura-client-creds.txt --rw
+neo4j-cli credential aura-client add --name work --env ~/Downloads/aura-client-creds.txt --rw
 
 # Switch the default after adding a second credential
 neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse the optional --file first so we can distinguish
+			// Parse the optional --env first so we can distinguish
 			// "file had the key but with empty value" (error) from
 			// "file didn't have the key" (fall through to flag).
 			var (
 				fileVals    = map[string]string{}
 				filePresent = map[string]bool{}
 			)
-			if filePath != "" {
-				vals, present, err := envfile.Parse(cfg.Aura.Fs(), filePath)
+			if envPath != "" {
+				vals, present, err := envfile.Parse(cfg.Aura.Fs(), envPath)
 				if err != nil {
 					return err
 				}
@@ -123,7 +123,7 @@ neo4j-cli credential aura-client use personal --rw`,
 				{envClientSecret, clientSecretFlag},
 			} {
 				if filePresent[c.envKey] && fileVals[c.envKey] == "" && !changed(c.flagName) {
-					return clierr.NewUsageError("--file %q: %s has an empty value", filePath, c.envKey)
+					return clierr.NewUsageError("--env %q: %s has an empty value", envPath, c.envKey)
 				}
 			}
 
@@ -137,7 +137,7 @@ neo4j-cli credential aura-client use personal --rw`,
 				{clientSecretFlag, clientSecret, envClientSecret},
 			} {
 				if req.value == "" {
-					return clierr.NewUsageError("--%s is required (provide via --file as %s, or pass --%s)", req.flag, req.envKey, req.flag)
+					return clierr.NewUsageError("--%s is required (provide via --env as %s, or pass --%s)", req.flag, req.envKey, req.flag)
 				}
 			}
 
@@ -148,7 +148,7 @@ neo4j-cli credential aura-client use personal --rw`,
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
 	cmd.Flags().StringVar(&clientId, clientIdFlag, "", "(required) Client ID")
 	cmd.Flags().StringVar(&clientSecret, clientSecretFlag, "", "(required) Client secret")
-	cmd.Flags().StringVar(&filePath, fileFlag, "", "Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values.")
+	cmd.Flags().StringVar(&envPath, envFlag, "", "Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values.")
 
 	return cmd
 }

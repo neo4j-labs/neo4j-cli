@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -19,13 +20,12 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 	const (
 		instanceIdFlag = "instance-id"
 		dataApiIdFlag  = "data-api-id"
-		awaitFlag      = "await"
 	)
 
 	var (
 		instanceId string
 		dataApiId  string
-		await      bool
+		wait       bool
 	)
 
 	cmd := &cobra.Command{
@@ -34,14 +34,14 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Adds a new allowed origin to the CORS policy",
 		Long: `This command adds a new allowed origin to the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
 
-Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
+Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
 
 Adding a new allowed origin to the CORS policy of a GraphQL Data API allows browsers to make requests to the GraphQL Data API from a web app that is served from the specified origin.`,
 		Example: `# Add an allowed origin to the CORS policy
 neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
 
 # Add an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --await --rw
+neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw
 
 # Add an allowed origin and capture the response as JSON
 neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json`,
@@ -84,7 +84,7 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.examp
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusUpdating)
 					if err != nil {
@@ -104,7 +104,7 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.examp
 	cmd.Flags().StringVar(&dataApiId, dataApiIdFlag, "", "(required) The ID of the GraphQL Data API to add the CORS allowed origin for")
 	cmd.MarkFlagRequired(dataApiIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until updated GraphQL Data API is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready.")
 
 	return cmd
 }

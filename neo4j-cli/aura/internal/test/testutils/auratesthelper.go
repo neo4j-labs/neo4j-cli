@@ -101,7 +101,7 @@ func (helper *AuraTestHelper) SetCredentialsValue(key string, value interface{})
 // SeedFile stashes a pending write to the in-memory test fs. The write is
 // flushed inside ExecuteCommand after the fs is constructed, so callers can
 // stage file content (e.g. an Aura-exported credentials file consumed via
-// --file) before invoking the command under test.
+// --env) before invoking the command under test.
 func (helper *AuraTestHelper) SeedFile(path, content string) {
 	if helper.pendingFiles == nil {
 		helper.pendingFiles = map[string]string{}

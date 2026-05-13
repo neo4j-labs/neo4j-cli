@@ -33,7 +33,7 @@ func TestCreateSnapshot(t *testing.T) {
 	  }`)
 }
 
-func TestCreateSnapshotWithAwait(t *testing.T) {
+func TestCreateSnapshotWithWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 	instanceId := "2f49c2b3"
@@ -60,7 +60,7 @@ func TestCreateSnapshotWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s --await --rw", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance snapshot create --instance-id %s --wait --rw", instanceId))
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)

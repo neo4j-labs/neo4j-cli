@@ -1,0 +1,159 @@
+feature: cli-87-rename-await-to-wait
+prd: ./prd-cli-87-rename-await-to-wait.md
+created_at: 2026-05-13T13:22:22Z
+updated_at: 2026-05-13T13:22:22Z
+
+tasks:
+  - id: task-001
+    title: "Open follow-up Linear issue for --await alias removal"
+    description: |
+      Create the follow-up Linear issue that tracks removing the deprecated `--await` alias after one release.
+      Use `mcp__linear-server__save_issue` with team Neo4j, project CLI, parent CLI-71, due date 2026-06-03.
+      The issue ID is needed by the changelog task, so this must run early.
+    status: completed
+    follow_up_issue_id: CLI-111
+    dependencies: []
+    acceptance_criteria:
+      - "New Linear issue exists titled 'Remove deprecated --await alias (follow-up to CLI-87)'"
+      - "Issue is under team Neo4j, project CLI, parent CLI-71"
+      - "Due date set to 2026-06-03"
+      - "Body lists the mechanical removal targets: wait.go (drop AwaitFlagAlias const, second BoolVar, MarkDeprecated), wait_test.go (drop alias cases), regenerate bundles, drop the alias sentence in CONTRIBUTING.md §3.5"
+      - "Issue ID captured for use in task-008 (changelog)"
+    completed_at: 2026-05-13T13:26:00Z
+
+  - id: task-002
+    title: "Create flags.RegisterWait helper and tests"
+    description: |
+      Add `neo4j-cli/aura/internal/flags/wait.go` exporting `WaitFlag`, `AwaitFlagAlias`, and `RegisterWait(cmd, *bool, helpText)`.
+      The helper registers `--wait` and binds `--await` to the same `*bool`, then calls `cmd.Flags().MarkDeprecated(AwaitFlagAlias, "use --wait instead")`.
+      Add `wait_test.go` with table-driven coverage for the four behavioural cases listed in REQ-F-002.
+      Include the Neo4j copyright header on `wait.go` so `make license-check` passes.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "wait.go exports WaitFlag = \"wait\", AwaitFlagAlias = \"await\", and RegisterWait(cmd *cobra.Command, wait *bool, helpText string)"
+      - "RegisterWait registers both flags binding to the same *bool and marks --await deprecated via cobra MarkDeprecated"
+      - "wait_test.go covers: --wait sets bool / no deprecation marker on stderr; --await sets bool AND stderr contains 'Flag --await has been deprecated, use --wait instead'; neither flag → false, no marker; both flags → true + marker"
+      - "wait.go carries the Neo4j copyright header"
+      - "go test ./neo4j-cli/aura/internal/flags/... passes"
+    completed_at: 2026-05-13T13:35:00Z
+
+  - id: task-003
+    title: "Refactor 13 leaf commands to use flags.RegisterWait"
+    description: |
+      For each of the 13 async-leaf commands listed in REQ-F-003, replace the existing `BoolVar(&await, "await"|awaitFlag, false, "...")` registration with `flags.RegisterWait(cmd, &wait, "<existing help text>")`.
+      Drop the local `awaitFlag` const (9 files) and rename the local `var await bool` → `var wait bool`, plus `if await {` → `if wait {`.
+      Update `Example:` strings on every leaf to replace `--await` with `--wait`; update `Long:` strings where the flag is mentioned by name.
+      Add the `flags` package import where not already present.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "All 13 leaves call flags.RegisterWait; no remaining `BoolVar(... \"await\" ...)` or `awaitFlag = \"await\"` const in any of them"
+      - "Local variable renamed to `wait` throughout each leaf; no `await` identifier remains in source"
+      - "Each leaf's Example: block uses --wait (preserves flush-left indent, ≥3 invocations, # comment per invocation, --rw on write invocations, --format json on at least one read invocation per CLI-93)"
+      - "go build ./... succeeds; go vet ./... clean"
+      - "TestAllLeafCommands_HaveExamples passes"
+    completed_at: 2026-05-13T13:55:00Z
+
+  - id: task-004
+    title: "Rewrite existing tests to use --wait and rename test functions"
+    description: |
+      Find every `--await` literal under `*_test.go` and replace with `--wait`.
+      Rename test functions whose names embed `WithAwait` / `BeforeAwait` to `WithWait` / `BeforeWait` (see REQ-F-004 for the explicit list).
+      Do not duplicate alias-warning coverage per leaf — the helper test in task-002 owns that path.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`grep -rn '\\-\\-await' --include='*_test.go'` returns no results inside the test invocations (only string-literal expectations of cobra's deprecation message, if any, remain)"
+      - "Renamed: TestCreateFreeInstanceWithAwait → WithWait, TestCreateFreeInstanceWithAwait_StdoutIsValidJSON → WithWait_StdoutIsValidJSON, TestCreateCredentialStoredBeforeAwait → BeforeWait, TestCreateSnapshotWithAwait → WithWait, TestOverwriteWithAwait → WithWait, and any equivalent in graphanalytics/session"
+      - "All updated tests pass under `go test ./...`"
+      - "No new alias-warning tests added per-leaf; alias regression remains the helper's responsibility"
+    completed_at: 2026-05-13T14:05:00Z
+
+  - id: task-005
+    title: "Update agent-context async_flag constant and tests"
+    description: |
+      In `neo4j-cli/internal/subcommands/agentcontext/build.go`, change `const asyncFlag = "--await"` (line 38) to `"--wait"` and rewrite the comment block above (lines 35-37) to drop the "separate audit item" wording — replace with a single line stating the canonical name post-CLI-87.
+      Update the assertions in `build_test.go` and `agentcontext_test.go` that expect `"--await"` to expect `"--wait"`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "asyncFlag constant equals \"--wait\""
+      - "Comment above the constant is one line and no longer references a separate audit item"
+      - "All `assert.Equal(t, \"--await\", ctx.AsyncFlag)` occurrences in build_test.go and agentcontext_test.go updated to \"--wait\""
+      - "`go test ./neo4j-cli/internal/subcommands/agentcontext/...` passes"
+      - "`./bin/neo4j-cli agent-context | jq -r .async_flag` returns \"--wait\" after rebuild"
+    completed_at: 2026-05-13T14:15:00Z
+
+  - id: task-006
+    title: "Update documentation surfaces"
+    description: |
+      Update `CONTRIBUTING.md §3.5` (around line 207) so the canonical async flag is documented as `--wait`, with one extra sentence stating that `--await` is a deprecated alias to be removed in the following release.
+      Replace every `--await` mention in `README.md`, `AGENTS.md` (do NOT edit `CLAUDE.md` — it's a symlink to `AGENTS.md`), and `.agents/architecture.md` with `--wait`.
+      Do not edit `CHANGELOG-aura.md` or `.changes/aura-cli/*.md` (historical).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "CONTRIBUTING.md §3.5 documents --wait as canonical and notes the deprecated --await alias"
+      - "README.md contains no remaining --await references"
+      - "AGENTS.md contains no remaining --await references (CLAUDE.md is a symlink and updates automatically)"
+      - ".agents/architecture.md contains no remaining --await references"
+      - "CHANGELOG-aura.md and .changes/aura-cli/* are untouched"
+    completed_at: 2026-05-13T14:25:00Z
+
+  - id: task-007
+    title: "Regenerate skill bundles and verify alias is hidden"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` to refresh both skill bundle reference markdown sets.
+      Inspect the diffs in `neo4j-cli/internal/skill/bundle/references/*.md` and `neo4j-cli/aura/internal/skill/bundle/references/*.md` — they must show `--await` → `--wait` and must NOT contain `--await` as a documented flag (cobra's MarkDeprecated should elide it from FlagUsages). If `--await` leaks into the bundle, escalate as a render-side fix.
+      Commit the source-side changes and the regenerated bundles together so `TestGenerator_RoundTrip` stays green.
+    status: completed
+    dependencies:
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` runs cleanly"
+      - "Both bundles' references/*.md files show --wait, not --await"
+      - "Deprecated --await alias does NOT appear in any rendered bundle reference"
+      - "TestGenerator_RoundTrip passes in both skill packages"
+      - "`make generate-check` passes (no diff after go generate ./... against a clean working tree)"
+    completed_at: 2026-05-13T14:45:00Z
+
+  - id: task-008
+    title: "Add changie entry referencing CLI-87 and the follow-up issue"
+    description: |
+      Use `changie new --projects neo4j-cli --kind Minor --body '<text>'` (or hand-author the YAML under `.changes/unreleased/` per the AGENTS.md fallback) to add a single entry.
+      Body: `Renamed --await to --wait on all async commands. --await is accepted as a deprecated alias for one release; see <follow-up-id> for removal (CLI-87).` — substitute the actual follow-up issue ID captured in task-001.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "One new file under .changes/unreleased/ named neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml"
+      - "Body references both CLI-87 and the follow-up issue ID from task-001"
+      - "project: neo4j-cli; kind: Minor; time: RFC3339"
+      - "File parses (e.g. via `changie batch --dry-run` or a YAML syntax check)"
+    completed_at: 2026-05-13T15:56:00Z
+
+  - id: task-009
+    title: "Run final gates and verify end-to-end behaviour"
+    description: |
+      Final gates: `make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check`.
+      Build the binary and verify both flag paths interactively: `--wait` (canonical, golden path), `--await` (alias, prints `Flag --await has been deprecated, use --wait instead` to stderr), `--help` (shows --wait, hides --await), `agent-context` (returns `"--wait"` for async_flag).
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "`make fmt-check && make lint && make test && make generate-check && make license-check` all pass"
+      - "`bin/neo4j-cli aura instance create --type free-db --wait --rw <…>` works (golden path)"
+      - "`bin/neo4j-cli aura instance create --type free-db --await --rw <…>` works AND emits the cobra deprecation message to stderr"
+      - "`bin/neo4j-cli aura instance create --help` shows --wait and does NOT show --await"
+      - "`bin/neo4j-cli agent-context | jq -r .async_flag` returns \"--wait\""
+    completed_at: 2026-05-13T16:10:00Z

@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +22,6 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		instancePasswordFlag = "instance-password"
 		typeDefsFlag         = "type-definitions"
 		typeDefsFileFlag     = "type-definitions-file"
-		awaitFlag            = "await"
 	)
 
 	var (
@@ -31,7 +31,7 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		instancePassword string
 		typeDefs         string
 		typeDefsFile     string
-		await            bool
+		wait             bool
 	)
 
 	cmd := &cobra.Command{
@@ -40,12 +40,12 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Edit a GraphQL Data API",
 		Long: `This endpoint edits a specific GraphQL Data API.
 
-Updating a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.`,
+Updating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.`,
 		Example: `# Rename a GraphQL Data API
 neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
 
 # Update the underlying instance credentials and wait for the API to be ready
-neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --await --rw
+neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --wait --rw
 
 # Replace the type definitions from a local file
 neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw`,
@@ -93,7 +93,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-de
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, args[0], api.GraphQLDataApiStatusUpdating)
 					if err != nil {
@@ -121,7 +121,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-de
 	cmd.Flags().StringVar(&typeDefsFile, typeDefsFileFlag, "", "Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql")
 	cmd.MarkFlagsMutuallyExclusive(typeDefsFlag, typeDefsFileFlag)
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until updated GraphQL Data API is ready again.")
+	flags.RegisterWait(cmd, &wait, "Waits until updated GraphQL Data API is ready again.")
 
 	return cmd
 }
