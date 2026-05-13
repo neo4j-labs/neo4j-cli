@@ -13,14 +13,14 @@ tasks:
       weak match for "look into the schema of neo4j" / "generate a data model
       from the schema". Stay ≤1024 chars, single paragraph, third-person.
       See PRD REQ-F-001.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`description.txt` contains the literal substring `:schema` or `neo4j-cli query :schema`"
       - "File is a single paragraph, third-person voice, ≤1024 chars"
       - "Phrase covers the agent-side triggers: `inspect/view/introspect the schema`, `data model from the schema`"
       - "No mention of `-f` shorthand anywhere in the new text (use long-form `--format` if a flag is shown)"
-    completed_at: null
+    completed_at: 2026-05-13T00:00:00Z
 
   - id: task-002
     title: "Promote schema-first directive to first bullet in `additions.md`"
