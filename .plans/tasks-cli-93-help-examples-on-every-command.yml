@@ -194,7 +194,7 @@ tasks:
       `go generate`, `make test`, `make fmt-check`, `make lint`, `make generate-check`
       on a clean tree, and perform the manual smoke checks from the PRD acceptance
       criteria.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -203,4 +203,4 @@ tasks:
       - "`go run ./neo4j-cli aura instance list --help` shows an 'Examples:' block with >=3 flush-left lines"
       - "`go run ./neo4j-cli credential dbms add --help` shows an 'Examples:' block including `--rw`"
       - "`git diff neo4j-cli/internal/skill/bundle/ neo4j-cli/aura/internal/skill/bundle/` against main shows only Example-related additions, no unrelated drift"
-    completed_at: null
+    completed_at: 2026-05-13T13:55:00Z
