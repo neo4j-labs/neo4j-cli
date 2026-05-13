@@ -18,3 +18,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/credential/add.go, ~neo4j-cli/aura/i
 ## task-005 — 2026-05-13T12:45:00Z
 Verification-only no-op. `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produced no bundle diff (task-004 folded the regen in). Confirmed `references/credential.md` aura-client add subsection documents `--file` (line 50: "Path to an Aura console–exported aura-client credentials file"). `make test`, `make fmt-check`, `make lint` all green. `make generate-check` only flags the harness `.plans/tasks-*.yml` status flip — bundle paths are clean per AGENTS.md.
 Files: (none)
+
+## task-006 — 2026-05-13T11:32:00Z
+Added Minor changie entry for CLI-100 via `changie new --projects neo4j-cli --kind Minor --body "credential aura-client add: --file accepts an Aura-exported credentials file (CLI-100)"`. `make test`, `make fmt-check`, `make lint` all green.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-113144.yaml

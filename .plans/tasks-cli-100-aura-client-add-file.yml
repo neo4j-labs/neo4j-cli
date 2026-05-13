@@ -95,11 +95,11 @@ tasks:
     description: |
       Add a `Minor` changie entry recording the user-facing feature. Prefer `changie new --projects neo4j-cli --kind Minor --body "credential aura-client add: --file accepts an Aura-exported credentials file (CLI-100)"`; if changie isn't on PATH, hand-author the YAML at `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per AGENTS.md "Changie Notes" with fields `project: neo4j-cli`, `kind: Minor`, `body: '…'` (single-quoted), `time: <RFC3339>`.
       Implements PRD REQ-NF-005.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
       - "New YAML file under `.changes/unreleased/` with `project: neo4j-cli`, `kind: Minor`, and the new-flag body"
       - "Filename matches `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` shape if hand-authored"
       - "`make test`, `make fmt-check`, `make lint` still pass with the new file present"
-    completed_at: null
+    completed_at: 2026-05-13T11:32:00Z
