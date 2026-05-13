@@ -151,6 +151,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.15s ease, color 0.15s ease;
+    overflow-x: clip;
   }
 
   ::selection { background: var(--accent); color: #fff; }
@@ -514,7 +515,14 @@
     flex-direction: column;
   }
   @media (max-width: 720px) {
-    .example-tabs { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 0; }
+    .example-tabs {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+    }
   }
   .example-tab {
     display: flex;
@@ -533,7 +541,12 @@
     transition: all 0.1s;
   }
   @media (max-width: 720px) {
-    .example-tab { border-left: 0; border-bottom: 2px solid transparent; flex-shrink: 0; }
+    .example-tab {
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 4px 12px;
+      font-size: 12px;
+    }
   }
   .example-tab:hover { color: var(--fg); background: color-mix(in srgb, var(--accent) 4%, transparent); }
   .example-tab.active {
@@ -542,7 +555,11 @@
     border-left-color: var(--accent);
   }
   @media (max-width: 720px) {
-    .example-tab.active { border-left-color: transparent; border-bottom-color: var(--accent); }
+    .example-tab.active {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+      color: var(--fg);
+    }
   }
   .example-tab .label-tag {
     margin-left: auto;
@@ -560,6 +577,7 @@
     font-family: var(--font-mono);
     font-size: 14px;
     line-height: 1.7;
+    min-width: 0;
     overflow-x: auto;
     position: relative;
     min-height: 400px;
