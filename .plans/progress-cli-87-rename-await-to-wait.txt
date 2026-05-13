@@ -16,3 +16,7 @@ Decisions: existing *_test.go failures (TestCreate*WithAwait etc.) and TestGener
 ## task-004 — 2026-05-13T14:05:00Z
 Renamed 6 test functions (WithAwait/BeforeAwait → WithWait/BeforeWait) across 4 test files and replaced 6 `--await` invocations with `--wait`. Tests pass. TestGenerator_RoundTrip still fails as expected (owned by task-007); agentcontext --await assertions left for task-005.
 Files: ~neo4j-cli/aura/internal/subcommands/{graphanalytics/session/create_test.go, instance/create_test.go, instance/overwrite_test.go, instance/snapshot/create_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-005 — 2026-05-13T14:15:00Z
+Flipped agentcontext asyncFlag constant "--await" → "--wait", trimmed audit-item comment to one line, updated two test assertions. Built binary confirms `agent-context | jq -r .async_flag` returns "--wait".
+Files: ~neo4j-cli/internal/subcommands/agentcontext/{build.go, build_test.go, agentcontext_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml

@@ -84,7 +84,7 @@ func TestBuildContext_Envelope(t *testing.T) {
 	assert.Equal(t, 1, ctx.SchemaVersion)
 	assert.Equal(t, "v9.9.9-test", ctx.CliVersion)
 	assert.Equal(t, "neo4j-cli", ctx.Binary)
-	assert.Equal(t, "--await", ctx.AsyncFlag)
+	assert.Equal(t, "--wait", ctx.AsyncFlag)
 	assert.Equal(t, clicfg.ValidFormatValues[:], ctx.OutputFormats)
 	assert.Len(t, ctx.ExitCodes, 9, "exit_codes must list entries 0-8 (closed set per agent-cli-auditor §4.1)")
 	assert.Equal(t, "success", ctx.ExitCodes["0"])

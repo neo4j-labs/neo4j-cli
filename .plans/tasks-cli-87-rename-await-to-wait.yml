@@ -77,7 +77,7 @@ tasks:
     description: |
       In `neo4j-cli/internal/subcommands/agentcontext/build.go`, change `const asyncFlag = "--await"` (line 38) to `"--wait"` and rewrite the comment block above (lines 35-37) to drop the "separate audit item" wording — replace with a single line stating the canonical name post-CLI-87.
       Update the assertions in `build_test.go` and `agentcontext_test.go` that expect `"--await"` to expect `"--wait"`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "asyncFlag constant equals \"--wait\""
@@ -85,7 +85,7 @@ tasks:
       - "All `assert.Equal(t, \"--await\", ctx.AsyncFlag)` occurrences in build_test.go and agentcontext_test.go updated to \"--wait\""
       - "`go test ./neo4j-cli/internal/subcommands/agentcontext/...` passes"
       - "`./bin/neo4j-cli agent-context | jq -r .async_flag` returns \"--wait\" after rebuild"
-    completed_at: null
+    completed_at: 2026-05-13T14:15:00Z
 
   - id: task-006
     title: "Update documentation surfaces"
