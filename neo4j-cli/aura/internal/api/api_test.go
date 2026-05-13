@@ -4,6 +4,7 @@
 package api_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
@@ -259,4 +261,34 @@ func TestMakeRequest_RejectsBlockedAuthURL(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "aura auth-url")
+}
+
+// TestGetToken_401_AuthError locks the task-004 reclassification: an aura
+// token-endpoint 401 (invalid/expired/revoked client credentials) surfaces as
+// *CLIError with Code == 4 (auth), not the previous usage exit.
+func TestGetToken_401_AuthError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	cfg := buildTestConfig(t, srv.URL, `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"","token-expiry":0}],
+			"default-credential": "c"
+		}
+	}`)
+
+	_, _, err := api.MakeRequest(cfg, "instances", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 4, ce.Code)
+	assert.Contains(t, ce.Error(), "invalid, expired, or revoked")
 }

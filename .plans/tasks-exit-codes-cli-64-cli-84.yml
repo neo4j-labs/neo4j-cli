@@ -90,7 +90,7 @@ tasks:
       unrecoverable internal failures stay on `NewFatalError`. Run
       `grep -n "clierr.New" -r` after the sweep to confirm nothing
       regressed and the call distribution matches the intent.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -99,7 +99,7 @@ tasks:
       - "Flag/usage and fatal sites remain unchanged."
       - "Sweep documented in the commit message (which sites moved, which stayed)."
       - "`make test`, `make fmt-check`, `make lint` pass."
-    completed_at: null
+    completed_at: 2026-05-13T07:35:00Z
 
   - id: task-005
     title: "Wrap cobra flag-parse errors via FlagErrorFunc on both root commands"

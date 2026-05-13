@@ -63,7 +63,7 @@ type huggingFaceEmbedRequest struct {
 // Authorization header value never appears in any error text.
 func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32, error) {
 	if p.cfg.APIKey == "" {
-		return nil, clierr.NewUsageError(
+		return nil, clierr.NewAuthError(
 			"missing API key for huggingface: set HF_TOKEN, NEO4J_EMBED_API_KEY, or store one with `neo4j-cli credential embed add`")
 	}
 
