@@ -80,7 +80,7 @@ tasks:
       Run `go generate ./neo4j-cli/internal/skill/...` to refresh `neo4j-cli/internal/skill/bundle/references/credential.md` after the `add.go` flag/Long change from task-004. Don't hand-edit the generated file — verify the regen reflects the new `--file` flag in the aura-client subsection.
       Confirm `TestGenerator_RoundTrip` passes and `make generate-check` is a no-op against a clean working tree. Per AGENTS.md "Cobra Help / Skill Bundle Rendering Notes", any flag/Long change on a credential leaf requires this regen, otherwise the gate trips. NOTE: the same regen step in CLI-75 was effectively folded into the implementation task because `make test` would have been red otherwise; if `go generate` already happened during task-004 (to keep `make test` green there), this task can be a verification-only no-op that just records the work.
       Implements PRD REQ-NF-004.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -88,7 +88,7 @@ tasks:
       - "`references/credential.md` mentions the new `--file` flag in the aura-client add subsection"
       - "`make test` passes including `TestGenerator_RoundTrip`"
       - "`make generate-check` exits clean"
-    completed_at: null
+    completed_at: 2026-05-13T12:45:00Z
 
   - id: task-006
     title: "Add changie entry for new aura-client --file flag"
