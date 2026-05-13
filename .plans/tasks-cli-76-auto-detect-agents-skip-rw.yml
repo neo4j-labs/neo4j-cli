@@ -75,7 +75,7 @@ tasks:
       write commands; agents (Claude Code, Codex, Cursor, …) and non-interactive scripts still need
       `--rw` explicitly; authoritative env-var list lives at `unjs/std-env`. Do NOT enumerate the
       agent env vars in README — link out to upstream.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -83,7 +83,7 @@ tasks:
       - "Section links to https://github.com/unjs/std-env/blob/main/src/agents.ts rather than enumerating env vars"
       - "Existing --rw prose elsewhere in README is updated or cross-referenced for consistency"
       - "Markdown renders cleanly (no broken anchors or fenced blocks)"
-    completed_at: null
+    completed_at: 2026-05-13T11:30:00Z
 
   - id: task-005
     title: "Add changelog entry"

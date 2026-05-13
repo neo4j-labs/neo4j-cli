@@ -10,3 +10,7 @@ Decisions: Kept usage-error string verbatim ("this command writes; pass --rw to 
 ## TASK-003 — 2026-05-13T11:18:00Z
 Rewrote --rw bullets on both skill additions.md surfaces: agents-always-need-rw + ask-once-on-gate-fail flow, retaining EXPLAIN preflight pointer. Regenerated both bundle/SKILL.md files via go generate.
 Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
+
+## TASK-004 — 2026-05-13T11:30:00Z
+Added "Auto-detect: when --rw is required" subsection under Write operations in README; describes TTY auto-apply + agent/non-interactive override and links to unjs/std-env upstream instead of enumerating env vars. Tweaked lead sentence from "require" to "gated by" for consistency.
+Files: ~README.md
