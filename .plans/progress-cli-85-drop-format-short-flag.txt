@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-13T16:30:00Z
 Dropped `-f` shorthand from `--format` registration; switched `RegisterOutputFlag`'s `StringP` to `String` and updated doc comment. Mirrored in versioncheck test helper.
 Files: ~common/flags/flags.go, ~neo4j-cli/internal/versioncheck/versioncheck_test.go
+
+## task-002 — 2026-05-13T16:45:00Z
+Wired `-f` shorthand on `update --force` via `BoolVarP`. Child `update check` does not inherit `--force` (verified). Description string unchanged.
+Files: ~neo4j-cli/internal/subcommands/update/update.go

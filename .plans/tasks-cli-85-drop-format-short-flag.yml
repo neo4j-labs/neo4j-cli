@@ -34,7 +34,8 @@ tasks:
       collision. `update check` (child) does not inherit `--force` and its
       existing `TestCheckCmd_UnknownForceFlag` must stay green. See PRD
       REQ-F-003.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T16:45:00Z
     dependencies: []
     acceptance_criteria:
       - "`update.go:125` calls `cmd.Flags().BoolVarP(&force, forceFlag, \"f\", false, …)`"
