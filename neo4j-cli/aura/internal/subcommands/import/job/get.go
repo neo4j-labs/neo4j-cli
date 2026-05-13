@@ -32,6 +32,14 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Get a job by id",
 		Args:  cobra.ExactArgs(1),
+		Example: `# Get an import job by ID
+neo4j-cli aura import job get 00000000-0000-0000-0000-000000000000 --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222
+
+# Get an import job and include detailed progress information
+neo4j-cli aura import job get 00000000-0000-0000-0000-000000000000 --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222 --progress
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura import job get 00000000-0000-0000-0000-000000000000 --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222 --format json`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

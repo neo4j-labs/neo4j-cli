@@ -15,3 +15,7 @@ Decisions: bundle skipped on purpose — deployment subtree is mounted only unde
 Added Example blocks to 13 data-api/graphql leaves: top-level (create/list/get/update/delete/pause/resume), auth-provider (create/list/delete/get), cors-policy/allowed-origin (add/remove). Bundles unchanged because data-api is beta-gated like deployment. Incidentally cleaned trailing tabs on two Long blocks (update.go, resume.go).
 Files: ~13 leaf .go
 Decisions: bundle skipped — same beta-gate reason as task-003. Cleaned-up trailing whitespace in Long strings is harmless (not referenced elsewhere).
+
+## task-005 — 2026-05-13T11:34:04Z
+Added Example blocks to 7 leaves: graph-analytics/session (create/list/delete/get) + import/job (create/get/cancel). Regenerated bundles (graph-analytics.md + aura.md).
+Files: ~7 leaf .go + ~bundle/references/graph-analytics.md (aura) + ~bundle/references/aura.md (neo4j-cli)

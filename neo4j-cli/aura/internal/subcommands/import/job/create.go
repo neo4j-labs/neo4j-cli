@@ -40,6 +40,14 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Allows you to create a new import job",
+		Example: `# Create an online import job targeting an Aura instance
+neo4j-cli aura import job create --rw --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --import-model-id 22222222-2222-2222-2222-222222222222 --db-id 33333333 --user neo4j --password mySecret
+
+# Create a bulk import job (overwrites all existing data) with explicit project flags
+neo4j-cli aura import job create --rw --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --import-model-id 22222222-2222-2222-2222-222222222222 --db-id 33333333 --user neo4j --password mySecret --import-type bulk
+
+# Create an import job and emit JSON for scripting (capture the returned job id)
+neo4j-cli aura import job create --rw --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --import-model-id 22222222-2222-2222-2222-222222222222 --db-id 33333333 --user neo4j --password mySecret --format json`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

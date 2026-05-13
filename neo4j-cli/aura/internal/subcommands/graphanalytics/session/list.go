@@ -20,6 +20,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of Graph Analytics Serverless sessions",
+		Example: `# List all Graph Analytics sessions the current user has access to
+neo4j-cli aura graph-analytics session list
+
+# List sessions in a specific project/tenant
+neo4j-cli aura graph-analytics session list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# List sessions attached to a specific instance and emit JSON for scripting
+neo4j-cli aura graph-analytics session list --instance-id 00000000 --format json`,
 		Long: `This subcommand returns a list containing a summary of each of your Graph Analytics Serverless session
 				By default, this subcommand lists all sessions a user has access to across all projects.
 				You can filter sessions in a particular project/tenant using:

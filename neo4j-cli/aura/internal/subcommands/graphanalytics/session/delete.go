@@ -19,7 +19,15 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete <id>",
 		Args:        cobra.ExactArgs(1),
 		Short:       "Delete a Graph Analytics Serverless session",
-		Long:        `This subcommand deletes a Graph Analytics Serverless session by id.`,
+		Example: `# Delete a session by ID
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a session and emit JSON for scripting
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete a session, suppressing all stdout output
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw > /dev/null`,
+		Long: `This subcommand deletes a Graph Analytics Serverless session by id.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/graph-analytics/sessions/%s", args[0])
 

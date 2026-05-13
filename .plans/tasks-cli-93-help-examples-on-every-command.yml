@@ -80,7 +80,7 @@ tasks:
       `neo4j-cli/aura/internal/subcommands/graphanalytics/session/`
       (create, list, delete, get) and `neo4j-cli/aura/internal/subcommands/import/job/`
       (create, get, cancel). Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -88,7 +88,7 @@ tasks:
       - "Write leaves (`session create`, `session delete`, `job create`, `job cancel`) include `--rw` on every invocation"
       - "Read leaves (`session list`, `session get`, `job get`) include at least one `--format json` invocation and never `--rw`"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:34:04Z
 
   - id: task-006
     title: "Top-level credential dbms + embed: add Example blocks"
