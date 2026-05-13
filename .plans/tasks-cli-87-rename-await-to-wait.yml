@@ -62,7 +62,7 @@ tasks:
       Find every `--await` literal under `*_test.go` and replace with `--wait`.
       Rename test functions whose names embed `WithAwait` / `BeforeAwait` to `WithWait` / `BeforeWait` (see REQ-F-004 for the explicit list).
       Do not duplicate alias-warning coverage per leaf — the helper test in task-002 owns that path.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -70,7 +70,7 @@ tasks:
       - "Renamed: TestCreateFreeInstanceWithAwait → WithWait, TestCreateFreeInstanceWithAwait_StdoutIsValidJSON → WithWait_StdoutIsValidJSON, TestCreateCredentialStoredBeforeAwait → BeforeWait, TestCreateSnapshotWithAwait → WithWait, TestOverwriteWithAwait → WithWait, and any equivalent in graphanalytics/session"
       - "All updated tests pass under `go test ./...`"
       - "No new alias-warning tests added per-leaf; alias regression remains the helper's responsibility"
-    completed_at: null
+    completed_at: 2026-05-13T14:05:00Z
 
   - id: task-005
     title: "Update agent-context async_flag constant and tests"

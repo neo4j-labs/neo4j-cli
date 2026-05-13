@@ -12,3 +12,7 @@ Decisions: pflag's FlagSet writes deprecation warnings to its own Output() (os.S
 Refactored 13 async leaf commands to use flags.RegisterWait; renamed local `await` var to `wait`, dropped awaitFlag consts, updated Example/Long strings, added flags import where missing.
 Files: ~neo4j-cli/aura/internal/subcommands/{customermanagedkey/create.go, dataapi/graphql/{create,update,resume,pause}.go, dataapi/graphql/authprovider/create.go, dataapi/graphql/corspolicy/allowedorigin/{add,remove}.go, graphanalytics/session/create.go, instance/{create,resume,overwrite}.go, instance/snapshot/create.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
 Decisions: existing *_test.go failures (TestCreate*WithAwait etc.) and TestGenerator_RoundTrip diffs left for task-004/task-007 per dependency order.
+
+## task-004 — 2026-05-13T14:05:00Z
+Renamed 6 test functions (WithAwait/BeforeAwait → WithWait/BeforeWait) across 4 test files and replaced 6 `--await` invocations with `--wait`. Tests pass. TestGenerator_RoundTrip still fails as expected (owned by task-007); agentcontext --await assertions left for task-005.
+Files: ~neo4j-cli/aura/internal/subcommands/{graphanalytics/session/create_test.go, instance/create_test.go, instance/overwrite_test.go, instance/snapshot/create_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
