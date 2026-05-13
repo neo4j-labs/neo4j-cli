@@ -12,7 +12,7 @@ tasks:
       `Write operations require --rw.` clause as the global gate hint. After the
       edits, run the binary directly to confirm the leak is gone before regenerating
       bundles. See PRD REQ-F-001, REQ-F-002.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`neo4j-cli/app/app.go:36` Long equals: `\"Allows you to manage Neo4j resources. Write operations require --rw.\"`"
@@ -20,7 +20,7 @@ tasks:
       - "`go run ./neo4j-cli --help` output does not contain the substring `EXPLAIN`"
       - "`go run ./neo4j-cli aura --help` output does not contain the substring `EXPLAIN`"
       - "`go run ./neo4j-cli aura tenant --help` output is unchanged (was already clean)"
-    completed_at: null
+    completed_at: 2026-05-13T12:45:00Z
 
   - id: task-002
     title: "Append EXPLAIN/`--rw`-gate sentence to `query` `Long:`"

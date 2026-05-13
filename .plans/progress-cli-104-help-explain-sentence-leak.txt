@@ -1,0 +1,3 @@
+## task-001 — 2026-05-13T12:45:00Z
+Stripped query/EXPLAIN clause from root (`app.go`) and aura (`aura.go`) `Long:` fields. Verified `--help` output clean.
+Files: ~neo4j-cli/app/app.go, ~neo4j-cli/aura/aura.go
