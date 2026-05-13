@@ -36,6 +36,20 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`.",
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, req := range []struct {
+				flag   string
+				value  string
+				envKey string
+			}{
+				{nameFlag, name, "AURA_INSTANCENAME"},
+				{usernameFlag, username, "NEO4J_USERNAME"},
+				{passwordFlag, password, "NEO4J_PASSWORD"},
+				{uriFlag, uri, "NEO4J_URI"},
+			} {
+				if req.value == "" {
+					return clierr.NewUsageError("--%s is required (provide via --file as %s, or pass --%s)", req.flag, req.envKey, req.flag)
+				}
+			}
 			if embedCredential != "" {
 				if _, err := cfg.Credentials.Embed.Get(embedCredential); err != nil {
 					return clierr.NewUsageError("invalid --embed-credential %q: no such embed credential (run `credential embed list` to see available)", embedCredential)
@@ -52,17 +66,9 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
-	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&username, usernameFlag, "", "(required) Username")
-	cmd.MarkFlagRequired(usernameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&password, passwordFlag, "", "(required) Password")
-	cmd.MarkFlagRequired(passwordFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&uri, uriFlag, "", "(required) URI")
-	cmd.MarkFlagRequired(uriFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&databaseName, databaseNameFlag, "neo4j", "Database name")
 	cmd.Flags().StringVar(&embedCredential, embedCredentialFlag, "", "Name of an embed credential to link (must already exist; see `credential embed list`)")
 
