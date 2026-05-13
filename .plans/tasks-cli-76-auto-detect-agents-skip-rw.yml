@@ -34,7 +34,7 @@ tasks:
       string in `RegisterRwFlag` to the REQ-F-005 wording. Add the gate matrix test (6 rows) from
       REQ-F-006 via the new seams; preserve the existing usage-error string verbatim so other tests
       that grep it stay green.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -44,7 +44,7 @@ tasks:
       - "All 6 rows of the gate matrix from REQ-F-006 have a corresponding test case and pass"
       - "Existing EnforceWriteGate tests pass unchanged (default seams = no TTY, no agent)"
       - "make test, make fmt-check, make lint all green"
-    completed_at: null
+    completed_at: 2026-05-13T11:04:21Z
 
   - id: task-003
     title: "Update skill additions on both surfaces and regenerate bundles"

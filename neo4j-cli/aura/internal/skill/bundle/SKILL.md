@@ -14,7 +14,7 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
+| `--rw` | bool | false | Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script. |
 
 ## Subcommands
 

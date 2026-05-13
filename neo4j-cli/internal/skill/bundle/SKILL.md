@@ -15,7 +15,7 @@ Allows you to manage Neo4j resources. Write operations require --rw. `neo4j-cli 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
-| `--rw` | bool | false | Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher). |
+| `--rw` | bool | false | Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script. |
 
 ## Subcommands
 

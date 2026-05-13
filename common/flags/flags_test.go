@@ -337,6 +337,56 @@ func TestEnforceWriteGate(t *testing.T) {
 	}
 }
 
+// TestEnforceWriteGate_GateMatrix exercises the 4-step rule (REQ-F-004) by
+// toggling the detectAgent and stdoutIsTerminal seams per row. Default seams
+// in plain `go test` runs are no-agent / no-TTY, so other tests asserting the
+// usage error keep matching without modification.
+func TestEnforceWriteGate_GateMatrix(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		rw      bool
+		agent   bool
+		tty     bool
+		wantErr string
+	}{
+		{name: "rw=true + agent + TTY → allow", rw: true, agent: true, tty: true},
+		{name: "rw=true + no agent + no TTY → allow", rw: true, agent: false, tty: false},
+		{name: "rw=false + agent + TTY → gate fires", rw: false, agent: true, tty: true, wantErr: "this command writes; pass --rw to allow it"},
+		{name: "rw=false + agent + no TTY → gate fires", rw: false, agent: true, tty: false, wantErr: "this command writes; pass --rw to allow it"},
+		{name: "rw=false + no agent + TTY → allow (NEW)", rw: false, agent: false, tty: true},
+		{name: "rw=false + no agent + no TTY → gate fires", rw: false, agent: false, tty: false, wantErr: "this command writes; pass --rw to allow it"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			origAgent := detectAgent
+			origTTY := stdoutIsTerminal
+			detectAgent = func() bool { return tc.agent }
+			stdoutIsTerminal = func() bool { return tc.tty }
+			t.Cleanup(func() {
+				detectAgent = origAgent
+				stdoutIsTerminal = origTTY
+			})
+
+			cmd := &cobra.Command{
+				Use:         "leaf",
+				Annotations: map[string]string{"write": "true"},
+			}
+			RegisterRwFlag(cmd)
+			cmd.Flags().AddFlagSet(cmd.PersistentFlags())
+			if tc.rw {
+				require.NoError(t, cmd.Flags().Set("rw", "true"))
+			}
+
+			err := EnforceWriteGate(cmd)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.EqualError(t, err, tc.wantErr)
+		})
+	}
+}
+
 func TestRegisterRwFlagHelp(t *testing.T) {
 	cmd := &cobra.Command{Use: "root"}
 	RegisterRwFlag(cmd)
@@ -344,5 +394,5 @@ func TestRegisterRwFlagHelp(t *testing.T) {
 	flag := cmd.PersistentFlags().Lookup("rw")
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
-	assert.Equal(t, "Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher).", flag.Usage)
+	assert.Equal(t, "Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script.", flag.Usage)
 }
