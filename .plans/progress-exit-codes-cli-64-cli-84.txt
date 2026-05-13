@@ -34,3 +34,7 @@ Files: ~neo4j-cli/internal/subcommands/agentcontext/build.go, ~neo4j-cli/interna
 Added build-tag-gated (`e2e_exitcodes`) end-to-end suite under test/e2e/exitcodes that builds the neo4j-cli binary, runs it as a subprocess against an in-test httptest fixture, and asserts the process exit code for all 9 scenarios in REQ-F-004 (200→0, --bad-flag→2, 404→3, 401→4, 409→5, 400→6, 429→7 with Retry-After substring, 503→8, no-arg help→0). Per-OS HOME/XDG_CONFIG_HOME/LOCALAPPDATA redirect keeps the suite hermetic.
 Files: +test/e2e/exitcodes/exitcodes_test.go
 Decisions: in-test httptest.Server (not a separate fixture binary like release_fixture) because the test does not need to outlive the test process; seeds credentials.json with a long-expiry stub access token so getToken short-circuits and the fixture's HTTP status reaches handleResponseError unimpeded.
+
+## task-009 — 2026-05-13T09:35:00Z
+Added two changie entries (Patch for CLI-64, Minor for CLI-84) via `changie new` with PRD-specified bodies; all four gates green (`make test`, `make fmt-check`, `make lint`, `make generate-check`; license-check also clean). Manual smoke confirmed: `--version` → 0, no-arg help → 0, `aura instance list --bad-flag` → 2.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260513-093127.yaml, +.changes/unreleased/neo4j-cli-Minor-20260513-093132.yaml

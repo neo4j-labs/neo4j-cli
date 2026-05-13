@@ -205,7 +205,7 @@ tasks:
       files. Run the full local gate set (`make test`, `make fmt-check`,
       `make lint`, `make generate-check`) and the manual smoke commands
       from the PRD verification section.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -219,4 +219,4 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all green."
       - "Manual smoke: `--bad-flag` → 2, `--version` → 0, no-arg → 0."
       - "PR description references both CLI-64 and CLI-84 and notes the new exit codes 2-8 as a behaviour change."
-    completed_at: null
+    completed_at: 2026-05-13T09:35:00Z
