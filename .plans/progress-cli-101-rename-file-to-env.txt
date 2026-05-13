@@ -1,0 +1,4 @@
+## task-001 — 2026-05-13T12:45:23Z
+Renamed --file to --env across credential dbms add, credential aura-client add, and aura credential add (sources, tests, error messages, examples). Regenerated skill bundles.
+Files: ~neo4j-cli/internal/subcommands/credential/dbms/add.go, ~neo4j-cli/internal/subcommands/credential/dbms/add_test.go, ~neo4j-cli/internal/subcommands/credential/credential.go, ~neo4j-cli/aura/internal/subcommands/credential/add.go, ~neo4j-cli/aura/internal/subcommands/credential/add_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go, ~common/clicfg/envfile/envfile.go, ~common/clicfg/envfile/envfile_test.go, ~neo4j-cli/internal/skill/bundle/references/credential.md, ~neo4j-cli/aura/internal/skill/bundle/references/credential.md
+Decisions: also renamed shared envfile.Parse open-error wrapper from `--file %q` to `--env %q` so the user-facing error names the actual flag they used.

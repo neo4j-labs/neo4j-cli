@@ -37,7 +37,7 @@ Usage: `neo4j-cli credential aura-client`
 
 Adds an aura-client credential
 
-Add an Aura Console API client credential (client ID + secret). The first credential added becomes the default; switch later with `credential aura-client use <name>`. Pass `--file <path>` to import an Aura console–exported aura-client credentials file (recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.
+Add an Aura Console API client credential (client ID + secret). The first credential added becomes the default; switch later with `credential aura-client use <name>`. Pass `--env <path>` to import an Aura console–exported aura-client credentials file (recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.
 
 Usage: `neo4j-cli credential aura-client add [flags]`
 
@@ -47,7 +47,7 @@ Flags:
 |------|------|---------|-------------|
 | `--client-id` | string | - | (required) Client ID |
 | `--client-secret` | string | - | (required) Client secret |
-| `--file` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
+| `--env` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 
 Examples:
@@ -57,7 +57,7 @@ Examples:
 neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
 
 # Import an Aura console–exported aura-client credentials file
-neo4j-cli credential aura-client add --name work --file ~/Downloads/aura-client-creds.txt --rw
+neo4j-cli credential aura-client add --name work --env ~/Downloads/aura-client-creds.txt --rw
 
 # Switch the default after adding a second credential
 neo4j-cli credential aura-client use personal --rw
@@ -138,7 +138,7 @@ Usage: `neo4j-cli credential dbms`
 
 Adds a dbms credential
 
-Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--file <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.
+Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.
 
 Usage: `neo4j-cli credential dbms add [flags]`
 
@@ -148,7 +148,7 @@ Flags:
 |------|------|---------|-------------|
 | `--database-name` | string | neo4j | Database name |
 | `--embed-credential` | string | - | Name of an embed credential to link (must already exist; see `credential embed list`) |
-| `--file` | string | - | Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values. |
+| `--env` | string | - | Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 | `--password` | string | - | (required) Password |
 | `--uri` | string | - | (required) URI |
@@ -158,7 +158,7 @@ Examples:
 
 ```
 # Add a dbms credential from an Aura-exported credentials file
-neo4j-cli credential dbms add --file ./Neo4j-12345-Created-2025-01-01.txt --rw
+neo4j-cli credential dbms add --env ./Neo4j-12345-Created-2025-01-01.txt --rw
 
 # Add a dbms credential with explicit flags (becomes the default if it is the first one)
 neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --rw

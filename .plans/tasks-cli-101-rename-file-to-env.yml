@@ -48,7 +48,7 @@ tasks:
       - Quick manual smoke: `make build && ./bin/neo4j-cli credential dbms add --help | grep -- --env` (must find it), `./bin/neo4j-cli credential dbms add --file foo 2>&1 | grep "unknown flag: --file"` (must find it).
 
       Implements PRD REQ-F-001 through REQ-F-007 and REQ-NF-001 through REQ-NF-004.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "All three source files updated symmetrically: const `envFlag`, var `envPath`, Long/Example/comment/error-message/flag-registration text all reference `--env` and no longer reference `--file`"
@@ -56,7 +56,7 @@ tasks:
       - "Both skill bundle reference docs regenerated via `go generate` and committed; neither file contains `--file` anymore; `TestGenerator_RoundTrip` passes in both packages"
       - "`./bin/neo4j-cli credential dbms add --help` and `./bin/neo4j-cli credential aura-client add --help` show `--env`; passing `--file` yields cobra's `unknown flag: --file`"
       - "`make fmt-check`, `make lint`, `make test` all green; `TestAllLeafCommands_HaveExamples` still passes (rewritten Example blocks remain flush-left, 3+ invocations, blank-line separated, `--rw` on writes)"
-    completed_at: null
+    completed_at: 2026-05-13T12:45:23Z
 
   - id: task-002
     title: "Add Minor changie entry for the --file → --env rename"
