@@ -13,8 +13,13 @@ Usage: `neo4j-cli agent-context`
 Examples:
 
 ```
+# Emit the agent-context envelope as JSON (default when piped)
 neo4j-cli agent-context
+
+# Emit the envelope as JSON and list the top-level commands
 neo4j-cli agent-context --format json | jq '.commands | keys'
+
+# Inspect the flags exposed by a specific leaf via the envelope
 neo4j-cli agent-context --format json | jq -e '.commands.aura.subcommands.instance.subcommands.list.flags'
 ```
 

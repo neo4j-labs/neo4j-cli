@@ -21,8 +21,14 @@ func newRemoveCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 			"single agent. Idempotent: a second run on a clean target is a " +
 			"no-op." +
 			"\n\nSupported agents: " + strings.Join(agentNames(), ", "),
-		Example: "skill remove            # remove from every detected agent\n" +
-			"skill remove claude-code  # remove from a single agent",
+		Example: `# Remove the skill from every detected agent
+neo4j-cli skill remove --rw
+
+# Remove the skill from a single agent (case-insensitive name)
+neo4j-cli skill remove claude-code --rw
+
+# Remove and emit the result as JSON (machine-readable)
+neo4j-cli skill remove --format json --rw`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

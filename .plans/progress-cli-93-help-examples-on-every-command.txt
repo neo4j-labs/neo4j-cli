@@ -33,3 +33,8 @@ Decisions: update parent treated as non-read/non-write — no `write: true` anno
 Added Example block to query.go parent (5 invocations covering inline Cypher, stdin, --param, :embed modifier, --rw write) and schema.go (:schema, 3 invocations with --format json). Normalised existing :embed Example in embed.go from + concatenation to backtick raw string with # comment lines.
 Files: ~query.go ~schema.go ~embed.go ~bundle/references/query.md (neo4j-cli)
 Decisions: query parent supports both read and write; included one --rw invocation to demonstrate the opt-in write path per the task's PRD REQ-F-015 reference (no --rw on read invocations).
+
+## task-009 — 2026-05-13T12:45:00Z
+Added Example blocks to 3 skill leaves (list/check/print) and normalised existing Examples on install/remove (backtick raw, neo4j-cli prefix, # comment lines, --rw on every write invocation). Normalised agent-context Example with # comment lines preserving the jq pipelines. Regenerated bundles.
+Files: ~common/skill/list.go ~check.go ~print.go ~install.go ~remove.go ~agentcontext/agentcontext.go ~neo4j-cli/internal/skill/bundle/references/{skill.md,agent-context.md} ~neo4j-cli/aura/internal/skill/bundle/references/skill.md
+Decisions: skill print honours --format flag at parser-level (parent persistent) but ignores it (raw markdown dump); included a --format json invocation per acceptance criterion with an explicit comment noting it is a no-op.

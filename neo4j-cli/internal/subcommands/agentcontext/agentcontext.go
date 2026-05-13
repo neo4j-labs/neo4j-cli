@@ -24,8 +24,13 @@ func NewCmd(cfg *clicfg.Config, version string) *cobra.Command {
 The envelope (schema_version 1) carries: schema_version, cli_version, binary, commands (recursive tree of every visible subcommand with use/short/long/example/aliases/deprecated/flags/subcommands), exit_codes, error_codes, output_formats, and async_flag. The commands tree is reflected from the live cobra tree at every invocation — adding a new subcommand, flag, or alias auto-surfaces with no regen step.
 
 JSON is the canonical machine view. On a TTY, --format defaults to a degraded flat command-list table. The same envelope is also available via --format toon. See AGENTS.md "Agent Context Notes" for the schema-versioning rules and the hand-coded constants that live in build.go.`,
-		Example: `neo4j-cli agent-context
+		Example: `# Emit the agent-context envelope as JSON (default when piped)
+neo4j-cli agent-context
+
+# Emit the envelope as JSON and list the top-level commands
 neo4j-cli agent-context --format json | jq '.commands | keys'
+
+# Inspect the flags exposed by a specific leaf via the envelope
 neo4j-cli agent-context --format json | jq -e '.commands.aura.subcommands.instance.subcommands.list.flags'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := BuildContext(cmd.Root(), version)

@@ -152,7 +152,7 @@ tasks:
       existing Example in `neo4j-cli/internal/subcommands/agentcontext/agentcontext.go`
       to add `# comment` lines per the style rules (it is already flush-left and uses
       `neo4j-cli`). Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -161,7 +161,7 @@ tasks:
       - "`agent-context` Example retains its jq pipelines and gains `# comment` lines per the style rules"
       - "Existing `TestAgentContext_HelpExamples` still passes (flush-left enforcement)"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T12:45:00Z
 
   - id: task-010
     title: "Add TestAllLeafCommands_HaveExamples gate test"

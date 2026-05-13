@@ -19,6 +19,14 @@ func newPrintCmd(_ *clicfg.Config, bundle fs.FS, _ string) *cobra.Command {
 			"preview the skill markdown before running `skill install`. " +
 			"The {{VERSION}} placeholder is left literal; substitution " +
 			"happens at install time.",
+		Example: `# Print the embedded SKILL.md to stdout
+neo4j-cli skill print
+
+# Save the embedded SKILL.md to a file for review
+neo4j-cli skill print > skill-preview.md
+
+# Print the embedded SKILL.md (--format is accepted for parity but ignored — output is always raw markdown)
+neo4j-cli skill print --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
