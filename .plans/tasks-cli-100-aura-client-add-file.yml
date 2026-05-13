@@ -59,7 +59,7 @@ tasks:
       Add `--file <path>` (long form only) to `neo4j-cli/aura/internal/subcommands/credential/add.go`. Lift `cmd.MarkFlagRequired(...)` from `--name`, `--client-id`, `--client-secret`. In `RunE`: call `envfile.Parse(cfg.Aura.Fs(), filePath)` when set; filter to `CLIENT_ID` / `CLIENT_SECRET` / `CLIENT_NAME`; merge file → flag override (using `cmd.Flag(K).Changed`) for each of name/client-id/client-secret; emit the empty-value usage error (REQ-F-008) if a recognised key was present with empty value AND no flag overrode it; emit the first-missing required usage error (REQ-F-009) shape `--%s is required (provide via --file as %s, or pass --%s)`. CLIENT_NAME falls back to `--name` per REQ-F-011. Update `Long` description to mention `--file` briefly (mirror dbms `add.go:44-47`).
       Extend `neo4j-cli/aura/internal/subcommands/credential/add_test.go` with table-driven cases using the new `helper.SeedFile(...)`: happy path (all three fields → cred stored, name from CLIENT_NAME), --name override, --client-secret override, comments/blank-lines from the exact issue snippet, missing CLIENT_ID → required-flag error names client-id, empty file → required-flag error, CLIENT_ID= empty + no flag → empty-value error, CLIENT_ID= empty + --client-id <val> → success, --file pointing at missing path → wrapped open error. Update the existing three missing-flag tests to assert the new RunE-emitted required-flag message.
       Implements PRD REQ-F-001, REQ-F-002, REQ-F-003, REQ-F-004, REQ-F-005, REQ-F-008, REQ-F-009, REQ-F-010, REQ-F-011, REQ-F-012, REQ-F-013, REQ-NF-001, REQ-NF-002, REQ-NF-006.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -72,7 +72,7 @@ tasks:
       - "Three existing missing-flag test cases updated to match new RunE-emitted message and pass"
       - "All new and existing aura-client `add_test.go` cases pass; cross-platform path conventions respected"
       - "`make test`, `make fmt-check`, `make lint` all green"
-    completed_at: null
+    completed_at: 2026-05-13T12:30:00Z
 
   - id: task-005
     title: "Regenerate skill bundle for credential subtree"

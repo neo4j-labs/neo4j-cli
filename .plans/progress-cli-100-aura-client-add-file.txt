@@ -9,3 +9,8 @@ Files: ~neo4j-cli/internal/subcommands/credential/dbms/add.go
 ## task-003 — 2026-05-13T12:00:00Z
 Add `pendingFiles` map + exported `SeedFile(path, content)` to `AuraTestHelper`; flush into `helper.fs` immediately after fs construction in `ExecuteCommand`. Backwards-compatible — nil map iterates zero times.
 Files: ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+
+## task-004 — 2026-05-13T12:30:00Z
+Add `--file` flag to both `aura credential add` (standalone aura tree) and `credential aura-client add` (user-facing neo4j-cli tree). RunE merges file→flag, emits empty-value error per REQ-F-008 and first-missing required-flag error per REQ-F-009. `MarkFlagRequired` lifted; required check moved into RunE. Tests use new `helper.SeedFile(...)` and `AssertErrContainsStrings`. Skill bundles regenerated for both neo4j-cli and aura standalone (folded into this task so `make test` stays green).
+Decisions: PRD line 35 names only the aura standalone path, but task-005 (skill bundle regen) covers the user-facing path. Both trees needed the change for behavioural symmetry; followed dbms-style local `filterAuraClientEnvKeys` helper in each location rather than lifting to a shared spot (matches existing pattern).
+Files: ~neo4j-cli/aura/internal/subcommands/credential/add.go, ~neo4j-cli/aura/internal/subcommands/credential/add_test.go, ~neo4j-cli/internal/subcommands/credential/credential.go, ~neo4j-cli/internal/skill/bundle/references/credential.md, ~neo4j-cli/aura/internal/skill/bundle/references/credential.md

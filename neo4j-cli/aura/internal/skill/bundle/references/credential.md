@@ -8,6 +8,8 @@ Usage: `aura-cli credential`
 
 Adds a credential
 
+Add an Aura API client credential. Pass `--file <path>` to import an Aura console–exported aura-client credentials file (recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.
+
 Usage: `aura-cli credential add [flags]`
 
 Flags:
@@ -16,6 +18,7 @@ Flags:
 |------|------|---------|-------------|
 | `--client-id` | string | - | (required) Client ID |
 | `--client-secret` | string | - | (required) Client secret |
+| `--file` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 
 ## aura-cli credential list
