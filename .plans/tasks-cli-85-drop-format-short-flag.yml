@@ -131,7 +131,8 @@ tasks:
       changie isn't installed locally. The entry is `Minor` (not `Patch`)
       because dropping the shorthand breaks existing `-f json` / `-f toon`
       scripts. See PRD REQ-F-015.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T15:58:00Z
     dependencies: []
     acceptance_criteria:
       - "Exactly one new file exists matching `.changes/unreleased/neo4j-cli-Minor-*.yaml`"
