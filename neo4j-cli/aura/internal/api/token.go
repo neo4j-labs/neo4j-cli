@@ -54,7 +54,7 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 
 	switch statusCode := res.StatusCode; statusCode {
 	case http.StatusUnauthorized:
-		return "", clierr.NewUsageError("the provided credentials are invalid, expired, or revoked")
+		return "", clierr.NewAuthError("the provided credentials are invalid, expired, or revoked")
 	case http.StatusBadRequest:
 	case http.StatusForbidden:
 	case http.StatusNotFound:

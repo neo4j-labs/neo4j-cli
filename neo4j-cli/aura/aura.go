@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
 	binskill "github.com/neo4j/cli/neo4j-cli/aura/internal/skill"
@@ -45,6 +46,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 func NewStandaloneCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := NewCmd(cfg)
 	flags.RegisterRwFlag(cmd)
+	// Wrap cobra's flag-parse errors (unknown flag, missing value, bad type)
+	// into a typed *clierr.CLIError with exit code 2. Cobra walks up to the
+	// root for FlagErrorFunc, so one registration covers every subcommand
+	// under the standalone tree.
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return clierr.NewUsageError("%v", err)
+	})
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "aura-cli"))

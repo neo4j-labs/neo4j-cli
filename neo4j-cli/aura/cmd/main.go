@@ -4,11 +4,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura"
@@ -23,6 +25,20 @@ var Version = "dev"
 func recoverPanic(w io.Writer, args []string, r any) {
 	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j/cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
 	panic(r)
+}
+
+// exitCodeFor mirrors neo4j-cli/main.go's helper: typed *clierr.CLIError
+// errors pass their Code through (via errors.As); other non-nil errors fall
+// back to 1; nil returns 0.
+func exitCodeFor(err error) int {
+	if err == nil {
+		return 0
+	}
+	var ce *clierr.CLIError
+	if errors.As(err, &ce) {
+		return ce.Code
+	}
+	return 1
 }
 
 func main() {
@@ -50,7 +66,7 @@ func main() {
 
 	if err := cmd.Execute(); err != nil {
 		// add metrics callback for fail here
-		os.Exit(1)
+		os.Exit(exitCodeFor(err))
 	}
 	// add metrics callback for success here
 }

@@ -61,7 +61,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, message)
 		}
 
-		return clierr.NewUpstreamError("%s", messages)
+		return clierr.NewValidationError("%s", messages)
 	case http.StatusUnauthorized:
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusForbidden:
@@ -72,7 +72,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 		}
 		if serverError.Error != "" {
-			return clierr.NewUpstreamError("%s", serverError.Error)
+			return clierr.NewAuthError("%s", serverError.Error)
 		}
 
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
@@ -89,7 +89,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewUpstreamError("%s", messages)
+		return clierr.NewNotFoundError("%s", messages)
 	case http.StatusMethodNotAllowed:
 		var errorResponse ErrorResponse
 
@@ -117,12 +117,12 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewUpstreamError("%s", messages)
+		return clierr.NewConflictError("%s", messages)
 	case http.StatusUnsupportedMediaType:
 		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
-		return clierr.NewUpstreamError("server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter)
+		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter)
 	// server error responses
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		var errorResponse ErrorResponse
@@ -333,7 +333,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewUsageError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:]))
 	}
 
 	messages := []string{}
@@ -348,7 +348,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 		messages = append(messages, "Request failed authorization - access token has been cleared and will be refreshed on next request - please retry the command")
 	}
 
-	return clierr.NewUsageError(`[
+	return clierr.NewAuthError(`[
 	%s
 ]`, strings.Join(messages, ",\n\t"))
 }

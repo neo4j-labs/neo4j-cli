@@ -42,20 +42,34 @@ const asyncFlag = "--await"
 const maxDepth = 10
 
 // exitCodes documents the integer exit codes the binary actually emits.
-// Keep this in sync with neo4j-cli/main.go. Bump schemaVersion when
-// removing an entry.
+// Mirrors the closed set defined in common/clierr/error.go and the
+// agent-cli-auditor.md §4.1 table. Keep this in sync with the
+// constructors over there. Bump schemaVersion when removing an entry.
 var exitCodes = map[string]string{
 	"0": "success",
 	"1": "general error",
+	"2": "usage error: bad flag, missing argument, or malformed invocation",
+	"3": "not found: resource doesn't exist",
+	"4": "auth error: authentication or authorization failed",
+	"5": "conflict: request conflicts with current resource state",
+	"6": "validation error: input payload rejected by validation",
+	"7": "rate limited: upstream signalled rate limit",
+	"8": "upstream error: transient API failure; retry may succeed",
 }
 
-// errorCodes mirrors the three constructors in common/clierr/error.go.
+// errorCodes mirrors the constructors in common/clierr/error.go. Each
+// `error.code` string maps 1:1 to a process exit code in `exitCodes`.
 // Wording matches REQ-F-009. Adding a new constructor over there means
 // adding an entry here.
 var errorCodes = map[string]string{
-	"usage_error":    "invalid flag, missing argument, or other input rejection",
-	"upstream_error": "transient API failure; retry may succeed",
-	"fatal_error":    "unrecoverable internal failure",
+	"fatal_error":      "unrecoverable internal failure",
+	"usage_error":      "invalid flag, missing argument, or other input rejection",
+	"not_found":        "resource doesn't exist",
+	"auth_error":       "authentication or authorization failed",
+	"conflict":         "request conflicts with current resource state",
+	"validation_error": "input payload rejected by validation",
+	"rate_limited":     "upstream signalled rate limit; retry after the hinted delay",
+	"upstream_error":   "transient API failure; retry may succeed",
 }
 
 // Context is the top-level JSON envelope. Field order in the struct

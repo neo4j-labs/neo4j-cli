@@ -4,9 +4,12 @@
 package app
 
 import (
+	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -39,4 +42,37 @@ func TestNewCmdRegistersRwFlag(t *testing.T) {
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
 	assert.Contains(t, flag.Usage, "Allow write operations")
+}
+
+// TestNewCmdFlagErrorFuncWrapsAsUsageError asserts cobra's flag-parse errors
+// are wrapped into a typed *clierr.CLIError with exit code 2 across both the
+// root command and subcommands (cobra walks up to root for FlagErrorFunc).
+func TestNewCmdFlagErrorFuncWrapsAsUsageError(t *testing.T) {
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{name: "unknown flag at root", args: []string{"--bad-flag"}},
+		{name: "unknown flag on subcommand", args: []string{"aura", "instance", "list", "--bad-flag"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, err := testfs.GetDefaultTestFs()
+			require.NoError(t, err)
+
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			cmd := NewCmd(cfg)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetArgs(tc.args)
+
+			execErr := cmd.Execute()
+			require.Error(t, execErr)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(execErr, &ce), "expected *clierr.CLIError, got %T: %v", execErr, execErr)
+			assert.Equal(t, 2, ce.Code)
+		})
+	}
 }

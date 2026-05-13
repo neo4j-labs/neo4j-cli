@@ -6,6 +6,7 @@ package embed
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +133,7 @@ func TestHuggingFace_Embed_ServerlessMode_FlatShapeAlsoTolerated(t *testing.T) {
 	assert.Equal(t, []float32{0.9, 1.0}, got)
 }
 
-func TestHuggingFace_Embed_MissingKeyReturnsUsageError(t *testing.T) {
+func TestHuggingFace_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("server should not be hit when API key is missing")
 	}))
@@ -148,6 +150,10 @@ func TestHuggingFace_Embed_MissingKeyReturnsUsageError(t *testing.T) {
 	assert.Nil(t, got)
 	assert.Contains(t, err.Error(), "missing API key for huggingface")
 	assert.Contains(t, err.Error(), "HF_TOKEN")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 4, ce.Code)
 }
 
 func TestHuggingFace_Embed_Non2xxWrapsStatusNoAuthLeak(t *testing.T) {
