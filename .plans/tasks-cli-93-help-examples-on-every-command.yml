@@ -132,7 +132,7 @@ tasks:
       existing `:embed` Example in `neo4j-cli/query/embed.go` from `+`-concatenated strings
       to a backtick raw string and add `# comment` lines per the style rules. Regenerate
       the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -140,7 +140,7 @@ tasks:
       - "`schema.go` (`:schema`) has a non-empty Example: with at least one `--format json` invocation; read-only so no `--rw`"
       - "`embed.go` (`:embed`) is converted to a backtick raw string; lines are flush-left; `# comment` lines precede each invocation; behaviour-equivalent to today"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T12:15:00Z
 
   - id: task-009
     title: "agent-context + skill leaves: normalise + add Example blocks"

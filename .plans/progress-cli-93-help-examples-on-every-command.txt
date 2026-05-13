@@ -28,3 +28,8 @@ Files: ~9 leaf .go + ~bundle/references/credential.md (neo4j-cli)
 Added Example blocks to 5 top-level leaves: config (list/get/set) + update parent + update check. config set + update use --rw where applicable (config set always; update has no write annotation so plain). Regenerated neo4j-cli bundle (references/config.md, references/update.md).
 Files: ~5 leaf .go + ~bundle/references/config.md ~bundle/references/update.md (neo4j-cli)
 Decisions: update parent treated as non-read/non-write — no `write: true` annotation but emits structured JSON, so examples include --format json and omit --rw to match the actual gate.
+
+## task-008 — 2026-05-13T12:15:00Z
+Added Example block to query.go parent (5 invocations covering inline Cypher, stdin, --param, :embed modifier, --rw write) and schema.go (:schema, 3 invocations with --format json). Normalised existing :embed Example in embed.go from + concatenation to backtick raw string with # comment lines.
+Files: ~query.go ~schema.go ~embed.go ~bundle/references/query.md (neo4j-cli)
+Decisions: query parent supports both read and write; included one --rw invocation to demonstrate the opt-in write path per the task's PRD REQ-F-015 reference (no --rw on read invocations).

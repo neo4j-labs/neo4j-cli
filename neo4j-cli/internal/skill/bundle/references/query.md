@@ -26,6 +26,25 @@ Flags:
 | `--uri` | string | - | Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default "neo4j://localhost:7687") |
 | `-u, --username` | string | - | Neo4j username [env: NEO4J_USERNAME] (default "neo4j") |
 
+Examples:
+
+```
+# Run inline Cypher (read-only — no --rw needed)
+neo4j-cli query "MATCH (n) RETURN count(n) AS n" --format json
+
+# Pipe Cypher from stdin
+echo "MATCH (n) RETURN n LIMIT 5" | neo4j-cli query --format json
+
+# Pass typed parameters with --param (repeatable; JSON values are auto-typed)
+neo4j-cli query "MATCH (p:Person {name: $name}) RETURN p" --param name=Alice --format json
+
+# Embed text inline as a vector parameter via the :embed modifier
+neo4j-cli query "CALL db.index.vector.queryNodes('idx', 5, $v) YIELD node RETURN node" --param v:embed="hello world" --format json
+
+# Write Cypher requires --rw (opt-in)
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
+```
+
 ## neo4j-cli query :embed
 
 Compute an embedding vector for the given text
@@ -37,9 +56,14 @@ Usage: `neo4j-cli query :embed [text]`
 Examples:
 
 ```
+# Compute an embedding vector for inline text (JSON output)
 neo4j-cli query :embed "hello world" --format json
+
+# Pipe text from stdin and render the vector as toon
 echo "hello world" | neo4j-cli query :embed --format toon
-neo4j-cli query :embed "hello" --embed-provider openai --embed-model text-embedding-3-small
+
+# Override the embed provider and model inline (no stored credential needed)
+neo4j-cli query :embed "hello" --embed-provider openai --embed-model text-embedding-3-small --format json
 ```
 
 ## neo4j-cli query :schema
@@ -49,4 +73,17 @@ Introspect the connected database (labels, rel types, indexes, constraints)
 Introspect the connected database. Runs a sequence of read-only cypher calls and aggregates the result into one structured payload with database info, node/relationship properties, relationship paths, indexes, and constraints. --max-rows and --truncate-arrays-over do not apply.
 
 Usage: `neo4j-cli query :schema`
+
+Examples:
+
+```
+# Introspect the connected database as a 5-section table
+neo4j-cli query :schema
+
+# Same introspection rendered as a single JSON payload (machine-readable)
+neo4j-cli query :schema --format json
+
+# Pipe the JSON into jq to inspect just the index names
+neo4j-cli query :schema --format json | jq '.indexes[].name'
+```
 
