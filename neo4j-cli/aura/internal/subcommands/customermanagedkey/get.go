@@ -18,7 +18,15 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Returns a customer managed key details",
 		Long:  `This subcommand returns details about a specific Customer Managed Key.`,
-		Args:  cobra.ExactArgs(1),
+		Example: `# Get details of a customer managed key by ID
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the key status
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.status'`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/customer-managed-keys/%s", args[0])
 			cmd.SilenceUsage = true

@@ -21,6 +21,14 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `Deletes a Customer Managed Key from Aura.
 
 Note that you can only delete a Key if it is not being used by any instances, otherwise you will get an error with the reason field set to encryption-key-is-active.`,
+		Example: `# Delete a customer managed key by ID
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and confirm by piping the response through jq
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.deleted'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/customer-managed-keys/%s", args[0])

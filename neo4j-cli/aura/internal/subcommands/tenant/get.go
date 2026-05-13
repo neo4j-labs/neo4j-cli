@@ -20,7 +20,15 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Returns tenant details",
 		Long:  "This subcommand returns details about a specific Aura Tenant.",
-		Args:  cobra.ExactArgs(1),
+		Example: `# Get details of a tenant by ID
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
+
+# Get tenant details and emit JSON for scripting
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the tenant name
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tenantId := args[0]
 			path := fmt.Sprintf("/tenants/%s", tenantId)

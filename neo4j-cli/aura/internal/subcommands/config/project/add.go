@@ -25,6 +25,14 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "add",
 		Short:       "Adds a project",
+		Example: `# Add a project configuration (becomes the default if it is the first one)
+neo4j-cli aura config project add --name prod --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Add a second project alongside an existing default
+neo4j-cli aura config project add --name staging --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Add a project and emit the response as JSON
+neo4j-cli aura config project add --name prod --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Aura.Projects.Add(name, organizationId, projectId)
 		},

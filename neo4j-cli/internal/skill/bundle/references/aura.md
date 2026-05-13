@@ -76,6 +76,19 @@ Flags:
 | `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. |
 
+Examples:
+
+```
+# Create a customer managed key (AWS-hosted instance)
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a key and wait until it is ready before returning
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Create a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
 ### neo4j-cli aura customer-managed-key delete
 
 Deletes a customer managed key
@@ -86,6 +99,19 @@ Note that you can only delete a Key if it is not being used by any instances, ot
 
 Usage: `neo4j-cli aura customer-managed-key delete <id>`
 
+Examples:
+
+```
+# Delete a customer managed key by ID
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and confirm by piping the response through jq
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.deleted'
+```
+
 ### neo4j-cli aura customer-managed-key get
 
 Returns a customer managed key details
@@ -93,6 +119,19 @@ Returns a customer managed key details
 This subcommand returns details about a specific Customer Managed Key.
 
 Usage: `neo4j-cli aura customer-managed-key get <id>`
+
+Examples:
+
+```
+# Get details of a customer managed key by ID
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the key status
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.status'
+```
 
 ### neo4j-cli aura customer-managed-key list
 
@@ -109,6 +148,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--tenant-id` | string | - | An optional Tenant ID to filter customer managed keys in a tenant |
+
+Examples:
+
+```
+# List all customer managed keys the current user has access to
+neo4j-cli aura customer-managed-key list
+
+# List keys in a specific tenant
+neo4j-cli aura customer-managed-key list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura customer-managed-key list --format json
+```
 
 ## neo4j-cli aura graph-analytics
 
@@ -569,6 +621,19 @@ This subcommand returns details about a specific Aura Tenant.
 
 Usage: `neo4j-cli aura tenant get <id>`
 
+Examples:
+
+```
+# Get details of a tenant by ID
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
+
+# Get tenant details and emit JSON for scripting
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the tenant name
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
+```
+
 ### neo4j-cli aura tenant list
 
 Returns a list of tenants
@@ -576,4 +641,17 @@ Returns a list of tenants
 This subcommand returns a list containing a summary of each of your Aura Tenants. To find out more about a specific Tenant, retrieve the details using the get subcommand.
 
 Usage: `neo4j-cli aura tenant list`
+
+Examples:
+
+```
+# List all tenants the current user has access to
+neo4j-cli aura tenant list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura tenant list --format json
+
+# Pipe tenant ids through jq for a follow-up command
+neo4j-cli aura tenant list --format json | jq -r '.data[].id'
+```
 

@@ -13,7 +13,15 @@ func NewRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "remove <name>",
 		Short:       "Removes a credential",
 		Annotations: map[string]string{"write": "true"},
-		Args:        cobra.ExactArgs(1),
+		Example: `# Remove a stored credential by name
+neo4j-cli aura credential remove my-creds --rw
+
+# Remove a staging credential
+neo4j-cli aura credential remove staging --rw
+
+# Remove and confirm by listing remaining credentials as JSON
+neo4j-cli aura credential remove my-creds --rw && neo4j-cli aura credential list --format json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Remove(args[0])
 		},

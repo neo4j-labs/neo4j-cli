@@ -47,6 +47,14 @@ Before you can use the key you will need to setup permissions for it. Log in to 
 You can poll the current status of this operation by periodically getting the key details using the get subcommand.
 
 Once the key has a status of ready you can use it for creating new instances by setting the --customer-managed-key-id flag.`,
+		Example: `# Create a customer managed key (AWS-hosted instance)
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a key and wait until it is ready before returning
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Create a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cfg.Aura.DefaultTenant() == "" {
 				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

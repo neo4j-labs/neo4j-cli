@@ -29,7 +29,7 @@ tasks:
       under `tenant/` (list, get), `credential/` (add, list, use, remove),
       `config/` (list, get, set), `config/project/` (list, add, use, remove),
       and `customermanagedkey/` (list, create, delete, get). Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -37,7 +37,7 @@ tasks:
       - "Write leaves (`credential add`, `credential use`, `credential remove`, `config set`, `config project add`, `config project use`, `config project remove`, `customer-managed-key create`, `customer-managed-key delete`) include `--rw` on every invocation"
       - "Read leaves include at least one `--format json` invocation and never `--rw`"
       - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces no further diff after running once; `make test`, `make fmt-check`, `make lint` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:30:00Z
 
   - id: task-003
     title: "Aura deployment subtree: add Example blocks"

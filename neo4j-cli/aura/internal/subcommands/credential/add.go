@@ -25,6 +25,14 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "add",
 		Short:       "Adds a credential",
+		Example: `# Add an Aura Console API credential (becomes the default if it is the first one)
+neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw
+
+# Add a second credential alongside an existing default
+neo4j-cli aura credential add --name staging --client-id <client-id> --client-secret <client-secret> --rw
+
+# Add a credential and emit the response as JSON
+neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
 		},

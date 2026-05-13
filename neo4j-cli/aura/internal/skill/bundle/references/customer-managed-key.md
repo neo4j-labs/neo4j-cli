@@ -1,5 +1,12 @@
 # aura-cli customer-managed-key
 
+## Contents
+
+- [aura-cli customer-managed-key create](#aura-cli-customer-managed-key-create)
+- [aura-cli customer-managed-key delete](#aura-cli-customer-managed-key-delete)
+- [aura-cli customer-managed-key get](#aura-cli-customer-managed-key-get)
+- [aura-cli customer-managed-key list](#aura-cli-customer-managed-key-list)
+
 Relates to Customer Managed Keys
 
 Usage: `aura-cli customer-managed-key`
@@ -38,6 +45,19 @@ Flags:
 | `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. |
 
+Examples:
+
+```
+# Create a customer managed key (AWS-hosted instance)
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a key and wait until it is ready before returning
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Create a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
 ## aura-cli customer-managed-key delete
 
 Deletes a customer managed key
@@ -48,6 +68,19 @@ Note that you can only delete a Key if it is not being used by any instances, ot
 
 Usage: `aura-cli customer-managed-key delete <id>`
 
+Examples:
+
+```
+# Delete a customer managed key by ID
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and confirm by piping the response through jq
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.deleted'
+```
+
 ## aura-cli customer-managed-key get
 
 Returns a customer managed key details
@@ -55,6 +88,19 @@ Returns a customer managed key details
 This subcommand returns details about a specific Customer Managed Key.
 
 Usage: `aura-cli customer-managed-key get <id>`
+
+Examples:
+
+```
+# Get details of a customer managed key by ID
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the key status
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.status'
+```
 
 ## aura-cli customer-managed-key list
 
@@ -71,4 +117,17 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--tenant-id` | string | - | An optional Tenant ID to filter customer managed keys in a tenant |
+
+Examples:
+
+```
+# List all customer managed keys the current user has access to
+neo4j-cli aura customer-managed-key list
+
+# List keys in a specific tenant
+neo4j-cli aura customer-managed-key list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura customer-managed-key list --format json
+```
 

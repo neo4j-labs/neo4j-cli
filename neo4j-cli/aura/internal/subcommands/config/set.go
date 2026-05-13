@@ -14,6 +14,14 @@ func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "set <key> <value>",
 		Short:       "Sets the specified configuration value to the provided value",
 		Annotations: map[string]string{"write": "true"},
+		Example: `# Set the default tenant used by aura commands
+neo4j-cli aura config set default-tenant 00000000-0000-0000-0000-000000000000 --rw
+
+# Override the Aura API base URL (for staging environments)
+neo4j-cli aura config set base-url https://api.neo4j.io/v1 --rw
+
+# Switch the output format default to JSON
+neo4j-cli aura config set format json --rw`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.ExactArgs(2)(cmd, args); err != nil {
 				return err
