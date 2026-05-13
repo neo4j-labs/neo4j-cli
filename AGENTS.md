@@ -125,6 +125,7 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - Drift sim: editing a bundle file directly to test generate-check is futile — `go generate` overwrites it. Mutate a real cobra-tree input (e.g. a Short string in `app.go`) to simulate stale-bundle detection.
 - Changing `ValidFormatValues` in `common/clicfg/clicfg.go` affects the `--format` flag help text, which is embedded in skill bundle reference docs. Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` after any such change; `TestGenerator_RoundTrip` is the gate that catches stale bundles.
 - Adding any new command to the neo4j-cli command tree (including sub-sub-packages like `credential/dbms/`) also requires `go generate ./neo4j-cli/internal/skill/...` — otherwise `TestGenerator_RoundTrip` fails with a "references/credential.md differs" message. Run this immediately after any command-tree change before the test gate.
+- `aura-client` credential cmd lives in TWO places: `neo4j-cli/internal/subcommands/credential/credential.go` (user-facing `credential aura-client add`, feeds neo4j-cli skill bundle) AND `neo4j-cli/aura/internal/subcommands/credential/add.go` (standalone aura `credential add`, feeds aura standalone skill bundle). Any flag/Long change must hit BOTH for behavioural symmetry AND both `go generate ./neo4j-cli/internal/skill/...` and `go generate ./neo4j-cli/aura/internal/skill/...` must run, otherwise the OTHER tree's `TestGenerator_RoundTrip` fails.
 
 ## Changie Notes
 
