@@ -7,3 +7,8 @@ Decisions: PRD's "team Neo4j, project CLI" = team neo4j-cli-workinggroup (key CL
 Added flags.RegisterWait helper that binds --wait and deprecated --await alias to same *bool via cobra MarkDeprecated; covered four behavioural cases in table-driven test plus help-hiding check.
 Files: +neo4j-cli/aura/internal/flags/wait.go, +neo4j-cli/aura/internal/flags/wait_test.go, ~.plans/tasks-cli-87-rename-await-to-wait.yml
 Decisions: pflag's FlagSet writes deprecation warnings to its own Output() (os.Stderr by default), independent of cmd.SetErr; test sets cmd.Flags().SetOutput(buf) explicitly to capture. MarkDeprecated err handled via panic since only programmer-error conditions trigger it.
+
+## task-003 — 2026-05-13T13:55:00Z
+Refactored 13 async leaf commands to use flags.RegisterWait; renamed local `await` var to `wait`, dropped awaitFlag consts, updated Example/Long strings, added flags import where missing.
+Files: ~neo4j-cli/aura/internal/subcommands/{customermanagedkey/create.go, dataapi/graphql/{create,update,resume,pause}.go, dataapi/graphql/authprovider/create.go, dataapi/graphql/corspolicy/allowedorigin/{add,remove}.go, graphanalytics/session/create.go, instance/{create,resume,overwrite}.go, instance/snapshot/create.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: existing *_test.go failures (TestCreate*WithAwait etc.) and TestGenerator_RoundTrip diffs left for task-004/task-007 per dependency order.

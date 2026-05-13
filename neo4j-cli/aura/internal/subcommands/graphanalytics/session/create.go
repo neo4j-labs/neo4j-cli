@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		tenant_id     string
 		cloudProvider string
 		region        string
-		await         bool
+		wait          bool
 	)
 
 	const (
@@ -33,7 +34,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		tenantIdFlag      = "tenant-id"
 		cloudProviderFlag = "cloud-provider"
 		regionFlag        = "region"
-		awaitFlag         = "await"
 	)
 
 	cmd := &cobra.Command{
@@ -44,12 +44,12 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
 
 # Create a session attached to an existing Aura instance and wait until ready
-neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --await
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --wait
 
 # Create a session with a TTL and emit JSON for scripting
 neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json`,
 		Long: `This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
-				Creating a session is an asynchronous operation that can be awaited with --await.`,
+				Creating a session is an asynchronous operation that can be waited for with --wait.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if instance_id == "" {
 				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
@@ -106,7 +106,7 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "memory", "status", "created_at"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
 					respData := api.ParseBody(resBody)
@@ -143,7 +143,7 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 	cmd.Flags().StringVar(&instance_id, instanceIdFlag, "", "The ID of the instance to create the session for.")
 	cmd.Flags().StringVar(&ttl, ttlFlag, "", "This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration.")
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created session is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created session is ready.")
 
 	return cmd
 }

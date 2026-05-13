@@ -45,7 +45,7 @@ tasks:
       Drop the local `awaitFlag` const (9 files) and rename the local `var await bool` → `var wait bool`, plus `if await {` → `if wait {`.
       Update `Example:` strings on every leaf to replace `--await` with `--wait`; update `Long:` strings where the flag is mentioned by name.
       Add the `flags` package import where not already present.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -54,7 +54,7 @@ tasks:
       - "Each leaf's Example: block uses --wait (preserves flush-left indent, ≥3 invocations, # comment per invocation, --rw on write invocations, --format json on at least one read invocation per CLI-93)"
       - "go build ./... succeeds; go vet ./... clean"
       - "TestAllLeafCommands_HaveExamples passes"
-    completed_at: null
+    completed_at: 2026-05-13T13:55:00Z
 
   - id: task-004
     title: "Rewrite existing tests to use --wait and rename test functions"

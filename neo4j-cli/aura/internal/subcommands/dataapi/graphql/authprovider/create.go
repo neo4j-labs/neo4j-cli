@@ -22,7 +22,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		nameFlag       = "name"
 		disabledFlag   = "disabled"
 		urlFlag        = "url"
-		awaitFlag      = "await"
 
 		disabledDefault = false
 	)
@@ -34,7 +33,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		name       string
 		disabled   bool
 		url        string
-		await      bool
+		wait       bool
 	)
 
 	cmd := &cobra.Command{
@@ -43,7 +42,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Creates a new GraphQL Data API authentication provider",
 		Long: `This command creates a new GraphQL Data API authentication provider.
 
-Creating a GraphQL Data API authentication provider is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
+Creating a GraphQL Data API authentication provider is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
 
 If you create an 'api-key' Authentication provider, an API key will be created. It is important to store the API key as it is not currently possible to get it or update it.
 
@@ -55,7 +54,7 @@ neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --da
 neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --rw
 
 # Create a disabled api-key provider and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --await --rw`,
+neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --wait --rw`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if _type == api.GraphQLDataApiAuthProviderTypeJwks {
 				cmd.MarkFlagRequired(urlFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
@@ -99,7 +98,7 @@ neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --da
 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "key", "url"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusCreating)
 					if err != nil {
@@ -131,7 +130,7 @@ neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --da
 	msgUrlFlag := fmt.Sprintf("The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type '%s'", api.GraphQLDataApiAuthProviderTypeJwks)
 	cmd.Flags().StringVar(&url, urlFlag, "", msgUrlFlag)
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created Authentication provider is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created Authentication provider is ready.")
 
 	return cmd
 }

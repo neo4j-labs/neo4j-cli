@@ -23,7 +23,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		tenantId      string
 		cloudProvider flags.CloudProvider
 		keyId         string
-		await         bool
+		wait          bool
 	)
 
 	const (
@@ -33,7 +33,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		tenantIdFlag      = "tenant-id"
 		cloudProviderFlag = "cloud-provider"
 		keyIdFlag         = "key-id"
-		awaitFlag         = "await"
 	)
 
 	cmd := &cobra.Command{
@@ -51,7 +50,7 @@ Once the key has a status of ready you can use it for creating new instances by 
 neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
 
 # Create a key and wait until it is ready before returning
-neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Create a key and emit JSON for scripting
 neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
@@ -89,7 +88,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateCMKResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
@@ -128,7 +127,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 	cmd.Flags().StringVar(&keyId, keyIdFlag, "", "(required) Encryption Key ARN")
 	cmd.MarkFlagRequired(keyIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created customer managed key is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created customer managed key is ready.")
 
 	return cmd
 }

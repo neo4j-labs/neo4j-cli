@@ -10,17 +10,14 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func NewResumeCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		await bool
-	)
-
-	const (
-		awaitFlag = "await"
+		wait bool
 	)
 
 	cmd := &cobra.Command{
@@ -36,7 +33,7 @@ If another operation is being performed on the instance you are trying to resume
 neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
 
 # Resume and wait until the instance is ready
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --await --rw
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --wait --rw
 
 # Resume and emit the response as JSON for scripting
 neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json`,
@@ -56,7 +53,7 @@ neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --forma
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateInstanceResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
@@ -75,6 +72,6 @@ neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --forma
 		},
 	}
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until resumed instance is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until resumed instance is ready.")
 	return cmd
 }

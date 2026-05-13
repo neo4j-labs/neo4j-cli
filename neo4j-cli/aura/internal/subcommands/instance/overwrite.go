@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +18,7 @@ func NewOverwriteCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		sourceInstanceId string
 		sourceSnapshotId string
-		await            bool
+		wait             bool
 	)
 
 	const (
@@ -39,7 +40,7 @@ If only --source-instance-id is provided, a new snapshot of that instance is cre
 neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Overwrite using a specific exportable snapshot and wait until ready
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --await --rw
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
 
 # Overwrite and emit JSON for scripting
 neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
@@ -72,7 +73,7 @@ neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
 			}
 
-			if await {
+			if wait {
 				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 				pollResponse, err := api.PollInstance(cfg, instanceId, api.InstanceStatusOverwriting)
 				if err != nil {
@@ -91,7 +92,7 @@ neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-
 
 	cmd.MarkFlagsOneRequired(sourceInstanceIdFlag, sourceSnapshotIdFlag)
 
-	cmd.Flags().BoolVar(&await, "await", false, "Waits until created snapshot is ready")
+	flags.RegisterWait(cmd, &wait, "Waits until created snapshot is ready")
 
 	return cmd
 }

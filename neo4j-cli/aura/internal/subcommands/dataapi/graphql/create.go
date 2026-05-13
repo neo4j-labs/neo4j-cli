@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		instancePasswordFlag = "instance-password"
 		typeDefsFlag         = "type-definitions"
 		typeDefsFileFlag     = "type-definitions-file"
-		awaitFlag            = "await"
 	)
 
 	var (
@@ -32,7 +32,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		instancePassword string
 		typeDefs         string
 		typeDefsFile     string
-		await            bool
+		wait             bool
 	)
 
 	cmd := &cobra.Command{
@@ -41,7 +41,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Creates a new GraphQL Data API",
 		Long: `This command starts the creation process of a GraphQL Data API.
 
-Creating a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "creating" to "ready" you may begin to use your GraphQL Data API.
+Creating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "creating" to "ready" you may begin to use your GraphQL Data API.
 
 This command returns your GraphQL Data API ID, API key, and connection URL for you to use once the GraphQL Data API is running. It is important to store the API key as it is not currently possible to get this or update it.
 
@@ -53,7 +53,7 @@ neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --in
 neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --await --rw`,
+neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --wait --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{
 				"name": name,
@@ -97,7 +97,7 @@ neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --in
 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url", "authentication_providers"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateGraphQLDataApiResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
@@ -134,7 +134,7 @@ neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --in
 	cmd.MarkFlagsMutuallyExclusive(typeDefsFlag, typeDefsFileFlag)
 	cmd.MarkFlagsOneRequired(typeDefsFlag, typeDefsFileFlag)
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created GraphQL Data API is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created GraphQL Data API is ready.")
 
 	return cmd
 }
