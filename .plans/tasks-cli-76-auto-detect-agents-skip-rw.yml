@@ -160,7 +160,7 @@ tasks:
 
       Ensure no persistent state leaks: any temp credential written goes under `t.TempDir()`; no
       `~/Library/Preferences/...` mutations.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "New e2e/writegate_test.go (or equivalent path) exists and runs as part of go test ./..."
@@ -169,4 +169,4 @@ tasks:
       - "piped_blocks subtest asserts exit 2 + canonical error (without agent env vars)"
       - "agent_with_rw_succeeds subtest asserts exit 0 with --rw, AND does not mutate any state outside t.TempDir()"
       - "make test passes including the new e2e package; make fmt-check, make lint, make generate-check all green"
-    completed_at: null
+    completed_at: 2026-05-13T14:05:00Z

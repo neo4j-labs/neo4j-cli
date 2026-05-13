@@ -54,3 +54,8 @@ Post-verification cleanup: `grep -c 'test-cli76' ~/Library/Preferences/neo4j/cli
 Final gates + manual verification. All four gates green; PRD acceptance scenarios (a)-(d) reproduced against the built binary and proof captured above; dev credentials file left unmodified.
 Files: ~progress
 Decisions: TTY simulation used `script -q /dev/null env -u <agent-vars> TERM_PROGRAM=plain …` to (1) allocate a real pty for stdout and (2) strip stray agent vars from the parent shell so `Detect()` returns false. Cleaner than relying on the agent's own shell, which carries `CLAUDECODE=1`.
+
+## TASK-007 — 2026-05-13T14:05:00Z
+Added real-binary E2E write-gate test at test/e2e/writegate/. TestMain builds neo4j-cli once (CGO_ENABLED=0) into a temp dir cleaned at process exit; three subtests (agent_blocks, piped_blocks, agent_with_rw_succeeds) drive the binary via exec.Command with a scrubbed env and assert exit code + canonical gate string. Not build-tag gated, so runs in `go test ./...`.
+Files: +test/e2e/writegate/writegate_test.go
+Decisions: agent_with_rw_succeeds skips on darwin because clicfg.ConfigPrefix is derived from os/user.Current() (passwd-database lookup), and HOME-override has no effect — running the subtest there would mutate the dev's real credentials.json. Linux + Windows honour XDG_CONFIG_HOME / LOCALAPPDATA so the subtest runs in CI on those platforms with full write-isolation verification (assert credentials.json lands under t.TempDir()). Adding a NEO4J_CLI_CONFIG_DIR seam to clicfg was considered but deemed scope-creep for this task.
