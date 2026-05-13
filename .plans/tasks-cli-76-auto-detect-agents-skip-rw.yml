@@ -56,7 +56,7 @@ tasks:
       user once to confirm the write, then re-run with `--rw`. Keep the existing pointer to `query
       run` EXPLAIN preflight. Run `go generate ./neo4j-cli/internal/skill/...
       ./neo4j-cli/aura/internal/skill/...` and commit the regenerated bundle files in the same task.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -65,7 +65,7 @@ tasks:
       - "go generate runs cleanly on both skill trees; bundle/SKILL.md on both surfaces shows the new prose"
       - "TestGenerator_RoundTrip on both surfaces passes"
       - "make generate-check is clean against this task's changes (only skill files differ)"
-    completed_at: null
+    completed_at: 2026-05-13T11:18:00Z
 
   - id: task-004
     title: "Add README auto-detect section"

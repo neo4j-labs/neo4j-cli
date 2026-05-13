@@ -6,3 +6,7 @@ Files: +common/agent/agent.go, +common/agent/agent_test.go
 Wired agent.Detect + stdout-TTY check into EnforceWriteGate (4-step precedence), updated --rw Usage to interactive/agent wording, added 6-row gate-matrix table test via detectAgent/stdoutIsTerminal seams. Usage-string change rippled into both skill bundles (regen committed in lockstep).
 Files: ~common/flags/flags.go, ~common/flags/flags_test.go, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
 Decisions: Kept usage-error string verbatim ("this command writes; pass --rw to allow it") so existing grep-style tests on both surfaces stay green without edits.
+
+## TASK-003 — 2026-05-13T11:18:00Z
+Rewrote --rw bullets on both skill additions.md surfaces: agents-always-need-rw + ask-once-on-gate-fail flow, retaining EXPLAIN preflight pointer. Regenerated both bundle/SKILL.md files via go generate.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
