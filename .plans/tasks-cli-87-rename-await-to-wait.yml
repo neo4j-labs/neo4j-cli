@@ -141,7 +141,7 @@ tasks:
     description: |
       Final gates: `make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check`.
       Build the binary and verify both flag paths interactively: `--wait` (canonical, golden path), `--await` (alias, prints `Flag --await has been deprecated, use --wait instead` to stderr), `--help` (shows --wait, hides --await), `agent-context` (returns `"--wait"` for async_flag).
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -156,4 +156,4 @@ tasks:
       - "`bin/neo4j-cli aura instance create --type free-db --await --rw <…>` works AND emits the cobra deprecation message to stderr"
       - "`bin/neo4j-cli aura instance create --help` shows --wait and does NOT show --await"
       - "`bin/neo4j-cli agent-context | jq -r .async_flag` returns \"--wait\""
-    completed_at: null
+    completed_at: 2026-05-13T16:10:00Z

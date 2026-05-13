@@ -32,3 +32,8 @@ Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/ad
 ## task-008 — 2026-05-13T15:56:00Z
 Added changie Minor entry for neo4j-cli referencing CLI-87 and follow-up CLI-111; verified via `changie batch --dry-run`.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260513-155521.yaml, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-009 — 2026-05-13T16:10:00Z
+Final gates green (fmt-check/lint/test/generate-check/license-check) and e2e binary verified: --wait golden path, --await emits cobra deprecation to stderr, --help hides --await, agent-context async_flag returns "--wait".
+Files: ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: generate-check meaningful only against clean tree — stashed task-yaml edit before running, popped after.
