@@ -59,7 +59,7 @@ tasks:
       renderer at `common/skill/render/render.go:235` does not produce a ragged
       code block. Verify with `go run ./neo4j-cli query --help`.
       See PRD REQ-F-003, REQ-F-004, REQ-F-005.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`query.go` Short equals: `\"Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol\"`"
@@ -69,7 +69,7 @@ tasks:
       - "Existing 5 examples follow in their original order"
       - "Example block is flush-left (no leading whitespace on the first line)"
       - "`go run ./neo4j-cli query --help` shows the new Long lede and the new first example"
-    completed_at: null
+    completed_at: 2026-05-13T14:24:10Z
 
   - id: task-004
     title: "Edit `schema.go` Long and Example for stronger `:schema` framing"

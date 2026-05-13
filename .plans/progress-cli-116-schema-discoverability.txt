@@ -6,3 +6,7 @@ Decisions: Dropped "graph data modeling" from the Skip list — contradicts the 
 ## task-002 — 2026-05-13T00:00:00Z
 Replaced first Tips & Gotchas bullet in `additions.md` with the schema-first directive showing the literal command `neo4j-cli query :schema --format toon`; kept link to query-additions.md.
 Files: ~neo4j-cli/internal/skill/additions.md
+
+## task-003 — 2026-05-13T14:24:10Z
+Rewrote `query.go` Short to name `:schema` (Subcommands-table surface), prepended Long with `:schema`-first directive, and inserted `:schema --format toon` as the new first Example. Ran in parallel batch with task-004/006.
+Files: ~neo4j-cli/query/query.go
