@@ -49,6 +49,19 @@ Flags:
 | `--client-secret` | string | - | (required) Client secret |
 | `--name` | string | - | (required) Name |
 
+Examples:
+
+```
+# Add the first aura-client credential (becomes the default)
+neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
+
+# Add an additional aura-client credential (default stays unchanged)
+neo4j-cli credential aura-client add --name personal --client-id <id> --client-secret <secret> --rw
+
+# Switch the default after adding a second credential
+neo4j-cli credential aura-client use personal --rw
+```
+
 ### neo4j-cli credential aura-client list
 
 List aura-client credentials
@@ -56,6 +69,19 @@ List aura-client credentials
 List stored Aura Console API client credentials. The `default` column flags the credential used by `aura ...` commands when no other selector is set.
 
 Usage: `neo4j-cli credential aura-client list`
+
+Examples:
+
+```
+# List all aura-client credentials as a table
+neo4j-cli credential aura-client list
+
+# List as JSON for scripting / agent consumption
+neo4j-cli credential aura-client list --format json
+
+# List as toon (compact, agent-friendly)
+neo4j-cli credential aura-client list --format toon
+```
 
 ### neo4j-cli credential aura-client remove
 
@@ -65,6 +91,19 @@ Remove a stored Aura Console API client credential by name.
 
 Usage: `neo4j-cli credential aura-client remove`
 
+Examples:
+
+```
+# Remove an aura-client credential by name
+neo4j-cli credential aura-client remove work --rw
+
+# Remove the personal credential
+neo4j-cli credential aura-client remove personal --rw
+
+# Remove a stale credential that no longer authenticates
+neo4j-cli credential aura-client remove old-tenant --rw
+```
+
 ### neo4j-cli credential aura-client use
 
 Sets the default aura-client credential to be used
@@ -72,6 +111,19 @@ Sets the default aura-client credential to be used
 Set the named aura-client credential as the default consumed by `aura ...` commands.
 
 Usage: `neo4j-cli credential aura-client use`
+
+Examples:
+
+```
+# Switch the default to the personal credential
+neo4j-cli credential aura-client use personal --rw
+
+# Switch the default to the work credential
+neo4j-cli credential aura-client use work --rw
+
+# Switch the default after adding a new credential
+neo4j-cli credential aura-client use new-tenant --rw
+```
 
 ## neo4j-cli credential dbms
 

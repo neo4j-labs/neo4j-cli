@@ -64,6 +64,14 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add an Aura Console API client credential (client ID + secret). " +
 			"The first credential added becomes the default; switch later with " +
 			"`credential aura-client use <name>`.",
+		Example: `# Add the first aura-client credential (becomes the default)
+neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
+
+# Add an additional aura-client credential (default stays unchanged)
+neo4j-cli credential aura-client add --name personal --client-id <id> --client-secret <secret> --rw
+
+# Switch the default after adding a second credential
+neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
@@ -87,6 +95,14 @@ func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "List aura-client credentials",
 		Long:  "List stored Aura Console API client credentials. The `default` column flags the credential used by `aura ...` commands when no other selector is set.",
+		Example: `# List all aura-client credentials as a table
+neo4j-cli credential aura-client list
+
+# List as JSON for scripting / agent consumption
+neo4j-cli credential aura-client list --format json
+
+# List as toon (compact, agent-friendly)
+neo4j-cli credential aura-client list --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), []string{"name", "type", "identifier", "default"})
 			return nil
@@ -96,9 +112,17 @@ func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {
 
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:         "remove",
-		Short:       "Removes an aura-client credential",
-		Long:        "Remove a stored Aura Console API client credential by name.",
+		Use:   "remove",
+		Short: "Removes an aura-client credential",
+		Long:  "Remove a stored Aura Console API client credential by name.",
+		Example: `# Remove an aura-client credential by name
+neo4j-cli credential aura-client remove work --rw
+
+# Remove the personal credential
+neo4j-cli credential aura-client remove personal --rw
+
+# Remove a stale credential that no longer authenticates
+neo4j-cli credential aura-client remove old-tenant --rw`,
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -109,9 +133,17 @@ func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:         "use",
-		Short:       "Sets the default aura-client credential to be used",
-		Long:        "Set the named aura-client credential as the default consumed by `aura ...` commands.",
+		Use:   "use",
+		Short: "Sets the default aura-client credential to be used",
+		Long:  "Set the named aura-client credential as the default consumed by `aura ...` commands.",
+		Example: `# Switch the default to the personal credential
+neo4j-cli credential aura-client use personal --rw
+
+# Switch the default to the work credential
+neo4j-cli credential aura-client use work --rw
+
+# Switch the default after adding a new credential
+neo4j-cli credential aura-client use new-tenant --rw`,
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {

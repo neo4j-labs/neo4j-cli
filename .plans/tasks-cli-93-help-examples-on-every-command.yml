@@ -174,7 +174,7 @@ tasks:
       start with two spaces. Filter out hidden commands and cobra-injected `help` /
       `completion` subtrees to mirror the visibility filter used by
       `common/skill/render`. Failure messages must include the full command path.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -183,7 +183,7 @@ tasks:
       - "Failure messages identify the offending command by its full path (e.g. 'neo4j-cli aura instance list')"
       - "Removing the Example: field from any one leaf causes the test to fail with that leaf's full path in the message (verify by temporary edit, then restore)"
       - "`make test`, `make fmt-check`, `make lint` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T13:05:00Z
 
   - id: task-011
     title: "Add Minor changelog entry and verify all gates"
