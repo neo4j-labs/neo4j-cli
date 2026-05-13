@@ -74,7 +74,7 @@ tasks:
       Confirm the new error string did not inadvertently land in a skill
       bundle (it shouldn't — verified by PRD REQ-NF-004 — but the gate is the
       ground truth). No skill `go generate` step expected.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -84,4 +84,4 @@ tasks:
       - "make lint exits 0"
       - "make test exits 0"
       - "make generate-check exits 0 (no skill-bundle drift introduced by this change; ignore unrelated working-tree noise per AGENTS.md §Makefile Notes)"
-    completed_at: null
+    completed_at: 2026-05-13T08:58:00Z
