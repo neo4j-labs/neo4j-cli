@@ -47,7 +47,7 @@ func TestAddAditionalCredentials(t *testing.T) {
 // TestAddCredentialMissingFlag covers the three required-flag cases that used
 // to surface cobra's auto-generated `required flag(s)` text. After CLI-100,
 // validation moved into RunE so the message names the offending flag and
-// points at the equivalent --file env key.
+// points at the equivalent --env env key.
 func TestAddCredentialMissingFlag(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -57,17 +57,17 @@ func TestAddCredentialMissingFlag(t *testing.T) {
 		{
 			name:    "missing --name",
 			command: "credential add --client-id testclientid --client-secret testclientsecret --rw",
-			wantErr: `--name is required (provide via --file as CLIENT_NAME, or pass --name)`,
+			wantErr: `--name is required (provide via --env as CLIENT_NAME, or pass --name)`,
 		},
 		{
 			name:    "missing --client-id",
 			command: "credential add --name test --client-secret testclientsecret --rw",
-			wantErr: `--client-id is required (provide via --file as CLIENT_ID, or pass --client-id)`,
+			wantErr: `--client-id is required (provide via --env as CLIENT_ID, or pass --client-id)`,
 		},
 		{
 			name:    "missing --client-secret",
 			command: "credential add --name test --client-id testclientid --rw",
-			wantErr: `--client-secret is required (provide via --file as CLIENT_SECRET, or pass --client-secret)`,
+			wantErr: `--client-secret is required (provide via --env as CLIENT_SECRET, or pass --client-secret)`,
 		},
 	}
 
@@ -114,23 +114,23 @@ func TestAddCredentialFromFile(t *testing.T) {
 		assertNoAdd     bool
 	}{
 		{
-			name:            "happy path: --file alone populates all fields",
+			name:            "happy path: --env alone populates all fields",
 			files:           map[string]string{credsPath: auraClientFileContent},
-			command:         "credential add --file " + credsPath + " --rw",
+			command:         "credential add --env " + credsPath + " --rw",
 			wantCredentials: `[{"name":"MyClient","client-id":"abc123def456","client-secret":"supersecretvalue","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "MyClient",
 		},
 		{
 			name:            "--name overrides CLIENT_NAME",
 			files:           map[string]string{credsPath: auraClientFileContent},
-			command:         "credential add --file " + credsPath + " --name custom --rw",
+			command:         "credential add --env " + credsPath + " --name custom --rw",
 			wantCredentials: `[{"name":"custom","client-id":"abc123def456","client-secret":"supersecretvalue","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "custom",
 		},
 		{
 			name:            "--client-secret overrides CLIENT_SECRET from file",
 			files:           map[string]string{credsPath: auraClientFileContent},
-			command:         "credential add --file " + credsPath + " --client-secret override --rw",
+			command:         "credential add --env " + credsPath + " --client-secret override --rw",
 			wantCredentials: `[{"name":"MyClient","client-id":"abc123def456","client-secret":"override","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "MyClient",
 		},
@@ -144,43 +144,43 @@ CLIENT_ID=abc123
 CLIENT_SECRET=ssss
 CLIENT_NAME=Inst
 `},
-			command:         "credential add --file " + credsPath + " --rw",
+			command:         "credential add --env " + credsPath + " --rw",
 			wantCredentials: `[{"name":"Inst","client-id":"abc123","client-secret":"ssss","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "Inst",
 		},
 		{
 			name:        "file missing CLIENT_ID errors naming client-id",
 			files:       map[string]string{credsPath: "CLIENT_SECRET=ssss\nCLIENT_NAME=Inst\n"},
-			command:     "credential add --file " + credsPath + " --rw",
-			wantErr:     `--client-id is required (provide via --file as CLIENT_ID, or pass --client-id)`,
+			command:     "credential add --env " + credsPath + " --rw",
+			wantErr:     `--client-id is required (provide via --env as CLIENT_ID, or pass --client-id)`,
 			assertNoAdd: true,
 		},
 		{
 			name:        "empty file errors on first missing field (name)",
 			files:       map[string]string{credsPath: ""},
-			command:     "credential add --file " + credsPath + " --rw",
-			wantErr:     `--name is required (provide via --file as CLIENT_NAME, or pass --name)`,
+			command:     "credential add --env " + credsPath + " --rw",
+			wantErr:     `--name is required (provide via --env as CLIENT_NAME, or pass --name)`,
 			assertNoAdd: true,
 		},
 		{
 			name:        "CLIENT_ID= empty with no flag override is a usage error",
 			files:       map[string]string{credsPath: "CLIENT_ID=\nCLIENT_SECRET=ssss\nCLIENT_NAME=Inst\n"},
-			command:     "credential add --file " + credsPath + " --rw",
+			command:     "credential add --env " + credsPath + " --rw",
 			wantErr:     `CLIENT_ID has an empty value`,
 			assertNoAdd: true,
 		},
 		{
 			name:            "CLIENT_ID= empty with --client-id override succeeds",
 			files:           map[string]string{credsPath: "CLIENT_ID=\nCLIENT_SECRET=ssss\nCLIENT_NAME=Inst\n"},
-			command:         "credential add --file " + credsPath + " --client-id real --rw",
+			command:         "credential add --env " + credsPath + " --client-id real --rw",
 			wantCredentials: `[{"name":"Inst","client-id":"real","client-secret":"ssss","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "Inst",
 		},
 		{
-			name:        "missing --file path returns a wrapped open error",
+			name:        "missing --env path returns a wrapped open error",
 			files:       map[string]string{},
-			command:     "credential add --file " + missingPath + " --rw",
-			wantErr:     "--file \"" + missingPath + "\":",
+			command:     "credential add --env " + missingPath + " --rw",
+			wantErr:     "--env \"" + missingPath + "\":",
 			assertNoAdd: true,
 		},
 	}

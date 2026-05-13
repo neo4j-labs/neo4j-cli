@@ -84,7 +84,7 @@ NEO4J_USERNAME=neo4j
 			name:          "missing path returns wrapped usage error",
 			path:          "/does-not-exist.txt",
 			writeFile:     false,
-			wantErrSubstr: `--file "/does-not-exist.txt":`,
+			wantErrSubstr: `--env "/does-not-exist.txt":`,
 		},
 		{
 			name:      "unrecognised keys are returned — caller filters",

@@ -2,7 +2,7 @@
 // Neo4j Sweden AB [http://neo4j.com]
 
 // Package envfile parses dotenv-style credential files for CLI commands that
-// accept a `--file` flag. The helper is intentionally domain-neutral: it
+// accept a `--env` flag. The helper is intentionally domain-neutral: it
 // returns the raw key/value map and a per-key presence map; key filtering
 // (recognised keys, required keys) is left to the caller.
 //
@@ -24,13 +24,13 @@ import (
 //   - present: per-key presence map; true when the file contained the key,
 //     regardless of whether the value was empty
 //   - err:     a clierr.UsageError wrapping any open failure, in the shape
-//     `--file %q: %s` so the user-facing message points at the offending path
+//     `--env %q: %s` so the user-facing message points at the offending path
 //
 // Unrecognised keys are returned as-is — filtering is the caller's job.
 func Parse(fs afero.Fs, path string) (vals map[string]string, present map[string]bool, err error) {
 	f, err := fs.Open(path)
 	if err != nil {
-		return nil, nil, clierr.NewUsageError("--file %q: %s", path, err.Error())
+		return nil, nil, clierr.NewUsageError("--env %q: %s", path, err.Error())
 	}
 	defer f.Close() //nolint:errcheck // read-only close error is not actionable in a defer
 
