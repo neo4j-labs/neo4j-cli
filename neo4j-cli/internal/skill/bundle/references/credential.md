@@ -37,7 +37,7 @@ Usage: `neo4j-cli credential aura-client`
 
 Adds an aura-client credential
 
-Add an Aura Console API client credential (client ID + secret). The first credential added becomes the default; switch later with `credential aura-client use <name>`.
+Add an Aura Console API client credential (client ID + secret). The first credential added becomes the default; switch later with `credential aura-client use <name>`. Pass `--file <path>` to import an Aura console–exported aura-client credentials file (recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.
 
 Usage: `neo4j-cli credential aura-client add [flags]`
 
@@ -47,6 +47,7 @@ Flags:
 |------|------|---------|-------------|
 | `--client-id` | string | - | (required) Client ID |
 | `--client-secret` | string | - | (required) Client secret |
+| `--file` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 
 Examples:
@@ -55,8 +56,8 @@ Examples:
 # Add the first aura-client credential (becomes the default)
 neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
 
-# Add an additional aura-client credential (default stays unchanged)
-neo4j-cli credential aura-client add --name personal --client-id <id> --client-secret <secret> --rw
+# Import an Aura console–exported aura-client credentials file
+neo4j-cli credential aura-client add --name work --file ~/Downloads/aura-client-creds.txt --rw
 
 # Switch the default after adding a second credential
 neo4j-cli credential aura-client use personal --rw

@@ -8,6 +8,8 @@ Usage: `aura-cli credential`
 
 Adds a credential
 
+Add an Aura API client credential. Pass `--file <path>` to import an Aura console–exported aura-client credentials file (recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.
+
 Usage: `aura-cli credential add [flags]`
 
 Flags:
@@ -16,6 +18,7 @@ Flags:
 |------|------|---------|-------------|
 | `--client-id` | string | - | (required) Client ID |
 | `--client-secret` | string | - | (required) Client secret |
+| `--file` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 
 Examples:
@@ -24,8 +27,8 @@ Examples:
 # Add an Aura Console API credential (becomes the default if it is the first one)
 neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw
 
-# Add a second credential alongside an existing default
-neo4j-cli aura credential add --name staging --client-id <client-id> --client-secret <client-secret> --rw
+# Import an Aura console–exported aura-client credentials file
+neo4j-cli aura credential add --name my-creds --file ~/Downloads/aura-client-creds.txt --rw
 
 # Add a credential and emit the response as JSON
 neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw --format json

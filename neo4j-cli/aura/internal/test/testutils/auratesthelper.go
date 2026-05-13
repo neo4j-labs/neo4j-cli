@@ -29,14 +29,15 @@ import (
 )
 
 type AuraTestHelper struct {
-	mux         *http.ServeMux
-	Server      *httptest.Server
-	out         *bytes.Buffer
-	err         *bytes.Buffer
-	cfg         string
-	credentials string
-	fs          afero.Fs
-	t           *testing.T
+	mux          *http.ServeMux
+	Server       *httptest.Server
+	out          *bytes.Buffer
+	err          *bytes.Buffer
+	cfg          string
+	credentials  string
+	fs           afero.Fs
+	pendingFiles map[string]string
+	t            *testing.T
 }
 
 func (helper *AuraTestHelper) Close() {
@@ -51,6 +52,10 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	assert.Nil(helper.t, err)
 
 	helper.fs = fs
+
+	for path, content := range helper.pendingFiles {
+		assert.Nil(helper.t, afero.WriteFile(helper.fs, path, []byte(content), 0o644))
+	}
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
 
@@ -91,6 +96,17 @@ func (helper *AuraTestHelper) SetCredentialsValue(key string, value interface{})
 	credentials, err := sjson.Set(helper.credentials, key, value)
 	assert.Nil(helper.t, err)
 	helper.credentials = credentials
+}
+
+// SeedFile stashes a pending write to the in-memory test fs. The write is
+// flushed inside ExecuteCommand after the fs is constructed, so callers can
+// stage file content (e.g. an Aura-exported credentials file consumed via
+// --file) before invoking the command under test.
+func (helper *AuraTestHelper) SeedFile(path, content string) {
+	if helper.pendingFiles == nil {
+		helper.pendingFiles = map[string]string{}
+	}
+	helper.pendingFiles[path] = content
 }
 
 func (helper *AuraTestHelper) SetDefaultProjectInConfig(organizationId, projectId string) {

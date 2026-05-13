@@ -5,6 +5,8 @@ package credential
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/envfile"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/dbms"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/embed"
@@ -50,12 +52,18 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 		name         string
 		clientId     string
 		clientSecret string
+		filePath     string
 	)
 
 	const (
 		nameFlag         = "name"
 		clientIdFlag     = "client-id"
 		clientSecretFlag = "client-secret"
+		fileFlag         = "file"
+
+		envClientId     = "CLIENT_ID"
+		envClientSecret = "CLIENT_SECRET"
+		envClientName   = "CLIENT_NAME"
 	)
 
 	cmd := &cobra.Command{
@@ -63,31 +71,107 @@ func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Adds an aura-client credential",
 		Long: "Add an Aura Console API client credential (client ID + secret). " +
 			"The first credential added becomes the default; switch later with " +
-			"`credential aura-client use <name>`.",
+			"`credential aura-client use <name>`. " +
+			"Pass `--file <path>` to import an Aura console–exported aura-client credentials file " +
+			"(recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.",
 		Example: `# Add the first aura-client credential (becomes the default)
 neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
 
-# Add an additional aura-client credential (default stays unchanged)
-neo4j-cli credential aura-client add --name personal --client-id <id> --client-secret <secret> --rw
+# Import an Aura console–exported aura-client credentials file
+neo4j-cli credential aura-client add --name work --file ~/Downloads/aura-client-creds.txt --rw
 
 # Switch the default after adding a second credential
 neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse the optional --file first so we can distinguish
+			// "file had the key but with empty value" (error) from
+			// "file didn't have the key" (fall through to flag).
+			var (
+				fileVals    = map[string]string{}
+				filePresent = map[string]bool{}
+			)
+			if filePath != "" {
+				vals, present, err := envfile.Parse(cfg.Aura.Fs(), filePath)
+				if err != nil {
+					return err
+				}
+				fileVals, filePresent = filterAuraClientEnvKeys(vals, present)
+			}
+
+			changed := func(flag string) bool {
+				f := cmd.Flag(flag)
+				return f != nil && f.Changed
+			}
+
+			if !changed(nameFlag) && filePresent[envClientName] {
+				name = fileVals[envClientName]
+			}
+			if !changed(clientIdFlag) && filePresent[envClientId] {
+				clientId = fileVals[envClientId]
+			}
+			if !changed(clientSecretFlag) && filePresent[envClientSecret] {
+				clientSecret = fileVals[envClientSecret]
+			}
+
+			for _, c := range []struct {
+				envKey   string
+				flagName string
+			}{
+				{envClientName, nameFlag},
+				{envClientId, clientIdFlag},
+				{envClientSecret, clientSecretFlag},
+			} {
+				if filePresent[c.envKey] && fileVals[c.envKey] == "" && !changed(c.flagName) {
+					return clierr.NewUsageError("--file %q: %s has an empty value", filePath, c.envKey)
+				}
+			}
+
+			for _, req := range []struct {
+				flag   string
+				value  string
+				envKey string
+			}{
+				{nameFlag, name, envClientName},
+				{clientIdFlag, clientId, envClientId},
+				{clientSecretFlag, clientSecret, envClientSecret},
+			} {
+				if req.value == "" {
+					return clierr.NewUsageError("--%s is required (provide via --file as %s, or pass --%s)", req.flag, req.envKey, req.flag)
+				}
+			}
+
 			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
-	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&clientId, clientIdFlag, "", "(required) Client ID")
-	cmd.MarkFlagRequired(clientIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 	cmd.Flags().StringVar(&clientSecret, clientSecretFlag, "", "(required) Client secret")
-	cmd.MarkFlagRequired(clientSecretFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+	cmd.Flags().StringVar(&filePath, fileFlag, "", "Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values.")
 
 	return cmd
+}
+
+// filterAuraClientEnvKeys narrows envfile.Parse's domain-neutral maps to the
+// keys the aura-client add command recognises. Unrecognised keys are silently
+// discarded.
+func filterAuraClientEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
+	recognised := map[string]bool{
+		"CLIENT_ID":     true,
+		"CLIENT_SECRET": true,
+		"CLIENT_NAME":   true,
+	}
+	filteredVals := map[string]string{}
+	filteredPresent := map[string]bool{}
+	for k := range present {
+		if !recognised[k] {
+			continue
+		}
+		filteredVals[k] = vals[k]
+		filteredPresent[k] = true
+	}
+	return filteredVals, filteredPresent
 }
 
 func newCredentialListCmd(cfg *clicfg.Config) *cobra.Command {

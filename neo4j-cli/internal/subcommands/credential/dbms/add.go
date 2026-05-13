@@ -5,10 +5,9 @@ package dbms
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"github.com/subosito/gotenv"
 )
 
 func newAddCmd(cfg *clicfg.Config) *cobra.Command {
@@ -63,12 +62,11 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				filePresent = map[string]bool{}
 			)
 			if filePath != "" {
-				vals, present, err := parseAuraEnvFile(cfg.Aura.Fs(), filePath)
+				vals, present, err := envfile.Parse(cfg.Aura.Fs(), filePath)
 				if err != nil {
 					return err
 				}
-				fileVals = vals
-				filePresent = present
+				fileVals, filePresent = filterAuraEnvKeys(vals, present)
 			}
 
 			// Track which flags the user explicitly set so we can prefer them
@@ -170,19 +168,10 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 	return cmd
 }
 
-// parseAuraEnvFile reads an Aura-exported credentials file via the supplied
-// afero.Fs and returns two maps: the parsed values, and a per-key presence
-// map so callers can distinguish `KEY=` (present, empty) from a missing key
-// (gotenv collapses both to ""). Only the recognised Aura keys are emitted;
-// unrecognised keys (including AURA_INSTANCEID) are silently discarded.
-func parseAuraEnvFile(fs afero.Fs, path string) (map[string]string, map[string]bool, error) {
-	f, err := fs.Open(path)
-	if err != nil {
-		return nil, nil, clierr.NewUsageError("--file %q: %s", path, err.Error())
-	}
-	defer f.Close() //nolint:errcheck // read-only close error is not actionable in a defer
-
-	parsed := gotenv.Parse(f)
+// filterAuraEnvKeys narrows envfile.Parse's domain-neutral maps to the keys
+// the dbms add command recognises. Unrecognised keys (including
+// AURA_INSTANCEID) are silently discarded.
+func filterAuraEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
 	recognised := map[string]bool{
 		"NEO4J_URI":         true,
 		"NEO4J_USERNAME":    true,
@@ -190,14 +179,14 @@ func parseAuraEnvFile(fs afero.Fs, path string) (map[string]string, map[string]b
 		"NEO4J_DATABASE":    true,
 		"AURA_INSTANCENAME": true,
 	}
-	vals := map[string]string{}
-	present := map[string]bool{}
-	for k, v := range parsed {
+	filteredVals := map[string]string{}
+	filteredPresent := map[string]bool{}
+	for k := range present {
 		if !recognised[k] {
 			continue
 		}
-		vals[k] = v
-		present[k] = true
+		filteredVals[k] = vals[k]
+		filteredPresent[k] = true
 	}
-	return vals, present, nil
+	return filteredVals, filteredPresent
 }
