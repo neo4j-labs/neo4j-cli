@@ -6,7 +6,9 @@ package dbms
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/subosito/gotenv"
 )
 
 func newAddCmd(cfg *clicfg.Config) *cobra.Command {
@@ -17,6 +19,7 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		databaseName    string
 		uri             string
 		embedCredential string
+		filePath        string
 	)
 
 	const (
@@ -26,6 +29,13 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		databaseNameFlag    = "database-name"
 		uriFlag             = "uri"
 		embedCredentialFlag = "embed-credential"
+		fileFlag            = "file"
+
+		envURI          = "NEO4J_URI"
+		envUsername     = "NEO4J_USERNAME"
+		envPassword     = "NEO4J_PASSWORD"
+		envDatabase     = "NEO4J_DATABASE"
+		envInstanceName = "AURA_INSTANCENAME"
 	)
 
 	cmd := &cobra.Command{
@@ -33,23 +43,99 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Adds a dbms credential",
 		Long: "Add a Neo4j Bolt connection profile. The first credential added becomes the default. " +
 			"Pass `--embed-credential <name>` to link this profile to an existing embed credential — " +
-			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`.",
+			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. " +
+			"Pass `--file <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.",
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse the optional --file before applying any defaults so we can
+			// distinguish "file had the key but with empty value" (error) from
+			// "file didn't have the key" (fall through to flag/default).
+			var (
+				fileVals    = map[string]string{}
+				filePresent = map[string]bool{}
+			)
+			if filePath != "" {
+				vals, present, err := parseAuraEnvFile(cfg.Aura.Fs(), filePath)
+				if err != nil {
+					return err
+				}
+				fileVals = vals
+				filePresent = present
+			}
+
+			// Track which flags the user explicitly set so we can prefer them
+			// over file values per REQ-F-005 / REQ-F-010.
+			changed := func(flag string) bool {
+				f := cmd.Flag(flag)
+				return f != nil && f.Changed
+			}
+
+			// Merge file → flag for each recognised field. The flag default is
+			// the empty string for everything except --database-name (which
+			// defaults to "neo4j"); the merge logic for database-name is
+			// special-cased below to respect REQ-F-006.
+			merge := func(envKey, flagName string, flagVal string) string {
+				if changed(flagName) {
+					return flagVal
+				}
+				if filePresent[envKey] {
+					return fileVals[envKey]
+				}
+				return ""
+			}
+
+			if !changed(nameFlag) && filePresent[envInstanceName] {
+				name = fileVals[envInstanceName]
+			}
+			username = merge(envUsername, usernameFlag, username)
+			password = merge(envPassword, passwordFlag, password)
+			uri = merge(envURI, uriFlag, uri)
+
+			// database-name: special-case the "neo4j" default. The flag default
+			// loads into databaseName even when the user didn't pass it, so we
+			// rebuild it from scratch using Changed-vs-present semantics.
+			switch {
+			case changed(databaseNameFlag):
+				// keep the user-provided databaseName as-is.
+			case filePresent[envDatabase]:
+				databaseName = fileVals[envDatabase]
+			default:
+				databaseName = "neo4j"
+			}
+
+			// REQ-F-006: if any recognised file key was present with an empty
+			// value AND no flag override won, it's a usage error.
+			for _, c := range []struct {
+				envKey   string
+				flagName string
+			}{
+				{envInstanceName, nameFlag},
+				{envUsername, usernameFlag},
+				{envPassword, passwordFlag},
+				{envURI, uriFlag},
+				{envDatabase, databaseNameFlag},
+			} {
+				if filePresent[c.envKey] && fileVals[c.envKey] == "" && !changed(c.flagName) {
+					return clierr.NewUsageError("--file %q: %s has an empty value", filePath, c.envKey)
+				}
+			}
+
+			// REQ-F-007: surface the first missing required field.
 			for _, req := range []struct {
 				flag   string
 				value  string
 				envKey string
 			}{
-				{nameFlag, name, "AURA_INSTANCENAME"},
-				{usernameFlag, username, "NEO4J_USERNAME"},
-				{passwordFlag, password, "NEO4J_PASSWORD"},
-				{uriFlag, uri, "NEO4J_URI"},
+				{nameFlag, name, envInstanceName},
+				{usernameFlag, username, envUsername},
+				{passwordFlag, password, envPassword},
+				{uriFlag, uri, envURI},
 			} {
 				if req.value == "" {
 					return clierr.NewUsageError("--%s is required (provide via --file as %s, or pass --%s)", req.flag, req.envKey, req.flag)
 				}
 			}
+
 			if embedCredential != "" {
 				if _, err := cfg.Credentials.Embed.Get(embedCredential); err != nil {
 					return clierr.NewUsageError("invalid --embed-credential %q: no such embed credential (run `credential embed list` to see available)", embedCredential)
@@ -71,6 +157,39 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.Flags().StringVar(&uri, uriFlag, "", "(required) URI")
 	cmd.Flags().StringVar(&databaseName, databaseNameFlag, "neo4j", "Database name")
 	cmd.Flags().StringVar(&embedCredential, embedCredentialFlag, "", "Name of an embed credential to link (must already exist; see `credential embed list`)")
+	cmd.Flags().StringVar(&filePath, fileFlag, "", "Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values.")
 
 	return cmd
+}
+
+// parseAuraEnvFile reads an Aura-exported credentials file via the supplied
+// afero.Fs and returns two maps: the parsed values, and a per-key presence
+// map so callers can distinguish `KEY=` (present, empty) from a missing key
+// (gotenv collapses both to ""). Only the recognised Aura keys are emitted;
+// unrecognised keys (including AURA_INSTANCEID) are silently discarded.
+func parseAuraEnvFile(fs afero.Fs, path string) (map[string]string, map[string]bool, error) {
+	f, err := fs.Open(path)
+	if err != nil {
+		return nil, nil, clierr.NewUsageError("--file %q: %s", path, err.Error())
+	}
+	defer f.Close() //nolint:errcheck // read-only close error is not actionable in a defer
+
+	parsed := gotenv.Parse(f)
+	recognised := map[string]bool{
+		"NEO4J_URI":         true,
+		"NEO4J_USERNAME":    true,
+		"NEO4J_PASSWORD":    true,
+		"NEO4J_DATABASE":    true,
+		"AURA_INSTANCENAME": true,
+	}
+	vals := map[string]string{}
+	present := map[string]bool{}
+	for k, v := range parsed {
+		if !recognised[k] {
+			continue
+		}
+		vals[k] = v
+		present[k] = true
+	}
+	return vals, present, nil
 }

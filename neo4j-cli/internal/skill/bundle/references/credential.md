@@ -85,7 +85,7 @@ Usage: `neo4j-cli credential dbms`
 
 Adds a dbms credential
 
-Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`.
+Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--file <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.
 
 Usage: `neo4j-cli credential dbms add [flags]`
 
@@ -95,6 +95,7 @@ Flags:
 |------|------|---------|-------------|
 | `--database-name` | string | neo4j | Database name |
 | `--embed-credential` | string | - | Name of an embed credential to link (must already exist; see `credential embed list`) |
+| `--file` | string | - | Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 | `--password` | string | - | (required) Password |
 | `--uri` | string | - | (required) URI |
