@@ -13,7 +13,15 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "Lists the current configuration of the Aura CLI subcommand",
-		Args:  cobra.NoArgs,
+		Example: `# List the current Aura CLI configuration
+neo4j-cli aura config list
+
+# Emit configuration as JSON for scripting
+neo4j-cli aura config list --format json
+
+# Pipe through jq to print just the default-tenant value
+neo4j-cli aura config list --format json | jq -r '."default-tenant"'`,
+		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			output.PrintBodyMap(cmd, cfg, cfg.Printable(), configPrintFields)
 		},

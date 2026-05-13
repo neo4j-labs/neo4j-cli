@@ -24,8 +24,14 @@ func newInstallCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Co
 			"single agent. Unknown agent names exit non-zero with the list " +
 			"of valid names." +
 			"\n\nSupported agents: " + strings.Join(agentNames(), ", "),
-		Example: "skill install            # install into every detected agent\n" +
-			"skill install claude-code  # install into a single agent",
+		Example: `# Install the skill into every detected agent
+neo4j-cli skill install --rw
+
+# Install the skill into a single agent (case-insensitive name)
+neo4j-cli skill install claude-code --rw
+
+# Install and emit the result as JSON (machine-readable)
+neo4j-cli skill install --format json --rw`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

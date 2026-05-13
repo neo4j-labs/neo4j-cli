@@ -76,6 +76,19 @@ Flags:
 | `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. |
 
+Examples:
+
+```
+# Create a customer managed key (AWS-hosted instance)
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a key and wait until it is ready before returning
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Create a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
 ### neo4j-cli aura customer-managed-key delete
 
 Deletes a customer managed key
@@ -86,6 +99,19 @@ Note that you can only delete a Key if it is not being used by any instances, ot
 
 Usage: `neo4j-cli aura customer-managed-key delete <id>`
 
+Examples:
+
+```
+# Delete a customer managed key by ID
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a key and emit JSON for scripting
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and confirm by piping the response through jq
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.deleted'
+```
+
 ### neo4j-cli aura customer-managed-key get
 
 Returns a customer managed key details
@@ -93,6 +119,19 @@ Returns a customer managed key details
 This subcommand returns details about a specific Customer Managed Key.
 
 Usage: `neo4j-cli aura customer-managed-key get <id>`
+
+Examples:
+
+```
+# Get details of a customer managed key by ID
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the key status
+neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.status'
+```
 
 ### neo4j-cli aura customer-managed-key list
 
@@ -109,6 +148,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--tenant-id` | string | - | An optional Tenant ID to filter customer managed keys in a tenant |
+
+Examples:
+
+```
+# List all customer managed keys the current user has access to
+neo4j-cli aura customer-managed-key list
+
+# List keys in a specific tenant
+neo4j-cli aura customer-managed-key list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura customer-managed-key list --format json
+```
 
 ## neo4j-cli aura graph-analytics
 
@@ -159,6 +211,19 @@ Flags:
 | `--tenant-id` | string | - | The Aura project/tenant ID |
 | `--ttl` | string | - | This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration. |
 
+Examples:
+
+```
+# Create a standalone session in a specific project/tenant on AWS
+neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
+
+# Create a session attached to an existing Aura instance and wait until ready
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --await
+
+# Create a session with a TTL and emit JSON for scripting
+neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json
+```
+
 #### neo4j-cli aura graph-analytics session delete
 
 Delete a Graph Analytics Serverless session
@@ -167,6 +232,19 @@ This subcommand deletes a Graph Analytics Serverless session by id.
 
 Usage: `neo4j-cli aura graph-analytics session delete <id>`
 
+Examples:
+
+```
+# Delete a session by ID
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a session and emit JSON for scripting
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete a session, suppressing all stdout output
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw > /dev/null
+```
+
 #### neo4j-cli aura graph-analytics session get
 
 Get a Graph Analytics Serverless session
@@ -174,6 +252,19 @@ Get a Graph Analytics Serverless session
 This subcommand returns the details of a Graph Analytics Serverless session.
 
 Usage: `neo4j-cli aura graph-analytics session get <id>`
+
+Examples:
+
+```
+# Get a session by ID
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000
+
+# Render the session as a TOON table
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format toon
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format json
+```
 
 #### neo4j-cli aura graph-analytics session list
 
@@ -195,6 +286,19 @@ Flags:
 | `--instance-id` | string | - | An optional Instance ID to filter for sessions attached to an instance |
 | `--organization-id` | string | - | An optional Organization ID to filter sessions in an organization |
 | `--tenant-id` | string | - | An optional Project ID to filter sessions in a project/tenant |
+
+Examples:
+
+```
+# List all Graph Analytics sessions the current user has access to
+neo4j-cli aura graph-analytics session list
+
+# List sessions in a specific project/tenant
+neo4j-cli aura graph-analytics session list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# List sessions attached to a specific instance and emit JSON for scripting
+neo4j-cli aura graph-analytics session list --instance-id 00000000 --format json
+```
 
 ## neo4j-cli aura instance
 
@@ -251,19 +355,13 @@ Examples:
 
 ```
 # Create a free-db instance (no cloud provider, region, or memory required)
-  neo4j aura instance create --type free-db --await --rw
+neo4j-cli aura instance create --type free-db --await --rw
 
-  # Create a professional-db instance on AWS (us-east-1, N. Virginia)
-  neo4j aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+# Create a professional-db instance on AWS (us-east-1, N. Virginia)
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
 
-  # Create a professional-db instance on Azure (eastus, Virginia)
-  neo4j aura instance create --rw --name my-azure-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider azure --region eastus --memory 4GB
-
-  # Create a professional-db instance on GCP (europe-west1, Belgium)
-  neo4j aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB
-
-  # Create a business-critical instance on AWS (us-east-1, N. Virginia)
-  neo4j aura instance create --name my-bc-instance --type business-critical --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 64GB
+# Create a professional-db instance on GCP and emit JSON for scripting
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
 ```
 
 ### neo4j-cli aura instance delete
@@ -278,6 +376,19 @@ If another operation is being performed on the instance you are trying to delete
 
 Usage: `neo4j-cli aura instance delete <id>`
 
+Examples:
+
+```
+# Delete an instance by ID
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete an instance and emit the response as JSON
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and pipe the response status through jq
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'
+```
+
 ### neo4j-cli aura instance get
 
 Returns instance details
@@ -285,6 +396,19 @@ Returns instance details
 This endpoint returns details about a specific Aura Instance.
 
 Usage: `neo4j-cli aura instance get <id>`
+
+Examples:
+
+```
+# Get details of an instance by ID
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the connection URL
+neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.connection_url'
+```
 
 ### neo4j-cli aura instance list
 
@@ -301,6 +425,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--tenant-id` | string | - | An optional Tenant ID to filter instances in a tenant |
+
+Examples:
+
+```
+# List all instances the current user has access to
+neo4j-cli aura instance list
+
+# List instances in a specific tenant
+neo4j-cli aura instance list --tenant-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance list --format json
+```
 
 ### neo4j-cli aura instance overwrite
 
@@ -322,6 +459,19 @@ Flags:
 | `--source-instance-id` | string | - | The ID of the instance to overwrite with, from the source snapshot ID if provided, otherwise takes a new snapshot and overwrites |
 | `--source-snapshot-id` | string | - | The ID of the snapshot to overwrite with, which must be exportable, from the source instance ID if provided, otherwise the argument provided instance |
 
+Examples:
+
+```
+# Overwrite an instance with a fresh snapshot of a source instance
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Overwrite using a specific exportable snapshot and wait until ready
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --await --rw
+
+# Overwrite and emit JSON for scripting
+neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json
+```
+
 ### neo4j-cli aura instance pause
 
 Pauses an instance
@@ -335,6 +485,19 @@ The pause time depends on the amount of data stored in the instance; larger quan
 If another operation is being performed on the instance you are trying to pause, an error will be returned that indicates that the pause operation cannot be performed.
 
 Usage: `neo4j-cli aura instance pause <id>`
+
+Examples:
+
+```
+# Pause an Aura instance
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw
+
+# Pause an instance and emit the response as JSON
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Pause and pipe the response status through jq
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'
+```
 
 ### neo4j-cli aura instance resume
 
@@ -353,6 +516,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--await` | bool | false | Waits until resumed instance is ready. |
+
+Examples:
+
+```
+# Resume a paused Aura instance
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
+
+# Resume and wait until the instance is ready
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Resume and emit the response as JSON for scripting
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json
+```
 
 ### neo4j-cli aura instance snapshot
 
@@ -377,6 +553,19 @@ Flags:
 | `--await` | bool | false | Waits until created snapshot is ready. |
 | `--instance-id` | string | - | (required) The ID of the instance to create a snapshot of |
 
+Examples:
+
+```
+# Take an on-demand snapshot of an instance
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Take a snapshot and wait until it is ready
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Take a snapshot and emit JSON for scripting
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
 #### neo4j-cli aura instance snapshot get
 
 Get details of a snapshot
@@ -390,6 +579,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | The ID of the instance to get the snapshot details of |
+
+Examples:
+
+```
+# Get details of a snapshot by its ID
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json
+
+# Check whether a snapshot is exportable via jq
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.exportable'
+```
 
 #### neo4j-cli aura instance snapshot list
 
@@ -405,6 +607,19 @@ Flags:
 |------|------|---------|-------------|
 | `--date` | string | - | An optional date to list snapshots for a given day, defaults to today. Must be formatted with an ISO formatted date string (YYYY-MM-DD) |
 | `--instance-id` | string | - | The ID of the instance to list the snapshots of |
+
+Examples:
+
+```
+# List today's snapshots for an instance
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000
+
+# List snapshots for a specific date
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --date 2025-01-15
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --format json
+```
 
 ### neo4j-cli aura instance update
 
@@ -422,6 +637,19 @@ Flags:
 |------|------|---------|-------------|
 | `--memory` | string | - | The size of the instance memory in GB. |
 | `--name` | string | - | The name of the instance (any UTF-8 characters with no trailing or leading whitespace). |
+
+Examples:
+
+```
+# Rename an Aura instance
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --rw
+
+# Resize an Aura instance to 8GB of memory
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB --rw
+
+# Rename and resize, emitting JSON for scripting
+neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json
+```
 
 ## neo4j-cli aura tenant
 
@@ -445,6 +673,19 @@ This subcommand returns details about a specific Aura Tenant.
 
 Usage: `neo4j-cli aura tenant get <id>`
 
+Examples:
+
+```
+# Get details of a tenant by ID
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
+
+# Get tenant details and emit JSON for scripting
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the tenant name
+neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
+```
+
 ### neo4j-cli aura tenant list
 
 Returns a list of tenants
@@ -452,4 +693,17 @@ Returns a list of tenants
 This subcommand returns a list containing a summary of each of your Aura Tenants. To find out more about a specific Tenant, retrieve the details using the get subcommand.
 
 Usage: `neo4j-cli aura tenant list`
+
+Examples:
+
+```
+# List all tenants the current user has access to
+neo4j-cli aura tenant list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura tenant list --format json
+
+# Pipe tenant ids through jq for a follow-up command
+neo4j-cli aura tenant list --format json | jq -r '.data[].id'
+```
 

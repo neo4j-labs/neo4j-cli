@@ -32,6 +32,14 @@ func NewResumeCmd(cfg *clicfg.Config) *cobra.Command {
 Resuming an instance is an asynchronous operation. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand.
 
 If another operation is being performed on the instance you are trying to resume, an error will be returned that indicates that resume cannot be performed.`,
+		Example: `# Resume a paused Aura instance
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
+
+# Resume and wait until the instance is ready
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --await --rw
+
+# Resume and emit the response as JSON for scripting
+neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/instances/%s/resume", args[0])

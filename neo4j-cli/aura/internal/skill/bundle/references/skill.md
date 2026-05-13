@@ -1,5 +1,13 @@
 # aura-cli skill
 
+## Contents
+
+- [aura-cli skill check](#aura-cli-skill-check)
+- [aura-cli skill install](#aura-cli-skill-install)
+- [aura-cli skill list](#aura-cli-skill-list)
+- [aura-cli skill print](#aura-cli-skill-print)
+- [aura-cli skill remove](#aura-cli-skill-remove)
+
 Install agent skills for this CLI into supported AI agents
 
 Install, remove, list, and check the per-binary agent-skill bundle. The bundle teaches AI agents (Claude Code, Cursor, Windsurf, etc.) how to drive this CLI.
@@ -20,6 +28,19 @@ Reads each installed SKILL.md frontmatter `version:` and compares to the running
 
 Usage: `aura-cli skill check`
 
+Examples:
+
+```
+# Check installed skills for version drift (table output)
+neo4j-cli skill check
+
+# Check installed skills as JSON (machine-readable)
+neo4j-cli skill check --format json
+
+# Check installed skills in toon format
+neo4j-cli skill check --format toon
+```
+
 ## aura-cli skill install
 
 Install the skill bundle into supported AI agents
@@ -33,8 +54,14 @@ Usage: `aura-cli skill install [agent]`
 Examples:
 
 ```
-skill install            # install into every detected agent
-skill install claude-code  # install into a single agent
+# Install the skill into every detected agent
+neo4j-cli skill install --rw
+
+# Install the skill into a single agent (case-insensitive name)
+neo4j-cli skill install claude-code --rw
+
+# Install and emit the result as JSON (machine-readable)
+neo4j-cli skill install --format json --rw
 ```
 
 ## aura-cli skill list
@@ -43,6 +70,19 @@ List supported agents and per-agent install state
 
 Usage: `aura-cli skill list`
 
+Examples:
+
+```
+# List supported agents as a table
+neo4j-cli skill list
+
+# List supported agents as JSON (machine-readable)
+neo4j-cli skill list --format json
+
+# List supported agents in toon format
+neo4j-cli skill list --format toon
+```
+
 ## aura-cli skill print
 
 Print the embedded SKILL.md to stdout
@@ -50,6 +90,19 @@ Print the embedded SKILL.md to stdout
 Writes the bundled SKILL.md verbatim to stdout so you can preview the skill markdown before running `skill install`. The {{VERSION}} placeholder is left literal; substitution happens at install time.
 
 Usage: `aura-cli skill print`
+
+Examples:
+
+```
+# Print the embedded SKILL.md to stdout
+neo4j-cli skill print
+
+# Save the embedded SKILL.md to a file for review
+neo4j-cli skill print > skill-preview.md
+
+# Print the embedded SKILL.md (--format is accepted for parity but ignored — output is always raw markdown)
+neo4j-cli skill print --format json
+```
 
 ## aura-cli skill remove
 
@@ -64,7 +117,13 @@ Usage: `aura-cli skill remove [agent]`
 Examples:
 
 ```
-skill remove            # remove from every detected agent
-skill remove claude-code  # remove from a single agent
+# Remove the skill from every detected agent
+neo4j-cli skill remove --rw
+
+# Remove the skill from a single agent (case-insensitive name)
+neo4j-cli skill remove claude-code --rw
+
+# Remove and emit the result as JSON (machine-readable)
+neo4j-cli skill remove --format json --rw
 ```
 

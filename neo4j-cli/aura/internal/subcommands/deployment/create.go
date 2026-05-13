@@ -35,7 +35,15 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create",
 		Short:       "Create a new deployment",
 		Long:        "Creates a new unmonitored Fleet Manager deployment.",
-		Args:        cobra.ExactArgs(0),
+		Example: `# Create a deployment in the default project
+neo4j-cli aura deployment create --name my-deployment --rw
+
+# Create a deployment with an explicit connection URL
+neo4j-cli aura deployment create --name my-deployment --connection-url neo4j+s://example.databases.neo4j.io --rw
+
+# Create a deployment in a specific organization and project
+neo4j-cli aura deployment create --name my-deployment --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

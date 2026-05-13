@@ -33,7 +33,15 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create",
 		Short:       "Create a deployment token",
 		Long:        "Create a new auto rotating Fleet Manager deployment token with a three month rotation interval. Register the deployment with Fleet Manager using the `call fleetManagement.registerToken('$token');` database procedure.",
-		Args:        cobra.ExactArgs(0),
+		Example: `# Create a deployment token
+neo4j-cli aura deployment token create --deployment-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a token in a specific organization and project
+neo4j-cli aura deployment token create --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Create a token and capture it as JSON for scripting
+neo4j-cli aura deployment token create --deployment-id 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.token'`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

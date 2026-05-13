@@ -50,6 +50,19 @@ Flags:
 | `--file` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
 
+Examples:
+
+```
+# Add the first aura-client credential (becomes the default)
+neo4j-cli credential aura-client add --name work --client-id <id> --client-secret <secret> --rw
+
+# Import an Aura console–exported aura-client credentials file
+neo4j-cli credential aura-client add --name work --file ~/Downloads/aura-client-creds.txt --rw
+
+# Switch the default after adding a second credential
+neo4j-cli credential aura-client use personal --rw
+```
+
 ### neo4j-cli credential aura-client list
 
 List aura-client credentials
@@ -57,6 +70,19 @@ List aura-client credentials
 List stored Aura Console API client credentials. The `default` column flags the credential used by `aura ...` commands when no other selector is set.
 
 Usage: `neo4j-cli credential aura-client list`
+
+Examples:
+
+```
+# List all aura-client credentials as a table
+neo4j-cli credential aura-client list
+
+# List as JSON for scripting / agent consumption
+neo4j-cli credential aura-client list --format json
+
+# List as toon (compact, agent-friendly)
+neo4j-cli credential aura-client list --format toon
+```
 
 ### neo4j-cli credential aura-client remove
 
@@ -66,6 +92,19 @@ Remove a stored Aura Console API client credential by name.
 
 Usage: `neo4j-cli credential aura-client remove`
 
+Examples:
+
+```
+# Remove an aura-client credential by name
+neo4j-cli credential aura-client remove work --rw
+
+# Remove the personal credential
+neo4j-cli credential aura-client remove personal --rw
+
+# Remove a stale credential that no longer authenticates
+neo4j-cli credential aura-client remove old-tenant --rw
+```
+
 ### neo4j-cli credential aura-client use
 
 Sets the default aura-client credential to be used
@@ -73,6 +112,19 @@ Sets the default aura-client credential to be used
 Set the named aura-client credential as the default consumed by `aura ...` commands.
 
 Usage: `neo4j-cli credential aura-client use`
+
+Examples:
+
+```
+# Switch the default to the personal credential
+neo4j-cli credential aura-client use personal --rw
+
+# Switch the default to the work credential
+neo4j-cli credential aura-client use work --rw
+
+# Switch the default after adding a new credential
+neo4j-cli credential aura-client use new-tenant --rw
+```
 
 ## neo4j-cli credential dbms
 
@@ -102,6 +154,19 @@ Flags:
 | `--uri` | string | - | (required) URI |
 | `--username` | string | - | (required) Username |
 
+Examples:
+
+```
+# Add a dbms credential from an Aura-exported credentials file
+neo4j-cli credential dbms add --file ./Neo4j-12345-Created-2025-01-01.txt --rw
+
+# Add a dbms credential with explicit flags (becomes the default if it is the first one)
+neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --rw
+
+# Add a dbms credential and link it to an existing embed credential
+neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --embed-credential openai-small --rw
+```
+
 ### neo4j-cli credential dbms list
 
 Lists dbms credentials
@@ -109,6 +174,19 @@ Lists dbms credentials
 List stored Bolt connection profiles. Columns include any linked embed credential (empty when unset). Passwords are never printed.
 
 Usage: `neo4j-cli credential dbms list`
+
+Examples:
+
+```
+# List dbms credentials as a table
+neo4j-cli credential dbms list
+
+# List dbms credentials as JSON (machine-readable)
+neo4j-cli credential dbms list --format json
+
+# List dbms credentials in toon format
+neo4j-cli credential dbms list --format toon
+```
 
 ### neo4j-cli credential dbms remove
 
@@ -118,6 +196,19 @@ Remove a stored Bolt connection profile by name. Linked embed-credential referen
 
 Usage: `neo4j-cli credential dbms remove <name>`
 
+Examples:
+
+```
+# Remove a dbms credential by name
+neo4j-cli credential dbms remove local --rw
+
+# Remove a staging dbms credential
+neo4j-cli credential dbms remove staging --rw
+
+# Remove a prod dbms credential
+neo4j-cli credential dbms remove prod --rw
+```
+
 ### neo4j-cli credential dbms set-embed
 
 Links (or clears) an embed credential on a dbms credential
@@ -126,6 +217,19 @@ Link a stored dbms credential to an existing embed credential by name. Pass only
 
 Usage: `neo4j-cli credential dbms set-embed <dbms-name> [embed-name]`
 
+Examples:
+
+```
+# Link a dbms credential to an embed credential
+neo4j-cli credential dbms set-embed local openai-small --rw
+
+# Replace the linked embed credential
+neo4j-cli credential dbms set-embed local ollama-nomic --rw
+
+# Clear the embed-credential link on a dbms credential
+neo4j-cli credential dbms set-embed local --rw
+```
+
 ### neo4j-cli credential dbms use
 
 Sets the default dbms credential to be used
@@ -133,6 +237,19 @@ Sets the default dbms credential to be used
 Set the named dbms credential as the default consumed by `query` when no `--credential <name>` flag and no connection flags / env vars / .env values are present.
 
 Usage: `neo4j-cli credential dbms use <name>`
+
+Examples:
+
+```
+# Make 'local' the default dbms credential
+neo4j-cli credential dbms use local --rw
+
+# Switch the default to 'staging'
+neo4j-cli credential dbms use staging --rw
+
+# Switch the default to 'prod'
+neo4j-cli credential dbms use prod --rw
+```
 
 ## neo4j-cli credential embed
 
@@ -161,6 +278,19 @@ Flags:
 | `--name` | string | - | (required) Name |
 | `--provider` | string | - | (required) Provider (one of: openai, ollama, huggingface) |
 
+Examples:
+
+```
+# Add an OpenAI embed credential (becomes the default if it is the first one)
+neo4j-cli credential embed add --name openai-small --provider openai --model text-embedding-3-small --api-key sk-... --rw
+
+# Add a local Ollama embed credential (no api-key required)
+neo4j-cli credential embed add --name ollama-nomic --provider ollama --model nomic-embed-text --base-url http://localhost:11434 --rw
+
+# Add a HuggingFace embed credential with explicit dimensions
+neo4j-cli credential embed add --name hf-bge --provider huggingface --model BAAI/bge-small-en-v1.5 --api-key hf_... --dimensions 384 --rw
+```
+
 ### neo4j-cli credential embed list
 
 Lists embed credentials
@@ -168,6 +298,19 @@ Lists embed credentials
 List stored embedding-provider credentials. The `api-key` column is never shown — keys are persisted on disk but redacted in every printable form.
 
 Usage: `neo4j-cli credential embed list`
+
+Examples:
+
+```
+# List embed credentials as a table
+neo4j-cli credential embed list
+
+# List embed credentials as JSON (machine-readable)
+neo4j-cli credential embed list --format json
+
+# List embed credentials in toon format
+neo4j-cli credential embed list --format toon
+```
 
 ### neo4j-cli credential embed remove
 
@@ -177,6 +320,19 @@ Remove a stored embedding-provider credential by name. Removal is non-cascading:
 
 Usage: `neo4j-cli credential embed remove <name>`
 
+Examples:
+
+```
+# Remove an embed credential by name
+neo4j-cli credential embed remove openai-small --rw
+
+# Remove the local Ollama embed credential
+neo4j-cli credential embed remove ollama-nomic --rw
+
+# Remove a HuggingFace embed credential
+neo4j-cli credential embed remove hf-bge --rw
+```
+
 ### neo4j-cli credential embed use
 
 Sets the default embed credential to be used
@@ -184,4 +340,17 @@ Sets the default embed credential to be used
 Set the named embed credential as the default consumed by `query --param NAME:embed=...` and `query :embed` when no `--embed-credential` flag, no `NEO4J_EMBED_*` env, no `.env` value, and no dbms→embed link resolves first.
 
 Usage: `neo4j-cli credential embed use <name>`
+
+Examples:
+
+```
+# Make 'openai-small' the default embed credential
+neo4j-cli credential embed use openai-small --rw
+
+# Switch the default to the local Ollama embedder
+neo4j-cli credential embed use ollama-nomic --rw
+
+# Switch the default to a HuggingFace embedder
+neo4j-cli credential embed use hf-bge --rw
+```
 

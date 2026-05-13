@@ -23,6 +23,14 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 Deleting an instance is an asynchronous operation. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand.
 
 If another operation is being performed on the instance you are trying to delete, an error will be returned that indicates that deletion cannot be performed.`,
+		Example: `# Delete an instance by ID
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete an instance and emit the response as JSON
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Delete and pipe the response status through jq
+neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/instances/%s", args[0])

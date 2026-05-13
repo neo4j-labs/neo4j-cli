@@ -40,6 +40,14 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Creates a new Aura Graph Analytics Serverless session",
+		Example: `# Create a standalone session in a specific project/tenant on AWS
+neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
+
+# Create a session attached to an existing Aura instance and wait until ready
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --await
+
+# Create a session with a TTL and emit JSON for scripting
+neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json`,
 		Long: `This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
 				Creating a session is an asynchronous operation that can be awaited with --await.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {

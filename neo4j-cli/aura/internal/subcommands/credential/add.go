@@ -36,6 +36,14 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add an Aura API client credential. " +
 			"Pass `--file <path>` to import an Aura console–exported aura-client credentials file " +
 			"(recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME); explicit flags override file values.",
+		Example: `# Add an Aura Console API credential (becomes the default if it is the first one)
+neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw
+
+# Import an Aura console–exported aura-client credentials file
+neo4j-cli aura credential add --name my-creds --file ~/Downloads/aura-client-creds.txt --rw
+
+# Add a credential and emit the response as JSON
+neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-secret <client-secret> --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the optional --file first so we can distinguish "file had
 			// the key but with empty value" (error) from "file didn't have

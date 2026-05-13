@@ -11,8 +11,16 @@ import (
 
 func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:       "get <key>",
-		Short:     "Displays the specified configuration value",
+		Use:   "get <key>",
+		Short: "Displays the specified configuration value",
+		Example: `# Get the default tenant configured for the Aura CLI
+neo4j-cli aura config get default-tenant
+
+# Get the Aura API base URL and emit JSON for scripting
+neo4j-cli aura config get base-url --format json
+
+# Pipe the auth-url value through jq
+neo4j-cli aura config get auth-url --format json | jq -r '."auth-url"'`,
 		ValidArgs: cfg.Aura.ValidConfigKeys,
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {

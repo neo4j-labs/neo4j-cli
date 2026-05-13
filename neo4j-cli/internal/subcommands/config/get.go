@@ -28,8 +28,16 @@ func validGetArgs(cfg *clicfg.Config) []string {
 
 func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:       "get <key>",
-		Short:     "Displays the specified configuration value",
+		Use:   "get <key>",
+		Short: "Displays the specified configuration value",
+		Example: `# Get the active output format
+neo4j-cli config get format
+
+# Get the active output format as JSON
+neo4j-cli config get format --format json
+
+# Get an aura-scoped key via dot-notation
+neo4j-cli config get aura.default-tenant --format json`,
 		ValidArgs: validGetArgs(cfg),
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {

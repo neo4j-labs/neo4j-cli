@@ -24,7 +24,15 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete <id>",
 		Short:       "Delete a GraphQL Data API authentication provider",
 		Long:        "Deletes a GraphQL Data API authentication provider. This action can not be undone.",
-		Args:        cobra.ExactArgs(1),
+		Example: `# Delete an authentication provider
+neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw
+
+# Delete an authentication provider and capture the response as JSON
+neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --format json
+
+# Delete the first authentication provider returned by list
+neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, args[0])

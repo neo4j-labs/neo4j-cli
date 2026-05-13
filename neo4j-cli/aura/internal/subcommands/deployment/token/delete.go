@@ -33,7 +33,15 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete",
 		Short:       "Delete the deployment token",
 		Long:        "Deletes the token for the given Fleet Manager deployment. After deleting the token, users should also disable Fleet Manager from the database using `call fleetManagement.disable();`",
-		Args:        cobra.ExactArgs(0),
+		Example: `# Delete the deployment token
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete the token in a specific organization and project
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete the token and emit the response as JSON for scripting
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

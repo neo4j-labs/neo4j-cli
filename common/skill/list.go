@@ -16,6 +16,14 @@ func newListCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List supported agents and per-agent install state",
+		Example: `# List supported agents as a table
+neo4j-cli skill list
+
+# List supported agents as JSON (machine-readable)
+neo4j-cli skill list --format json
+
+# List supported agents in toon format
+neo4j-cli skill list --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			rows, err := List(cfg.Aura.Fs(), skillName)

@@ -208,3 +208,54 @@ func TestAgentContext_HelpExamples(t *testing.T) {
 	assert.False(t, strings.HasPrefix(firstLine, "  "),
 		"agent-context.Example first line must be flush-left (no leading two-space indent); got %q", firstLine)
 }
+
+// TestAllLeafCommands_HaveExamples covers REQ-F-001, REQ-F-012, REQ-F-015:
+// every visible, runnable cobra command reachable from app.NewCmd(cfg) carries
+// a non-empty Example: field whose first line is flush-left.
+//
+// Filtering mirrors common/skill/render.visibleSubcommands — Hidden commands
+// and the cobra-injected `help` / `completion` subtrees are skipped, so the
+// gate matches what users see via --help and what ships in the SKILL bundle.
+// The `query` parent IS runnable (REQ-F-015) and is therefore checked even
+// though it owns the `:schema` subcommand; non-runnable parents are skipped
+// (only their runnable descendants are checked).
+//
+// Failure messages name the offending command by its full path (e.g.
+// `neo4j-cli aura instance list`) so a missed leaf is trivial to localise.
+func TestAllLeafCommands_HaveExamples(t *testing.T) {
+	root := newAppCmd(t)
+
+	var walk func(c *cobra.Command, path string)
+	walk = func(c *cobra.Command, path string) {
+		if c.Runnable() {
+			firstLine := strings.SplitN(c.Example, "\n", 2)[0]
+			assert.NotEmpty(t, c.Example,
+				"command %q must have a non-empty Example: field (REQ-F-001 / REQ-F-015)", path)
+			assert.False(t, strings.HasPrefix(firstLine, "  "),
+				"command %q Example first line must be flush-left (no leading two-space indent); got %q", path, firstLine)
+		}
+		for _, sub := range c.Commands() {
+			if sub.Hidden {
+				continue
+			}
+			name := sub.Name()
+			if name == "help" || name == "completion" {
+				continue
+			}
+			walk(sub, path+" "+name)
+		}
+	}
+
+	// Start the walk at root's children: the root command itself
+	// (`neo4j-cli`) is not a runnable leaf and its Example is not required.
+	for _, sub := range root.Commands() {
+		if sub.Hidden {
+			continue
+		}
+		name := sub.Name()
+		if name == "help" || name == "completion" {
+			continue
+		}
+		walk(sub, root.Name()+" "+name)
+	}
+}

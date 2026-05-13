@@ -98,6 +98,17 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 			"prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the " +
 			"channel-correct upgrade command instead — pass `--force` to override. " +
 			"After a successful swap, any installed agent skill bundles are refreshed automatically.",
+		Example: `# Self-update to the latest stable release
+neo4j-cli update
+
+# Self-update including pre-release (alpha/beta/rc) tags
+neo4j-cli update --pre-releases
+
+# Update to a specific tag and emit JSON
+neo4j-cli update --version v1.1.0 --format json
+
+# Force an in-place swap even on a package-manager-managed binary
+neo4j-cli update --force`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpdate(cmd.Context(), cmd, cfg, runOpts{
 				preReleases: preReleases,

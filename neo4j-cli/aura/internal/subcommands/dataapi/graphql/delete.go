@@ -21,7 +21,15 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete <id>",
 		Short:       "Delete a GraphQL Data API",
 		Long:        "Deletes a GraphQL Data API. This action can not be undone.",
-		Args:        cobra.ExactArgs(1),
+		Example: `# Delete a GraphQL Data API
+neo4j-cli aura data-api graphql delete 11111111 --instance-id 00000000 --rw
+
+# Delete a GraphQL Data API and capture the response as JSON
+neo4j-cli aura data-api graphql delete 11111111 --instance-id 00000000 --rw --format json
+
+# Delete a GraphQL Data API discovered via list
+neo4j-cli aura data-api graphql delete $(neo4j-cli aura data-api graphql list --instance-id 00000000 --format json | jq -r '.data[0].id') --instance-id 00000000 --rw`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, args[0])

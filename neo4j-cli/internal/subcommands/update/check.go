@@ -41,6 +41,14 @@ func newCheckCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Comm
 			"opt into alpha/beta/rc tags. Exits 0 whether or not a newer version exists; " +
 			"scripts that want to branch on drift compare `current != latest` in the JSON " +
 			"output.",
+		Example: `# Check whether a newer stable release is available
+neo4j-cli update check
+
+# Check including pre-release tags
+neo4j-cli update check --pre-releases
+
+# Emit a JSON document so scripts can diff current vs latest
+neo4j-cli update check --format json`,
 		// Silence the cobra Usage block on RunE error — runUpdate sets
 		// SilenceUsage on the parent after flag validation too, but
 		// keeping it here defends against any future RunE that returns

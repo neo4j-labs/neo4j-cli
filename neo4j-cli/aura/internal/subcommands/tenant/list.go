@@ -17,6 +17,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns a list of tenants",
 		Long:  "This subcommand returns a list containing a summary of each of your Aura Tenants. To find out more about a specific Tenant, retrieve the details using the get subcommand.",
+		Example: `# List all tenants the current user has access to
+neo4j-cli aura tenant list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura tenant list --format json
+
+# Pipe tenant ids through jq for a follow-up command
+neo4j-cli aura tenant list --format json | jq -r '.data[].id'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/tenants", &api.RequestConfig{

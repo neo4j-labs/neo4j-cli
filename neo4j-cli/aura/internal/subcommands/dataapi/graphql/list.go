@@ -19,6 +19,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of GraphQL Data APIs",
+		Example: `# List GraphQL Data APIs of an instance
+neo4j-cli aura data-api graphql list --instance-id 00000000
+
+# List GraphQL Data APIs as JSON for scripting
+neo4j-cli aura data-api graphql list --instance-id 00000000 --format json
+
+# Extract just the IDs of every GraphQL Data API for an instance
+neo4j-cli aura data-api graphql list --instance-id 00000000 --format json | jq -r '.data[].id'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql", instanceId)

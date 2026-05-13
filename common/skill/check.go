@@ -20,6 +20,14 @@ func newCheckCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
 		Long: "Reads each installed SKILL.md frontmatter `version:` and " +
 			"compares to the running binary version. Exits non-zero on any " +
 			"drift; prints a per-agent table.",
+		Example: `# Check installed skills for version drift (table output)
+neo4j-cli skill check
+
+# Check installed skills as JSON (machine-readable)
+neo4j-cli skill check --format json
+
+# Check installed skills in toon format
+neo4j-cli skill check --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			rows, drift, err := Check(cfg.Aura.Fs(), skillName, cfg.Version)

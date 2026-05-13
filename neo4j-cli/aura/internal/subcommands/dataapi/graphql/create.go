@@ -46,6 +46,14 @@ Creating a GraphQL Data API is an asynchronous operation. Use the --await flag t
 This command returns your GraphQL Data API ID, API key, and connection URL for you to use once the GraphQL Data API is running. It is important to store the API key as it is not currently possible to get this or update it.
 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
+		Example: `# Create a GraphQL Data API from inline type definitions (base64-encoded)
+neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+
+# Create a GraphQL Data API from a local type definitions file
+neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
+
+# Create a GraphQL Data API and wait until it is ready
+neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --await --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{
 				"name": name,

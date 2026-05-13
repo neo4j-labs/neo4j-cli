@@ -27,6 +27,20 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
 			"The sibling `query :embed [text]` leaf computes a vector standalone " +
 			"without opening a Bolt connection.",
+		Example: `# Run inline Cypher (read-only — no --rw needed)
+neo4j-cli query "MATCH (n) RETURN count(n) AS n" --format json
+
+# Pipe Cypher from stdin
+echo "MATCH (n) RETURN n LIMIT 5" | neo4j-cli query --format json
+
+# Pass typed parameters with --param (repeatable; JSON values are auto-typed)
+neo4j-cli query "MATCH (p:Person {name: $name}) RETURN p" --param name=Alice --format json
+
+# Embed text inline as a vector parameter via the :embed modifier
+neo4j-cli query "CALL db.index.vector.queryNodes('idx', 5, $v) YIELD node RETURN node" --param v:embed="hello world" --format json
+
+# Write Cypher requires --rw (opt-in)
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)

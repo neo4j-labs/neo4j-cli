@@ -25,6 +25,14 @@ Pausing an instance is an asynchronous operation. You can poll the current statu
 The pause time depends on the amount of data stored in the instance; larger quantities of data will take longer. The exact time this will take is dependent on the size of your data store.
 
 If another operation is being performed on the instance you are trying to pause, an error will be returned that indicates that the pause operation cannot be performed.`,
+		Example: `# Pause an Aura instance
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw
+
+# Pause an instance and emit the response as JSON
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json
+
+# Pause and pipe the response status through jq
+neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/instances/%s/pause", args[0])

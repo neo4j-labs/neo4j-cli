@@ -14,6 +14,22 @@ Flags:
 | `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
 | `--version` | string | - | Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
 
+Examples:
+
+```
+# Self-update to the latest stable release
+neo4j-cli update
+
+# Self-update including pre-release (alpha/beta/rc) tags
+neo4j-cli update --pre-releases
+
+# Update to a specific tag and emit JSON
+neo4j-cli update --version v1.1.0 --format json
+
+# Force an in-place swap even on a package-manager-managed binary
+neo4j-cli update --force
+```
+
 ## neo4j-cli update check
 
 Report whether a newer neo4j-cli release is available without swapping
@@ -28,4 +44,17 @@ Flags:
 |------|------|---------|-------------|
 | `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
 | `--version` | string | - | Compare against the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
+
+Examples:
+
+```
+# Check whether a newer stable release is available
+neo4j-cli update check
+
+# Check including pre-release tags
+neo4j-cli update check --pre-releases
+
+# Emit a JSON document so scripts can diff current vs latest
+neo4j-cli update check --format json
+```
 

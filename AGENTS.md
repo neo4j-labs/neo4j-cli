@@ -209,6 +209,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - `--param` flag Usage on the `query` parent now mentions the `:embed` modifier (`key:embed=<text>`) — keeping the modifier discoverable in `--help` was cheaper than a separate flag. The full rule (JSON-array rejection, empty-text accepted) lives in README and the bundle additions.md, not the flag Usage.
 - README's "Aura API Credentials" example uses `credential aura-client add` (canonical neo4j-cli path), NOT the standalone-aura `aura credential add` form. The standalone aura binary is no longer built/shipped, so README must lead with commands the shipped binary actually has.
 - Skill bundle `description.txt` (frontmatter description) is single-paragraph, ≤1024 chars, third-person. When adding new top-level capability to it, list every credential subtree explicitly ("Aura, Neo4j connection (dbms), and embedding-provider credentials") rather than collapsing them — the agent-side trigger phrasing matches user wording better when each subtree is named.
+- Every runnable cobra command reachable from `app.NewCmd(cfg)` must have a non-empty flush-left `Example:` field (≥3 invocations, each preceded by a `# comment` line, blank-line separators, `neo4j-cli` prefix, `--rw` on write invocations, at least one `--format json` on read invocations). Enforced by `TestAllLeafCommands_HaveExamples` in `neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go` — failure message names the full command path.
 
 ## Agent Context Notes
 

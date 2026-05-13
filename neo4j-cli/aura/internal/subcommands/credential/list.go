@@ -15,7 +15,15 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "list credentials",
-		Args:  cobra.NoArgs,
+		Example: `# List all stored Aura credentials (the default column flags the active one)
+neo4j-cli aura credential list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura credential list --format json
+
+# Pipe through jq to print just the default credential's name
+neo4j-cli aura credential list --format json | jq -r '.data[] | select(.default == true) | .name'`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), credentialFields)
 			return nil

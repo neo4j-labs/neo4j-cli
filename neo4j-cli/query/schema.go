@@ -75,6 +75,14 @@ func newSchemaCmd(cfg *clicfg.Config) *cobra.Command {
 			"cypher calls and aggregates the result into one structured payload " +
 			"with database info, node/relationship properties, relationship " +
 			"paths, indexes, and constraints. --max-rows and --truncate-arrays-over do not apply.",
+		Example: `# Introspect the connected database as a 5-section table
+neo4j-cli query :schema
+
+# Same introspection rendered as a single JSON payload (machine-readable)
+neo4j-cli query :schema --format json
+
+# Pipe the JSON into jq to inspect just the index names
+neo4j-cli query :schema --format json | jq '.indexes[].name'`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSchema(cmd, cfg)

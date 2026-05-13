@@ -29,7 +29,15 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns all deployments",
 		Long:  "Returns all Fleet Manager deployments for the given project.",
-		Args:  cobra.ExactArgs(0),
+		Example: `# List all deployments in the default project
+neo4j-cli aura deployment list
+
+# List deployments in a specific organization and project
+neo4j-cli aura deployment list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# List deployments as JSON for scripting
+neo4j-cli aura deployment list --format json`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

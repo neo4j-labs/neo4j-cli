@@ -31,6 +31,14 @@ func NewCancelCommand(cfg *clicfg.Config) *cobra.Command {
 		Use:         "cancel <id>",
 		Short:       "Cancel a job by id",
 		Args:        cobra.ExactArgs(1),
+		Example: `# Cancel an import job by ID
+neo4j-cli aura import job cancel 00000000-0000-0000-0000-000000000000 --rw --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222
+
+# Cancel an import job and emit JSON for scripting
+neo4j-cli aura import job cancel 00000000-0000-0000-0000-000000000000 --rw --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222 --format json
+
+# Cancel an import job, suppressing all stdout output
+neo4j-cli aura import job cancel 00000000-0000-0000-0000-000000000000 --rw --organization-id 11111111-1111-1111-1111-111111111111 --project-id 22222222-2222-2222-2222-222222222222 > /dev/null`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

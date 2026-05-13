@@ -18,7 +18,15 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Args:  cobra.ExactArgs(1),
 		Short: "Get a Graph Analytics Serverless session",
-		Long:  `This subcommand returns the details of a Graph Analytics Serverless session.`,
+		Example: `# Get a session by ID
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000
+
+# Render the session as a TOON table
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format toon
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format json`,
+		Long: `This subcommand returns the details of a Graph Analytics Serverless session.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := fmt.Sprintf("/graph-analytics/sessions/%s", args[0])
 

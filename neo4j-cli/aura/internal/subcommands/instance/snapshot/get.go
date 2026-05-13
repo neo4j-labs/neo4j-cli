@@ -20,7 +20,15 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Get details of a snapshot",
 		Long:  `This endpoint returns details about a specific snapshot.`,
-		Args:  cobra.ExactArgs(1),
+		Example: `# Get details of a snapshot by its ID
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000
+
+# Get details and emit JSON for scripting
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json
+
+# Check whether a snapshot is exportable via jq
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.exportable'`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/snapshots/%s", instanceId, args[0])

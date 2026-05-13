@@ -32,7 +32,15 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns deployment databases",
 		Long:  "Returns databases for the given Fleet Manager deployment.",
-		Args:  cobra.ExactArgs(0),
+		Example: `# List databases on a deployment
+neo4j-cli aura deployment database list --deployment-id 00000000-0000-0000-0000-000000000000
+
+# List databases in a specific organization and project
+neo4j-cli aura deployment database list --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# List databases as JSON for scripting
+neo4j-cli aura deployment database list --deployment-id 00000000-0000-0000-0000-000000000000 --format json`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
