@@ -128,14 +128,14 @@ tasks:
       `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per
       `.agents/build.md` if changie isn't installed locally.
       See PRD REQ-F-009.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Exactly one new file under `.changes/unreleased/neo4j-cli-Minor-*.yaml`"
       - "YAML has `project: neo4j-cli`, `kind: Minor`"
       - "`body:` references `CLI-116` and mentions `:schema` / schema-first"
       - "YAML loads without error"
-    completed_at: null
+    completed_at: 2026-05-13T14:24:10Z
 
   - id: task-007
     title: "Run final gates: `make test`, `make fmt-check`, `make lint`"

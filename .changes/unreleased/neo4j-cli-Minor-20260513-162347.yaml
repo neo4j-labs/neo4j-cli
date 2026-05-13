@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'skill bundle: surface query :schema as the schema-first workflow on SKILL.md, query --help, and :schema --help (CLI-116)'
+time: 2026-05-13T16:23:47.97545+02:00

@@ -14,3 +14,7 @@ Files: ~neo4j-cli/query/query.go
 ## task-004 — 2026-05-13T14:24:10Z
 Prepended `schema.go` Long with "Run this BEFORE generating Cypher…" directive; replaced first Example with `:schema --format toon` invocation. Ran in parallel batch with task-003/006.
 Files: ~neo4j-cli/query/schema.go
+
+## task-006 — 2026-05-13T14:24:10Z
+Added Minor-kind changelog entry via `changie new` referencing CLI-116. Ran in parallel batch with task-003/004.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-162347.yaml
