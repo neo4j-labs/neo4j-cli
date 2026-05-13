@@ -1,0 +1,83 @@
+feature: cli-101-rename-file-to-env
+prd: ./prd-cli-101-rename-file-to-env.md
+created_at: 2026-05-13T12:31:32Z
+updated_at: 2026-05-13T12:31:32Z
+
+tasks:
+  - id: task-001
+    title: "Rename --file to --env across all three credential add sources, tests, and skill bundles"
+    description: |
+      Hard rename of the `--file` flag to `--env` on `credential dbms add`, `credential aura-client add`, and `aura credential add`. Behaviour is unchanged: explicit path required, no auto-discovery walk-up, same merge/validation/exit-code semantics. Only the flag name (and the user-visible wording around it) changes.
+
+      Source edits — three files, symmetric shape:
+
+      1. `neo4j-cli/internal/subcommands/credential/dbms/add.go`
+         - const `fileFlag = "file"` → `envFlag = "env"` (line 31)
+         - var `filePath` → `envPath` (line 21; usages at 64, 125)
+         - `cmd.Long` `--file <path>` → `--env <path>` (line 46)
+         - `cmd.Example` `--file` → `--env` (line 48)
+         - inline comment (line 57) `--file` → `--env`
+         - empty-value error (line 125): `clierr.NewUsageError("--env %q: %s has an empty value", envPath, c.envKey)`
+         - required-field error (line 141): `clierr.NewUsageError("--%s is required (provide via --env as %s, or pass --%s)", req.flag, req.envKey, req.flag)`
+         - flag registration (line 166): `cmd.Flags().StringVar(&envPath, envFlag, "", "Path to a Neo4j Aura–exported credentials file. Recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME. Explicit flags override file values.")`
+
+      2. `neo4j-cli/internal/subcommands/credential/credential.go` (inline `newCredentialAddCmd`, lines 50–154)
+         - same shape of edits at lines 62 (const), 55 (var), 75 (Long), 81 (Example), 87 (comment), 126 (empty-value error), 140 (required-field error), 151 (flag registration).
+
+      3. `neo4j-cli/aura/internal/subcommands/credential/add.go` (standalone aura mirror)
+         - same shape of edits at lines 25 (const), 18 (var), 37 (Long), 43 (Example), 48 (comment), 90 (empty-value error), 105 (required-field error), 116 (flag registration).
+
+      Test updates — two files, mechanical:
+
+      4. `neo4j-cli/internal/subcommands/credential/dbms/add_test.go`
+         - Rewrite `--file` literals to `--env` at lines 32 (comment), 169/175/181/187 (wantErr `provide via --env as …`), 269/272/281/290/299/317/326/327/334/342/351/356/359/360/364/370/376/380 (command strings, wantErr strings, test case `name:` strings).
+
+      5. `neo4j-cli/aura/internal/subcommands/credential/add_test.go`
+         - Same treatment at lines 50/60/65/70/117/119/126/133/147/154/155/161/162/168/175/180.
+
+      Bundle regen — DO NOT hand-edit; run:
+
+          go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
+
+      This refreshes `neo4j-cli/internal/skill/bundle/references/credential.md` (currently mentions `--file` at lines 40, 50, 60, 141, 151, 161) and `neo4j-cli/aura/internal/skill/bundle/references/credential.md` (lines 11, 21, 31). Commit the regenerated bundles in the same change as the source edits — `TestGenerator_RoundTrip` (in both skill packages) is the gate that catches stale bundles.
+
+      Final gates (must all pass before this task is complete):
+      - `make fmt-check`
+      - `make lint`
+      - `make test` — pay attention to `TestGenerator_RoundTrip` and `TestAllLeafCommands_HaveExamples`
+      - Quick manual smoke: `make build && ./bin/neo4j-cli credential dbms add --help | grep -- --env` (must find it), `./bin/neo4j-cli credential dbms add --file foo 2>&1 | grep "unknown flag: --file"` (must find it).
+
+      Implements PRD REQ-F-001 through REQ-F-007 and REQ-NF-001 through REQ-NF-004.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "All three source files updated symmetrically: const `envFlag`, var `envPath`, Long/Example/comment/error-message/flag-registration text all reference `--env` and no longer reference `--file`"
+      - "Both test files updated: `--file` literals rewritten to `--env` in command strings, wantErr strings (`provide via --env as …`), and test case names; all cases pass"
+      - "Both skill bundle reference docs regenerated via `go generate` and committed; neither file contains `--file` anymore; `TestGenerator_RoundTrip` passes in both packages"
+      - "`./bin/neo4j-cli credential dbms add --help` and `./bin/neo4j-cli credential aura-client add --help` show `--env`; passing `--file` yields cobra's `unknown flag: --file`"
+      - "`make fmt-check`, `make lint`, `make test` all green; `TestAllLeafCommands_HaveExamples` still passes (rewritten Example blocks remain flush-left, 3+ invocations, blank-line separated, `--rw` on writes)"
+    completed_at: null
+
+  - id: task-002
+    title: "Add Minor changie entry for the --file → --env rename"
+    description: |
+      Create one new file under `.changes/unreleased/` named `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` documenting the rename. Single entry covers all three command surfaces (the standalone aura binary is no longer built; everything ships from the `neo4j-cli` project key per AGENTS.md "Changie Notes").
+
+      File contents:
+
+          project: neo4j-cli
+          kind: Minor
+          body: 'Renamed --file to --env on ''credential dbms add'' and ''credential aura-client add'' for consistency with ''query --env'' (CLI-101).'
+          time: <RFC3339 timestamp at write time>
+
+      Use `changie new --projects neo4j-cli --kind Minor --body '...'` if changie is installed locally; otherwise hand-author the YAML at the path above (filename pattern: `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`, single-quoted body, RFC3339 time). Kind = Minor (visible CLI surface change in alpha; matches the precedent for the `--output` → `--format` rename in v0.1.0-alpha.2).
+
+      Implements PRD REQ-F-008.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Exactly one new YAML file under `.changes/unreleased/` with the filename pattern `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`"
+      - "Fields: `project: neo4j-cli`, `kind: Minor`, body mentions the rename + both affected commands + CLI-101, `time` is a valid RFC3339 timestamp"
+      - "`make test`, `make fmt-check`, `make lint` still green"
+    completed_at: null
