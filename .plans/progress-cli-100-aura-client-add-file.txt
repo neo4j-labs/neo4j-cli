@@ -1,0 +1,3 @@
+## task-001 — 2026-05-13T11:20:00Z
+Add domain-neutral `common/clicfg/envfile` package exporting `Parse(fs, path) (vals, present, err)`; gotenv keeps `KEY=` entries so presence is derived from the parsed map. Open errors wrap as `--file %q: %s` usage errors.
+Files: +common/clicfg/envfile/envfile.go, +common/clicfg/envfile/envfile_test.go

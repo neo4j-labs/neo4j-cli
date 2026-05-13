@@ -11,7 +11,7 @@ tasks:
       Wrap open errors as `clierr.NewUsageError("--file %q: %s", path, err.Error())` to preserve the user-facing error shape from CLI-75. Apply the Neo4j copyright header to both new files.
       Add `common/clicfg/envfile/envfile_test.go` with table-driven cases: happy path, comments + blank lines, `KEY=` (empty value, presence map true), missing path (wrapped error), unrecognised keys (still returned — caller filters). Use `afero.NewMemMapFs` for the fs.
       Implements PRD REQ-F-006, REQ-NF-003, REQ-NF-007.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`common/clicfg/envfile/envfile.go` exists with the exported `Parse` signature from REQ-F-006"
@@ -19,7 +19,7 @@ tasks:
       - "Presence map distinguishes `KEY=` from missing-key (test covers both)"
       - "`common/clicfg/envfile/envfile_test.go` covers happy path, comments/blanks, empty value, missing path, unrecognised keys"
       - "Both new files carry the Neo4j copyright header; `make test`, `make fmt-check`, `make lint`, `make license-check` all green"
-    completed_at: null
+    completed_at: 2026-05-13T11:20:00Z
 
   - id: task-002
     title: "Refactor dbms add.go to use envfile.Parse; remove parseAuraEnvFile"
