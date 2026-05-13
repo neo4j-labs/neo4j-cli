@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Fix neo4j-cli exiting 0 on command errors (CLI-64).
-time: 2026-05-13T09:31:27.881388+02:00

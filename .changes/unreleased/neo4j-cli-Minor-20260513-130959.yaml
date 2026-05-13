@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Auto-detect agent harnesses; --rw no longer required when running interactively in a terminal (CLI-76)
-time: 2026-05-13T13:09:59.91059+02:00

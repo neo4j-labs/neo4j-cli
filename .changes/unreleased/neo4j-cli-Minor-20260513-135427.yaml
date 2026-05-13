@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add usage examples to every command's --help output (CLI-93).
-time: 2026-05-13T13:54:27.808819+02:00

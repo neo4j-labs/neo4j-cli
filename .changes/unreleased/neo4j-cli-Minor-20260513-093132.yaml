@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Differentiate exit codes by error category: usage (2), not-found (3), auth (4), conflict (5), validation (6), rate-limit (7), upstream (8). See neo4j-cli agent-context for the closed set. (CLI-84)'
-time: 2026-05-13T09:31:32.249042+02:00

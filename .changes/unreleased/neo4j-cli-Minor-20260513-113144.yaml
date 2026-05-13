@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'credential aura-client add: --file accepts an Aura-exported credentials file (CLI-100)'
-time: 2026-05-13T11:31:44.957895+02:00

@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Fix broken Aura docs URL and update subcommand wording in the 'default credential not set' error (CLI-80).
-time: 2026-05-13T08:53:30.469959+02:00

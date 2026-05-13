@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Renamed --file to --env on 'credential dbms add' and 'credential aura-client add' for consistency with 'query --env' (CLI-101).
-time: 2026-05-13T14:47:03.107227+02:00

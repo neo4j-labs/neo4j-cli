@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Renamed --await to --wait on all async commands. --await is accepted as a deprecated alias for one release; see CLI-111 for removal (CLI-87).
-time: 2026-05-13T15:55:21.708074+02:00
