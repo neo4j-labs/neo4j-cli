@@ -71,12 +71,13 @@ func newSchemaCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   ":schema",
 		Short: "Introspect the connected database (labels, rel types, indexes, constraints)",
-		Long: "Introspect the connected database. Runs a sequence of read-only " +
+		Long: "Run this BEFORE generating Cypher to discover the database's actual labels, relationship types, and properties — never guess. " +
+			"Introspect the connected database. Runs a sequence of read-only " +
 			"cypher calls and aggregates the result into one structured payload " +
 			"with database info, node/relationship properties, relationship " +
 			"paths, indexes, and constraints. --max-rows and --truncate-arrays-over do not apply.",
-		Example: `# Introspect the connected database as a 5-section table
-neo4j-cli query :schema
+		Example: `# Discover labels, rel types, and properties (run this before writing Cypher)
+neo4j-cli query :schema --format toon
 
 # Same introspection rendered as a single JSON payload (machine-readable)
 neo4j-cli query :schema --format json

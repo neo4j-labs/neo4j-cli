@@ -81,7 +81,7 @@ tasks:
       `neo4j-cli query :schema --format toon`
       Existing JSON and `jq` examples follow in their current order. Verify with
       `go run ./neo4j-cli query :schema --help`. See PRD REQ-F-006, REQ-F-007.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`schema.go` Long starts with `\"Run this BEFORE generating Cypher to discover the database's actual labels, relationship types, and properties — never guess. \"`"
@@ -90,7 +90,7 @@ tasks:
       - "Example field second line is `neo4j-cli query :schema --format toon`"
       - "Existing `--format json` and `jq` examples are preserved in original order"
       - "`go run ./neo4j-cli query :schema --help` shows the new Long lede and the new first example"
-    completed_at: null
+    completed_at: 2026-05-13T14:24:10Z
 
   - id: task-005
     title: "Regenerate the neo4j-cli skill bundle"
