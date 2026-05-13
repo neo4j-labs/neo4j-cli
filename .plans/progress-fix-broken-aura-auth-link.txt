@@ -5,3 +5,7 @@ Files: ~common/clicfg/credentials/aura.go
 ## TASK-002 — 2026-05-13T06:52:28Z
 Added `TestAuraCredentials_GetDefault_NoDefaultErrorBody` locking REQ-F-002..005 substring invariants on the no-default error body; uses testfs+NewCredentials pattern mirroring dbms/embed tests.
 Files: +common/clicfg/credentials/aura_test.go
+
+## TASK-003 — 2026-05-13T08:54:30Z
+Added user-visible Patch changelog entry for CLI-80 via `changie new` referencing the URL+subcommand fix in the default-credential error.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260513-085330.yaml

@@ -56,7 +56,7 @@ tasks:
       the YAML per AGENTS.md §"Changie Notes" (filename
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`, single-quoted body, RFC3339
       time).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -64,7 +64,7 @@ tasks:
       - "Body references CLI-80 and describes the URL + subcommand fix"
       - "File parses as valid YAML"
       - "make test stays green"
-    completed_at: null
+    completed_at: 2026-05-13T08:54:30Z
 
   - id: task-004
     title: "Run final gates: fmt-check, lint, test, generate-check"
