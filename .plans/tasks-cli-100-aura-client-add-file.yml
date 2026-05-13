@@ -44,14 +44,14 @@ tasks:
       Extend `neo4j-cli/aura/internal/test/testutils/auratesthelper.go` with a `pendingFiles map[string]string` field and a `SeedFile(path, content string)` method that stashes pending writes. Inside `ExecuteCommand`, immediately after `helper.fs = fs` (line 53), iterate `pendingFiles` and write each via `afero.WriteFile(helper.fs, path, []byte(content), 0o644)`.
       Backwards-compatible — existing aura tests that don't call `SeedFile` see no behaviour change. No new tests for this scaffolding alone (it'll be exercised via task-004's `--file` cases); just confirm existing aura tests stay green.
       Implements PRD REQ-F-014.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`AuraTestHelper` has a `pendingFiles map[string]string` field and exported `SeedFile(path, content string)` method"
       - "`ExecuteCommand` flushes `pendingFiles` into `helper.fs` immediately after `helper.fs = fs`"
       - "Existing aura tests pass unchanged (no calls to SeedFile)"
       - "`make test`, `make fmt-check`, `make lint` all green"
-    completed_at: null
+    completed_at: 2026-05-13T12:00:00Z
 
   - id: task-004
     title: "Add --file flag to aura credential add with merge, validation, and tests"
