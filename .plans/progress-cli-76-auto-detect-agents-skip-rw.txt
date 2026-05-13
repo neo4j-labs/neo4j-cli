@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-13T11:05:00Z
+Added common/agent/ package with Detect() covering 11 unjs/std-env agents (presence + case-insensitive substring rules) via overridable getenv seam.
+Files: +common/agent/agent.go, +common/agent/agent_test.go

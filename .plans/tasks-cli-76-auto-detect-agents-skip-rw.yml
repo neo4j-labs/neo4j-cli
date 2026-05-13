@@ -13,7 +13,7 @@ tasks:
       for `EDITOR` / `TERM_PROGRAM` / `PATH`. Internal env lookup must go through an overridable
       `getenv = os.Getenv` package-level seam so tests don't need `t.Setenv`. Colocated table-driven
       `agent_test.go` exercises each row of the agent table plus a no-agent baseline.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "common/agent/agent.go exists with exported Detect() bool and unexported getenv seam"
@@ -21,7 +21,7 @@ tasks:
       - "common/agent/agent_test.go is table-driven and toggles the getenv seam (no real env mutation)"
       - "Both files carry the Neo4j copyright header; make fmt-check, make lint, go test ./common/agent/... all pass"
       - "Zero new third-party imports — only os and strings from stdlib"
-    completed_at: null
+    completed_at: 2026-05-13T11:05:00Z
 
   - id: task-002
     title: "Wire agent detection into write gate + update --rw flag Usage + gate matrix tests"
