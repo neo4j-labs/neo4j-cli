@@ -78,7 +78,7 @@ var validInstallMethods = map[string]struct{}{
 }
 
 // resultDoc mirrors the REQ-F-018 JSON shape emitted by `neo4j-cli update check
-// -f json`. The optional updated_skills / skill_install_suggested fields are
+// --format json`. The optional updated_skills / skill_install_suggested fields are
 // captured as raw json.RawMessage so we can detect "field present" vs "absent":
 // json.Unmarshal of a missing field leaves the RawMessage at its zero value (nil).
 type resultDoc struct {
