@@ -27,7 +27,7 @@ tasks:
       Strict-equivalence refactor of `neo4j-cli/internal/subcommands/credential/dbms/add.go`. Import `common/clicfg/envfile`. Replace the call to the private `parseAuraEnvFile` with `envfile.Parse(cfg.Aura.Fs(), filePath)`. Move the recognised-keys filter (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`, `AURA_INSTANCENAME`) into the dbms RunE (or a small dbms-local helper). Delete the now-unused `parseAuraEnvFile` function.
       No behaviour change. The existing CLI-75 dbms `add_test.go` table-driven cases must pass UNTOUCHED — they are the regression net for this lift. If any existing test fails, the refactor is wrong.
       Implements PRD REQ-F-007.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -36,7 +36,7 @@ tasks:
       - "Recognised-keys filter for the five dbms-relevant keys is applied in the dbms RunE (or a colocated private helper)"
       - "ALL existing dbms `add_test.go` cases pass without modification"
       - "`make test`, `make fmt-check`, `make lint` all green"
-    completed_at: null
+    completed_at: 2026-05-13T11:35:00Z
 
   - id: task-003
     title: "Add SeedFile method to AuraTestHelper"

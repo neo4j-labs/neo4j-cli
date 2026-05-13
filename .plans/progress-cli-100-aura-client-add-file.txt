@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-13T11:20:00Z
 Add domain-neutral `common/clicfg/envfile` package exporting `Parse(fs, path) (vals, present, err)`; gotenv keeps `KEY=` entries so presence is derived from the parsed map. Open errors wrap as `--file %q: %s` usage errors.
 Files: +common/clicfg/envfile/envfile.go, +common/clicfg/envfile/envfile_test.go
+
+## task-002 — 2026-05-13T11:35:00Z
+Refactor dbms `add.go` to use `envfile.Parse`; recognised-keys filter moved into a colocated `filterAuraEnvKeys` helper. `parseAuraEnvFile` deleted along with `afero` + `gotenv` imports. All existing CLI-75 dbms `add_test.go` cases pass unchanged.
+Files: ~neo4j-cli/internal/subcommands/credential/dbms/add.go
