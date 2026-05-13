@@ -27,8 +27,12 @@ type dbmsTestHelper struct {
 	out         *bytes.Buffer
 	err         *bytes.Buffer
 	credentials string
-	fs          afero.Fs
-	t           *testing.T
+	// files is seeded into the in-memory FS at executeCommand time. Keys are
+	// paths (e.g. "/tmp/creds.txt"), values are the file contents. Use this
+	// to drive --file flag tests without touching the real filesystem.
+	files map[string]string
+	fs    afero.Fs
+	t     *testing.T
 }
 
 func newDbmsTestHelper(t *testing.T) dbmsTestHelper {
@@ -64,6 +68,11 @@ func (h *dbmsTestHelper) executeCommand(command string) error {
 	fs, err := testfs.GetTestFs("{}", h.credentials)
 	assert.Nil(h.t, err)
 	h.fs = fs
+
+	for path, contents := range h.files {
+		assert.Nil(h.t, fs.MkdirAll(filepath.Dir(path), 0755))
+		assert.Nil(h.t, afero.WriteFile(fs, path, []byte(contents), 0600))
+	}
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
@@ -157,25 +166,25 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			name:         "missing --name produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --username neo4j --password secret --uri bolt://localhost:7687",
-			wantErr:      `required flag(s) "name" not set`,
+			wantErr:      `--name is required (provide via --file as AURA_INSTANCENAME, or pass --name)`,
 		},
 		{
 			name:         "missing --username produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --name mydb --password secret --uri bolt://localhost:7687",
-			wantErr:      `required flag(s) "username" not set`,
+			wantErr:      `--username is required (provide via --file as NEO4J_USERNAME, or pass --username)`,
 		},
 		{
 			name:         "missing --password produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --name mydb --username neo4j --uri bolt://localhost:7687",
-			wantErr:      `required flag(s) "password" not set`,
+			wantErr:      `--password is required (provide via --file as NEO4J_PASSWORD, or pass --password)`,
 		},
 		{
 			name:         "missing --uri produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --name mydb --username neo4j --password secret",
-			wantErr:      `required flag(s) "uri" not set`,
+			wantErr:      `--uri is required (provide via --file as NEO4J_URI, or pass --uri)`,
 		},
 		{
 			name:             "--embed-credential pointing at missing embed cred errors before persisting",
@@ -214,6 +223,180 @@ func TestDbmsCredentialAdd(t *testing.T) {
 				h.assertErr(tc.wantErr)
 				if tc.assertNoCredsAdd {
 					// Confirm no half-creation: dbms.credentials remains the empty slice it started as.
+					h.assertCredentialsValue("dbms.credentials", `[]`)
+				}
+				return
+			}
+
+			h.assertErr("")
+			h.assertCredentialsValue("dbms.credentials", tc.wantCredentials)
+			h.assertCredentialsValue("dbms.default-credential", tc.wantDefaultCred)
+		})
+	}
+}
+
+// auraFileContent is the verbatim Aura-exported credentials file shape from
+// the CLI-75 issue: comments, blank lines, AURA_INSTANCEID (ignored), and the
+// four NEO4J_* keys plus AURA_INSTANCENAME.
+const auraFileContent = `# Wait 60 seconds before connecting using these details, or login to https://console.neo4j.io to validate the Aura Instance is available
+NEO4J_URI=neo4j+s://abc12345.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=supersecret
+AURA_INSTANCEID=abc12345
+AURA_INSTANCENAME=Instance01
+`
+
+func TestDbmsCredentialAddFromFile(t *testing.T) {
+	// Use forward-slash literal paths: shlex.Split treats backslashes as escapes
+	// (POSIX-style), so a Windows-native path like `\tmp\x` would be mangled by
+	// the command parser. afero.MemMapFs normalises paths via filepath.Clean,
+	// so `/tmp/x` is equivalent to `\tmp\x` on Windows for storage lookup.
+	credsPath := "/tmp/aura-creds.txt"
+	missingPath := "/tmp/missing.txt"
+
+	tests := []struct {
+		name             string
+		initialCreds     []map[string]interface{}
+		initialEmbed     []map[string]interface{}
+		files            map[string]string
+		command          string
+		wantErr          string
+		wantCredentials  string
+		wantDefaultCred  string
+		assertNoCredsAdd bool
+	}{
+		{
+			name:         "happy path: --file alone populates all fields from Aura export",
+			initialCreds: []map[string]interface{}{},
+			files:        map[string]string{credsPath: auraFileContent},
+			command:      "add --file " + credsPath,
+			wantCredentials: `[{"name":"Instance01","username":"neo4j","password":"supersecret",` +
+				`"database-name":"neo4j","uri":"neo4j+s://abc12345.databases.neo4j.io"}]`,
+			wantDefaultCred: "Instance01",
+		},
+		{
+			name:         "--name overrides AURA_INSTANCENAME",
+			initialCreds: []map[string]interface{}{},
+			files:        map[string]string{credsPath: auraFileContent},
+			command:      "add --file " + credsPath + " --name custom",
+			wantCredentials: `[{"name":"custom","username":"neo4j","password":"supersecret",` +
+				`"database-name":"neo4j","uri":"neo4j+s://abc12345.databases.neo4j.io"}]`,
+			wantDefaultCred: "custom",
+		},
+		{
+			name:         "--password overrides NEO4J_PASSWORD from file",
+			initialCreds: []map[string]interface{}{},
+			files:        map[string]string{credsPath: auraFileContent},
+			command:      "add --file " + credsPath + " --password override",
+			wantCredentials: `[{"name":"Instance01","username":"neo4j","password":"override",` +
+				`"database-name":"neo4j","uri":"neo4j+s://abc12345.databases.neo4j.io"}]`,
+			wantDefaultCred: "Instance01",
+		},
+		{
+			name:         "NEO4J_DATABASE from file is honoured when --database-name not passed",
+			initialCreds: []map[string]interface{}{},
+			files:        map[string]string{credsPath: "NEO4J_URI=bolt://x:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=pw\nAURA_INSTANCENAME=Inst\nNEO4J_DATABASE=mydb\n"},
+			command:      "add --file " + credsPath,
+			wantCredentials: `[{"name":"Inst","username":"neo4j","password":"pw",` +
+				`"database-name":"mydb","uri":"bolt://x:7687"}]`,
+			wantDefaultCred: "Inst",
+		},
+		{
+			name:         "comments and blank lines parse without error",
+			initialCreds: []map[string]interface{}{},
+			files: map[string]string{credsPath: `# leading comment
+
+NEO4J_URI=bolt://x:7687
+# inline comment between keys
+
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=pw
+AURA_INSTANCENAME=Inst
+AURA_INSTANCEID=abc12345
+`},
+			command: "add --file " + credsPath,
+			wantCredentials: `[{"name":"Inst","username":"neo4j","password":"pw",` +
+				`"database-name":"neo4j","uri":"bolt://x:7687"}]`,
+			wantDefaultCred: "Inst",
+		},
+		{
+			name:             "empty file errors on first missing field (name)",
+			initialCreds:     []map[string]interface{}{},
+			files:            map[string]string{credsPath: ""},
+			command:          "add --file " + credsPath,
+			wantErr:          `--name is required (provide via --file as AURA_INSTANCENAME, or pass --name)`,
+			assertNoCredsAdd: true,
+		},
+		{
+			name:             "NEO4J_URI= empty with no flag override is a usage error",
+			initialCreds:     []map[string]interface{}{},
+			files:            map[string]string{credsPath: "NEO4J_URI=\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=pw\nAURA_INSTANCENAME=Inst\n"},
+			command:          "add --file " + credsPath,
+			wantErr:          `NEO4J_URI has an empty value`,
+			assertNoCredsAdd: true,
+		},
+		{
+			name:         "NEO4J_URI= empty with --uri override succeeds",
+			initialCreds: []map[string]interface{}{},
+			files:        map[string]string{credsPath: "NEO4J_URI=\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=pw\nAURA_INSTANCENAME=Inst\n"},
+			command:      "add --file " + credsPath + " --uri bolt://x:7687",
+			wantCredentials: `[{"name":"Inst","username":"neo4j","password":"pw",` +
+				`"database-name":"neo4j","uri":"bolt://x:7687"}]`,
+			wantDefaultCred: "Inst",
+		},
+		{
+			name:             "NEO4J_DATABASE= empty with no --database-name flag is an error (default NOT applied)",
+			initialCreds:     []map[string]interface{}{},
+			files:            map[string]string{credsPath: "NEO4J_URI=bolt://x:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=pw\nAURA_INSTANCENAME=Inst\nNEO4J_DATABASE=\n"},
+			command:          "add --file " + credsPath,
+			wantErr:          `NEO4J_DATABASE has an empty value`,
+			assertNoCredsAdd: true,
+		},
+		{
+			name:             "missing --file path returns a wrapped open error",
+			initialCreds:     []map[string]interface{}{},
+			files:            map[string]string{},
+			command:          "add --file " + missingPath,
+			wantErr:          "--file \"" + missingPath + "\":",
+			assertNoCredsAdd: true,
+		},
+		{
+			name:         "--file + --embed-credential matching existing embed cred links it",
+			initialCreds: []map[string]interface{}{},
+			initialEmbed: []map[string]interface{}{
+				{"name": "myembed", "provider": "openai", "model": "text-embedding-3-small", "base-url": "", "dimensions": 0, "api-key": "k"},
+			},
+			files:   map[string]string{credsPath: auraFileContent},
+			command: "add --file " + credsPath + " --embed-credential myembed",
+			wantCredentials: `[{"name":"Instance01","username":"neo4j","password":"supersecret",` +
+				`"database-name":"neo4j","uri":"neo4j+s://abc12345.databases.neo4j.io","embed-credential":"myembed"}]`,
+			wantDefaultCred: "Instance01",
+		},
+		{
+			name:             "--file + --embed-credential pointing at missing embed errors before persisting",
+			initialCreds:     []map[string]interface{}{},
+			initialEmbed:     []map[string]interface{}{},
+			files:            map[string]string{credsPath: auraFileContent},
+			command:          "add --file " + credsPath + " --embed-credential nope",
+			wantErr:          `invalid --embed-credential "nope"`,
+			assertNoCredsAdd: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newDbmsTestHelper(t)
+			h.setCredentialsValue("dbms.credentials", tc.initialCreds)
+			if tc.initialEmbed != nil {
+				h.setCredentialsValue("embed.credentials", tc.initialEmbed)
+			}
+			h.files = tc.files
+
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
+
+			if tc.wantErr != "" {
+				h.assertErr(tc.wantErr)
+				if tc.assertNoCredsAdd {
 					h.assertCredentialsValue("dbms.credentials", `[]`)
 				}
 				return
