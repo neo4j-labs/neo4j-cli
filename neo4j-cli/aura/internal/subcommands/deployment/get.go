@@ -29,7 +29,15 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Returns deployment details",
 		Long:  "Returns details about a specific Fleet Manager deployment.",
-		Args:  cobra.ExactArgs(1),
+		Example: `# Get details for a deployment
+neo4j-cli aura deployment get 00000000-0000-0000-0000-000000000000
+
+# Get a deployment in a specific organization and project
+neo4j-cli aura deployment get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# Get deployment details as JSON for scripting
+neo4j-cli aura deployment get 00000000-0000-0000-0000-000000000000 --format json`,
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

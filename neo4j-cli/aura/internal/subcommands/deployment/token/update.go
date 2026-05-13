@@ -33,7 +33,15 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "update",
 		Short:       "Update the deployment token incase it needs to be rotated manually.",
 		Long:        "Creates a new auto rotating Fleet Manager deployment token with a three month rotation interval. The token should be registered to the database again using `call fleetManagement.registerToken('$token');`",
-		Args:        cobra.ExactArgs(0),
+		Example: `# Manually rotate the deployment token
+neo4j-cli aura deployment token update --deployment-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Rotate the token in a specific organization and project
+neo4j-cli aura deployment token update --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Rotate the token and capture the new value as JSON for scripting
+neo4j-cli aura deployment token update --deployment-id 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.token'`,
+		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

@@ -30,7 +30,15 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "delete",
 		Short:       "Delete the given deployment",
 		Long:        "Deletes the given Fleet Manager deployment. This will only delete the deployment from Fleet Manager without affecting the actual running database. It is advised to disable Fleet Management for the database using `call fleetManagement.disable()`",
-		Args:        cobra.ExactArgs(1),
+		Example: `# Delete a deployment by ID
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a deployment in a specific organization and project
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete a deployment and emit the response as JSON for scripting
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --format json`,
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},

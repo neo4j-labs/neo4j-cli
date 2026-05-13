@@ -46,7 +46,7 @@ tasks:
       top-level (list, create, delete, get), `token/` (create, update, delete),
       `database/` (list), `server/` (list), `server/database/` (list).
       Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -54,7 +54,7 @@ tasks:
       - "Write leaves (`deployment create`, `deployment delete`, `deployment token create`, `deployment token update`, `deployment token delete`) include `--rw` on every invocation"
       - "Read leaves (`deployment list`, `deployment get`, `deployment database list`, `deployment server list`, `deployment server database list`) include at least one `--format json` invocation and never `--rw`"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:24:45Z
 
   - id: task-004
     title: "Aura data-api / graphql subtree: add Example blocks"
