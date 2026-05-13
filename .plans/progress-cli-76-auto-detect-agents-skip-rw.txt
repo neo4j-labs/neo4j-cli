@@ -14,3 +14,7 @@ Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/ad
 ## TASK-004 — 2026-05-13T11:30:00Z
 Added "Auto-detect: when --rw is required" subsection under Write operations in README; describes TTY auto-apply + agent/non-interactive override and links to unjs/std-env upstream instead of enumerating env vars. Tweaked lead sentence from "require" to "gated by" for consistency.
 Files: ~README.md
+
+## TASK-005 — 2026-05-13T13:11:00Z
+Added Minor changie entry for CLI-76 via `changie new --projects neo4j-cli --kind Minor`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-130959.yaml

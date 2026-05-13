@@ -93,14 +93,14 @@ tasks:
       longer required when running interactively in a terminal (CLI-76)"`. If changie isn't installed
       locally, hand-author the YAML under `.changes/unreleased/` per the AGENTS.md fallback format
       (project / kind / body / time, RFC3339 time, single-quoted body).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "A new file under .changes/unreleased/ records the change with kind Minor and the CLI-76 reference"
       - "YAML has the four required fields (project, kind, body, time) and RFC3339 time"
       - "File name follows the neo4j-cli-Minor-YYYYMMDD-HHMMSS.yaml convention"
-    completed_at: null
+    completed_at: 2026-05-13T13:11:00Z
 
   - id: task-006
     title: "Final gates + manual verification"
