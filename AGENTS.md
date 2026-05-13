@@ -168,22 +168,11 @@ See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill 
 
 ## Hermetic Test Notes
 
-- For path-expansion tests using `~` / `$XDG_CONFIG_HOME`, use `t.Setenv("HOME", "...")` and `t.Setenv("XDG_CONFIG_HOME", "")` — Go's `os.Getenv` returns "" for both unset and set-to-empty, and `t.Setenv` auto-restores after the test.
-- Use `afero.DirExists` (not `Exists`) for "is the agent installed?" checks — files at the marker path shouldn't count as detected.
-- `go-pretty/v6/table` upper-cases header text by default — assertions on table output should compare against `strings.ToLower(...)` for header columns, exact case for body cells.
-- Lightweight cobra command tests can wire `clicfg.NewConfig(testfs.GetTestFs(...), version)` directly without the heavier `testutils.NewAuraTestHelper` — the latter pulls in API mocking and credential setup that `skill` doesn't need.
-- For repo-wide gate tests that must auto-discover content (e.g. `common/skill/bundles_test.go` walking every `<bin>/internal/skill/bundle/SKILL.md`), resolve repo root via `runtime.Caller(0)` then `filepath.Walk` from there. Suffix-match paths after `filepath.ToSlash` so Windows runs match. Prune `.git`, `node_modules`, `bin`, `.changes` to keep the walk fast.
-- `os.OpenFile(..., 0o644)` mode bits are masked by umask on create — if downstream readers (e.g. a docker container running as a different uid) need a specific perm, follow up with `os.Chmod` rather than relying on the OpenFile mode. Same applies to `t.TempDir()` which creates with 0700; a read-only bind mount into a container needs `os.Chmod(dir, 0o755)` for the in-container user to traverse.
-- Package-level test seams (e.g. `stdinIsTTY` at `neo4j-cli/query/run.go`, `stdoutIsTerminal` at `neo4j-cli/query/output.go`) are `var <name> = func(...) ...` declarations that production fills with the real impl. For TTY-related seams in the `query` package, `TestMain` in `testseam_test.go` seeds the seam to the most-common-existing-assertion value (e.g. TTY=true) so legacy tests stay green without per-test edits; tests that need the other branch use a small `withX(t, val)` helper that swaps the seam and registers `t.Cleanup` to restore it.
-- `httptest.NewServer` server-side `r.Context().Done()` propagation from a closed client connection is best-effort and timing-dependent — when testing client ctx-cancellation paths, ALWAYS guard the handler with a short safety timeout (`select { case <-r.Context().Done(): case <-time.After(2*time.Second): }`) AND wrap the test-side wait on `errCh` in a `select` with a 5s fallback `t.Fatal`. Without these, a propagation miss hangs the handler until `-test.timeout` (default 10m), looking exactly like an infinite go-test loop. Symptom: `pkill -QUIT <pid>` shows the handler's goroutine blocked on `chanrecv` at `<-r.Context().Done()` while the client side has long returned.
-- Tier-1 e2e for `update check` uses the `e2e_seams` build tag + `test/e2e/release_fixture` to cover both `channel: stable` and `channel: pre-release` deterministically (two scenarios, sequential restarts); a sibling `Update e2e (schema-only live smoke)` step pipes real-api.github.com output through `check_json --schema-only` as a calendar-immune contract canary.
-- Cobra lazily injects its built-in `completion` subcommand (and four children) on the FIRST `Execute()` call via `InitDefaultCompletionCmd`. Tests that walk the live cobra tree AND a post-execute artifact (e.g. `agent-context` JSON, skill bundle) must build ONE tree, run `Execute()`, then walk THAT same instance — building a fresh `app.NewCmd` for the walk and a separate one for Execute yields a phantom diff of `[completion, completion bash, completion fish, completion powershell, completion zsh]` in the post-execute side.
+See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expansion, TTY seams, `httptest` cancellation timeouts, cobra completion injection, gate-test repo walking.
 
 ## Windows CI Gotchas
 
-- Path-separator bugs in `expandPath`-style helpers are Windows-only. Catalog entries keep forward slashes (portable convention); helpers MUST wrap any post-substitution path through `filepath.FromSlash` (or build via `filepath.Join`) so the whole path is OS-native. A `ReplaceAll(path, "$XDG_CONFIG_HOME", xdg)` where `xdg` came from `os.Getenv` produces mixed separators on Windows (`C:\…\.config/opencode`) — fix at the helper, not the catalog.
-- Test expected values that hard-code separators bake in OS assumptions. Build expected values with `filepath.Join` / `filepath.FromSlash` rather than literals when asserting cross-OS path output. MemMapFs marker paths in detection tests must also be built OS-natively so they match what the (post-fix) helper looks up.
-- Committed `.md` / golden / bundle files MUST be pinned to LF via `.gitattributes` — Windows runners have `core.autocrlf=true` by default and will rewrite to CRLF on checkout. The renderer (`common/skill/render`) and `make generate-check` both assume LF; a CRLF checkout breaks byte-equal golden tests AND `git diff --exit-code`. The repo-root `.gitattributes` covers `common/skill/render/testdata/**`, `**/internal/skill/bundle/**`, `**/internal/skill/additions.md`, `**/internal/skill/description.txt`. `common/skill/bundles_test.go::TestCommittedBundlesAndTestdataAreLF` is the assertion that catches a weakened/removed attribute.
+See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
 ## npm Distribution Notes
 
@@ -191,14 +180,7 @@ See [`distribution/npm/README.md`](distribution/npm/README.md).
 
 ## PyPI Distribution Notes
 
-See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintainer-facing channel docs (install commands, version mapping, recovery, auth).
-
-- `publish-pypi.yml` mirrors `publish-npm.yml`'s `workflow_run + workflow_dispatch` shape — see that file's comments and the `## Release Workflow Notes` section in `.agents/deployment.md` for the cross-workflow gotchas (`workflows: ["release"]` matches the lowercase `name:`, cross-run `download-artifact` needs both `github-token` and `run-id`, `workflow_run` events have no `inputs.*`).
-- The `go-to-wheel` CLI ALWAYS cross-compiles from Go source — its argparse accepts only `go_dir`, no `--binary-path`. To wrap pre-built GoReleaser binaries into wheels (REQ-F-009 binary-parity invariant), bypass the CLI and call `go_to_wheel.build_wheel(binary_path=..., ...)` directly via an inline `python3 - <<'PY'` heredoc. The library function takes a binary path and a platform_tag; iterate over the six platforms and read each binary from `dist/neo4j-cli_<VERSION>_<TitleOS>_<arch>/<binary>`.
-- PEP 440 version normalisation lives in a single shell helper at `.github/scripts/version-to-pep440.sh` (pure bash, no python/jq deps). Both auto and manual paths invoke it once. The Go ldflags `Version` stays the original GoReleaser tag (so `neo4j-cli --version` and the smoke-test grep keep matching); only the wheel filename + PyPI metadata use the PEP 440 form.
-- `.github/workflows/requirements-build.txt` pins `go-to-wheel` with `--require-hashes` for supply-chain safety. Update the hash via `pip3 download --no-deps -d /tmp/x go-to-wheel` then `pip3 hash /tmp/x/<wheel>`.
-- YAML `run: |` block + bash heredoc gotcha: the heredoc terminator (`PY`) must be at the same indentation as the surrounding YAML block (which strips a fixed prefix). After strip, both the heredoc body and `PY` end up at column 0 — that IS valid for `<<'PY'`. Verify by round-tripping with PyYAML and `compile()`-ing the extracted python.
-- `permissions: {}` works for jobs that download SAME-run artifacts via `actions/download-artifact@v4`. Cross-run downloads (workflow_run path consuming release.yml's artifacts) need workflow-level `actions: read`.
+See [`distribution/pypi/README.md`](distribution/pypi/README.md) for maintainer-facing channel docs (install commands, version mapping, recovery, auth). See [`.agents/pypi.md`](.agents/pypi.md) for workflow-side gotchas (`workflow_run` shape, `go-to-wheel` invocation, PEP 440 normalisation, heredoc indentation).
 
 ## golangci-lint Notes
 
@@ -212,17 +194,7 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for the maintai
 
 ## Credentials Storage Notes
 
-- `Credentials.load()` re-wires `onUpdate` on Aura, Dbms, AND Embed after JSON unmarshal — JSON decode creates a new struct pointer that loses the callback. This is the correct pattern for any future credential type added to `CredentialsFile`.
-- `DbmsCredentials.GetDefault()` returns `(nil, nil)` when no default is set (not a usage error). Use `nil` check at the call site to decide whether to fall back to other connection resolution strategies. `EmbedCredentials.GetDefault()` follows the same convention.
-- `PrintableDbmsCredentials.AsArray()` / `MarshalJSON()` omit `password`; `PrintableEmbedCredentials.AsArray()` / `MarshalJSON()` omit `api-key`. Any future credential type with sensitive fields must follow this pattern.
-- When adding a new credential type to `CredentialsFile` with `omitempty`, `load()` must defensively re-init the field if older credentials.json files lack the key — otherwise `c.Embed.onUpdate = c.save` panics on nil. Mirror the `if c.Embed == nil { ... }` guard in credentials.go.
-- `PrintBodyMap` `fields` slice only affects TABLE rendering — it is ignored for JSON/toon formats. To suppress a sensitive field (e.g. `password`) from ALL output formats you must `delete(data, "field")` from the map before passing to `NewSingleValueResponseData`. The `fields` slice alone is insufficient.
-- `DbmsCredentials.Add` can only fail with "already exists". Since `resolveCredentialName` guarantees the resolved name is free, Add cannot fail in a single-threaded context after a successful `resolveCredentialName` call. Storage failure warning paths are effectively dead code in normal operation.
-- To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.
-- The default test helper credentials JSON only has `"aura": {...}` (no `"dbms"` key). During `Credentials.load()`, the absence of `"dbms"` in JSON leaves the field at its initial value `&DbmsCredentials{Credentials: []*DbmsCredential{}}`, so `cfg.Credentials.Dbms` is non-nil in all default test helpers. Passing `"dbms": null` in the JSON explicitly sets it to nil.
-- `DbmsCredential.EmbedCredential` uses `json:"embed-credential,omitempty"` so older creds without a link don't gain the key on disk. `PrintableDbmsCredentials.AsArray` / `MarshalJSON` always emit the key (empty string when unset) so the column is stable across rows for table rendering and external JSON consumers. Pattern: omitempty on the persisted struct, unconditional emit on the printable wrapper.
-- Cross-credential-type validation (e.g. `credential dbms add --embed-credential x`): validate the target with `Embed.Get(name)` BEFORE calling `Dbms.Add(...)` so a bad name never half-creates a cred. Then call `Dbms.SetEmbed(name, embedName)` AFTER `Dbms.Add` succeeds — keeps the storage `Add` signature stable rather than threading new optional fields through.
-- Test fixture seeding: when a dbms test exercises code that touches `cfg.Credentials.Embed`, seed the `embed` block in `newDbmsTestHelper` initial JSON; sjson.Set on `embed.credentials` from a partial fixture works but seeding upfront is more honest about the test surface.
+See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of `onUpdate` callbacks, sensitive-field omission, omitempty-vs-printable patterns, cross-type validation order, and test fixture seeding for the `Aura` / `Dbms` / `Embed` credential types.
 
 ## query Subsystem Notes
 
@@ -239,12 +211,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 ## Agent Context Notes
 
-- `neo4j-cli agent-context` emits the full CLI shape as JSON for AI-agent discovery (Layer 2 per `agent-cli-auditor.md` §7.2). Reflected from the live cobra tree at runtime — no static artifact to keep in sync.
-- Adding a new command/flag automatically surfaces in the next `agent-context` invocation. No regen step, no `make generate-check` involvement for the JSON itself. (Skill-bundle `references/<cmd>.md` still needs `go generate` per the existing rules.)
-- Hand-coded constants live in `neo4j-cli/internal/subcommands/agentcontext/build.go`: `schemaVersion`, `exitCodes`, `errorCodes`, `asyncFlag`. Update these when adding a new error category, exit code, or async-flag convention.
-- `output_formats` is sourced from `clicfg.ValidFormatValues`; do NOT duplicate the list in agent-context.
-- Bump `schemaVersion` on breaking JSON-shape changes (rename a top-level key, change a field type, drop a documented code).
-- Tests in `agentcontext_test.go` lock the envelope shape, output-format parity, and tree coverage. Adding a new top-level command will trip the coverage test until the JSON includes it — the failure message tells you what's missing.
+See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
 ---
 
