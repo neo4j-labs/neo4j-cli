@@ -113,7 +113,7 @@ tasks:
       Add `Example:` fields to every leaf in `neo4j-cli/internal/subcommands/config/`
       (list, get, set) and `neo4j-cli/internal/subcommands/update/` (check, plus any
       sibling leaves discovered while editing). Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -121,7 +121,7 @@ tasks:
       - "Write leaves (`config set`) include `--rw` on every invocation"
       - "Read leaves (`config list`, `config get`, `update check`) include at least one `--format json` invocation and never `--rw`"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T12:00:00Z
 
   - id: task-008
     title: "Query: add Example to parent + :schema, normalise :embed"

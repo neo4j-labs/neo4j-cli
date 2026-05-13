@@ -23,3 +23,8 @@ Files: ~7 leaf .go + ~bundle/references/graph-analytics.md (aura) + ~bundle/refe
 ## task-006 — 2026-05-13T11:37:27Z
 Added Example blocks to 9 credential leaves: dbms (add/list/use/remove/set-embed) + embed (add/list/use/remove). dbms add covers both --file and explicit-flag forms. Regenerated neo4j-cli bundle (references/credential.md).
 Files: ~9 leaf .go + ~bundle/references/credential.md (neo4j-cli)
+
+## task-007 — 2026-05-13T12:00:00Z
+Added Example blocks to 5 top-level leaves: config (list/get/set) + update parent + update check. config set + update use --rw where applicable (config set always; update has no write annotation so plain). Regenerated neo4j-cli bundle (references/config.md, references/update.md).
+Files: ~5 leaf .go + ~bundle/references/config.md ~bundle/references/update.md (neo4j-cli)
+Decisions: update parent treated as non-read/non-write — no `write: true` annotation but emits structured JSON, so examples include --format json and omit --rw to match the actual gate.

@@ -10,8 +10,16 @@ import (
 
 func NewSetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:         "set <key> <value>",
-		Short:       "Sets the specified configuration value to the provided value",
+		Use:   "set <key> <value>",
+		Short: "Sets the specified configuration value to the provided value",
+		Example: `# Set the default output format to JSON
+neo4j-cli config set format json --rw
+
+# Disable telemetry
+neo4j-cli config set telemetry false --rw
+
+# Set the default Aura tenant via dot-notation
+neo4j-cli config set aura.default-tenant my-tenant-id --rw`,
 		Annotations: map[string]string{"write": "true"},
 		ValidArgs:   validSetArgs(cfg),
 		Args: func(cmd *cobra.Command, args []string) error {
