@@ -9,3 +9,7 @@ Files: ~neo4j-cli/query/query.go
 ## TASK-003 — 2026-05-13T12:55:00Z
 Regenerated skill bundles via `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`. Drift matches PRD exactly: root/aura SKILL.md drop the query clause; references/aura.md mirrors aura Long; references/query.md picks up the new EXPLAIN gate sentence. make test (TestGenerator_RoundTrip green), make fmt-check, make lint all pass.
 Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/aura.md, ~neo4j-cli/internal/skill/bundle/references/query.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
+
+## task-004 — 2026-05-13T14:43:34Z
+Added Patch-kind changelog entry via `changie new --projects neo4j-cli --kind Patch --body "..."`. YAML loads cleanly; body references CLI-104 and scopes change to `query --help`. fmt-check + lint clean.
+Files: ~.changes/unreleased/neo4j-cli-Patch-20260513-144334.yaml

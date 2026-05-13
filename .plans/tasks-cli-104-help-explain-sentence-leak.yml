@@ -73,14 +73,14 @@ tasks:
       fall back to hand-authoring the YAML file named
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` per `.agents/build.md` if changie
       isn't installed locally. See PRD REQ-F-006.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Exactly one new file exists matching `.changes/unreleased/neo4j-cli-Patch-*.yaml`"
       - "The YAML file has `project: neo4j-cli`, `kind: Patch`, and a populated `body:` referencing CLI-104"
       - "The body mentions `query --help` and the scope of the change"
       - "The YAML is valid (loads without error)"
-    completed_at: null
+    completed_at: 2026-05-13T14:43:34Z
 
   - id: task-005
     title: "Run final gates: `make test`, `make fmt-check`, `make lint`"
