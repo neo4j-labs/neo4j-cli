@@ -106,7 +106,8 @@ tasks:
       `additions.md` / `query-additions.md` propagate from source. Skipping
       this trips `TestGenerator_RoundTrip`. See PRD REQ-F-014 and AGENTS.md
       "Cobra Help / Skill Bundle Rendering Notes".
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T17:30:00Z
     dependencies:
       - task-001
       - task-002

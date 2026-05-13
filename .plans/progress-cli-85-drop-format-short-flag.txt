@@ -13,3 +13,7 @@ Files: ~AGENTS.md, ~CONTRIBUTING.md, ~.agents/architecture.md, ~.agents/repo-lay
 ## task-004 — 2026-05-13T17:15:00Z
 Added regression tests: TestRegisterOutputFlag_NoShorthand asserts `--format`.Shorthand=="" after RegisterOutputFlag; TestNewCmd_ForceFlagShorthand asserts `update --force`.Shorthand=="f"; TestNewCmd_ForceShorthand_ParsesToTrue drives `update -f --version v0.2.0` through cobra Execute and confirms force=true reaches runOpts (bypasses homebrew passthrough). Scoped tests + fmt-check + lint all green; TestGenerator_RoundTrip deferred to task-005.
 Files: ~common/flags/flags_test.go, ~neo4j-cli/internal/subcommands/update/update_test.go
+
+## TASK-005 — 2026-05-13T17:30:00Z
+Regenerated skill bundles via `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`. `-f` removed from `--format` row in both SKILL.md Global Flags tables and references/{query,skill}.md; `-f, --force` now appears on the update --force row in references/update.md. Source-side additions / query-additions text propagated to bundle copies. `make test`, `make fmt-check`, `make lint` all green; TestGenerator_RoundTrip passes.
+Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/query-additions.md, ~neo4j-cli/internal/skill/bundle/references/query.md, ~neo4j-cli/internal/skill/bundle/references/skill.md, ~neo4j-cli/internal/skill/bundle/references/update.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/references/skill.md
