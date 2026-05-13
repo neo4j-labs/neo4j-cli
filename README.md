@@ -93,9 +93,9 @@ neo4j-cli aura instance list --format table
 # Free-db — no cloud provider, region, or memory required
 neo4j-cli aura instance create --name my-free-db --type free-db --tenant-id <tenant-id> --rw
 
-# Professional-db on AWS, awaiting readiness
+# Professional-db on AWS, waiting for readiness
 neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-provider aws \
-  --region us-east-1 --memory 4GB --tenant-id <tenant-id> --await --rw
+  --region us-east-1 --memory 4GB --tenant-id <tenant-id> --wait --rw
 ```
 
 `aura tenant list` shows tenant IDs. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.

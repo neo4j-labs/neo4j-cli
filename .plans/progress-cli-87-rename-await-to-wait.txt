@@ -20,3 +20,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/{graphanalytics/session/create_test.
 ## task-005 — 2026-05-13T14:15:00Z
 Flipped agentcontext asyncFlag constant "--await" → "--wait", trimmed audit-item comment to one line, updated two test assertions. Built binary confirms `agent-context | jq -r .async_flag` returns "--wait".
 Files: ~neo4j-cli/internal/subcommands/agentcontext/{build.go, build_test.go, agentcontext_test.go}, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-006 — 2026-05-13T14:25:00Z
+Updated doc surfaces: CONTRIBUTING.md §3.5 documents --wait canonical + deprecated alias sentence; README.md/AGENTS.md/.agents/architecture.md replaced --await→--wait. Historical CHANGELOG-aura.md and .changes/aura-cli/* untouched. lint+fmt pass; only TestGenerator_RoundTrip fails (owned by task-007).
+Files: ~CONTRIBUTING.md, ~README.md, ~AGENTS.md, ~.agents/architecture.md, ~.plans/tasks-cli-87-rename-await-to-wait.yml

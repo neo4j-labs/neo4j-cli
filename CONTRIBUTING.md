@@ -204,7 +204,7 @@ Most commands targetting API resources contain some of the following subcommands
 
 Commands may also have some extra, specific commands, such as `instance pause`.
 
-For asynchronous operations (i.e. operations that trigger a job that won't be finished in the same request), the flag `--await` can be used to wait until the operation has been completed, generally polling for the status. If this flag is not set, all operations must finish when the request has been completed, even if a job is pending.
+For asynchronous operations (i.e. operations that trigger a job that won't be finished in the same request), the flag `--wait` can be used to wait until the operation has been completed, generally polling for the status. If this flag is not set, all operations must finish when the request has been completed, even if a job is pending. `--await` is accepted as a deprecated alias for one release and will be removed in the following release.
 
 ## Resources
 

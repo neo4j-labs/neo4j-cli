@@ -93,7 +93,7 @@ tasks:
       Update `CONTRIBUTING.md §3.5` (around line 207) so the canonical async flag is documented as `--wait`, with one extra sentence stating that `--await` is a deprecated alias to be removed in the following release.
       Replace every `--await` mention in `README.md`, `AGENTS.md` (do NOT edit `CLAUDE.md` — it's a symlink to `AGENTS.md`), and `.agents/architecture.md` with `--wait`.
       Do not edit `CHANGELOG-aura.md` or `.changes/aura-cli/*.md` (historical).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CONTRIBUTING.md §3.5 documents --wait as canonical and notes the deprecated --await alias"
@@ -101,7 +101,7 @@ tasks:
       - "AGENTS.md contains no remaining --await references (CLAUDE.md is a symlink and updates automatically)"
       - ".agents/architecture.md contains no remaining --await references"
       - "CHANGELOG-aura.md and .changes/aura-cli/* are untouched"
-    completed_at: null
+    completed_at: 2026-05-13T14:25:00Z
 
   - id: task-007
     title: "Regenerate skill bundles and verify alias is hidden"
