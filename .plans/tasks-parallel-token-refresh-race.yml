@@ -1,0 +1,108 @@
+feature: parallel-token-refresh-race
+prd: ./prd-parallel-token-refresh-race.md
+created_at: 2026-05-13T00:00:00Z
+updated_at: 2026-05-13T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Implement cross-platform advisory file lock helpers in fileutils"
+    description: |
+      Create two build-tag-separated files in common/clicfg/fileutils/:
+      lock_unix.go (//go:build !windows) using golang.org/x/sys/unix.Flock(LOCK_EX),
+      and lock_windows.go (//go:build windows) using golang.org/x/sys/windows.LockFileEx.
+      Each file exposes an acquireLock(path string) (release func(), err error) function
+      that opens <path>.lock via os.OpenFile (not afero) and acquires a blocking exclusive
+      lock. The lock file is created if absent and never deleted. Both files carry the Neo4j
+      copyright header and must compile cleanly on their target platforms.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "lock_unix.go exists with //go:build !windows tag and uses unix.Flock(LOCK_EX)"
+      - "lock_windows.go exists with //go:build windows tag and uses windows.LockFileEx with LOCKFILE_EXCLUSIVE_LOCK"
+      - "acquireLock returns a release func that closes the lock file (OS releases flock on close)"
+      - "Lock file is opened via os.OpenFile (not afero) so it works across all afero.Fs implementations"
+      - "Both files carry the Neo4j copyright header; make license-check passes"
+    completed_at: null
+
+  - id: task-002
+    title: "Wire acquireLock into writeFileAtomic and add concurrent-write test"
+    description: |
+      In fileutils.go, call acquireLock(path) at the start of writeFileAtomic and defer the
+      release function so the lock is held for the full open/write/sync/close/rename sequence.
+      On lock acquisition error, return the error (WriteFile panics on it as before).
+      Add a test in fileutils_test.go (or a new race_test.go) that spawns two goroutines both
+      calling WriteFile on the same real temp-dir path concurrently; verify neither panics and
+      the resulting file contains valid JSON from one of the writes.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "writeFileAtomic calls acquireLock(path) before opening the temp file"
+      - "release func is deferred so the lock is held through rename and released on return"
+      - "All existing fileutils_test.go tests continue to pass (MemMapFs path skips OS lock gracefully)"
+      - "New concurrent-write test: two goroutines writing to the same path produce no panic and a valid final file"
+      - "make test passes; make fmt-check and make lint are clean"
+    completed_at: null
+
+  - id: task-003
+    title: "Add Credentials.FilePath() accessor and ReloadAuraCredential helper"
+    description: |
+      Expose the private filePath field of credentials.Credentials via a FilePath() string
+      method so callers (specifically getToken) can pass the path to the re-read helper without
+      accessing internal state. Add a package-level function ReloadAuraCredential(fs afero.Fs,
+      filePath, name string) (*AuraCredential, bool) in common/clicfg/credentials/ that reads
+      and JSON-parses credentials.json from disk, looks up the named credential, and returns it
+      with ok=true on success; returns nil, false on any error (file missing, parse error, name
+      not found). Also add AuraCredentials.SyncCredential(fresh *AuraCredential) that updates the
+      matching in-memory credential's AccessToken and TokenExpiry fields without triggering onUpdate.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Credentials.FilePath() returns the same path used by load() and save()"
+      - "ReloadAuraCredential reads directly from disk (not from in-memory state)"
+      - "ReloadAuraCredential returns nil, false on file-not-found, parse error, or unknown name — never panics"
+      - "AuraCredentials.SyncCredential updates AccessToken and TokenExpiry on the matching credential without calling onUpdate"
+      - "Unit tests cover ReloadAuraCredential: returns valid credential when file is fresh, returns false when name absent or file corrupt"
+    completed_at: null
+
+  - id: task-004
+    title: "Add disk re-read optimization to getToken before the HTTP refresh call"
+    description: |
+      In neo4j-cli/aura/internal/api/token.go, after the in-memory HasValidAccessToken() check
+      fails, call credentials.ReloadAuraCredential using cfg.Credentials.FilePath() and
+      cfg.Aura.Fs() to get the on-disk state of the credential. If the fresh disk read returns
+      a valid token, call cfg.Credentials.Aura.SyncCredential(fresh) to update in-memory state
+      and return the fresh token without making an HTTP request. If the reload fails or the
+      reloaded token is also expired, fall through to the existing HTTP refresh path unchanged.
+      Add a test that pre-writes a fresh credential file before calling getToken and asserts no
+      HTTP call is made.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "getToken calls ReloadAuraCredential after in-memory HasValidAccessToken returns false"
+      - "getToken returns the on-disk token and calls SyncCredential when the disk token is valid — no HTTP request"
+      - "getToken falls through to HTTP refresh when ReloadAuraCredential returns false or the fresh token is also expired"
+      - "New test: writes a fresh credentials.json to disk before calling getToken; asserts the mock HTTP server is not called"
+      - "Existing getToken tests continue to pass; make test is clean"
+    completed_at: null
+
+  - id: task-005
+    title: "Final gates: test, lint, fmt-check, license-check"
+    description: |
+      Run the full project gate suite to confirm all tasks integrate cleanly. Verify make test
+      passes on the local platform, make fmt-check reports no unformatted files, make lint is
+      clean, and make license-check passes. Confirm go.mod and go.sum have no new module entries
+      beyond golang.org/x/sys sub-packages that were already present. Fix any issues found before
+      marking complete.
+    status: pending
+    dependencies:
+      - task-002
+      - task-004
+    acceptance_criteria:
+      - "make test passes with no failures"
+      - "make fmt-check exits 0 (no files need gofmt)"
+      - "make lint exits 0 (no golangci-lint errors)"
+      - "make license-check exits 0 (all new .go files carry the Neo4j copyright header)"
+      - "go.mod contains no new module entries beyond what was present before this feature"
+    completed_at: null
