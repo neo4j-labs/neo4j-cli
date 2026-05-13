@@ -1,0 +1,3 @@
+## task-001 — 2026-05-13T16:30:00Z
+Dropped `-f` shorthand from `--format` registration; switched `RegisterOutputFlag`'s `StringP` to `String` and updated doc comment. Mirrored in versioncheck test helper.
+Files: ~common/flags/flags.go, ~neo4j-cli/internal/versioncheck/versioncheck_test.go

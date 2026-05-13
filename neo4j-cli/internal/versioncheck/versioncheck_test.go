@@ -275,7 +275,7 @@ func makeRoot(_ *testing.T, cfg *clicfg.Config) *cobra.Command {
 	root := &cobra.Command{Use: "neo4j-cli"}
 	root.Version = "v0.1.0"
 	// Replicate app.go wiring just enough for cmd.Flags()/Root() lookups.
-	root.PersistentFlags().StringP("format", "f", "", "format")
+	root.PersistentFlags().String("format", "", "format")
 	cfg.Global.BindFormat(root.PersistentFlags().Lookup("format"))
 
 	root.AddCommand(&cobra.Command{Use: "update", RunE: func(cmd *cobra.Command, args []string) error { return nil }})

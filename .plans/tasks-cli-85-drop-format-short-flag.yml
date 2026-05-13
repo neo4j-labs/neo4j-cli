@@ -13,7 +13,8 @@ tasks:
       `--format`. Mirror the same change in the test-only helper at
       `neo4j-cli/internal/versioncheck/versioncheck_test.go:278` so the test
       surface stays honest. See PRD REQ-F-001, REQ-F-002, REQ-F-004.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T16:30:00Z
     dependencies: []
     acceptance_criteria:
       - "`common/flags/flags.go` calls `cmd.PersistentFlags().String(\"format\", \"\", …)` (no `\"f\"` shorthand argument)"
