@@ -38,7 +38,7 @@ Flags:
 Creates a new Aura Graph Analytics Serverless session
 
 This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
-				Creating a session is an asynchronous operation that can be awaited with --await.
+				Creating a session is an asynchronous operation that can be waited for with --wait.
 
 Usage: `aura-cli graph-analytics session create [flags]`
 
@@ -46,7 +46,6 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--await` | bool | false | Waits until created session is ready. |
 | `--cloud-provider` | string | - | The cloud provider hosting the session. |
 | `--instance-id` | string | - | The ID of the instance to create the session for. |
 | `--memory` | string | - | (required) The size of the session memory in GB. |
@@ -54,6 +53,7 @@ Flags:
 | `--region` | string | - | The region where the session is hosted. |
 | `--tenant-id` | string | - | The Aura project/tenant ID |
 | `--ttl` | string | - | This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration. |
+| `--wait` | bool | false | Waits until created session is ready. |
 
 Examples:
 
@@ -62,7 +62,7 @@ Examples:
 neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
 
 # Create a session attached to an existing Aura instance and wait until ready
-neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --await
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --wait
 
 # Create a session with a TTL and emit JSON for scripting
 neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json

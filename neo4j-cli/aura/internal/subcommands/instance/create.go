@@ -27,7 +27,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		customerManagedKeyId string
 		vectorOptimized      bool
 		graphAnalyticsPlugin bool
-		await                bool
+		wait                 bool
 		credentialName       string
 		noCredentialStorage  bool
 		noCredentialPrint    bool
@@ -44,7 +44,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		customerManagedKeyIdFlag = "customer-managed-key-id"
 		vectorOptimizedFlag      = "vector-optimized"
 		graphAnalyticsPluginFlag = "graph-analytics-plugin"
-		awaitFlag                = "await"
 		credentialNameFlag       = "credential-name"
 		noCredentialStorageFlag  = "no-credential-storage"
 		noCredentialPrintFlag    = "no-credential-print"
@@ -55,7 +54,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create",
 		Short:       "Creates a new instance",
 		Example: `# Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --type free-db --await --rw
+neo4j-cli aura instance create --type free-db --wait --rw
 
 # Create a professional-db instance on AWS (us-east-1, N. Virginia)
 neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
@@ -68,7 +67,7 @@ Region identifiers follow each cloud provider's own naming convention: AWS uses 
 
 If you're unsure of possible configurations, run 'tenant get' to discover the full list of supported configurations for your tenant. The output lists every valid combination of --cloud-provider, --region, --type, and --memory.
 
-Creating an instance is an asynchronous operation that can be awaited with --await. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
+Creating an instance is an asynchronous operation that can be waited for with --wait. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
 This subcommand returns your instance ID, initial credentials, connection URL along with your tenant id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
 
@@ -224,7 +223,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(instance), fields)
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					instanceId, _ := instance["id"].(string)
 
@@ -262,7 +261,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().BoolVar(&graphAnalyticsPlugin, graphAnalyticsPluginFlag, false, "An optional graph analytics plugin configuration to be set during instance creation")
 
-	cmd.Flags().BoolVar(&await, awaitFlag, false, "Waits until created instance is ready.")
+	flags.RegisterWait(cmd, &wait, "Waits until created instance is ready.")
 
 	cmd.Flags().StringVar(&credentialName, credentialNameFlag, "", "The name to use when storing the credentials locally. Defaults to <instance-id>-default.")
 

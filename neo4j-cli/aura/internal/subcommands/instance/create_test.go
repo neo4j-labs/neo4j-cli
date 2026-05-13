@@ -439,7 +439,7 @@ func TestCreateFreeInstanceWithConfigTenantId(t *testing.T) {
 	}`)
 }
 
-func TestCreateFreeInstanceWithAwait(t *testing.T) {
+func TestCreateFreeInstanceWithWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -469,7 +469,7 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --wait --rw")
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)
@@ -500,11 +500,11 @@ func TestCreateFreeInstanceWithAwait(t *testing.T) {
 	})
 }
 
-// TestCreateFreeInstanceWithAwait_StdoutIsValidJSON is the CLI-82 regression-pin
-// for the await narration: pre-fix, stdout had narration mixed with the JSON
+// TestCreateFreeInstanceWithWait_StdoutIsValidJSON is the CLI-82 regression-pin
+// for the wait narration: pre-fix, stdout had narration mixed with the JSON
 // body and would fail to unmarshal. Reverting any of the Pattern A fmt.Fprintln
 // replacements to cmd.Println causes this test to fail.
-func TestCreateFreeInstanceWithAwait_StdoutIsValidJSON(t *testing.T) {
+func TestCreateFreeInstanceWithWait_StdoutIsValidJSON(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -534,7 +534,7 @@ func TestCreateFreeInstanceWithAwait_StdoutIsValidJSON(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw --format json")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --wait --rw --format json")
 
 	helper.AssertOutIsValidJSON()
 }
@@ -939,7 +939,7 @@ func TestCreateNoCredentialStorageAndNoPrint(t *testing.T) {
 	}`)
 }
 
-func TestCreateCredentialStoredBeforeAwait(t *testing.T) {
+func TestCreateCredentialStoredBeforeWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -957,14 +957,14 @@ func TestCreateCredentialStoredBeforeAwait(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --await --rw")
+	helper.ExecuteCommand("instance create --name Instance01 --type free-db --tenant-id YOUR_TENANT_ID --wait --rw")
 
 	helper.AssertErrContainsStrings([]string{
 		"Waiting for instance to be ready...",
 		"Instance Status: ready",
 	})
 
-	// Credential must be stored even though --await polling followed.
+	// Credential must be stored even though --wait polling followed.
 	helper.AssertCredentialsValue("dbms.credentials.0.name", "db1d1234-default")
 }
 

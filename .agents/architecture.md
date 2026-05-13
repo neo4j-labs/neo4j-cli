@@ -43,7 +43,7 @@ common/
 - Only one positional argument max; extras become flags
 - The positional argument always refers to the nearest noun
 - `--format json|table` (shorthand `-f`) for read commands
-- `--await` flag for async operations
+- `--wait` flag for async operations
 
 ## Config & State
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +17,7 @@ import (
 func NewPauseCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		instanceId string
-		await      bool
+		wait       bool
 	)
 
 	cmd := &cobra.Command{
@@ -25,12 +26,12 @@ func NewPauseCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:       "Pause a GraphQL Data API",
 		Long: `This command starts the pausing process of an existing GraphQL Data API.
 
-Pausing a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be paused. The GraphQL Data API will only be paused once the status transitions from "pausing" to "paused".`,
+Pausing a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be paused. The GraphQL Data API will only be paused once the status transitions from "pausing" to "paused".`,
 		Example: `# Pause a GraphQL Data API
 neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw
 
 # Pause a GraphQL Data API and wait until it is paused
-neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --await --rw
+neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --wait --rw
 
 # Pause a GraphQL Data API and capture the response as JSON
 neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw --format json`,
@@ -50,7 +51,7 @@ neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw --for
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
 
-				if await {
+				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be paused...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, args[0], api.GraphQLDataApiStatusPausing)
 					if err != nil {
@@ -67,7 +68,7 @@ neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw --for
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to pause the Data API for")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().BoolVar(&await, "await", false, "Waits until GraphQL Data API is paused.")
+	flags.RegisterWait(cmd, &wait, "Waits until GraphQL Data API is paused.")
 
 	return cmd
 }

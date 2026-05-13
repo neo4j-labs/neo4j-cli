@@ -32,10 +32,8 @@ import (
 // recursion structure of `commands`. See AGENTS.md "Agent Context Notes".
 const schemaVersion = 1
 
-// asyncFlag is the canonical async-flag name in this repo. v1 emits
-// "--await" (honest to the actual flag); renaming to "--wait" is a separate
-// audit item.
-const asyncFlag = "--await"
+// asyncFlag is the canonical async-flag name in this repo post-CLI-87.
+const asyncFlag = "--wait"
 
 // maxDepth bounds recursion defensively. The repo's command tree does not
 // exceed depth 4 today; the bound is purely a guardrail.

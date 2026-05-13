@@ -77,7 +77,7 @@ func TestAgentContext_Envelope(t *testing.T) {
 	} {
 		assert.Contains(t, ctx.ErrorCodes, code, "error_codes must include %q", code)
 	}
-	assert.Equal(t, "--await", ctx.AsyncFlag)
+	assert.Equal(t, "--wait", ctx.AsyncFlag)
 	assert.Equal(t, clicfg.ValidFormatValues[:], ctx.OutputFormats)
 }
 
