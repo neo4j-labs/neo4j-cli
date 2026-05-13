@@ -7,7 +7,7 @@ Required pre-reading before using `neo4j-cli query`. Covers the schema-first wor
 **Before generating ANY Cypher yourself, ALWAYS run `:schema` first** to understand the database structure. Do not guess label names, relationship types, or property names — get them from the schema.
 
 ```bash
-neo4j-cli query :schema -f toon
+neo4j-cli query :schema --format toon
 ```
 
 If the user supplies a Cypher query directly, just execute it — no need to fetch schema first.
@@ -21,7 +21,7 @@ Use the schema output to:
 
 ## What `:schema` returns
 
-`neo4j-cli query :schema` returns a single structured payload (TOON by default, JSON via `-f json`, table via `-f table`) with these top-level fields:
+`neo4j-cli query :schema` returns a single structured payload (TOON by default, JSON via `--format json`, table via `--format table`) with these top-level fields:
 
 - **`database`** — optional metadata: `name`, `versions[]` (e.g. `["5.26.0"]`), `edition` (`community`/`enterprise`), `default_language` (`CYPHER 5` or `CYPHER 25`). Missing if the server / role can't run `dbms.components()` or `SHOW SETTINGS`.
 - **`nodes[]`** — one row per (node-label-set, property) pair. Fields: `nodeType`, `nodeLabels[]`, `propertyName`, `propertyTypes[]`, `mandatory`. Flat shape: a single label with three properties appears as three rows.
@@ -37,34 +37,34 @@ Use the schema output to:
 Run Cypher with the positional argument:
 
 ```bash
-neo4j-cli query "MATCH (n:Person) RETURN n.name, n.age LIMIT 10" -f toon
+neo4j-cli query "MATCH (n:Person) RETURN n.name, n.age LIMIT 10" --format toon
 ```
 
 Pipe from stdin when no positional is supplied:
 
 ```bash
-echo "MATCH (n) RETURN labels(n), count(*)" | neo4j-cli query -f toon
+echo "MATCH (n) RETURN labels(n), count(*)" | neo4j-cli query --format toon
 ```
 
 Use a stored dbms credential to avoid passing connection details every time:
 
 ```bash
-neo4j-cli query --credential prod "MATCH (n:Person) RETURN count(n)" -f toon
+neo4j-cli query --credential prod "MATCH (n:Person) RETURN count(n)" --format toon
 ```
 
 Pass query parameters with repeatable `--param`:
 
 ```bash
 neo4j-cli query --param name=Alice --param age=30 \
-  'MATCH (n:Person {name: $name, age: $age}) RETURN n' -f toon
+  'MATCH (n:Person {name: $name, age: $age}) RETURN n' --format toon
 ```
 
-Always pass `-f toon` on read commands — TOON is ~40% smaller than JSON for the same data, so it's the agent-friendly default. Switch to `-f json` only when piping into a JSON-aware tool.
+Always pass `--format toon` on read commands — TOON is ~40% smaller than JSON for the same data, so it's the agent-friendly default. Switch to `--format json` only when piping into a JSON-aware tool.
 
 ## Handling user requests
 
 - **User supplies a Cypher query as `$ARGUMENTS`** — run it directly. Do NOT fetch schema first.
-- **User asks a data question without Cypher** (e.g. "how many people work at Acme?") — run `neo4j-cli query :schema -f toon` first, use the schema to write the correct Cypher, then run the query.
+- **User asks a data question without Cypher** (e.g. "how many people work at Acme?") — run `neo4j-cli query :schema --format toon` first, use the schema to write the correct Cypher, then run the query.
 - **User asks to write / modify / delete** — surface the `--rw` requirement and ASK before retrying. Do not add `--rw` on your own. `neo4j-cli query` runs an `EXPLAIN` preflight over Bolt to detect write Cypher and blocks the statement unless `--rw` is set.
 
 ## Parameters
@@ -73,11 +73,11 @@ Use `--param NAME=VALUE` (repeatable). Values that parse as JSON are bound with 
 
 ```bash
 # string param
-neo4j-cli query --param name=Alice 'MATCH (n:Person {name:$name}) RETURN n' -f toon
+neo4j-cli query --param name=Alice 'MATCH (n:Person {name:$name}) RETURN n' --format toon
 
 # JSON-typed params (number, array, bool)
 neo4j-cli query --param limit=10 --param tags='["sci-fi","ai"]' --param strict=true \
-  'MATCH (m:Movie) WHERE any(t IN m.tags WHERE t IN $tags) RETURN m LIMIT $limit' -f toon
+  'MATCH (m:Movie) WHERE any(t IN m.tags WHERE t IN $tags) RETURN m LIMIT $limit' --format toon
 ```
 
 Prefer `--param` over string interpolation: it keeps the query plan cacheable and avoids quoting bugs.
@@ -96,7 +96,7 @@ Inline embedding inside a query — `:embed` modifier on `--param`:
 neo4j-cli query \
   --param q:embed='science fiction movies about AI' \
   "CALL db.index.vector.queryNodes('movie_embeddings', 5, \$q)
-   YIELD node, score RETURN node.title AS title, score" -f toon
+   YIELD node, score RETURN node.title AS title, score" --format toon
 ```
 
 Other `--param` values keep normal type coercion, so mix freely:
@@ -106,13 +106,13 @@ neo4j-cli query \
   --param k=5 \
   --param q:embed='sci-fi movies' \
   "CALL db.index.vector.queryNodes('movie_embeddings', \$k, \$q)
-   YIELD node, score RETURN node.title, score" -f toon
+   YIELD node, score RETURN node.title, score" --format toon
 ```
 
 Standalone preview without opening a Bolt connection — `:embed` leaf:
 
 ```bash
-neo4j-cli query :embed "hello world" -f json
+neo4j-cli query :embed "hello world" --format json
 ```
 
 Useful for verifying provider config and the vector dimensions before running a vector query.
@@ -136,8 +136,8 @@ Read `database.default_language` from `:schema` to pick the right dialect. If un
 
 ## Tips
 
-- Run `neo4j-cli query :schema -f toon` before generating Cypher — never assume you know the schema.
-- Default to `-f toon` on every read command; switch to `-f json` only when piping into a JSON-aware tool, and `-f table` only when the user asked for a human-readable table.
+- Run `neo4j-cli query :schema --format toon` before generating Cypher — never assume you know the schema.
+- Default to `--format toon` on every read command; switch to `--format json` only when piping into a JSON-aware tool, and `--format table` only when the user asked for a human-readable table.
 - Use `LIMIT` for exploratory queries to avoid pulling large result sets.
 - Use `--param` for dynamic values instead of string interpolation — keeps the query plan cacheable and avoids quoting bugs.
 - Relationship directions matter: check `relationship_paths.from` → `to` in the schema output before writing `MATCH`.

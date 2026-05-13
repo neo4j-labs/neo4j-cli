@@ -100,7 +100,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 - Singular nouns for commands (`instance`, not `instances`)
 - `<resource> <action>` form (`instance list`, not `list-instance`)
 - One positional argument max; extras become flags
-- `--format json|table|toon` (shorthand `-f`) for all read commands
+- `--format json|table|toon` for all read commands
 - `--wait` flag for async operations
 - Follow CLI best practices from https://clig.dev/ — source at https://github.com/cli-guidelines/cli-guidelines/blob/main/content/_index.md (fetch the raw markdown for token-efficient reference)
 

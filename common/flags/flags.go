@@ -29,12 +29,11 @@ var stdoutIsTerminal = func() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-// RegisterOutputFlag adds a persistent --format/-f flag to cmd and installs a
+// RegisterOutputFlag adds a persistent --format flag to cmd and installs a
 // PersistentPreRunE hook that validates the value and binds it to cfg.Global.
 func RegisterOutputFlag(cmd *cobra.Command, cfg *clicfg.Config) {
-	cmd.PersistentFlags().StringP(
+	cmd.PersistentFlags().String(
 		"format",
-		"f",
 		"",
 		fmt.Sprintf("Format to print console output in, from a choice of [%s]. (agents: prefer toon)", strings.Join(clicfg.ValidFormatValues[:], ", ")),
 	)

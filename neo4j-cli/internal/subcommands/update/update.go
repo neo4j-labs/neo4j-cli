@@ -122,7 +122,7 @@ neo4j-cli update --force`,
 
 	cmd.Flags().BoolVar(&preReleases, preReleasesFlag, false, "Include alpha/beta/rc tags when looking up the latest release")
 	cmd.Flags().StringVar(&version, versionFlag, "", "Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0)")
-	cmd.Flags().BoolVar(&force, forceFlag, false, "Bypass the package-manager-managed-binary check and proceed with the in-place swap")
+	cmd.Flags().BoolVarP(&force, forceFlag, "f", false, "Bypass the package-manager-managed-binary check and proceed with the in-place swap")
 
 	cmd.AddCommand(newCheckCmd(cfg, bundle, skillName))
 

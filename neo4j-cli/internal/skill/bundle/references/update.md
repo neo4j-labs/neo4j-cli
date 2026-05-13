@@ -10,7 +10,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--force` | bool | false | Bypass the package-manager-managed-binary check and proceed with the in-place swap |
+| `-f, --force` | bool | false | Bypass the package-manager-managed-binary check and proceed with the in-place swap |
 | `--pre-releases` | bool | false | Include alpha/beta/rc tags when looking up the latest release |
 | `--version` | string | - | Update to the named release tag instead of the latest (must be a valid semver tag, e.g. v0.1.0) |
 

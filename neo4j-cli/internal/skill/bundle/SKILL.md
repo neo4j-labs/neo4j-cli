@@ -14,7 +14,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-f, --format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
+| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
 | `--rw` | bool | false | Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script. |
 
 ## Subcommands
@@ -36,8 +36,8 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 - **Before using `neo4j-cli query`, read [query-additions.md](query-additions.md) — required pre-reading covering schema-first workflow, parameters, embeddings, Cypher 25 vs 5, and tips.**
 - The `aura` subcommand under neo4j-cli mirrors the standalone aura-cli surface but does NOT carry a duplicate `skill` group — install agent skills via `neo4j-cli skill install` at the top level.
 - `credential` lives at the top level of neo4j-cli (not nested under `aura`) so credentials apply across every subcommand that talks to Aura.
-- All read commands accept `--format json|table|toon` (shorthand `-f`). Write commands print confirmation text only; pipe-friendly output requires explicit `--format json` where supported.
-- **Always pass `--format toon` (`-f toon`) on read commands** — toon uses ~40% fewer tokens than JSON while encoding the same data, so default to it for every list/get/show command. Only use `--format json` when piping into a JSON-aware tool that requires it; only use `--format table` when the user explicitly asks for a human-readable table.
+- All read commands accept `--format json|table|toon`. Write commands print confirmation text only; pipe-friendly output requires explicit `--format json` where supported.
+- **Always pass `--format toon` on read commands** — toon uses ~40% fewer tokens than JSON while encoding the same data, so default to it for every list/get/show command. Only use `--format json` when piping into a JSON-aware tool that requires it; only use `--format table` when the user explicitly asks for a human-readable table.
 - Async resource operations (instance create/resize/destroy) accept `--wait` to block until the resource reaches a terminal state.
 - The `version:` line in an installed SKILL.md reflects the binary that wrote it. Run `neo4j-cli skill check` after upgrading to detect drift; v1 reports drift only — re-run `skill install` to refresh.
 - If you pass an HTTP-style URI (e.g. `http://host:7474`) to `query` it is auto-rewritten to `neo4j://host:7687` (and `https://` to `neo4j+s://host:7687`); this command speaks the Bolt protocol. Use `neo4j+ssc://` for self-signed certs.

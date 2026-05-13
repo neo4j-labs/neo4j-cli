@@ -130,6 +130,21 @@ func TestRegisterAuraCredentialFlag_CredentialNotFound(t *testing.T) {
 	}
 }
 
+// TestRegisterOutputFlag_NoShorthand pins CLI-85 REQ-F-001/004: the persistent
+// `--format` flag must NOT claim any short-form letter. Locks the freed `-f`
+// slot so a future contributor cannot re-introduce a `StringP("format", "f", …)`
+// call without this test failing.
+func TestRegisterOutputFlag_NoShorthand(t *testing.T) {
+	cfg := buildConfig(t, `{"aura":{"credentials":[],"default-credential":""}}`)
+	cmd := &cobra.Command{Use: "resource"}
+	RegisterOutputFlag(cmd, cfg)
+
+	flag := cmd.PersistentFlags().Lookup("format")
+	require.NotNil(t, flag, "--format must be registered as a persistent flag")
+	assert.Equal(t, "", flag.Shorthand,
+		"--format must have empty Shorthand (CLI-85 freed `-f` for `update --force`)")
+}
+
 func TestRegisterOutputFlag_SilencesUsageOnError(t *testing.T) {
 	for _, tc := range []struct {
 		name             string

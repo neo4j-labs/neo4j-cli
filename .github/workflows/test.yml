@@ -169,7 +169,7 @@ jobs:
                     set +e
                     out="$(NEO4J_CLI_UPDATE_E2E_API_URL="${base}" \
                            NEO4J_CLI_UPDATE_E2E_ALLOW_HTTP=1 \
-                           "${cli_bin}" update check --pre-releases -f json)"
+                           "${cli_bin}" update check --pre-releases --format json)"
                     set -e
                     echo "--- update check stdout (${name}) ---"
                     printf '%s\n' "$out"
@@ -221,7 +221,7 @@ jobs:
                   # Capture stdout. Defense in depth around exit code (see
                   # the hermetic block above for the rationale).
                   set +e
-                  out="$("${cli_bin}" update check --pre-releases -f json)"
+                  out="$("${cli_bin}" update check --pre-releases --format json)"
                   set -e
                   echo "--- update check stdout (live) ---"
                   printf '%s\n' "$out"
