@@ -564,6 +564,53 @@ func TestNewCmd_FlagsExposed(t *testing.T) {
 	assert.Nil(t, cmd.Flags().Lookup("check"), "--check must NOT be registered on the parent — use the `check` subcommand")
 }
 
+// TestNewCmd_ForceFlagShorthand pins CLI-85 REQ-F-003: `update --force` claims
+// the `-f` short-form letter freed by dropping `--format`'s shorthand. Locks
+// the new binding so a future refactor cannot silently drop it.
+func TestNewCmd_ForceFlagShorthand(t *testing.T) {
+	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	flag := cmd.Flags().Lookup("force")
+	require.NotNil(t, flag, "--force must be registered on `update`")
+	assert.Equal(t, "f", flag.Shorthand,
+		"--force must claim the `-f` shorthand freed by CLI-85")
+}
+
+// TestNewCmd_ForceShorthand_ParsesToTrue exercises the cobra parse path for
+// `update -f --version <valid>` and confirms `force=true` reaches runOpts.
+// Locks REQ-F-003 end-to-end via cobra arg dispatch (not just flag-registration
+// introspection).
+func TestNewCmd_ForceShorthand_ParsesToTrue(t *testing.T) {
+	withGetByTag(t, func(ctx context.Context, tag string) (*Release, error) {
+		return &Release{TagName: tag}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
+	})
+	swapCalled := false
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		swapCalled = true
+		return nil
+	})
+
+	tfs, err := testfs.GetTestFs(`{"format":"default"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	out := &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetArgs([]string{"-f", "--version", "v0.2.0"})
+
+	require.NoError(t, cmd.Execute(), "cobra must parse `update -f --version <valid>` without error")
+	assert.True(t, swapCalled,
+		"`-f` must propagate as force=true and bypass the homebrew passthrough hint")
+}
+
 func TestRunUpdate_ChannelLabel_StableVsPreRelease(t *testing.T) {
 	// The channel label appears in user-facing messages (and feeds JSON
 	// output in task-007). Stable target → "stable"; prerelease tag with

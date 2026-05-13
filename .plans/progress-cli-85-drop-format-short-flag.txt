@@ -9,3 +9,7 @@ Files: ~neo4j-cli/internal/subcommands/update/update.go
 ## task-003 — 2026-05-13T17:00:00Z
 Stripped `(shorthand `-f`)` parentheticals from skill source markdown (additions, query-additions) and repo docs (AGENTS, CONTRIBUTING, .agents/architecture, .agents/repo-layout). Rewrote `-f <value>` tokens to `--format <value>` in query-additions. CLAUDE.md symlink untouched.
 Files: ~AGENTS.md, ~CONTRIBUTING.md, ~.agents/architecture.md, ~.agents/repo-layout.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/query-additions.md, ~neo4j-cli/aura/internal/skill/additions.md
+
+## task-004 — 2026-05-13T17:15:00Z
+Added regression tests: TestRegisterOutputFlag_NoShorthand asserts `--format`.Shorthand=="" after RegisterOutputFlag; TestNewCmd_ForceFlagShorthand asserts `update --force`.Shorthand=="f"; TestNewCmd_ForceShorthand_ParsesToTrue drives `update -f --version v0.2.0` through cobra Execute and confirms force=true reaches runOpts (bypasses homebrew passthrough). Scoped tests + fmt-check + lint all green; TestGenerator_RoundTrip deferred to task-005.
+Files: ~common/flags/flags_test.go, ~neo4j-cli/internal/subcommands/update/update_test.go

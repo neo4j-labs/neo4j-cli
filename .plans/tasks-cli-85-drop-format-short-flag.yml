@@ -81,7 +81,8 @@ tasks:
       case confirming `update check -f` still errors. These lock the freed
       slot and the new binding so neither can silently regress. See PRD
       REQ-F-005, REQ-F-006.
-    status: pending
+    status: completed
+    completed_at: 2026-05-13T17:15:00Z
     dependencies:
       - task-001
       - task-002
