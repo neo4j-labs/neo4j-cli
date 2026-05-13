@@ -18,3 +18,7 @@ Files: ~neo4j-cli/query/schema.go
 ## task-006 — 2026-05-13T14:24:10Z
 Added Minor-kind changelog entry via `changie new` referencing CLI-116. Ran in parallel batch with task-003/004.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260513-162347.yaml
+
+## task-005 — 2026-05-13T14:25:00Z
+Regenerated `neo4j-cli/internal/skill/bundle/` via `go generate`. Aura bundle untouched (diff clean). SKILL.md description, Subcommands row, first Tips & Gotchas bullet, and references/query.md Long + first Example all now lead with `:schema`.
+Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/query.md

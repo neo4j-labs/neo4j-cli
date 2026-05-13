@@ -102,7 +102,7 @@ tasks:
       the aura skill bundle (`neo4j-cli/aura/internal/skill/`) MUST NOT be
       touched (query is not under aura). See PRD REQ-F-008 and AGENTS.md
       "Cobra Help / Skill Bundle Rendering Notes".
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -116,7 +116,7 @@ tasks:
       - "`bundle/references/query.md` Long lede mentions `:schema`"
       - "`bundle/references/query.md` first Example is `neo4j-cli query :schema --format toon`"
       - "`git diff --stat neo4j-cli/aura/internal/skill/bundle/` shows zero changes"
-    completed_at: null
+    completed_at: 2026-05-13T14:25:00Z
 
   - id: task-006
     title: "Add `Minor`-kind changelog entry for CLI-116"

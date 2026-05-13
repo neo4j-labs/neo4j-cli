@@ -1,8 +1,8 @@
 # neo4j-cli query
 
-Run Cypher against a Neo4j database via the Bolt protocol
+Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol
 
-Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
+Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
 
 Usage: `neo4j-cli query [cypher]`
 
@@ -29,6 +29,9 @@ Flags:
 Examples:
 
 ```
+# Introspect the schema before writing Cypher (always do this first)
+neo4j-cli query :schema --format toon
+
 # Run inline Cypher (read-only — no --rw needed)
 neo4j-cli query "MATCH (n) RETURN count(n) AS n" --format json
 
@@ -70,15 +73,15 @@ neo4j-cli query :embed "hello" --embed-provider openai --embed-model text-embedd
 
 Introspect the connected database (labels, rel types, indexes, constraints)
 
-Introspect the connected database. Runs a sequence of read-only cypher calls and aggregates the result into one structured payload with database info, node/relationship properties, relationship paths, indexes, and constraints. --max-rows and --truncate-arrays-over do not apply.
+Run this BEFORE generating Cypher to discover the database's actual labels, relationship types, and properties — never guess. Introspect the connected database. Runs a sequence of read-only cypher calls and aggregates the result into one structured payload with database info, node/relationship properties, relationship paths, indexes, and constraints. --max-rows and --truncate-arrays-over do not apply.
 
 Usage: `neo4j-cli query :schema`
 
 Examples:
 
 ```
-# Introspect the connected database as a 5-section table
-neo4j-cli query :schema
+# Discover labels, rel types, and properties (run this before writing Cypher)
+neo4j-cli query :schema --format toon
 
 # Same introspection rendered as a single JSON payload (machine-readable)
 neo4j-cli query :schema --format json
