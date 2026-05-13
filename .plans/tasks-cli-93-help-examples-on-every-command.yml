@@ -96,7 +96,7 @@ tasks:
       Add `Example:` fields to every leaf under `neo4j-cli/internal/subcommands/credential/`:
       `dbms/` (add, list, use, remove, set_embed) and `embed/` (add, list, use, remove).
       Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -105,7 +105,7 @@ tasks:
       - "Read leaves (`dbms list`, `embed list`) include at least one `--format json` invocation and never `--rw`"
       - "`dbms add` Examples illustrate both `--file <path>` (Aura JSON credential bundle) and explicit flag (`--uri`, `--username`, `--password`) forms — the two real-world input modes"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:37:27Z
 
   - id: task-007
     title: "Top-level config + update: add Example blocks"

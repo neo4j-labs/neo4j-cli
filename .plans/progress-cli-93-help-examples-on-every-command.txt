@@ -19,3 +19,7 @@ Decisions: bundle skipped — same beta-gate reason as task-003. Cleaned-up trai
 ## task-005 — 2026-05-13T11:34:04Z
 Added Example blocks to 7 leaves: graph-analytics/session (create/list/delete/get) + import/job (create/get/cancel). Regenerated bundles (graph-analytics.md + aura.md).
 Files: ~7 leaf .go + ~bundle/references/graph-analytics.md (aura) + ~bundle/references/aura.md (neo4j-cli)
+
+## task-006 — 2026-05-13T11:37:27Z
+Added Example blocks to 9 credential leaves: dbms (add/list/use/remove/set-embed) + embed (add/list/use/remove). dbms add covers both --file and explicit-flag forms. Regenerated neo4j-cli bundle (references/credential.md).
+Files: ~9 leaf .go + ~bundle/references/credential.md (neo4j-cli)

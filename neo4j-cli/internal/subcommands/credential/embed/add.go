@@ -40,6 +40,14 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add an embedding-provider credential. Provider must be one of openai, ollama, huggingface. " +
 			"`--api-key` is optional for ollama (no auth required) and may be omitted for openai/huggingface if you intend to provide it via env var (`OPENAI_API_KEY` / `HF_TOKEN` / `NEO4J_EMBED_API_KEY`). " +
 			"The first credential added becomes the default; switch later with `credential embed use <name>`.",
+		Example: `# Add an OpenAI embed credential (becomes the default if it is the first one)
+neo4j-cli credential embed add --name openai-small --provider openai --model text-embedding-3-small --api-key sk-... --rw
+
+# Add a local Ollama embed credential (no api-key required)
+neo4j-cli credential embed add --name ollama-nomic --provider ollama --model nomic-embed-text --base-url http://localhost:11434 --rw
+
+# Add a HuggingFace embed credential with explicit dimensions
+neo4j-cli credential embed add --name hf-bge --provider huggingface --model BAAI/bge-small-en-v1.5 --api-key hf_... --dimensions 384 --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !isValidProvider(provider) {

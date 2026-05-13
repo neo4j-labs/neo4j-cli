@@ -10,9 +10,17 @@ import (
 
 func newUseCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:         "use <name>",
-		Short:       "Sets the default embed credential to be used",
-		Long:        "Set the named embed credential as the default consumed by `query --param NAME:embed=...` and `query :embed` when no `--embed-credential` flag, no `NEO4J_EMBED_*` env, no `.env` value, and no dbms→embed link resolves first.",
+		Use:   "use <name>",
+		Short: "Sets the default embed credential to be used",
+		Long:  "Set the named embed credential as the default consumed by `query --param NAME:embed=...` and `query :embed` when no `--embed-credential` flag, no `NEO4J_EMBED_*` env, no `.env` value, and no dbms→embed link resolves first.",
+		Example: `# Make 'openai-small' the default embed credential
+neo4j-cli credential embed use openai-small --rw
+
+# Switch the default to the local Ollama embedder
+neo4j-cli credential embed use ollama-nomic --rw
+
+# Switch the default to a HuggingFace embedder
+neo4j-cli credential embed use hf-bge --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

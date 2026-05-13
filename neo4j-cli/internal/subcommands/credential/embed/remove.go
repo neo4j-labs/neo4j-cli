@@ -15,6 +15,14 @@ func newRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Remove a stored embedding-provider credential by name. " +
 			"Removal is non-cascading: dbms credentials linked to the removed embed credential keep their `embed-credential` field; " +
 			"the stale link is reported lazily at query time. Run `credential dbms list` to find linked profiles or `credential dbms set-embed <dbms-name>` to clear them.",
+		Example: `# Remove an embed credential by name
+neo4j-cli credential embed remove openai-small --rw
+
+# Remove the local Ollama embed credential
+neo4j-cli credential embed remove ollama-nomic --rw
+
+# Remove a HuggingFace embed credential
+neo4j-cli credential embed remove hf-bge --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

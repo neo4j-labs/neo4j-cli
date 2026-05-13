@@ -16,6 +16,14 @@ func newSetEmbedCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Link a stored dbms credential to an existing embed credential by name. Pass only the dbms name to clear the link. " +
 			"No embed-credential is required for `query` to run plain Cypher; this only links one for downstream embedding via `--param NAME:embed=...` and `query :embed`. " +
 			"With a link in place, `query --credential <dbms-name>` picks up both the connection and the embed config in a single selector.",
+		Example: `# Link a dbms credential to an embed credential
+neo4j-cli credential dbms set-embed local openai-small --rw
+
+# Replace the linked embed credential
+neo4j-cli credential dbms set-embed local ollama-nomic --rw
+
+# Clear the embed-credential link on a dbms credential
+neo4j-cli credential dbms set-embed local --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {

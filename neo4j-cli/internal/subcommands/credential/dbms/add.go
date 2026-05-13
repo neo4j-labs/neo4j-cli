@@ -45,6 +45,14 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 			"Pass `--embed-credential <name>` to link this profile to an existing embed credential — " +
 			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. " +
 			"Pass `--file <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.",
+		Example: `# Add a dbms credential from an Aura-exported credentials file
+neo4j-cli credential dbms add --file ./Neo4j-12345-Created-2025-01-01.txt --rw
+
+# Add a dbms credential with explicit flags (becomes the default if it is the first one)
+neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --rw
+
+# Add a dbms credential and link it to an existing embed credential
+neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --embed-credential openai-small --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the optional --file before applying any defaults so we can

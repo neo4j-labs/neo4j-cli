@@ -16,7 +16,15 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Lists dbms credentials",
 		Long:  "List stored Bolt connection profiles. Columns include any linked embed credential (empty when unset). Passwords are never printed.",
-		Args:  cobra.NoArgs,
+		Example: `# List dbms credentials as a table
+neo4j-cli credential dbms list
+
+# List dbms credentials as JSON (machine-readable)
+neo4j-cli credential dbms list --format json
+
+# List dbms credentials in toon format
+neo4j-cli credential dbms list --format toon`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Dbms.Printable(), dbmsCredentialFields)
 			return nil
