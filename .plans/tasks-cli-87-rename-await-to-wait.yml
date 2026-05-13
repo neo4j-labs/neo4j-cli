@@ -109,7 +109,7 @@ tasks:
       Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` to refresh both skill bundle reference markdown sets.
       Inspect the diffs in `neo4j-cli/internal/skill/bundle/references/*.md` and `neo4j-cli/aura/internal/skill/bundle/references/*.md` — they must show `--await` → `--wait` and must NOT contain `--await` as a documented flag (cobra's MarkDeprecated should elide it from FlagUsages). If `--await` leaks into the bundle, escalate as a render-side fix.
       Commit the source-side changes and the regenerated bundles together so `TestGenerator_RoundTrip` stays green.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-005
@@ -119,7 +119,7 @@ tasks:
       - "Deprecated --await alias does NOT appear in any rendered bundle reference"
       - "TestGenerator_RoundTrip passes in both skill packages"
       - "`make generate-check` passes (no diff after go generate ./... against a clean working tree)"
-    completed_at: null
+    completed_at: 2026-05-13T14:45:00Z
 
   - id: task-008
     title: "Add changie entry referencing CLI-87 and the follow-up issue"
