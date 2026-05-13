@@ -2,7 +2,7 @@
 
 Run Cypher against a Neo4j database via the Bolt protocol
 
-Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection.
+Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
 
 Usage: `neo4j-cli query [cypher]`
 

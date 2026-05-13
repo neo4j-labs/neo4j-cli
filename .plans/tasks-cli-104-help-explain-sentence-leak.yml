@@ -51,7 +51,7 @@ tasks:
       error. Inspect the diff and confirm only the three expected `Long:`-derived
       surfaces changed. See PRD REQ-F-005 and AGENTS.md "Cobra Help / Skill Bundle
       Rendering Notes".
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -62,7 +62,7 @@ tasks:
       - "`neo4j-cli/internal/skill/bundle/references/query.md` contains the new EXPLAIN gate sentence"
       - "`neo4j-cli/aura/internal/skill/bundle/SKILL.md` no longer contains `runs EXPLAIN first when --rw`"
       - "`grep -rn \"runs EXPLAIN first when --rw\" .` returns no hits anywhere"
-    completed_at: null
+    completed_at: 2026-05-13T12:55:00Z
 
   - id: task-004
     title: "Add `Patch`-kind changelog entry"
