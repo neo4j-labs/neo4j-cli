@@ -35,7 +35,7 @@ tasks:
       negative assertion on the legacy URL. Per the PRD Open Question, skip
       the bare-`credential add` negative assertion — the positive `credential
       aura-client add` assertion is sufficient.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -44,7 +44,7 @@ tasks:
       - "Test asserts absence of: https://neo4j.com/docs/aura/classic/platform/api/authentication"
       - "Test passes via `go test ./common/clicfg/credentials/...`"
       - "make test is green"
-    completed_at: null
+    completed_at: 2026-05-13T06:52:28Z
 
   - id: task-003
     title: "Add changie Patch entry for CLI-80"
