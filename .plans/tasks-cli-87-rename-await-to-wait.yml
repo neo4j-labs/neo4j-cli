@@ -10,7 +10,8 @@ tasks:
       Create the follow-up Linear issue that tracks removing the deprecated `--await` alias after one release.
       Use `mcp__linear-server__save_issue` with team Neo4j, project CLI, parent CLI-71, due date 2026-06-03.
       The issue ID is needed by the changelog task, so this must run early.
-    status: pending
+    status: completed
+    follow_up_issue_id: CLI-111
     dependencies: []
     acceptance_criteria:
       - "New Linear issue exists titled 'Remove deprecated --await alias (follow-up to CLI-87)'"
@@ -18,7 +19,7 @@ tasks:
       - "Due date set to 2026-06-03"
       - "Body lists the mechanical removal targets: wait.go (drop AwaitFlagAlias const, second BoolVar, MarkDeprecated), wait_test.go (drop alias cases), regenerate bundles, drop the alias sentence in CONTRIBUTING.md §3.5"
       - "Issue ID captured for use in task-008 (changelog)"
-    completed_at: null
+    completed_at: 2026-05-13T13:26:00Z
 
   - id: task-002
     title: "Create flags.RegisterWait helper and tests"

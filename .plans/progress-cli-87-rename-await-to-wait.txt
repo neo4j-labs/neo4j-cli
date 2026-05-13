@@ -1,0 +1,4 @@
+## task-001 — 2026-05-13T13:26:00Z
+Created Linear issue CLI-111 (parent CLI-71, project Neo4j-CLI, team neo4j-cli-workinggroup, due 2026-06-03) to track --await alias removal after one release.
+Files: ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: PRD's "team Neo4j, project CLI" = team neo4j-cli-workinggroup (key CLI) + project Neo4j-CLI. Recorded follow_up_issue_id: CLI-111 in YAML for task-008.
