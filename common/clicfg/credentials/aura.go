@@ -74,7 +74,7 @@ func (c *AuraCredentials) SetDefault(name string) error {
 
 func (c *AuraCredentials) GetDefault() (*AuraCredential, error) {
 	if c.DefaultCredential == "" {
-		return nil, clierr.NewUsageError("default credential not set, please follow the instructions at https://neo4j.com/docs/aura/classic/platform/api/authentication/#_creating_credentials and use the `credential add` subcommand to add the created credentials")
+		return nil, clierr.NewUsageError("default credential not set, create Aura API credentials at https://console.neo4j.io/account (see https://neo4j.com/docs/aura/api/authentication/) and run `credential aura-client add` to store them")
 	}
 	return c.Get(c.DefaultCredential)
 }

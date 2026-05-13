@@ -14,7 +14,7 @@ tasks:
       §"Proposed wording" verbatim: leads with `https://console.neo4j.io/account`,
       parenthetical docs reference `https://neo4j.com/docs/aura/api/authentication/`,
       and `credential aura-client add` as the shipped subcommand.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "common/clicfg/credentials/aura.go:77 returns the new message verbatim"
@@ -22,7 +22,7 @@ tasks:
       - "Message contains the substrings: https://console.neo4j.io/account, https://neo4j.com/docs/aura/api/authentication/, credential aura-client add"
       - "(c *AuraCredentials) GetDefault() signature unchanged"
       - "make fmt-check is clean"
-    completed_at: null
+    completed_at: 2026-05-13T06:50:24Z
 
   - id: task-002
     title: "Add regression test for GetDefault no-default error body"

@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-13T06:50:24Z
+Replaced broken Aura auth URL and stale `credential add` subcommand in `AuraCredentials.GetDefault()` no-default error with PRD verbatim wording (console.neo4j.io/account primary, docs/aura/api/authentication parenthetical, `credential aura-client add`).
+Files: ~common/clicfg/credentials/aura.go
