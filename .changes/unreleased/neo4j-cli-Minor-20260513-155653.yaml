@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Remove '-f' shorthand from '--format'; '-f' is now the shorthand for 'neo4j-cli update --force' (CLI-85).
-time: 2026-05-13T15:56:53.667284+02:00
