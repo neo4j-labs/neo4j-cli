@@ -1,0 +1,206 @@
+feature: cli-93-help-examples-on-every-command
+prd: ./prd-cli-93-help-examples-on-every-command.md
+created_at: 2026-05-13T10:59:56Z
+updated_at: 2026-05-13T10:59:56Z
+
+tasks:
+  - id: task-001
+    title: "Aura instance + snapshot leaves: add/normalise Example blocks"
+    description: |
+      Add `Example:` fields to every leaf under `neo4j-cli/aura/internal/subcommands/instance/`
+      (list, get, delete, pause, resume, update, overwrite) and `instance/snapshot/`
+      (create, list, get). Normalise the existing `create.go` Example to the
+      target style (flush-left, backtick raw string, `neo4j-cli` binary prefix).
+      Regenerate the skill bundle and confirm gates pass.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Each of the 10 leaves has a non-empty Example: field with >=3 invocations, each preceded by a '# comment' line and separated by blank lines"
+      - "Every line is flush-left (no leading whitespace on any line, including the first)"
+      - "All invocations use the `neo4j-cli` binary prefix; write leaves (create/delete/pause/resume/update/overwrite/snapshot create) include `--rw` on every invocation; read leaves (list/get/snapshot list/snapshot get) include at least one `--format json` invocation and no `--rw`"
+      - "Existing `instance create` Example is normalised in-place: flush-left and uses `neo4j-cli` (was `neo4j`)"
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces no further diff after running once; `make test`, `make fmt-check`, `make lint` all pass"
+    completed_at: null
+
+  - id: task-002
+    title: "Aura tenant / credential / config / customer-managed-key: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf in `neo4j-cli/aura/internal/subcommands/`
+      under `tenant/` (list, get), `credential/` (add, list, use, remove),
+      `config/` (list, get, set), `config/project/` (list, add, use, remove),
+      and `customermanagedkey/` (list, create, delete, get). Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Each of the 17 leaves has a non-empty Example: field meeting style rules (>=3 invocations, '# comment' lines, blank-line separators, flush-left, `neo4j-cli` prefix)"
+      - "Write leaves (`credential add`, `credential use`, `credential remove`, `config set`, `config project add`, `config project use`, `config project remove`, `customer-managed-key create`, `customer-managed-key delete`) include `--rw` on every invocation"
+      - "Read leaves include at least one `--format json` invocation and never `--rw`"
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces no further diff after running once; `make test`, `make fmt-check`, `make lint` all pass"
+    completed_at: null
+
+  - id: task-003
+    title: "Aura deployment subtree: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf in `neo4j-cli/aura/internal/subcommands/deployment/`:
+      top-level (list, create, delete, get), `token/` (create, update, delete),
+      `database/` (list), `server/` (list), `server/database/` (list).
+      Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Each of the 10 deployment leaves has a non-empty Example: field meeting style rules"
+      - "Write leaves (`deployment create`, `deployment delete`, `deployment token create`, `deployment token update`, `deployment token delete`) include `--rw` on every invocation"
+      - "Read leaves (`deployment list`, `deployment get`, `deployment database list`, `deployment server list`, `deployment server database list`) include at least one `--format json` invocation and never `--rw`"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-004
+    title: "Aura data-api / graphql subtree: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf in `neo4j-cli/aura/internal/subcommands/dataapi/graphql/`:
+      top-level (create, list, get, update, delete, pause, resume),
+      `authprovider/` (create, list, delete, get),
+      `corspolicy/allowedorigin/` (add, remove). Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Each of the 13 leaves has a non-empty Example: field meeting style rules"
+      - "Write leaves (`graphql create`, `graphql update`, `graphql delete`, `graphql pause`, `graphql resume`, `auth-provider create`, `auth-provider delete`, `allowed-origin add`, `allowed-origin remove`) include `--rw` on every invocation"
+      - "Read leaves (`graphql list`, `graphql get`, `auth-provider list`, `auth-provider get`) include at least one `--format json` invocation and never `--rw`"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-005
+    title: "Aura graph-analytics + import: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf in
+      `neo4j-cli/aura/internal/subcommands/graphanalytics/session/`
+      (create, list, delete, get) and `neo4j-cli/aura/internal/subcommands/import/job/`
+      (create, get, cancel). Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Each of the 7 leaves has a non-empty Example: field meeting style rules"
+      - "Write leaves (`session create`, `session delete`, `job create`, `job cancel`) include `--rw` on every invocation"
+      - "Read leaves (`session list`, `session get`, `job get`) include at least one `--format json` invocation and never `--rw`"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-006
+    title: "Top-level credential dbms + embed: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf under `neo4j-cli/internal/subcommands/credential/`:
+      `dbms/` (add, list, use, remove, set_embed) and `embed/` (add, list, use, remove).
+      Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "Each of the 9 leaves has a non-empty Example: field meeting style rules"
+      - "Write leaves (`dbms add`, `dbms use`, `dbms remove`, `dbms set-embed`, `embed add`, `embed use`, `embed remove`) include `--rw` on every invocation"
+      - "Read leaves (`dbms list`, `embed list`) include at least one `--format json` invocation and never `--rw`"
+      - "`dbms add` Examples illustrate both `--file <path>` (Aura JSON credential bundle) and explicit flag (`--uri`, `--username`, `--password`) forms — the two real-world input modes"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-007
+    title: "Top-level config + update: add Example blocks"
+    description: |
+      Add `Example:` fields to every leaf in `neo4j-cli/internal/subcommands/config/`
+      (list, get, set) and `neo4j-cli/internal/subcommands/update/` (check, plus any
+      sibling leaves discovered while editing). Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "Every leaf under `config/` and `update/` has a non-empty Example: field meeting style rules"
+      - "Write leaves (`config set`) include `--rw` on every invocation"
+      - "Read leaves (`config list`, `config get`, `update check`) include at least one `--format json` invocation and never `--rw`"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-008
+    title: "Query: add Example to parent + :schema, normalise :embed"
+    description: |
+      Add `Example:` to `neo4j-cli/query/query.go` (the runnable parent — see PRD REQ-F-015,
+      examples cover inline Cypher, stdin pipe, `--param`, `key:embed=<text>` modifier, and
+      `--format json`) and to `neo4j-cli/query/schema.go` (`:schema` leaf). Normalise the
+      existing `:embed` Example in `neo4j-cli/query/embed.go` from `+`-concatenated strings
+      to a backtick raw string and add `# comment` lines per the style rules. Regenerate
+      the skill bundle.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`query.go` parent has a non-empty Example: field with >=3 invocations covering inline Cypher, stdin-piped Cypher, `--param`, `key:embed=<text>` modifier, and `--format json`"
+      - "`schema.go` (`:schema`) has a non-empty Example: with at least one `--format json` invocation; read-only so no `--rw`"
+      - "`embed.go` (`:embed`) is converted to a backtick raw string; lines are flush-left; `# comment` lines precede each invocation; behaviour-equivalent to today"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-009
+    title: "agent-context + skill leaves: normalise + add Example blocks"
+    description: |
+      Add `Example:` fields to skill leaves in `common/skill/` that lack them
+      (`list.go`, `check.go`, `print.go`) and normalise the existing Examples on
+      `install.go` and `remove.go` to the target style (flush-left, full `neo4j-cli`
+      binary prefix, `# comment` lines, >=3 invocations). Normalise `agent-context`'s
+      existing Example in `neo4j-cli/internal/subcommands/agentcontext/agentcontext.go`
+      to add `# comment` lines per the style rules (it is already flush-left and uses
+      `neo4j-cli`). Regenerate the skill bundle.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`skill list`, `skill check`, `skill print` each have a non-empty Example: field with >=3 invocations meeting style rules; all read-only so no `--rw`, at least one `--format json` per leaf"
+      - "`skill install` and `skill remove` Examples are normalised: backtick raw string, flush-left, `neo4j-cli` binary prefix, `# comment` lines, `--rw` on every invocation"
+      - "`agent-context` Example retains its jq pipelines and gains `# comment` lines per the style rules"
+      - "Existing `TestAgentContext_HelpExamples` still passes (flush-left enforcement)"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
+    completed_at: null
+
+  - id: task-010
+    title: "Add TestAllLeafCommands_HaveExamples gate test"
+    description: |
+      Add a new test `TestAllLeafCommands_HaveExamples` to
+      `neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go` (alongside
+      the existing `TestAgentContext_HelpExamples`). Walk the live tree via
+      `app.NewCmd(cfg)`, recurse through every visible subcommand, and for each
+      runnable leaf assert `cmd.Example` is non-empty and the first line does not
+      start with two spaces. Filter out hidden commands and cobra-injected `help` /
+      `completion` subtrees to mirror the visibility filter used by
+      `common/skill/render`. Failure messages must include the full command path.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "`TestAllLeafCommands_HaveExamples` is defined in `agentcontext_test.go` and walks the tree built by `app.NewCmd(cfg)`"
+      - "Filter excludes hidden commands, `help`, `completion`, and non-runnable parents (except `query` which is runnable — REQ-F-015)"
+      - "Failure messages identify the offending command by its full path (e.g. 'neo4j-cli aura instance list')"
+      - "Removing the Example: field from any one leaf causes the test to fail with that leaf's full path in the message (verify by temporary edit, then restore)"
+      - "`make test`, `make fmt-check`, `make lint` all pass"
+    completed_at: null
+
+  - id: task-011
+    title: "Add Minor changelog entry and verify all gates"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Minor --body "Add usage examples
+      to every command's --help output (CLI-93)."` (or hand-author the equivalent
+      YAML under `.changes/unreleased/`). Verify the full PR is green: re-run
+      `go generate`, `make test`, `make fmt-check`, `make lint`, `make generate-check`
+      on a clean tree, and perform the manual smoke checks from the PRD acceptance
+      criteria.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "A new file matches `.changes/unreleased/neo4j-cli-Minor-*.yaml` with project=neo4j-cli, kind=Minor, body referencing CLI-93 and usage examples"
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass on a clean tree"
+      - "`go run ./neo4j-cli aura instance list --help` shows an 'Examples:' block with >=3 flush-left lines"
+      - "`go run ./neo4j-cli credential dbms add --help` shows an 'Examples:' block including `--rw`"
+      - "`git diff neo4j-cli/internal/skill/bundle/ neo4j-cli/aura/internal/skill/bundle/` against main shows only Example-related additions, no unrelated drift"
+    completed_at: null
