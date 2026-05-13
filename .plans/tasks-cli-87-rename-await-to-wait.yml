@@ -126,7 +126,7 @@ tasks:
     description: |
       Use `changie new --projects neo4j-cli --kind Minor --body '<text>'` (or hand-author the YAML under `.changes/unreleased/` per the AGENTS.md fallback) to add a single entry.
       Body: `Renamed --await to --wait on all async commands. --await is accepted as a deprecated alias for one release; see <follow-up-id> for removal (CLI-87).` — substitute the actual follow-up issue ID captured in task-001.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -134,7 +134,7 @@ tasks:
       - "Body references both CLI-87 and the follow-up issue ID from task-001"
       - "project: neo4j-cli; kind: Minor; time: RFC3339"
       - "File parses (e.g. via `changie batch --dry-run` or a YAML syntax check)"
-    completed_at: null
+    completed_at: 2026-05-13T15:56:00Z
 
   - id: task-009
     title: "Run final gates and verify end-to-end behaviour"

@@ -28,3 +28,7 @@ Files: ~CONTRIBUTING.md, ~README.md, ~AGENTS.md, ~.agents/architecture.md, ~.pla
 ## task-007 — 2026-05-13T14:45:00Z
 Regenerated both skill bundles; --wait replaces --await everywhere and deprecated alias is elided by cobra MarkDeprecated. Also flipped hand-written `--await` line in both additions.md (else SKILL.md would still mention --await). All gates pass (test/lint/fmt-check/license-check); generate-check meaningful only on clean tree per AGENTS.md.
 Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/aura.md, ~neo4j-cli/aura/internal/skill/bundle/references/{customer-managed-key,graph-analytics,instance}.md, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+
+## task-008 — 2026-05-13T15:56:00Z
+Added changie Minor entry for neo4j-cli referencing CLI-87 and follow-up CLI-111; verified via `changie batch --dry-run`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-155521.yaml, ~.plans/tasks-cli-87-rename-await-to-wait.yml
