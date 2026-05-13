@@ -847,6 +847,82 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* ---------- Reference accordion pane ---------- */
+  .ref-pane { max-height: 580px; overflow-y: auto; }
+  /* Full-width sections — no nested boxes, just horizontal dividers */
+  .ref-accordion { padding: 0; display: flex; flex-direction: column; }
+  details.ref-section {
+    border-bottom: 1px solid color-mix(in srgb, var(--code-fg) 10%, transparent);
+  }
+  details.ref-section:last-child { border-bottom: none; }
+  summary.ref-title {
+    cursor: pointer;
+    padding: 11px 22px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--code-fn);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  summary.ref-title::-webkit-details-marker { display: none; }
+  summary.ref-title::before {
+    content: '▶';
+    font-size: 9px;
+    color: var(--fg-faint);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details.ref-section[open] summary.ref-title::before { transform: rotate(90deg); }
+  summary.ref-title:hover { background: rgba(255,255,255,0.04); }
+  .ref-body {
+    padding: 4px 22px 18px;
+  }
+  .ref-body p {
+    margin: 0 0 9px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: color-mix(in srgb, var(--code-fg) 72%, transparent);
+    line-height: 1.6;
+  }
+  .ref-body p:last-child { margin-bottom: 0; }
+  .ref-body ul {
+    margin: 0 0 9px 18px;
+    padding: 0;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: color-mix(in srgb, var(--code-fg) 72%, transparent);
+    line-height: 1.6;
+  }
+  .ref-body li { margin-bottom: 2px; }
+  .ref-body code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    background: rgba(255,255,255,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--code-keyword);
+  }
+  .ref-body a { color: var(--code-fn); text-decoration: none; }
+  .ref-body a:hover { text-decoration: underline; }
+  /* pre: only one level of inset — border-left accent, no background box */
+  .ref-body pre {
+    margin: 8px 0 12px;
+    padding: 10px 14px;
+    border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    overflow-x: auto;
+    white-space: pre;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--code-fg);
+  }
+  .ref-body .ref-sub { margin-bottom: 5px !important; }
 </style>
 </head>
 <body>
@@ -861,6 +937,7 @@
     </a>
     <nav class="top-nav">
       <a href="#examples">Examples</a>
+      <a href="#examples" data-activate-tab="reference">Reference</a>
       <a href="#quickstart">Quickstart</a>
       <a href="https://github.com/neo4j-labs/neo4j-cli" target="_blank" rel="noopener">GitHub</a>
     </nav>
@@ -1058,6 +1135,14 @@
           <span>skill</span>
           <span class="label-tag">agents</span>
         </button>
+        <button class="example-tab" data-tab="embed" role="tab">
+          <span>embed</span>
+          <span class="label-tag">vectors</span>
+        </button>
+        <button class="example-tab" data-tab="reference" role="tab">
+          <span>reference</span>
+          <span class="label-tag">full docs</span>
+        </button>
       </div>
 
       <!-- aura -->
@@ -1225,6 +1310,189 @@
 
 <span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.2.0.</span></span></pre>
       </div>
+
+      <!-- embed -->
+      <div class="example-pane" data-pane="embed">
+        <div class="example-header">
+          <span class="desc">Vector similarity search — embed a query inline and find semantically similar nodes</span>
+          <button class="copy-mini" data-copy-pane="embed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; Find the 5 movies most similar to "sci-fi movies" using vector search on the plot index</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="comment"># add embedding credential (one-time)</span>
+<span class="prompt">$</span> neo4j-cli credential embed add <span class="flag">--name</span> openai-shared <span class="flag">--rw</span> \
+    <span class="flag">--provider</span> openai <span class="flag">--model</span> text-embedding-3-small <span class="flag">--api-key</span> <span class="string">'&lt;key&gt;'</span>
+
+<span class="ok">✓</span> credential <span class="string">"openai-shared"</span> saved · set as default
+
+<span class="comment"># link it to your dbms connection profile</span>
+<span class="prompt">$</span> neo4j-cli credential dbms set-embed prod openai-shared
+
+<span class="ok">✓</span> prod → openai-shared linked
+
+<span class="comment"># vector search — embed text inline, bind as $q</span>
+<span class="prompt">$</span> neo4j-cli query \
+    <span class="string">"CALL db.index.vector.queryNodes('plot_idx', \$k, \$q) YIELD node, score RETURN node.title, score"</span> \
+    <span class="flag">--param</span> <span class="string">'q:embed=sci-fi movies'</span> <span class="flag">--param</span> k=5
+
+<span class="out">┌──────────────────┬────────┐
+│ title            │ score  │
+├──────────────────┼────────┤
+│ <span class="string">"The Matrix"</span>     │  <span class="num">0.94</span>  │
+│ <span class="string">"Inception"</span>      │  <span class="num">0.91</span>  │
+│ <span class="string">"Interstellar"</span>   │  <span class="num">0.89</span>  │
+│ <span class="string">"Ex Machina"</span>     │  <span class="num">0.87</span>  │
+│ <span class="string">"Arrival"</span>        │  <span class="num">0.85</span>  │
+└──────────────────┴────────┘</span>
+
+<span class="comment"># standalone vector — no DB connection needed</span>
+<span class="prompt">$</span> neo4j-cli query :embed <span class="string">"hello world"</span> <span class="flag">--format</span> json
+
+<span class="out">{<span class="string">"dimensions"</span>:<span class="num">1536</span>,<span class="string">"provider"</span>:<span class="string">"openai"</span>,<span class="string">"model"</span>:<span class="string">"text-embedding-3-small"</span>,<span class="string">"vector"</span>:[<span class="num">0.021</span>,<span class="num">-0.013</span>,<span class="num">0.007</span>,...]}</span>
+<span class="agentic-line"><span class="agentic-result">Added embed credential, linked to dbms profile, and returned top 5 semantically similar movies.</span></span>
+</pre>
+      </div>
+
+      <!-- reference -->
+      <div class="example-pane ref-pane" data-pane="reference">
+        <div class="example-header">
+          <span class="desc">Complete reference — install, credentials, query, embeddings, Aura, write gate, agent skills</span>
+          <button class="copy-mini" data-copy-pane="reference">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy prompt
+          </button>
+        </div>
+        <div class="ref-accordion">
+
+          <!-- BEGIN:docs:install -->
+          <details class="ref-section" open>
+            <summary class="ref-title">Installation &amp; Update</summary>
+            <div class="ref-body">
+              <p>Install with curl (macOS / Linux) or PowerShell (Windows):</p>
+              <pre><span class="prompt">$</span> curl -sSfL https://neo4j.sh/install.sh | bash
+<span class="comment"># PowerShell:  irm https://neo4j.sh/install.ps1 | iex</span>
+<span class="comment"># Homebrew:    brew install neo4j-labs/tap/neo4j-cli</span>
+<span class="comment"># npm:         npm install -g @neo4j-labs/cli</span>
+<span class="comment"># PyPI/pipx:   pipx install neo4j-cli</span></pre>
+              <p>Self-update:</p>
+              <pre><span class="prompt">$</span> neo4j-cli update                    <span class="comment"># latest stable</span>
+<span class="prompt">$</span> neo4j-cli update check              <span class="comment"># report availability, exit 1 if newer</span>
+<span class="prompt">$</span> neo4j-cli update <span class="flag">--pre-releases</span>     <span class="comment"># opt into alpha/beta/rc tags</span>
+<span class="prompt">$</span> neo4j-cli update <span class="flag">--version</span> v1.0.0   <span class="comment"># pin or downgrade</span></pre>
+              <p>Verify: <code>neo4j-cli --help</code>. Installed skill bundles are refreshed automatically after a successful update.</p>
+            </div>
+          </details>
+          <!-- END:docs:install -->
+
+          <!-- BEGIN:docs:credentials -->
+          <details class="ref-section">
+            <summary class="ref-title">Credentials</summary>
+            <div class="ref-body">
+              <p>Three credential types share <code>add / list / use / remove</code>. All are stored in <code>credentials.json</code> under your OS config directory.</p>
+              <p class="ref-sub"><span class="keyword">aura-client</span> — Aura Console API (client ID + secret). Required for any <code>aura …</code> command.</p>
+              <pre><span class="prompt">$</span> neo4j-cli credential aura-client add <span class="flag">--name</span> prod <span class="flag">--client-id</span> &lt;id&gt; <span class="flag">--client-secret</span> &lt;secret&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli credential aura-client use prod</pre>
+              <p class="ref-sub"><span class="keyword">dbms</span> — Neo4j Bolt connection profiles (URI, username, password, database). When a default exists, <code>query</code> connects without flags.</p>
+              <pre><span class="prompt">$</span> neo4j-cli credential dbms add <span class="flag">--name</span> prod <span class="flag">--uri</span> neo4j+s://… <span class="flag">--username</span> neo4j <span class="flag">--password</span> &lt;pw&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli credential dbms set-embed prod openai-shared   <span class="comment"># link an embed credential</span>
+<span class="prompt">$</span> neo4j-cli credential dbms use prod</pre>
+              <p class="ref-sub"><span class="keyword">embed</span> — Embedding providers (<code>openai</code> / <code>ollama</code> / <code>huggingface</code>). Consumed by <code>--param NAME:embed=…</code> and <code>query :embed</code>.</p>
+              <pre><span class="prompt">$</span> neo4j-cli credential embed add <span class="flag">--name</span> openai-shared <span class="flag">--provider</span> openai <span class="flag">--model</span> text-embedding-3-small <span class="flag">--api-key</span> &lt;key&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli credential embed use openai-shared</pre>
+            </div>
+          </details>
+          <!-- END:docs:credentials -->
+
+          <!-- BEGIN:docs:query -->
+          <details class="ref-section">
+            <summary class="ref-title">Querying Neo4j</summary>
+            <div class="ref-body">
+              <p>Run Cypher via the Bolt protocol. With a stored <code>dbms</code> credential, no connection flags are needed.</p>
+              <pre><span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (n) RETURN count(n) AS n'</span>
+<span class="prompt">$</span> echo <span class="string">'MATCH (n) RETURN count(n)'</span> | neo4j-cli query    <span class="comment"># stdin</span>
+<span class="prompt">$</span> neo4j-cli query :schema                             <span class="comment"># schema introspection</span>
+<span class="prompt">$</span> neo4j-cli query … <span class="flag">--format</span> json                    <span class="comment"># {columns, rows, truncated}</span>
+<span class="prompt">$</span> neo4j-cli query … <span class="flag">--max-rows</span> 500 <span class="flag">--truncate-arrays-over</span> 0
+<span class="prompt">$</span> neo4j-cli query <span class="string">'RETURN $ids'</span> <span class="flag">--param</span> <span class="string">'ids=[1,2,3]'</span>  <span class="comment"># JSON-typed param</span></pre>
+              <p>Connection resolution (highest first): <code>--uri / --username / --password / --database</code> flags → env vars (<code>NEO4J_URI</code>, <code>NEO4J_USERNAME</code>, <code>NEO4J_PASSWORD</code>, <code>NEO4J_DATABASE</code>) → <code>.env</code> (walks up to git root) → stored dbms credential → built-in defaults (<code>neo4j://localhost:7687</code>, user <code>neo4j</code>, db <code>neo4j</code>).</p>
+              <p><code>http://</code> and <code>https://</code> URIs are auto-rewritten to <code>neo4j://</code> and <code>neo4j+s://</code>. For self-signed certs use <code>neo4j+ssc://</code>.</p>
+            </div>
+          </details>
+          <!-- END:docs:query -->
+
+          <!-- BEGIN:docs:embed -->
+          <details class="ref-section">
+            <summary class="ref-title">Vector Embeddings</summary>
+            <div class="ref-body">
+              <p>Bind a vector inline with <code>--param NAME:embed=text</code> — text is sent to the configured provider and the resulting <code>[]float32</code> is bound as <code>$NAME</code> for both EXPLAIN preflight and the real query.</p>
+              <pre><span class="prompt">$</span> neo4j-cli query <span class="flag">--param</span> <span class="string">'q:embed=sci-fi movies'</span> <span class="flag">--param</span> k=5 \
+  <span class="string">"CALL db.index.vector.queryNodes('idx', \$k, \$q) YIELD node, score RETURN node.title, score"</span>
+
+<span class="prompt">$</span> neo4j-cli query :embed <span class="string">"hello world"</span> <span class="flag">--format</span> json   <span class="comment"># standalone, no DB needed</span></pre>
+              <p>Providers and defaults: <span class="keyword">openai</span> (<code>api.openai.com/v1</code>) · <span class="keyword">ollama</span> (<code>localhost:11434</code>, no key) · <span class="keyword">huggingface</span> (serverless; set <code>--embed-base-url</code> for dedicated endpoint).</p>
+              <p>Settings resolution (highest first): flag (<code>--embed-provider</code>, <code>--embed-model</code>, …) → env (<code>NEO4J_EMBED_PROVIDER</code>, <code>NEO4J_EMBED_MODEL</code>, …) → <code>.env</code> → stored embed credential → provider defaults.</p>
+              <p>API-key priority: <code>OPENAI_API_KEY</code> / <code>HF_TOKEN</code> → <code>NEO4J_EMBED_API_KEY</code> → <code>.env</code> → stored credential. One <code>--credential dbms</code> can drive both connection and embedding when the dbms profile carries an embed link.</p>
+            </div>
+          </details>
+          <!-- END:docs:embed -->
+
+          <!-- BEGIN:docs:aura -->
+          <details class="ref-section">
+            <summary class="ref-title">Aura Management</summary>
+            <div class="ref-body">
+              <p>Requires an <code>aura-client</code> credential. Get client ID + secret from <a href="https://console.neo4j.io/#account" target="_blank" rel="noopener">Aura Account Settings</a>.</p>
+              <pre><span class="prompt">$</span> neo4j-cli aura tenant list
+<span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> table
+<span class="prompt">$</span> neo4j-cli aura instance get &lt;id&gt;
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> my-db <span class="flag">--type</span> free-db <span class="flag">--tenant-id</span> &lt;tid&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance create <span class="flag">--name</span> prod <span class="flag">--type</span> professional-db \
+    <span class="flag">--cloud-provider</span> aws <span class="flag">--region</span> us-east-1 <span class="flag">--memory</span> 4GB \
+    <span class="flag">--tenant-id</span> &lt;tid&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--rw</span></pre>
+              <p><code>instance create</code> auto-stores DB credentials as a <code>dbms</code> credential named <code>&lt;instance-id&gt;-default</code> so <code>query</code> connects immediately. Pass <code>--no-credential-storage</code> to skip.</p>
+            </div>
+          </details>
+          <!-- END:docs:aura -->
+
+          <!-- BEGIN:docs:write-gate -->
+          <details class="ref-section">
+            <summary class="ref-title">Write Gate (--rw)</summary>
+            <div class="ref-body">
+              <p>All state-mutating commands require <code>--rw</code>. Without it, <code>neo4j-cli query</code> runs <code>EXPLAIN</code> first and blocks mutating Cypher before execution.</p>
+              <pre><span class="prompt">$</span> neo4j-cli query <span class="string">'CREATE (:Person {name:"Alice"})'</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli config set telemetry false <span class="flag">--rw</span></pre>
+              <p><code>--rw</code> is auto-applied on an interactive TTY. It must be set explicitly for:</p>
+              <ul>
+                <li><strong>Agent harnesses</strong> — Claude Code, Cursor, Codex, Gemini CLI, Windsurf, Replit, Goose, Devin, Kiro, and others detected by env var (see <a href="https://github.com/unjs/std-env/blob/main/src/agents.ts" target="_blank" rel="noopener">unjs/std-env</a>).</li>
+                <li><strong>Non-interactive scripts</strong> — CI, piped invocations, redirected stdout, <code>nohup</code>.</li>
+              </ul>
+              <p>Disable telemetry without writing config: <code>DO_NOT_TRACK=1 neo4j-cli …</code></p>
+            </div>
+          </details>
+          <!-- END:docs:write-gate -->
+
+          <!-- BEGIN:docs:skills -->
+          <details class="ref-section">
+            <summary class="ref-title">Agent Skills</summary>
+            <div class="ref-body">
+              <p>Installs the embedded skill bundle (SKILL.md + per-subcommand references) into each detected agent's skill directory so agents know the full CLI API without guessing.</p>
+              <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>             <span class="comment"># all detected agents</span>
+<span class="prompt">$</span> neo4j-cli skill install claude-code <span class="flag">--rw</span>  <span class="comment"># target one agent</span>
+<span class="prompt">$</span> neo4j-cli skill list                      <span class="comment"># per-agent install state</span>
+<span class="prompt">$</span> neo4j-cli skill check                     <span class="comment"># version drift vs running binary</span>
+<span class="prompt">$</span> neo4j-cli skill remove [agent]            <span class="comment"># idempotent</span></pre>
+              <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.</p>
+              <p>Skills are refreshed automatically after <code>neo4j-cli update</code>. The bundle covers Aura, Bolt queries, schema introspection, embeddings, credentials, and the write gate — everything agents need to drive the CLI correctly.</p>
+            </div>
+          </details>
+          <!-- END:docs:skills -->
+
+        </div><!-- /.ref-accordion -->
+      </div><!-- /.example-pane[reference] -->
+
     </div>
   </div>
 </section>
@@ -1415,14 +1683,37 @@
   // ---------- Tabs ----------
   const tabs = document.querySelectorAll('.example-tab');
   const panes = document.querySelectorAll('.example-pane');
+  const validTabIds = new Set([...tabs].map(t => t.dataset.tab));
+
   function activateExampleTab(id) {
+    if (!validTabIds.has(id)) return;
     tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === id));
     panes.forEach(p => p.classList.toggle('active', p.dataset.pane === id));
+    history.replaceState(null, '', '#tab-' + id);
   }
+
   tabs.forEach(tab => tab.addEventListener('click', () => activateExampleTab(tab.dataset.tab)));
+
+  // Nav links with data-activate-tab scroll + activate without letting the href
+  // overwrite the hash we just set.
   document.querySelectorAll('a[data-activate-tab]').forEach(a => {
-    a.addEventListener('click', () => activateExampleTab(a.dataset.activateTab));
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      activateExampleTab(a.dataset.activateTab);
+      document.getElementById('examples').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   });
+
+  // Restore tab from URL hash on load (#tab-<name>)
+  (function restoreTabFromHash() {
+    const m = location.hash.match(/^#tab-(.+)$/);
+    if (!m || !validTabIds.has(m[1])) return;
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === m[1]));
+    panes.forEach(p => p.classList.toggle('active', p.dataset.pane === m[1]));
+    requestAnimationFrame(() =>
+      document.getElementById('examples').scrollIntoView({ block: 'start' })
+    );
+  })();
 
   // ---------- cli / agentic mode — global state ----------
   let viewMode = 'agentic';
@@ -1451,6 +1742,8 @@
     schema: 'neo4j-cli query :schema',
     pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
     skill: 'neo4j-cli skill install --rw',
+    embed: 'neo4j-cli query --param \'q:embed=sci-fi movies\' --param k=5 "CALL db.index.vector.queryNodes(\'plot_idx\', $k, $q) YIELD node, score RETURN node.title, score"',
+    reference: 'neo4j-cli --help',
   };
   const panePrompts = {
     aura: 'Set up my Aura environment — add credentials, create a free movies instance, then list all',
@@ -1458,6 +1751,8 @@
     schema: "What's in my database? Show all labels, relationships, and indexes.",
     pipe: 'Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON',
     skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
+    embed: 'Add an OpenAI embedding credential, link it to my dbms profile, then find the 5 most similar movies to "sci-fi movies"',
+    reference: 'Set up neo4j-cli from scratch — install, add credentials for Aura and a Bolt connection, then run a query',
   };
   document.querySelectorAll('.copy-mini').forEach(btn => {
     btn.addEventListener('click', async () => {
