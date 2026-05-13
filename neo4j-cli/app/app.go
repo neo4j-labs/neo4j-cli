@@ -10,6 +10,7 @@ package app
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura"
@@ -38,6 +39,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
+
+	// Wrap cobra's flag-parse errors (unknown flag, missing value, bad type)
+	// into a typed *clierr.CLIError with exit code 2. Cobra walks up to the
+	// root for FlagErrorFunc, so one registration covers every subcommand.
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return clierr.NewUsageError("%v", err)
+	})
 
 	// Compose the root PersistentPreRunE: bind --format, enforce --rw,
 	// then schedule the silent background version-check (5% sample, cached

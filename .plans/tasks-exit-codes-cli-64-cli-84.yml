@@ -112,7 +112,7 @@ tasks:
       `neo4j-cli/app/app_test.go` or similar) that builds the tree, calls
       `Execute` with `--bad-flag`, captures the returned error, and
       asserts it's a `*CLIError` with `Code == 2`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -120,7 +120,7 @@ tasks:
       - "Standalone `aura.NewStandaloneCmd` does the same on its root."
       - "A unit test asserts `--bad-flag` returns `*CLIError` with `Code == 2` from `Execute`."
       - "`make test` passes."
-    completed_at: null
+    completed_at: 2026-05-13T07:13:12Z
 
   - id: task-006
     title: "Propagate typed exit codes from cmd.Execute in both main.go files"
