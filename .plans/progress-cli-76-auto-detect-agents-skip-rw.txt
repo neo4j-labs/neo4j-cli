@@ -1,0 +1,61 @@
+## TASK-001 — 2026-05-13T11:05:00Z
+Added common/agent/ package with Detect() covering 11 unjs/std-env agents (presence + case-insensitive substring rules) via overridable getenv seam.
+Files: +common/agent/agent.go, +common/agent/agent_test.go
+
+## TASK-002 — 2026-05-13T11:04:21Z
+Wired agent.Detect + stdout-TTY check into EnforceWriteGate (4-step precedence), updated --rw Usage to interactive/agent wording, added 6-row gate-matrix table test via detectAgent/stdoutIsTerminal seams. Usage-string change rippled into both skill bundles (regen committed in lockstep).
+Files: ~common/flags/flags.go, ~common/flags/flags_test.go, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
+Decisions: Kept usage-error string verbatim ("this command writes; pass --rw to allow it") so existing grep-style tests on both surfaces stay green without edits.
+
+## TASK-003 — 2026-05-13T11:18:00Z
+Rewrote --rw bullets on both skill additions.md surfaces: agents-always-need-rw + ask-once-on-gate-fail flow, retaining EXPLAIN preflight pointer. Regenerated both bundle/SKILL.md files via go generate.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/aura/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/aura/internal/skill/bundle/SKILL.md
+
+## TASK-004 — 2026-05-13T11:30:00Z
+Added "Auto-detect: when --rw is required" subsection under Write operations in README; describes TTY auto-apply + agent/non-interactive override and links to unjs/std-env upstream instead of enumerating env vars. Tweaked lead sentence from "require" to "gated by" for consistency.
+Files: ~README.md
+
+## TASK-005 — 2026-05-13T13:11:00Z
+Added Minor changie entry for CLI-76 via `changie new --projects neo4j-cli --kind Minor`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260513-130959.yaml
+
+## Verification — 2026-05-13T13:20:00Z
+
+Gates:
+- `make test` — green across all packages (full ok., no FAIL).
+- `make fmt-check` — clean (no output).
+- `make lint` — `0 issues.`
+- `make generate-check` — only diff is the harness's task-status flip (`pending` → `in_progress`); no `internal/skill/bundle/**` drift. Per AGENTS.md note, only bundle paths matter for the gate.
+
+Manual verification (against `bin/neo4j-cli` built from this branch; TTY simulated via `script -q /dev/null`; cleaned up `test-cli76-*` dbms entries afterwards so the dev creds file is unchanged):
+
+(a) Interactive TTY, no agent, no --rw:
+    `script -q /dev/null env -u CLAUDECODE … TERM_PROGRAM=plain bin/neo4j-cli credential dbms add --name test-cli76-a …`
+    EXIT=0; credential row written (grep -c 'test-cli76-a' = 1).
+
+(b) `CLAUDECODE=1`, no --rw:
+    `CLAUDECODE=1 bin/neo4j-cli credential dbms add --name test-cli76-b …`
+    stderr: `Error: this command writes; pass --rw to allow it`
+    EXIT=2.
+
+(c) Piped (`</dev/null`), no TTY, no agent, no --rw:
+    `bin/neo4j-cli credential dbms add --name test-cli76-c … </dev/null`
+    stderr: `Error: this command writes; pass --rw to allow it`
+    EXIT=2.
+
+(d) `--rw=true` in agent + piped contexts:
+    `CLAUDECODE=1 bin/neo4j-cli credential dbms add --name test-cli76-d1 … --rw=true` → EXIT=0
+    `bin/neo4j-cli credential dbms add --name test-cli76-d2 … --rw=true </dev/null` → EXIT=0
+    Both writes landed in credentials.json; subsequently removed via `credential dbms remove … --rw=true`.
+
+Post-verification cleanup: `grep -c 'test-cli76' ~/Library/Preferences/neo4j/cli/credentials.json` = 0.
+
+## TASK-006 — 2026-05-13T13:20:00Z
+Final gates + manual verification. All four gates green; PRD acceptance scenarios (a)-(d) reproduced against the built binary and proof captured above; dev credentials file left unmodified.
+Files: ~progress
+Decisions: TTY simulation used `script -q /dev/null env -u <agent-vars> TERM_PROGRAM=plain …` to (1) allocate a real pty for stdout and (2) strip stray agent vars from the parent shell so `Detect()` returns false. Cleaner than relying on the agent's own shell, which carries `CLAUDECODE=1`.
+
+## TASK-007 — 2026-05-13T14:05:00Z
+Added real-binary E2E write-gate test at test/e2e/writegate/. TestMain builds neo4j-cli once (CGO_ENABLED=0) into a temp dir cleaned at process exit; three subtests (agent_blocks, piped_blocks, agent_with_rw_succeeds) drive the binary via exec.Command with a scrubbed env and assert exit code + canonical gate string. Not build-tag gated, so runs in `go test ./...`.
+Files: +test/e2e/writegate/writegate_test.go
+Decisions: agent_with_rw_succeeds skips on darwin because clicfg.ConfigPrefix is derived from os/user.Current() (passwd-database lookup), and HOME-override has no effect — running the subtest there would mutate the dev's real credentials.json. Linux + Windows honour XDG_CONFIG_HOME / LOCALAPPDATA so the subtest runs in CI on those platforms with full write-isolation verification (assert credentials.json lands under t.TempDir()). Adding a NEO4J_CLI_CONFIG_DIR seam to clicfg was considered but deemed scope-creep for this task.

@@ -1,0 +1,172 @@
+feature: cli-76-auto-detect-agents-skip-rw
+prd: ./prd-cli-76-auto-detect-agents-skip-rw.md
+created_at: 2026-05-13T10:53:59Z
+updated_at: 2026-05-13T10:53:59Z
+
+tasks:
+  - id: task-001
+    title: "Add common/agent/ package with Detect() + table-driven tests"
+    description: |
+      Create new package `common/agent/` exporting `Detect() bool`, covering the full upstream
+      `unjs/std-env` agents list (Claude Code, Replit, Gemini CLI, Codex, OpenCode, Auggie, Goose,
+      Cursor, Devin, Kiro, pi). Plain env-var presence for most; substring matches (case-insensitive)
+      for `EDITOR` / `TERM_PROGRAM` / `PATH`. Internal env lookup must go through an overridable
+      `getenv = os.Getenv` package-level seam so tests don't need `t.Setenv`. Colocated table-driven
+      `agent_test.go` exercises each row of the agent table plus a no-agent baseline.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "common/agent/agent.go exists with exported Detect() bool and unexported getenv seam"
+      - "All 11 agents from the PRD table are covered; substring cases use case-insensitive strings.Contains"
+      - "common/agent/agent_test.go is table-driven and toggles the getenv seam (no real env mutation)"
+      - "Both files carry the Neo4j copyright header; make fmt-check, make lint, go test ./common/agent/... all pass"
+      - "Zero new third-party imports — only os and strings from stdlib"
+    completed_at: 2026-05-13T11:05:00Z
+
+  - id: task-002
+    title: "Wire agent detection into write gate + update --rw flag Usage + gate matrix tests"
+    description: |
+      Extend `EnforceWriteGate` in `common/flags/flags.go:72` per REQ-F-004:
+      (1) `--rw` set → allow; (2) agent detected → require `--rw`; (3) stdout TTY → allow;
+      (4) otherwise → require `--rw`. Add two package-level overridable seams: `detectAgent =
+      agent.Detect` and `stdoutIsTerminal = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }`,
+      mirroring the `stdinIsTTY` pattern in `neo4j-cli/query/run.go:35`. Update the `--rw` flag Usage
+      string in `RegisterRwFlag` to the REQ-F-005 wording. Add the gate matrix test (6 rows) from
+      REQ-F-006 via the new seams; preserve the existing usage-error string verbatim so other tests
+      that grep it stay green.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "EnforceWriteGate implements the 4-step rule and still returns the exact string 'this command writes; pass --rw to allow it'"
+      - "detectAgent and stdoutIsTerminal seams exist as package-level vars and are used in tests"
+      - "--rw flag Usage updated to the REQ-F-005 wording on the shared RegisterRwFlag (covers both binaries)"
+      - "All 6 rows of the gate matrix from REQ-F-006 have a corresponding test case and pass"
+      - "Existing EnforceWriteGate tests pass unchanged (default seams = no TTY, no agent)"
+      - "make test, make fmt-check, make lint all green"
+    completed_at: 2026-05-13T11:04:21Z
+
+  - id: task-003
+    title: "Update skill additions on both surfaces and regenerate bundles"
+    description: |
+      Rewrite the two `--rw` bullets in `neo4j-cli/internal/skill/additions.md` (lines 11-12) and the
+      matching line in `neo4j-cli/aura/internal/skill/additions.md` per REQ-F-007 / REQ-F-008. New
+      prose: CLI auto-detects agent harnesses; agents always need `--rw` for writes; do NOT add `--rw`
+      preemptively — if a command fails with `this command writes; pass --rw to allow it`, ask the
+      user once to confirm the write, then re-run with `--rw`. Keep the existing pointer to `query
+      run` EXPLAIN preflight. Run `go generate ./neo4j-cli/internal/skill/...
+      ./neo4j-cli/aura/internal/skill/...` and commit the regenerated bundle files in the same task.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "neo4j-cli/internal/skill/additions.md updated; the two --rw bullets reflect the new flow + ask-once instruction"
+      - "neo4j-cli/aura/internal/skill/additions.md updated with the matching prose"
+      - "go generate runs cleanly on both skill trees; bundle/SKILL.md on both surfaces shows the new prose"
+      - "TestGenerator_RoundTrip on both surfaces passes"
+      - "make generate-check is clean against this task's changes (only skill files differ)"
+    completed_at: 2026-05-13T11:18:00Z
+
+  - id: task-004
+    title: "Add README auto-detect section"
+    description: |
+      Add a short subsection to README.md (placed near the existing safety / `--rw` prose) summarising
+      the new behaviour for human readers: in an interactive terminal, `--rw` is auto-applied for
+      write commands; agents (Claude Code, Codex, Cursor, …) and non-interactive scripts still need
+      `--rw` explicitly; authoritative env-var list lives at `unjs/std-env`. Do NOT enumerate the
+      agent env vars in README — link out to upstream.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "README has a new subsection describing TTY-auto-apply + agent override"
+      - "Section links to https://github.com/unjs/std-env/blob/main/src/agents.ts rather than enumerating env vars"
+      - "Existing --rw prose elsewhere in README is updated or cross-referenced for consistency"
+      - "Markdown renders cleanly (no broken anchors or fenced blocks)"
+    completed_at: 2026-05-13T11:30:00Z
+
+  - id: task-005
+    title: "Add changelog entry"
+    description: |
+      Generate a user-facing changelog entry via changie per REQ-F-011:
+      `changie new --projects neo4j-cli --kind Minor --body "Auto-detect agent harnesses; --rw no
+      longer required when running interactively in a terminal (CLI-76)"`. If changie isn't installed
+      locally, hand-author the YAML under `.changes/unreleased/` per the AGENTS.md fallback format
+      (project / kind / body / time, RFC3339 time, single-quoted body).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "A new file under .changes/unreleased/ records the change with kind Minor and the CLI-76 reference"
+      - "YAML has the four required fields (project, kind, body, time) and RFC3339 time"
+      - "File name follows the neo4j-cli-Minor-YYYYMMDD-HHMMSS.yaml convention"
+    completed_at: 2026-05-13T13:11:00Z
+
+  - id: task-006
+    title: "Final gates + manual verification"
+    description: |
+      Run the full local gate set (`make test`, `make fmt-check`, `make lint`, `make generate-check`)
+      against the integrated branch and capture the manual verification from the PRD Acceptance
+      Criteria: (a) interactive write succeeds without `--rw`; (b) `CLAUDECODE=1` write fails the
+      gate; (c) non-TTY write fails the gate; (d) `--rw=true` succeeds in all three paths.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "make test passes (full suite, including TestGenerator_RoundTrip)"
+      - "make fmt-check, make lint, make generate-check all clean"
+      - "Manual verification: bin/neo4j-cli credential dbms add ... in a terminal succeeds without --rw"
+      - "Manual verification: CLAUDECODE=1 bin/neo4j-cli credential dbms add ... fails with the existing usage error"
+      - "Manual verification: piped invocation (no TTY, no agent) fails with the same usage error"
+      - "Manual verification: --rw=true succeeds across all three contexts"
+    completed_at: 2026-05-13T13:20:00Z
+
+  - id: task-007
+    title: "Add real-binary E2E test for the write gate (agent-detect end-to-end)"
+    description: |
+      Add an automated E2E smoke test that boots the real binary and proves the gate behaves
+      correctly end-to-end. Today the gate is only tested through `detectAgent` / `stdoutIsTerminal`
+      seams; this leaves a small gap where an env-var-name typo or a future decoupling of the seams
+      from production wiring would slip through CI. The test closes that gap for the dangerous
+      direction (agent slips through gate).
+
+      Place the new test in a new package at the repo root (e.g. `e2e/writegate_test.go`). The test
+      MUST be self-contained:
+      - `TestMain` (or a `sync.Once` helper) runs `go build -o $TMPDIR/neo4j-cli ./neo4j-cli` so the
+        test doesn't depend on a pre-existing `bin/neo4j-cli`. Use `t.TempDir()` for the binary path.
+      - Three subtests, each running the built binary via `exec.Command`:
+          - `agent_blocks`: env includes `CLAUDECODE=1`, command `credential dbms add --name e2e-test
+            --uri neo4j+s://example --username u --password p`. Assert exit code 2 (`*exec.ExitError`
+            with `ExitCode() == 2`) AND stderr contains the canonical string
+            `this command writes; pass --rw to allow it`.
+          - `piped_blocks`: no agent env (explicitly unset CLAUDECODE / CLAUDE_CODE / etc. for the
+            child); `exec.Command` already gives the child a non-TTY stdout, which is exactly the
+            "no agent, no TTY" branch. Same exit + stderr assertions as agent_blocks.
+          - `agent_with_rw_succeeds`: env includes `CLAUDECODE=1`, command adds `--rw=true`. Assert
+            exit code 0. To avoid mutating the dev machine's real credentials store, redirect the
+            credentials path for this subtest — investigate existing seams: clicfg likely supports an
+            env var like `NEO4J_CLI_CONFIG_DIR` or honours `XDG_CONFIG_HOME` / `HOME` overrides. If
+            no such seam exists, set `HOME=$TMPDIR` for the child process and verify the file lands
+            under `$TMPDIR/...` (cross-check the platform-specific path in `common/clicfg/`).
+      - The TTY-success path (REQ-F-006 row 5) is intentionally OUT OF SCOPE for this E2E because
+        synthesising a PTY in pure Go test requires a new dependency (`creack/pty`). The gate matrix
+        test already covers `stdoutIsTerminal == true`; the E2E focuses on the regression-dangerous
+        paths.
+      - Test must work on linux + macOS in CI. Windows: gate with `runtime.GOOS != "windows"` skip
+        if `exec` + path handling proves awkward, or fix as you go; mirror what other tests in the
+        repo do for cross-platform binary invocation.
+
+      Ensure no persistent state leaks: any temp credential written goes under `t.TempDir()`; no
+      `~/Library/Preferences/...` mutations.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "New e2e/writegate_test.go (or equivalent path) exists and runs as part of go test ./..."
+      - "Test builds the binary into t.TempDir() — no reliance on pre-existing bin/neo4j-cli"
+      - "agent_blocks subtest asserts exit 2 + stderr contains the canonical error string"
+      - "piped_blocks subtest asserts exit 2 + canonical error (without agent env vars)"
+      - "agent_with_rw_succeeds subtest asserts exit 0 with --rw, AND does not mutate any state outside t.TempDir()"
+      - "make test passes including the new e2e package; make fmt-check, make lint, make generate-check all green"
+    completed_at: 2026-05-13T14:05:00Z

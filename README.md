@@ -171,13 +171,22 @@ Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://l
 
 ## Write operations
 
-Write commands require `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
+Write commands are gated by `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
 
 ```bash
 neo4j-cli aura instance delete <id> --rw
 neo4j-cli config set telemetry false --rw
 neo4j-cli query 'CREATE (:Person {name:"Alice"})' --rw
 ```
+
+### Auto-detect: when `--rw` is required
+
+When `neo4j-cli` runs in an interactive terminal, `--rw` is auto-applied for write commands — humans typing at a prompt don't need the flag. Two cases still require `--rw` explicitly:
+
+- **Agent harnesses** (Claude Code, Codex, Cursor, Gemini CLI, Replit, OpenCode, Auggie, Goose, Devin, Kiro, pi, …). Detection is by env var; the authoritative list lives at [`unjs/std-env`](https://github.com/unjs/std-env/blob/main/src/agents.ts).
+- **Non-interactive scripts** (CI, piped invocations, `nohup`, redirected stdout).
+
+Precedence: `--rw` set → allow; agent detected → require `--rw`; stdout is a TTY → allow; otherwise → require `--rw`.
 
 Set `DO_NOT_TRACK=1` to disable telemetry without writing config.
 

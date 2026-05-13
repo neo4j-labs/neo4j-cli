@@ -5,13 +5,29 @@ package flags
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+// detectAgent is the test seam for agent-harness detection. Production calls
+// agent.Detect (env-var driven); tests override to drive the gate matrix
+// without mutating real process state.
+var detectAgent = agent.Detect
+
+// stdoutIsTerminal is the test seam for TTY detection on stdout. Production
+// calls term.IsTerminal on os.Stdout's file descriptor; tests override to
+// simulate interactive vs. piped contexts. Mirrors stdinIsTTY in
+// neo4j-cli/query/run.go.
+var stdoutIsTerminal = func() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
 
 // RegisterOutputFlag adds a persistent --format/-f flag to cmd and installs a
 // PersistentPreRunE hook that validates the value and binds it to cfg.Global.
@@ -43,7 +59,7 @@ func RegisterRwFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(
 		"rw",
 		false,
-		"Allow write operations. Required for any command that mutates state (Aura API, local config, credentials, skills, write cypher).",
+		"Allow write operations. Auto-applied in interactive terminals; required when running under an agent harness or non-interactive script.",
 	)
 }
 
@@ -69,7 +85,13 @@ func BindFormatFromFlag(cmd *cobra.Command, cfg *clicfg.Config) error {
 	return nil
 }
 
-// EnforceWriteGate rejects write-annotated commands unless --rw is true.
+// EnforceWriteGate rejects write-annotated commands unless --rw is true, an
+// interactive terminal is detected on stdout, or the caller is running under
+// a known agent harness (in which case --rw must be explicit). Precedence:
+//  1. --rw set         → allow
+//  2. agent detected   → require --rw (gate fires)
+//  3. stdout is a TTY  → allow (interactive human)
+//  4. otherwise        → require --rw (CI, piped script, nohup, …)
 func EnforceWriteGate(cmd *cobra.Command) error {
 	if cmd.Annotations["write"] != "true" {
 		return nil
@@ -84,6 +106,14 @@ func EnforceWriteGate(cmd *cobra.Command) error {
 		if rw {
 			return nil
 		}
+	}
+
+	if detectAgent() {
+		return clierr.NewUsageError("this command writes; pass --rw to allow it")
+	}
+
+	if stdoutIsTerminal() {
+		return nil
 	}
 
 	return clierr.NewUsageError("this command writes; pass --rw to allow it")
