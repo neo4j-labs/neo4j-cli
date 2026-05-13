@@ -1,0 +1,87 @@
+feature: fix-broken-aura-auth-link
+prd: ./prd-fix-broken-aura-auth-link.md
+created_at: 2026-05-13T06:46:20Z
+updated_at: 2026-05-13T06:46:20Z
+
+tasks:
+  - id: task-001
+    title: "Update default-credential error wording in aura.go"
+    description: |
+      Replace the single `clierr.NewUsageError(...)` argument in
+      `(c *AuraCredentials) GetDefault()` at `common/clicfg/credentials/aura.go:77`.
+      Drop the broken `neo4j.com/docs/aura/classic/platform/api/authentication/#_creating_credentials`
+      URL and the bare `credential add` subcommand. Use the wording from the PRD
+      §"Proposed wording" verbatim: leads with `https://console.neo4j.io/account`,
+      parenthetical docs reference `https://neo4j.com/docs/aura/api/authentication/`,
+      and `credential aura-client add` as the shipped subcommand.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "common/clicfg/credentials/aura.go:77 returns the new message verbatim"
+      - "grep -rn 'neo4j.com/docs/aura/classic/platform/api/authentication' . returns zero hits"
+      - "Message contains the substrings: https://console.neo4j.io/account, https://neo4j.com/docs/aura/api/authentication/, credential aura-client add"
+      - "(c *AuraCredentials) GetDefault() signature unchanged"
+      - "make fmt-check is clean"
+    completed_at: 2026-05-13T06:50:24Z
+
+  - id: task-002
+    title: "Add regression test for GetDefault no-default error body"
+    description: |
+      Add `TestAuraCredentials_GetDefault_NoDefaultErrorBody` in
+      `common/clicfg/credentials/aura_test.go` (file exists, co-located).
+      Builds an `AuraCredentials` with empty `DefaultCredential`, calls
+      `GetDefault()`, asserts the four substring invariants (REQ-F-002 through
+      REQ-F-005). Positive assertions on the three required substrings and a
+      negative assertion on the legacy URL. Per the PRD Open Question, skip
+      the bare-`credential add` negative assertion — the positive `credential
+      aura-client add` assertion is sufficient.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "New test lives in common/clicfg/credentials/aura_test.go"
+      - "Test asserts presence of: https://console.neo4j.io/account, https://neo4j.com/docs/aura/api/authentication/, credential aura-client add"
+      - "Test asserts absence of: https://neo4j.com/docs/aura/classic/platform/api/authentication"
+      - "Test passes via `go test ./common/clicfg/credentials/...`"
+      - "make test is green"
+    completed_at: 2026-05-13T06:52:28Z
+
+  - id: task-003
+    title: "Add changie Patch entry for CLI-80"
+    description: |
+      Add a user-visible changelog entry under `.changes/unreleased/` via
+      `changie new --projects neo4j-cli --kind Patch --body "Fix broken Aura
+      docs URL and update subcommand wording in the 'default credential not
+      set' error (CLI-80)."`. If changie isn't installed locally, hand-author
+      the YAML per AGENTS.md §"Changie Notes" (filename
+      `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`, single-quoted body, RFC3339
+      time).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "A new file exists under .changes/unreleased/ with kind: Patch and project: neo4j-cli"
+      - "Body references CLI-80 and describes the URL + subcommand fix"
+      - "File parses as valid YAML"
+      - "make test stays green"
+    completed_at: 2026-05-13T08:54:30Z
+
+  - id: task-004
+    title: "Run final gates: fmt-check, lint, test, generate-check"
+    description: |
+      Run all four local gates per AGENTS.md §"Feedback Instructions":
+      `make fmt-check`, `make lint`, `make test`, `make generate-check`.
+      Confirm the new error string did not inadvertently land in a skill
+      bundle (it shouldn't — verified by PRD REQ-NF-004 — but the gate is the
+      ground truth). No skill `go generate` step expected.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "make fmt-check exits 0"
+      - "make lint exits 0"
+      - "make test exits 0"
+      - "make generate-check exits 0 (no skill-bundle drift introduced by this change; ignore unrelated working-tree noise per AGENTS.md §Makefile Notes)"
+    completed_at: 2026-05-13T08:58:00Z

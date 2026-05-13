@@ -41,7 +41,7 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 				}
 				output.PrintBodyMap(cmd, cfg, values, fields)
 				if cfg.Global.Format() == "table" || cfg.Global.Format() == "default" {
-					cmd.Println("instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")
+					fmt.Fprintln(cmd.ErrOrStderr(), "instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these") //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 

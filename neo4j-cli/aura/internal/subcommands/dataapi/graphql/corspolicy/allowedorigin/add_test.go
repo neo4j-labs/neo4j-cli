@@ -76,15 +76,14 @@ func TestAddAllowedOriginWithNoExistingOrigins(t *testing.T) {
 			}
 		}
 	}`
-	expectedResponse := fmt.Sprintf(`New allowed origins: ["%s"]
-{
+	expectedResponse := `{
 	"data": {
 		"id": "2f49c2b3",
 		"name": "my-data-api-1",
 		"status": "ready",
 		"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql"
 	}
-}`, allowedOrigin)
+}`
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -102,6 +101,9 @@ func TestAddAllowedOriginWithNoExistingOrigins(t *testing.T) {
 	mockHandler.AssertCalledWithBody(fmt.Sprintf("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"%s\"]}}}", allowedOrigin))
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		fmt.Sprintf(`New allowed origins: ["%s"]`, allowedOrigin),
+	})
 }
 
 func TestAddAllowedOriginWithExistingOrigins(t *testing.T) {
@@ -119,15 +121,14 @@ func TestAddAllowedOriginWithExistingOrigins(t *testing.T) {
 		}
 	}`
 
-	expectedResponse := fmt.Sprintf(`New allowed origins: ["https://test1.com", "https://test2.com", "%s"]
-{
+	expectedResponse := `{
 	"data": {
 		"id": "2f49c2b3",
 		"name": "my-data-api-1",
 		"status": "ready",
 		"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql"
 	}
-}`, allowedOrigin)
+}`
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -145,6 +146,9 @@ func TestAddAllowedOriginWithExistingOrigins(t *testing.T) {
 	mockHandler.AssertCalledWithBody(fmt.Sprintf("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"https://test1.com\",\"https://test2.com\",\"%s\"]}}}", allowedOrigin))
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		fmt.Sprintf(`New allowed origins: ["https://test1.com", "https://test2.com", "%s"]`, allowedOrigin),
+	})
 }
 
 func TestAddAllowedOriginWithDuplicateOrigin(t *testing.T) {
@@ -192,13 +196,12 @@ func TestAddAllowedOriginWithOutputTable(t *testing.T) {
 			}
 		}
 	}`
-	expectedResponse := fmt.Sprintf(`New allowed origins: ["https://test1.com", "https://test2.com", "%s"]
-┌──────────┬───────────────┬────────┬────────────────────────────────────────────────────────────────────────────────┐
+	expectedResponse := `┌──────────┬───────────────┬────────┬────────────────────────────────────────────────────────────────────────────────┐
 │ ID       │ NAME          │ STATUS │ URL                                                                            │
 ├──────────┼───────────────┼────────┼────────────────────────────────────────────────────────────────────────────────┤
 │ 2f49c2b3 │ my-data-api-1 │ ready  │ https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql │
 └──────────┴───────────────┴────────┴────────────────────────────────────────────────────────────────────────────────┘
-`, allowedOrigin)
+`
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
@@ -216,4 +219,39 @@ func TestAddAllowedOriginWithOutputTable(t *testing.T) {
 	mockHandler.AssertCalledWithBody(fmt.Sprintf("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"https://test1.com\",\"https://test2.com\",\"%s\"]}}}", allowedOrigin))
 
 	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		fmt.Sprintf(`New allowed origins: ["https://test1.com", "https://test2.com", "%s"]`, allowedOrigin),
+	})
+}
+
+// TestAddAllowedOrigin_StdoutIsValidJSON is the CLI-82 regression-pin
+// for the origin echo: pre-fix, the "New allowed origins: ..." line was emitted
+// to stdout, which broke `--format json | jq`. Reverting the Pattern C
+// fmt.Fprintf replacements in allowedorigin/add.go causes this test to fail.
+func TestAddAllowedOrigin_StdoutIsValidJSON(t *testing.T) {
+	mockGetResponse := `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "my-data-api-1",
+			"status": "ready",
+			"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql",
+			"security": {
+				"cors_policy": {
+					"allowed_origins": []
+				}
+			}
+		}
+	}`
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
+	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
+
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add %s --instance-id %s --data-api-id %s --format json --rw", allowedOrigin, instanceId, dataApiId))
+
+	helper.AssertOutIsValidJSON()
 }

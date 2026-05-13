@@ -299,7 +299,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		// shape requires a `latest` field which we never resolve in this
 		// branch, so emitting partial JSON here would be more confusing than
 		// the friendly text.
-		cmd.Println("running a dev build, nothing to update")
+		fmt.Fprintln(cmd.ErrOrStderr(), "running a dev build, nothing to update") //nolint:errcheck // status to stderr; write errors are not actionable
 		return nil
 	}
 
@@ -323,7 +323,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	if err != nil {
 		// REQ-F-006: friendly hint when stable-only filter excludes everything.
 		if errors.Is(err, ErrNoStableRelease) {
-			cmd.Println("no stable release published yet — pass `--pre-releases` to track alpha/beta/rc tags.")
+			fmt.Fprintln(cmd.ErrOrStderr(), "no stable release published yet — pass `--pre-releases` to track alpha/beta/rc tags.") //nolint:errcheck // status to stderr; write errors are not actionable
 			return nil
 		}
 		if errors.Is(err, ErrTagNotFound) {
@@ -431,8 +431,8 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	// and emits the full document at the end (REQ-F-018: scripts get a single
 	// deterministic blob).
 	if !isStructuredFormat(cfg.Global.Format()) {
-		cmd.Printf("Current version: %s\n", current)
-		cmd.Println("Checking for updates to latest version...")
+		fmt.Fprintf(cmd.ErrOrStderr(), "Current version: %s\n", current)             //nolint:errcheck // status to stderr; write errors are not actionable
+		fmt.Fprintln(cmd.ErrOrStderr(), "Checking for updates to latest version...") //nolint:errcheck // status to stderr; write errors are not actionable
 	}
 
 	if err := swapFn(ctx, urls, currentBinaryPath, cmd.ErrOrStderr()); err != nil {
@@ -472,7 +472,7 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 		case len(refreshed) > 0:
 			cmd.Printf("Refreshed skill bundle for: %s\n", strings.Join(refreshed, ", "))
 		case suggestInstall:
-			cmd.Println("Tip: install the agent skill so AI assistants pick up the new commands — run `neo4j-cli skill install`.")
+			fmt.Fprintln(cmd.ErrOrStderr(), "Tip: install the agent skill so AI assistants pick up the new commands — run `neo4j-cli skill install`.") //nolint:errcheck // status to stderr; write errors are not actionable
 		}
 	})
 	return nil

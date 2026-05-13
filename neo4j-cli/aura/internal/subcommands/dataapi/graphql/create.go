@@ -83,14 +83,14 @@ If you lose your API key, you will need to create a new Authentication provider.
 			// NOTE: GraphQL Data API create should not return OK (200), it always returns 202, checking both just in case
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
 
-				cmd.Println("###############################")
-				cmd.Println("# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.")
-				cmd.Println("###############################")
+				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
+				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url", "authentication_providers"})
 
 				if await {
-					cmd.Println("Waiting for GraphQL Data API to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateGraphQLDataApiResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
 						return err
@@ -101,7 +101,7 @@ If you lose your API key, you will need to create a new Authentication provider.
 						return err
 					}
 
-					cmd.Println("GraphQL Data API Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 			return nil

@@ -1,0 +1,42 @@
+## TASK-001 — 2026-05-12T15:45:00Z
+Added AssertErrContainsStrings and AssertOutIsValidJSON helpers to AuraTestHelper; foundation for CLI-82 regression-pinning tests.
+Files: ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+
+## TASK-002 — 2026-05-12T16:15:00Z
+Routed --await polling narration to stderr across 13 commands via fmt.Fprintln(cmd.ErrOrStderr(), ...); wording preserved verbatim. Updated affected tests; added TestCreateFreeInstanceWithAwait_StdoutIsValidJSON regression pin (sanity-checked: fails when reverted).
+Files: ~instance/{create,resume,overwrite}.go, ~instance/snapshot/create.go, ~dataapi/graphql/{create,resume,update,pause}.go, ~dataapi/graphql/authprovider/create.go, ~dataapi/graphql/corspolicy/allowedorigin/{add,remove}.go, ~customermanagedkey/create.go, ~graphanalytics/session/create.go, ~instance/{create,overwrite}_test.go, ~instance/snapshot/create_test.go, ~graphanalytics/session/create_test.go
+Decisions: added //nolint:errcheck on each new fmt.Fprintln call (matches existing convention in create.go warning lines).
+
+## TASK-003 — 2026-05-12T17:00:00Z
+Converted 3 delete commands (customer-managed-key, deployment, deployment token) to emit structured JSON on stdout via output.PrintBodyMap and human confirmation on stderr; switched delete tests to AssertOutJson + AssertErrContainsStrings; added regression pins (cmk + deployment) and a --format table assertion. Pins sanity-checked: fail when reverted.
+Files: ~customermanagedkey/delete.go, ~customermanagedkey/delete_test.go, ~deployment/delete.go, ~deployment/delete_test.go, ~deployment/token/delete.go, ~deployment/token/delete_test.go
+Decisions: field keys per PRD ("id" for cmk/deployment, "deployment_id" for token); table-format coverage added only on cmk to avoid duplication.
+
+## TASK-004 — 2026-05-12T17:30:00Z
+Routed banner (graphql/create, authprovider/create) and origin-echo (allowedorigin/add, allowedorigin/remove) plain-text to stderr via fmt.Fprintln/Fprintf; wording preserved verbatim. Updated colocated tests: dropped moved lines from AssertOut, added AssertErrContainsStrings. Added TestCreateGraphQLDataApi_StdoutIsValidJSON (banner) and TestAddAllowedOrigin_StdoutIsValidJSON (origin echo) regression pins; both sanity-checked: fail when reverted.
+Files: ~dataapi/graphql/create.go, ~dataapi/graphql/create_test.go, ~dataapi/graphql/authprovider/create.go, ~dataapi/graphql/authprovider/create_test.go, ~dataapi/graphql/corspolicy/allowedorigin/add.go, ~dataapi/graphql/corspolicy/allowedorigin/add_test.go, ~dataapi/graphql/corspolicy/allowedorigin/remove.go, ~dataapi/graphql/corspolicy/allowedorigin/remove_test.go
+Decisions: authprovider banner only fires for api-key type; used a table-driven expectedErrContains field so jwks rows assert empty stderr.
+
+## TASK-005 — 2026-05-12T17:55:00Z
+Routed config/project/use confirmation to stderr via fmt.Fprintf(cmd.ErrOrStderr(), ...) and added missing trailing \n. Updated use_test.go to assert stderr message via AssertErrContainsStrings and stdout empty via AssertOut("").
+Files: ~config/project/use.go, ~config/project/use_test.go
+Decisions: collapsed multi-line Printf to single-line Fprintf so //nolint:errcheck trailing comment fits existing convention.
+
+## TASK-006 — 2026-05-12T16:06:00Z
+Added Patch-kind changie entry for CLI-82 via `changie new`; body matches PRD wording, time RFC3339, project: neo4j-cli.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+
+## TASK-007 — 2026-05-12T18:30:00Z
+Routed tenant get table-format warning to stderr (CLI-95) via fmt.Fprintln(cmd.ErrOrStderr(), ...); wording + table/default gate preserved. Updated TestGetTenantWithTableOutput to assert stdout has only the table and stderr contains the warning; added TestGetTenant_StdoutIsValidJSON regression pin under --format json. Appended CLI-95 to existing changie body.
+Files: ~tenant/get.go, ~tenant/get_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: edited changie body in place (vs new entry + delete) per task hint.
+
+## TASK-008 — 2026-05-12T19:15:00Z
+TTY-gated the five :schema H2 section markers (CLI-94) via commonoutput.StdoutIsTerminal(cmd.OutOrStdout()) — interactive stdout still shows labels, piped/redirected stdout gets table rows only. Added TestSchema_TableNonTTYSuppressesHeaders pin (sanity-checked: fails when reverted) plus explicit withStdoutIsTerminal(t,true) on TestSchema_HappyPath_Table. Updated changie body to credit CLI-82, CLI-95, CLI-94.
+Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: assertSectionsInOrder anchors use upper-case column headers (go-pretty default) — five unique-per-section column names give stronger coverage than just table-presence.
+
+## TASK-009 — 2026-05-12T19:30:00Z
+Routed 5 update-command status lines (CLI-96) to stderr via fmt.Fprintln/Fprintf(cmd.ErrOrStderr(), ...): dev-build early return, no-stable-release recovery, pre-swap Current/Checking narrative, post-swap skill-install tip. Wording verbatim. Added TestUpdate_StatusLinesGoToStderr with split outBuf/errBuf for dev-build + no-stable branches (sanity-checked: fails when reverted); fixed TestRunUpdate_PostSwap_NoAgentsInstalled to assert Tip on errOut. Appended CLI-96 to changie body.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~.changes/unreleased/neo4j-cli-Patch-20260512-160529.yaml
+Decisions: split-buffer test covers dev-build (required) + no-stable (bonus); L434/L435/L475 covered implicitly by existing runWithBundleFormat tests that read errOut.

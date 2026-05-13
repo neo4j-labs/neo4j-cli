@@ -4,6 +4,7 @@
 package session
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -98,7 +99,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "memory", "status", "created_at"})
 
 				if await {
-					cmd.Println("Waiting for session to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 
 					respData := api.ParseBody(resBody)
 					status := respData.AsArray()[0]["status"]
@@ -112,7 +113,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 						return err
 					}
 
-					cmd.Println("Session Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "Session Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 			}
 

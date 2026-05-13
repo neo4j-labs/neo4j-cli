@@ -28,7 +28,13 @@ func TestDeleteDeploymentToken(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
-	helper.AssertOut("Deployment token deleted successfully for deployment 9a1e6181-7d0b-48a2-bc2b-4250c36b5cc2")
+	helper.AssertErrContainsStrings([]string{fmt.Sprintf("deployment-token for deployment %s deleted", deploymentId)})
+	helper.AssertOutJson(fmt.Sprintf(`{
+	"data": {
+		"deleted": true,
+		"deployment_id": "%s"
+	}
+}`, deploymentId))
 }
 
 func TestDeleteDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.T) {
@@ -49,7 +55,13 @@ func TestDeleteDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
-	helper.AssertOut("Deployment token deleted successfully for deployment 9a1e6181-7d0b-48a2-bc2b-4250c36b5cc2")
+	helper.AssertErrContainsStrings([]string{fmt.Sprintf("deployment-token for deployment %s deleted", deploymentId)})
+	helper.AssertOutJson(fmt.Sprintf(`{
+	"data": {
+		"deleted": true,
+		"deployment_id": "%s"
+	}
+}`, deploymentId))
 }
 
 func TestDeleteDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {

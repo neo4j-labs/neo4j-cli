@@ -97,10 +97,7 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 		}
 	}`
 
-	expectedResponseJson := `###############################
-# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-###############################
-{
+	expectedResponseJson := `{
 	"data": {
 		"authentication_providers": [
 			{
@@ -117,10 +114,7 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 		"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql"
 	}
 }`
-	expectedResponseTable := `###############################
-# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-###############################
-┌──────────┬───────────────┬──────────┬────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────┐
+	expectedResponseTable := `┌──────────┬───────────────┬──────────┬────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────┐
 │ ID       │ NAME          │ STATUS   │ URL                                                                            │ AUTHENTICATION_PROVIDERS                          │
 ├──────────┼───────────────┼──────────┼────────────────────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
 │ 2f49c2b3 │ my-data-api-1 │ creating │ https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql │ [                                                 │
@@ -170,6 +164,46 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 			mockHandler.AssertCalledWithBody(tt.expectedRequestBody)
 
 			helper.AssertOut(tt.expectedResponse)
+			helper.AssertErrContainsStrings([]string{
+				"###############################",
+				"# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.",
+			})
 		})
 	}
+}
+
+// TestCreateGraphQLDataApi_StdoutIsValidJSON is the CLI-82 regression-pin
+// for the banner: pre-fix, the "###" banner was emitted to stdout, which broke
+// `--format json | jq`. Reverting the Pattern C fmt.Fprintln replacements to
+// cmd.Println in graphql/create.go causes this test to fail.
+func TestCreateGraphQLDataApi_StdoutIsValidJSON(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	instanceId := "2f49c2b3"
+	mockResponse := `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "my-data-api-1",
+			"status": "creating",
+			"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql",
+			"authentication_providers": [
+				{
+					"id": "1ad1b794-e40e-41f7-8e8c-5638130317ed",
+					"name": "default",
+					"type": "api-key",
+					"enabled": true,
+					"key": "ublHwKxm2ylsc1HlkuL8NAcMfZnEVP1g"
+				}
+			]
+		}
+	}`
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusAccepted, mockResponse)
+
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql create --instance-id %s --instance-username neo4j --instance-password dfjglhssdopfrow --name my-data-api-1 --type-definitions dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ== --rw --format json", instanceId))
+
+	helper.AssertOutIsValidJSON()
 }

@@ -1,0 +1,305 @@
+feature: route-status-text-to-stderr
+prd: ./prd-route-status-text-to-stderr.md
+created_at: 2026-05-12T15:30:00Z
+updated_at: 2026-05-12T19:15:00Z
+
+tasks:
+  - id: task-001
+    title: "Add AssertErrContainsStrings and AssertOutIsValidJSON helpers to AuraTestHelper"
+    description: |
+      In `neo4j-cli/aura/internal/test/testutils/auratesthelper.go`, add two methods on
+      `AuraTestHelper`: `AssertErrContainsStrings(expected []string)` mirroring the
+      existing `AssertOutContainsStrings` at line 146, and `AssertOutIsValidJSON()` which
+      reads stdout, calls `json.Unmarshal(out, &v)` into `var v any`, and asserts
+      `err == nil` with the offending stdout quoted in the failure message. These
+      helpers are the foundation for the CLI-82 regression-pinning tests — pre-fix,
+      `AssertOutIsValidJSON` fails for affected commands because stdout has narration
+      mixed with the JSON body; post-fix it passes.
+    status: completed
+    completed_at: 2026-05-12T15:45:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "AssertErrContainsStrings exists on AuraTestHelper, reads helper.err via io.ReadAll, and asserts each expected substring is present via assert.Contains"
+      - "AssertOutIsValidJSON exists on AuraTestHelper, reads helper.out, calls json.Unmarshal into a var, and asserts err is nil with the stdout content quoted in the failure message"
+      - "encoding/json import added if not already present"
+      - "Both helpers follow the existing pattern (io.ReadAll error checked via assert.Nil)"
+      - "make fmt-check, make lint, make test all pass with no existing tests broken"
+
+  - id: task-002
+    title: "Pattern A — route --await polling narration to stderr across 13 commands"
+    description: |
+      Replace `cmd.Println("Waiting for ... to be ready...")` and `cmd.Println("<Resource> Status:", ...)`
+      with `fmt.Fprintln(cmd.ErrOrStderr(), ...)` in the 13 await-supporting commands
+      listed under "Pattern A" in the PRD. Wording is preserved verbatim — only the
+      destination changes. Update each colocated `*_test.go` to (a) drop the moved
+      lines from `AssertOut(...)` expected text and (b) add an
+      `AssertErrContainsStrings(...)` assertion for the narration. Add ONE regression
+      test (e.g. `TestCreateFreeInstanceWithAwait_StdoutIsValidJSON` in
+      `instance/create_test.go`) that runs the await command with `--format json` and
+      calls `AssertOutIsValidJSON()` — this test MUST fail if any of the 13 fmt.Fprintln
+      replacements is reverted to cmd.Println.
+    status: completed
+    completed_at: 2026-05-12T16:15:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All 13 source files (instance/create.go, instance/resume.go, instance/snapshot/create.go, instance/overwrite.go, dataapi/graphql/create.go, dataapi/graphql/resume.go, dataapi/graphql/update.go, dataapi/graphql/pause.go, dataapi/graphql/authprovider/create.go, dataapi/graphql/corspolicy/allowedorigin/add.go, dataapi/graphql/corspolicy/allowedorigin/remove.go, customermanagedkey/create.go, graphanalytics/session/create.go) write polling narration via fmt.Fprintln(cmd.ErrOrStderr(), ...) instead of cmd.Println"
+      - "Narration wording is unchanged (verbatim 'Waiting for ... to be ready...' and '<Resource> Status: ...')"
+      - "Each colocated *_test.go that asserts await text via AssertOut is updated to drop those lines and add AssertErrContainsStrings for them"
+      - "A new regression test (e.g. TestCreateFreeInstanceWithAwait_StdoutIsValidJSON) uses AssertOutIsValidJSON to pin that stdout is parseable JSON for at least one await command under --format json"
+      - "Manual sanity: reverting one fmt.Fprintln back to cmd.Println causes the regression test to fail with a clear message"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-003
+    title: "Pattern B — convert 3 delete commands to structured JSON stdout + human stderr line"
+    description: |
+      In `customermanagedkey/delete.go:35`, `deployment/delete.go:55`, and
+      `deployment/token/delete.go:57`, replace the bare `cmd.Println("Operation Successful")`
+      / `cmd.Println("... deleted successfully ...")` with two calls: (1) a stderr
+      `fmt.Fprintf(cmd.ErrOrStderr(), "<resource> %s deleted\n", id)` human line, and
+      (2) a stdout structured confirmation via
+      `output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(map[string]any{"deleted": true, "<key>": <value>}), []string{"deleted", "<key>"})`.
+      The identifier key matches each resource's existing list/get/create convention:
+      `"id"` for customermanagedkey and deployment, `"deployment_id"` for
+      deployment-token (per PRD "Delete-confirmation field keys"). Update colocated
+      delete tests to switch `AssertOut("Operation Successful\n")` →
+      `AssertOutJson(...)` and add `AssertErrContainsStrings([]string{...})` for the
+      human line. Add one regression test using `AssertOutIsValidJSON()` on a delete
+      command under `--format json`.
+    status: completed
+    completed_at: 2026-05-12T17:00:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "customermanagedkey/delete.go emits stderr 'customer-managed-key <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"id\":\"<id>\"}} via output.PrintBodyMap"
+      - "deployment/delete.go emits stderr 'deployment <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"id\":\"<id>\"}}"
+      - "deployment/token/delete.go emits stderr 'deployment-token for deployment <id> deleted\\n' and stdout JSON {\"data\":{\"deleted\":true,\"deployment_id\":\"<id>\"}}"
+      - "TestDeleteCustomerManagedKey, TestDeleteDeployment (and its org/project-from-config variant), and the deployment-token delete test are updated to assert stdout JSON via AssertOutJson and stderr text via AssertErrContainsStrings"
+      - "At least one regression test calls AssertOutIsValidJSON after a delete with --format json"
+      - "Output respects --format table and --format toon (table renders deleted/id columns, toon renders correspondingly); verify by adding or extending one --format table assertion in a delete test"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-004
+    title: "Pattern C — route banners and origin-echo plain-text to stderr"
+    description: |
+      Replace `cmd.Println(...)` / `cmd.Printf(...)` with
+      `fmt.Fprintln(cmd.ErrOrStderr(), ...)` / `fmt.Fprintf(cmd.ErrOrStderr(), ...)`
+      in: (a) `dataapi/graphql/create.go:86-88` (3-line banner about storing the API
+      key), (b) `dataapi/graphql/authprovider/create.go:87-89` (same banner), (c)
+      `dataapi/graphql/corspolicy/allowedorigin/add.go:77` (plain-text `New allowed
+      origins: [...]`), and (d) `dataapi/graphql/corspolicy/allowedorigin/remove.go:92,94`
+      (same in empty-list and populated-list branches). Wording preserved verbatim.
+      Update colocated tests to drop these lines from AssertOut expected text and add
+      AssertErrContainsStrings assertions. Add two regression tests using
+      AssertOutIsValidJSON: one for a banner command (e.g. graphql/create with --format
+      json) and one for an origin-echo command (e.g. allowedorigin/add with --format
+      json).
+    status: completed
+    completed_at: 2026-05-12T17:30:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "graphql/create.go L86-88 banner and graphql/authprovider/create.go L87-89 banner write to cmd.ErrOrStderr() with the existing wording preserved"
+      - "graphql/corspolicy/allowedorigin/add.go L77 and remove.go L92,L94 write the 'New allowed origins: ...' text to cmd.ErrOrStderr()"
+      - "Colocated *_test.go for these four files are updated to drop the moved lines from AssertOut and add AssertErrContainsStrings for them"
+      - "Two new regression tests use AssertOutIsValidJSON: one for a banner-emitting command under --format json, one for an origin-echo command under --format json"
+      - "Manual sanity: reverting one fmt.Fprintln back to cmd.Println causes the corresponding regression test to fail"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-005
+    title: "Pattern D — route config/project/use confirmation to stderr (with missing newline fix)"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/config/project/use.go:23`, replace
+      `cmd.Printf("Set %s as default project ...", ...)` with
+      `fmt.Fprintf(cmd.ErrOrStderr(), "Set %s as default project ... \n", ...)` —
+      same format string, but terminated with `\n` (the original lacked one — fix
+      incidentally). Update the colocated `use_test.go` to assert the message via
+      AssertErrContainsStrings instead of AssertOut. No regression-pinning
+      AssertOutIsValidJSON test is required for this command because it has no JSON
+      body in any format; the test instead asserts stdout is empty after the call.
+    status: completed
+    completed_at: 2026-05-12T17:55:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "config/project/use.go:23 writes via fmt.Fprintf(cmd.ErrOrStderr(), ...) with \\n appended"
+      - "Format-string arguments and order unchanged"
+      - "use_test.go asserts the confirmation appears on stderr via AssertErrContainsStrings and stdout is empty via AssertOut(\"\")"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-006
+    title: "Add Patch-kind changie entry for CLI-82 stdout/stderr fix"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "fix(cli): route
+      progress/status text to stderr so --format json output stays jq-parseable
+      (CLI-82)"`, or hand-author the YAML under `.changes/unreleased/` following the
+      `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` convention if changie is unavailable.
+      Body single-quoted, time in RFC3339, project field set to `neo4j-cli`.
+    status: completed
+    completed_at: 2026-05-12T16:06:00Z
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "A file exists under .changes/unreleased/ with project: neo4j-cli, kind: Patch, and the documented body"
+      - "Filename matches the neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml convention"
+      - "Body single-quoted, time in RFC3339"
+      - "make test stays green"
+
+  - id: task-007
+    title: "Pattern E (CLI-95) — route tenant get table-format warning to stderr"
+    description: |
+      In `neo4j-cli/aura/internal/subcommands/tenant/get.go:42`, replace
+      `cmd.Println("instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")`
+      with `fmt.Fprintln(cmd.ErrOrStderr(), "instance configurations are not visible with table output - please use a different output setting using --format if you would like to view these")`.
+      Wording unchanged (per the no-rewording convention used for every other CLI-82 case).
+      The conditional gate `cfg.Global.Format() == "table" || cfg.Global.Format() == "default"`
+      is preserved — under json/toon the field is included so the warning is irrelevant.
+
+      Update `tenant/get_test.go` (the test at L145+ currently asserts the warning via
+      `AssertOut`): split assertions so stdout contains only the table body
+      (`AssertOut(<table>)` or `AssertOutContainsStrings`) and the warning is asserted
+      via `AssertErrContainsStrings([]string{"instance configurations are not visible"})`.
+      Add a regression test `TestGetTenant_StdoutIsValidJSON` that runs `tenant get`
+      under `--format json` and calls `AssertOutIsValidJSON()` — pre-fix this passes
+      because the warning is gated to table/default, but the new test pins that
+      `--format table` does not pollute stdout either (use the existing table assertion
+      pattern plus assert stderr contains the warning).
+
+      Also update the changie entry from task-006: append `(CLI-95)` to the existing
+      `(CLI-82)` reference in the body so the changelog line credits both Linear
+      issues. Either run `changie new` again with the combined body and remove the old
+      entry, or edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body
+      string in place.
+    status: completed
+    completed_at: 2026-05-12T18:30:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "tenant/get.go:42 writes the warning via fmt.Fprintln(cmd.ErrOrStderr(), ...) with the existing wording verbatim"
+      - "The format conditional (table|default only) is preserved unchanged"
+      - "tenant/get_test.go is updated so the warning is asserted on stderr via AssertErrContainsStrings, not on stdout"
+      - "A regression test pins that --format table emits no warning on stdout AND the warning IS emitted on stderr"
+      - "Changie Patch entry body mentions both CLI-82 and CLI-95"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-008
+    title: "Pattern F (CLI-94) — TTY-gate :schema H2 headers in table mode"
+    description: |
+      In `neo4j-cli/query/schema.go`, function `printSchemaTables` at L296-318, wrap
+      each of the five `cmd.Println("## <Section>")` calls in a TTY check via
+      `commonoutput.StdoutIsTerminal(cmd.OutOrStdout())`. When stdout is a TTY (the
+      package's TestMain default and real interactive use), the H2 headers print to
+      stdout as today. When stdout is NOT a TTY (piped, redirected, file output), the
+      H2 lines are suppressed entirely — table rows and the blank-line separators
+      still flow to stdout unchanged.
+
+      Reference fix shape (audit-prescribed):
+      ```go
+      if commonoutput.StdoutIsTerminal(cmd.OutOrStdout()) {
+          cmd.Println("## Nodes")
+      }
+      cmd.Println(renderNodesTable(r.Nodes))
+      cmd.Println()
+      ```
+      Apply to all five H2 sites: Nodes, Relationships, Relationship Paths, Indexes,
+      Constraints.
+
+      Update `neo4j-cli/query/schema_test.go`:
+      - `TestSchema_HappyPath_Table` (L199+) already passes because TestMain seeds
+        `StdoutIsTerminal=true` (see `testseam_test.go:22`); leave it alone OR add a
+        belt-and-suspenders `withStdoutIsTerminal(t, true)` line at the top to make
+        the TTY expectation explicit at the test level.
+      - Add a NEW test `TestSchema_TableNonTTYSuppressesHeaders` that calls
+        `withStdoutIsTerminal(t, false)`, runs `--format table`, and asserts:
+        * stdout does NOT contain any of `## Nodes`, `## Relationships`,
+          `## Relationship Paths`, `## Indexes`, `## Constraints`.
+        * stdout DOES still contain the rendered table rows for each section (use
+          existing `assertSectionsInOrder` with non-H2 substrings, or substring
+          asserts on column headers from the rendered tables).
+      - Manual sanity: revert the TTY gate on one H2 site and confirm the new test
+        fails with a clear message.
+
+      Update the changie body from task-006/task-007 to also mention CLI-94. The
+      existing body says `(CLI-82, CLI-95)`; change it to
+      `keep stdout clean for --format json consumers — route narration to stderr (CLI-82, CLI-95), TTY-gate :schema H2 headers (CLI-94)`
+      (or equivalent wording that credits all three Linear issues). Edit the
+      existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body in place rather
+      than creating a new entry.
+
+      No bundle regen needed (no cobra `Long` / `Use` / flag-description edits) —
+      but run `make generate-check` as a gate anyway.
+    status: completed
+    completed_at: 2026-05-12T19:15:00Z
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "schema.go printSchemaTables wraps each of the 5 H2 cmd.Println calls with `if commonoutput.StdoutIsTerminal(cmd.OutOrStdout())`"
+      - "Table rows (renderXxxTable) and blank-line separators still print unconditionally to stdout"
+      - "New TestSchema_TableNonTTYSuppressesHeaders asserts stdout does NOT contain ## Nodes/Relationships/etc. when TTY=false under --format table, while table rows still render"
+      - "Existing TestSchema_HappyPath_Table continues to pass (TestMain seeds TTY=true)"
+      - "Manual sanity: reverting one H2 gate causes the new non-TTY test to fail"
+      - "Changie Patch entry body credits CLI-82, CLI-95, AND CLI-94"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"
+
+  - id: task-009
+    status: completed
+    completed_at: 2026-05-12T19:30:00Z
+    title: "Pattern G (CLI-96) — route update command status lines to stderr"
+    description: |
+      In `neo4j-cli/internal/subcommands/update/update.go`, replace 5 `cmd.Println` /
+      `cmd.Printf` sites with `fmt.Fprintln` / `fmt.Fprintf` against `cmd.ErrOrStderr()`.
+      Wording preserved verbatim.
+
+      Sites to change:
+      - L302: `cmd.Println("running a dev build, nothing to update")` (top-level dev-build
+        early return; fires regardless of format → fixes a real `--format json` pollution).
+      - L326: `cmd.Println("no stable release published yet — pass \`--pre-releases\` to track alpha/beta/rc tags.")`
+        (ErrNoStableRelease recovery; fires regardless of format → fixes `--format json` pollution).
+      - L434: `cmd.Printf("Current version: %s\n", current)` (pre-swap narrative; already
+        gated to `!isStructuredFormat(cfg.Global.Format())`; moved for status-noise consistency).
+      - L435: `cmd.Println("Checking for updates to latest version...")` (same block).
+      - L475: `cmd.Println("Tip: install the agent skill so AI assistants pick up the new commands — run \`neo4j-cli skill install\`.")`
+        (inside post-swap printResult plain-text closure; moved for consistency).
+
+      Leave UNCHANGED (these are plain-text-mode data, not narration):
+      - L358: `Already on %s. No update needed.`
+      - L382: `<method> already on %s; <target> available.`
+      - L398-402: 4-line `update check` block (Current version / Latest / New version
+        available / Run to install).
+      - L470: `Successfully updated from %s to %s`.
+      - L473: `Refreshed skill bundle for: %s`.
+
+      Existing tests at `neo4j-cli/internal/subcommands/update/update_test.go:115-117`
+      set both `cmd.SetOut(out)` AND `cmd.SetErr(out)` to the same combined buffer, so
+      assertions like `assert.Contains(t, out, "Checking for updates to latest version...")`
+      keep passing because the text still flows into `out` (just via the err writer
+      instead of the out writer). The 13-row dev-build / no-stable-release / `update check`
+      tests at L164 / L622-623 / L1007-1175 stay green.
+
+      Add ONE new regression test `TestUpdate_StatusLinesGoToStderr` that:
+      - Uses SEPARATE `outBuf` and `errBuf` buffers (`cmd.SetOut(outBuf); cmd.SetErr(errBuf)`).
+      - Exercises the dev-build branch (current = devVersion) → asserts:
+        * `outBuf.String() == ""` (or doesn't contain "running a dev build").
+        * `errBuf.String()` contains `"running a dev build, nothing to update"`.
+      - Bonus: a sub-case for the ErrNoStableRelease branch with the same shape.
+      - Sanity-check: reverting L302 back to `cmd.Println` makes the new test fail.
+
+      Update the changie body from the prior tasks (currently mentions CLI-82, CLI-95,
+      CLI-94) to also credit CLI-96. New body per PRD REQ-F-010:
+      `keep stdout clean for --format json consumers — route narration to stderr (CLI-82, CLI-95, CLI-96), TTY-gate :schema H2 headers (CLI-94)`.
+      Edit the existing `.changes/unreleased/neo4j-cli-Patch-*.yaml` body in place.
+
+      No bundle regen expected; run `make generate-check` as a gate.
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "update.go L302, L326, L434, L435, L475 all write via fmt.Fprintln/Fprintf(cmd.ErrOrStderr(), ...) with verbatim wording"
+      - "Plain-text-data lines (L358, L382, L398-402, L470, L473) are NOT changed"
+      - "Existing update_test.go assertions keep passing (combined out/err buffer)"
+      - "New TestUpdate_StatusLinesGoToStderr uses split buffers and asserts dev-build text appears on stderr ONLY (and similarly for the no-stable-release branch)"
+      - "Manual sanity: reverting one of the 5 sites causes the new split-buffer test to fail"
+      - "Changie Patch entry body credits CLI-82, CLI-95, CLI-94, AND CLI-96"
+      - "make fmt-check, make lint, make test all pass; make generate-check shows no bundle drift"

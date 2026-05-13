@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
@@ -52,7 +53,10 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 			}
 
 			if api.IsSuccessful(statusCode) {
-				cmd.Println("Deployment deleted successfully", deploymentId)
+				fmt.Fprintf(cmd.ErrOrStderr(), "deployment %s deleted\n", deploymentId) //nolint:errcheck // narration to stderr; write errors are not actionable
+				output.PrintBodyMap(cmd, cfg,
+					api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": deploymentId}),
+					[]string{"deleted", "id"})
 			}
 
 			return nil

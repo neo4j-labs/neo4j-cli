@@ -84,10 +84,7 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 		}
 	}`
 
-	expectedResponseJsonApiKey := `###############################
-# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-###############################
-{
+	expectedResponseJsonApiKey := `{
 	"data": {
 		"enabled": true,
 		"id": "1ad1b794-e40e-41f7-8e8c-5638130317ed",
@@ -96,10 +93,7 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 		"type": "api-key"
 	}
 }`
-	expectedResponseTableApiKey := `###############################
-# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-###############################
-┌──────────────────────────────────────┬──────────┬─────────┬─────────┬──────────────────────────────────┬─────┐
+	expectedResponseTableApiKey := `┌──────────────────────────────────────┬──────────┬─────────┬─────────┬──────────────────────────────────┬─────┐
 │ ID                                   │ NAME     │ TYPE    │ ENABLED │ KEY                              │ URL │
 ├──────────────────────────────────────┼──────────┼─────────┼─────────┼──────────────────────────────────┼─────┤
 │ 1ad1b794-e40e-41f7-8e8c-5638130317ed │ my-key-2 │ api-key │ true    │ ublHwKxm2ylsc1HlkuL8NAcMfZnEVP1g │     │
@@ -122,29 +116,38 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 └─────────────────────────────────────┴───────────┴──────┴─────────┴─────┴────────────────────────────────────────┘
 			`
 
+	apiKeyBanner := []string{
+		"###############################",
+		"# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.",
+	}
+
 	tests := map[string]struct {
 		mockResponse        string
 		executeCommand      string
 		expectedRequestBody string
 		expectedResponse    string
+		expectedErrContains []string
 	}{
 		"create api-key only with name": {
 			mockResponse:        mockResponseApiKey,
 			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":true,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseJsonApiKey,
+			expectedErrContains: apiKeyBanner,
 		},
 		"create api-key with name and disabled flag": {
 			mockResponse:        mockResponseApiKey,
 			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --instance-id %s --data-api-id %s --name %s --type api-key --disabled --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":false,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseJsonApiKey,
+			expectedErrContains: apiKeyBanner,
 		},
 		"create api-key with name and disabled flag response as table": {
 			mockResponse:        mockResponseApiKey,
 			executeCommand:      fmt.Sprintf("data-api graphql auth-provider create --format table --instance-id %s --data-api-id %s --name %s --type api-key --disabled --rw", instanceId, dataApiId, nameApiKey),
 			expectedRequestBody: `{"enabled":false,"name":"my-key-2","type":"api-key"}`,
 			expectedResponse:    expectedResponseTableApiKey,
+			expectedErrContains: apiKeyBanner,
 		},
 		"create jwks only with name and url": {
 			mockResponse:        mockResponseJwks,
@@ -182,6 +185,11 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 			mockHandler.AssertCalledWithBody(tt.expectedRequestBody)
 
 			helper.AssertOut(tt.expectedResponse)
+			if len(tt.expectedErrContains) > 0 {
+				helper.AssertErrContainsStrings(tt.expectedErrContains)
+			} else {
+				helper.AssertErr("")
+			}
 		})
 	}
 }

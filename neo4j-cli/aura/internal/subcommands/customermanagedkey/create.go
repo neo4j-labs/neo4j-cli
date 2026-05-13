@@ -5,6 +5,7 @@ package customermanagedkey
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -81,7 +82,7 @@ Once the key has a status of ready you can use it for creating new instances by 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 				if await {
-					cmd.Println("Waiting for customer managed key to be ready...")
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
 					var response api.CreateCMKResponse
 					if err := json.Unmarshal(resBody, &response); err != nil {
 						return err
@@ -92,7 +93,7 @@ Once the key has a status of ready you can use it for creating new instances by 
 						return err
 					}
 
-					cmd.Println("CMK Status:", pollResponse.Data.Status)
+					fmt.Fprintln(cmd.ErrOrStderr(), "CMK Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 				}
 
 			}

@@ -28,9 +28,46 @@ func TestDeleteCustomerManagedKey(t *testing.T) {
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
-			helper.AssertOut("Operation Successful\n")
+			helper.AssertErrContainsStrings([]string{fmt.Sprintf("customer-managed-key %s deleted", cmkId)})
+			helper.AssertOutJson(fmt.Sprintf(`{
+	"data": {
+		"deleted": true,
+		"id": "%s"
+	}
+}`, cmkId))
 		})
 	}
+}
+
+// TestDeleteCustomerManagedKey_StdoutIsValidJSON is the CLI-82 regression-pin
+// for the delete-success narration: pre-fix, stdout had "Operation Successful"
+// instead of structured JSON. Reverting the Pattern B fmt.Fprintf/PrintBodyMap
+// pair to cmd.Println causes this test to fail.
+func TestDeleteCustomerManagedKey_StdoutIsValidJSON(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	cmkId := "8c764aed-8eb3-4a1c-92f6-e4ef0c7a6ed9"
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusNoContent, "")
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --rw --format json", cmkId))
+
+	helper.AssertOutIsValidJSON()
+}
+
+func TestDeleteCustomerManagedKey_TableFormat(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	cmkId := "8c764aed-8eb3-4a1c-92f6-e4ef0c7a6ed9"
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusNoContent, "")
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --rw --format table", cmkId))
+
+	helper.AssertOutContainsStrings([]string{"DELETED", "ID", "true", cmkId})
+	helper.AssertErrContainsStrings([]string{fmt.Sprintf("customer-managed-key %s deleted", cmkId)})
 }
 
 func TestDeleteCustomerManagedKeyError(t *testing.T) {
