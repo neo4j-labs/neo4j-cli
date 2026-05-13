@@ -28,7 +28,7 @@ tasks:
       The helper registers `--wait` and binds `--await` to the same `*bool`, then calls `cmd.Flags().MarkDeprecated(AwaitFlagAlias, "use --wait instead")`.
       Add `wait_test.go` with table-driven coverage for the four behavioural cases listed in REQ-F-002.
       Include the Neo4j copyright header on `wait.go` so `make license-check` passes.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "wait.go exports WaitFlag = \"wait\", AwaitFlagAlias = \"await\", and RegisterWait(cmd *cobra.Command, wait *bool, helpText string)"
@@ -36,7 +36,7 @@ tasks:
       - "wait_test.go covers: --wait sets bool / no deprecation marker on stderr; --await sets bool AND stderr contains 'Flag --await has been deprecated, use --wait instead'; neither flag → false, no marker; both flags → true + marker"
       - "wait.go carries the Neo4j copyright header"
       - "go test ./neo4j-cli/aura/internal/flags/... passes"
-    completed_at: null
+    completed_at: 2026-05-13T13:35:00Z
 
   - id: task-003
     title: "Refactor 13 leaf commands to use flags.RegisterWait"

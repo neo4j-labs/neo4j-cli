@@ -2,3 +2,8 @@
 Created Linear issue CLI-111 (parent CLI-71, project Neo4j-CLI, team neo4j-cli-workinggroup, due 2026-06-03) to track --await alias removal after one release.
 Files: ~.plans/tasks-cli-87-rename-await-to-wait.yml
 Decisions: PRD's "team Neo4j, project CLI" = team neo4j-cli-workinggroup (key CLI) + project Neo4j-CLI. Recorded follow_up_issue_id: CLI-111 in YAML for task-008.
+
+## task-002 — 2026-05-13T13:35:00Z
+Added flags.RegisterWait helper that binds --wait and deprecated --await alias to same *bool via cobra MarkDeprecated; covered four behavioural cases in table-driven test plus help-hiding check.
+Files: +neo4j-cli/aura/internal/flags/wait.go, +neo4j-cli/aura/internal/flags/wait_test.go, ~.plans/tasks-cli-87-rename-await-to-wait.yml
+Decisions: pflag's FlagSet writes deprecation warnings to its own Output() (os.Stderr by default), independent of cmd.SetErr; test sets cmd.Flags().SetOutput(buf) explicitly to capture. MarkDeprecated err handled via panic since only programmer-error conditions trigger it.
