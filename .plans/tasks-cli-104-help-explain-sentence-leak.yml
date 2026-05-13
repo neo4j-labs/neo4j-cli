@@ -31,7 +31,7 @@ tasks:
       `query :embed` sentence at line 28-29). Use backticks around `--rw` to match
       the surrounding style. Verify the rendered paragraph reads naturally.
       See PRD REQ-F-003, REQ-F-004.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -40,7 +40,7 @@ tasks:
       - "Backticks wrap `--rw` (matching the existing `--param NAME:embed=<text>` style)"
       - "`go run ./neo4j-cli query --help` shows the new sentence as the final clause of the Long paragraph"
       - "`go run ./neo4j-cli query --help` output contains the substring `EXPLAIN preflight`"
-    completed_at: null
+    completed_at: 2026-05-13T12:50:00Z
 
   - id: task-003
     title: "Regenerate skill bundles to reflect new help text"
