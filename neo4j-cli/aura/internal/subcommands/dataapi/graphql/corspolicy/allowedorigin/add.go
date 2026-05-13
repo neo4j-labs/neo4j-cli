@@ -37,6 +37,14 @@ func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --await flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
 
 Adding a new allowed origin to the CORS policy of a GraphQL Data API allows browsers to make requests to the GraphQL Data API from a web app that is served from the specified origin.`,
+		Example: `# Add an allowed origin to the CORS policy
+neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
+
+# Add an allowed origin and wait until the GraphQL Data API is ready
+neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --await --rw
+
+# Add an allowed origin and capture the response as JSON
+neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			newOrigin := args[0]

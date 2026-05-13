@@ -63,7 +63,7 @@ tasks:
       top-level (create, list, get, update, delete, pause, resume),
       `authprovider/` (create, list, delete, get),
       `corspolicy/allowedorigin/` (add, remove). Regenerate the skill bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -71,7 +71,7 @@ tasks:
       - "Write leaves (`graphql create`, `graphql update`, `graphql delete`, `graphql pause`, `graphql resume`, `auth-provider create`, `auth-provider delete`, `allowed-origin add`, `allowed-origin remove`) include `--rw` on every invocation"
       - "Read leaves (`graphql list`, `graphql get`, `auth-provider list`, `auth-provider get`) include at least one `--format json` invocation and never `--rw`"
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass"
-    completed_at: null
+    completed_at: 2026-05-13T11:45:00Z
 
   - id: task-005
     title: "Aura graph-analytics + import: add Example blocks"

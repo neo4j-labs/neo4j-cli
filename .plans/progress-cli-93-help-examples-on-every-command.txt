@@ -10,3 +10,8 @@ Files: ~17 leaf .go + ~bundle/references/{config,credential,customer-managed-key
 Added Example blocks to 10 aura deployment leaves: top-level (list/create/delete/get), token (create/update/delete), database (list), server (list), server/database (list). Bundles unchanged because deployment is beta-gated (AuraBetaEnabled=false in gen).
 Files: ~10 leaf .go
 Decisions: bundle skipped on purpose — deployment subtree is mounted only under AuraBetaEnabled, generator runs with default config so references/deployment.md isn't emitted. Examples still flow to --help.
+
+## task-004 — 2026-05-13T11:45:00Z
+Added Example blocks to 13 data-api/graphql leaves: top-level (create/list/get/update/delete/pause/resume), auth-provider (create/list/delete/get), cors-policy/allowed-origin (add/remove). Bundles unchanged because data-api is beta-gated like deployment. Incidentally cleaned trailing tabs on two Long blocks (update.go, resume.go).
+Files: ~13 leaf .go
+Decisions: bundle skipped — same beta-gate reason as task-003. Cleaned-up trailing whitespace in Long strings is harmless (not referenced elsewhere).
