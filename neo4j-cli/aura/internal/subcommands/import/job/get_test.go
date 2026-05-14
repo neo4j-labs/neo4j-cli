@@ -665,6 +665,34 @@ func TestGetImportJobByIdWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	`)
 }
 
+func TestGetImportJobByIdWithTrailingNewline(t *testing.T) {
+	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	jobId := "87d485b4-73fc-4a7f-bb03-720f4672947e"
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs/%s", organizationId, projectId, jobId), http.StatusOK, fmt.Sprintf(`{
+    "data": {
+        "id": "%s",
+        "import_type": "cloud"
+    }}`, jobId))
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.ExecuteCommand(fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s\"\n\"", organizationId, projectId, jobId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+	mockHandler.AssertCalledWithQueryParam("progress", "false")
+	helper.AssertOutJson(fmt.Sprintf(`{
+		"data": {
+			"id": "%s",
+			"import_type": "cloud"
+		}
+	}`, jobId))
+}
+
 func TestGetImportJobError(t *testing.T) {
 	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
 	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"

@@ -182,6 +182,50 @@ func TestAddAllowedOriginWithDuplicateOrigin(t *testing.T) {
 	helper.AssertErr(fmt.Sprintf("Error: Origin \"%s\" already exists in allowed origins\n", allowedOrigin))
 }
 
+func TestAddAllowedOriginWithTrailingNewline(t *testing.T) {
+	mockGetResponse := `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "my-data-api-1",
+			"status": "ready",
+			"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql",
+			"security": {
+				"cors_policy": {
+					"allowed_origins": []
+				}
+			}
+		}
+	}`
+	expectedResponse := `{
+	"data": {
+		"id": "2f49c2b3",
+		"name": "my-data-api-1",
+		"status": "ready",
+		"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql"
+	}
+}`
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
+	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
+
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin add --instance-id %s --data-api-id %s --rw %s\"\n\"", instanceId, dataApiId, allowedOrigin))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+	mockHandler.AssertCalledWithMethod(http.MethodPatch)
+	mockHandler.AssertCalledWithBody(fmt.Sprintf("{\"security\":{\"cors_policy\":{\"allowed_origins\":[\"%s\"]}}}", allowedOrigin))
+
+	helper.AssertOut(expectedResponse)
+	helper.AssertErrContainsStrings([]string{
+		fmt.Sprintf(`New allowed origins: ["%s"]`, allowedOrigin),
+	})
+}
+
 func TestAddAllowedOriginWithOutputTable(t *testing.T) {
 	mockGetResponse := `{
 		"data": {

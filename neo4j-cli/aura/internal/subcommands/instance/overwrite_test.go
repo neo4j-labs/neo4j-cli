@@ -53,6 +53,48 @@ func TestOverwriteFromInstance(t *testing.T) {
 	}`)
 }
 
+func TestOverwriteWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	instanceId := "2f49c2b3"
+	sourceId := "191b0da2"
+
+	postMock := helper.NewRequestHandlerMock(fmt.Sprintf("POST /v1/instances/%s/overwrite", instanceId), http.StatusAccepted, `{
+		"data": {
+		  "id": "2f49c2b3",
+		  "name": "Production",
+		  "status": "overwriting",
+		  "connection_url": "YOUR_CONNECTION_URL",
+		  "tenant_id": "YOUR_TENANT_ID",
+		  "cloud_provider": "gcp",
+		  "memory": "8GB",
+		  "region": "europe-west1",
+		  "type": "enterprise-db"
+		}
+	  }`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance overwrite --source-instance-id %s --rw %s\"\n\"", sourceId, instanceId))
+	postMock.AssertCalledTimes(1)
+	postMock.AssertCalledWithBody(`{
+		"source_instance_id": "191b0da2"
+	  }`)
+
+	helper.AssertOutJson(`{
+	  "data": {
+		"cloud_provider": "gcp",
+		"connection_url": "YOUR_CONNECTION_URL",
+		"id": "2f49c2b3",
+		"memory": "8GB",
+		"name": "Production",
+		"region": "europe-west1",
+		"status": "overwriting",
+		"tenant_id": "YOUR_TENANT_ID",
+		"type": "enterprise-db"
+	  }
+	}`)
+}
+
 func TestOverwriteFromSnapshot(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
