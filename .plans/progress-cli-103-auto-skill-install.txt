@@ -1,0 +1,24 @@
+================================================================================
+TASK-001: Add NEO4J_CLI_AUTO_INSTALL_SKILL postinstall hook to npm package template
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added a `postinstall` npm lifecycle hook to the `@neo4j-labs/cli` package template.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set, `npm install -g @neo4j-labs/cli`
+automatically runs `neo4j-cli skill install --rw` after binary placement. Any
+failure is silently suppressed so npm install is never aborted.
+
+Files Changed:
+- distribution/npm/cli/bin/postinstall.js (created — Node.js postinstall hook script)
+- distribution/npm/cli/package.json.tmpl (modified — added scripts.postinstall and postinstall.js to files array)
+- distribution/npm/publish.sh (modified — copies postinstall.js to wrapper build dir)
+
+Key Decisions:
+- Implemented postinstall logic in a separate `bin/postinstall.js` file (not inline in package.json scripts) to keep the logic readable and testable
+- Used `process.execPath` to invoke the shim so the same Node.js binary runs both scripts
+- Used `spawnSync` with `{ stdio: 'inherit' }` for consistent output passthrough
+- Always exits 0 at end of postinstall.js — non-zero exit from skill install is not propagated
+- `postinstall.js` does NOT need chmod +x since it's invoked via `node bin/postinstall.js`
+
+Next Task: task-002

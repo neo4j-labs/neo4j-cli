@@ -13,14 +13,14 @@ tasks:
       The invocation must be wrapped in try/catch so any failure (including
       ErrNoAgentsDetected) does not fail `npm install`. If the env var is absent
       or any other value, the script exits 0 immediately.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 npm install -g @neo4j-labs/cli` triggers `skill install --rw`"
       - "`npm install -g @neo4j-labs/cli` with unset or `=0` var exits 0 with no skill action"
       - "Any non-zero exit from `skill install --rw` is caught and suppressed; `npm install` succeeds"
       - "`make npm-publish-dry` renders `postinstall` in the generated `package.json`"
-    completed_at: null
+    completed_at: 2026-05-14T00:00:00Z
 
   - id: task-002
     title: "Add post_install Ruby block to Homebrew formula via .goreleaser.yaml"
