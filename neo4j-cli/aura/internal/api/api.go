@@ -33,8 +33,9 @@ type Grant struct {
 type AuraApiVersion string
 
 const (
-	AuraApiVersion1 AuraApiVersion = "1"
-	AuraApiVersion2 AuraApiVersion = "2"
+	AuraApiVersion1     AuraApiVersion = "1"
+	AuraApiVersion2     AuraApiVersion = "2"
+	AuraApiVersionBeta2 AuraApiVersion = "2beta"
 )
 
 type RequestConfig struct {
@@ -127,6 +128,8 @@ func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
 			return cfg.Aura.BetaPathV2()
 		}
 		return "v2"
+	case AuraApiVersionBeta2:
+		return cfg.Aura.BetaPathV2()
 	default:
 		panic(fmt.Sprintf("version not set in requests %s", version))
 	}

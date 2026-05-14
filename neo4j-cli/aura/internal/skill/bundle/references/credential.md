@@ -20,6 +20,8 @@ Flags:
 | `--client-secret` | string | - | (required) Client secret |
 | `--env` | string | - | Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values. |
 | `--name` | string | - | (required) Name |
+| `--organization-id` | string | - | Optional default organization ID — stored and used by 'project list' when --organization-id is not passed explicitly |
+| `--organization-name` | string | - | Human-readable organization name (display only; not validated against the API) |
 
 Examples:
 

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var credentialFields = []string{"name", "type", "identifier", "default"}
+var credentialFields = []string{"name", "type", "identifier", "default", "organization-id", "organization-name"}
 
 func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{

@@ -12,16 +12,20 @@ import (
 
 func NewAddCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		name         string
-		clientId     string
-		clientSecret string
-		envPath      string
+		name             string
+		clientId         string
+		clientSecret     string
+		organizationId   string
+		organizationName string
+		envPath          string
 	)
 
 	const (
 		nameFlag         = "name"
 		clientIdFlag     = "client-id"
 		clientSecretFlag = "client-secret"
+		orgIdFlag        = "organization-id"
+		orgNameFlag      = "organization-name"
 		envFlag          = "env"
 
 		envClientId     = "CLIENT_ID"
@@ -106,13 +110,15 @@ neo4j-cli aura credential add --name my-creds --client-id <client-id> --client-s
 				}
 			}
 
-			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
+			return cfg.Credentials.Aura.Add(name, clientId, clientSecret, organizationId, organizationName)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
 	cmd.Flags().StringVar(&clientId, clientIdFlag, "", "(required) Client ID")
 	cmd.Flags().StringVar(&clientSecret, clientSecretFlag, "", "(required) Client secret")
+	cmd.Flags().StringVar(&organizationId, orgIdFlag, "", "Optional default organization ID — stored and used by 'project list' when --organization-id is not passed explicitly")
+	cmd.Flags().StringVar(&organizationName, orgNameFlag, "", "Human-readable organization name (display only; not validated against the API)")
 	cmd.Flags().StringVar(&envPath, envFlag, "", "Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values.")
 
 	return cmd

@@ -153,6 +153,14 @@ func TestCredentialAddAuraClient(t *testing.T) {
 			wantCredentials: `[{"name":"test","client-id":"testclientid","client-secret":"testclientsecret","access-token":"","token-expiry":0},{"name":"test-new","client-id":"testclientid2","client-secret":"testclientsecret2","access-token":"","token-expiry":0}]`,
 			wantDefaultCred: "test",
 		},
+		{
+			name:            "organization-id is stored with credential",
+			initialCreds:    []map[string]string{},
+			initialDefault:  "",
+			command:         "aura-client add --rw --name work --client-id cid --client-secret csec --organization-id 3d6481bf-2df1-47cf-8392-0288b1ac215f",
+			wantCredentials: `[{"name":"work","client-id":"cid","client-secret":"csec","organization-id":"3d6481bf-2df1-47cf-8392-0288b1ac215f","access-token":"","token-expiry":0}]`,
+			wantDefaultCred: "work",
+		},
 	}
 
 	for _, tc := range tests {
@@ -191,7 +199,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			name:         "lists all stored credentials as table (explicit --format table)",
 			command:      "aura-client list --format table",
 			initialCreds: []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "test", "aura-client", "testclientid"},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "ORGANIZATION-ID", "test", "aura-client", "testclientid"},
 		},
 		{
 			name:         "lists all stored credentials as json (explicit --format json)",
@@ -202,6 +210,8 @@ func TestCredentialListAuraClient(t *testing.T) {
 		"default": false,
 		"identifier": "testclientid",
 		"name": "test",
+		"organization-id": "",
+		"organization-name": "",
 		"type": "aura-client"
 	}
 ]`,
@@ -215,6 +225,8 @@ func TestCredentialListAuraClient(t *testing.T) {
 		"default": false,
 		"identifier": "testclientid",
 		"name": "test",
+		"organization-id": "",
+		"organization-name": "",
 		"type": "aura-client"
 	}
 ]`,
@@ -223,7 +235,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			name:         "lists empty credentials as table (explicit --format table)",
 			command:      "aura-client list --format table",
 			initialCreds: []map[string]string{},
-			wantContains: []string{"NAME", "TYPE", "IDENTIFIER"},
+			wantContains: []string{"NAME", "TYPE", "IDENTIFIER", "ORGANIZATION-ID"},
 		},
 		{
 			name:         "lists empty credentials as json (explicit --format json)",

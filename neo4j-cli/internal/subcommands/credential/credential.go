@@ -49,16 +49,20 @@ func NewAuraClientCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 
 func newCredentialAddCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
-		name         string
-		clientId     string
-		clientSecret string
-		envPath      string
+		name             string
+		clientId         string
+		clientSecret     string
+		organizationId   string
+		organizationName string
+		envPath          string
 	)
 
 	const (
 		nameFlag         = "name"
 		clientIdFlag     = "client-id"
 		clientSecretFlag = "client-secret"
+		orgIdFlag        = "organization-id"
+		orgNameFlag      = "organization-name"
 		envFlag          = "env"
 
 		envClientId     = "CLIENT_ID"
@@ -141,13 +145,15 @@ neo4j-cli credential aura-client use personal --rw`,
 				}
 			}
 
-			return cfg.Credentials.Aura.Add(name, clientId, clientSecret)
+			return cfg.Credentials.Aura.Add(name, clientId, clientSecret, organizationId, organizationName)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Name")
 	cmd.Flags().StringVar(&clientId, clientIdFlag, "", "(required) Client ID")
 	cmd.Flags().StringVar(&clientSecret, clientSecretFlag, "", "(required) Client secret")
+	cmd.Flags().StringVar(&organizationId, orgIdFlag, "", "Optional default organization ID — stored on the credential and used by 'aura project list' when --organization-id is not passed explicitly")
+	cmd.Flags().StringVar(&organizationName, orgNameFlag, "", "Human-readable organization name (display only; not validated against the API)")
 	cmd.Flags().StringVar(&envPath, envFlag, "", "Path to an Aura console–exported aura-client credentials file. Recognised keys: CLIENT_ID, CLIENT_SECRET, CLIENT_NAME. Explicit flags override file values.")
 
 	return cmd
@@ -188,7 +194,7 @@ neo4j-cli credential aura-client list --format json
 # List as toon (compact, agent-friendly)
 neo4j-cli credential aura-client list --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), []string{"name", "type", "identifier", "default"})
+			output.PrintBodyMap(cmd, cfg, cfg.Credentials.Aura.Printable(), []string{"name", "type", "identifier", "default", "organization-id", "organization-name"})
 			return nil
 		},
 	}

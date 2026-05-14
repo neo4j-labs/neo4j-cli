@@ -98,3 +98,68 @@ func TestListTenantsWithCredentialFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestListTenantsWithOrganizationId(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	const orgId = "3d6481bf-2df1-47cf-8392-0288b1ac215f"
+
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+orgId+"/projects", http.StatusOK, `{
+		"data": [
+			{
+				"id": "9aa289f6-1ccf-57c8-bc90-a0c3cecc82ac",
+				"name": "Michaels Test Tenant"
+			}
+		]
+	}`)
+
+	helper.ExecuteCommand("tenant list --organization-id " + orgId)
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AssertOutJson(`{
+		"data": [
+			{
+				"id": "9aa289f6-1ccf-57c8-bc90-a0c3cecc82ac",
+				"name": "Michaels Test Tenant"
+			}
+		]
+	}`)
+}
+
+func TestListTenantsOrgFromCredential(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	const orgId = "3d6481bf-2df1-47cf-8392-0288b1ac215f"
+
+	helper.SetCredentialsValue("aura", map[string]interface{}{
+		"credentials": []map[string]interface{}{
+			{
+				"name":            "test-cred",
+				"client-id":       "testclientid",
+				"client-secret":   "testclientsecret",
+				"access-token":    "dsa",
+				"token-expiry":    123,
+				"organization-id": orgId,
+			},
+		},
+		"default-credential": "test-cred",
+	})
+
+	mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations/"+orgId+"/projects", http.StatusOK, `{
+		"data": [
+			{
+				"id": "9aa289f6-1ccf-57c8-bc90-a0c3cecc82ac",
+				"name": "Michaels Test Tenant"
+			}
+		]
+	}`)
+
+	helper.ExecuteCommand("tenant list")
+
+	mockHandler.AssertCalledTimes(1)
+	helper.AsssertOk()
+}

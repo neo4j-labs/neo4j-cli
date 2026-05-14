@@ -23,7 +23,7 @@ func (c *AuraCredentials) Printable() PrintableAuraCredentials {
 	}
 }
 
-func (c *AuraCredentials) Add(name string, clientId string, clientSecret string) error {
+func (c *AuraCredentials) Add(name string, clientId string, clientSecret string, organizationId string, organizationName string) error {
 	auraCredentials := c.Credentials
 	for _, credential := range auraCredentials {
 		if credential.Name == name {
@@ -31,7 +31,13 @@ func (c *AuraCredentials) Add(name string, clientId string, clientSecret string)
 		}
 	}
 
-	c.Credentials = append(c.Credentials, &AuraCredential{Name: name, ClientId: clientId, ClientSecret: clientSecret})
+	c.Credentials = append(c.Credentials, &AuraCredential{
+		Name:             name,
+		ClientId:         clientId,
+		ClientSecret:     clientSecret,
+		OrganizationId:   organizationId,
+		OrganizationName: organizationName,
+	})
 	if len(c.Credentials) == 1 {
 		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
 	}
@@ -138,10 +144,12 @@ func (d PrintableAuraCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
 		result[i] = map[string]any{
-			"name":       cred.Name,
-			"type":       "aura-client",
-			"identifier": cred.ClientId,
-			"default":    cred.Name == d.defaultCredential,
+			"name":              cred.Name,
+			"type":              "aura-client",
+			"identifier":        cred.ClientId,
+			"default":           cred.Name == d.defaultCredential,
+			"organization-id":   cred.OrganizationId,
+			"organization-name": cred.OrganizationName,
 		}
 	}
 	return result
@@ -154,11 +162,13 @@ func (d PrintableAuraCredentials) MarshalJSON() ([]byte, error) {
 }
 
 type AuraCredential struct {
-	Name         string `json:"name"`
-	ClientId     string `json:"client-id"`
-	ClientSecret string `json:"client-secret"`
-	AccessToken  string `json:"access-token"`
-	TokenExpiry  int64  `json:"token-expiry"`
+	Name             string `json:"name"`
+	ClientId         string `json:"client-id"`
+	ClientSecret     string `json:"client-secret"`
+	OrganizationId   string `json:"organization-id,omitempty"`
+	OrganizationName string `json:"organization-name,omitempty"`
+	AccessToken      string `json:"access-token"`
+	TokenExpiry      int64  `json:"token-expiry"`
 }
 
 func (credential *AuraCredential) HasValidAccessToken() bool {
