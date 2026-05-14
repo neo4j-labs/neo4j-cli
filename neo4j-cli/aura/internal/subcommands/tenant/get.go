@@ -6,6 +6,7 @@ package tenant
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -30,7 +31,7 @@ neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
 neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tenantId := args[0]
+			tenantId := strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/tenants/%s", tenantId)
 
 			cmd.SilenceUsage = true

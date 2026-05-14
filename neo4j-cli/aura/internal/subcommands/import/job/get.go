@@ -6,6 +6,7 @@ package job
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -49,7 +50,7 @@ neo4j-cli aura import job get 00000000-0000-0000-0000-000000000000 --organizatio
 				return err
 			}
 
-			jobId = args[0]
+			jobId = strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/organizations/%s/projects/%s/import/jobs/%s", organizationId, projectId, jobId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
