@@ -1,0 +1,121 @@
+feature: skill-auto-refresh-on-version-bump
+prd: ./prd-skill-auto-refresh-on-version-bump.md
+created_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-14T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add skill-auto-refresh bool config key to GlobalConfig"
+    description: |
+      Add "skill-auto-refresh" to GlobalConfig.ValidConfigKeys in common/clicfg/clicfg.go
+      and register a default of true via Viper.SetDefault("skill-auto-refresh", true).
+      This makes the key visible to `neo4j-cli config set skill-auto-refresh false` and
+      readable by the skillrefresh package via cfg.Global.Get("skill-auto-refresh").
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "\"skill-auto-refresh\" appears in GlobalConfig.ValidConfigKeys"
+      - "Viper.SetDefault(\"skill-auto-refresh\", true) is set in setDefaultValues"
+      - "`neo4j-cli config set skill-auto-refresh false` succeeds without error"
+      - "`make test` and `make fmt-check` pass after the change"
+    completed_at: null
+
+  - id: task-002
+    title: "Create skillrefresh package — state file I/O (cache.go)"
+    description: |
+      Create neo4j-cli/internal/skillrefresh/cache.go with the state file path constant
+      (skill-refresh.json in clicfg.ConfigPrefix/neo4j/cli/), a cacheEntry struct with a
+      single LastRefreshedVersion string field, and readCache/writeCache functions that use
+      afero.Fs for testability. All I/O errors must be silently swallowed — a corrupt or
+      absent cache is treated as "no prior record". The file must be written with mode 0600.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "cache.go includes the Neo4j copyright header"
+      - "readCache returns nil (not an error) when the file is absent or malformed"
+      - "writeCache writes mode-0600 JSON via afero.Fs; panics are recovered internally"
+      - "cachePath() resolves to clicfg.ConfigPrefix/neo4j/cli/skill-refresh.json"
+      - "All read/write paths accept an afero.Fs argument (no direct os calls)"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement skillrefresh trigger and background goroutine (skillrefresh.go)"
+    description: |
+      Create neo4j-cli/internal/skillrefresh/skillrefresh.go with a MaybeRefresh function
+      that reads the state file, compares the recorded version to the current binary version,
+      and spawns a background goroutine when they differ (and skill-auto-refresh is true).
+      The goroutine calls commonskill.List() to find installed agents, calls
+      commonskill.Install() for each, prints a one-line success notice or per-agent warnings
+      to stderr, then writes the updated version to the state file. The goroutine respects
+      ctx.Done() for early cancellation.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "MaybeRefresh is a no-op when cfg.Global.Get(\"skill-auto-refresh\") is false"
+      - "MaybeRefresh is a no-op when readCache returns a version matching current"
+      - "Only agents with Installed == true are passed to commonskill.Install()"
+      - "Success path prints exactly one stderr line: \"Refreshed neo4j-cli skill for <N> agent(s) (vOLD → vNEW)\""
+      - "Per-agent install errors print a stderr warning but do not abort remaining agents"
+      - "writeCache is called with the current version after all install attempts complete"
+      - "The goroutine exits cleanly when ctx is cancelled before completing"
+    completed_at: null
+
+  - id: task-004
+    title: "Write table-driven unit tests for the skillrefresh package"
+    description: |
+      Create neo4j-cli/internal/skillrefresh/skillrefresh_test.go with table-driven tests
+      covering all branches of MaybeRefresh. Use afero.NewMemMapFs() for the filesystem and
+      a fake commonskill.List/Install seam to avoid touching the real agent directories.
+      Tests must cover: no state file, version match (no-op), version mismatch (refresh
+      triggered), opt-out via config (no-op), partial agent install failure (warning printed
+      + state updated for successes only).
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Test file includes the Neo4j copyright header"
+      - "Table-driven test covers: no state file, version match, version mismatch, opt-out, partial failure"
+      - "All tests use afero.NewMemMapFs() — no real filesystem access"
+      - "Partial-failure case asserts warning on stderr and state file written with current version"
+      - "`make test` passes with all new tests green"
+    completed_at: null
+
+  - id: task-005
+    title: "Wire skillrefresh.MaybeRefresh into app.go PersistentPreRunE"
+    description: |
+      In neo4j-cli/app/app.go, call skillrefresh.MaybeRefresh from the PersistentPreRunE
+      hook alongside the existing versioncheck.MaybeHint / versioncheck.Schedule calls.
+      Pass cmd.Context(), cmd, cfg, the binary-specific bundle (binskill.Bundle), and the
+      skill name. The call must be non-blocking — MaybeRefresh spawns a goroutine internally
+      and returns immediately.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "skillrefresh.MaybeRefresh is called in PersistentPreRunE after versioncheck calls"
+      - "The call passes cmd.Context() so the goroutine is cancelled on process exit"
+      - "No foreground command is delayed by the refresh"
+      - "`make build` produces a working binary with the new hook wired in"
+      - "`make generate-check` shows no unexpected bundle drift"
+    completed_at: null
+
+  - id: task-006
+    title: "Run final gate checks and add changelog entry"
+    description: |
+      Run make test, make fmt-check, and make lint to confirm all gates pass with no
+      regressions. Run make generate-check to confirm no skill bundle drift was introduced.
+      Add a changelog entry via changie for the new auto-refresh behaviour (user-facing Minor
+      change).
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "`make test` exits zero with all tests passing"
+      - "`make fmt-check` exits zero (no unformatted files)"
+      - "`make lint` exits zero (no lint errors)"
+      - "`make generate-check` exits zero (no bundle drift)"
+      - "A changie entry exists under .changes/unreleased/ with kind Minor describing the auto-refresh feature"
+    completed_at: null
