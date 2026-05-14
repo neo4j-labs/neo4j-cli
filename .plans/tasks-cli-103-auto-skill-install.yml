@@ -84,7 +84,7 @@ tasks:
       new opt-in auto-install behaviour. The body should mention that setting
       `NEO4J_CLI_AUTO_INSTALL_SKILL=1` before installing via npm, Homebrew, or
       the curl installer automatically runs `skill install --rw`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -94,4 +94,4 @@ tasks:
       - "A new file exists under `.changes/unreleased/` with `project: neo4j-cli` and `kind: Minor`"
       - "The body mentions `NEO4J_CLI_AUTO_INSTALL_SKILL=1` and the three channels (npm, Homebrew, curl)"
       - "`make changelog` (or `changie batch`) succeeds without errors"
-    completed_at: null
+    completed_at: 2026-05-14T15:48:51Z
