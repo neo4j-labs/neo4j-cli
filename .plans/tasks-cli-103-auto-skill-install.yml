@@ -1,0 +1,97 @@
+feature: cli-103-auto-skill-install
+prd: ./prd-cli-103-auto-skill-install.md
+created_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-14T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL postinstall hook to npm package template"
+    description: |
+      Add a `scripts.postinstall` entry to `distribution/npm/cli/package.json.tmpl`
+      that checks if `NEO4J_CLI_AUTO_INSTALL_SKILL === "1"` and, if so, calls
+      `neo4j-cli skill install --rw` via the existing `bin/neo4j-cli.js` shim.
+      The invocation must be wrapped in try/catch so any failure (including
+      ErrNoAgentsDetected) does not fail `npm install`. If the env var is absent
+      or any other value, the script exits 0 immediately.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 npm install -g @neo4j-labs/cli` triggers `skill install --rw`"
+      - "`npm install -g @neo4j-labs/cli` with unset or `=0` var exits 0 with no skill action"
+      - "Any non-zero exit from `skill install --rw` is caught and suppressed; `npm install` succeeds"
+      - "`make npm-publish-dry` renders `postinstall` in the generated `package.json`"
+    completed_at: null
+
+  - id: task-002
+    title: "Add post_install Ruby block to Homebrew formula via .goreleaser.yaml"
+    description: |
+      Add a `post_install` field to the `brews:` block in `.goreleaser.yaml`.
+      GoReleaser embeds the string verbatim as a Ruby method in the generated
+      formula. The block must return early unless `NEO4J_CLI_AUTO_INSTALL_SKILL`
+      equals `"1"`, then call `system "#{bin}/neo4j-cli", "skill", "install", "--rw"`.
+      Validate the rendered output using `make snapshot` and inspecting
+      `dist/homebrew/Formula/neo4j-cli.rb`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`make snapshot` produces a formula containing the correct `post_install` method"
+      - "Formula `post_install` returns early when env var is unset or `=0`"
+      - "Formula `post_install` calls `skill install --rw` when env var is `=1`"
+      - "`brew audit --strict --formula dist/homebrew/Formula/neo4j-cli.rb` passes (or equivalent local check)"
+    completed_at: null
+
+  - id: task-003
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.sh"
+    description: |
+      Edit `distribution/installation-scripts/install-neo4j-cli.sh` on the main
+      branch. After the binary is placed in PATH, add a block that skips unless
+      `NEO4J_CLI_AUTO_INSTALL_SKILL` equals `"1"`, then calls
+      `neo4j-cli skill install --rw || true` so any failure is non-fatal and
+      the overall install is unaffected. The shellcheck.yml CI workflow validates
+      this file on every PR.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 ./install-neo4j-cli.sh` calls `neo4j-cli skill install --rw` after binary placement"
+      - "`./install-neo4j-cli.sh` with unset or `=0` var does not call `skill install`"
+      - "A failed `skill install --rw` (e.g. no agents detected) does not abort the install script"
+      - "`shellcheck distribution/installation-scripts/install-neo4j-cli.sh` passes with no errors"
+    completed_at: null
+
+  - id: task-004
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.ps1"
+    description: |
+      Edit `distribution/installation-scripts/install-neo4j-cli.ps1` on the main
+      branch. After placing the binary in PATH, add a block that skips unless
+      `$env:NEO4J_CLI_AUTO_INSTALL_SKILL -eq "1"`, then calls
+      `neo4j-cli skill install --rw` with error suppression so the overall install
+      is unaffected. Note: if editing on a non-Windows OS, run `unix2dos` on the
+      file afterwards (per the README).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`$env:NEO4J_CLI_AUTO_INSTALL_SKILL='1'` triggers `skill install --rw` after binary placement"
+      - "`install-neo4j-cli.ps1` with unset or any non-`'1'` value does not call `skill install`"
+      - "A failed `skill install --rw` does not abort the PowerShell install script"
+      - "File has Windows line endings (CRLF) if edited on a Unix system"
+    completed_at: null
+
+  - id: task-005
+    title: "Add changelog entry for CLI-103 auto-skill-install feature"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Minor --body <body>` (or
+      hand-author a YAML file under `.changes/unreleased/`) to record the
+      new opt-in auto-install behaviour. The body should mention that setting
+      `NEO4J_CLI_AUTO_INSTALL_SKILL=1` before installing via npm, Homebrew, or
+      the curl installer automatically runs `skill install --rw`.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "A new file exists under `.changes/unreleased/` with `project: neo4j-cli` and `kind: Minor`"
+      - "The body mentions `NEO4J_CLI_AUTO_INSTALL_SKILL=1` and the three channels (npm, Homebrew, curl)"
+      - "`make changelog` (or `changie batch`) succeeds without errors"
+    completed_at: null
