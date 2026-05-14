@@ -31,7 +31,7 @@ tasks:
       equals `"1"`, then call `system "#{bin}/neo4j-cli", "skill", "install", "--rw"`.
       Validate the rendered output using `make snapshot` and inspecting
       `dist/homebrew/Formula/neo4j-cli.rb`.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "`make snapshot` produces a formula containing the correct `post_install` method"
@@ -49,7 +49,7 @@ tasks:
       `neo4j-cli skill install --rw || true` so any failure is non-fatal and
       the overall install is unaffected. The shellcheck.yml CI workflow validates
       this file on every PR.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 ./install-neo4j-cli.sh` calls `neo4j-cli skill install --rw` after binary placement"
@@ -67,14 +67,14 @@ tasks:
       `neo4j-cli skill install --rw` with error suppression so the overall install
       is unaffected. Note: if editing on a non-Windows OS, run `unix2dos` on the
       file afterwards (per the README).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`$env:NEO4J_CLI_AUTO_INSTALL_SKILL='1'` triggers `skill install --rw` after binary placement"
       - "`install-neo4j-cli.ps1` with unset or any non-`'1'` value does not call `skill install`"
       - "A failed `skill install --rw` does not abort the PowerShell install script"
       - "File has Windows line endings (CRLF) if edited on a Unix system"
-    completed_at: null
+    completed_at: 2026-05-14T00:00:00Z
 
   - id: task-005
     title: "Add changelog entry for CLI-103 auto-skill-install feature"

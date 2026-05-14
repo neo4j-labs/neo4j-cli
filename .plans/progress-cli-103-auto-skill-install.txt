@@ -22,3 +22,26 @@ Key Decisions:
 - `postinstall.js` does NOT need chmod +x since it's invoked via `node bin/postinstall.js`
 
 Next Task: task-002
+
+================================================================================
+TASK-004: Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.ps1
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added an opt-in auto-skill-install block to the Windows PowerShell installer.
+When `$env:NEO4J_CLI_AUTO_INSTALL_SKILL` equals `"1"`, the script calls
+`neo4j-cli skill install --rw` after placing the binary in PATH. Any failure
+is suppressed via try/catch so the overall install is never aborted.
+
+Files Changed:
+- distribution/installation-scripts/install-neo4j-cli.ps1 (modified — added env var guard block before finally cleanup)
+
+Key Decisions:
+- Used `try { & neo4j-cli skill install --rw } catch { }` — the empty catch block swallows all errors silently
+- Used `& neo4j-cli` (call operator) rather than full path `$Destination` so the block works correctly after PATH is updated
+- Placed block after "Done!" message and before `} finally {` so it runs only on successful install, not on error paths
+- CRLF line endings verified after edit: 196 CRLF, 0 LF-only — no unix2dos step needed (Edit tool preserved them)
+- Comment follows existing `# -- Section ---` dashes style used throughout the file
+
+Next Task: task-005
