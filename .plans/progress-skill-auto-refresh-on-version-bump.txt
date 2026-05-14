@@ -156,3 +156,26 @@ Gates:
 - make lint: PASS
 
 Next Task: task-006
+
+================================================================================
+TASK-006: Run final gate checks and add changelog entry
+Date: 2026-05-14T16:23:00Z
+================================================================================
+
+Summary:
+Ran all gate checks (make test, make fmt-check, make lint, make generate-check) —
+all passed with zero errors. The only diff from generate-check was the task YAML
+status flip (the known hone harness artefact); no skill bundle drift was introduced.
+Added a changie Minor changelog entry describing the auto-refresh feature.
+
+Files Changed:
+- .plans/tasks-skill-auto-refresh-on-version-bump.yml (modified — task-006 status set to completed)
+- .changes/unreleased/neo4j-cli-Minor-20260514-162325.yaml (new — changie entry for auto-refresh feature)
+
+Key Decisions:
+- generate-check output was inspected: only the task YAML status diff appeared, confirming
+  no bundle drift. AGENTS.md documents this false-positive and says to ignore it.
+- Changelog kind is Minor (new user-facing feature), body describes both the behaviour
+  and the opt-out config key.
+
+Next Task: All tasks complete

@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: The neo4j-cli skill is now automatically refreshed in the background when the binary version changes, so agents always get up-to-date tool documentation without manual reinstall. Auto-refresh can be disabled via `neo4j-cli config set skill-auto-refresh false`.
+time: 2026-05-14T16:23:25.603906+01:00

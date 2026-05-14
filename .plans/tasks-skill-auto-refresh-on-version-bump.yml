@@ -108,7 +108,7 @@ tasks:
       regressions. Run make generate-check to confirm no skill bundle drift was introduced.
       Add a changelog entry via changie for the new auto-refresh behaviour (user-facing Minor
       change).
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -118,4 +118,4 @@ tasks:
       - "`make lint` exits zero (no lint errors)"
       - "`make generate-check` exits zero (no bundle drift)"
       - "A changie entry exists under .changes/unreleased/ with kind Minor describing the auto-refresh feature"
-    completed_at: null
+    completed_at: "2026-05-14T16:23:00Z"
