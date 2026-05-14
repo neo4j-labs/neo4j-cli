@@ -31,14 +31,14 @@ tasks:
       equals `"1"`, then call `system "#{bin}/neo4j-cli", "skill", "install", "--rw"`.
       Validate the rendered output using `make snapshot` and inspecting
       `dist/homebrew/Formula/neo4j-cli.rb`.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`make snapshot` produces a formula containing the correct `post_install` method"
       - "Formula `post_install` returns early when env var is unset or `=0`"
       - "Formula `post_install` calls `skill install --rw` when env var is `=1`"
       - "`brew audit --strict --formula dist/homebrew/Formula/neo4j-cli.rb` passes (or equivalent local check)"
-    completed_at: null
+    completed_at: 2026-05-14T10:00:00Z
 
   - id: task-003
     title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.sh"
@@ -49,14 +49,14 @@ tasks:
       `neo4j-cli skill install --rw || true` so any failure is non-fatal and
       the overall install is unaffected. The shellcheck.yml CI workflow validates
       this file on every PR.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 ./install-neo4j-cli.sh` calls `neo4j-cli skill install --rw` after binary placement"
       - "`./install-neo4j-cli.sh` with unset or `=0` var does not call `skill install`"
       - "A failed `skill install --rw` (e.g. no agents detected) does not abort the install script"
       - "`shellcheck distribution/installation-scripts/install-neo4j-cli.sh` passes with no errors"
-    completed_at: null
+    completed_at: 2026-05-14T00:00:00Z
 
   - id: task-004
     title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.ps1"

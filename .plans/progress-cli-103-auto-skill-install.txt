@@ -45,3 +45,50 @@ Key Decisions:
 - Comment follows existing `# -- Section ---` dashes style used throughout the file
 
 Next Task: task-005
+
+================================================================================
+TASK-002: Add post_install Ruby block to Homebrew formula via .goreleaser.yaml
+Date: 2026-05-14T10:00:00Z
+================================================================================
+
+Summary:
+Added a `post_install` field to the `brews:` block in `.goreleaser.yaml`.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set at brew install time, the generated
+Homebrew formula's `post_install` method calls `neo4j-cli skill install --rw`.
+Validated by running `goreleaser release --snapshot --skip=publish --clean` and
+inspecting `dist/homebrew/Formula/neo4j-cli.rb`.
+
+Files Changed:
+- .goreleaser.yaml (modified — added post_install field to brews block)
+
+Key Decisions:
+- GoReleaser wraps the `post_install:` string value in `def post_install ... end`
+  automatically, so only the method BODY (not the def/end) should be provided.
+  The initial attempt included the def/end wrapper, resulting in a nested def.
+- `return unless ENV[...] == "1"` is idiomatic Ruby guard clause (early return).
+- Trailing `true` return is Ruby best practice to avoid nil return from system().
+- `make snapshot` (single-target) does NOT generate the Homebrew formula —
+  must use `goreleaser release --snapshot --skip=publish --clean` (full build).
+
+Next Task: task-003 (already in_progress per task file)
+
+================================================================================
+TASK-003: Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.sh
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added an opt-in auto-skill-install block to the POSIX shell installer.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set, the script calls
+`neo4j-cli skill install --rw` after placing the binary. Any failure is
+suppressed via `|| true` so the overall install is never aborted.
+
+Files Changed:
+- distribution/installation-scripts/install-neo4j-cli.sh (modified — added env var guard block after --version confirmation, before PATH check)
+
+Key Decisions:
+- Used `"$INSTALLED_PATH" skill install --rw || true` (absolute path via existing variable) rather than bare `neo4j-cli`, because INSTALL_DIR may not be on PATH yet at this point in the script — using the absolute path guarantees the binary is found regardless of PATH state
+- Placed block after `"$INSTALLED_PATH" --version` confirmation and before the PATH-check section, matching the logical flow: binary is confirmed present, then skill install runs, then PATH advice is given
+- `${NEO4J_CLI_AUTO_INSTALL_SKILL:-}` default-expansion is shellcheck-safe with `set -u` in effect
+
+Next Task: task-005

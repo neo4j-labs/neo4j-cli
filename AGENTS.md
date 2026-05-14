@@ -115,6 +115,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - macOS binaries are code-signed and notarized
 - The release version comes from `GORELEASER_CURRENT_TAG` (set by the GoReleaser action)
 - `release-notes.md` is generated with a `## Changes` section (neo4j-cli changelog body) before GoReleaser runs
+- GoReleaser `brews.post_install:` takes the method **body** only — GoReleaser wraps it in `def post_install ... end` automatically. Do NOT include the `def`/`end` yourself or you get a nested def in the formula.
+- `make snapshot` (single-target) does **not** generate the Homebrew formula. To validate formula output locally run `GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --skip=publish --clean` (full multi-platform build) and inspect `dist/homebrew/Formula/neo4j-cli.rb`.
 
 ## Makefile Notes
 
