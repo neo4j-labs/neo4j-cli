@@ -11,14 +11,14 @@ tasks:
       and register a default of true via Viper.SetDefault("skill-auto-refresh", true).
       This makes the key visible to `neo4j-cli config set skill-auto-refresh false` and
       readable by the skillrefresh package via cfg.Global.Get("skill-auto-refresh").
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "\"skill-auto-refresh\" appears in GlobalConfig.ValidConfigKeys"
       - "Viper.SetDefault(\"skill-auto-refresh\", true) is set in setDefaultValues"
       - "`neo4j-cli config set skill-auto-refresh false` succeeds without error"
       - "`make test` and `make fmt-check` pass after the change"
-    completed_at: null
+    completed_at: "2026-05-14T00:00:00Z"
 
   - id: task-002
     title: "Create skillrefresh package — state file I/O (cache.go)"

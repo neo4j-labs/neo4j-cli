@@ -1,0 +1,21 @@
+================================================================================
+TASK-001: Add skill-auto-refresh bool config key to GlobalConfig
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added "skill-auto-refresh" as a boolean GlobalConfig key with default true. The key
+is visible to `neo4j-cli config set skill-auto-refresh false` and readable via
+cfg.Global.Get("skill-auto-refresh"). Two affected config-list tests were updated to
+include the new key in their expected JSON output.
+
+Files Changed:
+- common/clicfg/clicfg.go (modified — added "skill-auto-refresh" to ValidConfigKeys, SetDefault, and Set validation)
+- neo4j-cli/internal/subcommands/config/list_test.go (modified — updated expected JSON output in 2 test cases)
+- neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go (modified — updated expected JSON output in 1 test case)
+
+Key Decisions:
+- Followed exact same pattern as "telemetry" key: added to ValidConfigKeys slice, SetDefault, and boolean validation in Set()
+- The key sorts alphabetically between "format" and "telemetry" in JSON output
+
+Next Task: task-002
