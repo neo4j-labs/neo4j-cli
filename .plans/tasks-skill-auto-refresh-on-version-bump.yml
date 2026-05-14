@@ -28,7 +28,7 @@ tasks:
       single LastRefreshedVersion string field, and readCache/writeCache functions that use
       afero.Fs for testability. All I/O errors must be silently swallowed — a corrupt or
       absent cache is treated as "no prior record". The file must be written with mode 0600.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "cache.go includes the Neo4j copyright header"
@@ -36,7 +36,7 @@ tasks:
       - "writeCache writes mode-0600 JSON via afero.Fs; panics are recovered internally"
       - "cachePath() resolves to clicfg.ConfigPrefix/neo4j/cli/skill-refresh.json"
       - "All read/write paths accept an afero.Fs argument (no direct os calls)"
-    completed_at: null
+    completed_at: "2026-05-14T00:00:00Z"
 
   - id: task-003
     title: "Implement skillrefresh trigger and background goroutine (skillrefresh.go)"

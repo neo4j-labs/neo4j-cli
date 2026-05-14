@@ -19,3 +19,34 @@ Key Decisions:
 - The key sorts alphabetically between "format" and "telemetry" in JSON output
 
 Next Task: task-002
+
+================================================================================
+TASK-002: Create skillrefresh package — state file I/O (cache.go)
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/internal/skillrefresh/cache.go with state file I/O following
+the versioncheck pattern. Also created a stub skillrefresh.go to satisfy the
+linter (Go requires at least one non-test .go file to declare the package).
+
+Files Changed:
+- neo4j-cli/internal/skillrefresh/cache.go (new — Neo4j copyright header, cacheEntry
+  struct with LastRefreshedVersion string, cachePath() resolving to
+  clicfg.ConfigPrefix/neo4j/cli/skill-refresh.json, readCache/writeCache using
+  afero.Fs with silent error swallowing and mode-0600 writes)
+- neo4j-cli/internal/skillrefresh/skillrefresh.go (new stub — package declaration only,
+  satisfies Go compiler for the package to be importable)
+
+Key Decisions:
+- Followed the same afero.Fs injection pattern as versioncheck/cache.go
+- All I/O errors silently swallowed: absent/malformed cache returns nil cacheEntry
+- writeCache uses a deferred recover() to swallow any panics internally
+- Mode 0600 enforced via afero.WriteFile with os.FileMode(0600)
+
+Gates:
+- make test: PASS
+- make fmt-check: PASS
+- make lint: PASS
+
+Next Task: task-003
