@@ -15,6 +15,7 @@ import (
 	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
+	"github.com/neo4j/cli/neo4j-cli/internal/skillrefresh"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
@@ -62,6 +63,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		}
 		versioncheck.MaybeHint(cmd, cfg, Version)
 		versioncheck.Schedule(cmd.Context(), cfg, Version)
+		skillrefresh.MaybeRefresh(cmd.Context(), cmd, cfg, binskill.Bundle, "neo4j-cli")
 		return nil
 	}
 

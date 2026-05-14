@@ -90,7 +90,7 @@ tasks:
       Pass cmd.Context(), cmd, cfg, the binary-specific bundle (binskill.Bundle), and the
       skill name. The call must be non-blocking — MaybeRefresh spawns a goroutine internally
       and returns immediately.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -99,7 +99,7 @@ tasks:
       - "No foreground command is delayed by the refresh"
       - "`make build` produces a working binary with the new hook wired in"
       - "`make generate-check` shows no unexpected bundle drift"
-    completed_at: null
+    completed_at: "2026-05-14T00:30:00Z"
 
   - id: task-006
     title: "Run final gate checks and add changelog entry"

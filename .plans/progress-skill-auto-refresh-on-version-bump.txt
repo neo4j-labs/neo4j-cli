@@ -124,3 +124,35 @@ Gates:
 - make lint: PASS
 
 Next Task: task-005
+
+================================================================================
+TASK-005: Wire skillrefresh.MaybeRefresh into app.go PersistentPreRunE
+Date: 2026-05-14T00:30:00Z
+================================================================================
+
+Summary:
+Wired skillrefresh.MaybeRefresh into neo4j-cli/app/app.go PersistentPreRunE hook,
+placed after the existing versioncheck calls. The call is non-blocking — MaybeRefresh
+spawns a goroutine internally and returns immediately, so no foreground command is
+delayed.
+
+Files Changed:
+- neo4j-cli/app/app.go (modified — added skillrefresh import and MaybeRefresh call
+  in PersistentPreRunE after versioncheck.Schedule)
+
+Key Decisions:
+- Import sorted alphabetically: skillrefresh sits between internal/skill and
+  internal/subcommands/agentcontext
+- Passes cmd.Context() so the background goroutine is cancelled on process exit
+- Passes binskill.Bundle (the neo4j-cli embedded skill bundle) and "neo4j-cli" as
+  the skill name, matching the pattern used for skill.NewCmd and update.NewCmd
+- No generate-check drift: this change doesn't touch the cobra command tree, only
+  runtime behavior
+
+Gates:
+- make build: PASS
+- make test: PASS
+- make fmt-check: PASS
+- make lint: PASS
+
+Next Task: task-006
