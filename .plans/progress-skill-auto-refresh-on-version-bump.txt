@@ -88,3 +88,39 @@ Gates:
 - make lint: PASS
 
 Next Task: task-004
+
+================================================================================
+TASK-004: Write table-driven unit tests for the skillrefresh package
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Created neo4j-cli/internal/skillrefresh/skillrefresh_test.go with a full suite of
+table-driven and standalone tests covering all branches of MaybeRefresh. The
+partial-failure test case was fixed (after code review) to use a per-call
+customInstallFn: the first agent succeeds and the second fails, so both the
+"Refreshed neo4j-cli skill for 1 agent(s)" success line AND the "Warning:" line
+are asserted in stderr.
+
+Files Changed:
+- neo4j-cli/internal/skillrefresh/skillrefresh_test.go (new — table-driven test
+  covering no-state-file, version-match no-op, version-mismatch refresh, opt-out
+  via config, dev-version no-op, no-installed-agents, and partial-failure cases;
+  plus standalone tests for context cancellation, nil config, and multiple agents)
+- neo4j-cli/internal/skillrefresh/skillrefresh.go (modified — added listFn and
+  installFn package-level var seams for test injection)
+
+Key Decisions:
+- Added customInstallFn field to the table case struct for per-call behaviour;
+  the partial-failure case uses an IIFE closure with a call counter so the first
+  install returns nil and the second returns an error
+- waitForCacheVersion polls the in-memory afero.Fs until the cache file is written
+  (up to 2 s), avoiding fixed sleeps for the goroutine racing path
+- Tests use testfs.GetTestFs (in-memory afero) — no real filesystem access
+
+Gates:
+- make test: PASS
+- make fmt-check: PASS
+- make lint: PASS
+
+Next Task: task-005

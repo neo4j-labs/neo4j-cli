@@ -71,7 +71,7 @@ tasks:
       Tests must cover: no state file, version match (no-op), version mismatch (refresh
       triggered), opt-out via config (no-op), partial agent install failure (warning printed
       + state updated for successes only).
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -80,7 +80,7 @@ tasks:
       - "All tests use afero.NewMemMapFs() — no real filesystem access"
       - "Partial-failure case asserts warning on stderr and state file written with current version"
       - "`make test` passes with all new tests green"
-    completed_at: null
+    completed_at: "2026-05-14T00:00:00Z"
 
   - id: task-005
     title: "Wire skillrefresh.MaybeRefresh into app.go PersistentPreRunE"

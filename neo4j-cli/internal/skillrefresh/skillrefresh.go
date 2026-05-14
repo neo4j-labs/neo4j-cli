@@ -20,7 +20,19 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	commonskill "github.com/neo4j/cli/common/skill"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+)
+
+// Test seams — package-level vars so tests can inject fakes without
+// rewriting the real commonskill calls. Production keeps the real impls.
+var (
+	listFn = func(filesystem afero.Fs, skillName string) ([]commonskill.AgentInstall, error) {
+		return commonskill.List(filesystem, skillName)
+	}
+	installFn = func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		return commonskill.Install(filesystem, bundle, skillName, version, agentFilter)
+	}
 )
 
 // devVersion is the sentinel used when no ldflags tag has been baked in.
@@ -90,7 +102,7 @@ func MaybeRefresh(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, b
 		default:
 		}
 
-		rows, err := commonskill.List(auraFs, skillName)
+		rows, err := listFn(auraFs, skillName)
 		if err != nil {
 			return
 		}
@@ -122,7 +134,7 @@ func MaybeRefresh(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, b
 			default:
 			}
 
-			_, installErr := commonskill.Install(auraFs, bundle, skillName, current, ai.Agent.Name)
+			_, installErr := installFn(auraFs, bundle, skillName, current, ai.Agent.Name)
 			if installErr != nil {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 					"Warning: neo4j-cli skill auto-refresh failed for %s: %v\n",
