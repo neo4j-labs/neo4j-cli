@@ -48,7 +48,7 @@ tasks:
       commonskill.Install() for each, prints a one-line success notice or per-agent warnings
       to stderr, then writes the updated version to the state file. The goroutine respects
       ctx.Done() for early cancellation.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -60,7 +60,7 @@ tasks:
       - "Per-agent install errors print a stderr warning but do not abort remaining agents"
       - "writeCache is called with the current version after all install attempts complete"
       - "The goroutine exits cleanly when ctx is cancelled before completing"
-    completed_at: null
+    completed_at: "2026-05-14T00:00:00Z"
 
   - id: task-004
     title: "Write table-driven unit tests for the skillrefresh package"

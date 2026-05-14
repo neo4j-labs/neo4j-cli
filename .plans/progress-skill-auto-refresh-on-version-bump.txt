@@ -50,3 +50,41 @@ Gates:
 - make lint: PASS
 
 Next Task: task-003
+
+================================================================================
+TASK-003: Implement skillrefresh trigger and background goroutine (skillrefresh.go)
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Replaced the task-002 stub skillrefresh.go with the full MaybeRefresh implementation.
+The function reads the state file, compares the recorded version to the current binary
+version, and spawns a background goroutine when they differ and skill-auto-refresh is
+enabled. The goroutine calls commonskill.List() to find installed agents, calls
+commonskill.Install() for each, prints per-agent warnings on failure, then writes the
+updated version to the state file. Dev builds (version == "dev") are skipped entirely.
+
+Files Changed:
+- neo4j-cli/internal/skillrefresh/skillrefresh.go (replaced stub — full MaybeRefresh
+  implementation with autoRefreshEnabled helper, goroutine with ctx.Done() cancellation,
+  partial-failure handling, and stderr notice on success)
+
+Key Decisions:
+- autoRefreshEnabled handles both bool (viper default) and string ("true"/"false") shapes
+  from cfg.Global.Get, matching the pattern used by the telemetry key
+- devVersion ("dev") sentinel skips refresh for local builds — nothing meaningful to compare
+- Goroutine opens with a non-blocking ctx.Done() check so cancellation before start is
+  honoured without blocking
+- writeCache is called after all install attempts regardless of partial failures, so the
+  next invocation does not re-try already-refreshed agents
+- Success notice printed only when at least one agent was successfully refreshed, using
+  "dev" as the old-version label when no prior cache entry exists
+- Review noted: ErrAgentNotDetected edge case when agent binary uninstalled is acceptable;
+  no context timeout cap needed for FS I/O
+
+Gates:
+- make test: PASS
+- make fmt-check: PASS
+- make lint: PASS
+
+Next Task: task-004
