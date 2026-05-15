@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-16T00:45:00Z
+updated_at: 2026-05-16T01:15:00Z
 
 tasks:
   - id: task-001
@@ -725,3 +725,91 @@ tasks:
       - "Live verification: bin/neo4j-cli docker create --name htest --data-dir /tmp/htest-data --rw; ls /tmp/htest-data shows files written by the container; delete + recreate against the same path reuses the existing DB"
       - "make fmt-check, make lint, make test, make license-check all pass"
     completed_at: "2026-05-15T14:05:00Z"
+
+  - id: task-025
+    title: "Live-docker end-to-end smoke test (build tag + LookPath guard, minimum-viable lifecycle)"
+    description: |
+      Add a live-docker smoke test that exercises the create / list / get / delete lifecycle against a real Docker daemon. Previously listed as Out-of-Scope in the PR description; promoted to in-scope because all four unit-tested write commands have now been live-verified manually one at a time, but no automated gate catches a regression in the docker-CLI shelling layer (argv shape, label semantics, daemon-side error propagation, image-pull tolerance, container-name uniqueness).
+
+      User-locked decisions:
+      - **Gate**: belt-and-braces — `//go:build smoke` build tag AT THE FILE LEVEL + `exec.LookPath("docker") + t.Skip` AT THE TEST LEVEL. Default `go test ./...` ignores the file entirely (no risk of accidentally pulling `neo4j:enterprise` during a routine local test run); opt-in via `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...`. The LookPath guard guarantees a clean skip if a user runs with `-tags=smoke` on a host without docker installed.
+      - **Scope**: minimum-viable lifecycle. One container created with default flags, listed, inspected, deleted. ~30s wall time including image pull on first run; ~5s when the image is cached. Adds ~120 LoC. Does NOT cover `--ephemeral`, `--data-dir`, `--wait`, or `start`/`stop` cycles in v1 — those can be follow-up tasks if the smoke proves valuable.
+
+      ### File
+
+      New: `neo4j-cli/internal/subcommands/docker/smoke_test.go` with `//go:build smoke` at the top. Package `docker` (same package as the leaves so it can call `NewCmd(cfg)` and the package-level seams).
+
+      ### Test shape
+
+      Single test `TestSmoke_Lifecycle(t *testing.T)`:
+
+      1. **Guard**: `if _, err := exec.LookPath("docker"); err != nil { t.Skip("docker not on PATH; skipping live smoke") }`. Matches the pattern in `neo4j-cli/query/query_bolt_smoke_test.go`.
+
+      2. **Unique resource names**: container name `fmt.Sprintf("neo4j-cli-smoke-%d", time.Now().UnixNano())`. Bolt and HTTP ports sourced via `net.Listen(":0")` + `Close()` to grab two ephemeral free ports on the host (mirrors the listenerFactory's underlying mechanism but ON the OS fs, not a stub). Avoids collisions with anything else on the developer's machine or with another smoke test running in parallel.
+
+      3. **Cleanup**: `t.Cleanup(func() { _ = exec.Command("docker", "rm", "-f", name).Run() })` so a failed/aborted test never leaves a managed container behind on the developer's box. Best-effort — ignore the error because the container may already be gone.
+
+      4. **Config**: `cfg := clicfg.NewConfig(afero.NewMemMapFs(), "smoke-test", clicfg.GlobalScope)`. Memfs means the smoke does not touch the developer's real `cli/config.json` or `cli/credentials.json`. Combined with `--no-store-credential`, the test is hermetic w.r.t. the operator's CLI state even though it touches the docker daemon.
+
+      5. **Phases**:
+         a. **create**: build a fresh `NewCmd(cfg)`, register `--format` and `--rw`, call `cmd.SetArgs([]string{"create", "--name", name, "--no-store-credential", "--bolt-port", strconv.Itoa(boltPort), "--http-port", strconv.Itoa(httpPort), "--rw"})`, `cmd.Execute()`. Assert no error. (Image pull may run for 1-2 minutes on a cold host; the test has no time budget of its own — go test's default 10-minute test timeout applies.)
+         b. **list**: same cmd structure, args `[]string{"list", "--format", "json"}`. Capture stdout, parse the JSON array, assert it contains an entry whose `name` field equals `name`. Defense-in-depth: also assert the parsed entry's `edition` is `enterprise` and `bolt-port` is `strconv.Itoa(boltPort)`.
+         c. **get**: args `[]string{"get", name, "--format", "json"}`. Parse stdout as a one-element JSON array (matches the `singleRow.MarshalJSON` shape — see create.go for the contract). Assert: `name == name`, `uri == fmt.Sprintf("neo4j://localhost:%d", boltPort)`, `image == "neo4j:enterprise"` (per task-022 — pins that regression too), all 9 documented fields present and non-empty (except `Ephemeral` which is bool false). Status will be Docker's "Up X seconds" or similar — assert non-empty rather than exact-match.
+         d. **delete**: args `[]string{"delete", name, "--force", "--rw"}`. Assert no error. Then `exec.Command("docker", "ps", "-a", "--filter", "name=^"+name+"$", "--format", "{{.Names}}").Output()` and assert the output is empty (container gone from the daemon's view).
+
+      6. **Each phase rebuilds `NewCmd`**: cobra commands are stateful across invocations (flags, args, errors); construct a fresh cmd per phase to avoid leakage. Matches how the existing unit-test rigs operate.
+
+      ### AGENTS.md update
+
+      Append a one-line note under the "Docker Subsystem Notes" section:
+
+      > Live-docker smoke test: `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs a create→list→get→delete lifecycle against the host Docker daemon. NOT part of `make test`. Skips cleanly when `docker` is not on PATH (belt-and-braces — also gated by the `smoke` build tag).
+
+      ### PR description update
+
+      Once this task lands, update the PR description's "Out of scope / follow-ups" section to remove the smoke-test bullet (it's now in scope and tracked here).
+
+      ### Out of scope for THIS task
+
+      - `--ephemeral` + `--env-out-file` round-trip (would need `query --env` plumbing in the smoke). Track as follow-up.
+      - `--data-dir` persist + recreate-reuses-data check. Track as follow-up.
+      - `start --wait` / `stop --wait` Bolt readiness coverage (requires a real Bolt handshake which doubles the wall time). Track as follow-up.
+      - Multi-container parallel collision scenarios. Track as follow-up.
+      - CI matrix integration (whether GitHub Actions runners have docker available and whether to wire the smoke into the workflow). The smoke is the building block; CI wiring is a separate decision.
+
+      ### Verification
+
+      Locally with docker running:
+      ```
+      go test -tags=smoke -v -run TestSmoke_Lifecycle ./neo4j-cli/internal/subcommands/docker/...
+      ```
+      Expect: 4 phases pass, container is created + listed + inspected + deleted, no leftover container after the test exits.
+
+      Locally without docker running:
+      ```
+      go test -tags=smoke -v -run TestSmoke_Lifecycle ./neo4j-cli/internal/subcommands/docker/...
+      ```
+      Expect: t.Skip with `docker not on PATH; skipping live smoke`, exit 0.
+
+      Default test run unchanged:
+      ```
+      make test
+      ```
+      Expect: smoke_test.go is not compiled (build tag excludes it); existing test count + duration unchanged.
+    status: pending
+    dependencies:
+      - task-015
+      - task-018
+      - task-022
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/docker/smoke_test.go exists with `//go:build smoke` at file top and `exec.LookPath(\"docker\") + t.Skip` at function entry"
+      - "TestSmoke_Lifecycle exercises create + list + get + delete against the real Docker daemon using a unique container name and ephemeral ports"
+      - "t.Cleanup ensures the container is removed even on test failure (best-effort `docker rm -f <name>`)"
+      - "Test uses `--no-store-credential` and an in-memory afero fs so it does NOT touch the developer's real cli config / credential store"
+      - "get phase asserts image == `neo4j:enterprise` (regression guard for task-022) and uri == `neo4j://localhost:<bolt-port>`"
+      - "Default `make test` and `go test ./...` do NOT compile the smoke file (build tag excludes); test count and duration unchanged"
+      - "`go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs the smoke when docker is available; t.Skips cleanly when docker is missing"
+      - "AGENTS.md \"Docker Subsystem Notes\" gains the one-line note documenting how to run the smoke"
+      - "PR #118 description: smoke-test bullet removed from \"Out of scope / follow-ups\""
+      - "make fmt-check, make lint, make test, make license-check all pass on the default (no-tag) run"
+    completed_at: null
