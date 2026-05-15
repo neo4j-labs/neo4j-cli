@@ -31,3 +31,34 @@ Key Decisions:
   that have real Aura credentials stored.
 
 Next Task: task-004
+
+================================================================================
+TASK-001: Implement cross-platform advisory file lock helpers in fileutils
+Date: 2026-05-15T00:00:00Z
+================================================================================
+
+Summary:
+Added two build-tag-separated lock helper files to common/clicfg/fileutils/ and
+wired acquireLock into writeFileAtomic so parallel writers are serialised at the
+OS level. Also added *.lock to .gitignore so lock files created during make test
+(e.g. typeDefs.graphql.lock) are not tracked as untracked files.
+
+Files Changed:
+- common/clicfg/fileutils/lock_unix.go (created — acquireLock via unix.Flock(LOCK_EX), !windows build tag)
+- common/clicfg/fileutils/lock_windows.go (created — acquireLock via windows.LockFileEx, windows build tag)
+- common/clicfg/fileutils/fileutils.go (modified — acquireLock called at start of writeFileAtomic, release deferred)
+- .gitignore (modified — appended *.lock pattern)
+
+Key Decisions:
+- acquireLock uses os.OpenFile (not afero) so it works regardless of the afero.Fs
+  implementation passed to WriteFile; the lock file is a real OS file.
+- Lock file is never deleted; OS releases the flock/LockFileEx on close, so the
+  file can be safely left behind (idiomatic for advisory locks).
+- MkdirAll called inside acquireLock to ensure the parent directory exists before
+  opening the lock file, matching the same pattern as writeFileAtomic itself.
+- acquireLock wired into writeFileAtomic (not exported) keeps the locking
+  transparent to callers; lint required it to be used in the same task.
+
+Gates: make test PASS, make fmt-check PASS, make lint PASS (0 issues).
+
+Next Task: task-004 (disk re-read optimisation in getToken)

@@ -14,7 +14,7 @@ tasks:
       that opens <path>.lock via os.OpenFile (not afero) and acquires a blocking exclusive
       lock. The lock file is created if absent and never deleted. Both files carry the Neo4j
       copyright header and must compile cleanly on their target platforms.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "lock_unix.go exists with //go:build !windows tag and uses unix.Flock(LOCK_EX)"
@@ -22,7 +22,7 @@ tasks:
       - "acquireLock returns a release func that closes the lock file (OS releases flock on close)"
       - "Lock file is opened via os.OpenFile (not afero) so it works across all afero.Fs implementations"
       - "Both files carry the Neo4j copyright header; make license-check passes"
-    completed_at: null
+    completed_at: "2026-05-15T00:00:00Z"
 
   - id: task-002
     title: "Wire acquireLock into writeFileAtomic and add concurrent-write test"
