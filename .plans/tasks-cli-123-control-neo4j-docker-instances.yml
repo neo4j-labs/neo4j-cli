@@ -34,7 +34,7 @@ tasks:
       Poll every 500ms until the handshake succeeds or `timeout` elapses; on timeout return `clierr.NewUsageError("container started but Bolt did not become ready within %s; check 'docker logs <name>'", timeout)`.
       Add `bolt_ready_test.go` with a unit test using a closed listener (immediate refusal → poll continues → timeout fires) and a fake-listener that accepts after N polls.
       If the import introduces a cycle with `clicfg`, fall back to `net.Dial` + a raw Bolt v5 hello frame and document the choice in a comment.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -43,7 +43,7 @@ tasks:
       - "Reuses the neo4j-go-driver from query/ (or falls back to net.Dial + Bolt v5 hello with an inline comment explaining why)"
       - "bolt_ready_test.go covers: immediate success, success after N retries, timeout"
       - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
-    completed_at: null
+    completed_at: 2026-05-15T13:05:00Z
 
   - id: task-003
     title: "docker create — basic happy path (no ephemeral, no collision, no port-conflict, no wait)"

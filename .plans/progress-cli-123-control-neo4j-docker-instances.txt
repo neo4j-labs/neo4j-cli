@@ -2,3 +2,8 @@
 Scaffolded neo4j-cli/internal/subcommands/docker/ with dockerClient interface (Run/Start/Stop/RemoveForce/PsAll/Inspect), execClient using sync.Once-cached exec.LookPath("docker"), label constants, Container struct, parent NewCmd, fakeDockerClient, smoke tests, and app.go mount between query and skill. Skill bundle regenerated; references/docker.md committed.
 Files: +neo4j-cli/internal/subcommands/docker/client.go, +neo4j-cli/internal/subcommands/docker/docker.go, +neo4j-cli/internal/subcommands/docker/docker_test.go, +neo4j-cli/internal/subcommands/docker/helpers_test.go, +neo4j-cli/internal/subcommands/docker/labels.go, +neo4j-cli/internal/skill/bundle/references/docker.md, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/skill/bundle/SKILL.md
 Decisions: parsePsOutput/parseInspectOutput stubs land here as named hooks so list/get leaf tasks (008/009) can fill in JSON parsing without renaming.
+
+## TASK-002 — 2026-05-15T13:05:00Z
+Added WaitForBolt(ctx, uri, user, pass, timeout) that polls a neo4j-go-driver/v6 RETURN 1 probe every 500ms (pollInterval var) until ready or timeout, returning a clierr.UsageError pointing at `docker logs <name>`. Hermetic tests via probeBoltFn seam cover immediate success, success-after-3-retries, and timeout — no real Bolt server required.
+Files: +neo4j-cli/internal/subcommands/docker/bolt_ready.go, +neo4j-cli/internal/subcommands/docker/bolt_ready_test.go
+Decisions: imported neo4j-go-driver/v6 directly (no cycle with clicfg) instead of the documented raw-Bolt-hello fallback; pollInterval kept as a package var (not parameter) so tests can shrink it without polluting the public API.
