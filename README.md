@@ -83,6 +83,40 @@ neo4j-cli credential embed remove openai-shared
 
 Manage Neo4j Aura instances from the terminal. Requires an `aura-client` credential — create one in your Aura [Account Settings](https://console.neo4j.io/#account) and add it via [Credentials](#credentials) above.
 
+### Organizations and projects
+
+Aura resources are organized in a hierarchy: organization → project → instance. Use `organization` and `project` commands to discover the IDs you need.
+
+```bash
+# List all organizations accessible to the current credential
+neo4j-cli aura organization list
+neo4j-cli aura organization get <org-id>
+
+# List projects within an organization
+neo4j-cli aura project list --organization-id <org-id>
+neo4j-cli aura project get <project-id>
+```
+
+### Setting a default context
+
+Use `context use` to set a default `{organizationId}/{projectId}` pair. Once set, commands that require an organization ID (such as `project list`) resolve it automatically without requiring `--organization-id` each time. It also supplies the default project ID for `instance` commands when `--tenant-id` is omitted.
+
+```bash
+# Discover available contexts (all org/project pairs)
+neo4j-cli aura context list
+neo4j-cli aura context list --format json | jq -r '.data[] | select(.default == true) | .context'
+
+# Set the active context (validates the pair against the API before persisting)
+neo4j-cli aura context use <org-id>/<project-id> --rw
+
+# Equivalently, using flags
+neo4j-cli aura context use --organization-id <org-id> --project-id <project-id> --rw
+
+# Read or update the context directly via config
+neo4j-cli aura config get default-context
+neo4j-cli config set aura.default-context <org-id>/<project-id> --rw
+```
+
 ### List your instances
 
 ```bash
@@ -93,14 +127,14 @@ neo4j-cli aura instance list --format table
 
 ```bash
 # Free-db — no cloud provider, region, or memory required
-neo4j-cli aura instance create --name my-free-db --type free-db --tenant-id <tenant-id> --rw
+neo4j-cli aura instance create --name my-free-db --type free-db --tenant-id <project-id> --rw
 
 # Professional-db on AWS, waiting for readiness
 neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-provider aws \
-  --region us-east-1 --memory 4GB --tenant-id <tenant-id> --wait --rw
+  --region us-east-1 --memory 4GB --tenant-id <project-id> --wait --rw
 ```
 
-`aura tenant list` shows tenant IDs. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
+`--tenant-id` accepts a project ID. When `aura context use` has been run, `--tenant-id` can be omitted and the project from the active context is used. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
 ## Querying Neo4j
 
