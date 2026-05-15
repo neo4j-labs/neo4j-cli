@@ -1,7 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GOLANGCI_LINT := $(GOPATH)/bin/golangci-lint
 
-.PHONY: build build-neo4j snapshot test lint fmt fmt-check license-check run-neo4j clean changelog generate generate-check npm-publish-dry npm-bootstrap
+.PHONY: build build-neo4j snapshot test lint fmt fmt-check license-check run-neo4j clean changelog generate generate-check npm-publish-dry npm-bootstrap test-installer-sh test-installer-ps1 test-installer-npm test-installer-rb test-installer
 
 ## build: build neo4j-cli into bin/
 build: build-neo4j
@@ -85,3 +85,32 @@ npm-publish-dry:
 ##           re-running after a partial failure skips already-published packages.
 npm-bootstrap:
 	bash distribution/npm/bootstrap-stubs.sh
+
+## Installer Tests
+
+## test-installer-sh: run bats-core behavioral tests for install-neo4j-cli.sh
+## REQUIRES: bats-core >= 1.5.0 on PATH (brew install bats-core / apt-get install bats)
+test-installer-sh:
+	bats distribution/installation-scripts/tests/install-neo4j-cli.bats
+
+## test-installer-ps1: run Pester behavioral tests for install-neo4j-cli.ps1
+## If pwsh is not on PATH, prints a skip message and exits 0 (graceful skip).
+test-installer-ps1:
+	@if command -v pwsh >/dev/null 2>&1; then \
+		pwsh -NoProfile -NonInteractive -Command "Invoke-Pester -Path distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 -Output Detailed"; \
+	else \
+		echo "test-installer-ps1: pwsh not found, skipping PowerShell tests"; \
+	fi
+
+## test-installer-npm: run Jest behavioral tests for the npm postinstall hook
+## REQUIRES: npm on PATH
+test-installer-npm:
+	cd distribution/npm/cli && npm ci && npm test
+
+## test-installer-rb: run Ruby minitest behavioral tests for the Homebrew post_install block
+## REQUIRES: ruby on PATH
+test-installer-rb:
+	ruby distribution/homebrew/tests/post_install_test.rb
+
+## test-installer: run all installer behavioral test suites in order
+test-installer: test-installer-sh test-installer-ps1 test-installer-npm test-installer-rb

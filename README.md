@@ -3,17 +3,19 @@
 ## Installation
 
 ```bash
-curl -sSfL https://neo4j.sh/install.sh | bash
+NEO4J_CLI_AUTO_INSTALL_SKILL=1 curl -sSfL https://neo4j.sh/install.sh | bash
 ```
+
+Setting `NEO4J_CLI_AUTO_INSTALL_SKILL=1` automatically runs `neo4j-cli skill install --rw` after the binary is placed, so AI agent skill bundles are ready immediately. Omit the prefix to skip skill installation.
 
 Verify with `neo4j-cli --help`.
 
 #### Alternatives
 
-- **Homebrew**: `brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
-- **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
+- **Homebrew**: `NEO4J_CLI_AUTO_INSTALL_SKILL=1 brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
+- **npm**: `NEO4J_CLI_AUTO_INSTALL_SKILL=1 npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
-- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
+- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest), place the binary on your `PATH`, then run `neo4j-cli skill install --rw`.
 
 ### Self-update
 

@@ -28,6 +28,7 @@ func TestConfigList(t *testing.T) {
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-context": null,
 	"format": "default",
+	"skill-auto-refresh": true,
 	"telemetry": true
 }`,
 		},
@@ -42,6 +43,7 @@ func TestConfigList(t *testing.T) {
 	"aura.base-url": "https://api.neo4j.io",
 	"aura.default-context": null,
 	"format": "json",
+	"skill-auto-refresh": true,
 	"telemetry": true
 }`,
 		},
