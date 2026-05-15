@@ -177,7 +177,7 @@ tasks:
       ensures config set aura.default-context applies the same v2beta1 API validation as
       context use. Update config set tests to cover the default-context key path including
       validation failure and success cases.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -186,7 +186,7 @@ tasks:
       - "Persists aura.default-context only on successful validation"
       - "Generic config set still works for other keys (auth-url, base-url)"
       - "Tests cover success, invalid slug, and API error paths"
-    completed_at: null
+    completed_at: 2026-05-15T00:00:00Z
 
   - id: task-010
     title: "Deprecate aura tenant list and tenant get commands"

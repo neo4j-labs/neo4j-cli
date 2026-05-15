@@ -6,6 +6,7 @@ package config
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	auracontext "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/context"
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +43,10 @@ neo4j-cli aura config set format json --rw`,
 				return cfg.Global.Set(key, value)
 			}
 			if cfg.Aura.IsValidConfigKey(key) {
+				if key == "default-context" {
+					cmd.SilenceUsage = true
+					return auracontext.ValidateAndSetDefaultContext(cfg, value)
+				}
 				cfg.Aura.Set(key, value)
 				return nil
 			}
