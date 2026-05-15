@@ -96,12 +96,6 @@ Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.mana
 
 Usage: `neo4j-cli docker get <name>`
 
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
-
 Examples:
 
 ```
@@ -122,12 +116,6 @@ List Neo4j containers managed by neo4j-cli
 List all Neo4j Docker containers carrying the `org.neo4j.cli.managed=true` label. Renders one row per container with name, status (Docker's human-readable state), edition, version, bolt-port, http-port, and ephemeral. Unmanaged containers (no label) are excluded. An empty result renders as an empty table or empty JSON array (exit 0).
 
 Usage: `neo4j-cli docker list`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
 
 Examples:
 

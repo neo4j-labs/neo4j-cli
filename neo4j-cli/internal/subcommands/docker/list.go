@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/flags"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +74,10 @@ neo4j-cli docker list --format toon`,
 		},
 	}
 
-	flags.RegisterOutputFlag(cmd, cfg)
+	// --format is registered as a persistent flag on the neo4j-cli root
+	// (see neo4j-cli/app/app.go) and inherited by every subcommand via
+	// cobra's persistent-flag propagation, so no per-leaf registration is
+	// needed here.
 	return cmd
 }
 

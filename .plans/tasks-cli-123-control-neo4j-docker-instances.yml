@@ -507,6 +507,7 @@ tasks:
 
   - id: task-021
     title: "Architectural cleanup: drop redundant per-leaf --format registration in docker subtree"
+    status: completed
     description: |
       `flags.RegisterOutputFlag(cmd, cfg)` adds `--format` as a persistent flag AND installs a PersistentPreRunE that validates+binds the value. The neo4j-cli root (`neo4j-cli/app/app.go:40`) already calls it on the root cmd. With `cobra.EnableTraverseRunHooks = true` (set at `app.go:78`), the leaf's PersistentPreRunE composes with the root's rather than replacing it — but registering the same persistent flag twice (root + leaf) creates two definitions on the same name, and the wiring brittle-ly relies on the EnableTraverseRunHooks setting being in place.
       In the docker subtree this surfaced as: `list.go:78` and `get.go:92` call `RegisterOutputFlag` on the leaf, but `create.go` (which ALSO renders via `PrintBodyMap`) does NOT. Three different patterns in one subtree.
@@ -517,7 +518,6 @@ tasks:
       3. Tests: `list_test.go` and `get_test.go` likely call `flags.RegisterOutputFlag(rootCmd, cfg)` on a test-built root command. Those calls are correct for the test setup (the test root is independent of `app.NewCmd`) — DO NOT remove them. The drop applies only to production-side per-leaf registration.
       4. Verify: `bin/neo4j-cli docker list --format json`, `bin/neo4j-cli docker get <name> --format json`, and `bin/neo4j-cli docker create --name X --rw --format json` all still emit JSON. The root's persistent flag propagates to all docker leaves via cobra inheritance.
       5. Regenerate skill bundle if `Long:` text changes (unlikely — this is a code-only cleanup). Otherwise no bundle update.
-    status: pending
     dependencies:
       - task-015
     acceptance_criteria:
@@ -526,4 +526,4 @@ tasks:
       - "test files retain their own root-cmd registrations for test isolation"
       - "manual smoke: bin/neo4j-cli docker {list,get,create} --format json all emit valid JSON via the root persistent flag"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T23:45:00Z
