@@ -268,7 +268,7 @@ tasks:
       - `neo4j-cli/internal/skill/additions.md`: add a section with copy-paste examples for the docker subtree plus a note covering `--ephemeral` + `--env-file` → `query --env`.
       If `CONTRIBUTING.md` has a "Commands" / "Add a new command" subsection, list the docker tree there (REQ-DOC-006).
       Re-run `go generate ./neo4j-cli/internal/skill/...` after editing `description.txt` / `additions.md` so the bundle SKILL.md picks up the new content; commit the regenerated bundle alongside.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -277,7 +277,7 @@ tasks:
       - "description.txt extended (third person, ≤1024 chars) so the skill triggers on docker / local neo4j phrasing"
       - "additions.md has a docker subsection plus the --ephemeral/--env-file → query --env note"
       - "Skill bundle regenerated after the description/additions edits; no make generate-check drift"
-    completed_at: null
+    completed_at: 2026-05-15T19:05:00Z
 
   - id: task-015
     title: "Changelog entry, security review, final gates"

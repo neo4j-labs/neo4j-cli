@@ -100,6 +100,48 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 
 `aura tenant list` shows tenant IDs. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
+## Local Neo4j (Docker)
+
+`neo4j-cli docker` runs Neo4j locally by shelling out to the host `docker` CLI. Managed containers carry the `org.neo4j.cli.managed=true` label — Docker is the source of truth, no separate state file is maintained. Requires Docker Desktop (or the `docker` CLI) on `PATH`.
+
+Defaults: enterprise edition with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` to upgrade to the commercial license (`=yes`). Use `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. If `--name` collides with an existing container or stored `dbms` credential, an auto-suffix (`<name>-1`, `<name>-2`, …) is chosen and logged to stderr.
+
+### Persistent flow (stored credential)
+
+```bash
+# Create a managed container; a 16-byte password is generated and stored as a dbms credential
+neo4j-cli docker create --name dev --wait --rw
+
+# Run Cypher via the stored credential
+neo4j-cli query --credential dev 'RETURN 1 AS n'
+
+# Inspect / list managed containers
+neo4j-cli docker list --format toon
+neo4j-cli docker get dev --format json
+
+# Stop / start
+neo4j-cli docker stop dev --rw
+neo4j-cli docker start dev --wait --rw
+
+# Remove both container and stored credential (TTY prompts; non-TTY requires --force)
+neo4j-cli docker delete dev --force --rw
+```
+
+### Ephemeral flow (env-file into `query --env`)
+
+```bash
+# Throwaway container (`docker run --rm`); no credential persisted; env-file written for query --env
+neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --wait --rw
+
+# Connect using the emitted env-file
+neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
+
+# Container is auto-removed by Docker when stopped — nothing to delete
+neo4j-cli docker stop tmp --rw
+```
+
+Without `--env-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) is emitted to stdout for piping. `--wait` blocks until Bolt is reachable (60s timeout); on timeout the container is left running so you can inspect `docker logs <name>`.
+
 ## Querying Neo4j
 
 `neo4j-cli query` runs Cypher against any Neo4j database via the Bolt protocol. Cypher comes from the positional argument or piped stdin.

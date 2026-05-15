@@ -62,3 +62,8 @@ Verified skill bundle reflects live docker command tree: no-op regen. `go genera
 Files: no-op (tasks/progress YAML updates only)
 Decisions: generate-check noise on the in_progress flip in tasks YAML is expected per AGENTS.md "Makefile Notes" — only bundle/** paths matter for the gate.
 
+
+## TASK-014 — 2026-05-15T19:05:00Z
+Documented docker subtree across five surfaces: README "Local Neo4j (Docker)" section with persistent + ephemeral flows; AGENTS.md "Docker Subsystem Notes" subsection (label source-of-truth, clientFactory test seam, WaitForBolt reuse, ephemeral env-file → query --env); skill description.txt extended to trigger on docker/local-neo4j/start-stop phrasing (980/1024 chars; removed "Docker" from Skip list); skill additions.md gained docker bullets + persistent/ephemeral code blocks; bundle SKILL.md regenerated. CONTRIBUTING.md has no "Commands"/"Add a new command" subtree-list — REQ-DOC-006 not applicable.
+Files: ~README.md, ~AGENTS.md, ~neo4j-cli/internal/skill/description.txt, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
+Decisions: removed "Docker" from description.txt Skip list since the CLI now manages docker — kept "Kubernetes" so the trigger doesn't fire on k8s questions.

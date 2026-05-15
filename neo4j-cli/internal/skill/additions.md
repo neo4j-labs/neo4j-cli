@@ -14,3 +14,20 @@
 - Embedding config (`--embed-provider`, `--embed-model`, `--embed-base-url`, `--embed-dimensions`) resolves with the same precedence as connection config: flag > OS env (`NEO4J_EMBED_*`) > `.env` walk-up > stored embed credential. API keys layer per provider: `OPENAI_API_KEY` / `HF_TOKEN` (per-provider) beats `NEO4J_EMBED_API_KEY` (generic) beats the stored credential. Ollama needs no API key.
 - Linking dbms→embed: `credential dbms add --embed-credential <name>` or `credential dbms set-embed <dbms-name> [embed-name]` attaches an embed cred to a dbms cred so `query --credential <dbms-name> --param NAME:embed=...` picks up both connection and embed config in one selector. Removing an embed cred is non-cascading; stale links surface lazily at query time.
 - Updating the CLI: run `neo4j-cli update` to self-update the binary in place. Use `neo4j-cli update check` to report whether a newer version is available without downloading (exits 1 when newer), and `--pre-releases` to opt into alpha/beta/rc tags (default is stable-only). When the binary lives under a known package-manager prefix (Homebrew, npm-global, pipx, uv tool) the command refuses to overwrite and prints the channel-correct upgrade command; pass `--force` to override. After a successful swap, any installed agent skill bundles are refreshed automatically — no manual `skill install` follow-up needed.
+- Local Neo4j via Docker: `neo4j-cli docker` (`create` / `list` / `get` / `start` / `stop` / `delete`) shells out to the host `docker` CLI. Docker itself is the source of truth — managed containers carry the `org.neo4j.cli.managed=true` label plus a small set of metadata labels (edition, version, bolt-port, http-port, ephemeral); no separate state file is maintained. `docker create` defaults to the enterprise image with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` for the commercial license, or `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. If `--name` collides with an existing container or stored dbms credential, the chosen name is auto-suffixed (`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr. All `--rw`, `--format json|table|toon`, and `--wait` conventions from the aura tree apply equally here.
+
+```sh
+# Persistent flow: create stores a dbms credential, then query --credential connects with no further config
+neo4j-cli docker create --name dev --wait --rw
+neo4j-cli query --credential dev 'RETURN 1 AS n'
+neo4j-cli docker delete dev --force --rw
+```
+
+- Ephemeral runs: `neo4j-cli docker create --ephemeral` shells `docker run --rm`, skips credential persistence, and emits a `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout. With `--env-file <path>` the blob is written to that path (mode 0600) and stdout stays silent so it can be piped into `neo4j-cli query --env <path>`. Docker auto-removes the container when it stops — nothing to delete.
+
+```sh
+# Ephemeral flow: throwaway container + env-file consumed by query --env
+neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --wait --rw
+neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
+neo4j-cli docker stop tmp --rw
+```

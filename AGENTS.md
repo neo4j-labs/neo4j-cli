@@ -201,6 +201,15 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
 
+## Docker Subsystem Notes
+
+`neo4j-cli/internal/subcommands/docker/` runs local Neo4j by shelling out to the host `docker` CLI. Docker itself is the source-of-truth: managed containers carry `org.neo4j.cli.managed=true` plus metadata labels (`...edition`, `...version`, `...bolt-port`, `...http-port`, `...ephemeral`) and the `list`/`get`/`start`/`stop`/`delete` leaves discover state via `docker ps`/`docker inspect` — no separate state file is maintained.
+
+- `client.go` defines the `dockerClient` interface (`Run`, `Start`, `Stop`, `RemoveForce`, `PsAll`, `Inspect`); the default `execClient` shells out and caches `exec.LookPath("docker")`. The package-level `clientFactory` var is the test seam — `helpers_test.go` swaps in a `fakeDockerClient` for every leaf test.
+- `bolt_ready.go` exports `WaitForBolt(ctx, uri, user, pass, timeout)` and is reused by both `create --wait` and `start --wait`. It uses the vendored `neo4j-go-driver` from `neo4j-cli/query/`; on timeout it returns a `clierr.UsageError` pointing at `docker logs <name>`. `stop --wait` polls `dockerClient.Inspect` for `State.Running == false` instead.
+- `create` auto-suffixes name collisions against BOTH `dockerClient.PsAll` AND `credentials.DbmsCredentials.List()` so the chosen name is unique across both surfaces; the chosen name is used for the container, the stored credential, and the env-file header.
+- `--ephemeral` adds `--rm` to `docker run`, labels the container `ephemeral=true`, skips credential persistence, and emits the `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout — or to `--env-file <path>` (mode 0600 via `cfg.Aura.Fs()`) when set. The blob is consumed by `query --env <path>`.
+
 ## Cobra Help / Skill Bundle Rendering Notes
 
 - `common/skill/render/render.go:235` strips a cobra command's `Example` field via `strings.TrimSpace` before wrapping it in a fenced code block. The leading 2-space "cobra convention" indent is therefore stripped from the FIRST line only and preserved on subsequent lines, producing a ragged block. Write multi-line Examples with NO leading indent so the rendered bundle stays flush-left and consistent.
