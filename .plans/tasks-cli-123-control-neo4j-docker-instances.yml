@@ -243,7 +243,7 @@ tasks:
       Confirm `TestGenerator_RoundTrip` in `neo4j-cli/internal/skill/...` passes.
       Inspect `bundle/references/docker.md` — every leaf renders with its Example block; flush-left, no ragged indent (per AGENTS.md "Cobra Help / Skill Bundle Rendering Notes").
       Commit the regenerated bundle files in this iteration.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -256,7 +256,7 @@ tasks:
       - "bundle/references/docker.md exists and renders every leaf with its Example block"
       - "TestGenerator_RoundTrip passes"
       - "Regenerated bundle files are committed (no make generate-check drift)"
-    completed_at: null
+    completed_at: 2026-05-15T18:35:00Z
 
   - id: task-014
     title: "Docs: README, AGENTS.md, skill description.txt, skill additions.md"

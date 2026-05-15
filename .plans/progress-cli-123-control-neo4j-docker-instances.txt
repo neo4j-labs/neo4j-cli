@@ -57,3 +57,8 @@ Added `neo4j-cli docker delete <name>` leaf (REQ-F-050..F-054): inspect-then-man
 Files: +delete.go, +delete_test.go, ~docker.go, ~bundle/references/docker.md
 Decisions: stdinIsTerminal as a package-var seam (mirrors common/flags pattern) — no PTY required for tests; missing-credential detected by prefix-match on DbmsCredentials.Remove's "could not find credential with name" wording so any future shape change surfaces verbatim rather than silently passing.
 
+## TASK-013 — 2026-05-15T18:35:00Z
+Verified skill bundle reflects live docker command tree: no-op regen. `go generate ./neo4j-cli/internal/skill/...` produced zero changes — bundle was already current from prior iterations (each create/list/get/start/stop/delete task regenerated incrementally). All 6 leaves present in bundle/references/docker.md with flush-left Example blocks, --rw on writes, --format json on at least one read example; SKILL.md lists docker subtree. All gates green (test, build, lint, fmt-check, license-check).
+Files: no-op (tasks/progress YAML updates only)
+Decisions: generate-check noise on the in_progress flip in tasks YAML is expected per AGENTS.md "Makefile Notes" — only bundle/** paths matter for the gate.
+
