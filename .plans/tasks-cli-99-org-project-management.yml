@@ -261,7 +261,7 @@ tasks:
       calls GetOrganization(orgID) via AuraApiVersion2, rendering output via RegisterOutputFlag
       (json/table/toon). Include a flush-left Example field with ≥3 invocations. Register
       the get leaf in organization.go. Add colocated get_test.go with table-driven tests.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-005
@@ -271,4 +271,4 @@ tasks:
       - "Fails with a clear error when no ID argument is provided"
       - "Example field present, flush-left, ≥3 invocations including one --format json"
       - "Table-driven tests cover success, missing arg, and API error (404) cases"
-    completed_at: null
+    completed_at: 2026-05-15T00:00:00Z

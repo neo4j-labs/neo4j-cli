@@ -12,6 +12,27 @@ Flags:
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
 
+## aura-cli organization get
+
+Returns organization details
+
+This subcommand returns details about a specific Aura organization.
+
+Usage: `aura-cli organization get <id>`
+
+Examples:
+
+```
+# Get details of an organization by ID
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the organization name
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
+```
+
 ## aura-cli organization list
 
 Returns a list of organizations
