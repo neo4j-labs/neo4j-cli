@@ -26,6 +26,8 @@
 - [neo4j-cli aura instance snapshot get](#neo4j-cli-aura-instance-snapshot-get)
 - [neo4j-cli aura instance snapshot list](#neo4j-cli-aura-instance-snapshot-list)
 - [neo4j-cli aura instance update](#neo4j-cli-aura-instance-update)
+- [neo4j-cli aura organization](#neo4j-cli-aura-organization)
+- [neo4j-cli aura organization list](#neo4j-cli-aura-organization-list)
 - [neo4j-cli aura tenant](#neo4j-cli-aura-tenant)
 - [neo4j-cli aura tenant get](#neo4j-cli-aura-tenant-get)
 - [neo4j-cli aura tenant list](#neo4j-cli-aura-tenant-list)
@@ -649,6 +651,41 @@ neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB
 
 # Rename and resize, emitting JSON for scripting
 neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json
+```
+
+## neo4j-cli aura organization
+
+Manage Aura organizations
+
+Usage: `neo4j-cli aura organization`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura organization list
+
+Returns a list of organizations
+
+This subcommand returns a list of Aura organizations accessible to the current user.
+
+Usage: `neo4j-cli aura organization list`
+
+Examples:
+
+```
+# List all organizations the current user has access to
+neo4j-cli aura organization list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura organization list --format json
+
+# Pipe organization ids through jq for a follow-up command
+neo4j-cli aura organization list --format json | jq -r '.data[].id'
 ```
 
 ## neo4j-cli aura tenant

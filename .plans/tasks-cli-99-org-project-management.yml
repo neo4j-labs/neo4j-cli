@@ -90,7 +90,7 @@ tasks:
       output via RegisterOutputFlag (json/table/toon). Include a flush-left Example field
       with ≥3 invocations. Register the organization subcommand in aura.go. Add colocated
       list_test.go with table-driven tests using the mock HTTP server.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -100,7 +100,7 @@ tasks:
       - "Example field present, flush-left, ≥3 invocations including one --format json"
       - "Registered in aura.go and visible in aura --help"
       - "Table-driven tests cover success and API error cases"
-    completed_at: null
+    completed_at: 2026-05-15T16:00:00Z
 
   - id: task-006
     title: "Add aura project list and project get commands"

@@ -25,6 +25,7 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 | [`customer-managed-key`](references/customer-managed-key.md) | Relates to Customer Managed Keys |
 | [`graph-analytics`](references/graph-analytics.md) | Relates to Aura Graph Analytics |
 | [`instance`](references/instance.md) | Relates to AuraDB or AuraDS instances |
+| [`organization`](references/organization.md) | Manage Aura organizations |
 | [`skill`](references/skill.md) | Install agent skills for this CLI into supported AI agents |
 | [`tenant`](references/tenant.md) | Relates to an Aura Tenant |
 
