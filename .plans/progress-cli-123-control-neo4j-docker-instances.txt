@@ -96,15 +96,116 @@ PRD acceptance criteria pass/fail (checked = unit-tested or verified; warn = req
 
 ## PR description draft
 
-Linear: CLI-123 (https://linear.app/neo4j/issue/CLI-123/control-neo4j-docker-instances)
+Title: `feat(cli): add 'docker' command tree for local Neo4j containers (CLI-123)`
 
-Adds a `neo4j-cli docker` command tree (`create / list / get / start / stop / delete`) for managing local Neo4j containers via the docker CLI. Default enterprise eval license (`--accept-license` upgrades to full); port-conflict pre-flight; name-collision auto-suffix; `--ephemeral` + `--env-file <path>` flow into `query --env`; `--wait` via Bolt readiness probe (reuses vendored neo4j-go-driver). Docker is source-of-truth via `org.neo4j.cli.managed=true` labels — no separate state file.
+Linear: [CLI-123](https://linear.app/neo4j/issue/CLI-123/control-neo4j-docker-instances)
 
-Security review (REQ-NF-004) ran during task-015. Two findings remediated in this PR: the high-severity password leak in `docker run` error messages (added `redactArgs` mask in client.go) and the low-severity pre-existing-file mode issue in `--env-file` writes (added `Chmod 0o600` after write). Both have regression tests.
+## Summary
 
-Docs updated: README "Local Neo4j (Docker)" section, AGENTS.md "Docker Subsystem Notes", skill `description.txt` extended to trigger on docker/local-neo4j phrasing, skill `additions.md` with copy-paste examples for persistent + ephemeral flows.
+Adds a `neo4j-cli docker` command tree for spinning up, inspecting, and tearing down local Neo4j containers via the host `docker` CLI. Containers carry an `org.neo4j.cli.managed=true` label (plus per-container metadata labels) so Docker itself is the source of truth — no separate state file under `cli/`. The flow is symmetric with `aura instance` so muscle memory carries over (`--name`, `--wait`, `--rw`, `--format`), and the resulting dbms credential drops straight into `neo4j-cli query --credential <name>`.
 
-Website update (REQ-DOC-008) is a separate follow-up — pick it up in the next prompt-driven `gh-pages` refresh.
+Shells out to the `docker` binary via `os/exec` — no Docker Go SDK dependency. Reuses the already-vendored `neo4j-go-driver/v6` from `query/` for Bolt readiness probes. Adds one new external dep: `golang.org/x/term` for TTY detection on `delete`'s confirmation prompt.
+
+## Commands
+
+| Command | Purpose | Write? |
+|---|---|---|
+| `docker create --name <s> [flags]` | Pull image, `docker run -d`, optionally store a dbms credential, optionally wait for Bolt | yes (`--rw`) |
+| `docker list` | List containers with `org.neo4j.cli.managed=true` | no |
+| `docker get <name>` | Render one managed container's details (name/status/edition/version/ports/uri/image/ephemeral) | no |
+| `docker start <name> [--wait]` | `docker start` a stopped container; optional Bolt-ready wait | yes (`--rw`) |
+| `docker stop <name> [--wait]` | `docker stop`; optional poll until exited | yes (`--rw`) |
+| `docker delete <name> [--force]` | `docker rm -f` + remove the matching dbms credential | yes (`--rw`) |
+
+All write commands respect the existing `--rw` write gate. All read commands accept `--format json|table|toon` (inherited from root). Every leaf has a flush-left `Example:` block that satisfies `TestAllLeafCommands_HaveExamples`.
+
+### `docker create` flags
+
+| Flag | Default | Behaviour |
+|---|---|---|
+| `--name` | *required* | Container name + dbms credential name. Auto-suffixed (`-1`, `-2`, …) on collision with any existing container OR stored credential; chosen name is echoed to stderr. |
+| `--version` | `latest` | Maps to image tag (`neo4j:<version>` community / `neo4j:<version>-enterprise`). |
+| `--edition` | `enterprise` | Validated against `community` / `enterprise`. |
+| `--accept-license` | `false` | Enterprise only. Default passes `NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`; this flag upgrades it to `yes`. No-op for community. |
+| `--bolt-port` | `7687` | Pre-flight `net.Listen` check before any `docker run` so a port clash never leaves a half-created container behind. |
+| `--http-port` | `7474` | Same pre-flight. `--bolt-port == --http-port` errors out before either check. |
+| `--password` | random 16-byte (base64 URL-safe) | Generated via `crypto/rand` when omitted. Surfaced in `create`'s standard output. |
+| `--no-store-credential` | `false` | Container still runs; skip persisting a dbms credential. |
+| `--ephemeral` | `false` | `docker run --rm`; skip credential persistence; emit a `.env` blob to stdout (or `--env-file`) instead of the standard table/JSON. |
+| `--env-file <path>` | unset | Only with `--ephemeral`. Writes the blob via a temp file + atomic rename (mode `0o600`); stdout stays silent so it can be piped. |
+| `--wait` | `false` | Block until Bolt accepts an authenticated session (60s fixed timeout). On timeout the container is left running; the message points at `docker logs <name>`. |
+
+## Credentials handling
+
+By default `docker create` persists a `DbmsCredential` with `name = <chosen container name>`, `username = neo4j`, `password = <generated or supplied>`, `database = neo4j`, `uri = neo4j://localhost:<bolt-port>`. First credential added becomes the default (existing `DbmsCredentials.Add` behaviour). `neo4j-cli query --credential <name>` then connects against the local container without any further setup.
+
+- `--no-store-credential` skips persistence; the container runs with the generated password but no credential is stored. The password still appears in the rendered output.
+- `--ephemeral` always skips credential persistence (it would outlive the container). Instead, an `.env` blob (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) is emitted — to stdout, or to `--env-file <path>` for `neo4j-cli query --env <path>`. Env var names match what `query --env` already consumes, no `query`-side changes needed.
+- `docker delete` removes both the container AND the matching dbms credential. A missing credential is *not* an error (e.g. `--no-store-credential` was used at create time). No `--keep-credential` flag — by design, the credential is meaningless once the container is gone.
+- `docker start --wait` does an authenticated Bolt handshake when a stored credential exists. When no credential is available (the `--no-store-credential` path, external credential management, or corrupt store), it falls back to a TCP-only probe with an explicit stderr announcement — weaker (port-open != Bolt-ready) but strictly better than failing the wait.
+
+> **Operator note**: the generated password is part of `create`'s standard output. Redirects (`> file`) and pipes (`| tee`, `| jq`) capture it. Pass `--password <s>` to choose your own, or `--no-store-credential` for neither stored nor rendered persistence (the container still uses a generated password internally).
+
+## State model
+
+Docker is the source of truth. Every managed container carries:
+
+- `org.neo4j.cli.managed=true`
+- `org.neo4j.cli.edition=<community|enterprise>`
+- `org.neo4j.cli.version=<tag>`
+- `org.neo4j.cli.bolt-port=<int>`
+- `org.neo4j.cli.http-port=<int>`
+- `org.neo4j.cli.ephemeral=<true|false>`
+
+`list` filters on the managed label both daemon-side (`--filter`) and in Go (defensive against fakes that don't honour daemon-side filters). `get`/`start`/`stop`/`delete` Inspect first and refuse anything without the managed label — `neo4j-cli docker` never touches a container it didn't create.
+
+## Security
+
+- **Password generation**: `crypto/rand`, 16 bytes → base64 URL-safe → 22 chars. Injectable `randSource` seam for deterministic tests.
+- **Argv redaction**: `docker run` errors are surfaced via `redactArgs(args)` which masks any `<LHS>=<value>` element where the uppercase-folded LHS contains `AUTH` or `PASSWORD`. The exec argv passed to `exec.CommandContext` is unchanged — redaction is only applied to the user-facing error string so a failed `docker run` never leaks `NEO4J_AUTH=neo4j/<password>` to terminals or CI logs.
+- **`--env-file` writes**: temp file (`afero.TempFile` with random suffix) in the same directory, `chmod 0o600` while we still own the temp, then `Rename` over the final path. Closes the symlink-follow + chmod-TOCTOU windows the naive `OpenFile|Chmod` pattern had. A pre-existing symlink at `--env-file <path>` is replaced by a regular file (operator-visible behaviour change, documented).
+- **`Inspect` error classification**: a typed `docker.ErrNotFound` sentinel distinguishes "container does not exist" (substring `"No such "` in docker stderr — stable across Docker versions for 7+ years) from operational failures (daemon down, socket permission denied, rootless misconfig). Leaves switch on `errors.Is(err, ErrNotFound)` → unknown-name; everything else propagates with the docker stderr verbatim so operators see what actually broke.
+- **`exec.CommandContext` with discrete argv**: no shell invocation, no `sh -c`. Container names, label values, env values all travel as separate argv elements.
+- **TTY confirmation on `delete`**: TTY callers without `--force` see `Delete container <name> and its dbms credential? [y/N]`; non-TTY callers must pass `--force` or the command errors (no silent destructive ops in scripts).
+
+## What's new in the file tree
+
+```
+neo4j-cli/internal/subcommands/docker/
+  docker.go           # parent cmd
+  create.go           # the densest leaf
+  list.go, get.go, start.go, stop.go, delete.go
+  client.go           # dockerClient interface + execClient + redactArgs + ErrNotFound + parseInspectOutput / parsePsOutput
+  labels.go           # label constants + Container metadata struct
+  bolt_ready.go       # WaitForBolt (auth) + WaitForBoltTCP (fallback)
+  *_test.go           # colocated tests; hermetic via fakeDockerClient — no docker required to run unit tests
+common/flags/wait.go  # RegisterWait moved here from aura/internal so non-aura subtrees share it; aura/internal/flags/wait.go is now a thin re-export
+neo4j-cli/app/app.go  # mounts docker.NewCmd(cfg) at root
+```
+
+Plus regenerated skill bundle (`neo4j-cli/internal/skill/bundle/references/docker.md` and `bundle/SKILL.md`), README "Local Neo4j (Docker)" section, AGENTS.md "Docker Subsystem Notes", skill `description.txt` + `additions.md`, and a `.changes/unreleased/neo4j-cli-Minor-*.yaml` entry.
+
+## Out of scope / follow-ups (not in this PR)
+
+- `docker logs` leaf — deferred from v1; track separately if wanted.
+- Live-docker end-to-end smoke test under a build tag, mirroring `query_bolt_smoke_test.go`. Useful for CI hosts that have docker; not required for the hermetic unit tests.
+- Website (`gh-pages`) refresh — prompt-driven via `.github/prompts/website-update.md`, handled in a separate manual pass.
+
+## Test plan
+
+- [ ] `make fmt-check && make lint && make test && make license-check` clean.
+- [ ] `bin/neo4j-cli docker --help` lists 6 leaves (`create`, `list`, `get`, `start`, `stop`, `delete`).
+- [ ] `bin/neo4j-cli docker create --name dev --rw` → container running, dbms credential `dev` stored, password visible in output.
+- [ ] `bin/neo4j-cli docker create --name dev --rw` a second time → auto-suffix `dev-1`; stderr `info: name "dev" already in use; using "dev-1"`.
+- [ ] `bin/neo4j-cli docker get dev --format json` → all 9 fields populated, `uri=neo4j://localhost:7687`.
+- [ ] `bin/neo4j-cli query --credential dev "RETURN 1"` → `1`.
+- [ ] `bin/neo4j-cli docker stop dev --rw --wait` → exits cleanly; `docker ps -a` shows Exited.
+- [ ] `bin/neo4j-cli docker start dev --rw --wait` → back to running.
+- [ ] `bin/neo4j-cli docker delete dev --force --rw` → container + credential both gone.
+- [ ] Ephemeral: `bin/neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw --wait` → `/tmp/n.env` is mode `0o600` with the env blob; `bin/neo4j-cli query --env /tmp/n.env "RETURN 1"` returns `1`; `docker stop tmp --rw` removes the container (`--rm`).
+- [ ] Port conflict: occupy 7687, run `create` → usage error naming `--bolt-port`; no docker side effect.
+- [ ] Missing docker: rename `docker` on PATH, run `bin/neo4j-cli docker list` → install hint; `bin/neo4j-cli aura instance list` still works.
+- [ ] Daemon-down: stop the Docker daemon, run `bin/neo4j-cli docker get <name>` → the docker stderr surfaces verbatim (NOT misclassified as unknown-name).
 
 ## TASK-015 — 2026-05-15T20:00:00Z
 Remediated two security findings surfaced by the golang-security review of the docker package: (1) high — `execClient.run` echoed full argv on non-zero exit, leaking `NEO4J_AUTH=neo4j/<pwd>`. Added `redactArgs` helper masking AUTH/PASSWORD env values (uppercase-folded LHS substring match) in the error string only; argv passed to exec is unchanged. (2) low — `writeEnvFile` relied on `OpenFile` mode arg which is ignored when the target exists. Added `fs.Chmod(path, 0o600)` after successful write. Both remediations have regression tests. Changie Minor entry already exists from earlier iteration; all gates green (fmt-check, lint, test, license-check, build); agent-context confirmed to list docker subtree.
