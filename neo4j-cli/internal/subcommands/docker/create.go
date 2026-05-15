@@ -13,9 +13,11 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
@@ -49,6 +51,18 @@ var listenerFactory = func(port int) (net.Listener, error) {
 // which is well above the entropy floor for a local Bolt password.
 const generatedPasswordBytes = 16
 
+// waitTimeout is the fixed budget for the post-`docker run` Bolt readiness
+// probe when --wait is passed (REQ-F-018). The contract pins this at 60s for
+// v1 — there is intentionally no --wait-timeout flag. Exposed as a package
+// var so tests can shrink it to keep the timeout path fast.
+var waitTimeout = 60 * time.Second
+
+// waitForBoltFn is the injectable seam create.go uses to perform the readiness
+// probe when --wait is set. Production wires WaitForBolt directly; tests swap
+// in a deterministic fake so the wait path can be exercised without standing
+// up a real Bolt endpoint.
+var waitForBoltFn = WaitForBolt
+
 // newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
 // the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
 // (REQ-F-014) before touching docker so a clash never leaves a half-created
@@ -63,6 +77,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPort          int
 		password          string
 		noStoreCredential bool
+		wait              bool
 	)
 
 	const (
@@ -86,12 +101,17 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"Docker itself is the source of truth, no separate state file is maintained. " +
 			"When --password is omitted, a 16-byte base64 URL-safe password is generated and surfaced in the output. " +
 			"If --name collides with an existing container or stored dbms credential, the chosen name is auto-suffixed " +
-			"(`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr.",
+			"(`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr. " +
+			"Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); " +
+			"on timeout the container is left running so the operator can inspect it with `docker logs <name>`.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
 # Create a community container on a non-default bolt port; emit JSON for scripting
 neo4j-cli docker create --name local --edition community --bolt-port 7688 --http-port 7475 --rw --format json
+
+# Create an enterprise container and block until Bolt is reachable before returning
+neo4j-cli docker create --name dev --wait --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw`,
@@ -193,6 +213,22 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				}
 			}
 
+			// --wait (REQ-F-018): block until the container's Bolt endpoint
+			// accepts sessions or waitTimeout elapses. Narrate ONCE on stderr
+			// before polling so an operator watching the terminal knows the
+			// CLI is waiting on purpose. On timeout we surface the
+			// WaitForBolt error verbatim and leave the container running —
+			// the partially-started Neo4j may still finish booting after we
+			// return, and `docker logs <name>` is the right next step (the
+			// error message points there).
+			if wait {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: waiting for Bolt on localhost:%d...\n", boltPort)
+				if err := waitForBoltFn(ctx, uri, "neo4j", resolvedPassword, waitTimeout); err != nil {
+					cmd.SilenceUsage = true
+					return err
+				}
+			}
+
 			// Render the result. Field order mirrors what an operator wants
 			// at a glance: identity, image identity, ports, connection details.
 			row := map[string]any{
@@ -221,6 +257,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474).")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
+	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
 }

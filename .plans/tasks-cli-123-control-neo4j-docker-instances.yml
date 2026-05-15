@@ -109,7 +109,7 @@ tasks:
       When `--wait` is set, after `docker run` succeeds call `WaitForBolt(ctx, "neo4j://localhost:<bolt-port>", "neo4j", password, 60*time.Second)` (REQ-F-018). On timeout, return the error but leave the container running.
       Print a single `info: waiting for Bolt on localhost:<port>...` line to stderr before polling.
       Extend `create_test.go` with cases: `--wait` happy path (fake bolt readiness returns nil immediately); `--wait` timeout (fake returns context deadline) → error returned, container not torn down.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -119,7 +119,7 @@ tasks:
       - "On timeout, the container is left running (no rm/stop call observed by fake client)"
       - "Stderr shows 'info: waiting for Bolt on localhost:<port>...' before polling"
       - "Bolt timeout fixed at 60s; no --wait-timeout flag in v1"
-    completed_at: null
+    completed_at: 2026-05-15T15:35:00Z
 
   - id: task-007
     title: "docker create — --ephemeral and --env-file"

@@ -5,13 +5,16 @@ package docker
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
@@ -523,6 +526,192 @@ func TestCreate_NameCollision_All99Taken_ReturnsUsageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "dev-1")
 	assert.Contains(t, err.Error(), fmt.Sprintf("dev-%d", maxNameSuffix))
 	assert.Empty(t, fake.RunCalls, "docker run must not execute when no free name is available")
+}
+
+// withCreateWaitProbe swaps the package-level waitForBoltFn seam for the
+// duration of the test and restores it on cleanup. Tests pass the prober they
+// want exercised; counting/inspection happens inside the prober via captured
+// pointers. The companion waitTimeout/pollInterval shrinking lives in the
+// caller — keep this helper single-purpose.
+func withCreateWaitProbe(t *testing.T, prober func(ctx context.Context, uri, user, pass string, timeout time.Duration) error) {
+	t.Helper()
+	orig := waitForBoltFn
+	waitForBoltFn = prober
+	t.Cleanup(func() { waitForBoltFn = orig })
+}
+
+// withShortWaitTimeout shrinks waitTimeout for the duration of the test so
+// `--wait` timeout cases don't burn the production 60s budget. Restored on
+// cleanup so other tests still see the production value.
+func withShortWaitTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	orig := waitTimeout
+	waitTimeout = d
+	t.Cleanup(func() { waitTimeout = orig })
+}
+
+func TestCreate_Wait_HappyPath_SucceedsAndNarrates(t *testing.T) {
+	// The fake prober returns nil on the first call → WaitForBolt-equivalent
+	// returns immediately. The seam is the entire waitForBoltFn (not the
+	// inner probeBoltFn) so we never enter the readiness polling loop here.
+	var calls int32
+	withCreateWaitProbe(t, func(_ context.Context, uri, user, pass string, _ time.Duration) error {
+		atomic.AddInt32(&calls, 1)
+		// Probe must target the localhost URI built from --bolt-port and the
+		// neo4j user with the generated password — verifies create.go wires
+		// the right arguments through.
+		assert.Equal(t, "neo4j://localhost:7687", uri)
+		assert.Equal(t, "neo4j", user)
+		assert.NotEmpty(t, pass)
+		return nil
+	})
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"create", "--name", "dev", "--wait"})
+
+	require.NoError(t, cmd.Execute())
+
+	// Prober called exactly once.
+	assert.Equal(t, int32(1), atomic.LoadInt32(&calls))
+
+	// Stderr narration is the documented single line, including the bolt port.
+	assert.Contains(t, errBuf.String(), "info: waiting for Bolt on localhost:7687...")
+
+	// Container created exactly once; --wait NEVER triggers a tear-down.
+	assert.Len(t, fake.RunCalls, 1)
+	assert.Empty(t, fake.StopCalls, "successful --wait must not stop the container")
+	assert.Empty(t, fake.RemoveForceCalls, "successful --wait must not remove the container")
+
+	// Credential persisted as usual on the wait happy-path.
+	_, getErr := cfg.Credentials.Dbms.Get("dev")
+	assert.NoError(t, getErr)
+}
+
+func TestCreate_Wait_Timeout_ReturnsErrorAndLeavesContainerRunning(t *testing.T) {
+	// Shrink the production budget so the test runs in <100ms even when the
+	// CI host is loaded.
+	withShortWaitTimeout(t, 50*time.Millisecond)
+
+	// The fake prober echoes whatever WaitForBolt would return on timeout —
+	// we don't go through the real polling loop here, so emit a clierr-style
+	// error directly and assert it round-trips back through create.go.
+	const timeoutMsg = "container started but Bolt did not become ready within 50ms; check 'docker logs <name>'"
+	var calls int32
+	withCreateWaitProbe(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
+		atomic.AddInt32(&calls, 1)
+		return errors.New(timeoutMsg)
+	})
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"create", "--name", "dev", "--wait"})
+
+	execErr := cmd.Execute()
+	require.Error(t, execErr)
+	assert.Contains(t, execErr.Error(), "Bolt did not become ready")
+
+	// Stderr still carries the pre-poll narration so the operator knows we
+	// committed to waiting before the failure.
+	assert.Contains(t, errBuf.String(), "info: waiting for Bolt on localhost:7687...")
+
+	// Probe was exercised exactly once.
+	assert.Equal(t, int32(1), atomic.LoadInt32(&calls))
+
+	// Container is NOT torn down on timeout (REQ-F-018 contract — the
+	// partially-started Neo4j may still finish booting after the CLI returns).
+	assert.Len(t, fake.RunCalls, 1)
+	assert.Empty(t, fake.StopCalls, "timeout must not stop the container")
+	assert.Empty(t, fake.RemoveForceCalls, "timeout must not remove the container")
+}
+
+func TestCreate_Wait_AwaitAlias_StillWorks(t *testing.T) {
+	// The flags.RegisterWait helper also registers the deprecated --await
+	// alias (CLI-87). Make sure passing --await reaches the same code path
+	// so users with stale muscle memory don't silently miss the readiness
+	// probe. The alias prints a cobra deprecation notice to stderr; we
+	// only assert behavioural equivalence here.
+	var calls int32
+	withCreateWaitProbe(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
+		atomic.AddInt32(&calls, 1)
+		return nil
+	})
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"create", "--name", "dev", "--await"})
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, int32(1), atomic.LoadInt32(&calls))
+}
+
+func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
+	// Without --wait, the readiness probe must never run — create.go is
+	// strictly fire-and-forget.
+	var calls int32
+	withCreateWaitProbe(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
+		atomic.AddInt32(&calls, 1)
+		return nil
+	})
+
+	fake, _, _, err := runCreate(t, "--name dev")
+	require.NoError(t, err)
+	require.Len(t, fake.RunCalls, 1)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&calls), "probe must not run without --wait")
 }
 
 func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
