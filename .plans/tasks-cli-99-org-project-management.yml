@@ -1,0 +1,274 @@
+feature: cli-99-org-project-management
+prd: ./prd-cli-99-org-project-management.md
+created_at: 2026-05-15T00:00:00Z
+updated_at: 2026-05-15T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Update config layer: validAuraConfigKeys and DefaultTenant() resolution"
+    description: |
+      In common/clicfg, add `default-context` to validAuraConfigKeys (both get and set) and
+      remove `default-tenant`. Update cfg.Aura.DefaultTenant() to resolve in this order:
+      (1) project portion of aura.default-context (split on '/', take right side);
+      (2) default-tenant config key as legacy fallback. Add tests covering both resolution
+      paths and the case where neither is set.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "aura config set/get/list accepts default-context and rejects default-tenant"
+      - "DefaultTenant() returns the project portion of aura.default-context when set"
+      - "DefaultTenant() falls back to default-tenant when aura.default-context is unset"
+      - "DefaultTenant() returns empty string when neither is set"
+      - "Unit tests pass for all DefaultTenant() resolution cases"
+    completed_at: null
+
+  - id: task-002
+    title: "Add v2beta1 API client methods for organizations and projects"
+    description: |
+      In neo4j-cli/aura/internal/api, add functions for the four v2beta1 endpoints needed:
+      GET /organizations, GET /organizations/{organizationId},
+      GET /organizations/{organizationId}/projects, and
+      GET /organizations/{organizationId}/projects/{projectId}. Each function must use
+      AuraApiVersion2 and define the corresponding response struct types. Add unit tests
+      using the existing httptest mock helpers.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "ListOrganizations() calls GET /organizations with AuraApiVersion2"
+      - "GetOrganization(orgID) calls GET /organizations/{orgID} with AuraApiVersion2"
+      - "ListProjects(orgID) calls GET /organizations/{orgID}/projects with AuraApiVersion2"
+      - "GetProject(orgID, projectID) calls GET /organizations/{orgID}/projects/{projectID} with AuraApiVersion2"
+      - "Response structs defined for all four endpoints"
+      - "Unit tests cover success and error (404, 5xx) cases for each method"
+    completed_at: null
+
+  - id: task-003
+    title: "Remove config project subsystem"
+    description: |
+      Delete the neo4j-cli/aura/internal/subcommands/config/project/ subcommand directory
+      and all its files (project.go, add.go, use.go, list.go, remove.go and their _test.go
+      files). Remove the aura-projects config storage key and the AuraProject struct from
+      common/clicfg/projects/. Clean up all references in clicfg.go and anywhere else that
+      imports or uses these types. Verify make test still passes after deletion.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/subcommands/config/project/ directory no longer exists"
+      - "AuraProject struct and aura-projects key removed from common/clicfg/"
+      - "aura config project add/use/list/remove commands no longer registered"
+      - "No compilation errors or dangling references after removal"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-004
+    title: "Implement validateAndSetDefaultContext shared helper"
+    description: |
+      Create a shared helper function (e.g. validateAndSetDefaultContext) in an appropriate
+      package (e.g. neo4j-cli/aura/internal/subcommands/context/ or a shared util package).
+      It must parse a {organizationId}/{projectId} slug, call GetProject() on v2beta1 to
+      verify the pair exists, and on success write aura.default-context to config. Fail with
+      clear errors on missing slash, invalid format, 404, or other API errors. Add
+      table-driven unit tests for all error paths and the success path.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Fails with clear error when slug has no '/'"
+      - "Fails with clear error when org or project portion is empty"
+      - "Calls GET /organizations/{orgID}/projects/{projectID} to validate the pair"
+      - "Persists aura.default-context only on successful API validation"
+      - "Returns API error (including 404) without persisting if validation fails"
+      - "Table-driven tests cover all error paths and success path"
+    completed_at: null
+
+  - id: task-005
+    title: "Add aura organization list command"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/organization/ with organization.go (parent)
+      and list.go (leaf). The leaf calls ListOrganizations() via AuraApiVersion2 and renders
+      output via RegisterOutputFlag (json/table/toon). Include a flush-left Example field
+      with ≥3 invocations. Register the organization subcommand in aura.go. Add colocated
+      list_test.go with table-driven tests using the mock HTTP server.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "aura organization list calls GET /organizations on v2beta1"
+      - "Supports --format json, table, and toon"
+      - "Does not read or use aura.default-context"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Registered in aura.go and visible in aura --help"
+      - "Table-driven tests cover success and API error cases"
+    completed_at: null
+
+  - id: task-006
+    title: "Add aura project list and project get commands"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/project/ with project.go (parent), list.go,
+      get.go, and their _test.go files. Both leaves resolve the organization ID using the
+      order: --organization-id flag > org portion of aura.default-context > hard error.
+      list calls ListProjects(orgID); get <id> calls GetProject(orgID, projectID). Both
+      support --format json|table|toon. Register the project subcommand in aura.go.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "aura project list resolves org from --organization-id then aura.default-context"
+      - "aura project list fails with a clear error when no org source is available"
+      - "aura project list does not filter by the project portion of aura.default-context"
+      - "aura project get <id> uses the same org resolution as project list"
+      - "Both commands support --format json, table, and toon"
+      - "Example fields present, flush-left, ≥3 invocations on each leaf"
+      - "Table-driven tests cover org resolution paths and API error cases"
+    completed_at: null
+
+  - id: task-007
+    title: "Add aura context use command"
+    description: |
+      Create list.go under neo4j-cli/aura/internal/subcommands/context/ (create the
+      directory and context.go parent first). The context use leaf accepts either a
+      positional {organizationId}/{projectId} slug or --organization-id + --project-id flags;
+      the two forms are mutually exclusive. Delegates validation and persistence to
+      validateAndSetDefaultContext. Fails clearly when org or project is missing, or when
+      both forms are mixed. Includes Example field and colocated use_test.go.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Positional slug form writes aura.default-context after successful validation"
+      - "Flag form (--organization-id + --project-id) writes aura.default-context identically"
+      - "Fails with clear error when either org or project is missing"
+      - "Fails with clear error when both positional and flag forms are provided"
+      - "Delegates to validateAndSetDefaultContext (not duplicating API call logic)"
+      - "Example field present, flush-left, ≥3 invocations"
+      - "Table-driven tests cover all error cases and the success path"
+    completed_at: null
+
+  - id: task-008
+    title: "Add aura context list command"
+    description: |
+      Add list.go under neo4j-cli/aura/internal/subcommands/context/. The command fans out:
+      calls ListOrganizations() then ListProjects(orgID) for each org, assembles a flat list
+      of entries each containing context, organizationId, projectId, projectName, and a
+      default boolean (true when the entry matches aura.default-context, false otherwise
+      including when aura.default-context is unset). Supports --format json|table|toon.
+      Add colocated list_test.go. Register context subcommand in aura.go.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Returns flat list of all org/project pairs across all accessible orgs"
+      - "Each entry contains context, organizationId, projectId, projectName, default fields"
+      - "Exactly one entry has default=true when aura.default-context matches it"
+      - "All entries have default=false when aura.default-context is unset"
+      - "Supports --format json, table, and toon"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Table-driven tests cover default=true, default=false, and empty org list cases"
+    completed_at: null
+
+  - id: task-009
+    title: "Wire config set aura.default-context to shared validation helper"
+    description: |
+      In the aura config set command handler, detect when the key is default-context and
+      route to validateAndSetDefaultContext instead of the generic config write path. This
+      ensures config set aura.default-context applies the same v2beta1 API validation as
+      context use. Update config set tests to cover the default-context key path including
+      validation failure and success cases.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "neo4j-cli config set aura.default-context <slug> calls validateAndSetDefaultContext"
+      - "Fails with clear error on invalid slug format, 404, or API error"
+      - "Persists aura.default-context only on successful validation"
+      - "Generic config set still works for other keys (auth-url, base-url)"
+      - "Tests cover success, invalid slug, and API error paths"
+    completed_at: null
+
+  - id: task-010
+    title: "Deprecate aura tenant list and tenant get commands"
+    description: |
+      In neo4j-cli/aura/internal/subcommands/tenant/, set cmd.Hidden = true on the list
+      and get leaf commands and on the tenant parent command. Add a deprecation warning
+      printed to cmd.ErrOrStderr() at the top of each leaf's RunE (e.g. "Warning: 'aura
+      tenant list' is deprecated and will be removed in a future release. Use 'aura project
+      list' instead."). Update TestAllLeafCommands_HaveExamples to skip hidden commands.
+      Add tests verifying the warning appears on stderr.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "aura tenant list and aura tenant get are hidden from --help output"
+      - "aura tenant parent command is hidden from aura --help"
+      - "Deprecation warning printed to stderr when aura tenant list is invoked"
+      - "Deprecation warning printed to stderr when aura tenant get is invoked"
+      - "Commands still return correct data (functionality preserved)"
+      - "TestAllLeafCommands_HaveExamples skips hidden commands and passes"
+    completed_at: null
+
+  - id: task-011
+    title: "Regenerate skill bundles and verify TestGenerator_RoundTrip"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
+      to regenerate skill bundles after all command-tree changes (new organization, project,
+      context commands; hidden tenant commands; removed config project commands). Confirm
+      TestGenerator_RoundTrip passes. Verify that deprecated tenant commands do not appear
+      in the generated bundle and that all new commands are represented correctly.
+    status: pending
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-013
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "go generate ./neo4j-cli/aura/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "Deprecated tenant commands absent from generated skill bundle"
+      - "organization list/get, project list/get, context list/use present in bundle"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: null
+
+  - id: task-012
+    title: "Add changelog entry and create Linear issue for tenant removal"
+    description: |
+      Add a changelog entry using changie (kind: Minor) describing the new organization,
+      project, and context commands, the replacement of the config project subsystem with
+      aura.default-context, and noting that aura tenant list/get are deprecated and will be
+      removed in a future release. Then create a Linear issue in the CLI working group (CLI)
+      team to track the hard removal of the deprecated tenant commands, referencing this PR.
+    status: pending
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "Changelog entry created under .changes/unreleased/ with kind: Minor"
+      - "Changelog body mentions new commands (organization list, project list/get, context list/use)"
+      - "Changelog body notes aura tenant list/get deprecation and future removal"
+      - "Linear issue created in CLI team for hard removal of tenant commands"
+      - "Linear issue references this PR and notes removal is blocked on deprecation window"
+    completed_at: null
+
+  - id: task-013
+    title: "Add aura organization get command"
+    description: |
+      Add get.go to neo4j-cli/aura/internal/subcommands/organization/ (alongside the existing
+      list.go created in task-005). The leaf takes a positional organization ID argument and
+      calls GetOrganization(orgID) via AuraApiVersion2, rendering output via RegisterOutputFlag
+      (json/table/toon). Include a flush-left Example field with ≥3 invocations. Register
+      the get leaf in organization.go. Add colocated get_test.go with table-driven tests.
+    status: pending
+    dependencies:
+      - task-002
+      - task-005
+    acceptance_criteria:
+      - "aura organization get <id> calls GET /organizations/{id} on v2beta1"
+      - "Supports --format json, table, and toon"
+      - "Fails with a clear error when no ID argument is provided"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Table-driven tests cover success, missing arg, and API error (404) cases"
+    completed_at: null

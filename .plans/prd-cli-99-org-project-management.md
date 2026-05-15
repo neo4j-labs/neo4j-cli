@@ -8,7 +8,7 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 
 ## Goals
 
-- Expose organization listing via a new `aura organization list` command backed by v2beta1.
+- Expose organization listing and detail retrieval via `aura organization list` and `aura organization get` commands backed by v2beta1.
 - Add `aura project list/get` commands backed by v2beta1 project endpoints, using `aura.default-context` for org resolution.
 - Add an `aura context` subcommand group (`context list`, `context use`) to discover and set the active org/project pair as a single `{organizationId}/{projectId}` slug.
 - Deprecate (but preserve) `aura tenant list/get` with a stderr warning directing users to the new commands.
@@ -18,7 +18,6 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 ## Non-Goals
 
 - Exposing v2beta1 endpoints beyond organizations and projects (no instance management, IP filters, fleet manager, agents, billing, etc.).
-- Adding `organization get <id>` (not required for this issue; list is sufficient).
 - Supporting project creation, update, or deletion via the CLI.
 - Migrating existing stored `config project` data from the old subsystem to the new key.
 - Hard removal of `aura tenant list/get` (deferred to a future breaking-change release).
@@ -55,6 +54,12 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 
 - REQ-F-013: `neo4j-cli config set aura.default-context <org-id>/<project-id>` must also be supported. It must apply the same validation as `context use` (same shared function: parse the slug, call `GET /organizations/{organizationId}/projects/{projectId}` on v2beta1, fail on 404 or API error, persist only on success). The `aura.default-context` key must be added to the valid settable keys for `config set`.
 
+- REQ-F-014: Update `cfg.Aura.DefaultTenant()` to use the following resolution order: (1) project portion of `aura.default-context` (right side of `/`) — primary source; (2) `default-tenant` config key — legacy fallback only. This ensures the following non-beta commands continue to work without requiring `--tenant-id`: `instance list`, `instance create`, `customermanagedkey list`, `customermanagedkey create`, `graphanalytics session list`, `graphanalytics session create`. The `--tenant-id` flag name on these commands is unchanged in this PR (renaming is out of scope).
+
+- REQ-F-015: As part of this PR, create a Linear issue in the CLI working group (CLI) team to track the hard removal of the deprecated `aura tenant list` and `aura tenant get` commands. The issue should reference this PR and note that removal is blocked until a suitable deprecation window has passed.
+
+- REQ-F-016: Add `aura organization get <id>` command that calls `GET /organizations/{organizationId}` on the v2beta1 API and outputs the organization details in `--format json|table|toon`. The command takes the organization ID as a positional argument.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: All new commands must follow the existing one-file-per-leaf Cobra layout: `aura context` under `neo4j-cli/aura/internal/subcommands/context/`, `aura organization` under `.../organization/`, `aura project` under `.../project/`.
@@ -89,6 +94,13 @@ It is writable via two surfaces that share a single validation function:
 
 Both surfaces parse the `{organizationId}/{projectId}` slug, call `GET /organizations/{organizationId}/projects/{projectId}` on v2beta1 to verify the pair, and persist the value only on success. Extract this logic into a shared helper (e.g. `validateAndSetDefaultContext(cfg, apiClient, slug string) error`) so neither surface duplicates the validation.
 
+### `DefaultTenant()` resolution order for v1 commands
+Several non-beta v1 commands (`instance list/create`, `customermanagedkey list/create`, `graphanalytics session list/create`) call `cfg.Aura.DefaultTenant()` when `--tenant-id` is not supplied. In the v1 API, "tenant ID" is equivalent to "project ID" in v2 terminology. Update `DefaultTenant()` to use this resolution order:
+1. Project portion of `aura.default-context` (split on `/`, take the right side) — primary source
+2. `default-tenant` config key — legacy fallback
+
+This means users who set `aura context use` will immediately get the right default for v1 commands too. Users who haven't migrated yet still work via the legacy `default-tenant` key. The `--tenant-id` flag name on these commands is not renamed in this PR.
+
 ### `context list` fan-out
 `context list` makes N+1 API calls (1 for orgs, 1 per org for its projects). For users with many orgs this may be slow, but no pagination or parallelism optimization is required for this issue.
 
@@ -108,6 +120,7 @@ go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
 ## Acceptance Criteria
 
 - [ ] `neo4j-cli aura organization list` returns organization data from v2beta1 in all three output formats. It does not read or use `aura.default-context`.
+- [ ] `neo4j-cli aura organization get <id>` returns organization details from v2beta1 in all three output formats.
 - [ ] `neo4j-cli aura project list` returns project data for the resolved org; fails with a clear error if neither `--organization-id` nor the org portion of `aura.default-context` is available. It does not filter by the project portion of `aura.default-context`.
 - [ ] `neo4j-cli aura project get <id>` returns project details using the same org resolution as `project list`.
 - [ ] `neo4j-cli aura context list` returns a flat list of all org/project pairs across all orgs; each entry has `context`, `organizationId`, `projectId`, `projectName`, and `default` fields. Exactly one entry has `default: true` when `aura.default-context` is set and matches that entry; all entries have `default: false` when `aura.default-context` is unset.
@@ -118,11 +131,13 @@ go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
 - [ ] `neo4j-cli aura config project add/use/list/remove` no longer exist.
 - [ ] `aura.default-context` is readable via `aura config get default-context` and `aura config list`.
 - [ ] `neo4j-cli config set aura.default-context <org-id>/<project-id>` validates the pair via the same shared function as `context use` and writes the key on success; fails with a clear error on invalid slug, 404, or API error.
+- [ ] `instance list/create`, `customermanagedkey list/create`, and `graphanalytics session list/create` continue to resolve a default tenant from `aura.default-context` (project portion) when `--tenant-id` is omitted and `default-tenant` is unset.
 - [ ] No "tenant" terminology appears in any non-deprecated command output, header, or help text.
 - [ ] `make test`, `make fmt-check`, and `make lint` all pass.
 - [ ] `TestGenerator_RoundTrip` passes (skill bundles up to date).
 - [ ] `TestAllLeafCommands_HaveExamples` passes (all new leaves have examples; hidden commands are exempt).
 - [ ] Changelog entry added, noting `aura tenant list/get` deprecation.
+- [ ] Linear issue created in the CLI team to track hard removal of `aura tenant list/get`, referencing this PR.
 
 ## Out of Scope
 
@@ -135,6 +150,7 @@ go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
 - Hard removal of `aura tenant list/get` (deferred to a future breaking-change release).
 - Interactive context selection mode for `context use`.
 - Pagination or parallelism in `context list` fan-out.
+- Renaming `--tenant-id` flags on `instance`, `customermanagedkey`, and `graphanalytics` commands (deferred to a future PR).
 
 ## Open Questions
 
