@@ -155,7 +155,7 @@ tasks:
       default boolean (true when the entry matches aura.default-context, false otherwise
       including when aura.default-context is unset). Supports --format json|table|toon.
       Add colocated list_test.go. Register context subcommand in aura.go.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -167,7 +167,7 @@ tasks:
       - "Supports --format json, table, and toon"
       - "Example field present, flush-left, ≥3 invocations including one --format json"
       - "Table-driven tests cover default=true, default=false, and empty org list cases"
-    completed_at: null
+    completed_at: 2026-05-15T17:00:00Z
 
   - id: task-009
     title: "Wire config set aura.default-context to shared validation helper"

@@ -12,6 +12,29 @@ Flags:
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
 
+## aura-cli context list
+
+Returns a flat list of all accessible organization/project contexts
+
+This subcommand lists all organization/project pairs accessible to the current user.
+Each entry includes the context slug ({organizationId}/{projectId}), the organization and
+project IDs and names, and whether this entry is the currently active default context.
+
+Usage: `aura-cli context list`
+
+Examples:
+
+```
+# List all accessible contexts in table format
+neo4j-cli aura context list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura context list --format json
+
+# Find the active context via jq
+neo4j-cli aura context list --format json | jq -r '.data[] | select(.default == true) | .context'
+```
+
 ## aura-cli context use
 
 Sets the active organization and project context

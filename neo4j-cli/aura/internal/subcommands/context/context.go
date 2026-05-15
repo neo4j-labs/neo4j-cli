@@ -23,6 +23,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().String("auth-url", "", "")
 	cmd.PersistentFlags().String("base-url", "", "")
 
+	cmd.AddCommand(newListCmd(cfg))
 	cmd.AddCommand(newUseCmd(cfg))
 
 	flags.RegisterAuraCredentialFlag(cmd, cfg)

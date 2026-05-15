@@ -1,3 +1,8 @@
+## TASK-008 — 2026-05-15T17:00:00Z
+Added aura context list command that fans out across all orgs/projects, assembling a flat list with context, organizationId, projectId, projectName, and default fields; default=true only when the entry matches aura.default-context; regenerated both skill bundles.
+Files: +neo4j-cli/aura/internal/subcommands/context/list.go, +neo4j-cli/aura/internal/subcommands/context/list_test.go, ~neo4j-cli/aura/internal/subcommands/context/context.go, ~neo4j-cli/aura/internal/skill/bundle/*, ~neo4j-cli/internal/skill/bundle/*
+Decisions: Custom contextListResponse type with AsArray() and MarshalJSON() wraps entries in {"data":[...]} for JSON consistency with other list commands.
+
 ## TASK-007 — 2026-05-15T00:00:00Z
 Added aura context use command accepting positional {org}/{project} slug or --organization-id + --project-id flags, delegating to validateAndSetDefaultContext. Both forms are mutually exclusive with clear errors.
 Files: ~neo4j-cli/aura/internal/subcommands/context/context.go, +neo4j-cli/aura/internal/subcommands/context/use.go, +neo4j-cli/aura/internal/subcommands/context/use_test.go, ~neo4j-cli/aura/aura.go
