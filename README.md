@@ -127,6 +127,8 @@ neo4j-cli docker start dev --wait --rw
 neo4j-cli docker delete dev --force --rw
 ```
 
+Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, or `--no-store-credential` if you want neither a stored credential nor the rendered password.
+
 ### Ephemeral flow (env-file into `query --env`)
 
 ```bash

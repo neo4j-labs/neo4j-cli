@@ -57,6 +57,8 @@ neo4j-cli query --credential dev 'RETURN 1 AS n'
 neo4j-cli docker delete dev --force --rw
 ```
 
+- The generated password appears in `docker create`'s rendered output; redirects and pipes capture it — pass `--password <s>` to pick your own, or `--no-store-credential` to suppress storage and rendering.
+
 - Ephemeral runs: `neo4j-cli docker create --ephemeral` shells `docker run --rm`, skips credential persistence, and emits a `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout. With `--env-file <path>` the blob is written to that path (mode 0600) and stdout stays silent so it can be piped into `neo4j-cli query --env <path>`. The env-file write goes through a temp file in the same directory + atomic rename; a pre-existing symlink at the target path is replaced by a regular file (the symlink is not followed). Docker auto-removes the container when it stops — nothing to delete.
 
 ```sh

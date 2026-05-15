@@ -495,7 +495,7 @@ tasks:
       - `neo4j-cli/internal/skill/additions.md`: mirror the paragraph so agent ingestion picks it up. Brief — one sentence is enough on the skill side since agents tend to be lossy on long explanations.
       - Regenerate the skill bundle: `go generate ./neo4j-cli/internal/skill/...`.
       No code changes. No test changes (this is a docs-only refinement).
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -503,7 +503,7 @@ tasks:
       - "neo4j-cli/internal/skill/additions.md has a mirror sentence"
       - "skill bundle regenerated; make test (TestGenerator_RoundTrip) passes"
       - "no code changes; make fmt-check, make lint, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T23:15:00Z
 
   - id: task-021
     title: "Architectural cleanup: drop redundant per-leaf --format registration in docker subtree"
