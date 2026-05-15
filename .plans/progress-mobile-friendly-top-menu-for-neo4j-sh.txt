@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-15T10:30:00Z
+Added id="topNav" to <nav class="top-nav"> and inserted the hamburger <button class="icon-btn nav-toggle" id="navToggle"> after the theme toggle inside <header class="top">. HTML-only change; CSS/JS deferred to task-002/003.
+Files: ~index.html, ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml

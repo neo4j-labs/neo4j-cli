@@ -34,7 +34,7 @@ tasks:
       `aria-label="Open menu"`). Do not touch any other markup.
 
       Use the exact HTML from the PRD's "Concrete HTML to add" section.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`index.html` opens cleanly in a browser with no console errors"
@@ -42,7 +42,7 @@ tasks:
       - "A new `<button class=\"icon-btn nav-toggle\" id=\"navToggle\">` exists immediately after the theme toggle button's closing tag, before the closing `</div>` of `.container.inner`"
       - "The new button has `aria-label=\"Open menu\"`, `aria-controls=\"topNav\"`, `aria-expanded=\"false\"`, and contains two SVGs with classes `open` (three horizontal lines) and `close` (X)"
       - "`git diff` shows changes confined to the `<header class=\"top\">` block of `index.html` (no edits elsewhere)"
-    completed_at: null
+    completed_at: 2026-05-15T10:30:00Z
 
   - id: task-002
     title: "Add responsive mobile-nav CSS block to index.html"
