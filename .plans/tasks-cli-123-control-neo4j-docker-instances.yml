@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-16T00:15:00Z
+updated_at: 2026-05-16T00:45:00Z
 
 tasks:
   - id: task-001
@@ -591,5 +591,137 @@ tasks:
       - "New test case pins `--version latest --edition enterprise` → `neo4j:enterprise` (the fix itself)"
       - "AGENTS.md gains a one-line note about the latest+enterprise → `neo4j:enterprise` mapping under Docker Subsystem Notes"
       - "Live verification: `bin/neo4j-cli docker create --name htest --rw` (no other flags) actually pulls + runs against a real docker daemon; followed by `bin/neo4j-cli docker delete htest --force --rw`"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
+
+  - id: task-023
+    title: "Rename `--env-file` → `--env-out-file` on `docker create` (hard rename, no alias)"
+    description: |
+      `docker create --env-file <path>` writes the env blob. The name overlaps with `neo4j-cli query --env <path>` which READS — confusing pair (one writes, one reads, both spelled `--env*`). Rename the write-side flag to `--env-out-file <path>` so direction is obvious from the name.
+
+      Hard rename, no deprecation alias. The docker tree is on this still-unreleased branch (CLI-123 PR #118 has not merged), so there are no external users of `--env-file` to break. CLI-101 set the precedent for hard renames of unshipped flags; follow the same approach.
+
+      Touch list (search-and-replace, then verify each surface):
+
+      1. `neo4j-cli/internal/subcommands/docker/create.go`:
+         - Const `envFileFlag = "env-file"` → `envOutFileFlag = "env-out-file"`.
+         - Local var `envFile` → `envOutFile` for readability.
+         - `cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")` — keep the existing description; just swap the flag name.
+         - Long: block on the leaf (lines ~104-116 area) — replace every `--env-file` mention with `--env-out-file`.
+         - Example: block — the existing example `neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw` becomes `... --env-out-file /tmp/n.env ...`.
+         - `clierr.NewUsageError("--%s requires --%s", envOutFileFlag, ephemeralFlag)` — the existing usage-error wording propagates the rename automatically because it uses the const.
+
+      2. `neo4j-cli/internal/subcommands/docker/create_test.go`:
+         - Every `--env-file` literal in test invocations → `--env-out-file`.
+         - Test function names that mention `EnvFile` → `EnvOutFile` (e.g. `TestCreate_Ephemeral_EnvFile_WritesFile` → `TestCreate_Ephemeral_EnvOutFile_WritesFile`).
+         - Assertion strings that look for `--env-file` in error messages → `--env-out-file`.
+
+      3. `README.md` "Local Neo4j (Docker)" section — find the `--env-file` mentions (task-014 added one, task-019 added the symlink-replacement note) and rename.
+
+      4. `neo4j-cli/internal/skill/additions.md` docker section — same rename pass.
+
+      5. `AGENTS.md` "Docker Subsystem Notes" — check for `--env-file` mentions (task-019 may have noted it) and rename.
+
+      6. Regenerate skill bundle: `go generate ./neo4j-cli/internal/skill/...`. Commit `bundle/SKILL.md` + `bundle/references/docker.md`.
+
+      7. Changelog: NOT needed. The docker tree's Minor entry (task-015) just says "Add 'docker' command tree for managing local Neo4j containers" — flag-name granularity isn't surfaced in the changelog. No update.
+
+      Process note: keep the test rename atomic with the code rename (same commit) so `make test` is green throughout history bisection.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "`docker create --help` shows `--env-out-file` (not `--env-file`); the help text mentions the temp-file + atomic rename behaviour"
+      - "All references to `--env-file` in create.go, create_test.go, README.md, AGENTS.md, and additions.md are renamed to `--env-out-file`"
+      - "Skill bundle (SKILL.md + references/docker.md) regenerated and committed; no `--env-file` substring remains in the bundle"
+      - "No deprecation alias retained (hard rename — the docker tree has not shipped yet)"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+      - "manual smoke: bin/neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw (against a live docker daemon) writes /tmp/n.env with the expected blob"
+    completed_at: null
+
+  - id: task-024
+    title: "Add --data-dir / --logs-dir / --import-dir flags on `docker create` for host-side volume mounts"
+    description: |
+      Neo4j stores DB data at `/data`, logs at `/logs`, and import CSVs at `/import` inside the container. Without a volume mount these live in the container layer and are lost on `docker delete`. Add three optional host-side bind-mount flags so operators can persist or inspect each directory from the host.
+
+      User-locked decisions:
+      - **Default**: empty — no mount unless the flag is set explicitly. Matches the current behaviour (no surprise filesystem writes outside docker storage). Operators opt in per directory.
+      - **Scope**: all three flags in this single task (`--data-dir`, `--logs-dir`, `--import-dir`).
+
+      ### Flags (new on `docker create`)
+
+      | Flag | Maps to | Notes |
+      |---|---|---|
+      | `--data-dir <path>` | `-v <host>:/data` | Persistent Neo4j data. Survives `docker delete`. |
+      | `--logs-dir <path>` | `-v <host>:/logs` | Grep / tail Neo4j logs from the host. |
+      | `--import-dir <path>` | `-v <host>:/import` | Host-side CSVs for `LOAD CSV`. |
+
+      Each flag is independent; you can set one, two, or all three. Each is empty by default.
+
+      ### Behaviour per flag
+
+      1. **Path expansion**: support `~` (HOME) and environment variables via the existing helper if one exists. Search `common/clicfg/`, `common/clicfg/credentials/`, and `neo4j-cli/query/` for `expandPath` or similar — AGENTS.md "Windows CI Gotchas" mentions `expandPath` helpers, so a reusable one likely exists. If none is reusable, add a small private `expandPath(s string) (string, error)` helper in `docker/` package — keep it minimal (HOME + `os.ExpandEnv`); don't shell out. Test the helper.
+
+      2. **Resolve to absolute path** via `filepath.Abs` after expansion so docker doesn't choke on relative paths.
+
+      3. **mkdir-if-missing**: `os.MkdirAll(resolved, 0o755)` (NOT 0o700 — the official Neo4j docker image's entrypoint runs the chown step that adjusts ownership for the container's neo4j user; 0o755 lets docker's root inspect the dir during that step). Log `info: created host directory <path>` to stderr on first creation.
+
+      4. **Compose into argv**: append `-v <resolved>:/data` (or /logs, /import) per flag. Order in argv doesn't matter semantically; keep the existing ports → env → labels → image order and slot volume args between env and labels.
+
+      5. **Incompatibility with --ephemeral**: any of the three volume flags combined with `--ephemeral` → `clierr.NewUsageError("--%s is incompatible with --%s (ephemeral containers do not persist data; mount and ephemeral are mutually exclusive)", "<flag>", ephemeralFlag)`. Fires BEFORE port pre-flight so a misconfigured invocation doesn't waste cycles on listener checks.
+
+      6. **Symlink and path-traversal hygiene**: NOT in scope. The operator explicitly supplies the path; we don't follow-or-refuse symlinks here (unlike `--env-out-file` which is a credential write target). If the host dir is a symlink, the bind mount follows it — that's docker's behaviour, document it but don't try to override.
+
+      ### Files to touch
+
+      1. `neo4j-cli/internal/subcommands/docker/create.go`:
+         - Three new string flags (`--data-dir`, `--logs-dir`, `--import-dir`) and three local vars + consts.
+         - New helper `mountFlag(flag, hostPath, containerPath string) ([]string, error)` or inline expansion+abs+mkdir per flag.
+         - Argv composition (slot `-v ...` args before labels).
+         - --ephemeral compat checks (one per flag).
+         - Long: + Example: blocks updated to mention the three flags (one new example showing `--data-dir ~/n4j-data` is enough; don't bloat the Example block).
+
+      2. `neo4j-cli/internal/subcommands/docker/create_test.go`:
+         - For each flag, a happy-path test asserting the `-v <abs-path>:/data` (or /logs, /import) appears in argv.
+         - Path expansion test: `--data-dir ~/foo` → resolved to `<HOME>/foo`.
+         - mkdir test: against a memfs (or temp OsFs dir) — flag points at a non-existent path → after RunE, the dir exists with mode 0o755 (use `t.TempDir()` if needed because mkdir on memfs may have quirks per AGENTS.md).
+         - Combination test: all three flags set together → all three `-v` args present, exactly once each.
+         - Each flag's `--ephemeral` incompatibility test → usage error; no docker call.
+
+      3. `README.md` "Local Neo4j (Docker)" section: add a paragraph + example showing the volume flow:
+         ```
+         # Persist data on the host so it survives delete + recreate
+         neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw
+         neo4j-cli docker delete dev --force --rw
+         neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses the same data
+         ```
+         Document the chown gotcha briefly: "Neo4j inside the container adjusts ownership of the mounted directories at startup; expect the dirs to show up under the container's neo4j UID on the host after first start."
+
+      4. `neo4j-cli/internal/skill/additions.md` docker section: mirror with a short bullet block (one line per flag + one line on the persistence flow).
+
+      5. `AGENTS.md` "Docker Subsystem Notes": one terse line — "Volume flags (`--data-dir`/`--logs-dir`/`--import-dir`) bind-mount host paths to `/data`/`/logs`/`/import`; empty-default = no mount; incompatible with `--ephemeral`."
+
+      6. Regenerate skill bundle: `go generate ./neo4j-cli/internal/skill/...`.
+
+      7. Changelog: not needed (still on unreleased docker tree).
+
+      ### Out of scope for this task
+
+      - Named docker volumes (`--data-volume <volname>` style). If wanted later, separate task.
+      - chown management — the official Neo4j image entrypoint handles container-side ownership; we don't try to second-guess it.
+      - `--conf-dir` / `--plugins-dir` mounts. Less commonly used in local dev; defer.
+      - Re-mounting a volume on an existing container via `docker start`. Docker doesn't support this — volumes are baked at create time. Don't try.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "`docker create --data-dir <path>` produces argv containing `-v <abs-path>:/data`; same for `--logs-dir` → `/logs` and `--import-dir` → `/import`"
+      - "All three flags default empty — no `-v` arg appears in argv when no flag is set"
+      - "Path expansion handles `~` (HOME) and env vars via a reusable helper; resolved path is absolute"
+      - "mkdir-if-missing creates the host dir at mode 0o755 and logs `info: created host directory <path>` to stderr"
+      - "Any of the three flags combined with `--ephemeral` → `clierr.NewUsageError` mentioning both flag names; no docker call observed"
+      - "Tests cover: each flag individually, combination of all three, ~ expansion, mkdir-if-missing, each --ephemeral incompatibility"
+      - "README + additions.md document the persist flow and the chown caveat; AGENTS.md gains a one-line subsystem note; skill bundle regenerated"
+      - "Live verification: bin/neo4j-cli docker create --name htest --data-dir /tmp/htest-data --rw; ls /tmp/htest-data shows files written by the container; delete + recreate against the same path reuses the existing DB"
       - "make fmt-check, make lint, make test, make license-check all pass"
     completed_at: null
