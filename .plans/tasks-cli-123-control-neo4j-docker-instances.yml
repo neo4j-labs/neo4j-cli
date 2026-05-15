@@ -373,6 +373,7 @@ tasks:
     title: "Replace parsePsOutput and parseInspectOutput stubs (BLOCKER — feature non-functional against real docker without this)"
     description: |
       `neo4j-cli/internal/subcommands/docker/client.go:193-202` defines `parsePsOutput` and `parseInspectOutput` as stubs that return empty values. They were placeholders in task-001 with TODO comments naming task-008 / task-009 as the landing tasks; neither task replaced them. Every docker-package test passes because the `fakeDockerClient` (helpers_test.go) bypasses the stubs entirely. Against a real `docker` binary the feature is non-functional:
+
       - `docker list` always renders empty (PsAll returns nil entries).
       - `docker get <any>` returns "no managed container named X" (parseInspectOutput returns `Container{Name: name}` with `Managed: false`; the managed-gate refuses it).
       - `docker start / stop / delete` likewise refuse with unknown-name for the same reason.
@@ -409,7 +410,7 @@ tasks:
       4. Optional follow-up (NOT this task): a smoke test under a build tag matching `query/query_bolt_smoke_test.go` that does `exec.LookPath("docker")` + `docker run` against a real `neo4j:latest-enterprise` image and asserts list/get round-trip. Track as a separate follow-up issue if wanted.
       5. Wire-up: nothing changes in the leaves. `client.go`'s `PsAll` and `Inspect` already call the parsers; replacing the stubs makes the call chain real.
       6. Regenerate skill bundle if any `Long:`/`Example:` text is edited (likely not — this task touches client.go and tests only).
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -419,7 +420,7 @@ tasks:
       - "no live docker required for tests; hand-crafted fixtures cover empty input, one entry, two entries (mixed managed/unmanaged), trailing newline, malformed JSON, and `Container` without our labels (Managed=false)"
       - "task-016 and task-017 dependency arrays already include task-018; the existing test suites for those tasks pass once 018 lands and the parsers return real data"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T10:38:22Z
 
   - id: task-019
     title: "writeEnvFile: temp file + atomic rename to close symlink-follow and chmod-TOCTOU"

@@ -4,8 +4,11 @@
 package docker
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 	"sync"
@@ -186,17 +189,82 @@ func (c *execClient) Inspect(ctx context.Context, name string) (Container, error
 	return parseInspectOutput(name, out)
 }
 
-// parsePsOutput is split out so unit tests can exercise the JSON-per-line
-// shape without invoking the real `docker` binary. The concrete parse lands
-// with the `list` leaf in task-008; the scaffold only needs the symbol so
-// leaf tasks can import it.
+// parsePsOutput decodes the output of
+// `docker ps -a --format '{{json .}}'` — one JSON object per line, separated
+// by newlines. Empty stdout yields an empty slice and no error. Malformed
+// JSON on any line returns a typed error naming the 1-indexed line number so
+// version drift surfaces immediately rather than silently emptying the list
+// (user-locked fail-loud decision).
+//
+// The scanner buffer is bumped to 4 MiB because rich label payloads
+// (multi-line org.opencontainers.image.* etc.) can push a single emitted line
+// well past bufio's default 64 KB ceiling.
 func parsePsOutput(stdout string) ([]PsEntry, error) {
-	_ = stdout
-	return nil, nil
+	entries := []PsEntry{}
+	if stdout == "" {
+		return entries, nil
+	}
+	scanner := bufio.NewScanner(strings.NewReader(stdout))
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		raw := strings.TrimSpace(scanner.Text())
+		if raw == "" {
+			continue
+		}
+		var entry PsEntry
+		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+			return nil, fmt.Errorf("docker: parse ps output: line %d: %w", lineNo, err)
+		}
+		entries = append(entries, entry)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("docker: parse ps output: scan: %w", err)
+	}
+	return entries, nil
 }
 
-// parseInspectOutput is similarly split out for hermetic testing. The
-// concrete parse lands with the `get` leaf in task-009.
+// parseInspectOutput decodes the output of `docker inspect <name>` — a JSON
+// array with exactly one element for a single-name inspect. Only the fields
+// we render are extracted (Name, State.Status/Running, Config.Image,
+// Config.Labels); unknown fields in Docker's payload are ignored.
+//
+// Fail loud on malformed JSON or unexpected element count (0 or >1) so
+// daemon/version drift surfaces immediately. Missing labels are NOT an error
+// — the resulting Container simply has empty strings and Managed=false; the
+// leaf's managed-gate handles refusing unmanaged containers.
 func parseInspectOutput(name, stdout string) (Container, error) {
-	return Container{Name: name}, nil
+	type inspectShape struct {
+		Name  string `json:"Name"`
+		State struct {
+			Status  string `json:"Status"`
+			Running bool   `json:"Running"`
+		} `json:"State"`
+		Config struct {
+			Image  string            `json:"Image"`
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+	}
+	var shapes []inspectShape
+	if err := json.Unmarshal([]byte(stdout), &shapes); err != nil {
+		return Container{}, fmt.Errorf("docker: parse inspect output for %q: %w", name, err)
+	}
+	if len(shapes) != 1 {
+		return Container{}, fmt.Errorf("docker: parse inspect output for %q: expected 1 container, got %d", name, len(shapes))
+	}
+	s := shapes[0]
+	labels := s.Config.Labels
+	return Container{
+		Name:      strings.TrimPrefix(s.Name, "/"),
+		Status:    s.State.Status,
+		Running:   s.State.Running,
+		Image:     s.Config.Image,
+		Edition:   labels[LabelEdition],
+		Version:   labels[LabelVersion],
+		BoltPort:  labels[LabelBoltPort],
+		HTTPPort:  labels[LabelHTTPPort],
+		Ephemeral: labels[LabelEphemeral] == "true",
+		Managed:   labels[LabelManaged] == "true",
+	}, nil
 }
