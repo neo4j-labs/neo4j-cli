@@ -1,0 +1,33 @@
+================================================================================
+TASK-003: Add Credentials.FilePath() accessor and ReloadAuraCredential helper
+Date: 2026-05-15T00:00:00Z
+================================================================================
+
+Summary:
+Added three new public API additions to the credentials package to support the
+parallel token refresh race fix. FilePath() exposes the private filePath field
+so callers (specifically getToken in task-004) can pass the path without
+accessing internal state. ReloadAuraCredential reads credentials.json from disk
+via afero and returns the named AuraCredential or nil,false on any error without
+panicking. SyncCredential updates in-memory AccessToken/TokenExpiry without
+calling onUpdate (no disk write), for use after a successful disk-based token
+reuse.
+
+Files Changed:
+- common/clicfg/credentials/credentials.go (modified — added FilePath() accessor)
+- common/clicfg/credentials/aura.go (modified — added SyncCredential method)
+- common/clicfg/credentials/reload.go (created — ReloadAuraCredential function)
+- common/clicfg/credentials/reload_test.go (created — unit tests for all three additions)
+
+Key Decisions:
+- ReloadAuraCredential uses fileutils.ReadFileSafe (returns empty slice on missing
+  file) rather than direct afero.ReadFile to stay consistent with existing patterns
+  and avoid panics on ErrNotExist.
+- SyncCredential is silent no-op when the credential name is not found, which avoids
+  any panic when called from a racing goroutine where the in-memory state may differ.
+- Test helpers (credentialsPath, writeCredsJSON, freshToken) placed in reload_test.go;
+  should move to a helpers_test.go if other test files in this package need them later.
+- FilePath test uses testfs.GetTestFs so no real FS is touched on developer machines
+  that have real Aura credentials stored.
+
+Next Task: task-004
