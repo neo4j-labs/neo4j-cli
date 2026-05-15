@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-16T01:15:00Z
+updated_at: 2026-05-16T01:45:00Z
 
 tasks:
   - id: task-001
@@ -812,4 +812,112 @@ tasks:
       - "AGENTS.md \"Docker Subsystem Notes\" gains the one-line note documenting how to run the smoke"
       - "PR #118 description: smoke-test bullet removed from \"Out of scope / follow-ups\""
       - "make fmt-check, make lint, make test, make license-check all pass on the default (no-tag) run"
+    completed_at: null
+
+  - id: task-026
+    title: "Hint that podman can be aliased as `docker` when `docker` is missing from PATH"
+    description: |
+      Today when `docker` is not on PATH, every docker subcommand returns:
+
+      > docker not found in PATH — install Docker Desktop (https://www.docker.com/products/docker-desktop/) or the docker CLI
+
+      Podman is a widely-used, drop-in compatible alternative to docker (same CLI surface, same `docker run` / `docker ps` semantics). Operators who already have podman installed will not see any hint that they can make neo4j-cli work by aliasing podman as `docker`. Extend the error message to surface that hint WHEN podman is detected on PATH.
+
+      ### Behaviour
+
+      In `neo4j-cli/internal/subcommands/docker/client.go` `execClient.resolve()` (around lines 73-88), after the `exec.LookPath("docker")` miss, perform a second `exec.LookPath("podman")`:
+
+      - If podman is found: append a sentence to the existing error message:
+        > " It looks like you have podman installed; podman is a drop-in for the docker CLI. Aliasing it as `docker` (e.g. `alias docker=podman` in your shell rc, or `Set-Alias docker podman` on Windows PowerShell) will let neo4j-cli use it. For a more permanent setup, symlink podman onto your PATH as `docker`."
+      - If podman is NOT found: keep the existing message verbatim.
+
+      The error stays a single `clierr.NewUsageError(...)` call; the suggestion is concatenated onto the existing format string. No multi-line stderr.
+
+      ### Implementation
+
+      1. Introduce a small package-private helper:
+         ```go
+         // altRuntimeHint returns a non-empty string describing an alternative
+         // container runtime that the operator can alias as `docker` when the
+         // real docker binary is missing from PATH. Currently checks for podman.
+         // The result is appended to the docker-missing usage error; an empty
+         // return means "no hint, use the default message".
+         //
+         // The lookPathFn package var seam keeps this hermetic in tests — the
+         // existing execClient.resolve() uses exec.LookPath directly via
+         // sync.Once, but the suggestion helper is invoked on the error path
+         // only so swapping a test seam there is cheap.
+         func altRuntimeHint(lookPath func(string) (string, error)) string {
+             if _, err := lookPath("podman"); err == nil {
+                 return ` It looks like you have podman installed; podman is a drop-in for the docker CLI. Aliasing it as ` + "`docker`" + ` (e.g. ` + "`alias docker=podman`" + ` in your shell rc, or ` + "`Set-Alias docker podman`" + ` on Windows PowerShell) will let neo4j-cli use it.`
+             }
+             return ""
+         }
+         ```
+         Add a `var lookPathFn = exec.LookPath` package var at file top OR pass it through to `altRuntimeHint` as an argument so tests can substitute deterministic results.
+
+      2. Update `execClient.resolve()`:
+         ```go
+         if c.lookupErr != nil {
+             return "", clierr.NewUsageError(
+                 "docker not found in PATH — install Docker Desktop (https://www.docker.com/products/docker-desktop/) or the docker CLI.%s",
+                 altRuntimeHint(lookPathFn),
+             )
+         }
+         ```
+         Note the `.` before `%s` and the leading space in the hint — they keep the resulting sentence well-formed whether or not the hint is appended. (When the hint is empty the message simply ends after the existing period.)
+
+      3. Preserve the `sync.Once` cache for docker lookup. The podman check fires only on the error path; that path is rare in practice (typical operator has docker installed) and the runtime is < 1ms, so no caching is needed.
+
+      ### Tests in client_test.go
+
+      Add cases via the `lookPathFn` seam (use `t.Cleanup` to restore):
+      - **docker present**: lookPathFn returns success for "docker"; resolve returns nil error. (Existing tests likely cover this; just ensure the seam is used consistently.)
+      - **docker missing, podman missing**: lookPathFn returns ErrNotFound for both; resolve returns the standard usage error WITHOUT the podman hint. Assert `strings.Contains(err.Error(), "install Docker Desktop")` AND `!strings.Contains(err.Error(), "podman")`.
+      - **docker missing, podman present**: lookPathFn returns ErrNotFound for "docker" but success for "podman"; resolve returns a usage error containing both the install hint AND the podman alias suggestion. Assert `strings.Contains(err.Error(), "alias docker=podman")` AND `strings.Contains(err.Error(), "podman is a drop-in")`.
+
+      Test the helper directly too:
+      - **altRuntimeHint with stub returning podman success**: returns non-empty string mentioning podman + alias.
+      - **altRuntimeHint with stub returning ErrNotFound**: returns empty string.
+
+      ### AGENTS.md update
+
+      Append one terse line under "Docker Subsystem Notes":
+      > Missing-`docker` error suggests `alias docker=podman` when podman is also detected on PATH; check via `lookPathFn` seam (`client.go`).
+
+      ### README.md update
+
+      Add a short paragraph under the "Local Neo4j (Docker)" section's intro (or in a new "Troubleshooting" subsection if you create one): something like "If you use podman instead of docker, you can alias it: `alias docker=podman`. neo4j-cli shells out to whatever resolves as `docker` on your PATH — it doesn't care which runtime backs it." Keep it brief.
+
+      ### Out of scope for this task
+
+      - **Native runtime selection** (e.g. `NEO4J_CLI_DOCKER_BIN=podman` env var, or `--runtime podman` flag) — would let users skip the alias entirely. Worth considering as a follow-up if operators report it; not in this task.
+      - **Other runtimes**: nerdctl, rancher-desktop's docker wrapper, etc. Podman covers the most common case; expand if asked.
+      - **Functional differences between podman and docker** at the CLI surface (e.g. podman defaults to rootless, network behaviour differs slightly) — out of scope. The CLI shells out the same way; any divergence is up to the runtime.
+      - **Skill bundle regen**: not needed. The error message text is not surfaced via `--help` or in any bundle content.
+
+      ### Verification
+
+      Locally:
+      ```
+      # Confirm baseline (docker present):
+      bin/neo4j-cli docker list   # works as before
+
+      # Simulate missing docker by renaming the binary or using PATH= to drop it:
+      PATH=/usr/bin bin/neo4j-cli docker list   # if /usr/bin has neither docker nor podman, see the default message
+      # ... or run on a host with podman but no docker:
+      ```
+      Expect either: the standard "install Docker Desktop" message (no podman on PATH), OR the same message followed by the podman-alias suggestion when podman is detected.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "execClient.resolve()'s docker-missing error includes an `alias docker=podman` suggestion ONLY when podman is found on PATH"
+      - "When neither docker nor podman is on PATH, the message is the existing 'install Docker Desktop' string verbatim"
+      - "lookPathFn package var seam lets tests deterministically simulate docker-missing-podman-present and docker-missing-podman-missing"
+      - "client_test.go adds three cases: present, both-missing, docker-missing-podman-present; plus direct tests of the altRuntimeHint helper"
+      - "AGENTS.md \"Docker Subsystem Notes\" gains a one-line note about the podman hint + lookPathFn seam"
+      - "README.md \"Local Neo4j (Docker)\" mentions the podman-alias workaround briefly (one paragraph)"
+      - "No skill bundle regen needed (error message is not in --help text)"
+      - "make fmt-check, make lint, make test, make license-check all pass"
     completed_at: null
