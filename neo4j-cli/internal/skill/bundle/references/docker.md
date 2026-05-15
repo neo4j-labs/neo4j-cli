@@ -5,6 +5,7 @@
 - [neo4j-cli docker create](#neo4j-cli-docker-create)
 - [neo4j-cli docker get](#neo4j-cli-docker-get)
 - [neo4j-cli docker list](#neo4j-cli-docker-list)
+- [neo4j-cli docker start](#neo4j-cli-docker-start)
 
 Manage local Neo4j containers via Docker
 
@@ -110,5 +111,32 @@ neo4j-cli docker list --format json
 
 # Emit TOON for token-efficient ingestion by agents
 neo4j-cli docker list --format toon
+```
+
+## neo4j-cli docker start
+
+Start a stopped Neo4j container managed by neo4j-cli
+
+Start a stopped Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); --wait requires a stored dbms credential for the container (the credential supplies the password used to authenticate the readiness probe). Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to start one after it has exited surfaces the same unknown-name error.
+
+Usage: `neo4j-cli docker start <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--wait` | bool | false | Wait until Bolt is reachable before returning. |
+
+Examples:
+
+```
+# Start a managed container by name
+neo4j-cli docker start dev --rw
+
+# Start and block until Bolt accepts sessions before returning
+neo4j-cli docker start dev --wait --rw
+
+# Same as above using the deprecated --await alias
+neo4j-cli docker start dev --await --rw
 ```
 

@@ -186,7 +186,7 @@ tasks:
       Non-managed container → unknown-name error per REQ-F-043. Ephemeral container already removed → REQ-F-042 error.
       Add `start_test.go`: happy path; --wait happy path; --wait timeout; non-managed → error; missing ephemeral → REQ-F-042 message.
       Flush-left `Example:` block with `--rw` on every invocation.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-001
@@ -196,7 +196,7 @@ tasks:
       - "Ephemeral-already-removed → REQ-F-042 usage error verbatim"
       - "start.go has Annotations write:true, Example block, copyright header"
       - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
-    completed_at: null
+    completed_at: 2026-05-15T17:35:00Z
 
   - id: task-011
     title: "docker stop <name>"
