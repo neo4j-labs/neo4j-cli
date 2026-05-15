@@ -80,7 +80,7 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 	const orgID = "org-abc-123"
 	const projectID = "proj-def-456"
 	const slug = orgID + "/" + projectID
-	const projectPath = "/v2beta1/organizations/" + orgID + "/projects/" + projectID
+	const listProjectsPath = "/v2beta1/organizations/" + orgID + "/projects"
 
 	for _, tc := range []struct {
 		name           string
@@ -111,29 +111,47 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 			wantErrContain: "project ID must not be empty",
 		},
 		{
-			name:           "404 from API returns error without persisting",
+			name:           "list API error returns error without persisting",
 			slug:           slug,
-			serverPath:     projectPath,
-			serverStatus:   http.StatusNotFound,
-			serverBody:     `{"errors": [{"message": "project not found"}]}`,
-			wantErr:        true,
-			wantErrContain: "project not found",
-		},
-		{
-			name:           "500 from API returns error without persisting",
-			slug:           slug,
-			serverPath:     projectPath,
+			serverPath:     listProjectsPath,
 			serverStatus:   http.StatusInternalServerError,
 			serverBody:     `{"errors": [{"message": "internal server error"}]}`,
 			wantErr:        true,
 			wantErrContain: "internal server error",
 		},
 		{
-			name:         "success persists aura.default-context",
+			name:           "404 from list API returns error without persisting",
+			slug:           slug,
+			serverPath:     listProjectsPath,
+			serverStatus:   http.StatusNotFound,
+			serverBody:     `{"errors": [{"message": "organization not found"}]}`,
+			wantErr:        true,
+			wantErrContain: "organization not found",
+		},
+		{
+			name:           "project not found in list returns clear error",
+			slug:           slug,
+			serverPath:     listProjectsPath,
+			serverStatus:   http.StatusOK,
+			serverBody:     `{"data": [{"id": "other-proj-111", "name": "Other Project"}]}`,
+			wantErr:        true,
+			wantErrContain: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
+		},
+		{
+			name:           "empty list returns clear error",
+			slug:           slug,
+			serverPath:     listProjectsPath,
+			serverStatus:   http.StatusOK,
+			serverBody:     `{"data": []}`,
+			wantErr:        true,
+			wantErrContain: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
+		},
+		{
+			name:         "success persists aura.default-context when project found in list",
 			slug:         slug,
-			serverPath:   projectPath,
+			serverPath:   listProjectsPath,
 			serverStatus: http.StatusOK,
-			serverBody:   fmt.Sprintf(`{"data": {"id": "%s", "name": "My Project"}}`, projectID),
+			serverBody:   fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}, {"id": "other-proj-111", "name": "Other Project"}]}`, projectID),
 			wantContext:  slug,
 		},
 	} {

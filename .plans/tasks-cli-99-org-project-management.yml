@@ -305,7 +305,7 @@ tasks:
       <orgId>") when the project is absent from the list. Update validate_test.go to mock
       the list endpoint and cover: project found (success), project not found (clear error),
       list API error, and empty list cases.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -315,4 +315,4 @@ tasks:
       - "Persists aura.default-context only when project ID is confirmed in the list"
       - "Tests cover project-found, project-not-found, API-error, and empty-list cases"
       - "make test, make fmt-check, and make lint all pass"
-    completed_at: null
+    completed_at: 2026-05-15T20:00:00Z

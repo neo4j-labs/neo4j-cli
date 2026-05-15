@@ -77,15 +77,22 @@ func TestSetDefaultContext(t *testing.T) {
 			name:        "success persists default-context",
 			slug:        slug,
 			status:      http.StatusOK,
-			body:        fmt.Sprintf(`{"data": {"id": "%s", "name": "My Project"}}`, projectID),
+			body:        fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
 			wantContext: slug,
 		},
 		{
-			name:    "404 from API returns error without persisting",
+			name:    "project not found in list returns clear error",
+			slug:    slug,
+			status:  http.StatusOK,
+			body:    `{"data": [{"id": "other-proj", "name": "Other Project"}]}`,
+			wantErr: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
+		},
+		{
+			name:    "404 from list API returns error without persisting",
 			slug:    slug,
 			status:  http.StatusNotFound,
-			body:    `{"errors": [{"message": "project not found"}]}`,
-			wantErr: "project not found",
+			body:    `{"errors": [{"message": "organization not found"}]}`,
+			wantErr: "organization not found",
 		},
 		{
 			name:    "API error returns error without persisting",
@@ -108,7 +115,7 @@ func TestSetDefaultContext(t *testing.T) {
 
 			if tc.status != 0 {
 				mockHandler := helper.NewRequestHandlerMock(
-					fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, projectID),
+					fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
 					tc.status,
 					tc.body,
 				)

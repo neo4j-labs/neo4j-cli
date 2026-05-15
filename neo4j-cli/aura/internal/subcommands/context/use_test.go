@@ -26,17 +26,23 @@ func TestContextUseWithSlug(t *testing.T) {
 		{
 			name:        "success with positional slug",
 			status:      http.StatusOK,
-			body:        fmt.Sprintf(`{"data": {"id": "%s", "name": "My Project"}}`, projectID),
+			body:        fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
 			wantContext: slug,
 		},
 		{
-			name:    "404 from API returns error without persisting",
-			status:  http.StatusNotFound,
-			body:    `{"errors": [{"message": "project not found"}]}`,
-			wantErr: "project not found",
+			name:    "project not found in list returns clear error",
+			status:  http.StatusOK,
+			body:    `{"data": [{"id": "other-proj", "name": "Other Project"}]}`,
+			wantErr: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
 		},
 		{
-			name:    "500 from API returns error without persisting",
+			name:    "404 from list API returns error without persisting",
+			status:  http.StatusNotFound,
+			body:    `{"errors": [{"message": "organization not found"}]}`,
+			wantErr: "organization not found",
+		},
+		{
+			name:    "500 from list API returns error without persisting",
 			status:  http.StatusInternalServerError,
 			body:    `{"errors": [{"message": "internal server error"}]}`,
 			wantErr: "internal server error",
@@ -49,7 +55,7 @@ func TestContextUseWithSlug(t *testing.T) {
 			helper.SetConfigValue("aura.beta-enabled", true)
 
 			mockHandler := helper.NewRequestHandlerMock(
-				fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, projectID),
+				fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
 				tc.status,
 				tc.body,
 			)
@@ -81,9 +87,9 @@ func TestContextUseWithFlags(t *testing.T) {
 	helper.SetConfigValue("aura.beta-enabled", true)
 
 	mockHandler := helper.NewRequestHandlerMock(
-		fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, projectID),
+		fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
 		http.StatusOK,
-		fmt.Sprintf(`{"data": {"id": "%s", "name": "My Project"}}`, projectID),
+		fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
 	)
 
 	helper.ExecuteCommand(fmt.Sprintf("context use --organization-id=%s --project-id=%s --rw", orgID, projectID))

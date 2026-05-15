@@ -1,3 +1,7 @@
+## TASK-015 — 2026-05-15T20:00:00Z
+Updated validateAndSetDefaultContext to call GET /organizations/{orgId}/projects (list endpoint) and check if projectId appears in the results, returning a clear error when absent; updated validate_test.go, use_test.go, and config/set_test.go to mock the list endpoint with project-found, project-not-found, API-error, and empty-list cases.
+Files: ~neo4j-cli/aura/internal/subcommands/context/validate.go, ~neo4j-cli/aura/internal/subcommands/context/validate_test.go, ~neo4j-cli/aura/internal/subcommands/context/use_test.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go
+
 ## TASK-014 — 2026-05-15T19:30:00Z
 Updated aura project get to call GET /tenants/{id} on v1 (AuraApiVersion1) instead of the non-existent v2beta1 single-project endpoint; removed org ID resolution logic, kept --organization-id flag for forward compatibility; updated tests to mock /v1/tenants/{id}; regenerated skill bundles.
 Files: ~neo4j-cli/aura/internal/subcommands/project/get.go, ~neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/internal/skill/bundle/references/project.md
