@@ -14,7 +14,7 @@ tasks:
       Mount in `neo4j-cli/app/app.go` via `cmd.AddCommand(docker.NewCmd(cfg))` between the existing `query` and `skill` lines.
       Add `helpers_test.go` with a `fakeDockerClient` implementing the interface for use by all leaf tests.
       Every new `.go` file carries the Neo4j copyright header.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/internal/subcommands/docker/{client.go,labels.go,docker.go,helpers_test.go} exist"
@@ -24,7 +24,7 @@ tasks:
       - "docker.NewCmd is mounted in neo4j-cli/app/app.go alongside the existing root subcommands"
       - "All new files carry the Neo4j copyright header; make license-check is clean"
       - "go build ./... succeeds; go test ./neo4j-cli/internal/subcommands/docker/... passes (interface-level smoke test only)"
-    completed_at: null
+    completed_at: 2026-05-15T08:46:41Z
 
   - id: task-002
     title: "Bolt readiness probe (bolt_ready.go) reusing the vendored neo4j-go-driver"

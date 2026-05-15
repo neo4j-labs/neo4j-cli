@@ -1,0 +1,4 @@
+## TASK-001 — 2026-05-15T08:46:41Z
+Scaffolded neo4j-cli/internal/subcommands/docker/ with dockerClient interface (Run/Start/Stop/RemoveForce/PsAll/Inspect), execClient using sync.Once-cached exec.LookPath("docker"), label constants, Container struct, parent NewCmd, fakeDockerClient, smoke tests, and app.go mount between query and skill. Skill bundle regenerated; references/docker.md committed.
+Files: +neo4j-cli/internal/subcommands/docker/client.go, +neo4j-cli/internal/subcommands/docker/docker.go, +neo4j-cli/internal/subcommands/docker/docker_test.go, +neo4j-cli/internal/subcommands/docker/helpers_test.go, +neo4j-cli/internal/subcommands/docker/labels.go, +neo4j-cli/internal/skill/bundle/references/docker.md, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/skill/bundle/SKILL.md
+Decisions: parsePsOutput/parseInspectOutput stubs land here as named hooks so list/get leaf tasks (008/009) can fill in JSON parsing without renaming.
