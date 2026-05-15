@@ -242,7 +242,7 @@ tasks:
       aura.default-context, and noting that aura tenant list/get are deprecated and will be
       removed in a future release. Then create a Linear issue in the CLI working group (CLI)
       team to track the hard removal of the deprecated tenant commands, referencing this PR.
-    status: pending
+    status: completed
     dependencies:
       - task-011
     acceptance_criteria:
@@ -251,7 +251,7 @@ tasks:
       - "Changelog body notes aura tenant list/get deprecation and future removal"
       - "Linear issue created in CLI team for hard removal of tenant commands"
       - "Linear issue references this PR and notes removal is blocked on deprecation window"
-    completed_at: null
+    completed_at: 2026-05-15T14:40:00Z
 
   - id: task-013
     title: "Add aura organization get command"
