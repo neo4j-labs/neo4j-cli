@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -78,6 +80,8 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		password          string
 		noStoreCredential bool
 		wait              bool
+		ephemeral         bool
+		envFile           string
 	)
 
 	const (
@@ -89,6 +93,8 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPortFlag          = "http-port"
 		passwordFlag          = "password"
 		noStoreCredentialFlag = "no-store-credential"
+		ephemeralFlag         = "ephemeral"
+		envFileFlag           = "env-file"
 	)
 
 	cmd := &cobra.Command{
@@ -103,7 +109,11 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"If --name collides with an existing container or stored dbms credential, the chosen name is auto-suffixed " +
 			"(`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr. " +
 			"Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); " +
-			"on timeout the container is left running so the operator can inspect it with `docker logs <name>`.",
+			"on timeout the container is left running so the operator can inspect it with `docker logs <name>`. " +
+			"Pass --ephemeral for a throwaway container (`docker run --rm`): no dbms credential is stored and an env-file " +
+			"blob (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / NEO4J_DATABASE) is emitted to stdout — or, with " +
+			"--env-file <path>, written to that path (mode 0600) while stdout stays silent so it can be piped into " +
+			"`neo4j-cli query --env <path>`.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -113,6 +123,12 @@ neo4j-cli docker create --name local --edition community --bolt-port 7688 --http
 # Create an enterprise container and block until Bolt is reachable before returning
 neo4j-cli docker create --name dev --wait --rw
 
+# Create an ephemeral container and emit an env-file blob to stdout for piping into another tool
+neo4j-cli docker create --name tmp --ephemeral --rw
+
+# Create an ephemeral container and write the env-file to a path that 'query --env' can consume
+neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw
+
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -121,6 +137,18 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// error rendering matches the rest of the docker subtree.
 			if edition != "community" && edition != "enterprise" {
 				return clierr.NewUsageError(`invalid argument %q for "--%s" flag: must be one of "community" or "enterprise"`, edition, editionFlag)
+			}
+
+			// --env-file / --ephemeral compatibility (REQ-F-017). --env-file
+			// is a child of --ephemeral (it only changes WHERE the env blob
+			// goes); rejecting it standalone keeps the contract honest.
+			// --no-store-credential + --ephemeral is redundant: ephemeral
+			// already skips persistence — error out so the operator notices.
+			if envFile != "" && !ephemeral {
+				return clierr.NewUsageError("--%s requires --%s", envFileFlag, ephemeralFlag)
+			}
+			if ephemeral && noStoreCredential {
+				return clierr.NewUsageError("--%s is incompatible with --%s (ephemeral already skips credential persistence)", noStoreCredentialFlag, ephemeralFlag)
 			}
 
 			// Port-conflict pre-flight (REQ-F-013). Run BEFORE any docker
@@ -172,8 +200,14 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 
 			// Build the docker run argv. Order matters for tests asserting
-			// shape; keep ports → env → labels → image (last).
+			// shape; keep ports → env → labels → image (last). When
+			// --ephemeral, prepend --rm so the docker daemon auto-removes
+			// the container on exit and flip the ephemeral label to "true"
+			// so `docker list` / `docker get` surface the choice (REQ-F-017).
 			argv := []string{"--name", chosenName}
+			if ephemeral {
+				argv = append(argv, "--rm")
+			}
 			argv = append(argv, "-p", fmt.Sprintf("%d:7474", httpPort))
 			argv = append(argv, "-p", fmt.Sprintf("%d:7687", boltPort))
 			argv = append(argv, "-e", "NEO4J_AUTH=neo4j/"+resolvedPassword)
@@ -184,12 +218,16 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				}
 				argv = append(argv, "-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT="+licenseValue)
 			}
+			ephemeralLabelValue := "false"
+			if ephemeral {
+				ephemeralLabelValue = "true"
+			}
 			argv = append(argv, "--label", LabelManaged+"=true")
 			argv = append(argv, "--label", LabelEdition+"="+edition)
 			argv = append(argv, "--label", LabelVersion+"="+version)
 			argv = append(argv, "--label", LabelBoltPort+"="+strconv.Itoa(boltPort))
 			argv = append(argv, "--label", LabelHTTPPort+"="+strconv.Itoa(httpPort))
-			argv = append(argv, "--label", LabelEphemeral+"=false")
+			argv = append(argv, "--label", LabelEphemeral+"="+ephemeralLabelValue)
 			argv = append(argv, image)
 
 			if _, err := client.Run(ctx, argv); err != nil {
@@ -201,10 +239,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			uri := fmt.Sprintf("neo4j://localhost:%d", boltPort)
 
-			// Persist a matching dbms credential unless explicitly opted out.
-			// Database name defaults to "neo4j" for local containers per
-			// existing credential conventions (mirrors credential dbms add).
-			if !noStoreCredential {
+			// Persist a matching dbms credential unless explicitly opted out
+			// or running ephemerally. Ephemeral containers leave no on-disk
+			// footprint — the credential travels via the env-file blob
+			// emitted below (REQ-F-017). Database name defaults to "neo4j"
+			// for local containers per existing credential conventions.
+			if !noStoreCredential && !ephemeral {
 				if cfg.Credentials == nil || cfg.Credentials.Dbms == nil {
 					return clierr.NewUsageError("credential storage is not available; use --%s to skip storing credentials locally", noStoreCredentialFlag)
 				}
@@ -227,6 +267,25 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 					cmd.SilenceUsage = true
 					return err
 				}
+			}
+
+			// --ephemeral replaces the standard table/JSON output with a
+			// `.env` file blob suitable for `query --env <path>` (REQ-F-017).
+			// With --env-file we write to disk via cfg.Aura.Fs() with 0600
+			// perms and stay silent on stdout (so callers can pipe). Without
+			// --env-file we emit the blob to stdout.
+			if ephemeral {
+				blob := renderEnvFile(chosenName, image, uri, resolvedPassword)
+				if envFile != "" {
+					if err := writeEnvFile(cfg.Aura.Fs(), envFile, blob); err != nil {
+						cmd.SilenceUsage = true
+						return err
+					}
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: wrote credentials to %s\n", envFile)
+				} else {
+					_, _ = fmt.Fprint(cmd.OutOrStdout(), blob)
+				}
+				return nil
 			}
 
 			// Render the result. Field order mirrors what an operator wants
@@ -257,9 +316,45 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474).")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
+	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
+	cmd.Flags().StringVar(&envFile, envFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout.")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
+}
+
+// renderEnvFile builds the .env blob consumed by `neo4j-cli query --env <path>`
+// (REQ-F-017). The variable names mirror neo4j-cli/query/connect.go so the
+// blob is a drop-in for the existing flow. A trailing newline keeps `cat`-style
+// inspection clean.
+func renderEnvFile(name, image, uri, password string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# neo4j-cli docker — %s @ %s\n", name, image)
+	fmt.Fprintf(&b, "NEO4J_URI=%s\n", uri)
+	b.WriteString("NEO4J_USERNAME=neo4j\n")
+	fmt.Fprintf(&b, "NEO4J_PASSWORD=%s\n", password)
+	b.WriteString("NEO4J_DATABASE=neo4j\n")
+	return b.String()
+}
+
+// writeEnvFile writes the blob to path via the cfg-supplied afero filesystem
+// using O_WRONLY|O_CREATE|O_TRUNC with mode 0600 (REQ-F-017 / REQ-NF-004) so
+// the file is only readable by the calling user. Routing through the afero
+// seam keeps unit tests hermetic — production hits the real OS fs, tests hit
+// the memfs from testfs.GetTestFs.
+func writeEnvFile(fs afero.Fs, path, contents string) error {
+	f, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return fmt.Errorf("docker create: write env-file %s: %w", path, err)
+	}
+	if _, werr := f.WriteString(contents); werr != nil {
+		_ = f.Close()
+		return fmt.Errorf("docker create: write env-file %s: %w", path, werr)
+	}
+	if cerr := f.Close(); cerr != nil {
+		return fmt.Errorf("docker create: write env-file %s: %w", path, cerr)
+	}
+	return nil
 }
 
 // singleRow adapts a single map[string]any into a commonoutput.ResponseData so

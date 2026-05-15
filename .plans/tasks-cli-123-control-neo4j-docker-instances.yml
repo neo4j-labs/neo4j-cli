@@ -130,7 +130,7 @@ tasks:
       `--env-file` without `--ephemeral` → `clierr.NewUsageError("--env-file requires --ephemeral")`.
       `--no-store-credential` is incompatible with `--ephemeral` (ephemeral already skips persistence) → usage error.
       Extend `create_test.go` with cases: ephemeral happy path (no credential stored, label ephemeral=true, stdout = env blob); ephemeral + env-file (file written with 0600, stdout silent); env-file without ephemeral → error; ephemeral + no-store-credential → error.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -139,7 +139,7 @@ tasks:
       - "--env-file <path> writes 0600 file via cfg.Aura.Fs() and produces empty stdout"
       - "--env-file without --ephemeral and --ephemeral with --no-store-credential both return usage errors"
       - "Env var names match query --env consumers (NEO4J_URI/USERNAME/PASSWORD/DATABASE)"
-    completed_at: null
+    completed_at: 2026-05-15T16:05:00Z
 
   - id: task-008
     title: "docker list"

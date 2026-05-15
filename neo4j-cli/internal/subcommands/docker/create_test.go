@@ -20,6 +20,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -712,6 +713,158 @@ func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, fake.RunCalls, 1)
 	assert.Equal(t, int32(0), atomic.LoadInt32(&calls), "probe must not run without --wait")
+}
+
+// runCreateForEphemeral is the test rig for --ephemeral / --env-file cases.
+// It mirrors runCreate but exposes stderr (where the env-file write narration
+// lands) and returns the cfg.Aura.Fs() handle so tests can stat / read any
+// file written via the afero seam.
+func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, afero.Fs, string, string, error) {
+	t.Helper()
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+
+	argv, splitErr := shlex.Split(args)
+	require.NoError(t, splitErr)
+	cmd.SetArgs(append([]string{"create"}, argv...))
+
+	execErr := cmd.Execute()
+	return fake, cfg, cfg.Aura.Fs(), out.String(), errBuf.String(), execErr
+}
+
+func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0xCD}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xCD}, generatedPasswordBytes))
+
+	fake, cfg, _, stdout, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral")
+	require.NoError(t, err)
+
+	// docker run argv carries --rm and label ephemeral=true.
+	argv := runArgv(t, fake)
+	assert.Contains(t, argv, "--rm", "ephemeral must add --rm to docker run argv: %v", argv)
+	assert.True(t, containsPair(argv, "--label", LabelEphemeral+"=true"),
+		"argv missing ephemeral=true label: %v", argv)
+	// Sanity: ephemeral=false label must NOT be present.
+	assert.False(t, containsPair(argv, "--label", LabelEphemeral+"=false"),
+		"argv must not carry ephemeral=false when --ephemeral: %v", argv)
+
+	// No credential was stored — ephemeral leaves no on-disk footprint.
+	assert.Empty(t, cfg.Credentials.Dbms.List(), "ephemeral must not persist a dbms credential")
+
+	// Stdout carries exactly the documented env blob (header + four NEO4J_*
+	// lines, in the documented order), in plain text — NOT through the
+	// table/JSON renderer.
+	expectedBlob := fmt.Sprintf(
+		"# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
+		expectedPassword,
+	)
+	assert.Equal(t, expectedBlob, stdout, "stdout must be the literal env-file blob")
+}
+
+func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0xEF}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xEF}, generatedPasswordBytes))
+
+	envPath := "/tmp/n.env"
+	fake, cfg, fs, stdout, stderr, err := runCreateForEphemeral(t,
+		"--name tmp --ephemeral --env-file "+envPath)
+	require.NoError(t, err)
+
+	// --rm + ephemeral label still applied.
+	argv := runArgv(t, fake)
+	assert.Contains(t, argv, "--rm")
+	assert.True(t, containsPair(argv, "--label", LabelEphemeral+"=true"))
+
+	// No credential persisted.
+	assert.Empty(t, cfg.Credentials.Dbms.List())
+
+	// Stdout MUST be empty so the caller can pipe.
+	assert.Empty(t, stdout, "--env-file must keep stdout silent for piping")
+
+	// Stderr carries the one-line confirmation pointing at the path.
+	assert.Contains(t, stderr, "info: wrote credentials to "+envPath)
+
+	// File written to the in-memory fs with mode 0600 and the documented blob.
+	info, statErr := fs.Stat(envPath)
+	require.NoError(t, statErr, "env-file must exist on the in-memory fs")
+	assert.Equal(t, "-rw-------", info.Mode().Perm().String(),
+		"env-file must be mode 0600 (REQ-NF-004); got %s", info.Mode().Perm())
+
+	contents, readErr := afero.ReadFile(fs, envPath)
+	require.NoError(t, readErr)
+	expectedBlob := fmt.Sprintf(
+		"# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
+		expectedPassword,
+	)
+	assert.Equal(t, expectedBlob, string(contents))
+}
+
+func TestCreate_EnvFileWithoutEphemeral_UsageError(t *testing.T) {
+	fake, _, _, _, _, err := runCreateForEphemeral(t, "--name dev --env-file /tmp/n.env")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--env-file")
+	assert.Contains(t, err.Error(), "--ephemeral")
+	assert.Empty(t, fake.RunCalls, "docker run must not execute when --env-file is misused")
+}
+
+func TestCreate_EphemeralWithNoStoreCredential_UsageError(t *testing.T) {
+	fake, _, _, _, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral --no-store-credential")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--no-store-credential")
+	assert.Contains(t, err.Error(), "--ephemeral")
+	assert.Empty(t, fake.RunCalls, "docker run must not execute on incompatible-flag usage error")
+}
+
+func TestCreate_Ephemeral_HonoursExplicitPassword(t *testing.T) {
+	// --ephemeral with --password must still surface that password verbatim
+	// in the env-file blob (operators do this to pre-share a known secret).
+	_, _, _, stdout, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral --password mysecret")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "NEO4J_PASSWORD=mysecret\n")
+	// Username and database are always the documented defaults.
+	assert.Contains(t, stdout, "NEO4J_USERNAME=neo4j\n")
+	assert.Contains(t, stdout, "NEO4J_DATABASE=neo4j\n")
+	assert.Contains(t, stdout, "NEO4J_URI=neo4j://localhost:7687\n")
+}
+
+func TestCreate_Ephemeral_EnvBlobLineOrder(t *testing.T) {
+	// REQ-F-017 fixes the order of the four NEO4J_* lines (URI → USERNAME →
+	// PASSWORD → DATABASE) right after the header. Assert literally so a
+	// reorder doesn't slip past review.
+	_, _, _, stdout, _, err := runCreateForEphemeral(t, "--name tmp --ephemeral --password p")
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
+	require.Len(t, lines, 5, "blob must have header + four NEO4J_* lines; got %v", lines)
+	assert.True(t, strings.HasPrefix(lines[0], "# neo4j-cli docker —"))
+	assert.True(t, strings.HasPrefix(lines[1], "NEO4J_URI="))
+	assert.True(t, strings.HasPrefix(lines[2], "NEO4J_USERNAME="))
+	assert.True(t, strings.HasPrefix(lines[3], "NEO4J_PASSWORD="))
+	assert.True(t, strings.HasPrefix(lines[4], "NEO4J_DATABASE="))
 }
 
 func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
