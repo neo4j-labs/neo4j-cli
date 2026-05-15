@@ -33,7 +33,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 - **No `--keep-credential` flag on `delete`.** Deleting the container always removes the linked dbms credential.
 - **No memory / heap / cache size flags.** The issue explicitly excludes these.
 - **No tenant / project / cloud-provider / region flags.** The issue explicitly excludes these (they're Aura concepts).
-- **No persistent data-volume management.** Containers use the default volume strategy; advanced volume control is out of scope for v1.
+- **No named docker volume management.** `--data-dir` / `--logs-dir` / `--import-dir` cover host-side bind-mount persistence (REQ-F-019); named volumes (`--data-volume <volname>`-style) are deferred. Defer mounts for `/conf` / `/plugins` too.
 - **No website (`gh-pages`) edits in this PR.** The site is prompt-driven and rolled out separately; flag in PR description for the next pass.
 - **No changes to the aura standalone binary's command tree.** Docker is a neo4j-cli tree only; the aura standalone is no longer shipped.
 - **No interactive `create` wizard.** All inputs are flags (or sensible defaults).
@@ -71,12 +71,16 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
   | `--env-out-file <path>` | unset | Only meaningful with `--ephemeral`; if set, write env file there and stay silent on stdout. |
   | `--wait` | `false` | Poll Bolt on `localhost:<bolt-port>` until handshake succeeds, 60 s timeout (REQ-F-018). |
   | `--no-store-credential` | `false` | Non-ephemeral path only; skip persisting a dbms credential. |
+  | `--data-dir <path>` | unset | Bind-mount host path at `/data` inside the container (REQ-F-019). Incompatible with `--ephemeral`. |
+  | `--logs-dir <path>` | unset | Bind-mount host path at `/logs` (REQ-F-019). Incompatible with `--ephemeral`. |
+  | `--import-dir <path>` | unset | Bind-mount host path at `/import` for `LOAD CSV` (REQ-F-019). Incompatible with `--ephemeral`. |
 
 - **REQ-F-011:** `create` shells `docker run -d` with:
   - Container name = chosen name (after collision auto-suffix).
   - `-p <bolt-port>:7687 -p <http-port>:7474`.
   - `-e NEO4J_AUTH=neo4j/<password>`.
   - `-e NEO4J_ACCEPT_LICENSE_AGREEMENT=<eval|yes>` when `--edition enterprise` (REQ-F-012).
+  - `-v <host>:<container>` per set volume flag (`--data-dir` → `/data`, `--logs-dir` → `/logs`, `--import-dir` → `/import`; see REQ-F-019). Slotted between env and labels in argv.
   - Labels: `org.neo4j.cli.managed=true`, `org.neo4j.cli.edition=<edition>`, `org.neo4j.cli.version=<version>`, `org.neo4j.cli.bolt-port=<port>`, `org.neo4j.cli.http-port=<port>`, `org.neo4j.cli.ephemeral=<bool>`.
   - Image: `neo4j:<version>` (community) or `neo4j:<version>-enterprise`.
   - `--rm` when `--ephemeral`.
@@ -100,6 +104,11 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
   - Otherwise emit the blob to stdout.
   - Env-var names match what `neo4j-cli/query/connect.go:29-32` consumes; no change to `query`.
 - **REQ-F-018:** `--wait` semantics: after `docker run`, poll `bolt://localhost:<bolt-port>` until a Bolt v5 handshake succeeds, with a fixed 60 s deadline. Reuse the neo4j-go-driver vendored by `query/` (preferred) — fall back to a raw `net.Dial` + handshake only if the import introduces a cycle. On timeout return `clierr.NewUsageError("container started but Bolt did not become ready within 60s; check 'docker logs <name>'")` but leave the container running (don't tear down).
+- **REQ-F-019:** Host-side bind-mount flags for the three Neo4j data directories. Each is optional and independent (default empty = no mount):
+  - `--data-dir <host>` → `-v <abs>:/data` (persistent DB; survives `docker delete`).
+  - `--logs-dir <host>` → `-v <abs>:/logs` (host-side log inspection).
+  - `--import-dir <host>` → `-v <abs>:/import` (host-side CSVs for `LOAD CSV`).
+  Behaviour per flag: (a) path expansion — leading `~` resolves to the operator's home dir (via the `homeDirFn` seam), embedded `$VAR` / `${VAR}` are expanded via `os.ExpandEnv`, the result is run through `filepath.Abs`; (b) mkdir-if-missing — `fs.MkdirAll(resolved, 0o755)` (NOT 0o700 — the Neo4j image's container-side chown step needs traversal), with `info: created host directory <path>` to stderr on first creation only; (c) the `-v` arg is slotted between env and labels in the docker run argv. Any of the three combined with `--ephemeral` → `clierr.NewUsageError("--%s is incompatible with --%s (ephemeral containers do not persist data; mount and ephemeral are mutually exclusive)", "<flag>", "ephemeral")`, fired BEFORE port pre-flight. Symlink / path-traversal hygiene is intentionally NOT enforced — the operator supplies the path explicitly; docker's bind-mount behaviour around symlinks is preserved unchanged.
 
 #### `neo4j-cli docker list`
 
@@ -226,7 +235,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 - `--wait-timeout <dur>` flag (deferred; fixed 60 s for v1).
 - Memory / heap / cache config (`--memory`, `dbms.memory.heap.*`) — explicitly excluded by the issue.
 - Tenant / project / cloud-provider / region flags — explicitly excluded by the issue (Aura-only concepts).
-- Persistent named volume / data-dir management.
+- Named docker volumes (`--data-volume <volname>` style) and `/conf` / `/plugins` mounts. Host-side bind-mount for `/data`, `/logs`, `/import` is in scope via REQ-F-019.
 - Compose / Kubernetes / Podman / remote Docker daemons.
 - Native (non-Docker) local Neo4j runners.
 - Website edits (`gh-pages` branch) — handled by the separate prompt-driven website update flow.

@@ -290,6 +290,56 @@ $ bin/neo4j-cli credential dbms list --format json | grep -i htest
 
 Fix confirmed: `create` succeeded with the real `neo4j:enterprise` tag (no "manifest not found" error), `list` showed the running container, `delete` removed both the container and the dbms credential.
 
+## TASK-024 — 2026-05-15T14:05:00Z
+Added three host-side bind-mount flags on `docker create`: `--data-dir` → `/data`, `--logs-dir` → `/logs`, `--import-dir` → `/import`. Each is empty by default (no mount); paths support `~` expansion (via homeDirFn seam) and `os.ExpandEnv`, are resolved through filepath.Abs, and missing dirs are created at mode 0o755 with a `info: created host directory <path>` line to stderr on first creation only. All three flags are incompatible with `--ephemeral` and surface a usage error before port pre-flight. New `expandHostPath` + `resolveHostDir` helpers kept package-local since no second consumer exists. 11 new tests cover happy paths (per flag + combined), tilde expansion, env-var expansion, pre-existing dir (no info line), all three `--ephemeral` incompatibility cases, the expandHostPath table, and an OsFs mode-bit assertion to guard against memfs/OsFs umask drift. README "Local Neo4j (Docker)" gained a "Persisting data across container deletes" subsection with the chown caveat; additions.md mirrors via a bullet + code block; AGENTS.md "Docker Subsystem Notes" gained a one-line entry. PRD updated: new REQ-F-019 with full behavioural contract, REQ-F-010 flag table extended with the three rows, REQ-F-011 argv shape mentions `-v` slot, both the "Excluded" item at L36 and the Out-of-Scope item at L229 narrowed to named-volume / `/conf` / `/plugins` mounts only (host-side bind-mount is now in scope). Skill bundle regenerated.
+Files: ~neo4j-cli/internal/subcommands/docker/create.go, ~neo4j-cli/internal/subcommands/docker/create_test.go, ~README.md, ~AGENTS.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/docker.md, ~.plans/prd-cli-123-control-neo4j-docker-instances.md, ~.plans/tasks-cli-123-control-neo4j-docker-instances.yml
+Decisions: kept `expandHostPath` package-local rather than promoting to `common/` since no second consumer exists; the existing `common/skill/agents.go::expandPath` is private to that package, returns `(string, bool)` instead of `(string, error)`, and doesn't run `os.ExpandEnv` — three signature mismatches that make sharing more churn than benefit. `~\` (Windows backslash) added to the tilde-prefix check defensively even though cobra typically normalises path separators.
+
+## Live verification — task-024
+Ran against local docker 29.4.3 (gates green first):
+
+```
+$ rm -rf /tmp/htest-data; bin/neo4j-cli docker create --name htest --data-dir /tmp/htest-data --bolt-port 7700 --http-port 7701 --rw
+info: created host directory /tmp/htest-data
+[
+    {
+        "bolt-port": 7700,
+        "edition": "enterprise",
+        "http-port": 7701,
+        "name": "htest",
+        "password": "P9SpmMwopyFxvHf27afykw",
+        "uri": "neo4j://localhost:7700",
+        "username": "neo4j",
+        "version": "latest"
+    }
+]
+
+$ docker exec htest ls /data
+cluster-state
+databases
+dbms
+server_id
+transactions
+
+$ ls /tmp/htest-data
+cluster-state  databases  dbms  server_id  transactions
+
+$ bin/neo4j-cli docker delete htest --force --rw
+(no output, exit 0)
+$ ls /tmp/htest-data
+cluster-state  databases  dbms  server_id  transactions   # host dir survives
+
+$ bin/neo4j-cli docker create --name htest --data-dir /tmp/htest-data --bolt-port 7700 --http-port 7701 --rw
+[ ... new run, same data dir reused, NO `info: created host directory` line ... ]
+
+$ docker exec htest ls /data
+cluster-state  databases  dbms  server_id  transactions   # Neo4j resumed existing DB
+$ bin/neo4j-cli docker delete htest --force --rw
+$ rm -rf /tmp/htest-data
+```
+
+Confirmed: (1) `--data-dir` created the host dir at 0o755 with the documented info line; (2) Neo4j wrote its data dirs into the mount; (3) `docker delete` removed the container but left the host data; (4) recreate against the same path reused the existing DB (no `info: created` line on recreate, since the dir already existed).
+
 ## TASK-023 — 2026-05-15T23:55:00Z
 Hard-renamed `docker create`'s `--env-file` flag → `--env-out-file` (no deprecation alias — docker tree is on an unreleased branch). Mechanical sweep across create.go (const, local var, flag-register, Long:, Example:, RunE branches, comments referring to the flag), create_test.go (test invocations + test-function names `TestCreate_Ephemeral_EnvFile_*` → `*_EnvOutFile_*` and `TestCreate_EnvFileWithoutEphemeral_UsageError` → `TestCreate_EnvOutFileWithoutEphemeral_UsageError`), README.md docker section, additions.md docker bullet+example, AGENTS.md Docker Subsystem Notes, and the PRD (REQ-F-010 flag table, REQ-F-017, REQ-NF-004, REQ-DOC-001, REQ-DOC-004, acceptance criteria). Regenerated skill bundle so SKILL.md + references/docker.md now carry `--env-out-file`. Live smoked on docker 29.4.3 (bin/neo4j-cli docker create --name tmpenv --ephemeral --env-out-file /tmp/n.env --rw --bolt-port 7689 --http-port 7476 --accept-license): /tmp/n.env written with header + four NEO4J_* lines, container --rm-cleaned on docker stop. All gates green (test, fmt-check, lint, license-check).
 Files: ~neo4j-cli/internal/subcommands/docker/create.go, ~neo4j-cli/internal/subcommands/docker/create_test.go, ~README.md, ~AGENTS.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/docker.md, ~.plans/prd-cli-123-control-neo4j-docker-instances.md

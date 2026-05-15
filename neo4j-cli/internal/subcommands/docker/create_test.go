@@ -1120,6 +1120,250 @@ func TestWriteEnvFile_MissingDir_Errors(t *testing.T) {
 	assert.Contains(t, err.Error(), "create temp env-file in "+dir)
 }
 
+// withHomeDirFn swaps the package-level homeDirFn seam for the duration of
+// the test so `--data-dir ~/...` tests can assert against a deterministic
+// home directory without depending on the host's actual HOME.
+func withHomeDirFn(t *testing.T, home string) {
+	t.Helper()
+	orig := homeDirFn
+	homeDirFn = func() (string, error) { return home, nil }
+	t.Cleanup(func() { homeDirFn = orig })
+}
+
+// containsVolume returns true if argv contains a `-v <host>:<container>`
+// consecutive pair anywhere. Used to assert volume-mount argv pairs.
+func containsVolume(argv []string, host, container string) bool {
+	return containsPair(argv, "-v", host+":"+container)
+}
+
+// countOccurrences returns the number of argv slots whose value equals the
+// supplied needle. Used to assert that each `-v` arg appears exactly once
+// when multiple volume flags are combined.
+func countOccurrences(argv []string, needle string) int {
+	n := 0
+	for _, a := range argv {
+		if a == needle {
+			n++
+		}
+	}
+	return n
+}
+
+func TestCreate_DataDir_HappyPath_AddsVolumeArgAndCreatesDir(t *testing.T) {
+	hostPath := "/tmp/n4j-data-happy"
+	fake, _, fs, _, stderr, err := runCreateForEphemeral(t,
+		"--name dev --no-store-credential --data-dir "+hostPath)
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, hostPath, "/data"),
+		"argv missing -v %s:/data: %v", hostPath, argv)
+
+	// Directory was created on the memfs (didn't exist before) at 0o755.
+	info, statErr := fs.Stat(hostPath)
+	require.NoError(t, statErr, "--data-dir target must exist after RunE")
+	assert.True(t, info.IsDir(), "--data-dir target must be a directory")
+	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm(),
+		"--data-dir target must be mode 0o755; got %s", info.Mode().Perm())
+
+	// Stderr carries the documented info line.
+	assert.Contains(t, stderr, "info: created host directory "+hostPath)
+}
+
+func TestCreate_LogsDir_HappyPath_AddsVolumeArg(t *testing.T) {
+	hostPath := "/tmp/n4j-logs-happy"
+	fake, _, _, _, _, err := runCreateForEphemeral(t,
+		"--name dev --no-store-credential --logs-dir "+hostPath)
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, hostPath, "/logs"),
+		"argv missing -v %s:/logs: %v", hostPath, argv)
+}
+
+func TestCreate_ImportDir_HappyPath_AddsVolumeArg(t *testing.T) {
+	hostPath := "/tmp/n4j-import-happy"
+	fake, _, _, _, _, err := runCreateForEphemeral(t,
+		"--name dev --no-store-credential --import-dir "+hostPath)
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, hostPath, "/import"),
+		"argv missing -v %s:/import: %v", hostPath, argv)
+}
+
+func TestCreate_AllVolumeFlags_AppendsThreeUniqueMounts(t *testing.T) {
+	data := "/tmp/n4j-all-data"
+	logs := "/tmp/n4j-all-logs"
+	imp := "/tmp/n4j-all-import"
+	fake, _, _, _, _, err := runCreateForEphemeral(t,
+		fmt.Sprintf("--name dev --no-store-credential --data-dir %s --logs-dir %s --import-dir %s",
+			data, logs, imp))
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, data, "/data"))
+	assert.True(t, containsVolume(argv, logs, "/logs"))
+	assert.True(t, containsVolume(argv, imp, "/import"))
+
+	// Each `-v` value must appear exactly once; total `-v` slots == 3.
+	assert.Equal(t, 3, countOccurrences(argv, "-v"),
+		"expected exactly three -v flags; got argv=%v", argv)
+}
+
+func TestCreate_NoVolumeFlags_NoVolumeArgs(t *testing.T) {
+	// Sanity / regression guard: when no volume flag is set, there must be
+	// no `-v` argument in argv. Earlier happy-path tests assert this
+	// indirectly; pin it explicitly.
+	fake, _, _, err := runCreate(t, "--name dev --no-store-credential")
+	require.NoError(t, err)
+	argv := runArgv(t, fake)
+	assert.Zero(t, countOccurrences(argv, "-v"),
+		"no volume flag set, no -v expected in argv: %v", argv)
+}
+
+func TestCreate_DataDir_TildeExpansion(t *testing.T) {
+	withHomeDirFn(t, "/home/operator")
+
+	fake, _, fs, _, _, err := runCreateForEphemeral(t,
+		"--name dev --no-store-credential --data-dir ~/foo")
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, "/home/operator/foo", "/data"),
+		"argv missing tilde-expanded -v: %v", argv)
+
+	info, statErr := fs.Stat("/home/operator/foo")
+	require.NoError(t, statErr)
+	assert.True(t, info.IsDir())
+}
+
+func TestCreate_DataDir_EnvVarExpansion(t *testing.T) {
+	t.Setenv("NEO4J_TEST_DIR", "/var/n4j-from-env")
+
+	fake, _, fs, _, _, err := runCreateForEphemeral(t,
+		"--name dev --no-store-credential --data-dir $NEO4J_TEST_DIR")
+	require.NoError(t, err)
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, "/var/n4j-from-env", "/data"),
+		"argv missing env-expanded -v: %v", argv)
+	_, statErr := fs.Stat("/var/n4j-from-env")
+	require.NoError(t, statErr)
+}
+
+func TestCreate_DataDir_PreexistingDir_NoCreatedInfoLine(t *testing.T) {
+	hostPath := "/tmp/n4j-data-existing"
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	// Pre-create the directory so the mkdir branch must be a no-op.
+	require.NoError(t, fs.MkdirAll(hostPath, 0o755))
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"create", "--name", "dev", "--no-store-credential", "--data-dir", hostPath})
+	require.NoError(t, cmd.Execute())
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsVolume(argv, hostPath, "/data"))
+	assert.NotContains(t, errBuf.String(), "info: created host directory",
+		"pre-existing dir must NOT emit the created info line; stderr=%q", errBuf.String())
+}
+
+func TestCreate_VolumeFlag_EphemeralIncompatible(t *testing.T) {
+	tests := []struct {
+		name string
+		flag string // flag name (without leading --)
+		args string
+	}{
+		{"data-dir", "data-dir", "--name dev --ephemeral --data-dir /tmp/x"},
+		{"logs-dir", "logs-dir", "--name dev --ephemeral --logs-dir /tmp/x"},
+		{"import-dir", "import-dir", "--name dev --ephemeral --import-dir /tmp/x"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake, _, _, _, _, err := runCreateForEphemeral(t, tc.args)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--"+tc.flag)
+			assert.Contains(t, err.Error(), "--ephemeral")
+			assert.Empty(t, fake.RunCalls,
+				"docker run must not execute when --%s + --ephemeral collide", tc.flag)
+		})
+	}
+}
+
+func TestExpandHostPath(t *testing.T) {
+	// Drive expandHostPath directly to cover the unit (independent of the
+	// cobra flow). The seam-based tests above exercise the full pipeline;
+	// these pin the helper contract.
+	withHomeDirFn(t, "/home/op")
+	t.Setenv("EXAMPLE_DIR", "/srv/example")
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty stays empty", "", ""},
+		{"tilde alone", "~", "/home/op"},
+		{"tilde slash", "~/x", "/home/op/x"},
+		{"env var", "$EXAMPLE_DIR/x", "/srv/example/x"},
+		{"braced env var", "${EXAMPLE_DIR}/x", "/srv/example/x"},
+		{"absolute unchanged", "/var/data", "/var/data"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := expandHostPath(tc.in)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestCreate_DataDir_OsFs_MkdirModeIs0755(t *testing.T) {
+	// The memfs-backed mkdir tests already assert the 0o755 mode bit, but
+	// memfs may not perfectly mirror OS mode semantics (umask etc). Drive
+	// resolveHostDir directly against a real OsFs under t.TempDir() so we
+	// catch a real-disk regression on CI even if memfs ever diverges.
+	tmp := t.TempDir()
+	hostPath := filepath.Join(tmp, "data")
+
+	fs := afero.NewOsFs()
+	// resolveHostDir only consumes cmd.ErrOrStderr() and the supplied fs —
+	// no clicfg.Config is involved on this code path. Build a minimal cobra
+	// command (no leaf body) so cmd.ErrOrStderr() resolves to our buffer.
+	cmd := NewCmd(clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope))
+	cmd.SetErr(bytes.NewBuffer(nil))
+
+	resolved, err := resolveHostDir(cmd, fs, "data-dir", hostPath)
+	require.NoError(t, err)
+	assert.Equal(t, hostPath, resolved)
+
+	info, err := os.Stat(hostPath)
+	require.NoError(t, err)
+	// Owner must have rwx, and at least group OR other must have r+x so
+	// docker's container-side chown step can traverse the dir. The exact
+	// "0o755" bit pattern depends on the host umask; assert behaviourally
+	// rather than literally.
+	mode := info.Mode().Perm()
+	assert.Equal(t, os.FileMode(0o700), mode&0o700, "owner rwx required, got %s", mode)
+	assert.NotZero(t, mode&0o55, "group or other must have at least r+x for docker chown step, got %s", mode)
+}
+
 func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) {
 	// End-to-end coverage: invoke `docker create --ephemeral --env-out-file`
 	// through the cobra flow with a rename-failing fs and confirm the

@@ -711,7 +711,7 @@ tasks:
       - chown management — the official Neo4j image entrypoint handles container-side ownership; we don't try to second-guess it.
       - `--conf-dir` / `--plugins-dir` mounts. Less commonly used in local dev; defer.
       - Re-mounting a volume on an existing container via `docker start`. Docker doesn't support this — volumes are baked at create time. Don't try.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -724,4 +724,4 @@ tasks:
       - "README + additions.md document the persist flow and the chown caveat; AGENTS.md gains a one-line subsystem note; skill bundle regenerated"
       - "Live verification: bin/neo4j-cli docker create --name htest --data-dir /tmp/htest-data --rw; ls /tmp/htest-data shows files written by the container; delete + recreate against the same path reuses the existing DB"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: "2026-05-15T14:05:00Z"

@@ -211,6 +211,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - `create` auto-suffixes name collisions against BOTH `dockerClient.PsAll` AND `credentials.DbmsCredentials.List()` so the chosen name is unique across both surfaces; the chosen name is used for the container, the stored credential, and the env-file header.
 - `--ephemeral` adds `--rm` to `docker run`, labels the container `ephemeral=true`, skips credential persistence, and emits the `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout — or to `--env-out-file <path>` (mode 0600 via `cfg.Aura.Fs()`) when set. The blob is consumed by `query --env <path>`.
 - Image tag mapping: `--edition enterprise --version latest` → `neo4j:enterprise` (NOT `neo4j:latest-enterprise`, which is unpublished); explicit versions → `neo4j:<version>-enterprise`. Verify any new edition/version logic against `https://hub.docker.com/_/neo4j` before assuming a tag pattern.
+- Volume flags (`--data-dir`/`--logs-dir`/`--import-dir`) bind-mount host paths to `/data`/`/logs`/`/import`; empty-default = no mount; paths support `~`/`$VAR` expansion via the package-local `expandHostPath` helper (`homeDirFn` test seam); missing dirs are created at 0o755; incompatible with `--ephemeral`.
 
 ## Cobra Help / Skill Bundle Rendering Notes
 

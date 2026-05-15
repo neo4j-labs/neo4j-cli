@@ -25,6 +25,15 @@ neo4j-cli docker delete dev --force --rw
 
 - The generated password appears in `docker create`'s rendered output; redirects and pipes capture it — pass `--password <s>` to pick your own, or `--no-store-credential` to suppress storage and rendering.
 
+- Persistent volume mounts: `--data-dir <host>` bind-mounts at `/data` (persist DB across `docker delete`), `--logs-dir <host>` at `/logs`, `--import-dir <host>` at `/import` (for `LOAD CSV`). Paths support `~` and `$VAR` expansion; missing dirs are created at mode 0o755. All three are incompatible with `--ephemeral`. Neo4j adjusts ownership of the mounted dirs at container startup, so they appear under the container's neo4j UID on the host after first start.
+
+```sh
+# Persist data on the host so it survives delete + recreate
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw
+neo4j-cli docker delete dev --force --rw
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses the same data
+```
+
 - Ephemeral runs: `neo4j-cli docker create --ephemeral` shells `docker run --rm`, skips credential persistence, and emits a `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout. With `--env-out-file <path>` the blob is written to that path (mode 0600) and stdout stays silent so it can be piped into `neo4j-cli query --env <path>`. The env-file write goes through a temp file in the same directory + atomic rename; a pre-existing symlink at the target path is replaced by a regular file (the symlink is not followed). Docker auto-removes the container when it stops — nothing to delete.
 
 ```sh

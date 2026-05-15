@@ -129,6 +129,19 @@ neo4j-cli docker delete dev --force --rw
 
 Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, or `--no-store-credential` if you want neither a stored credential nor the rendered password.
 
+### Persisting data across container deletes
+
+By default the Neo4j data, logs, and import dirs live in the container layer and are lost on `docker delete`. Bind-mount a host directory with `--data-dir`, `--logs-dir`, or `--import-dir` to keep them:
+
+```bash
+# Persist data on the host so it survives delete + recreate
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw
+neo4j-cli docker delete dev --force --rw
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses the same data
+```
+
+`--logs-dir` and `--import-dir` mount `/logs` and `/import` similarly. Each flag is optional and independent; combine any subset. Paths support `~` (HOME) and environment-variable expansion, and missing directories are created at mode 0o755. All three flags are incompatible with `--ephemeral` (which is, by definition, disposable). Note: the Neo4j container's entrypoint adjusts ownership of the mounted directories at startup; expect them to show up under the container's neo4j UID on the host after first start.
+
 ### Ephemeral flow (env-file into `query --env`)
 
 ```bash

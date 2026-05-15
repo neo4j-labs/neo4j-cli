@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -23,6 +24,13 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
+
+// homeDirFn is the injectable seam for resolving the operator's home dir when
+// expanding a leading `~` in a `--data-dir` / `--logs-dir` / `--import-dir`
+// flag value. Production wires os.UserHomeDir; tests can swap a deterministic
+// stub. Kept at package scope so the test seam matches the rest of this
+// package's seams (clientFactory, randSource, listenerFactory, waitForBoltFn).
+var homeDirFn = os.UserHomeDir
 
 // maxNameSuffix caps the auto-suffix walk for name-collision resolution
 // (REQ-F-014). The contract is `<name>-1` … `<name>-99`; exceeding it is
@@ -82,6 +90,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		wait              bool
 		ephemeral         bool
 		envOutFile        string
+		dataDir           string
+		logsDir           string
+		importDir         string
 	)
 
 	const (
@@ -95,6 +106,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		noStoreCredentialFlag = "no-store-credential"
 		ephemeralFlag         = "ephemeral"
 		envOutFileFlag        = "env-out-file"
+		dataDirFlag           = "data-dir"
+		logsDirFlag           = "logs-dir"
+		importDirFlag         = "import-dir"
 	)
 
 	cmd := &cobra.Command{
@@ -115,7 +129,11 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"--env-out-file <path>, written to that path (mode 0600) while stdout stays silent so it can be piped into " +
 			"`neo4j-cli query --env <path>`. The env-file is written via a temp file in the same directory and " +
 			"atomically renamed; a pre-existing symlink at the target path is REPLACED by a regular file (the " +
-			"symlink is not followed).",
+			"symlink is not followed). " +
+			"Use --data-dir / --logs-dir / --import-dir to bind-mount host directories at /data, /logs, /import " +
+			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
+			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
+			"--ephemeral.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -130,6 +148,9 @@ neo4j-cli docker create --name tmp --ephemeral --rw
 
 # Create an ephemeral container and write the env-file to a path that 'query --env' can consume
 neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw
+
+# Persist data on the host so it survives delete + recreate
+neo4j-cli docker create --name dev --data-dir ~/n4j-data --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw`,
@@ -151,6 +172,30 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 			if ephemeral && noStoreCredential {
 				return clierr.NewUsageError("--%s is incompatible with --%s (ephemeral already skips credential persistence)", noStoreCredentialFlag, ephemeralFlag)
+			}
+
+			// Volume-mount flags (--data-dir / --logs-dir / --import-dir) are
+			// incompatible with --ephemeral: ephemeral containers do not
+			// persist data, so a bind-mount on an ephemeral container is
+			// almost certainly operator error. Fire BEFORE port pre-flight so
+			// a misconfigured invocation doesn't waste cycles on listener
+			// checks.
+			volumeFlags := []struct {
+				flag      string
+				value     string
+				container string
+			}{
+				{dataDirFlag, dataDir, "/data"},
+				{logsDirFlag, logsDir, "/logs"},
+				{importDirFlag, importDir, "/import"},
+			}
+			for _, vol := range volumeFlags {
+				if vol.value != "" && ephemeral {
+					return clierr.NewUsageError(
+						"--%s is incompatible with --%s (ephemeral containers do not persist data; mount and ephemeral are mutually exclusive)",
+						vol.flag, ephemeralFlag,
+					)
+				}
 			}
 
 			// Port-conflict pre-flight (REQ-F-013). Run BEFORE any docker
@@ -226,6 +271,21 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 					licenseValue = "yes"
 				}
 				argv = append(argv, "-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT="+licenseValue)
+			}
+			// Resolve and mount host directories. Each resolved path goes
+			// through expand-home + ExpandEnv + filepath.Abs + mkdir-if-missing
+			// via resolveHostDir; errors here are fail-loud so the operator
+			// sees the bad path before any docker side effect. Slotted between
+			// env and labels per the documented argv shape.
+			for _, vol := range volumeFlags {
+				if vol.value == "" {
+					continue
+				}
+				resolved, err := resolveHostDir(cmd, cfg.Aura.Fs(), vol.flag, vol.value)
+				if err != nil {
+					return err
+				}
+				argv = append(argv, "-v", resolved+":"+vol.container)
 			}
 			ephemeralLabelValue := "false"
 			if ephemeral {
@@ -327,6 +387,9 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
 	cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
+	cmd.Flags().StringVar(&dataDir, dataDirFlag, "", "Host directory to bind-mount at /data inside the container. Empty = no mount (data lives in the container layer and is lost on delete). Path supports `~` and environment-variable expansion; resolved to an absolute path; created at mode 0o755 if missing. Incompatible with --ephemeral.")
+	cmd.Flags().StringVar(&logsDir, logsDirFlag, "", "Host directory to bind-mount at /logs inside the container. Empty = no mount. Same expansion + mkdir rules as --data-dir. Incompatible with --ephemeral.")
+	cmd.Flags().StringVar(&importDir, importDirFlag, "", "Host directory to bind-mount at /import inside the container (used by Neo4j's LOAD CSV). Empty = no mount. Same expansion + mkdir rules as --data-dir. Incompatible with --ephemeral.")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
@@ -497,4 +560,73 @@ func collectUsedNames(ctx context.Context, client dockerClient, cfg *clicfg.Conf
 		}
 	}
 	return used, nil
+}
+
+// expandHostPath resolves a user-supplied host directory string into an
+// absolute path. The expansion order:
+//  1. `~` or `~/...` at the start of the path resolves to the operator's
+//     home directory (via the homeDirFn seam).
+//  2. Embedded environment variables are expanded via os.ExpandEnv (so
+//     `$HOME/x` and `${HOME}/x` both work).
+//  3. The result is run through filepath.Abs so docker never sees a relative
+//     path.
+//
+// Empty input returns empty output and a nil error so callers can keep their
+// "skip when empty" branches simple.
+func expandHostPath(s string) (string, error) {
+	if s == "" {
+		return "", nil
+	}
+	// Tilde expansion must happen before ExpandEnv so a value like `~/$FOO`
+	// gets the HOME swap on the leading `~` while $FOO still resolves.
+	if s == "~" || strings.HasPrefix(s, "~/") || strings.HasPrefix(s, `~\`) {
+		home, err := homeDirFn()
+		if err != nil {
+			return "", fmt.Errorf("expand ~: %w", err)
+		}
+		if s == "~" {
+			s = home
+		} else {
+			s = filepath.Join(home, s[2:])
+		}
+	}
+	s = os.ExpandEnv(s)
+	abs, err := filepath.Abs(s)
+	if err != nil {
+		return "", fmt.Errorf("resolve absolute path: %w", err)
+	}
+	return abs, nil
+}
+
+// resolveHostDir expands a `--data-dir` / `--logs-dir` / `--import-dir` flag
+// value into a docker-ready absolute path: it runs expandHostPath, ensures
+// the resolved directory exists (creating at mode 0o755 if missing), and
+// narrates a single `info: created host directory <path>` line to stderr
+// when the directory was created. Routing through the supplied afero.Fs keeps
+// unit tests hermetic; production passes cfg.Aura.Fs() which is backed by the
+// real OS fs.
+//
+// flagName is only used for error rendering — it identifies which of the
+// three volume flags failed so the operator can act.
+func resolveHostDir(cmd *cobra.Command, fs afero.Fs, flagName, raw string) (string, error) {
+	resolved, err := expandHostPath(raw)
+	if err != nil {
+		return "", clierr.NewUsageError("--%s: %s", flagName, err.Error())
+	}
+	_, statErr := fs.Stat(resolved)
+	if statErr == nil {
+		return resolved, nil
+	}
+	if !os.IsNotExist(statErr) {
+		return "", fmt.Errorf("docker create: stat --%s %s: %w", flagName, resolved, statErr)
+	}
+	// Missing directory — create it now. 0o755 (NOT 0o700) lets the
+	// container's root-owned entrypoint chown the mounted dir to the neo4j
+	// UID at startup; restricting to 0o700 would break that step on first
+	// boot. The operator can chmod down later if they want to.
+	if mkErr := fs.MkdirAll(resolved, 0o755); mkErr != nil {
+		return "", fmt.Errorf("docker create: create --%s %s: %w", flagName, resolved, mkErr)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: created host directory %s\n", resolved)
+	return resolved, nil
 }
