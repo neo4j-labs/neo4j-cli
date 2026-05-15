@@ -1,3 +1,7 @@
+## TASK-010 — 2026-05-15T00:00:00Z
+Deprecated aura tenant list and tenant get by setting Hidden=true on parent and leaves, printing deprecation warnings to stderr in each RunE pointing to project list and organization get replacements. Skill bundles regenerated.
+Files: ~neo4j-cli/aura/internal/subcommands/tenant/tenant.go, ~neo4j-cli/aura/internal/subcommands/tenant/list.go, ~neo4j-cli/aura/internal/subcommands/tenant/list_test.go, ~neo4j-cli/aura/internal/subcommands/tenant/get.go, ~neo4j-cli/aura/internal/subcommands/tenant/get_test.go, -neo4j-cli/aura/internal/skill/bundle/references/tenant.md
+
 ## TASK-009 — 2026-05-15T00:00:00Z
 Wired aura config set default-context through ValidateAndSetDefaultContext for API validation before persistence. Note: neo4j-cli root config set path skips validation due to Go internal package boundary (neo4j-cli/internal cannot import neo4j-cli/aura/internal).
 Files: ~neo4j-cli/aura/internal/subcommands/config/set.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go, ~neo4j-cli/internal/subcommands/config/set_test.go

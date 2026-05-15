@@ -34,9 +34,6 @@
 - [neo4j-cli aura project](#neo4j-cli-aura-project)
 - [neo4j-cli aura project get](#neo4j-cli-aura-project-get)
 - [neo4j-cli aura project list](#neo4j-cli-aura-project-list)
-- [neo4j-cli aura tenant](#neo4j-cli-aura-tenant)
-- [neo4j-cli aura tenant get](#neo4j-cli-aura-tenant-get)
-- [neo4j-cli aura tenant list](#neo4j-cli-aura-tenant-list)
 
 Allows you to programmatically provision and manage your Aura resources
 
@@ -829,61 +826,5 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 
 # Emit JSON for scripting
 neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-000000000000 --format json
-```
-
-## neo4j-cli aura tenant
-
-Relates to an Aura Tenant
-
-Usage: `neo4j-cli aura tenant`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--auth-url` | string | - |  |
-| `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
-
-### neo4j-cli aura tenant get
-
-Returns tenant details
-
-This subcommand returns details about a specific Aura Tenant.
-
-Usage: `neo4j-cli aura tenant get <id>`
-
-Examples:
-
-```
-# Get details of a tenant by ID
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
-
-# Get tenant details and emit JSON for scripting
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
-
-# Pipe details through jq to extract the tenant name
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
-```
-
-### neo4j-cli aura tenant list
-
-Returns a list of tenants
-
-This subcommand returns a list containing a summary of each of your Aura Tenants. To find out more about a specific Tenant, retrieve the details using the get subcommand.
-
-Usage: `neo4j-cli aura tenant list`
-
-Examples:
-
-```
-# List all tenants the current user has access to
-neo4j-cli aura tenant list
-
-# Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura tenant list --format json
-
-# Pipe tenant ids through jq for a follow-up command
-neo4j-cli aura tenant list --format json | jq -r '.data[].id'
 ```
 

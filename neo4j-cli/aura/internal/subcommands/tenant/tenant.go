@@ -11,8 +11,9 @@ import (
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tenant",
-		Short: "Relates to an Aura Tenant",
+		Use:    "tenant",
+		Short:  "Relates to an Aura Tenant",
+		Hidden: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cfg.Aura.BindBaseUrl(cmd.Flags().Lookup("base-url"))
 

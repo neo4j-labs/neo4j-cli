@@ -197,7 +197,7 @@ tasks:
       tenant list' is deprecated and will be removed in a future release. Use 'aura project
       list' instead."). Update TestAllLeafCommands_HaveExamples to skip hidden commands.
       Add tests verifying the warning appears on stderr.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "aura tenant list and aura tenant get are hidden from --help output"
@@ -206,7 +206,7 @@ tasks:
       - "Deprecation warning printed to stderr when aura tenant get is invoked"
       - "Commands still return correct data (functionality preserved)"
       - "TestAllLeafCommands_HaveExamples skips hidden commands and passes"
-    completed_at: null
+    completed_at: 2026-05-15T00:00:00Z
 
   - id: task-011
     title: "Regenerate skill bundles and verify TestGenerator_RoundTrip"
