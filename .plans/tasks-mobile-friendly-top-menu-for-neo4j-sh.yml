@@ -1,7 +1,7 @@
 feature: mobile-friendly-top-menu-for-neo4j-sh
 prd: ./prd-mobile-friendly-top-menu-for-neo4j-sh.md
 created_at: 2026-05-15T10:00:00Z
-updated_at: 2026-05-15T10:00:00Z
+updated_at: 2026-05-15T12:00:00Z
 
 # IMPORTANT — this branch is a feature branch off `gh-pages`. It contains only
 # website files (index.html at repo root, install.sh, install.ps1, etc.) plus
@@ -132,3 +132,85 @@ tasks:
       - "Reference link still activates the reference tab when clicked from the mobile dropdown"
       - "`git diff` shows changes confined to three regions of `index.html` (CSS near the header rules, HTML inside `<header class=\"top\">`, JS inside the existing `<script>` block)"
     completed_at: 2026-05-15T11:15:00Z
+
+  - id: task-005
+    title: "Reflow installer bar into two-row grid on mobile"
+    description: |
+      Make the install-tabs bar (`<div class="install-tabs" role="tablist">`)
+      mobile-friendly by reflowing the six tabs into two full-width rows of
+      three on viewports ≤640px (`macOS / Linux / Windows` on row 1,
+      `Homebrew / pipx / npm` on row 2). Add the rules INSIDE the existing
+      `@media (max-width: 640px)` block in `index.html` (the block introduced
+      in task-002), after the `nav.top-nav a { … }` rule, so the header
+      rules and installer rules live in the same breakpoint.
+
+      Use the exact CSS from the PRD's "Concrete CSS to add (installer bar)"
+      section verbatim. Concretely, add inside the existing `@media (max-width: 640px)` block:
+
+      ```css
+        .install-tabs {
+          display: flex;
+          width: 100%;
+          flex-wrap: wrap;
+          margin: 0 0 14px;
+        }
+        .install-tab {
+          flex: 1 1 calc(33.333% - 2px);
+          justify-content: center;
+          padding: 8px 12px;
+        }
+      ```
+
+      Do NOT add a new @media query, do NOT touch the markup, do NOT touch
+      the `data-os` JS handler. Source-of-truth: the document order of the
+      six `<button class="install-tab">` elements is already
+      `macos, linux, windows, homebrew, pipx, npm` — wrap order falls out
+      naturally.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "New rules `.install-tabs { … }` and `.install-tab { … }` are appended INSIDE the existing `@media (max-width: 640px)` block (no new @media query added)"
+      - "Rules sit AFTER the `nav.top-nav a { padding: 10px 12px; font-size: 14px; }` rule, before the closing brace of the @media block"
+      - "`.install-tabs` mobile rule sets `display: flex`, `width: 100%`, `flex-wrap: wrap`, and `margin: 0 0 14px`"
+      - "`.install-tab` mobile rule sets `flex: 1 1 calc(33.333% - 2px)`, `justify-content: center`, and `padding: 8px 12px`"
+      - "At 375px width the installer bar wraps to two rows of three tabs in order `macOS / Linux / Windows` then `Homebrew / pipx / npm`, both rows visible, no horizontal scrollbar"
+      - "At 1024px width the installer bar renders as a single centered `inline-flex` row exactly as today (pixel-identical)"
+      - "`git diff` shows changes confined to the existing mobile-nav @media block in `<style>`. No HTML or JS edits."
+    completed_at: null
+
+  - id: task-006
+    title: "Verify installer-bar reflow across breakpoints and interactions"
+    description: |
+      Open the modified `index.html` in a browser (no build step needed) and
+      step through Chrome DevTools device mode at 320 / 375 / 414 / 540 /
+      640 / 641 / 720 / 1024 / 1440 px. Confirm:
+
+      - At ≤640px the installer bar renders as two equal-width rows of three
+        tabs in the order `macOS / Linux / Windows` then
+        `Homebrew / pipx / npm`. Each row spans the full width of `.install`
+        (which is centered, max-width 640px) with no horizontal scrollbar.
+      - At ≥641px the installer bar renders as a single centered
+        `inline-flex` row of six tabs, exactly as on production today.
+      - Clicking each tab still swaps the install command shown in
+        `#installBlock`. The active-tab visual treatment (raised background
+        + box-shadow) is preserved at every viewport width.
+      - Each mobile tab tap target is ≥36px tall (DevTools box inspector).
+      - Auto-OS detection on initial page load still selects the right tab
+        (macOS / Linux / Windows) based on the browser's UA hint.
+
+      You MAY use the `chrome-devtools` or `dev-browser` skill to verify
+      programmatically by opening `index.html` from the worktree filesystem
+      path and resizing the viewport.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "At 320 / 375 / 414 / 540 / 640 px: installer bar is two rows of three tabs (`macOS / Linux / Windows` then `Homebrew / pipx / npm`), full-width, no horizontal scrollbar"
+      - "At 641 / 720 / 1024 / 1440 px: installer bar is a single centered `inline-flex` row — pixel-identical to current production"
+      - "Each tab on mobile is ≥36px tall (verified with DevTools box inspector)"
+      - "Active-tab background and box-shadow render correctly at every viewport width"
+      - "Clicking each tab still swaps the install command shown in `#installBlock` (verified for at least 3 tabs across both rows)"
+      - "Auto-OS detection on initial load still works (e.g. macOS UA -> macOS tab active by default)"
+      - "No console errors when the page loads on any viewport width"
+    completed_at: null
