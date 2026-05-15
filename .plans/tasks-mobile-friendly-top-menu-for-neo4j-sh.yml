@@ -60,7 +60,7 @@ tasks:
       `.open` is present. Use the exact CSS from the PRD's "Concrete CSS to
       add" section verbatim. Reuse existing CSS variables (`--bg`, `--border`,
       `--shadow-overlay`) — no new variables.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -70,7 +70,7 @@ tasks:
       - "`.brand-tag` is hidden under the 640px breakpoint via `display: none`"
       - "At 1024px viewport the header renders with four inline nav links and `labs` tag visible, no hamburger — pixel-identical to current production"
       - "At 375px viewport the hamburger button is visible, the four nav links are hidden, the `labs` tag is hidden, and there is no horizontal scrollbar"
-    completed_at: null
+    completed_at: 2026-05-15T10:45:00Z
 
   - id: task-003
     title: "Add mobile-nav toggle JS to existing script block"

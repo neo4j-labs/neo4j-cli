@@ -252,6 +252,36 @@
     :root:not([data-theme="light"]) .theme-toggle .moon { display: block; }
   }
 
+  /* ---------- Mobile nav ---------- */
+  .nav-toggle { display: none; }
+  .nav-toggle .close { display: none; }
+  .nav-toggle[aria-expanded="true"] .open { display: none; }
+  .nav-toggle[aria-expanded="true"] .close { display: block; }
+
+  @media (max-width: 640px) {
+    header.top .inner { gap: 8px; }
+    .brand-tag { display: none; }
+    .nav-toggle { display: inline-flex; }
+
+    nav.top-nav {
+      position: absolute;
+      top: 56px;
+      left: 16px;
+      right: 16px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      padding: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-overlay);
+      display: none;
+    }
+    nav.top-nav.open { display: flex; }
+    nav.top-nav a { padding: 10px 12px; font-size: 14px; }
+  }
+
   /* ---------- Hero ---------- */
   .hero {
     position: relative;
