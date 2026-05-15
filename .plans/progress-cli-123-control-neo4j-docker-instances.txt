@@ -124,23 +124,26 @@ All write commands respect the existing `--rw` write gate. All read commands acc
 | Flag | Default | Behaviour |
 |---|---|---|
 | `--name` | *required* | Container name + dbms credential name. Auto-suffixed (`-1`, `-2`, …) on collision with any existing container OR stored credential; chosen name is echoed to stderr. |
-| `--version` | `latest` | Maps to image tag (`neo4j:<version>` community / `neo4j:<version>-enterprise`). |
+| `--version` | `latest` | Maps to image tag. Community: `neo4j:<version>`. Enterprise versioned: `neo4j:<version>-enterprise`. Enterprise + default `latest`: bare `neo4j:enterprise` (Docker Hub does NOT publish `neo4j:latest-enterprise`). |
 | `--edition` | `enterprise` | Validated against `community` / `enterprise`. |
 | `--accept-license` | `false` | Enterprise only. Default passes `NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`; this flag upgrades it to `yes`. No-op for community. |
 | `--bolt-port` | `7687` | Pre-flight `net.Listen` check before any `docker run` so a port clash never leaves a half-created container behind. |
 | `--http-port` | `7474` | Same pre-flight. `--bolt-port == --http-port` errors out before either check. |
 | `--password` | random 16-byte (base64 URL-safe) | Generated via `crypto/rand` when omitted. Surfaced in `create`'s standard output. |
 | `--no-store-credential` | `false` | Container still runs; skip persisting a dbms credential. |
-| `--ephemeral` | `false` | `docker run --rm`; skip credential persistence; emit a `.env` blob to stdout (or `--env-file`) instead of the standard table/JSON. |
-| `--env-file <path>` | unset | Only with `--ephemeral`. Writes the blob via a temp file + atomic rename (mode `0o600`); stdout stays silent so it can be piped. |
+| `--ephemeral` | `false` | `docker run --rm`; skip credential persistence; emit a `.env` blob to stdout (or `--env-out-file`) instead of the standard table/JSON. Incompatible with the three volume flags. |
+| `--env-out-file <path>` | unset | Only with `--ephemeral`. Writes the env blob to this path via a temp file + atomic rename (mode `0o600`); stdout stays silent so it can be piped. A pre-existing symlink at the path is replaced by a regular file (not followed). Name explicitly marks the write direction to disambiguate from `query --env <path>` which reads. |
 | `--wait` | `false` | Block until Bolt accepts an authenticated session (60s fixed timeout). On timeout the container is left running; the message points at `docker logs <name>`. |
+| `--data-dir <path>` | unset | Bind-mount this host directory at `/data` inside the container so the database survives `docker delete`. Empty default = no mount. `~` and env vars are expanded; missing directories are created at mode `0o755`. Incompatible with `--ephemeral`. |
+| `--logs-dir <path>` | unset | Same as `--data-dir` but mounted at `/logs` for host-side log access. |
+| `--import-dir <path>` | unset | Same as `--data-dir` but mounted at `/import` for `LOAD CSV` from host files. |
 
 ## Credentials handling
 
 By default `docker create` persists a `DbmsCredential` with `name = <chosen container name>`, `username = neo4j`, `password = <generated or supplied>`, `database = neo4j`, `uri = neo4j://localhost:<bolt-port>`. First credential added becomes the default (existing `DbmsCredentials.Add` behaviour). `neo4j-cli query --credential <name>` then connects against the local container without any further setup.
 
 - `--no-store-credential` skips persistence; the container runs with the generated password but no credential is stored. The password still appears in the rendered output.
-- `--ephemeral` always skips credential persistence (it would outlive the container). Instead, an `.env` blob (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) is emitted — to stdout, or to `--env-file <path>` for `neo4j-cli query --env <path>`. Env var names match what `query --env` already consumes, no `query`-side changes needed.
+- `--ephemeral` always skips credential persistence (it would outlive the container). Instead, an `.env` blob (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`) is emitted — to stdout, or to `--env-out-file <path>` for `neo4j-cli query --env <path>`. Env var names match what `query --env` already consumes, no `query`-side changes needed. The asymmetric flag names (`--env-out-file` vs `--env`) make the read/write direction explicit.
 - `docker delete` removes both the container AND the matching dbms credential. A missing credential is *not* an error (e.g. `--no-store-credential` was used at create time). No `--keep-credential` flag — by design, the credential is meaningless once the container is gone.
 - `docker start --wait` does an authenticated Bolt handshake when a stored credential exists. When no credential is available (the `--no-store-credential` path, external credential management, or corrupt store), it falls back to a TCP-only probe with an explicit stderr announcement — weaker (port-open != Bolt-ready) but strictly better than failing the wait.
 
@@ -163,7 +166,7 @@ Docker is the source of truth. Every managed container carries:
 
 - **Password generation**: `crypto/rand`, 16 bytes → base64 URL-safe → 22 chars. Injectable `randSource` seam for deterministic tests.
 - **Argv redaction**: `docker run` errors are surfaced via `redactArgs(args)` which masks any `<LHS>=<value>` element where the uppercase-folded LHS contains `AUTH` or `PASSWORD`. The exec argv passed to `exec.CommandContext` is unchanged — redaction is only applied to the user-facing error string so a failed `docker run` never leaks `NEO4J_AUTH=neo4j/<password>` to terminals or CI logs.
-- **`--env-file` writes**: temp file (`afero.TempFile` with random suffix) in the same directory, `chmod 0o600` while we still own the temp, then `Rename` over the final path. Closes the symlink-follow + chmod-TOCTOU windows the naive `OpenFile|Chmod` pattern had. A pre-existing symlink at `--env-file <path>` is replaced by a regular file (operator-visible behaviour change, documented).
+- **`--env-out-file` writes**: temp file (`afero.TempFile` with random suffix) in the same directory, `chmod 0o600` while we still own the temp, then `Rename` over the final path. Closes the symlink-follow + chmod-TOCTOU windows the naive `OpenFile|Chmod` pattern had. A pre-existing symlink at `--env-out-file <path>` is replaced by a regular file (operator-visible behaviour change, documented).
 - **`Inspect` error classification**: a typed `docker.ErrNotFound` sentinel distinguishes "container does not exist" (substring `"No such "` in docker stderr — stable across Docker versions for 7+ years) from operational failures (daemon down, socket permission denied, rootless misconfig). Leaves switch on `errors.Is(err, ErrNotFound)` → unknown-name; everything else propagates with the docker stderr verbatim so operators see what actually broke.
 - **`exec.CommandContext` with discrete argv**: no shell invocation, no `sh -c`. Container names, label values, env values all travel as separate argv elements.
 - **TTY confirmation on `delete`**: TTY callers without `--force` see `Delete container <name> and its dbms credential? [y/N]`; non-TTY callers must pass `--force` or the command errors (no silent destructive ops in scripts).
@@ -185,6 +188,14 @@ neo4j-cli/app/app.go  # mounts docker.NewCmd(cfg) at root
 
 Plus regenerated skill bundle (`neo4j-cli/internal/skill/bundle/references/docker.md` and `bundle/SKILL.md`), README "Local Neo4j (Docker)" section, AGENTS.md "Docker Subsystem Notes", skill `description.txt` + `additions.md`, and a `.changes/unreleased/neo4j-cli-Minor-*.yaml` entry.
 
+## Changes since PR open
+
+Three follow-ups landed after the initial open:
+
+- **Default image-tag fixed**: `--version latest --edition enterprise` (the default invocation) previously asked Docker for `neo4j:latest-enterprise`, which is **not a published tag**. The default-flag `bin/neo4j-cli docker create --name X --rw` returned `manifest unknown`. Fixed: default-enterprise now maps to bare `neo4j:enterprise` (Docker Hub's canonical tag for "latest enterprise"); explicit versioned enterprise still uses `<version>-enterprise`. Regression tests pin both paths. AGENTS.md got a note: verify image tags against `https://hub.docker.com/_/neo4j` before encoding them.
+- **`--env-file` → `--env-out-file`** (hard rename, no alias): the original name overlapped semantically with `neo4j-cli query --env <path>` (which reads). Asymmetric names now make read vs write direction obvious. Safe to rename without deprecation because the docker tree has not shipped.
+- **Host volume flags added**: `--data-dir`, `--logs-dir`, `--import-dir` map host directories to `/data`, `/logs`, `/import`. Empty default (no mount) so current behaviour is preserved; opt-in for persistence. Path expansion handles `~` and env vars; missing dirs are created at `0o755`. All three are incompatible with `--ephemeral`. PRD's "No persistent data-volume management" non-goal narrowed to named volumes / `/conf` / `/plugins` only.
+
 ## Out of scope / follow-ups (not in this PR)
 
 - `docker logs` leaf — deferred from v1; track separately if wanted.
@@ -202,7 +213,9 @@ Plus regenerated skill bundle (`neo4j-cli/internal/skill/bundle/references/docke
 - [ ] `bin/neo4j-cli docker stop dev --rw --wait` → exits cleanly; `docker ps -a` shows Exited.
 - [ ] `bin/neo4j-cli docker start dev --rw --wait` → back to running.
 - [ ] `bin/neo4j-cli docker delete dev --force --rw` → container + credential both gone.
-- [ ] Ephemeral: `bin/neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw --wait` → `/tmp/n.env` is mode `0o600` with the env blob; `bin/neo4j-cli query --env /tmp/n.env "RETURN 1"` returns `1`; `docker stop tmp --rw` removes the container (`--rm`).
+- [ ] Ephemeral: `bin/neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw --wait` → `/tmp/n.env` is mode `0o600` with the env blob; `bin/neo4j-cli query --env /tmp/n.env "RETURN 1"` returns `1`; `docker stop tmp --rw` removes the container (`--rm`).
+- [ ] Persistent data: `bin/neo4j-cli docker create --name dev --data-dir /tmp/dev-data --rw` → `/tmp/dev-data` created at `0o755` with `info: created host directory ...` on stderr; `docker delete dev --force --rw`; `docker create --name dev --data-dir /tmp/dev-data --rw` → recreates against the same DB (no `info: created` line on the second run).
+- [ ] Volume / ephemeral conflict: `docker create --name x --ephemeral --data-dir /tmp/x --rw` → usage error naming both flags; no docker call.
 - [ ] Port conflict: occupy 7687, run `create` → usage error naming `--bolt-port`; no docker side effect.
 - [ ] Missing docker: rename `docker` on PATH, run `bin/neo4j-cli docker list` → install hint; `bin/neo4j-cli aura instance list` still works.
 - [ ] Daemon-down: stop the Docker daemon, run `bin/neo4j-cli docker get <name>` → the docker stderr surfaces verbatim (NOT misclassified as unknown-name).
