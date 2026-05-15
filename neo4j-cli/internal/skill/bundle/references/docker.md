@@ -1,5 +1,11 @@
 # neo4j-cli docker
 
+## Contents
+
+- [neo4j-cli docker create](#neo4j-cli-docker-create)
+- [neo4j-cli docker get](#neo4j-cli-docker-get)
+- [neo4j-cli docker list](#neo4j-cli-docker-list)
+
 Manage local Neo4j containers via Docker
 
 Manage local Neo4j Docker containers (create, list, get, start, stop, delete). Shells out to the host `docker` CLI and discovers managed containers via the `org.neo4j.cli.managed=true` label — Docker itself is the source of truth, no separate state file is maintained. Use `--ephemeral` on `create` for a throwaway container plus an env-file consumable by `query --env <path>`.
@@ -50,6 +56,33 @@ neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw
+```
+
+## neo4j-cli docker get
+
+Show details of a Neo4j container managed by neo4j-cli
+
+Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, uri (neo4j://localhost:<bolt-port>), and image. Containers that exist in Docker but lack the managed label are treated as unknown; the error message points at `neo4j-cli docker list` so the operator can see the actual set of managed containers.
+
+Usage: `neo4j-cli docker get <name>`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
+
+Examples:
+
+```
+# Show details of a managed container by name
+neo4j-cli docker get dev
+
+# Emit JSON for scripting (e.g. piping into jq to extract the URI)
+neo4j-cli docker get dev --format json
+
+# Emit TOON for token-efficient ingestion by agents
+neo4j-cli docker get dev --format toon
 ```
 
 ## neo4j-cli docker list

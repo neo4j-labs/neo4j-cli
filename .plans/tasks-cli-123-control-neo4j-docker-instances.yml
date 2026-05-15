@@ -168,7 +168,7 @@ tasks:
       Unknown name → `clierr.NewUsageError("no managed container named %q (use 'neo4j-cli docker list' to see managed containers)", name)`.
       Add `get_test.go` table-driven: managed container exists → renders fields; container exists but unmanaged → unknown error; container missing → unknown error; `--format json` round-trips through fake client.
       Flush-left `Example:` block (≥3 invocations, at least one `--format json`).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -177,7 +177,7 @@ tasks:
       - "Args validated via cobra.ExactArgs(1)"
       - "--format json|table|toon all produce well-formed output"
       - "get.go has a flush-left Example block; TestAllLeafCommands_HaveExamples covers it"
-    completed_at: null
+    completed_at: 2026-05-15T17:05:00Z
 
   - id: task-010
     title: "docker start <name>"

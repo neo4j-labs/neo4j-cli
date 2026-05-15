@@ -22,6 +22,11 @@ const (
 // Container is the rendered metadata view of a managed neo4j-cli container.
 // Fields mirror the columns documented in REQ-F-021 (`list`) and REQ-F-031
 // (`get`); `URI` and `Image` are populated by `get` but left empty by `list`.
+//
+// Managed mirrors the `org.neo4j.cli.managed=true` label and lets the `get`
+// leaf enforce REQ-F-032: a container that exists in Docker but lacks the
+// label is treated as unknown. The field is NOT serialised into the rendered
+// output — it is a per-call control bit that `get` consumes before rendering.
 type Container struct {
 	Name      string `json:"name"`
 	Status    string `json:"status"`
@@ -32,6 +37,7 @@ type Container struct {
 	Ephemeral bool   `json:"ephemeral"`
 	URI       string `json:"uri,omitempty"`
 	Image     string `json:"image,omitempty"`
+	Managed   bool   `json:"-"`
 }
 
 // Inspect is a thin convenience over dockerClient.Inspect so leaves (`get`,

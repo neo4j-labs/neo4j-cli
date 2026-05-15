@@ -36,6 +36,7 @@ func TestNewCmd_Scaffold(t *testing.T) {
 		names[sub.Name()] = true
 	}
 	assert.True(t, names["create"], "create leaf should be registered on the docker parent")
+	assert.True(t, names["get"], "get leaf should be registered on the docker parent")
 	assert.True(t, names["list"], "list leaf should be registered on the docker parent")
 }
 
