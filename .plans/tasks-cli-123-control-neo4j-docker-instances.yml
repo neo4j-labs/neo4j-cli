@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-15T21:30:00Z
+updated_at: 2026-05-16T00:15:00Z
 
 tasks:
   - id: task-001
@@ -527,3 +527,69 @@ tasks:
       - "manual smoke: bin/neo4j-cli docker {list,get,create} --format json all emit valid JSON via the root persistent flag"
       - "make fmt-check, make lint, make test, make license-check all pass"
     completed_at: 2026-05-15T23:45:00Z
+
+  - id: task-022
+    title: "Fix `latest + enterprise` image-tag mapping (Docker Hub publishes `neo4j:enterprise`, not `neo4j:latest-enterprise`)"
+    description: |
+      `neo4j-cli docker create` (default flags `--version latest --edition enterprise`) currently tries to pull `neo4j:latest-enterprise`, which is NOT a published tag. Reproduced live by the operator:
+
+      ```
+      $ bin/neo4j-cli docker create --name oskar-test
+      Error: docker run -d --name oskar-test … neo4j:latest-enterprise: Unable to find image 'neo4j:latest-enterprise' locally
+      docker: Error response from daemon: manifest for neo4j:latest-enterprise not found: manifest unknown: manifest unknown
+      ```
+
+      Root cause: `create.go`'s image-resolution branch unconditionally maps `enterprise` to `neo4j:<version>-enterprise`. That works for explicit versions (`5.26-enterprise`, `2026.04-enterprise`, …) but the default version `latest` produces a tag that does not exist. The original implementation (task-003) assumed a tag pattern without verifying against the registry; the bug shipped because no live `docker create` was run during the implementation loop (all tests hermetic against the fake).
+
+      Verified against the registry — Docker Hub publishes (excerpted from `https://hub.docker.com/_/neo4j` and the v2 API):
+      - `latest` → "latest community"
+      - `enterprise` → "latest enterprise" (canonical tag for the default-enterprise image)
+      - `<version>-enterprise` → versioned enterprise (e.g. `5.26-enterprise`, `5-enterprise`, `2026.04-enterprise`)
+      - `latest-enterprise` → DOES NOT EXIST
+
+      Fix (narrow, in `neo4j-cli/internal/subcommands/docker/create.go` around the existing `image := "neo4j:" + version` block):
+
+      ```go
+      // Resolve image (REQ-F-011). Tag scheme verified against
+      // https://hub.docker.com/_/neo4j and the v2 tags API:
+      //   - community + any version → neo4j:<version>      (latest, 5, 5.26, 2026.04, …)
+      //   - enterprise + explicit version → neo4j:<version>-enterprise
+      //   - enterprise + "latest" → neo4j:enterprise        (Docker Hub does NOT publish neo4j:latest-enterprise)
+      image := "neo4j:" + version
+      if edition == "enterprise" {
+          if version == "latest" {
+              image = "neo4j:enterprise"
+          } else {
+              image = "neo4j:" + version + "-enterprise"
+          }
+      }
+      ```
+
+      Test updates in `neo4j-cli/internal/subcommands/docker/create_test.go`:
+      - Line ~185 (default-enterprise happy path asserts `argv[len(argv)-1]`): update from `"neo4j:latest-enterprise"` to `"neo4j:enterprise"`.
+      - Lines ~782, ~822, ~1003 (env-file blob header strings `# neo4j-cli docker — tmp @ neo4j:latest-enterprise`): update to `@ neo4j:enterprise`.
+      - Line ~214 (community → `neo4j:latest`): unchanged.
+      - NEW test case: `--version 5.26 --edition enterprise` → `argv[len(argv)-1] == "neo4j:5.26-enterprise"` (regression guard so the explicit-version path isn't broken while fixing latest).
+      - NEW test case: explicit `--version latest --edition enterprise` → `argv[len(argv)-1] == "neo4j:enterprise"` (pin the new contract).
+
+      Optional but recommended: add a terse line under AGENTS.md "Docker Subsystem Notes" along the lines of:
+
+      > Image tag mapping: `--edition enterprise --version latest` → `neo4j:enterprise` (NOT `neo4j:latest-enterprise`, which is unpublished); explicit versions → `neo4j:<version>-enterprise`. Verify any new edition/version logic against `https://hub.docker.com/_/neo4j` before assuming a tag pattern.
+
+      No skill-bundle regen needed (no `Long:`/`Example:` text changes). `--version` flag help text already says "Neo4j version tag (e.g. 5.20, latest)" — accurate.
+
+      No PRD change. This is a defect fix on the existing REQ-F-011 image-resolution contract.
+
+      Process learning (for future agents working on this repo): registry tag patterns must be verified against the canonical source (Docker Hub `_/neo4j` page or v2 tags API) before being encoded into Go logic. Assuming `<latest>-enterprise` from the `<version>-enterprise` pattern was wrong and reproducible against any default `docker create`.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "create.go's image-resolution branch handles `version==\"latest\" && edition==\"enterprise\"` → `neo4j:enterprise`; all other combinations unchanged"
+      - "create_test.go assertions updated for the default-enterprise argv and the three env-file blob headers; community case unchanged"
+      - "New test case pins `--version 5.26 --edition enterprise` → `neo4j:5.26-enterprise` (regression guard)"
+      - "New test case pins `--version latest --edition enterprise` → `neo4j:enterprise` (the fix itself)"
+      - "AGENTS.md gains a one-line note about the latest+enterprise → `neo4j:enterprise` mapping under Docker Subsystem Notes"
+      - "Live verification: `bin/neo4j-cli docker create --name htest --rw` (no other flags) actually pulls + runs against a real docker daemon; followed by `bin/neo4j-cli docker delete htest --force --rw`"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
