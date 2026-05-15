@@ -1,3 +1,8 @@
+## TASK-004 — 2026-05-15T15:00:00Z
+Created context package with ValidateAndSetDefaultContext helper; parses {orgId}/{projectId} slug, calls GetProject() on v2beta1, persists aura.default-context on success, returns clear errors for all failure paths; table-driven tests cover no-slash, empty-org, empty-project, 404, 500, and success cases.
+Files: +neo4j-cli/aura/internal/subcommands/context/context.go, +neo4j-cli/aura/internal/subcommands/context/validate.go, +neo4j-cli/aura/internal/subcommands/context/validate_test.go
+Decisions: cfg.Aura.Set writes to FS only (not viper in-memory); tests verify persistence via testfs.GetTestConfig+gjson rather than cfg.Aura.DefaultContext().
+
 ## TASK-003 — 2026-05-15T14:00:00Z
 Removed config/project subcommand tree, common/clicfg/projects/ package, and all aura-projects references; migrated SetDefaultProjectInConfig and utils/projectflags.go to use aura.default-context slug directly; added DefaultContext() accessor to AuraConfig.
 Files: -neo4j-cli/aura/internal/subcommands/config/project/, -common/clicfg/projects/projects.go, -neo4j-cli/aura/config.go, ~common/clicfg/clicfg.go, ~neo4j-cli/aura/internal/subcommands/config/config.go, ~neo4j-cli/internal/subcommands/config/config.go, ~neo4j-cli/aura/internal/subcommands/utils/projectflags.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go

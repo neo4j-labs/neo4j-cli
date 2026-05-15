@@ -69,7 +69,7 @@ tasks:
       verify the pair exists, and on success write aura.default-context to config. Fail with
       clear errors on missing slash, invalid format, 404, or other API errors. Add
       table-driven unit tests for all error paths and the success path.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -80,7 +80,7 @@ tasks:
       - "Persists aura.default-context only on successful API validation"
       - "Returns API error (including 404) without persisting if validation fails"
       - "Table-driven tests cover all error paths and success path"
-    completed_at: null
+    completed_at: 2026-05-15T15:00:00Z
 
   - id: task-005
     title: "Add aura organization list command"
