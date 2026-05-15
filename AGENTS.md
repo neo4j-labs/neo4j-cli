@@ -61,6 +61,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details and output testi
 - **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 - **Name test files per command**, not per package — use `get_test.go`, `set_test.go`, `list_test.go` mirroring the source files; put shared helpers in `helpers_test.go`. Avoid aggregating all tests in a single `config_test.go`.
 - **Never use `afero.NewOsFs()` in query package tests** — the dev machine has real credentials at `~/Library/Preferences/neo4j/cli/credentials.json`. Tests using a real FS will fail if any dbms credential is stored. Always use `testfs.GetTestFs(`{"format":"json"}`, "{}")` (empty credentials) even when testing dotenv walk-up; write the dotenv into the memFs at `filepath.Join(t.TempDir(), ".env")` and `t.Chdir(tmp)` so `os.Getwd()`+`cfg.Aura.Fs()` finds it.
+- **`afero.MemMapFs` quirks**: (1) no symlink support — `Symlink`/`Lstat` are not implemented, so symlink-replacement paths must be exercised against `afero.NewOsFs()` + `t.TempDir()`; (2) `OpenFile` creates files in non-existent parent dirs implicitly, which does NOT reflect production `OsFs` behaviour — missing-dir error paths must also use `OsFs`. Outside the query package both are safe because they don't touch the user's credentials.
 
 ## Architecture
 

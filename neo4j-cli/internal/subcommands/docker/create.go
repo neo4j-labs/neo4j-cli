@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -113,7 +113,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"Pass --ephemeral for a throwaway container (`docker run --rm`): no dbms credential is stored and an env-file " +
 			"blob (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / NEO4J_DATABASE) is emitted to stdout — or, with " +
 			"--env-file <path>, written to that path (mode 0600) while stdout stays silent so it can be piped into " +
-			"`neo4j-cli query --env <path>`.",
+			"`neo4j-cli query --env <path>`. The env-file is written via a temp file in the same directory and " +
+			"atomically renamed; a pre-existing symlink at the target path is REPLACED by a regular file (the " +
+			"symlink is not followed).",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -317,7 +319,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
-	cmd.Flags().StringVar(&envFile, envFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout.")
+	cmd.Flags().StringVar(&envFile, envFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
@@ -338,28 +340,60 @@ func renderEnvFile(name, image, uri, password string) string {
 }
 
 // writeEnvFile writes the blob to path via the cfg-supplied afero filesystem
-// using O_WRONLY|O_CREATE|O_TRUNC with mode 0600 (REQ-F-017 / REQ-NF-004) so
-// the file is only readable by the calling user. Routing through the afero
-// seam keeps unit tests hermetic — production hits the real OS fs, tests hit
-// the memfs from testfs.GetTestFs.
+// using a temp-file + atomic-rename strategy (REQ-F-017 / REQ-NF-004). This
+// closes two interlocking issues vs. an OpenFile-then-Chmod flow:
+//   - symlink follow on open: POSIX open() follows symlinks by default; an
+//     attacker with write access to the containing dir could plant <path> as
+//     a symlink to e.g. ~/.ssh/authorized_keys and have the generated Neo4j
+//     password written there with O_TRUNC semantics.
+//   - TOCTOU between OpenFile and Chmod: the window between syscalls plus a
+//     swap-in symlink could land the credential on disk in the wrong place.
+//
+// afero.TempFile produces a fresh `.neo4j-cli-env-<rand>` path in the same
+// directory as the final path; we chmod the temp while we still own it, then
+// fs.Rename (atomic on POSIX) replaces whatever is at <path> — including a
+// pre-existing symlink — with the regular temp file. Any error path after
+// temp creation removes the temp file best-effort so a stray ^C does not
+// leak. Routing through the afero seam keeps unit tests hermetic; production
+// hits the real OS fs.
+//
+// Behaviour change documented in --env-file's flag Long: and the README /
+// additions.md docker section: a pre-existing symlink at the target path is
+// replaced by a regular file (the symlink is NOT followed).
 func writeEnvFile(fs afero.Fs, path, contents string) error {
-	f, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	dir := filepath.Dir(path)
+	tmp, err := afero.TempFile(fs, dir, ".neo4j-cli-env-")
 	if err != nil {
-		return fmt.Errorf("docker create: write env-file %s: %w", path, err)
+		return fmt.Errorf("docker create: create temp env-file in %s: %w", dir, err)
 	}
-	if _, werr := f.WriteString(contents); werr != nil {
-		_ = f.Close()
-		return fmt.Errorf("docker create: write env-file %s: %w", path, werr)
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = fs.Remove(tmpPath) }
+
+	if _, werr := tmp.WriteString(contents); werr != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("docker create: write temp env-file %s: %w", tmpPath, werr)
 	}
-	if cerr := f.Close(); cerr != nil {
-		return fmt.Errorf("docker create: write env-file %s: %w", path, cerr)
+	if cerr := tmp.Close(); cerr != nil {
+		cleanup()
+		return fmt.Errorf("docker create: close temp env-file %s: %w", tmpPath, cerr)
 	}
-	// Defense-in-depth (REQ-NF-004): OpenFile only applies the mode arg on
-	// create; a pre-existing file at this path keeps its prior (potentially
-	// permissive) mode. Chmod unconditionally so the on-disk file ends up
-	// at 0o600 regardless of who owned it before.
-	if cerr := fs.Chmod(path, 0o600); cerr != nil {
-		return fmt.Errorf("docker create: chmod env-file %s: %w", path, cerr)
+	// Chmod while we still own the temp. The temp path is fresh and O_EXCL-
+	// guarded by afero.TempFile's random suffix, so there is no symlink-swap
+	// TOCTOU window: any attacker-controlled path manipulation in dir would
+	// have to win against the random suffix, which is cryptographically
+	// infeasible per crypto/rand.
+	if cerr := fs.Chmod(tmpPath, 0o600); cerr != nil {
+		cleanup()
+		return fmt.Errorf("docker create: chmod temp env-file %s: %w", tmpPath, cerr)
+	}
+	// Atomic rename (POSIX). Replaces whatever is at <path> — a regular file,
+	// a symlink, anything — with our temp file. On Windows fs.Rename is
+	// atomic on modern Go/NTFS. On failure cleanup runs so the temp does not
+	// accumulate.
+	if rerr := fs.Rename(tmpPath, path); rerr != nil {
+		cleanup()
+		return fmt.Errorf("docker create: rename env-file to %s: %w", path, rerr)
 	}
 	return nil
 }

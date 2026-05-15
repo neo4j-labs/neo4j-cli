@@ -475,7 +475,7 @@ tasks:
       - New: target dir does not exist → error; no temp file.
       Update the `Long:` string on `create.go --env-file` flag to mention "writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path will be replaced." Regenerate skill bundle.
       Also update `additions.md` and the README "Local Neo4j (Docker)" symlink note.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -484,7 +484,7 @@ tasks:
       - "tests cover: existing happy path, pre-existing-symlink → replaced with regular file mode 0o600 (original symlink target untouched), rename failure → no temp left, chmod failure → no temp left, dir missing → error"
       - "create.go --env-file flag Long: mentions the symlink-replacement behaviour; README + additions.md updated; bundle regenerated"
       - "make fmt-check, make lint, make test, make license-check all pass; security review verifies the new write path has no symlink-follow + no chmod-TOCTOU window"
-    completed_at: null
+    completed_at: 2026-05-15T22:50:00Z
 
   - id: task-020
     title: "Document that generated password is rendered to stdout (capture/pipe caveat)"

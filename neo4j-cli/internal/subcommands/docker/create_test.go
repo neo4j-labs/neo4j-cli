@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -940,4 +942,197 @@ func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, *probed, "no port may be probed when --bolt-port and --http-port are equal")
 	assert.Empty(t, fake.RunCalls, "docker run must not be invoked on equal-port usage error")
+}
+
+// renameFailFs wraps an afero.Fs and forces Rename to return a sentinel
+// error. Used to drive the writeEnvFile rename-failure cleanup path
+// without needing a real disk failure.
+type renameFailFs struct {
+	afero.Fs
+	err error
+}
+
+func (f *renameFailFs) Rename(oldname, newname string) error { return f.err }
+
+// chmodFailFs wraps an afero.Fs and forces Chmod to return a sentinel
+// error. Used to drive the writeEnvFile chmod-failure cleanup path.
+type chmodFailFs struct {
+	afero.Fs
+	err error
+}
+
+func (f *chmodFailFs) Chmod(name string, mode os.FileMode) error { return f.err }
+
+// listTempLeftovers returns all `.neo4j-cli-env-*` filenames currently
+// present under dir. Used by the rename/chmod failure tests to assert the
+// cleanup actually removed the temp file (zero leftover entries).
+func listTempLeftovers(t *testing.T, fs afero.Fs, dir string) []string {
+	t.Helper()
+	entries, err := afero.ReadDir(fs, dir)
+	if err != nil {
+		// Dir does not exist → no leftovers possible; treat as empty.
+		return nil
+	}
+	var leftovers []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".neo4j-cli-env-") {
+			leftovers = append(leftovers, e.Name())
+		}
+	}
+	return leftovers
+}
+
+func TestWriteEnvFile_ReplacesPreExistingSymlink_OsFs(t *testing.T) {
+	// afero.MemMapFs does not support symlinks, so the symlink-replacement
+	// path is exercised against a real afero.NewOsFs on t.TempDir(). The
+	// temp dir is isolated to this test and cleaned up automatically.
+	dir := t.TempDir()
+	envPath := filepath.Join(dir, "n.env")
+	otherPath := filepath.Join(dir, "other.txt")
+
+	const otherOriginal = "do-not-touch\n"
+	require.NoError(t, os.WriteFile(otherPath, []byte(otherOriginal), 0o644))
+
+	// Plant a symlink at envPath pointing at otherPath. A naive
+	// OpenFile(envPath, O_CREATE|O_TRUNC) would follow this and clobber
+	// otherPath's contents with the credential blob — the very class of
+	// attack the temp+rename strategy defends against.
+	require.NoError(t, os.Symlink(otherPath, envPath))
+
+	fs := afero.NewOsFs()
+	const blob = "# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\nNEO4J_DATABASE=neo4j\n"
+	require.NoError(t, writeEnvFile(fs, envPath, blob))
+
+	// envPath must now be a REGULAR file (symlink replaced) with mode 0600
+	// and the documented blob.
+	info, err := os.Lstat(envPath)
+	require.NoError(t, err)
+	assert.True(t, info.Mode().IsRegular(),
+		"env-file path must be a regular file after writeEnvFile; got mode %s", info.Mode())
+	assert.Zero(t, info.Mode()&os.ModeSymlink,
+		"env-file path must NOT be a symlink anymore; got mode %s", info.Mode())
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(),
+		"env-file must be mode 0600 (REQ-NF-004); got %s", info.Mode().Perm())
+
+	contents, err := os.ReadFile(envPath)
+	require.NoError(t, err)
+	assert.Equal(t, blob, string(contents))
+
+	// Crucially: the original symlink target was NOT followed and NOT
+	// clobbered. Anyone who could trick neo4j-cli into writing to a
+	// symlinked path can no longer commandeer the credential blob into
+	// arbitrary locations.
+	otherContents, err := os.ReadFile(otherPath)
+	require.NoError(t, err)
+	assert.Equal(t, otherOriginal, string(otherContents),
+		"symlink target must be untouched — the symlink was replaced, not followed")
+
+	// No `.neo4j-cli-env-*` leftover in the dir.
+	assert.Empty(t, listTempLeftovers(t, fs, dir),
+		"no temp leftovers permitted on a successful write")
+}
+
+func TestWriteEnvFile_RenameFailure_RemovesTempFile(t *testing.T) {
+	// Wrap the in-memory fs so Rename fails deterministically.
+	mem := afero.NewMemMapFs()
+	require.NoError(t, mem.MkdirAll("/tmp", 0o755))
+
+	sentinel := errors.New("simulated rename failure")
+	fs := &renameFailFs{Fs: mem, err: sentinel}
+
+	const path = "/tmp/n.env"
+	err := writeEnvFile(fs, path, "blob")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel, "writeEnvFile must wrap the underlying Rename error")
+	assert.Contains(t, err.Error(), "rename env-file to "+path)
+
+	// Cleanup MUST have removed the temp file. Walk the dir on the
+	// underlying memfs (rename failed, so the final path was never
+	// created either — both assertions hold).
+	leftovers := listTempLeftovers(t, mem, "/tmp")
+	assert.Empty(t, leftovers, "no temp file may remain after a rename failure; got %v", leftovers)
+
+	// Final path was never created (rename failed).
+	_, statErr := mem.Stat(path)
+	assert.True(t, os.IsNotExist(statErr) || statErr != nil,
+		"final env-file path must not exist after a rename failure; got stat err %v", statErr)
+}
+
+func TestWriteEnvFile_ChmodFailure_RemovesTempFile(t *testing.T) {
+	mem := afero.NewMemMapFs()
+	require.NoError(t, mem.MkdirAll("/tmp", 0o755))
+
+	sentinel := errors.New("simulated chmod failure")
+	fs := &chmodFailFs{Fs: mem, err: sentinel}
+
+	const path = "/tmp/n.env"
+	err := writeEnvFile(fs, path, "blob")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel)
+	assert.Contains(t, err.Error(), "chmod temp env-file")
+
+	leftovers := listTempLeftovers(t, mem, "/tmp")
+	assert.Empty(t, leftovers, "no temp file may remain after a chmod failure; got %v", leftovers)
+
+	_, statErr := mem.Stat(path)
+	assert.True(t, os.IsNotExist(statErr) || statErr != nil,
+		"final env-file path must not exist after a chmod failure; got stat err %v", statErr)
+}
+
+func TestWriteEnvFile_MissingDir_Errors(t *testing.T) {
+	// Target directory does not exist → afero.TempFile fails, we surface
+	// the wrapped error mentioning the dir.
+	//
+	// Uses OsFs against t.TempDir(): MemMapFs's OpenFile creates files in
+	// non-existent directories implicitly (a memfs quirk that does NOT
+	// reflect production OsFs behaviour), so a missing-dir test on memfs
+	// would always succeed and miss the real check.
+	dir := filepath.Join(t.TempDir(), "no-such-subdir")
+	envPath := filepath.Join(dir, "n.env")
+
+	fs := afero.NewOsFs()
+	err := writeEnvFile(fs, envPath, "blob")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "create temp env-file in "+dir)
+}
+
+func TestCreate_Ephemeral_EnvFile_RenameFailure_NoTempLeftover(t *testing.T) {
+	// End-to-end coverage: invoke `docker create --ephemeral --env-file`
+	// through the cobra flow with a rename-failing fs and confirm the
+	// command surfaces the error AND no temp file leaks into the target
+	// directory. Mirrors TestWriteEnvFile_RenameFailure_RemovesTempFile
+	// but through the full RunE path.
+	mem, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	require.NoError(t, mem.MkdirAll("/tmp", 0o755))
+
+	sentinel := errors.New("simulated rename failure")
+	wrapped := &renameFailFs{Fs: mem, err: sentinel}
+	cfg := clicfg.NewConfig(wrapped, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-file", "/tmp/n.env"})
+
+	execErr := cmd.Execute()
+	require.Error(t, execErr)
+	assert.ErrorIs(t, execErr, sentinel)
+
+	assert.Empty(t, listTempLeftovers(t, mem, "/tmp"),
+		"no temp file may remain after a rename failure in the cobra flow")
+	_, statErr := mem.Stat("/tmp/n.env")
+	assert.True(t, os.IsNotExist(statErr) || statErr != nil,
+		"final env-file path must not exist after a rename failure; got stat err %v", statErr)
 }
