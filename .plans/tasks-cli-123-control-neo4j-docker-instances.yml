@@ -796,7 +796,7 @@ tasks:
       make test
       ```
       Expect: smoke_test.go is not compiled (build tag excludes it); existing test count + duration unchanged.
-    status: pending
+    status: completed
     dependencies:
       - task-015
       - task-018
@@ -812,7 +812,7 @@ tasks:
       - "AGENTS.md \"Docker Subsystem Notes\" gains the one-line note documenting how to run the smoke"
       - "PR #118 description: smoke-test bullet removed from \"Out of scope / follow-ups\""
       - "make fmt-check, make lint, make test, make license-check all pass on the default (no-tag) run"
-    completed_at: null
+    completed_at: "2026-05-15T16:30:00Z"
 
   - id: task-026
     title: "Hint that podman can be aliased as `docker` when `docker` is missing from PATH"

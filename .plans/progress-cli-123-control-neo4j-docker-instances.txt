@@ -359,3 +359,30 @@ Confirmed: (1) `--data-dir` created the host dir at 0o755 with the documented in
 Hard-renamed `docker create`'s `--env-file` flag → `--env-out-file` (no deprecation alias — docker tree is on an unreleased branch). Mechanical sweep across create.go (const, local var, flag-register, Long:, Example:, RunE branches, comments referring to the flag), create_test.go (test invocations + test-function names `TestCreate_Ephemeral_EnvFile_*` → `*_EnvOutFile_*` and `TestCreate_EnvFileWithoutEphemeral_UsageError` → `TestCreate_EnvOutFileWithoutEphemeral_UsageError`), README.md docker section, additions.md docker bullet+example, AGENTS.md Docker Subsystem Notes, and the PRD (REQ-F-010 flag table, REQ-F-017, REQ-NF-004, REQ-DOC-001, REQ-DOC-004, acceptance criteria). Regenerated skill bundle so SKILL.md + references/docker.md now carry `--env-out-file`. Live smoked on docker 29.4.3 (bin/neo4j-cli docker create --name tmpenv --ephemeral --env-out-file /tmp/n.env --rw --bolt-port 7689 --http-port 7476 --accept-license): /tmp/n.env written with header + four NEO4J_* lines, container --rm-cleaned on docker stop. All gates green (test, fmt-check, lint, license-check).
 Files: ~neo4j-cli/internal/subcommands/docker/create.go, ~neo4j-cli/internal/subcommands/docker/create_test.go, ~README.md, ~AGENTS.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/docker.md, ~.plans/prd-cli-123-control-neo4j-docker-instances.md
 Decisions: generic "env-file" prose (the noun/concept) and Go identifiers (`writeEnvFile`, `renderEnvFile`, `TestWriteEnvFile_*`) kept — the contract is to rename the flag name and surface text that names it, not arbitrary noun usage of "env file"; flag rename propagates through the const-driven usage error automatically.
+
+## TASK-025 — 2026-05-15T16:30:00Z
+Added `neo4j-cli/internal/subcommands/docker/smoke_test.go` with `//go:build smoke` at file top + `exec.LookPath("docker") + t.Skip` at function entry. `TestSmoke_Lifecycle` drives the full create→list→get→delete lifecycle against the real Docker daemon using a unique time-keyed container name, two ephemeral free host ports via `net.Listen(":0")`, and an in-memory afero fs + `--no-store-credential` so the smoke leaves no on-disk footprint. `t.Cleanup` best-effort `docker rm -f`s the container so an aborted test never leaks state. Assertions cover the documented 9-field `get --format json` shape (with explicit pins on `image=neo4j:enterprise` per task-022, `uri=neo4j://localhost:<bolt>`, `ephemeral=false`, non-empty `status`) and verify post-delete that `docker ps -a --filter name=^<name>$` returns empty. Default `go test ./...` does NOT compile the file (verified: docker package test count 165 without `-tags=smoke` vs. 166 with). AGENTS.md "Docker Subsystem Notes" gained the one-line opt-in note.
+Files: +neo4j-cli/internal/subcommands/docker/smoke_test.go, ~AGENTS.md, ~.plans/tasks-cli-123-control-neo4j-docker-instances.yml
+Decisions: wrapped `docker` cobra cmd under a tiny `root := &cobra.Command{Use:"neo4j-cli"}` and registered `--format` + `--rw` on the docker cmd itself (mirrors create_test.go's rig); the write gate is not wired so `--rw` is decorative in the rig but kept for fidelity to the documented operator invocation.
+
+## Live verification — task-025
+Ran twice against local docker 29.4.3 (image `neo4j:enterprise` cached):
+
+```
+$ go test -count=1 -tags=smoke -v -run TestSmoke_Lifecycle ./neo4j-cli/internal/subcommands/docker/...
+=== RUN   TestSmoke_Lifecycle
+--- PASS: TestSmoke_Lifecycle (0.57s)
+PASS
+ok  	github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker	1.355s
+
+$ go test -count=1 -tags=smoke -v -run TestSmoke_Lifecycle ./neo4j-cli/internal/subcommands/docker/...
+=== RUN   TestSmoke_Lifecycle
+--- PASS: TestSmoke_Lifecycle (0.59s)
+PASS
+ok  	github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker	0.876s
+
+$ docker ps -a --filter "name=neo4j-cli-smoke" --format "{{.Names}}"
+(empty — t.Cleanup removed the container)
+```
+
+All four phases pass; no leftover container after either run. Default-suite gates (make test/fmt-check/lint/license-check) all green.
