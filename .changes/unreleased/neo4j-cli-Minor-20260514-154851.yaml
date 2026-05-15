@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Setting NEO4J_CLI_AUTO_INSTALL_SKILL=1 before installing via npm, Homebrew, or the curl installer now automatically runs `skill install --rw` after binary placement; the feature is strictly opt-in and any failure is suppressed so the install always succeeds.
-time: 2026-05-14T15:48:51.155708+01:00
