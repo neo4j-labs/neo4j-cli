@@ -6,6 +6,7 @@ package credentials
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -149,6 +150,11 @@ const credentialsLockTimeout = 10 * time.Second
 
 func (c *Credentials) save() {
 	lockPath := c.filePath + ".lock"
+	// gofslock uses real os.OpenFile (not afero), so the directory must
+	// exist at the OS level before we try to acquire the lock.
+	if err := os.MkdirAll(filepath.Dir(c.filePath), 0o700); err != nil {
+		panic(clierr.NewFatalError("failed to create credentials directory: %v", err))
+	}
 	deadline := time.Now().Add(credentialsLockTimeout)
 	blocker := func() error {
 		if time.Now().After(deadline) {
