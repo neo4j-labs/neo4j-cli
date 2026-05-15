@@ -62,15 +62,6 @@ func writeFileAtomic(fs afero.Fs, path string, data []byte) error {
 		return err
 	}
 
-	// Acquire a cross-process advisory lock for the duration of the
-	// open/write/sync/close/rename sequence so parallel writers don't
-	// interleave their temp files or clobber each other's rename.
-	release, lockErr := acquireLock(path)
-	if lockErr != nil {
-		return lockErr
-	}
-	defer release()
-
 	tmpPath := path + ".tmp"
 
 	f, err := fs.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)

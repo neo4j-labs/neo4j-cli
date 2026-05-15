@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/danjacques/gofslock/fslock"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/afero"
@@ -144,15 +145,68 @@ func (c *Credentials) FilePath() string {
 	return c.filePath
 }
 
+const credentialsLockTimeout = 10 * time.Second
+
 func (c *Credentials) save() {
-	data, err := json.Marshal(CredentialsFile{
-		Aura:  c.Aura,
-		Dbms:  c.Dbms,
-		Embed: c.Embed,
-	})
-	if err != nil {
-		panic(err)
+	lockPath := c.filePath + ".lock"
+	deadline := time.Now().Add(credentialsLockTimeout)
+	blocker := func() error {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for credentials lock after %s", credentialsLockTimeout)
+		}
+		time.Sleep(5 * time.Millisecond)
+		return nil
 	}
 
-	fileutils.WriteFile(c.fs, c.filePath, data)
+	if err := fslock.WithBlocking(lockPath, blocker, func() error {
+		// Read current on-disk state inside the lock so changes written by
+		// parallel processes (e.g. a freshly-refreshed access token) are not lost.
+		disk := c.readDisk()
+
+		// Merge: in-memory overlays disk by credential name.
+		// Disk-only entries (added by another process) are preserved.
+		// For Aura tokens, whichever expiry is later is kept.
+		merged := mergeCredentialsFile(disk, &CredentialsFile{
+			Aura:  c.Aura,
+			Dbms:  c.Dbms,
+			Embed: c.Embed,
+		})
+
+		data, err := json.Marshal(merged)
+		if err != nil {
+			return err
+		}
+		fileutils.WriteFile(c.fs, c.filePath, data)
+		return nil
+	}); err != nil {
+		panic(clierr.NewFatalError("failed to save credentials: %v", err))
+	}
+}
+
+// readDisk reads and parses credentials.json from disk, returning an empty
+// CredentialsFile on any error. Used inside save() to obtain the current
+// on-disk state before merging.
+func (c *Credentials) readDisk() *CredentialsFile {
+	disk := &CredentialsFile{
+		Aura:  &AuraCredentials{Credentials: []*AuraCredential{}},
+		Dbms:  &DbmsCredentials{Credentials: []*DbmsCredential{}},
+		Embed: &EmbedCredentials{Credentials: []*EmbedCredential{}},
+	}
+	data := fileutils.ReadFileSafe(c.fs, c.filePath)
+	if len(data) == 0 {
+		return disk
+	}
+	if err := json.Unmarshal(data, disk); err != nil {
+		return disk // corrupt file; merge against empty to avoid data loss
+	}
+	if disk.Aura == nil {
+		disk.Aura = &AuraCredentials{Credentials: []*AuraCredential{}}
+	}
+	if disk.Dbms == nil {
+		disk.Dbms = &DbmsCredentials{Credentials: []*DbmsCredential{}}
+	}
+	if disk.Embed == nil {
+		disk.Embed = &EmbedCredentials{Credentials: []*EmbedCredential{}}
+	}
+	return disk
 }

@@ -4,12 +4,10 @@
 package fileutils
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -152,40 +150,6 @@ func TestCreateFile_DirMode_OnOsFs(t *testing.T) {
 	}
 	if got := info.Mode().Perm(); got != 0o700 {
 		t.Fatalf("dir mode = %#o, want 0700", got)
-	}
-}
-
-// TestWriteFile_ConcurrentWrites verifies that two goroutines calling WriteFile
-// on the same real-OS path concurrently do not panic and leave a valid JSON file.
-// A real OsFs is required because acquireLock uses os.OpenFile for the lock file.
-func TestWriteFile_ConcurrentWrites(t *testing.T) {
-	tmp := t.TempDir()
-	fs := afero.NewOsFs()
-	path := filepath.Join(tmp, "credentials.json")
-
-	payloadA := []byte(`{"writer":"A"}`)
-	payloadB := []byte(`{"writer":"B"}`)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		WriteFile(fs, path, payloadA)
-	}()
-	go func() {
-		defer wg.Done()
-		WriteFile(fs, path, payloadB)
-	}()
-
-	wg.Wait()
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read final file: %v", err)
-	}
-	if !json.Valid(raw) {
-		t.Fatalf("final file is not valid JSON: %q", raw)
 	}
 }
 
