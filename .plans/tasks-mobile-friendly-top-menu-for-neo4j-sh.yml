@@ -202,7 +202,7 @@ tasks:
       You MAY use the `chrome-devtools` or `dev-browser` skill to verify
       programmatically by opening `index.html` from the worktree filesystem
       path and resizing the viewport.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -213,4 +213,4 @@ tasks:
       - "Clicking each tab still swaps the install command shown in `#installBlock` (verified for at least 3 tabs across both rows)"
       - "Auto-OS detection on initial load still works (e.g. macOS UA -> macOS tab active by default)"
       - "No console errors when the page loads on any viewport width"
-    completed_at: null
+    completed_at: 2026-05-15T13:00:00Z

@@ -281,18 +281,6 @@
     }
     nav.top-nav.open { display: flex; }
     nav.top-nav a { padding: 10px 12px; font-size: 14px; }
-
-    .install-tabs {
-      display: flex;
-      width: 100%;
-      flex-wrap: wrap;
-      margin: 0 0 14px;
-    }
-    .install-tab {
-      flex: 1 1 calc(33.333% - 2px);
-      justify-content: center;
-      padding: 8px 12px;
-    }
   }
 
   /* ---------- Hero ---------- */
@@ -479,6 +467,20 @@
     box-shadow: var(--shadow-raised);
   }
   .install-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  @media (max-width: 640px) {
+    .install-tabs {
+      display: flex;
+      width: 100%;
+      flex-wrap: wrap;
+      margin: 0 0 14px;
+    }
+    .install-tab {
+      flex: 1 1 calc(33.333% - 2px);
+      justify-content: center;
+      padding: 10px 12px;
+    }
+  }
 
   /* ---------- Toast ---------- */
   .toast {

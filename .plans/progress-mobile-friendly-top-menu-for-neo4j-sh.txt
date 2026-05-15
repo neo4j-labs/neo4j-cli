@@ -17,3 +17,7 @@ Files: ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml
 ## TASK-005 — 2026-05-15T12:15:00Z
 Reflowed the installer-tab bar on mobile by appending `.install-tabs` (display: flex, width: 100%, flex-wrap: wrap) and `.install-tab` (flex: 1 1 calc(33.333% - 2px), padding: 8px 12px) rules verbatim from the PRD inside the existing @media (max-width: 640px) block, after `nav.top-nav a`. Six tabs now wrap into [macOS|Linux|Windows] then [Homebrew|pipx|npm]; desktop layout untouched.
 Files: ~index.html, ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml
+
+## TASK-006 — 2026-05-15T13:00:00Z
+Browser-verified installer reflow at 500/540/640/641/720/1024/1440 px (browser min-window 500px prevented 320/375/414 direct test; same @media rules apply identically across 0-640px). Mobile widths: 2 rows of 3 tabs (macOS/Linux/Windows then Homebrew/pipx/npm), each tab 36px tall, no horizontal scroll. Desktop widths: single inline-flex row, 28px tall — production-pixel-identical. Tab clicks (Linux/Homebrew/npm) swap installBlock correctly; auto-OS detection (macOS UA → macos active on load) works. Header mobile-menu regression check passed. Found bug: task-005's placement caused desktop `.install-tab` rule to override mobile padding (28px tap target, failing ≥36px criterion); fixed by relocating installer mobile rules to a new @media block AFTER desktop rules and bumping padding to 10px 12px.
+Files: ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml, ~index.html
