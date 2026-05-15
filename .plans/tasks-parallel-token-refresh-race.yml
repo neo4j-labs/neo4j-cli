@@ -33,7 +33,7 @@ tasks:
       Add a test in fileutils_test.go (or a new race_test.go) that spawns two goroutines both
       calling WriteFile on the same real temp-dir path concurrently; verify neither panics and
       the resulting file contains valid JSON from one of the writes.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -42,7 +42,7 @@ tasks:
       - "All existing fileutils_test.go tests continue to pass (MemMapFs path skips OS lock gracefully)"
       - "New concurrent-write test: two goroutines writing to the same path produce no panic and a valid final file"
       - "make test passes; make fmt-check and make lint are clean"
-    completed_at: null
+    completed_at: "2026-05-15T15:30:00Z"
 
   - id: task-003
     title: "Add Credentials.FilePath() accessor and ReloadAuraCredential helper"

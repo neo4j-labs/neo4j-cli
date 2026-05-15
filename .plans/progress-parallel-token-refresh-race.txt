@@ -33,6 +33,29 @@ Key Decisions:
 Next Task: task-004
 
 ================================================================================
+TASK-002: Wire acquireLock into writeFileAtomic and add concurrent-write test
+Date: 2026-05-15T15:30:00Z
+================================================================================
+
+Summary:
+acquireLock was already wired into writeFileAtomic by task-001. This task added
+TestWriteFile_ConcurrentWrites to fileutils_test.go: two goroutines call WriteFile
+on the same real OS temp path concurrently via afero.NewOsFs(); test asserts the
+final file is valid JSON and no panic occurs.
+
+Files Changed:
+- common/clicfg/fileutils/fileutils_test.go (modified — added TestWriteFile_ConcurrentWrites)
+
+Key Decisions:
+- Used afero.NewOsFs() + t.TempDir() so the OS-level flock is actually exercised.
+- No assertion on which payload wins — serialisation is the correctness property, not ordering.
+- acquireLock wiring was already done in task-001; task-002 was test-only.
+
+Gates: make test PASS, make fmt-check PASS, make lint PASS.
+
+Next Task: task-004
+
+================================================================================
 TASK-001: Implement cross-platform advisory file lock helpers in fileutils
 Date: 2026-05-15T00:00:00Z
 ================================================================================
