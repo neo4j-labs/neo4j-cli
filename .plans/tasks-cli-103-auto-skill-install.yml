@@ -197,7 +197,8 @@ tasks:
         (install node, run `npm ci && npm test` in `distribution/npm/cli/`)
       - Ruby minitest tests: `ubuntu-latest` (Ruby pre-installed)
       The workflow must not require any secrets or external services.
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T14:30:00Z
     dependencies:
       - task-006
       - task-007

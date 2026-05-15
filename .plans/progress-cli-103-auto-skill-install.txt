@@ -210,3 +210,26 @@ Key Decisions:
 - Tests use cross-referencing comments between post_install.rb and .goreleaser.yaml to flag sync requirement.
 
 Next Task: task-010
+
+================================================================================
+TASK-010: Add installer-tests.yml GitHub Actions workflow
+Date: 2026-05-15T14:30:00Z
+================================================================================
+
+Summary:
+Created .github/workflows/installer-tests.yml with four jobs covering all
+installer test suites: bats (ubuntu+macos), Pester (windows), Jest (all three
+platforms), and Ruby minitest (ubuntu). Follows existing workflow conventions
+(pinned SHA checkout, permissions block, fail-fast: false on matrices).
+
+Files Changed:
+- .github/workflows/installer-tests.yml (created — four-job workflow)
+
+Key Decisions:
+- Ubuntu bats install uses `sudo npm install -g bats` (not apt-get) because the
+  apt package ships bats 1.1/1.2 which is rejected by `bats_require_minimum_version 1.5.0` in the test file. npm gives a modern bats-core release.
+- npm-tests step uses `working-directory: distribution/npm/cli` (not `cd &&`) to avoid shell portability issues across ubuntu/macos/windows runners.
+- Pester invocation omits -PassThru; Pester v5 exits non-zero on test failure by default, so exit code propagation is automatic.
+- actions/checkout pinned to SHA matching the repo's existing workflow convention.
+
+Next Task: task-011
