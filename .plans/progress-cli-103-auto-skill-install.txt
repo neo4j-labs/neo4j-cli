@@ -92,3 +92,36 @@ Key Decisions:
 - `${NEO4J_CLI_AUTO_INSTALL_SKILL:-}` default-expansion is shellcheck-safe with `set -u` in effect
 
 Next Task: task-005
+
+================================================================================
+TASK-006: Add bats-core behavioral tests for install-neo4j-cli.sh
+Date: 2026-05-15T00:00:00Z
+================================================================================
+
+Summary:
+Created bats-core behavioral tests covering the NEO4J_CLI_AUTO_INSTALL_SKILL
+feature in install-neo4j-cli.sh. Tests use a complete stub environment (curl,
+tar, sha256sum, shasum, uname, sudo, neo4j-cli) injected via PATH prepending.
+All 4 test cases pass on macOS (bats 1.13.0). shellcheck passes with no warnings.
+
+Files Changed:
+- distribution/installation-scripts/tests/install-neo4j-cli.bats (created — bats test suite with 4 test cases)
+
+Key Decisions:
+- The installer monolith cannot be partially sourced, so all external commands
+  are stubbed via a STUBS_DIR prepended to PATH. This includes curl, tar,
+  sha256sum, shasum, uname, and sudo.
+- The curl stub for the checksums file writes a fake sha256 line matching the
+  archive filename (derived from the checksums filename) so grep succeeds. The
+  uname stub always returns Linux/x86_64, coordinating with the checksums stub.
+- The tar stub creates a recording neo4j-cli binary (not just a blank file) that
+  appends to STUB_CALLS (exported env var) and respects NEO4J_CLI_STUB_EXIT.
+  This ensures the mv'd binary (which overwrites our pre-seeded INSTALL_DIR stub)
+  still records calls correctly.
+- NEO4J_CLI_STUB_EXIT env var controls skill subcommand exit code, enabling
+  test 3 (fail scenario) without rewriting the stub file per test.
+- bats `run` prefix-env mechanism passes NEO4J_CLI_AUTO_INSTALL_SKILL into the
+  child bash process; STUB_CALLS and INSTALL_DIR are also forwarded via
+  run_installer's explicit env block.
+
+Next Task: task-007

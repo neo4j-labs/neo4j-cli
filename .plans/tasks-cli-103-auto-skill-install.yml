@@ -107,7 +107,8 @@ tasks:
       3. `=1` but stub exits non-zero: install script still exits 0.
       Document local run command in the test file header:
       `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T00:00:00Z
     dependencies: []
     acceptance_criteria:
       - "All three test cases pass via `bats distribution/installation-scripts/tests/`"

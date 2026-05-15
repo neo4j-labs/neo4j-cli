@@ -177,6 +177,13 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Installer Script Testing Notes
+
+- Bats-core tests for `install-neo4j-cli.sh` live in `distribution/installation-scripts/tests/install-neo4j-cli.bats`. Run with `bats distribution/installation-scripts/tests/` (install bats-core via `brew install bats-core` or `apt-get install bats`).
+- The installer is a monolith; tests stub ALL external commands (curl, tar, sha256sum, shasum, uname, sudo) via a `STUBS_DIR` prepended to `PATH`. The curl stub for the checksums file must emit a fake sha256 line matching the archive filename so `grep <archive> checksums.txt | sha256sum -c` succeeds.
+- The tar stub creates a recording `neo4j-cli` binary (using `STUB_CALLS` env var) — this is critical because the installer `mv`s the tar-extracted binary to `INSTALL_DIR`, overwriting any pre-seeded stub. The recording logic must be embedded in what tar creates.
+- Always run `shellcheck` on `.bats` files; use `local stub_path=...` to avoid SC2097/SC2098 when constructing a `PATH=...` prefix that references other variables in the same assignment.
+
 ## npm Distribution Notes
 
 See [`distribution/npm/README.md`](distribution/npm/README.md).
