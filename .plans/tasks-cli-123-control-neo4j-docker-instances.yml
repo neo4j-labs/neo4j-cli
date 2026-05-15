@@ -287,7 +287,7 @@ tasks:
       Run the `golang-security` skill on the new docker package + changes to credentials handling (memory: "Security review gate"); address any findings before merge.
       Run the full gate suite: `make fmt-check && make lint && make test && make license-check && make generate-check`. All must be green.
       Manually run the verification scenarios from the PRD's Acceptance Criteria section against a local Docker daemon (happy path, ephemeral flow, port conflict, name collision, missing docker, TTY prompt) and capture pass/fail in the iteration notes.
-    status: pending
+    status: completed
     dependencies:
       - task-014
     acceptance_criteria:
@@ -296,4 +296,4 @@ tasks:
       - "make fmt-check, make lint, make test, make license-check, and make generate-check all pass"
       - "Manual verification of the PRD acceptance criteria scenarios documented (pass/fail per scenario)"
       - "PR description notes website update is a separate follow-up (REQ-DOC-008)"
-    completed_at: null
+    completed_at: 2026-05-15T20:00:00Z

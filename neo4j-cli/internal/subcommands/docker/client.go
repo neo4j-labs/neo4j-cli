@@ -104,9 +104,40 @@ func (c *execClient) run(ctx context.Context, args ...string) (string, error) {
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", clierr.NewUsageError("docker %s: %s", strings.Join(args, " "), msg)
+		// Redact AUTH/PASSWORD env values before echoing argv (REQ-NF-004) —
+		// `docker run -e NEO4J_AUTH=neo4j/<secret>` would otherwise leak the
+		// generated password to the terminal and any captured shell/CI logs
+		// on non-zero exit. The argv passed to exec is untouched; redaction
+		// is only applied to the user-facing error string.
+		return "", clierr.NewUsageError("docker %s: %s", strings.Join(redactArgs(args), " "), msg)
 	}
 	return stdout.String(), nil
+}
+
+// redactArgs returns a copy of args with any element shaped like a sensitive
+// env-var assignment (LHS contains AUTH or PASSWORD) replaced by `<LHS>=<redacted>`.
+// Non-env elements are preserved unchanged and the input slice is never mutated.
+// Match is performed on the uppercase-folded LHS so case variants are caught,
+// even though Neo4j's own env-var names are uppercase by convention.
+func redactArgs(args []string) []string {
+	if args == nil {
+		return nil
+	}
+	out := make([]string, len(args))
+	for i, a := range args {
+		eq := strings.IndexByte(a, '=')
+		if eq <= 0 {
+			out[i] = a
+			continue
+		}
+		lhs := strings.ToUpper(a[:eq])
+		if strings.Contains(lhs, "AUTH") || strings.Contains(lhs, "PASSWORD") {
+			out[i] = a[:eq] + "=<redacted>"
+			continue
+		}
+		out[i] = a
+	}
+	return out
 }
 
 func (c *execClient) Run(ctx context.Context, args []string) (string, error) {

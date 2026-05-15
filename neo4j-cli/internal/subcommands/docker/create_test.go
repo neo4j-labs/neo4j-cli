@@ -851,6 +851,52 @@ func TestCreate_Ephemeral_HonoursExplicitPassword(t *testing.T) {
 	assert.Contains(t, stdout, "NEO4J_URI=neo4j://localhost:7687\n")
 }
 
+func TestCreate_Ephemeral_EnvFile_ChmodsPreexistingFileTo0600(t *testing.T) {
+	// Defense-in-depth (REQ-NF-004): OpenFile's mode arg is honoured only on
+	// create. If --env-file points at a path that already exists with a
+	// permissive mode, the writeEnvFile call must Chmod the file down to
+	// 0o600 after the write so the credential blob never lands on disk in
+	// a world-readable state. Pre-seed a 0o644 file at the target path and
+	// assert the post-write mode is 0o600.
+	envPath := "/tmp/preexisting.env"
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	// Pre-seed the file with a permissive mode so we can verify Chmod ran.
+	require.NoError(t, afero.WriteFile(cfg.Aura.Fs(), envPath, []byte("stale\n"), 0o644))
+	pre, err := cfg.Aura.Fs().Stat(envPath)
+	require.NoError(t, err)
+	require.Equal(t, "-rw-r--r--", pre.Mode().Perm().String(), "preflight: file must be seeded at 0o644")
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-file", envPath})
+
+	require.NoError(t, cmd.Execute())
+
+	info, statErr := cfg.Aura.Fs().Stat(envPath)
+	require.NoError(t, statErr)
+	assert.Equal(t, "-rw-------", info.Mode().Perm().String(),
+		"pre-existing env-file must be chmod'd to 0o600 (REQ-NF-004); got %s", info.Mode().Perm())
+}
+
 func TestCreate_Ephemeral_EnvBlobLineOrder(t *testing.T) {
 	// REQ-F-017 fixes the order of the four NEO4J_* lines (URI → USERNAME →
 	// PASSWORD → DATABASE) right after the header. Assert literally so a

@@ -67,3 +67,46 @@ Decisions: generate-check noise on the in_progress flip in tasks YAML is expecte
 Documented docker subtree across five surfaces: README "Local Neo4j (Docker)" section with persistent + ephemeral flows; AGENTS.md "Docker Subsystem Notes" subsection (label source-of-truth, clientFactory test seam, WaitForBolt reuse, ephemeral env-file → query --env); skill description.txt extended to trigger on docker/local-neo4j/start-stop phrasing (980/1024 chars; removed "Docker" from Skip list); skill additions.md gained docker bullets + persistent/ephemeral code blocks; bundle SKILL.md regenerated. CONTRIBUTING.md has no "Commands"/"Add a new command" subtree-list — REQ-DOC-006 not applicable.
 Files: ~README.md, ~AGENTS.md, ~neo4j-cli/internal/skill/description.txt, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
 Decisions: removed "Docker" from description.txt Skip list since the CLI now manages docker — kept "Kubernetes" so the trigger doesn't fire on k8s questions.
+
+## Manual verification — 2026-05-15T20:00:00Z
+PRD acceptance criteria pass/fail (checked = unit-tested or verified; warn = requires live docker):
+- [check] docker --help shows 6 leaves (docker_test.go asserts mount)
+- [warn]  create with --name --rw stores credential + emits password (unit test confirms argv + label + credential; live-docker run not exercised)
+- [check] collision auto-suffix (create_test.go)
+- [check] --accept-license -> yes; --edition community -> no license env (create_test.go)
+- [check] --edition enterprise -> eval (create_test.go)
+- [check] port-conflict pre-flight -> usage error (create_test.go)
+- [check] docker get JSON has 9 fields (get_test.go)
+- [check] docker list filter (list_test.go)
+- [warn]  query --credential dev returns 1 (live)
+- [warn]  start/stop --wait live (live)
+- [check] start --wait happy/timeout, stop --wait happy/timeout (start_test.go, stop_test.go)
+- [check] delete TTY y / n / empty (delete_test.go)
+- [check] delete non-TTY without --force -> usage error (delete_test.go)
+- [check] delete --force on TTY and non-TTY (delete_test.go)
+- [check] --ephemeral + --env-file write 0o600; stdout silent (create_test.go)
+- [check] pre-existing --env-file path is chmod'd to 0o600 (create_test.go, new this iteration)
+- [warn]  query --env /tmp/n.env handshake (live)
+- [check] missing docker -> install hint (interface contract: execClient.resolve returns clierr.UsageError; covered by docker.go test surface)
+- [check] agent-context lists docker (verified `bin/neo4j-cli agent-context --format json | grep '"docker"'` returns the subtree)
+- [check] gate suite (this iteration: fmt-check, lint, test, license-check, build all green)
+- [check] changie Minor entry (.changes/unreleased/neo4j-cli-Minor-20260515-115550.yaml; body references CLI-123)
+- [check] README + AGENTS + skill description + additions updated (task-014)
+- [check] security review: high-finding (password leak in docker run error) remediated via redactArgs in client.go with regression test; low-finding (pre-existing-file mode) remediated via fs.Chmod after write with regression test
+
+## PR description draft
+
+Linear: CLI-123 (https://linear.app/neo4j/issue/CLI-123/control-neo4j-docker-instances)
+
+Adds a `neo4j-cli docker` command tree (`create / list / get / start / stop / delete`) for managing local Neo4j containers via the docker CLI. Default enterprise eval license (`--accept-license` upgrades to full); port-conflict pre-flight; name-collision auto-suffix; `--ephemeral` + `--env-file <path>` flow into `query --env`; `--wait` via Bolt readiness probe (reuses vendored neo4j-go-driver). Docker is source-of-truth via `org.neo4j.cli.managed=true` labels — no separate state file.
+
+Security review (REQ-NF-004) ran during task-015. Two findings remediated in this PR: the high-severity password leak in `docker run` error messages (added `redactArgs` mask in client.go) and the low-severity pre-existing-file mode issue in `--env-file` writes (added `Chmod 0o600` after write). Both have regression tests.
+
+Docs updated: README "Local Neo4j (Docker)" section, AGENTS.md "Docker Subsystem Notes", skill `description.txt` extended to trigger on docker/local-neo4j phrasing, skill `additions.md` with copy-paste examples for persistent + ephemeral flows.
+
+Website update (REQ-DOC-008) is a separate follow-up — pick it up in the next prompt-driven `gh-pages` refresh.
+
+## TASK-015 — 2026-05-15T20:00:00Z
+Remediated two security findings surfaced by the golang-security review of the docker package: (1) high — `execClient.run` echoed full argv on non-zero exit, leaking `NEO4J_AUTH=neo4j/<pwd>`. Added `redactArgs` helper masking AUTH/PASSWORD env values (uppercase-folded LHS substring match) in the error string only; argv passed to exec is unchanged. (2) low — `writeEnvFile` relied on `OpenFile` mode arg which is ignored when the target exists. Added `fs.Chmod(path, 0o600)` after successful write. Both remediations have regression tests. Changie Minor entry already exists from earlier iteration; all gates green (fmt-check, lint, test, license-check, build); agent-context confirmed to list docker subtree.
+Files: ~neo4j-cli/internal/subcommands/docker/client.go, ~neo4j-cli/internal/subcommands/docker/create.go, +neo4j-cli/internal/subcommands/docker/client_test.go, ~neo4j-cli/internal/subcommands/docker/create_test.go, ~.plans/progress-cli-123-control-neo4j-docker-instances.txt, ~.plans/tasks-cli-123-control-neo4j-docker-instances.yml
+Decisions: redactArgs uses uppercase-folded LHS substring match (AUTH or PASSWORD) so case variants and any future credential-shaped env var are caught defensively; redaction is applied only to the error string, never to the argv passed to `exec.CommandContext`.

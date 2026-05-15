@@ -354,6 +354,13 @@ func writeEnvFile(fs afero.Fs, path, contents string) error {
 	if cerr := f.Close(); cerr != nil {
 		return fmt.Errorf("docker create: write env-file %s: %w", path, cerr)
 	}
+	// Defense-in-depth (REQ-NF-004): OpenFile only applies the mode arg on
+	// create; a pre-existing file at this path keeps its prior (potentially
+	// permissive) mode. Chmod unconditionally so the on-disk file ends up
+	// at 0o600 regardless of who owned it before.
+	if cerr := fs.Chmod(path, 0o600); cerr != nil {
+		return fmt.Errorf("docker create: chmod env-file %s: %w", path, cerr)
+	}
 	return nil
 }
 
