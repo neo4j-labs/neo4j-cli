@@ -110,7 +110,7 @@ tasks:
       order: --organization-id flag > org portion of aura.default-context > hard error.
       list calls ListProjects(orgID); get <id> calls GetProject(orgID, projectID). Both
       support --format json|table|toon. Register the project subcommand in aura.go.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -122,7 +122,7 @@ tasks:
       - "Both commands support --format json, table, and toon"
       - "Example fields present, flush-left, ≥3 invocations on each leaf"
       - "Table-driven tests cover org resolution paths and API error cases"
-    completed_at: null
+    completed_at: 2026-05-15T00:00:00Z
 
   - id: task-007
     title: "Add aura context use command"

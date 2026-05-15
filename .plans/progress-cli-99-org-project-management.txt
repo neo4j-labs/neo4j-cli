@@ -1,3 +1,7 @@
+## TASK-006 — 2026-05-15T00:00:00Z
+Added aura project list and project get commands resolving org from --organization-id flag or aura.default-context. Both commands support --format json|table|toon with table-driven tests.
+Files: +neo4j-cli/aura/internal/subcommands/project/project.go, +neo4j-cli/aura/internal/subcommands/project/list.go, +neo4j-cli/aura/internal/subcommands/project/list_test.go, +neo4j-cli/aura/internal/subcommands/project/get.go, +neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/aura.go
+
 ## TASK-005 — 2026-05-15T16:00:00Z
 Created organization subcommand with parent (organization.go) and list leaf (list.go); calls GET /organizations via AuraApiVersion2 using MakeRequest + PrintBody pattern consistent with tenant list; table-driven tests cover success, empty list, API error, invalid format, and credential flag; registered in aura.go; regenerated both aura and neo4j-cli skill bundles.
 Files: +neo4j-cli/aura/internal/subcommands/organization/organization.go, +neo4j-cli/aura/internal/subcommands/organization/list.go, +neo4j-cli/aura/internal/subcommands/organization/list_test.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/aura/internal/skill/bundle/*, ~neo4j-cli/internal/skill/bundle/*
