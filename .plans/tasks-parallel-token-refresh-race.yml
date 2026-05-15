@@ -76,7 +76,7 @@ tasks:
       reloaded token is also expired, fall through to the existing HTTP refresh path unchanged.
       Add a test that pre-writes a fresh credential file before calling getToken and asserts no
       HTTP call is made.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -85,7 +85,7 @@ tasks:
       - "getToken falls through to HTTP refresh when ReloadAuraCredential returns false or the fresh token is also expired"
       - "New test: writes a fresh credentials.json to disk before calling getToken; asserts the mock HTTP server is not called"
       - "Existing getToken tests continue to pass; make test is clean"
-    completed_at: null
+    completed_at: "2026-05-15T00:00:00Z"
 
   - id: task-005
     title: "Final gates: test, lint, fmt-check, license-check"

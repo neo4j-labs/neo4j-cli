@@ -22,6 +22,12 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 		return credential.AccessToken, nil
 	}
 
+	// Re-read from disk; another parallel process may have already refreshed.
+	if fresh, ok := credentials.ReloadAuraCredential(cfg.Aura.Fs(), cfg.Credentials.FilePath(), credential.Name); ok && fresh.HasValidAccessToken() {
+		cfg.Credentials.Aura.SyncCredential(fresh)
+		return fresh.AccessToken, nil
+	}
+
 	data := url.Values{}
 
 	data.Set("grant_type", "client_credentials")

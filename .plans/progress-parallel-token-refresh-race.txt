@@ -1,4 +1,35 @@
 ================================================================================
+TASK-004: Add disk re-read optimization to getToken before the HTTP refresh call
+Date: 2026-05-15T00:00:00Z
+================================================================================
+
+Summary:
+Added a best-effort disk re-read path in getToken (neo4j-cli/aura/internal/api/token.go)
+between the in-memory HasValidAccessToken() check and the HTTP token refresh. If
+ReloadAuraCredential finds a valid token on disk (written by another process), it is
+synced into memory via SyncCredential and returned immediately — no HTTP request is made.
+If the reload fails or the disk token is also expired, the existing HTTP path is unchanged.
+
+Files Changed:
+- neo4j-cli/aura/internal/api/token.go (modified — 5-line disk re-read block inserted)
+- neo4j-cli/aura/internal/api/token_test.go (created — TestGetToken_DiskReread)
+
+Key Decisions:
+- Reuses cfg.Aura.Fs() (the same afero.Fs used by the rest of the config stack) so the
+  disk re-read works with any afero backend, including the MemMapFs used in tests.
+- cfg.Credentials.FilePath() accessor (added in task-003) keeps getToken free of internal
+  credentials state.
+- Test overwrites credentials.json on the MemMapFs after Config construction to simulate
+  a concurrent write by another process; asserts tokenEndpointCalled remains false.
+- Test also asserts in-memory SyncCredential was called (AccessToken and TokenExpiry match
+  the fresh disk values).
+- No new imports in token.go — credentials package was already imported.
+
+Gates: make test PASS, make fmt-check PASS, make lint PASS (0 issues).
+
+Next Task: task-005
+
+================================================================================
 TASK-003: Add Credentials.FilePath() accessor and ReloadAuraCredential helper
 Date: 2026-05-15T00:00:00Z
 ================================================================================
