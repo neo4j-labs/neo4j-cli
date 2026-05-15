@@ -15,9 +15,9 @@ import (
 )
 
 // TestNewCmd_Scaffold confirms the parent docker command is wired with the
-// expected Use / Short / Long, no leaves yet (leaves land in subsequent
-// tasks), and is non-runnable (so TestAllLeafCommands_HaveExamples doesn't
-// require an Example block on the parent itself).
+// expected Use / Short / Long, exposes registered leaves, and is itself
+// non-runnable (so TestAllLeafCommands_HaveExamples does not require an
+// Example block on the parent).
 func TestNewCmd_Scaffold(t *testing.T) {
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
@@ -29,8 +29,13 @@ func TestNewCmd_Scaffold(t *testing.T) {
 	assert.Equal(t, "docker", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
-	assert.False(t, cmd.Runnable(), "parent docker cmd must not be runnable until leaves are wired")
-	assert.Empty(t, cmd.Commands(), "no leaves should be registered yet")
+	assert.False(t, cmd.Runnable(), "parent docker cmd must not be runnable; leaves carry RunE")
+
+	names := make(map[string]bool, len(cmd.Commands()))
+	for _, sub := range cmd.Commands() {
+		names[sub.Name()] = true
+	}
+	assert.True(t, names["create"], "create leaf should be registered on the docker parent")
 }
 
 // TestFakeDockerClient_SatisfiesInterface exercises the fake against every

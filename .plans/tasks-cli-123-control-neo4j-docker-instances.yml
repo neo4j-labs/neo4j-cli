@@ -54,7 +54,7 @@ tasks:
       Annotations include `"write": "true"`; register `--format` via `flags.RegisterOutputFlag`.
       Provide a flush-left `Example:` block (≥3 invocations, `--rw` on each, `--format json` on at least one) per REQ-F-005.
       Add `create_test.go` covering: happy path stores credential; `--no-store-credential` skips persistence; `--edition community` omits the license env var; `--edition enterprise` passes `eval`; `--accept-license` upgrades to `yes`; `--password` is honored when set; `crypto/rand` is used when unset (assert via injectable randSource).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -64,7 +64,7 @@ tasks:
       - "Generated password is 16 bytes from crypto/rand, base64 URL-safe; surfaced in --format json output"
       - "create.go and create_test.go carry copyright headers; go test ./neo4j-cli/internal/subcommands/docker/... passes"
       - "create has Annotations write:true, supports --rw, registers --format, and has a flush-left Example block satisfying TestAllLeafCommands_HaveExamples"
-    completed_at: null
+    completed_at: 2026-05-15T13:55:00Z
 
   - id: task-004
     title: "docker create — port-conflict pre-flight"

@@ -12,13 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmd returns the `docker` parent command. Leaves (create, list, get,
-// start, stop, delete) are added in subsequent tasks.
+// NewCmd returns the `docker` parent command. Leaves are added below; the
+// default dockerClient is resolved via the package-level clientFactory seam
+// so tests can inject a fake.
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
-	// cfg is threaded through so leaf constructors (added in subsequent
-	// tasks) can reach credentials / Fs / output flags via the closure.
-	_ = cfg
-
 	cmd := &cobra.Command{
 		Use:   "docker",
 		Short: "Manage local Neo4j containers via Docker",
@@ -29,10 +26,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"throwaway container plus an env-file consumable by `query --env <path>`.",
 	}
 
-	// Leaves are registered in later tasks via cmd.AddCommand(newXxxCmd(cfg)).
-	// Reference newClient here so the default exec-backed client survives
-	// dead-code linting until the first leaf wires it.
-	_ = newClient
+	cmd.AddCommand(newCreateCmd(cfg))
 
 	return cmd
 }
