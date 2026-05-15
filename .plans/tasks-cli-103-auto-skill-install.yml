@@ -1,7 +1,7 @@
 feature: cli-103-auto-skill-install
 prd: ./prd-cli-103-auto-skill-install.md
 created_at: 2026-05-14T00:00:00Z
-updated_at: 2026-05-15T00:00:00Z
+updated_at: 2026-05-15T14:00:00Z
 
 tasks:
   - id: task-001
@@ -208,3 +208,32 @@ tasks:
       - "All four job types pass on a sample PR"
       - "Workflow fails fast if any test suite fails (exit code propagated)"
       - "Workflow file passes `actionlint` (or equivalent YAML validation)"
+
+  - id: task-011
+    title: "Add test-installer Makefile targets"
+    description: |
+      Add five targets to the `Makefile`:
+      - `test-installer-sh`: runs `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`.
+        Errors if `bats` is not on PATH.
+      - `test-installer-ps1`: runs Pester via
+        `pwsh -NoProfile -NonInteractive -Command "Invoke-Pester -Path distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 -Output Detailed"`.
+        If `pwsh` is not found, prints a skip message and exits 0.
+      - `test-installer-npm`: runs `npm ci && npm test` inside `distribution/npm/cli/`.
+        Errors if `npm` is not on PATH.
+      - `test-installer-rb`: runs `ruby distribution/homebrew/tests/post_install_test.rb`.
+        Errors if `ruby` is not on PATH.
+      - `test-installer`: aggregate target that calls all four sub-targets in order.
+      Follow existing Makefile conventions (tabs, `.PHONY`, section placement).
+    status: not_started
+    dependencies:
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "`make test-installer-sh` passes on macOS and Linux"
+      - "`make test-installer-ps1` exits 0 with a skip message when `pwsh` is absent"
+      - "`make test-installer-npm` passes on macOS, Linux, and Windows"
+      - "`make test-installer-rb` passes on macOS and Linux"
+      - "`make test-installer` runs all four sub-targets and succeeds"
+      - "All five targets are listed under `.PHONY`"

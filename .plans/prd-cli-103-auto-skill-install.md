@@ -93,6 +93,23 @@ invoked directly by each installer script.
   pull requests. Shell (bats-core) tests run on `ubuntu-latest` and
   `macos-latest`; Pester tests run on `windows-latest`; npm/Jest tests run on
   all three platforms; Ruby tests run on `ubuntu-latest`.
+- REQ-F-010: The `Makefile` must add a `test-installer-sh` target that runs
+  the bats-core suite: `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`.
+  Fails with a clear error if `bats` is not found on PATH.
+- REQ-F-011: The `Makefile` must add a `test-installer-ps1` target that runs
+  the Pester suite via `pwsh -NoProfile -NonInteractive -Command "Invoke-Pester -Path distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 -Output Detailed"`.
+  If `pwsh` is not found on PATH, the target must print a skip message and
+  exit 0 (graceful skip on non-Windows machines).
+- REQ-F-012: The `Makefile` must add a `test-installer-npm` target that runs
+  `npm ci && npm test` inside `distribution/npm/cli/`.
+  Fails with a clear error if `npm` is not found on PATH.
+- REQ-F-013: The `Makefile` must add a `test-installer-rb` target that runs
+  `ruby distribution/homebrew/tests/post_install_test.rb`.
+  Fails with a clear error if `ruby` is not found on PATH.
+- REQ-F-014: The `Makefile` must add a `test-installer` aggregate target that
+  calls `test-installer-sh`, `test-installer-ps1`, `test-installer-npm`, and
+  `test-installer-rb` in order. All targets that are not skipped must pass for
+  `test-installer` to succeed.
 
 ### Non-Functional Requirements
 
@@ -108,6 +125,10 @@ invoked directly by each installer script.
   per channel (e.g. `bats distribution/installation-scripts/tests/`,
   `Invoke-Pester`, `npm test`, `ruby -Ilib:test`) in addition to running in
   CI.
+- REQ-NF-005: The `test-installer-ps1` Makefile target must degrade gracefully
+  on platforms where `pwsh` is unavailable (macOS without PowerShell installed,
+  Linux) by printing a skip notice and exiting 0, so `make test-installer` is
+  usable on all developer machines without requiring PowerShell.
 
 ## Testing Strategy
 
@@ -203,6 +224,11 @@ Edit them there — changes go through normal PR review and are validated by the
 - [ ] `ruby distribution/homebrew/tests/post_install_test.rb` passes.
 - [ ] Ruby tests confirm `system` called with correct args when `=1`, not called otherwise.
 - [ ] `installer-tests.yml` workflow runs and passes on a sample PR.
+- [ ] `make test-installer-sh` passes on macOS and Linux.
+- [ ] `make test-installer-ps1` skips gracefully (exit 0 + message) when `pwsh` is not installed.
+- [ ] `make test-installer-npm` passes on macOS, Linux, and Windows.
+- [ ] `make test-installer-rb` passes on macOS and Linux.
+- [ ] `make test-installer` runs all four sub-targets and succeeds when non-ps1 targets pass.
 
 ## Out of Scope
 
