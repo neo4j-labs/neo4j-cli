@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1035,8 +1036,15 @@ func TestWriteEnvFile_ReplacesPreExistingSymlink_OsFs(t *testing.T) {
 		"env-file path must be a regular file after writeEnvFile; got mode %s", info.Mode())
 	assert.Zero(t, info.Mode()&os.ModeSymlink,
 		"env-file path must NOT be a symlink anymore; got mode %s", info.Mode())
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(),
-		"env-file must be mode 0600 (REQ-NF-004); got %s", info.Mode().Perm())
+	// POSIX-only mode-bit assertion: Windows os.Chmod only honors the
+	// read-only bit, so 0o600 lands as 0o666 there. The temp+rename strategy
+	// is still effective on Windows (the symlink-follow window is closed by
+	// using a fresh O_EXCL temp path); the mode bit is just an OS-level
+	// gotcha. AGENTS.md "Windows CI Gotchas" — guard the assertion.
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(),
+			"env-file must be mode 0600 (REQ-NF-004); got %s", info.Mode().Perm())
+	}
 
 	contents, err := os.ReadFile(envPath)
 	require.NoError(t, err)
@@ -1150,7 +1158,10 @@ func countOccurrences(argv []string, needle string) int {
 }
 
 func TestCreate_DataDir_HappyPath_AddsVolumeArgAndCreatesDir(t *testing.T) {
-	hostPath := "/tmp/n4j-data-happy"
+	// hostPath sourced via t.TempDir() so it's OS-native and survives
+	// expandHostPath idempotently on Windows (where filepath.Abs prepends
+	// drive + uses backslashes). AGENTS.md "Windows CI Gotchas".
+	hostPath := filepath.Join(t.TempDir(), "n4j-data-happy")
 	fake, _, fs, _, stderr, err := runCreateForEphemeral(t,
 		"--name dev --no-store-credential --data-dir "+hostPath)
 	require.NoError(t, err)
@@ -1163,15 +1174,18 @@ func TestCreate_DataDir_HappyPath_AddsVolumeArgAndCreatesDir(t *testing.T) {
 	info, statErr := fs.Stat(hostPath)
 	require.NoError(t, statErr, "--data-dir target must exist after RunE")
 	assert.True(t, info.IsDir(), "--data-dir target must be a directory")
-	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm(),
-		"--data-dir target must be mode 0o755; got %s", info.Mode().Perm())
+	// POSIX-only mode-bit assertion: Windows MkdirAll mode handling differs.
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o755), info.Mode().Perm(),
+			"--data-dir target must be mode 0o755; got %s", info.Mode().Perm())
+	}
 
 	// Stderr carries the documented info line.
 	assert.Contains(t, stderr, "info: created host directory "+hostPath)
 }
 
 func TestCreate_LogsDir_HappyPath_AddsVolumeArg(t *testing.T) {
-	hostPath := "/tmp/n4j-logs-happy"
+	hostPath := filepath.Join(t.TempDir(), "n4j-logs-happy")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
 		"--name dev --no-store-credential --logs-dir "+hostPath)
 	require.NoError(t, err)
@@ -1182,7 +1196,7 @@ func TestCreate_LogsDir_HappyPath_AddsVolumeArg(t *testing.T) {
 }
 
 func TestCreate_ImportDir_HappyPath_AddsVolumeArg(t *testing.T) {
-	hostPath := "/tmp/n4j-import-happy"
+	hostPath := filepath.Join(t.TempDir(), "n4j-import-happy")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
 		"--name dev --no-store-credential --import-dir "+hostPath)
 	require.NoError(t, err)
@@ -1193,9 +1207,10 @@ func TestCreate_ImportDir_HappyPath_AddsVolumeArg(t *testing.T) {
 }
 
 func TestCreate_AllVolumeFlags_AppendsThreeUniqueMounts(t *testing.T) {
-	data := "/tmp/n4j-all-data"
-	logs := "/tmp/n4j-all-logs"
-	imp := "/tmp/n4j-all-import"
+	base := t.TempDir()
+	data := filepath.Join(base, "data")
+	logs := filepath.Join(base, "logs")
+	imp := filepath.Join(base, "import")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
 		fmt.Sprintf("--name dev --no-store-credential --data-dir %s --logs-dir %s --import-dir %s",
 			data, logs, imp))
@@ -1223,37 +1238,42 @@ func TestCreate_NoVolumeFlags_NoVolumeArgs(t *testing.T) {
 }
 
 func TestCreate_DataDir_TildeExpansion(t *testing.T) {
-	withHomeDirFn(t, "/home/operator")
+	// Use t.TempDir() for the fake home so the resolved path is OS-native
+	// (Windows: filepath.Abs prepends drive + backslashes).
+	home := t.TempDir()
+	withHomeDirFn(t, home)
+	wantPath := filepath.Join(home, "foo")
 
 	fake, _, fs, _, _, err := runCreateForEphemeral(t,
 		"--name dev --no-store-credential --data-dir ~/foo")
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
-	assert.True(t, containsVolume(argv, "/home/operator/foo", "/data"),
+	assert.True(t, containsVolume(argv, wantPath, "/data"),
 		"argv missing tilde-expanded -v: %v", argv)
 
-	info, statErr := fs.Stat("/home/operator/foo")
+	info, statErr := fs.Stat(wantPath)
 	require.NoError(t, statErr)
 	assert.True(t, info.IsDir())
 }
 
 func TestCreate_DataDir_EnvVarExpansion(t *testing.T) {
-	t.Setenv("NEO4J_TEST_DIR", "/var/n4j-from-env")
+	envDir := filepath.Join(t.TempDir(), "n4j-from-env")
+	t.Setenv("NEO4J_TEST_DIR", envDir)
 
 	fake, _, fs, _, _, err := runCreateForEphemeral(t,
 		"--name dev --no-store-credential --data-dir $NEO4J_TEST_DIR")
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
-	assert.True(t, containsVolume(argv, "/var/n4j-from-env", "/data"),
+	assert.True(t, containsVolume(argv, envDir, "/data"),
 		"argv missing env-expanded -v: %v", argv)
-	_, statErr := fs.Stat("/var/n4j-from-env")
+	_, statErr := fs.Stat(envDir)
 	require.NoError(t, statErr)
 }
 
 func TestCreate_DataDir_PreexistingDir_NoCreatedInfoLine(t *testing.T) {
-	hostPath := "/tmp/n4j-data-existing"
+	hostPath := filepath.Join(t.TempDir(), "n4j-data-existing")
 	fs, err := testfs.GetTestFs(`{}`, `{
 		"dbms": {"credentials": [], "default-credential": ""},
 		"embed": {"credentials": [], "default-credential": ""}
