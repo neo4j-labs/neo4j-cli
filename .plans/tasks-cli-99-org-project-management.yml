@@ -216,7 +216,7 @@ tasks:
       context commands; hidden tenant commands; removed config project commands). Confirm
       TestGenerator_RoundTrip passes. Verify that deprecated tenant commands do not appear
       in the generated bundle and that all new commands are represented correctly.
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -232,7 +232,7 @@ tasks:
       - "Deprecated tenant commands absent from generated skill bundle"
       - "organization list/get, project list/get, context list/use present in bundle"
       - "make test, make fmt-check, and make lint all pass"
-    completed_at: null
+    completed_at: 2026-05-15T18:00:00Z
 
   - id: task-012
     title: "Add changelog entry and create Linear issue for tenant removal"

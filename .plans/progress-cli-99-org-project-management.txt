@@ -1,3 +1,7 @@
+## TASK-011 — 2026-05-15T18:00:00Z
+Verified skill bundles are up to date; go generate produced no drift, TestGenerator_RoundTrip passed, tenant.md absent from aura bundle, organization.md/project.md/context.md all present with content.
+Files: ~.plans/tasks-cli-99-org-project-management.yml
+
 ## TASK-013 — 2026-05-15T00:00:00Z
 Added aura organization get <id> leaf calling GET /organizations/{id} on v2beta1 with --format json|table|toon support and table-driven tests for success, 404, and missing-arg cases.
 Files: ~neo4j-cli/aura/internal/subcommands/organization/organization.go, +neo4j-cli/aura/internal/subcommands/organization/get.go, +neo4j-cli/aura/internal/subcommands/organization/get_test.go
