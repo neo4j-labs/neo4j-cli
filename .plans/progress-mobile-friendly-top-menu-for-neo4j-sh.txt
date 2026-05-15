@@ -9,3 +9,7 @@ Files: ~index.html, ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml
 ## TASK-003 — 2026-05-15T11:00:00Z
 Appended the mobile-nav toggle JS verbatim from the PRD into the existing <script> block, between the Sticky-header-shadow `onScroll();` call and the Toast section. Toggles `.open` on #topNav and updates aria-expanded/aria-label on #navToggle; closes on link click, outside click, and Escape. Guarded with `if (navToggle && topNav)`, no IIFE.
 Files: ~index.html, ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml
+
+## TASK-004 — 2026-05-15T11:15:00Z
+Browser-verified mobile menu at 320/375/414/540/640/641/720/1024/1440 px via Chrome DevTools emulate. Mobile widths: hamburger visible, nav hidden by default, labs tag hidden, no horizontal scrollbar. Dropdown opens full-width (16px gutters, top:56px), 4 links stacked, aria-expanded/aria-label flip correctly, icon switches to X; closes on link click, outside click, and Escape. Reference link activates the reference tab AND closes the dropdown. Desktop widths: inline nav, labs visible, no hamburger. Theme toggle and sticky-header-shadow (>8px) still work. No JS console errors caused by our changes.
+Files: ~.plans/tasks-mobile-friendly-top-menu-for-neo4j-sh.yml

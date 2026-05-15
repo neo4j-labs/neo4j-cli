@@ -118,7 +118,7 @@ tasks:
       `chrome-devtools`, `agent-browser`) to perform the verification
       programmatically by opening `index.html` directly from the worktree
       filesystem path and resizing the viewport.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -131,4 +131,4 @@ tasks:
       - "Sticky header shadow (`header.top.scrolled`) appears on `window.scrollY > 8` as before"
       - "Reference link still activates the reference tab when clicked from the mobile dropdown"
       - "`git diff` shows changes confined to three regions of `index.html` (CSS near the header rules, HTML inside `<header class=\"top\">`, JS inside the existing `<script>` block)"
-    completed_at: null
+    completed_at: 2026-05-15T11:15:00Z
