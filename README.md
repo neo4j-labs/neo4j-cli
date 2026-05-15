@@ -133,7 +133,7 @@ Heads up: the generated password is part of the standard `create` output. Redire
 
 ```bash
 # Throwaway container (`docker run --rm`); no credential persisted; env-file written for query --env
-neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --wait --rw
+neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --wait --rw
 
 # Connect using the emitted env-file
 neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
@@ -142,9 +142,9 @@ neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
 neo4j-cli docker stop tmp --rw
 ```
 
-Without `--env-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) is emitted to stdout for piping. `--wait` blocks until Bolt is reachable (60s timeout); on timeout the container is left running so you can inspect `docker logs <name>`.
+Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) is emitted to stdout for piping. `--wait` blocks until Bolt is reachable (60s timeout); on timeout the container is left running so you can inspect `docker logs <name>`.
 
-`--env-file` writes via a temp file in the target's directory and atomically renames it into place; a pre-existing symlink at the path is replaced by a regular file (the symlink is not followed). Use a non-symlink target if you rely on the path being a symlink.
+`--env-out-file` writes via a temp file in the target's directory and atomically renames it into place; a pre-existing symlink at the path is replaced by a regular file (the symlink is not followed). Use a non-symlink target if you rely on the path being a symlink.
 
 ## Querying Neo4j
 

@@ -68,7 +68,7 @@ var waitForBoltFn = WaitForBolt
 // newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
 // the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
 // (REQ-F-014) before touching docker so a clash never leaves a half-created
-// container behind. --wait, --ephemeral, and --env-file land in later tasks.
+// container behind. --wait, --ephemeral, and --env-out-file land in later tasks.
 func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		name              string
@@ -81,7 +81,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		noStoreCredential bool
 		wait              bool
 		ephemeral         bool
-		envFile           string
+		envOutFile        string
 	)
 
 	const (
@@ -94,7 +94,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		passwordFlag          = "password"
 		noStoreCredentialFlag = "no-store-credential"
 		ephemeralFlag         = "ephemeral"
-		envFileFlag           = "env-file"
+		envOutFileFlag        = "env-out-file"
 	)
 
 	cmd := &cobra.Command{
@@ -112,7 +112,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"on timeout the container is left running so the operator can inspect it with `docker logs <name>`. " +
 			"Pass --ephemeral for a throwaway container (`docker run --rm`): no dbms credential is stored and an env-file " +
 			"blob (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD / NEO4J_DATABASE) is emitted to stdout — or, with " +
-			"--env-file <path>, written to that path (mode 0600) while stdout stays silent so it can be piped into " +
+			"--env-out-file <path>, written to that path (mode 0600) while stdout stays silent so it can be piped into " +
 			"`neo4j-cli query --env <path>`. The env-file is written via a temp file in the same directory and " +
 			"atomically renamed; a pre-existing symlink at the target path is REPLACED by a regular file (the " +
 			"symlink is not followed).",
@@ -129,7 +129,7 @@ neo4j-cli docker create --name dev --wait --rw
 neo4j-cli docker create --name tmp --ephemeral --rw
 
 # Create an ephemeral container and write the env-file to a path that 'query --env' can consume
-neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw
+neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw`,
@@ -141,13 +141,13 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				return clierr.NewUsageError(`invalid argument %q for "--%s" flag: must be one of "community" or "enterprise"`, edition, editionFlag)
 			}
 
-			// --env-file / --ephemeral compatibility (REQ-F-017). --env-file
+			// --env-out-file / --ephemeral compatibility (REQ-F-017). --env-out-file
 			// is a child of --ephemeral (it only changes WHERE the env blob
 			// goes); rejecting it standalone keeps the contract honest.
 			// --no-store-credential + --ephemeral is redundant: ephemeral
 			// already skips persistence — error out so the operator notices.
-			if envFile != "" && !ephemeral {
-				return clierr.NewUsageError("--%s requires --%s", envFileFlag, ephemeralFlag)
+			if envOutFile != "" && !ephemeral {
+				return clierr.NewUsageError("--%s requires --%s", envOutFileFlag, ephemeralFlag)
 			}
 			if ephemeral && noStoreCredential {
 				return clierr.NewUsageError("--%s is incompatible with --%s (ephemeral already skips credential persistence)", noStoreCredentialFlag, ephemeralFlag)
@@ -280,17 +280,17 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			// --ephemeral replaces the standard table/JSON output with a
 			// `.env` file blob suitable for `query --env <path>` (REQ-F-017).
-			// With --env-file we write to disk via cfg.Aura.Fs() with 0600
+			// With --env-out-file we write to disk via cfg.Aura.Fs() with 0600
 			// perms and stay silent on stdout (so callers can pipe). Without
-			// --env-file we emit the blob to stdout.
+			// --env-out-file we emit the blob to stdout.
 			if ephemeral {
 				blob := renderEnvFile(chosenName, image, uri, resolvedPassword)
-				if envFile != "" {
-					if err := writeEnvFile(cfg.Aura.Fs(), envFile, blob); err != nil {
+				if envOutFile != "" {
+					if err := writeEnvFile(cfg.Aura.Fs(), envOutFile, blob); err != nil {
 						cmd.SilenceUsage = true
 						return err
 					}
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: wrote credentials to %s\n", envFile)
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: wrote credentials to %s\n", envOutFile)
 				} else {
 					_, _ = fmt.Fprint(cmd.OutOrStdout(), blob)
 				}
@@ -326,7 +326,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
-	cmd.Flags().StringVar(&envFile, envFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
+	cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
@@ -364,7 +364,7 @@ func renderEnvFile(name, image, uri, password string) string {
 // leak. Routing through the afero seam keeps unit tests hermetic; production
 // hits the real OS fs.
 //
-// Behaviour change documented in --env-file's flag Long: and the README /
+// Behaviour change documented in --env-out-file's flag Long: and the README /
 // additions.md docker section: a pre-existing symlink at the target path is
 // replaced by a regular file (the symlink is NOT followed).
 func writeEnvFile(fs afero.Fs, path, contents string) error {

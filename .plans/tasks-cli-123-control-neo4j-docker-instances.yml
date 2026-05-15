@@ -627,7 +627,7 @@ tasks:
       7. Changelog: NOT needed. The docker tree's Minor entry (task-015) just says "Add 'docker' command tree for managing local Neo4j containers" — flag-name granularity isn't surfaced in the changelog. No update.
 
       Process note: keep the test rename atomic with the code rename (same commit) so `make test` is green throughout history bisection.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -637,7 +637,7 @@ tasks:
       - "No deprecation alias retained (hard rename — the docker tree has not shipped yet)"
       - "make fmt-check, make lint, make test, make license-check all pass"
       - "manual smoke: bin/neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw (against a live docker daemon) writes /tmp/n.env with the expected blob"
-    completed_at: null
+    completed_at: 2026-05-15T23:55:00Z
 
   - id: task-024
     title: "Add --data-dir / --logs-dir / --import-dir flags on `docker create` for host-side volume mounts"

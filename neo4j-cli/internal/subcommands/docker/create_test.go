@@ -741,7 +741,7 @@ func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
 	assert.Equal(t, int32(0), atomic.LoadInt32(&calls), "probe must not run without --wait")
 }
 
-// runCreateForEphemeral is the test rig for --ephemeral / --env-file cases.
+// runCreateForEphemeral is the test rig for --ephemeral / --env-out-file cases.
 // It mirrors runCreate but exposes stderr (where the env-file write narration
 // lands) and returns the cfg.Aura.Fs() handle so tests can stat / read any
 // file written via the afero seam.
@@ -809,7 +809,7 @@ func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T)
 	assert.Equal(t, expectedBlob, stdout, "stdout must be the literal env-file blob")
 }
 
-func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
+func TestCreate_Ephemeral_EnvOutFile_WritesFileAndStaysSilent(t *testing.T) {
 	origRand := randSource
 	randSource = constantReader{b: 0xEF}
 	defer func() { randSource = origRand }()
@@ -817,7 +817,7 @@ func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
 
 	envPath := "/tmp/n.env"
 	fake, cfg, fs, stdout, stderr, err := runCreateForEphemeral(t,
-		"--name tmp --ephemeral --env-file "+envPath)
+		"--name tmp --ephemeral --env-out-file "+envPath)
 	require.NoError(t, err)
 
 	// --rm + ephemeral label still applied.
@@ -829,7 +829,7 @@ func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
 	assert.Empty(t, cfg.Credentials.Dbms.List())
 
 	// Stdout MUST be empty so the caller can pipe.
-	assert.Empty(t, stdout, "--env-file must keep stdout silent for piping")
+	assert.Empty(t, stdout, "--env-out-file must keep stdout silent for piping")
 
 	// Stderr carries the one-line confirmation pointing at the path.
 	assert.Contains(t, stderr, "info: wrote credentials to "+envPath)
@@ -849,12 +849,12 @@ func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
 	assert.Equal(t, expectedBlob, string(contents))
 }
 
-func TestCreate_EnvFileWithoutEphemeral_UsageError(t *testing.T) {
-	fake, _, _, _, _, err := runCreateForEphemeral(t, "--name dev --env-file /tmp/n.env")
+func TestCreate_EnvOutFileWithoutEphemeral_UsageError(t *testing.T) {
+	fake, _, _, _, _, err := runCreateForEphemeral(t, "--name dev --env-out-file /tmp/n.env")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--env-file")
+	assert.Contains(t, err.Error(), "--env-out-file")
 	assert.Contains(t, err.Error(), "--ephemeral")
-	assert.Empty(t, fake.RunCalls, "docker run must not execute when --env-file is misused")
+	assert.Empty(t, fake.RunCalls, "docker run must not execute when --env-out-file is misused")
 }
 
 func TestCreate_EphemeralWithNoStoreCredential_UsageError(t *testing.T) {
@@ -877,9 +877,9 @@ func TestCreate_Ephemeral_HonoursExplicitPassword(t *testing.T) {
 	assert.Contains(t, stdout, "NEO4J_URI=neo4j://localhost:7687\n")
 }
 
-func TestCreate_Ephemeral_EnvFile_ChmodsPreexistingFileTo0600(t *testing.T) {
+func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 	// Defense-in-depth (REQ-NF-004): OpenFile's mode arg is honoured only on
-	// create. If --env-file points at a path that already exists with a
+	// create. If --env-out-file points at a path that already exists with a
 	// permissive mode, the writeEnvFile call must Chmod the file down to
 	// 0o600 after the write so the credential blob never lands on disk in
 	// a world-readable state. Pre-seed a 0o644 file at the target path and
@@ -913,7 +913,7 @@ func TestCreate_Ephemeral_EnvFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 	errBuf := bytes.NewBuffer(nil)
 	cmd.SetOut(out)
 	cmd.SetErr(errBuf)
-	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-file", envPath})
+	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-out-file", envPath})
 
 	require.NoError(t, cmd.Execute())
 
@@ -1120,8 +1120,8 @@ func TestWriteEnvFile_MissingDir_Errors(t *testing.T) {
 	assert.Contains(t, err.Error(), "create temp env-file in "+dir)
 }
 
-func TestCreate_Ephemeral_EnvFile_RenameFailure_NoTempLeftover(t *testing.T) {
-	// End-to-end coverage: invoke `docker create --ephemeral --env-file`
+func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) {
+	// End-to-end coverage: invoke `docker create --ephemeral --env-out-file`
 	// through the cobra flow with a rename-failing fs and confirm the
 	// command surfaces the error AND no temp file leaks into the target
 	// directory. Mirrors TestWriteEnvFile_RenameFailure_RemovesTempFile
@@ -1148,7 +1148,7 @@ func TestCreate_Ephemeral_EnvFile_RenameFailure_NoTempLeftover(t *testing.T) {
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.SetOut(bytes.NewBuffer(nil))
 	cmd.SetErr(bytes.NewBuffer(nil))
-	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-file", "/tmp/n.env"})
+	cmd.SetArgs([]string{"create", "--name", "tmp", "--ephemeral", "--env-out-file", "/tmp/n.env"})
 
 	execErr := cmd.Execute()
 	require.Error(t, execErr)

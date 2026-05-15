@@ -19,7 +19,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 - Default to Neo4j Enterprise under evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`), with `--accept-license` to upgrade to full acceptance (`=yes`).
 - Pre-flight port-conflict detection on host (7474, 7687) with a clear error pointing at `--bolt-port` / `--http-port`.
 - Auto-suffix name collisions (`<name>-1`, `<name>-2`, …) against both Docker container names and existing dbms credentials; echo the chosen name.
-- `--ephemeral` mode that runs `docker run --rm`, skips credential persistence, and emits a `.env` file (stdout or `--env-file <path>`) consumable by `neo4j-cli query --env <path>`.
+- `--ephemeral` mode that runs `docker run --rm`, skips credential persistence, and emits a `.env` file (stdout or `--env-out-file <path>`) consumable by `neo4j-cli query --env <path>`.
 - Reuse existing infrastructure: `flags.RegisterOutputFlag`, `flags.RegisterRwFlag`, `flags.RegisterWait`, `credentials.DbmsCredentials.Add/Remove`, the `clicfg` filesystem abstraction, and the neo4j-go-driver vendored by `query/` for Bolt readiness.
 - Update all documentation surfaces (README.md, AGENTS.md, neo4j-cli skill description/additions, regenerated skill bundle, CONTRIBUTING.md, changelog entry).
 - Ship a non-trivial test suite with a swappable docker client fake (no live docker required for unit tests).
@@ -68,7 +68,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
   | `--http-port <int>` | `7474` | Same. |
   | `--password <s>` | random 16-char | Mapped to `-e NEO4J_AUTH=neo4j/<password>`. Surfaced in the rendered `create` output (REQ-F-015). |
   | `--ephemeral` | `false` | `docker run --rm`; skip credential persistence; emit `.env` (REQ-F-016, REQ-F-017). |
-  | `--env-file <path>` | unset | Only meaningful with `--ephemeral`; if set, write env file there and stay silent on stdout. |
+  | `--env-out-file <path>` | unset | Only meaningful with `--ephemeral`; if set, write env file there and stay silent on stdout. |
   | `--wait` | `false` | Poll Bolt on `localhost:<bolt-port>` until handshake succeeds, 60 s timeout (REQ-F-018). |
   | `--no-store-credential` | `false` | Non-ephemeral path only; skip persisting a dbms credential. |
 
@@ -96,7 +96,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
   NEO4J_PASSWORD=<password>
   NEO4J_DATABASE=neo4j
   ```
-  - If `--env-file <path>` is set, write the blob there with `os.OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, 0600)` and stay silent on stdout (so the path can be piped).
+  - If `--env-out-file <path>` is set, write the blob there with `os.OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, 0600)` and stay silent on stdout (so the path can be piped).
   - Otherwise emit the blob to stdout.
   - Env-var names match what `neo4j-cli/query/connect.go:29-32` consumes; no change to `query`.
 - **REQ-F-018:** `--wait` semantics: after `docker run`, poll `bolt://localhost:<bolt-port>` until a Bolt v5 handshake succeeds, with a fixed 60 s deadline. Reuse the neo4j-go-driver vendored by `query/` (preferred) — fall back to a raw `net.Dial` + handshake only if the import introduces a cycle. On timeout return `clierr.NewUsageError("container started but Bolt did not become ready within 60s; check 'docker logs <name>'")` but leave the container running (don't tear down).
@@ -142,7 +142,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
   - Password generation uses `crypto/rand` (REQ-F-015) — not `math/rand`.
   - Env-file writes use `0600` permissions (REQ-F-017).
   - The full `docker run` command line (including `NEO4J_AUTH=neo4j/<password>`) must **not** be echoed in verbose / debug output.
-  - `--name` and `--env-file <path>` are validated against shell-injection vectors before being passed to `os/exec` (no `sh -c`; pass as discrete `Args`).
+  - `--name` and `--env-out-file <path>` are validated against shell-injection vectors before being passed to `os/exec` (no `sh -c`; pass as discrete `Args`).
   - Run the `golang-security` skill as a final gate before merge (memory: "Security review gate").
 - **REQ-NF-005:** **License headers.** Every new `.go` file starts with the Neo4j copyright header; `make license-check` is clean.
 - **REQ-NF-006:** **Format / lint gates pass.** `make fmt-check` and `make lint` are clean. CI's golangci-lint v2 (with `gofmt` formatter) must be green.
@@ -151,10 +151,10 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 
 ### Documentation Requirements
 
-- **REQ-DOC-001:** **README.md** — add a "Local Neo4j (Docker)" section near the existing Aura/query sections covering: `create` → `query --credential <name>` → `delete` flow, plus the `--ephemeral` + `--env-file` → `query --env <path>` flow.
+- **REQ-DOC-001:** **README.md** — add a "Local Neo4j (Docker)" section near the existing Aura/query sections covering: `create` → `query --credential <name>` → `delete` flow, plus the `--ephemeral` + `--env-out-file` → `query --env <path>` flow.
 - **REQ-DOC-002:** **AGENTS.md** (the `CLAUDE.md` symlink) — add a short subsection under "Architecture" pointing at `neo4j-cli/internal/subcommands/docker/` and noting Docker as the source-of-truth (label-based discovery, no separate state file).
 - **REQ-DOC-003:** **`neo4j-cli/internal/skill/description.txt`** — extend the single-paragraph description so the skill triggers on "docker", "local neo4j", "start/stop a Neo4j container". Stay ≤1024 chars, third person (per AGENTS.md "Cobra Help / Skill Bundle Rendering Notes").
-- **REQ-DOC-004:** **`neo4j-cli/internal/skill/additions.md`** — add a section describing the docker subtree with copy-paste examples, plus an entry covering `--ephemeral` + `--env-file` flowing into `query --env`.
+- **REQ-DOC-004:** **`neo4j-cli/internal/skill/additions.md`** — add a section describing the docker subtree with copy-paste examples, plus an entry covering `--ephemeral` + `--env-out-file` flowing into `query --env`.
 - **REQ-DOC-005:** **Regenerated skill bundle** — `bundle/SKILL.md` and `bundle/references/docker.md` are produced by `go generate` and committed. Do **not** hand-edit.
 - **REQ-DOC-006:** **CONTRIBUTING.md** — if a "Commands" or "Add a new command" subsection exists, list the docker tree alongside aura / query / credential.
 - **REQ-DOC-007:** **Changelog** — `changie new --projects neo4j-cli --kind Minor --body "Add 'docker' command tree for managing local Neo4j containers"` (or hand-author a YAML under `.changes/unreleased/` per AGENTS.md "Changie Notes" if changie isn't installed).
@@ -177,7 +177,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 1. `client.go` — `dockerClient` interface + `execClient` default + `lookupDocker` once.
 2. `labels.go` — label key constants + `Container` metadata struct + `Inspect(name)`.
 3. `docker.go` — parent `NewCmd`; mount in `app/app.go`.
-4. `create.go` — by far the densest leaf; build incrementally (flags → run → labels → credential / env-file → wait).
+4. `create.go` — by far the densest leaf; build incrementally (flags → run → labels → credential / env-out-file → wait).
 5. `bolt_ready.go` — extract the readiness probe so it's reusable by `start`.
 6. `list.go`, `get.go` — read leaves.
 7. `start.go`, `stop.go`, `delete.go` — write leaves.
@@ -210,7 +210,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 - [ ] `bin/neo4j-cli docker delete dev --rw` (on a TTY) prompts `[y/N]`; on `y` removes the container AND the dbms credential.
 - [ ] `printf 'y\n' | bin/neo4j-cli docker delete dev --rw` (non-TTY, no `--force`) exits non-zero with a clear usage error.
 - [ ] `bin/neo4j-cli docker delete dev --rw --force` (any caller) deletes without prompting.
-- [ ] `bin/neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw --wait` writes `/tmp/n.env` with mode `0600`, header comment, and the four `NEO4J_*` env vars. No `tmp` dbms credential is created. The container has label `org.neo4j.cli.ephemeral=true`.
+- [ ] `bin/neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --rw --wait` writes `/tmp/n.env` with mode `0600`, header comment, and the four `NEO4J_*` env vars. No `tmp` dbms credential is created. The container has label `org.neo4j.cli.ephemeral=true`.
 - [ ] `bin/neo4j-cli query --env /tmp/n.env "RETURN 1"` (using the file from the previous step) returns `1`.
 - [ ] `bin/neo4j-cli docker stop tmp --rw` removes the ephemeral container (because `--rm`).
 - [ ] With `docker` removed from PATH: `bin/neo4j-cli docker list --rw` errors out with the install hint; `bin/neo4j-cli aura instance list --rw` continues to work.
