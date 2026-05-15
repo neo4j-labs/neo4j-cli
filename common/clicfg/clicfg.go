@@ -141,7 +141,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		ValidConfigKeys: []string{"format", "telemetry"},
 	}
 
-	validAuraConfigKeys := []string{"auth-url", "base-url", "default-tenant"}
+	validAuraConfigKeys := []string{"auth-url", "base-url", "default-context"}
 	if scope == AuraScope {
 		validAuraConfigKeys = append(validAuraConfigKeys, globalConfig.ValidConfigKeys...)
 	}
@@ -388,7 +388,18 @@ func (config *AuraConfig) ActiveCredential() *credentials.AuraCredential {
 	return config.activeCredential
 }
 
+// DefaultTenant resolves the default tenant/project ID for Aura commands.
+// Resolution order:
+//  1. Project portion of aura.default-context (the part after the '/' in "{orgId}/{projectId}").
+//  2. Legacy aura.default-tenant config key as a fallback.
+//
+// Returns an empty string when neither is set.
 func (config *AuraConfig) DefaultTenant() string {
+	if ctx := config.viper.GetString("aura.default-context"); ctx != "" {
+		if idx := strings.LastIndex(ctx, "/"); idx >= 0 {
+			return ctx[idx+1:]
+		}
+	}
 	return config.viper.GetString("aura.default-tenant")
 }
 

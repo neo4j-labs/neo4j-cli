@@ -66,29 +66,29 @@ func TestConfigGet(t *testing.T) {
 			wantErr: `Error: invalid argument "invalid-key" for "neo4j-cli config get"`,
 		},
 		{
-			name:    "get aura.default-tenant returns default (null) value as JSON",
-			command: "config get aura.default-tenant --format json",
+			name:    "get aura.default-context returns default (null) value as JSON",
+			command: "config get aura.default-context --format json",
 			wantOut: `{
-	"aura.default-tenant": null
+	"aura.default-context": null
 }`,
 		},
 		{
-			name: "get aura.default-tenant returns configured value as JSON",
+			name: "get aura.default-context returns configured value as JSON",
 			configSetup: func(h *neo4jTestHelper) {
-				h.setConfigValue("aura.default-tenant", "my-tenant")
+				h.setConfigValue("aura.default-context", "my-org/my-project")
 			},
-			command: "config get aura.default-tenant --format json",
+			command: "config get aura.default-context --format json",
 			wantOut: `{
-	"aura.default-tenant": "my-tenant"
+	"aura.default-context": "my-org/my-project"
 }`,
 		},
 		{
-			name:    "get aura.default-tenant renders as table",
-			command: "config get aura.default-tenant --format table",
+			name:    "get aura.default-context renders as table",
+			command: "config get aura.default-context --format table",
 			wantOutFunc: func(t *testing.T, outStr string) {
 				assert.Contains(t, outStr, "KEY")
 				assert.Contains(t, outStr, "VALUE")
-				assert.Contains(t, outStr, "aura.default-tenant")
+				assert.Contains(t, outStr, "aura.default-context")
 			},
 		},
 		{

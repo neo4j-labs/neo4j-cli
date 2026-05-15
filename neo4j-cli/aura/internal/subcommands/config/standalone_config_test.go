@@ -180,7 +180,7 @@ func TestStandaloneConfigList(t *testing.T) {
 			wantOut: fmt.Sprintf(`{
 	"auth-url": "%s",
 	"base-url": "%s",
-	"default-tenant": null,
+	"default-context": null,
 	"format": "json",
 	"telemetry": true
 }`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl),

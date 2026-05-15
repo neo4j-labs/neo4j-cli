@@ -68,10 +68,10 @@ func TestConfigSet(t *testing.T) {
 			wantConfigValue: "https://example.com",
 		},
 		{
-			name:            "set aura.default-tenant with rw writes to aura.default-tenant",
-			command:         "config set --rw aura.default-tenant my-tenant",
-			wantConfigKey:   "aura.default-tenant",
-			wantConfigValue: "my-tenant",
+			name:            "set aura.default-context with rw writes to aura.default-context",
+			command:         "config set --rw aura.default-context my-org/my-project",
+			wantConfigKey:   "aura.default-context",
+			wantConfigValue: "my-org/my-project",
 		},
 		{
 			name:    "set aura.format with rw returns error (global-only key)",

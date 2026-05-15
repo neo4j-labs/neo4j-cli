@@ -20,7 +20,7 @@ neo4j-cli config get format
 neo4j-cli config get format --format json
 
 # Get an aura-scoped key via dot-notation
-neo4j-cli config get aura.default-tenant --format json
+neo4j-cli config get aura.default-context --format json
 ```
 
 ## neo4j-cli config list
@@ -57,7 +57,7 @@ neo4j-cli config set format json --rw
 # Disable telemetry
 neo4j-cli config set telemetry false --rw
 
-# Set the default Aura tenant via dot-notation
-neo4j-cli config set aura.default-tenant my-tenant-id --rw
+# Set the default Aura context via dot-notation
+neo4j-cli config set aura.default-context my-org-id/my-project-id --rw
 ```
 

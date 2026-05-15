@@ -37,7 +37,7 @@ neo4j-cli config get format
 neo4j-cli config get format --format json
 
 # Get an aura-scoped key via dot-notation
-neo4j-cli config get aura.default-tenant --format json`,
+neo4j-cli config get aura.default-context --format json`,
 		ValidArgs: validGetArgs(cfg),
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {

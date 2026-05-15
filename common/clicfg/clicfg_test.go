@@ -41,10 +41,10 @@ func TestResolveConfigKey(t *testing.T) {
 		},
 		{
 			name:          "aura-prefixed key resolves to aura namespace with prefix stripped",
-			key:           "aura.default-tenant",
+			key:           "aura.default-context",
 			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.AuraScope,
-			wantKey:       "default-tenant",
+			wantKey:       "default-context",
 		},
 		{
 			name:          "aura.base-url resolves to aura namespace",
@@ -127,6 +127,49 @@ func TestGetAuraBaseUrlConfigRemovesTrailingPath(t *testing.T) {
 
 	//The path parameter will be removed from GET base url
 	assert.Equal(t, server.URL, cfg.Aura.BaseUrl())
+}
+
+func TestDefaultTenant(t *testing.T) {
+	tests := []struct {
+		name       string
+		configJSON string
+		want       string
+	}{
+		{
+			name:       "returns project portion of aura.default-context when set",
+			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz"}}`,
+			want:       "proj-xyz",
+		},
+		{
+			name:       "returns project portion when context has extra slashes",
+			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz/extra"}}`,
+			want:       "extra",
+		},
+		{
+			name:       "falls back to aura.default-tenant when default-context is unset",
+			configJSON: `{"aura":{"default-tenant":"legacy-tenant-id"}}`,
+			want:       "legacy-tenant-id",
+		},
+		{
+			name:       "returns empty string when neither is set",
+			configJSON: `{}`,
+			want:       "",
+		},
+		{
+			name:       "default-context takes priority over default-tenant when both are set",
+			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz","default-tenant":"legacy-tenant-id"}}`,
+			want:       "proj-xyz",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
+			require.NoError(t, err)
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			assert.Equal(t, tc.want, cfg.Aura.DefaultTenant())
+		})
+	}
 }
 
 func TestAuraConfigActiveCredential(t *testing.T) {

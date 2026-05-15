@@ -12,7 +12,7 @@ tasks:
       (1) project portion of aura.default-context (split on '/', take right side);
       (2) default-tenant config key as legacy fallback. Add tests covering both resolution
       paths and the case where neither is set.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "aura config set/get/list accepts default-context and rejects default-tenant"
@@ -20,7 +20,7 @@ tasks:
       - "DefaultTenant() falls back to default-tenant when aura.default-context is unset"
       - "DefaultTenant() returns empty string when neither is set"
       - "Unit tests pass for all DefaultTenant() resolution cases"
-    completed_at: null
+    completed_at: 2026-05-15T12:30:00Z
 
   - id: task-002
     title: "Add v2beta1 API client methods for organizations and projects"
