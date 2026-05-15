@@ -115,6 +115,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - macOS binaries are code-signed and notarized
 - The release version comes from `GORELEASER_CURRENT_TAG` (set by the GoReleaser action)
 - `release-notes.md` is generated with a `## Changes` section (neo4j-cli changelog body) before GoReleaser runs
+- GoReleaser `brews.post_install:` takes the method **body** only — GoReleaser wraps it in `def post_install ... end` automatically. Do NOT include the `def`/`end` yourself or you get a nested def in the formula.
+- `make snapshot` (single-target) does **not** generate the Homebrew formula. To validate formula output locally run `GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --skip=publish --clean` (full multi-platform build) and inspect `dist/homebrew/Formula/neo4j-cli.rb`.
 
 ## Makefile Notes
 
@@ -175,6 +177,13 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Installer Script Testing Notes
+
+- Bats-core tests for `install-neo4j-cli.sh` live in `distribution/installation-scripts/tests/install-neo4j-cli.bats`. Run with `bats distribution/installation-scripts/tests/` (install bats-core via `brew install bats-core` or `apt-get install bats`).
+- The installer is a monolith; tests stub ALL external commands (curl, tar, sha256sum, shasum, uname, sudo) via a `STUBS_DIR` prepended to `PATH`. The curl stub for the checksums file must emit a fake sha256 line matching the archive filename so `grep <archive> checksums.txt | sha256sum -c` succeeds.
+- The tar stub creates a recording `neo4j-cli` binary (using `STUB_CALLS` env var) — this is critical because the installer `mv`s the tar-extracted binary to `INSTALL_DIR`, overwriting any pre-seeded stub. The recording logic must be embedded in what tar creates.
+- Always run `shellcheck` on `.bats` files; use `local stub_path=...` to avoid SC2097/SC2098 when constructing a `PATH=...` prefix that references other variables in the same assignment.
+
 ## npm Distribution Notes
 
 See [`distribution/npm/README.md`](distribution/npm/README.md).
@@ -214,6 +223,14 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 ## Agent Context Notes
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
+
+## PowerShell Installer Test Notes
+
+- **Use `.cmd` stubs, not `.ps1`**: When testing PowerShell installer scripts that call `& neo4j-cli`, put the stub in a `.cmd` file (not `.ps1`). Windows resolves bare `& neo4j-cli` to `.cmd`/`.bat` before `.ps1` when scanning PATH — a `.ps1` stub is often silently skipped.
+- **Write subprocess commands to a temp `.ps1` file**: Pass the wrapper script via `pwsh -File <path>` rather than `pwsh -Command <big-string>`. This avoids escaping backslashes, single-quotes, and `$` signs in nested here-strings.
+- **Pass paths via env vars**: When stub scripts need to write to a file (e.g. a calls-recorder), pass the path via an environment variable (e.g. `$env:NEO4J_CALLS_FILE`) rather than embedding it as a literal string — avoids escaping backslashes on Windows paths.
+- **CRLF for `.ps1` files**: Any `.ps1` file in `distribution/installation-scripts/` must have Windows CRLF line endings. After writing with any tool on macOS/Linux, convert with `python3 -c "..."` (unix2dos not available by default on macOS). Verify with: `python3 -c "import sys; ... count b'\\r\\n'"`.
+- `pwsh` is not installed by default on macOS dev machines — Pester tests are gated on `windows-latest` CI. Validate syntax locally by reading the file; don't block task completion on local Pester execution.
 
 ---
 

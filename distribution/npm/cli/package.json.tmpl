@@ -14,8 +14,12 @@
   "bin": {
     "neo4j-cli": "bin/neo4j-cli.js"
   },
+  "scripts": {
+    "postinstall": "node bin/postinstall.js"
+  },
   "files": [
     "bin/neo4j-cli.js",
+    "bin/postinstall.js",
     "README.md"
   ],
   "engines": {

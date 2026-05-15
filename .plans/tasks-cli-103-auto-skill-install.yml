@@ -1,0 +1,241 @@
+feature: cli-103-auto-skill-install
+prd: ./prd-cli-103-auto-skill-install.md
+created_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-15T14:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL postinstall hook to npm package template"
+    description: |
+      Add a `scripts.postinstall` entry to `distribution/npm/cli/package.json.tmpl`
+      that checks if `NEO4J_CLI_AUTO_INSTALL_SKILL === "1"` and, if so, calls
+      `neo4j-cli skill install --rw` via the existing `bin/neo4j-cli.js` shim.
+      The invocation must be wrapped in try/catch so any failure (including
+      ErrNoAgentsDetected) does not fail `npm install`. If the env var is absent
+      or any other value, the script exits 0 immediately.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 npm install -g @neo4j-labs/cli` triggers `skill install --rw`"
+      - "`npm install -g @neo4j-labs/cli` with unset or `=0` var exits 0 with no skill action"
+      - "Any non-zero exit from `skill install --rw` is caught and suppressed; `npm install` succeeds"
+      - "`make npm-publish-dry` renders `postinstall` in the generated `package.json`"
+    completed_at: 2026-05-14T00:00:00Z
+
+  - id: task-002
+    title: "Add post_install Ruby block to Homebrew formula via .goreleaser.yaml"
+    description: |
+      Add a `post_install` field to the `brews:` block in `.goreleaser.yaml`.
+      GoReleaser embeds the string verbatim as a Ruby method in the generated
+      formula. The block must return early unless `NEO4J_CLI_AUTO_INSTALL_SKILL`
+      equals `"1"`, then call `system "#{bin}/neo4j-cli", "skill", "install", "--rw"`.
+      Validate the rendered output using `make snapshot` and inspecting
+      `dist/homebrew/Formula/neo4j-cli.rb`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`make snapshot` produces a formula containing the correct `post_install` method"
+      - "Formula `post_install` returns early when env var is unset or `=0`"
+      - "Formula `post_install` calls `skill install --rw` when env var is `=1`"
+      - "`brew audit --strict --formula dist/homebrew/Formula/neo4j-cli.rb` passes (or equivalent local check)"
+    completed_at: 2026-05-14T10:00:00Z
+
+  - id: task-003
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.sh"
+    description: |
+      Edit `distribution/installation-scripts/install-neo4j-cli.sh` on the main
+      branch. After the binary is placed in PATH, add a block that skips unless
+      `NEO4J_CLI_AUTO_INSTALL_SKILL` equals `"1"`, then calls
+      `neo4j-cli skill install --rw || true` so any failure is non-fatal and
+      the overall install is unaffected. The shellcheck.yml CI workflow validates
+      this file on every PR.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`NEO4J_CLI_AUTO_INSTALL_SKILL=1 ./install-neo4j-cli.sh` calls `neo4j-cli skill install --rw` after binary placement"
+      - "`./install-neo4j-cli.sh` with unset or `=0` var does not call `skill install`"
+      - "A failed `skill install --rw` (e.g. no agents detected) does not abort the install script"
+      - "`shellcheck distribution/installation-scripts/install-neo4j-cli.sh` passes with no errors"
+    completed_at: 2026-05-14T00:00:00Z
+
+  - id: task-004
+    title: "Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.ps1"
+    description: |
+      Edit `distribution/installation-scripts/install-neo4j-cli.ps1` on the main
+      branch. After placing the binary in PATH, add a block that skips unless
+      `$env:NEO4J_CLI_AUTO_INSTALL_SKILL -eq "1"`, then calls
+      `neo4j-cli skill install --rw` with error suppression so the overall install
+      is unaffected. Note: if editing on a non-Windows OS, run `unix2dos` on the
+      file afterwards (per the README).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`$env:NEO4J_CLI_AUTO_INSTALL_SKILL='1'` triggers `skill install --rw` after binary placement"
+      - "`install-neo4j-cli.ps1` with unset or any non-`'1'` value does not call `skill install`"
+      - "A failed `skill install --rw` does not abort the PowerShell install script"
+      - "File has Windows line endings (CRLF) if edited on a Unix system"
+    completed_at: 2026-05-14T00:00:00Z
+
+  - id: task-005
+    title: "Add changelog entry for CLI-103 auto-skill-install feature"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Minor --body <body>` (or
+      hand-author a YAML file under `.changes/unreleased/`) to record the
+      new opt-in auto-install behaviour. The body should mention that setting
+      `NEO4J_CLI_AUTO_INSTALL_SKILL=1` before installing via npm, Homebrew, or
+      the curl installer automatically runs `skill install --rw`.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "A new file exists under `.changes/unreleased/` with `project: neo4j-cli` and `kind: Minor`"
+      - "The body mentions `NEO4J_CLI_AUTO_INSTALL_SKILL=1` and the three channels (npm, Homebrew, curl)"
+      - "`make changelog` (or `changie batch`) succeeds without errors"
+    completed_at: 2026-05-14T15:48:51Z
+
+  - id: task-006
+    title: "Add bats-core behavioral tests for install-neo4j-cli.sh"
+    description: |
+      Create `distribution/installation-scripts/tests/install-neo4j-cli.bats`
+      using bats-core. Each test injects a stub `neo4j-cli` script into PATH
+      that records its arguments to a temp file. Test cases:
+      1. `NEO4J_CLI_AUTO_INSTALL_SKILL=1`: stub is called with `skill install --rw`.
+      2. Env var unset or `=0`: stub is never called.
+      3. `=1` but stub exits non-zero: install script still exits 0.
+      Document local run command in the test file header:
+      `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`
+    status: completed
+    completed_at: 2026-05-15T00:00:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "All three test cases pass via `bats distribution/installation-scripts/tests/`"
+      - "Tests pass on macOS and Linux without a real neo4j-cli binary installed"
+      - "Stub script records invocations; assertions check the recorded args"
+      - "`shellcheck` passes on the bats file and the stub helper"
+
+  - id: task-007
+    title: "Add Pester behavioral tests for install-neo4j-cli.ps1"
+    description: |
+      Create `distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1`
+      using Pester v5. Override `neo4j-cli` as a PowerShell function (or use
+      Mock) before dot-sourcing the installer to capture invocations. Test cases:
+      1. `$env:NEO4J_CLI_AUTO_INSTALL_SKILL = '1'`: mock receives `skill install --rw`.
+      2. Env var unset or any non-`'1'` value: mock is never called.
+      3. `=1` but mock throws: installer script still exits cleanly (no terminating error).
+      Document local run command: `Invoke-Pester distribution/installation-scripts/tests/`
+    status: completed
+    completed_at: 2026-05-15T10:00:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "All three test cases pass via `Invoke-Pester` on Windows"
+      - "Tests run without a real neo4j-cli binary installed"
+      - "Pester `Mock` or function stub captures invocation arguments"
+      - "Test file has Windows line endings (CRLF)"
+
+  - id: task-008
+    title: "Extract npm postinstall logic to testable module and add Jest tests"
+    description: |
+      Extract the inline postinstall logic from `distribution/npm/cli/package.json.tmpl`
+      into `distribution/npm/cli/postinstall.js`. Update the `scripts.postinstall`
+      entry in the template to call `node postinstall.js`. Add Jest as a dev
+      dependency in `distribution/npm/cli/package.json.tmpl` (or a separate
+      `package.json` for tests). Create `distribution/npm/cli/postinstall.test.js`
+      with test cases:
+      1. `process.env.NEO4J_CLI_AUTO_INSTALL_SKILL = '1'`: mock receives
+         `skill install --rw` args.
+      2. Env var unset or `=0`: mock never called.
+      3. `=1` but mock throws: postinstall exits 0 (error caught).
+      Use `jest.mock` or a manual stub for the `bin/neo4j-cli.js` invocation.
+      Document local run: `npm test` from `distribution/npm/cli/`.
+    status: completed
+    completed_at: 2026-05-15T12:00:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All three Jest test cases pass via `npm test` on macOS, Linux, and Windows"
+      - "Tests run without a real neo4j-cli binary installed"
+      - "`make npm-publish-dry` still passes after extracting postinstall.js"
+      - "postinstall.js has the Neo4j copyright header"
+
+  - id: task-009
+    title: "Add Ruby minitest behavioral tests for Homebrew post_install block"
+    description: |
+      Create `distribution/homebrew/tests/post_install_test.rb`. Extract the
+      `post_install` Ruby snippet from `.goreleaser.yaml` into a helper
+      (`distribution/homebrew/post_install.rb`) that can be `require`d. In the
+      test, override the `system` kernel method with a lambda that records calls,
+      set/unset `ENV['NEO4J_CLI_AUTO_INSTALL_SKILL']`, then invoke the method.
+      Test cases:
+      1. `ENV['NEO4J_CLI_AUTO_INSTALL_SKILL'] = '1'`: `system` called with
+         the correct binary path and `skill install --rw` args.
+      2. Env var unset or `=0`: `system` never called.
+      3. `=1` but `system` raises: method returns without propagating the error.
+      Document local run: `ruby distribution/homebrew/tests/post_install_test.rb`
+      No Homebrew installation required — pure Ruby stdlib only.
+    status: completed
+    completed_at: 2026-05-15T13:00:00Z
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "All three minitest cases pass via `ruby distribution/homebrew/tests/post_install_test.rb`"
+      - "Tests run without Homebrew or neo4j-cli installed"
+      - "Helper file has the Neo4j copyright header"
+      - "`post_install.rb` helper is referenced from `.goreleaser.yaml` (or kept in sync with it)"
+
+  - id: task-010
+    title: "Add installer-tests.yml GitHub Actions workflow"
+    description: |
+      Create `.github/workflows/installer-tests.yml` that runs all installer
+      behavioral tests on every pull request and push to main:
+      - bats-core tests: `ubuntu-latest` and `macos-latest`
+        (install bats-core via `apt-get` or `brew`)
+      - Pester tests: `windows-latest` (Pester v5 pre-installed)
+      - Jest tests: matrix of `ubuntu-latest`, `macos-latest`, `windows-latest`
+        (install node, run `npm ci && npm test` in `distribution/npm/cli/`)
+      - Ruby minitest tests: `ubuntu-latest` (Ruby pre-installed)
+      The workflow must not require any secrets or external services.
+    status: completed
+    completed_at: 2026-05-15T14:30:00Z
+    dependencies:
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "Workflow triggers on `pull_request` and `push` to `main`"
+      - "All four job types pass on a sample PR"
+      - "Workflow fails fast if any test suite fails (exit code propagated)"
+      - "Workflow file passes `actionlint` (or equivalent YAML validation)"
+
+  - id: task-011
+    title: "Add test-installer Makefile targets"
+    description: |
+      Add five targets to the `Makefile`:
+      - `test-installer-sh`: runs `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`.
+        Errors if `bats` is not on PATH.
+      - `test-installer-ps1`: runs Pester via
+        `pwsh -NoProfile -NonInteractive -Command "Invoke-Pester -Path distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 -Output Detailed"`.
+        If `pwsh` is not found, prints a skip message and exits 0.
+      - `test-installer-npm`: runs `npm ci && npm test` inside `distribution/npm/cli/`.
+        Errors if `npm` is not on PATH.
+      - `test-installer-rb`: runs `ruby distribution/homebrew/tests/post_install_test.rb`.
+        Errors if `ruby` is not on PATH.
+      - `test-installer`: aggregate target that calls all four sub-targets in order.
+      Follow existing Makefile conventions (tabs, `.PHONY`, section placement).
+    status: completed
+    completed_at: 2026-05-15T15:00:00Z
+    dependencies:
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "`make test-installer-sh` passes on macOS and Linux"
+      - "`make test-installer-ps1` exits 0 with a skip message when `pwsh` is absent"
+      - "`make test-installer-npm` passes on macOS, Linux, and Windows"
+      - "`make test-installer-rb` passes on macOS and Linux"
+      - "`make test-installer` runs all four sub-targets and succeeds"
+      - "All five targets are listed under `.PHONY`"
