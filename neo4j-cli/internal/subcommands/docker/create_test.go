@@ -7,6 +7,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
 	"strings"
 	"testing"
 
@@ -31,12 +34,62 @@ func (c constantReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// fakeListener is the in-memory net.Listener returned by the test
+// listenerFactory when a port is "free". Close is a no-op; the other
+// methods are unused because create.go only ever calls Close after Listen.
+type fakeListener struct{}
+
+func (fakeListener) Accept() (net.Conn, error) {
+	return nil, errors.New("fakeListener: Accept not supported")
+}
+func (fakeListener) Close() error   { return nil }
+func (fakeListener) Addr() net.Addr { return &net.TCPAddr{} }
+
+// stubListenerFactory swaps the package-level listenerFactory seam so port
+// pre-flight checks (REQ-F-013) are deterministic and hermetic — no real
+// sockets are opened. Each port in `occupied` returns a sentinel error
+// keyed by port number; all other ports return a no-op fakeListener.
+// Returns a cleanup func and a *[]int the test can read to assert which
+// ports were probed and in what order.
+func stubListenerFactory(t *testing.T, occupied ...int) (calls *[]int) {
+	t.Helper()
+	busy := map[int]bool{}
+	for _, p := range occupied {
+		busy[p] = true
+	}
+	var probed []int
+	orig := listenerFactory
+	listenerFactory = func(port int) (net.Listener, error) {
+		probed = append(probed, port)
+		if busy[port] {
+			return nil, fmt.Errorf("fakeListener: port %d is occupied (test stub)", port)
+		}
+		return fakeListener{}, nil
+	}
+	t.Cleanup(func() { listenerFactory = orig })
+	return &probed
+}
+
 // runCreate builds the docker parent command (with create leaf wired), swaps
 // the package-level clientFactory seam for the supplied fake, and executes the
 // given shell-like argument string. It returns the fake (for argv assertions),
 // the cfg (for credential assertions), and stdout (for output-format
 // assertions).
+//
+// runCreate also stubs the listenerFactory with no occupied ports so the
+// port-conflict pre-flight (REQ-F-013) never touches real sockets — keeping
+// the package's tests hermetic per AGENTS.md "Hermetic Test Notes". Tests
+// that need to simulate an occupied port use runCreateWithOccupiedPorts.
 func runCreate(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, string, error) {
+	t.Helper()
+	return runCreateWithOccupiedPorts(t, args)
+}
+
+// runCreateWithOccupiedPorts is the same as runCreate but installs a
+// listenerFactory that simulates the given ports as already-bound. It
+// exists so port-conflict cases can drive the pre-flight deterministically
+// without ever opening a real socket.
+func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int) (*fakeDockerClient, *clicfg.Config, string, error) {
 	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
@@ -50,6 +103,8 @@ func runCreate(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, st
 	origFactory := clientFactory
 	clientFactory = func() dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t, occupiedPorts...)
 
 	cmd := NewCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
@@ -234,4 +289,127 @@ func TestCreate_InvalidEdition_ReturnsUsageError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--edition")
 	assert.Empty(t, fake.RunCalls, "docker run must not be invoked on invalid --edition")
+}
+
+func TestCreate_PortPreflight(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            string
+		occupied        []int
+		wantErr         bool
+		wantErrContains []string
+		// wantRun is the expected number of recorded docker run invocations.
+		// All conflict cases must be 0 — pre-flight runs BEFORE any docker
+		// side effect (REQ-F-013).
+		wantRun int
+	}{
+		{
+			name:    "both ports free succeeds",
+			args:    "--name dev --no-store-credential",
+			wantRun: 1,
+		},
+		{
+			name:            "bolt port occupied surfaces --bolt-port hint",
+			args:            "--name dev --no-store-credential",
+			occupied:        []int{7687},
+			wantErr:         true,
+			wantErrContains: []string{"port 7687", "--bolt-port"},
+			wantRun:         0,
+		},
+		{
+			name:            "http port occupied surfaces --http-port hint",
+			args:            "--name dev --no-store-credential",
+			occupied:        []int{7474},
+			wantErr:         true,
+			wantErrContains: []string{"port 7474", "--http-port"},
+			wantRun:         0,
+		},
+		{
+			name:            "equal ports rejected before any Listen",
+			args:            "--name dev --bolt-port 9999 --http-port 9999 --no-store-credential",
+			wantErr:         true,
+			wantErrContains: []string{"--bolt-port", "--http-port", "9999"},
+			wantRun:         0,
+		},
+		{
+			name:            "custom bolt port occupied is named correctly",
+			args:            "--name dev --bolt-port 9999 --http-port 9000 --no-store-credential",
+			occupied:        []int{9999},
+			wantErr:         true,
+			wantErrContains: []string{"port 9999", "--bolt-port"},
+			wantRun:         0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake, _, _, err := runCreateWithOccupiedPorts(t, tc.args, tc.occupied...)
+			if tc.wantErr {
+				require.Error(t, err)
+				for _, sub := range tc.wantErrContains {
+					assert.Contains(t, err.Error(), sub)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Len(t, fake.RunCalls, tc.wantRun)
+		})
+	}
+}
+
+func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
+	// Verifies the listener factory is invoked exactly twice and in the
+	// documented order (bolt-port first, then http-port) on the happy path.
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	probed := stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"create", "--name", "dev", "--bolt-port", "7688", "--http-port", "7475", "--no-store-credential"})
+
+	require.NoError(t, cmd.Execute())
+	require.Equal(t, []int{7688, 7475}, *probed, "pre-flight must probe --bolt-port then --http-port")
+	require.Len(t, fake.RunCalls, 1, "docker run must execute exactly once after a clean pre-flight")
+}
+
+func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
+	// Equal-ports check must fire BEFORE any Listen call so the operator
+	// sees the conflict instead of a misleading "port in use" error.
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	fake := newFakeDockerClient()
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	probed := stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"create", "--name", "dev", "--bolt-port", "9999", "--http-port", "9999", "--no-store-credential"})
+
+	err = cmd.Execute()
+	require.Error(t, err)
+	assert.Empty(t, *probed, "no port may be probed when --bolt-port and --http-port are equal")
+	assert.Empty(t, fake.RunCalls, "docker run must not be invoked on equal-port usage error")
 }

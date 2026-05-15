@@ -73,7 +73,7 @@ tasks:
       On bind failure return `clierr.NewUsageError("port %d is in use on the host. Pass --%s <other> to pick a free port.", port, flagName)` — flag name is `bolt-port` or `http-port` depending on which one conflicted.
       Make the listener factory injectable so tests can simulate conflicts deterministically.
       Extend `create_test.go` with cases: 7687 occupied → error names --bolt-port; 7474 occupied → error names --http-port; both free → succeeds; same port for bolt and http → error.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -82,7 +82,7 @@ tasks:
       - "--bolt-port and --http-port set to the same value → usage error"
       - "Pre-flight uses net.Listen on tcp; test harness injects a fake listener factory"
       - "go test ./neo4j-cli/internal/subcommands/docker/... passes including the new cases"
-    completed_at: null
+    completed_at: 2026-05-15T14:30:00Z
 
   - id: task-005
     title: "docker create — name-collision auto-suffix"

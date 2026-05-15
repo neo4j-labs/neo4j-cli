@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -26,6 +27,14 @@ var clientFactory = newClient
 // generate a default Neo4j password (REQ-F-015). Tests swap in a deterministic
 // reader so the rendered password is assertable.
 var randSource io.Reader = rand.Reader
+
+// listenerFactory is the injectable seam for the port-conflict pre-flight
+// (REQ-F-013). Production binds an ephemeral TCP listener on the requested
+// host port (closing immediately on success); tests swap in a fake that
+// returns sentinel errors keyed by port so we never touch the network.
+var listenerFactory = func(port int) (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf(":%d", port))
+}
 
 // generatedPasswordBytes is the byte length consumed from randSource before
 // base64-URL-safe encoding without padding. 16 bytes → 22 base64 characters,
@@ -81,6 +90,21 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// error rendering matches the rest of the docker subtree.
 			if edition != "community" && edition != "enterprise" {
 				return clierr.NewUsageError(`invalid argument %q for "--%s" flag: must be one of "community" or "enterprise"`, edition, editionFlag)
+			}
+
+			// Port-conflict pre-flight (REQ-F-013). Run BEFORE any docker
+			// side effect so a port clash never leaves a half-created
+			// container behind. Equal-ports check fires first so we don't
+			// confusingly succeed on the first Listen and then fail on the
+			// second with the same port number in both error messages.
+			if boltPort == httpPort {
+				return clierr.NewUsageError("--%s and --%s must be different (got %d for both)", boltPortFlag, httpPortFlag, boltPort)
+			}
+			if err := checkPortFree(boltPort, boltPortFlag); err != nil {
+				return err
+			}
+			if err := checkPortFree(httpPort, httpPortFlag); err != nil {
+				return err
 			}
 
 			// Resolve password: honour --password verbatim, otherwise generate
@@ -198,4 +222,18 @@ func (s singleRow) AsArray() []map[string]any {
 // the struct's default `{"row":{...}}` shape.
 func (s singleRow) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.AsArray())
+}
+
+// checkPortFree binds and immediately releases a TCP listener on the given
+// host port via the listenerFactory seam. On bind failure it returns a
+// usage error naming both the port and the flag the operator can override
+// (REQ-F-013). On success the listener is closed before returning so the
+// real `docker run` call can claim the port a moment later.
+func checkPortFree(port int, flagName string) error {
+	ln, err := listenerFactory(port)
+	if err != nil {
+		return clierr.NewUsageError("port %d is in use on the host. Pass --%s <other> to pick a free port.", port, flagName)
+	}
+	_ = ln.Close()
+	return nil
 }
