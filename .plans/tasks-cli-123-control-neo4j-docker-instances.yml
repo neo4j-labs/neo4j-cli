@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-15T20:30:00Z
+updated_at: 2026-05-15T21:30:00Z
 
 tasks:
   - id: task-001
@@ -320,6 +320,7 @@ tasks:
     status: pending
     dependencies:
       - task-015
+      - task-018
     acceptance_criteria:
       - "neo4j-cli/internal/subcommands/docker/client.go exports an ErrNotFound sentinel; execClient.Inspect wraps it only when docker stderr contains 'No such '"
       - "get/start/stop/delete each use errors.Is(err, ErrNotFound) → unknown-name; any other Inspect error propagates with the original docker stderr visible"
@@ -357,6 +358,7 @@ tasks:
     status: pending
     dependencies:
       - task-015
+      - task-018
     acceptance_criteria:
       - "bolt_ready.go exports WaitForBoltTCP(ctx, host, port, timeout); uses pollInterval; injectable via tcpDialFn package var; timeout returns clierr.UsageError"
       - "start.go --wait flow uses WaitForBolt when a dbms credential exists and falls back to WaitForBoltTCP otherwise, with a stderr info line announcing the fallback"
@@ -364,5 +366,163 @@ tasks:
       - "start_test.go covers authenticated happy + timeout, TCP-fallback happy + timeout, container-not-torn-down on TCP timeout, info line emitted on fallback, and probeBoltFn NOT invoked when no credential"
       - "bolt_ready_test.go covers WaitForBoltTCP immediate / after-N / timeout / ctx-cancelled"
       - "start.go Long: + Example: mention the fallback; skill bundle regenerated and committed"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
+
+  - id: task-018
+    title: "Replace parsePsOutput and parseInspectOutput stubs (BLOCKER — feature non-functional against real docker without this)"
+    description: |
+      `neo4j-cli/internal/subcommands/docker/client.go:193-202` defines `parsePsOutput` and `parseInspectOutput` as stubs that return empty values. They were placeholders in task-001 with TODO comments naming task-008 / task-009 as the landing tasks; neither task replaced them. Every docker-package test passes because the `fakeDockerClient` (helpers_test.go) bypasses the stubs entirely. Against a real `docker` binary the feature is non-functional:
+      - `docker list` always renders empty (PsAll returns nil entries).
+      - `docker get <any>` returns "no managed container named X" (parseInspectOutput returns `Container{Name: name}` with `Managed: false`; the managed-gate refuses it).
+      - `docker start / stop / delete` likewise refuse with unknown-name for the same reason.
+      - `docker create`'s name-collision detection silently skips the docker-side of the collision set; collisions go straight to docker, which rejects with a daemon error.
+      Surfaced by the golang-security review of the branch. This is FUNCTIONAL not security per se (the feature fails closed: no info disclosure, no privilege escalation), but ship-blocking — no end-to-end live-docker run was ever attempted during the implementation loop. Must land before task-016 and task-017 (both updated to depend on task-018) because their behaviour is only observable once Inspect returns real data.
+      Implementation:
+      1. Replace `parsePsOutput(stdout string) ([]PsEntry, error)`:
+         - `docker ps --format '{{json .}}'` emits ONE JSON object per line, separated by newlines. Empty stdout → empty slice + nil error.
+         - For each non-empty line, `json.Unmarshal` into a `PsEntry` (the existing struct in client.go already has the right tags).
+         - **Fail loud** on the user's decision: any malformed line returns `fmt.Errorf("docker: parse ps output: line %d: %w", lineNo, err)` so version drift surfaces immediately rather than silently empties the list.
+         - Use `bufio.Scanner` with an increased buffer (some labels can push lines beyond the default 64KB) — set `scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)`.
+      2. Replace `parseInspectOutput(name, stdout string) (Container, error)`:
+         - `docker inspect <name>` emits a JSON ARRAY with one element (even for a single container). Decode into a small partial struct with only the fields we need:
+           ```go
+           type inspectShape struct {
+               Name   string `json:"Name"`           // leading "/", strip it
+               State  struct {
+                   Status  string `json:"Status"`
+                   Running bool   `json:"Running"`
+               } `json:"State"`
+               Config struct {
+                   Image  string            `json:"Image"`
+                   Labels map[string]string `json:"Labels"`
+               } `json:"Config"`
+           }
+           ```
+         - `json.Unmarshal` the stdout as `[]inspectShape`; require exactly one element (`len(shapes) != 1` → fail loud with a parse error mentioning the actual count).
+         - Build `Container`: `Name` = `strings.TrimPrefix(shape.Name, "/")` (docker prepends `/`); `Status` = `State.Status`; `Running` = `State.Running`; `Image` = `Config.Image`; `Edition` / `Version` / `BoltPort` / `HTTPPort` from the matching `org.neo4j.cli.*` labels; `Ephemeral` = `labels[LabelEphemeral] == "true"`; `Managed` = `labels[LabelManaged] == "true"`. Do NOT populate `URI` here — that's the leaf's job (REQ-F-031).
+         - Fail loud on any json.Unmarshal error: `fmt.Errorf("docker: parse inspect output for %q: %w", name, err)`.
+      3. Test fixtures (`client_test.go` or new `parsers_test.go`):
+         - Hand-craft realistic JSON fixtures matching Docker's documented shape — DO NOT capture from a live daemon in this task (we'd need docker on CI). Use the JSON from Docker's own engine API docs as the canonical source. Strive for one fixture per parser plus malformed-input cases.
+         - `parsePsOutput` cases: empty stdout → empty + nil; one managed container line → one PsEntry; two lines (managed + unmanaged) → two entries; trailing newline tolerated; malformed JSON on second line → parse error mentioning line 2; absurdly large label list (>64KB) handled.
+         - `parseInspectOutput` cases: single-element array with full label set → Container populated correctly (assert every field, including Managed=true); empty array → fail-loud parse error; two-element array → fail-loud parse error; missing labels → empty strings + Managed=false (NOT an error — Docker can emit containers without our labels); `Name` with leading `/` is stripped; `State.Running=false` flows through; malformed JSON → parse error with the field name.
+      4. Optional follow-up (NOT this task): a smoke test under a build tag matching `query/query_bolt_smoke_test.go` that does `exec.LookPath("docker")` + `docker run` against a real `neo4j:latest-enterprise` image and asserts list/get round-trip. Track as a separate follow-up issue if wanted.
+      5. Wire-up: nothing changes in the leaves. `client.go`'s `PsAll` and `Inspect` already call the parsers; replacing the stubs makes the call chain real.
+      6. Regenerate skill bundle if any `Long:`/`Example:` text is edited (likely not — this task touches client.go and tests only).
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "parsePsOutput decodes one PsEntry per newline-separated JSON line from `docker ps --format '{{json .}}'`; malformed JSON on any line returns a typed error naming the line number"
+      - "parseInspectOutput decodes `docker inspect <name>` JSON-array output, requires exactly one element, populates every Container field including Managed and Running, strips the leading `/` from Name"
+      - "parsers fail loud on malformed JSON (no silent empties); test cases assert the error message shape"
+      - "no live docker required for tests; hand-crafted fixtures cover empty input, one entry, two entries (mixed managed/unmanaged), trailing newline, malformed JSON, and `Container` without our labels (Managed=false)"
+      - "task-016 and task-017 dependency arrays already include task-018; the existing test suites for those tasks pass once 018 lands and the parsers return real data"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
+
+  - id: task-019
+    title: "writeEnvFile: temp file + atomic rename to close symlink-follow and chmod-TOCTOU"
+    description: |
+      `neo4j-cli/internal/subcommands/docker/create.go:345-365` (writeEnvFile) opens `<path>` with `O_WRONLY|O_CREATE|O_TRUNC|0o600` and then calls `fs.Chmod(path, 0o600)`. Two interlocking issues surfaced in the golang-security review:
+      - **Symlink follow on open**: POSIX `open()` follows symlinks by default; an attacker with write access to the containing dir can plant `<path>` as a symlink to `~/.ssh/authorized_keys` or similar and have the generated Neo4j password written there with `O_TRUNC` semantics.
+      - **TOCTOU between OpenFile and Chmod**: the small window between the two syscalls combined with a swap-in symlink lets an attacker land the credentials in an unowned target where our subsequent Chmod fails (we return the chmod error but the credential is already on disk in the wrong place).
+      DREAD ≈ 4.0 (Medium). Threat surface is a shared-host / shared-`/tmp` model — narrow for single-user dev boxes, real for shared CI / cloud-shells. Operator decision: **temp file + atomic rename** (user's pick).
+      Implementation in `writeEnvFile`:
+      ```go
+      func writeEnvFile(fs afero.Fs, path, contents string) error {
+          dir := filepath.Dir(path)
+          // O_EXCL guarantees we own the temp file we open; .neo4j-cli-env-<rand>
+          // keeps it discoverable on a stray ^C.
+          tmp, err := afero.TempFile(fs, dir, ".neo4j-cli-env-")
+          if err != nil { return fmt.Errorf("docker create: create temp env-file in %s: %w", dir, err) }
+          tmpPath := tmp.Name()
+          // Wire a cleanup that fires on any error path.
+          cleanup := func() { _ = fs.Remove(tmpPath) }
+          if _, werr := tmp.WriteString(contents); werr != nil {
+              _ = tmp.Close(); cleanup()
+              return fmt.Errorf("docker create: write temp env-file %s: %w", tmpPath, werr)
+          }
+          if cerr := tmp.Close(); cerr != nil {
+              cleanup(); return fmt.Errorf("docker create: close temp env-file %s: %w", tmpPath, cerr)
+          }
+          // Chmod while we still own the temp file. Atomic w.r.t. external symlinks
+          // because the temp path is fresh and O_EXCL-guarded.
+          if cerr := fs.Chmod(tmpPath, 0o600); cerr != nil {
+              cleanup(); return fmt.Errorf("docker create: chmod temp env-file %s: %w", tmpPath, cerr)
+          }
+          // Atomic rename (POSIX). On Windows fs.Rename will return an error if
+          // the destination exists on older Go; modern Go handles atomic replace
+          // on NTFS. If rename fails, cleanup and surface — do not leave the
+          // temp file behind.
+          if rerr := fs.Rename(tmpPath, path); rerr != nil {
+              cleanup(); return fmt.Errorf("docker create: rename env-file to %s: %w", path, rerr)
+          }
+          return nil
+      }
+      ```
+      Notes:
+      - `afero.TempFile(fs, dir, prefix)` works on both `afero.OsFs` (production) and `afero.MemMapFs` (tests).
+      - Use `path/filepath` (not `path/path`) for `Dir` so Windows separators are handled.
+      - `O_EXCL` is set internally by `TempFile` via its random suffix; the call returns an error if the temp path already exists.
+      - **Behavior change**: an operator-intended symlink at the target gets REPLACED with a regular file. Document this in `Long:` / additions.md so operators using `--env-file ~/.creds/n.env` where `~/.creds/n.env` is a symlink to a vault-mounted file know the symlink will be clobbered.
+      Tests (`create_test.go`):
+      - Existing `TestCreate_Ephemeral_EnvFile_WritesFile` / `TestCreate_Ephemeral_EnvFile_ChmodsPreexistingFileTo0600` should still pass with the new implementation.
+      - New: pre-create a symlink at the target path in the memfs pointing to a different file. Run create; assert the final path is a REGULAR file with mode 0o600 and the documented blob; assert the original symlink target is unchanged.
+      - New: simulate rename failure (afero memfs hook OR a fake fs wrapper); assert no temp file is left on disk.
+      - New: simulate chmod failure; assert no temp file is left on disk.
+      - New: target dir does not exist → error; no temp file.
+      Update the `Long:` string on `create.go --env-file` flag to mention "writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path will be replaced." Regenerate skill bundle.
+      Also update `additions.md` and the README "Local Neo4j (Docker)" symlink note.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "writeEnvFile creates a `.neo4j-cli-env-<rand>` temp file in the target's directory via afero.TempFile, writes + chmods + renames atomically"
+      - "any error path (write, close, chmod, rename) removes the temp file before returning"
+      - "tests cover: existing happy path, pre-existing-symlink → replaced with regular file mode 0o600 (original symlink target untouched), rename failure → no temp left, chmod failure → no temp left, dir missing → error"
+      - "create.go --env-file flag Long: mentions the symlink-replacement behaviour; README + additions.md updated; bundle regenerated"
+      - "make fmt-check, make lint, make test, make license-check all pass; security review verifies the new write path has no symlink-follow + no chmod-TOCTOU window"
+    completed_at: null
+
+  - id: task-020
+    title: "Document that generated password is rendered to stdout (capture/pipe caveat)"
+    description: |
+      `docker create` puts the generated 16-byte base64 password in the standard rendered output row (`name`, `edition`, …, `password`). This is documented behaviour and the operator-locked design from the planning loop, but `bin/neo4j-cli docker create --name dev --rw > out.txt` writes the credential to disk and any pipe (`| tee`, `| jq`, CI capture) ships it downstream. The golang-security review flagged this as Informational (S4) — operators do it on purpose, but should be told. One-line doc fix, no code change.
+      Update:
+      - `README.md` "Local Neo4j (Docker)" section: add a single paragraph near the persistent-flow example along the lines of: "Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` if you want to choose the password yourself, or `--no-store-credential` if you want neither the credential nor the rendered password."
+      - `neo4j-cli/internal/skill/additions.md`: mirror the paragraph so agent ingestion picks it up. Brief — one sentence is enough on the skill side since agents tend to be lossy on long explanations.
+      - Regenerate the skill bundle: `go generate ./neo4j-cli/internal/skill/...`.
+      No code changes. No test changes (this is a docs-only refinement).
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "README.md Local Neo4j (Docker) section warns that the generated password is in stdout and is captured by redirects/pipes"
+      - "neo4j-cli/internal/skill/additions.md has a mirror sentence"
+      - "skill bundle regenerated; make test (TestGenerator_RoundTrip) passes"
+      - "no code changes; make fmt-check, make lint, make license-check all pass"
+    completed_at: null
+
+  - id: task-021
+    title: "Architectural cleanup: drop redundant per-leaf --format registration in docker subtree"
+    description: |
+      `flags.RegisterOutputFlag(cmd, cfg)` adds `--format` as a persistent flag AND installs a PersistentPreRunE that validates+binds the value. The neo4j-cli root (`neo4j-cli/app/app.go:40`) already calls it on the root cmd. With `cobra.EnableTraverseRunHooks = true` (set at `app.go:78`), the leaf's PersistentPreRunE composes with the root's rather than replacing it — but registering the same persistent flag twice (root + leaf) creates two definitions on the same name, and the wiring brittle-ly relies on the EnableTraverseRunHooks setting being in place.
+      In the docker subtree this surfaced as: `list.go:78` and `get.go:92` call `RegisterOutputFlag` on the leaf, but `create.go` (which ALSO renders via `PrintBodyMap`) does NOT. Three different patterns in one subtree.
+      Scope (user-locked): **docker only**. Credential subtree has the same pre-existing mismatch (some leaves register, some don't) but that's tracked as a separate cleanup outside CLI-123.
+      Implementation:
+      1. Remove `flags.RegisterOutputFlag(cmd, cfg)` from `neo4j-cli/internal/subcommands/docker/list.go:78` and `neo4j-cli/internal/subcommands/docker/get.go:92`.
+      2. Remove the matching imports if `flags` is no longer used in those files (`list.go` only uses it for this call; `get.go` only uses it for this call — both imports can drop).
+      3. Tests: `list_test.go` and `get_test.go` likely call `flags.RegisterOutputFlag(rootCmd, cfg)` on a test-built root command. Those calls are correct for the test setup (the test root is independent of `app.NewCmd`) — DO NOT remove them. The drop applies only to production-side per-leaf registration.
+      4. Verify: `bin/neo4j-cli docker list --format json`, `bin/neo4j-cli docker get <name> --format json`, and `bin/neo4j-cli docker create --name X --rw --format json` all still emit JSON. The root's persistent flag propagates to all docker leaves via cobra inheritance.
+      5. Regenerate skill bundle if `Long:` text changes (unlikely — this is a code-only cleanup). Otherwise no bundle update.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "list.go and get.go no longer call flags.RegisterOutputFlag in production code"
+      - "create.go is unchanged (already doesn't call it)"
+      - "test files retain their own root-cmd registrations for test isolation"
+      - "manual smoke: bin/neo4j-cli docker {list,get,create} --format json all emit valid JSON via the root persistent flag"
       - "make fmt-check, make lint, make test, make license-check all pass"
     completed_at: null
