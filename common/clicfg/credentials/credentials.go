@@ -137,6 +137,13 @@ func (c *Credentials) backupCorruptFile(data []byte) (string, error) {
 	return backupPath, nil
 }
 
+// FilePath returns the path to the credentials.json file used by this
+// Credentials instance. Callers can pass this to ReloadAuraCredential to
+// re-read the on-disk state without accessing internal fields.
+func (c *Credentials) FilePath() string {
+	return c.filePath
+}
+
 func (c *Credentials) save() {
 	data, err := json.Marshal(CredentialsFile{
 		Aura:  c.Aura,

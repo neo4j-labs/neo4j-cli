@@ -115,6 +115,20 @@ func (c *AuraCredentials) ClearAccessToken(cred *AuraCredential) (*AuraCredentia
 	return credential, nil
 }
 
+// SyncCredential updates the in-memory credential matching fresh.Name with
+// the AccessToken and TokenExpiry from fresh. It does NOT call onUpdate, so
+// no disk write occurs. This is safe to call from concurrent token-refresh
+// paths to reflect a credential that was written to disk by another process.
+func (c *AuraCredentials) SyncCredential(fresh *AuraCredential) {
+	for _, cred := range c.Credentials {
+		if cred.Name == fresh.Name {
+			cred.AccessToken = fresh.AccessToken
+			cred.TokenExpiry = fresh.TokenExpiry
+			return
+		}
+	}
+}
+
 func (c *AuraCredentials) credentialExists(name string) bool {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
