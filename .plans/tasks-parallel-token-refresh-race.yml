@@ -95,7 +95,7 @@ tasks:
       clean, and make license-check passes. Confirm go.mod and go.sum have no new module entries
       beyond golang.org/x/sys sub-packages that were already present. Fix any issues found before
       marking complete.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-004
@@ -105,4 +105,4 @@ tasks:
       - "make lint exits 0 (no golangci-lint errors)"
       - "make license-check exits 0 (all new .go files carry the Neo4j copyright header)"
       - "go.mod contains no new module entries beyond what was present before this feature"
-    completed_at: null
+    completed_at: "2026-05-15T16:00:00Z"
