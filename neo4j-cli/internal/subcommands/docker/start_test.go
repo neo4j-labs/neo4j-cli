@@ -96,6 +96,16 @@ func withStartWaitProbe(t *testing.T, prober func(ctx context.Context, uri, user
 	t.Cleanup(func() { waitForBoltFn = orig })
 }
 
+// withStartTCPWaitProbe swaps the package-level waitForBoltTCPFn seam so
+// --wait fallback tests run deterministically without standing up a real
+// listener. Restored on cleanup.
+func withStartTCPWaitProbe(t *testing.T, prober func(ctx context.Context, host string, port int, timeout time.Duration) error) {
+	t.Helper()
+	orig := waitForBoltTCPFn
+	waitForBoltTCPFn = prober
+	t.Cleanup(func() { waitForBoltTCPFn = orig })
+}
+
 // withStartShortWaitTimeout shrinks waitTimeout for the duration of the test
 // so timeout cases don't burn the production 60s budget when the fake prober
 // echoes WaitForBolt's timeout error directly.
@@ -166,13 +176,19 @@ func TestStart_UnmanagedContainer_UnknownError(t *testing.T) {
 
 func TestStart_Wait_HappyPath(t *testing.T) {
 	// REQ-F-041: --wait blocks until WaitForBolt returns nil. Verify the
-	// prober receives the uri/user/password from the stored dbms credential.
+	// prober receives the uri/user/password from the stored dbms credential
+	// and that the TCP fallback probe is NOT invoked when a credential exists.
 	var calls int32
+	var tcpCalls int32
 	withStartWaitProbe(t, func(_ context.Context, uri, user, pass string, _ time.Duration) error {
 		atomic.AddInt32(&calls, 1)
 		assert.Equal(t, "neo4j://localhost:7687", uri)
 		assert.Equal(t, "neo4j", user)
 		assert.Equal(t, "secretpw", pass)
+		return nil
+	})
+	withStartTCPWaitProbe(t, func(_ context.Context, _ string, _ int, _ time.Duration) error {
+		atomic.AddInt32(&tcpCalls, 1)
 		return nil
 	})
 
@@ -183,7 +199,10 @@ func TestStart_Wait_HappyPath(t *testing.T) {
 	require.NoError(t, s.cmd.run("dev --wait"))
 	require.Len(t, s.fake.StartCalls, 1)
 	assert.Equal(t, int32(1), atomic.LoadInt32(&calls))
+	assert.Equal(t, int32(0), atomic.LoadInt32(&tcpCalls), "TCP fallback must not fire when a credential exists")
 	assert.Contains(t, s.cmd.err.String(), "info: waiting for Bolt on localhost:7687...")
+	assert.NotContains(t, s.cmd.err.String(), "falling back to TCP probe",
+		"authenticated path must not announce the TCP fallback")
 	// --wait happy path must NOT tear down the container.
 	assert.Empty(t, s.fake.StopCalls)
 	assert.Empty(t, s.fake.RemoveForceCalls)
@@ -210,15 +229,49 @@ func TestStart_Wait_Timeout_ReturnsErrorNoTearDown(t *testing.T) {
 	assert.Empty(t, s.fake.RemoveForceCalls, "timeout must not remove the container")
 }
 
-func TestStart_Wait_MissingCredential_UsageError(t *testing.T) {
-	// --wait needs the stored password to authenticate the Bolt probe. If
-	// the container was created with --no-store-credential, there is no
-	// credential to look up — surface a clear usage error rather than
-	// silently skipping the wait or hanging.
-	var calls int32
+func TestStart_Wait_TCPFallback_HappyPath(t *testing.T) {
+	// When no dbms credential is stored for the container (e.g. created with
+	// --no-store-credential), --wait must fall back to a TCP-only readiness
+	// probe rather than hard-erroring. The authenticated probe must NOT run,
+	// and stderr must announce the reduced guarantee so the operator knows
+	// "port open != Bolt ready".
+	var boltCalls int32
+	var tcpCalls int32
 	withStartWaitProbe(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
-		atomic.AddInt32(&calls, 1)
+		atomic.AddInt32(&boltCalls, 1)
 		return nil
+	})
+	withStartTCPWaitProbe(t, func(_ context.Context, host string, port int, _ time.Duration) error {
+		atomic.AddInt32(&tcpCalls, 1)
+		assert.Equal(t, "localhost", host)
+		assert.Equal(t, 7687, port)
+		return nil
+	})
+
+	s := newStartSetup(t, map[string]Container{
+		"dev": managedRunningContainer("dev"),
+	}, nil)
+
+	require.NoError(t, s.cmd.run("dev --wait"))
+	require.Len(t, s.fake.StartCalls, 1)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&boltCalls),
+		"authenticated probe must NOT run without a credential")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&tcpCalls),
+		"TCP fallback probe must run exactly once when no credential is stored")
+	assert.Contains(t, s.cmd.err.String(), `no stored credential for "dev"`)
+	assert.Contains(t, s.cmd.err.String(), "falling back to TCP probe on localhost:7687 (not authenticated)")
+	// --wait happy path must NOT tear down the container.
+	assert.Empty(t, s.fake.StopCalls)
+	assert.Empty(t, s.fake.RemoveForceCalls)
+}
+
+func TestStart_Wait_TCPFallback_Timeout_NoTearDown(t *testing.T) {
+	// On TCP-fallback timeout the leaf returns the WaitForBoltTCP error and
+	// leaves the container running — same contract as the authenticated
+	// timeout path (no Stop / RemoveForce calls).
+	withStartShortWaitTimeout(t, 50*time.Millisecond)
+	withStartTCPWaitProbe(t, func(_ context.Context, _ string, _ int, timeout time.Duration) error {
+		return errors.New("container started but TCP port 7687 did not open within " + timeout.String() + "; check 'docker logs <name>'")
 	})
 
 	s := newStartSetup(t, map[string]Container{
@@ -227,12 +280,27 @@ func TestStart_Wait_MissingCredential_UsageError(t *testing.T) {
 
 	err := s.cmd.run("dev --wait")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--wait on 'docker start' requires a stored dbms credential")
-	assert.Contains(t, err.Error(), `"dev"`)
-	// Start still ran (the credential gate is post-start by design — the
-	// container is correctly started, only the readiness probe is gated).
+	assert.Contains(t, err.Error(), "TCP port 7687 did not open")
 	require.Len(t, s.fake.StartCalls, 1)
-	assert.Equal(t, int32(0), atomic.LoadInt32(&calls), "probe must not run without a credential")
+	assert.Contains(t, s.cmd.err.String(), "falling back to TCP probe")
+	assert.Empty(t, s.fake.StopCalls, "TCP timeout must not stop the container")
+	assert.Empty(t, s.fake.RemoveForceCalls, "TCP timeout must not remove the container")
+}
+
+func TestStart_Wait_UnparseableBoltPort_Error(t *testing.T) {
+	// If Inspect returns a container with an unparseable bolt-port label
+	// (label corruption / version drift), --wait fails loud with a
+	// diagnostic naming the offending value. Start has already run so the
+	// container itself is fine; the operator can re-run without --wait.
+	bad := managedRunningContainer("dev")
+	bad.BoltPort = "not-a-port"
+	s := newStartSetup(t, map[string]Container{"dev": bad}, nil)
+
+	err := s.cmd.run("dev --wait")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unparseable bolt-port label")
+	assert.Contains(t, err.Error(), `"not-a-port"`)
+	require.Len(t, s.fake.StartCalls, 1, "Start fires before the port parse")
 }
 
 func TestStart_DockerStartError_Surfaced(t *testing.T) {

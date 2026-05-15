@@ -146,7 +146,7 @@ neo4j-cli docker list --format toon
 
 Start a stopped Neo4j container managed by neo4j-cli
 
-Start a stopped Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); --wait requires a stored dbms credential for the container (the credential supplies the password used to authenticate the readiness probe). Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to start one after it has exited surfaces the same unknown-name error. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
+Start a stopped Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container's Bolt endpoint is reachable (60s timeout). When a stored dbms credential exists for the container, --wait performs an authenticated Bolt handshake. When no credential is stored (e.g. created with --no-store-credential, or managed externally), --wait falls back to a TCP-only probe — weaker (Neo4j may bind the port briefly before Bolt is fully ready) but strictly better than no wait. Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to start one after it has exited surfaces the same unknown-name error. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker start <name> [flags]`
 
@@ -163,6 +163,9 @@ Examples:
 neo4j-cli docker start dev --rw
 
 # Start and block until Bolt accepts sessions before returning
+neo4j-cli docker start dev --wait --rw
+
+# Wait for a container started with --no-store-credential (TCP fallback)
 neo4j-cli docker start dev --wait --rw
 
 # Same as above using the deprecated --await alias

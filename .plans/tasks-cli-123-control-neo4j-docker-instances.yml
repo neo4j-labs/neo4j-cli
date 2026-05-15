@@ -355,7 +355,7 @@ tasks:
       Add `bolt_ready_test.go` cases for `WaitForBoltTCP`: immediate success, success after N retries, timeout, ctx cancelled.
       Update `Long:`/`Example:` on `start` to mention the fallback ("--wait uses the stored dbms credential when present, otherwise falls back to a TCP-only readiness probe"). Bundle regen required.
       No PRD requirement changes — this is a UX refinement to REQ-F-018 (carry the auth-optional behavior over from `create --wait`-style guarantees to `start --wait`).
-    status: pending
+    status: completed
     dependencies:
       - task-015
       - task-018
@@ -367,7 +367,7 @@ tasks:
       - "bolt_ready_test.go covers WaitForBoltTCP immediate / after-N / timeout / ctx-cancelled"
       - "start.go Long: + Example: mention the fallback; skill bundle regenerated and committed"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T22:30:00Z
 
   - id: task-018
     title: "Replace parsePsOutput and parseInspectOutput stubs (BLOCKER — feature non-functional against real docker without this)"
