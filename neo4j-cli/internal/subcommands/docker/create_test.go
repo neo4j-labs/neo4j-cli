@@ -92,6 +92,19 @@ func runCreate(t *testing.T, args string) (*fakeDockerClient, *clicfg.Config, st
 	return runCreateWithOccupiedPorts(t, args)
 }
 
+// shlexQuote wraps s in single quotes so google/shlex preserves backslashes
+// when splitting the test args string. Windows temp-dir paths from
+// t.TempDir() (e.g. `C:\Users\RUNNER~1\AppData\Local\Temp\...`) would
+// otherwise have every `\X` consumed as an escape sequence by shlex,
+// mangling the path before it reaches expandHostPath. Single quotes are
+// literal in shlex — backslashes inside them survive. Embedded single
+// quotes are POSIX-escaped via the standard close/escape/open dance.
+// (Refactoring the runCreate* helpers to take []string would also fix
+// this but would touch every call site in the file.)
+func shlexQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // runCreateWithOccupiedPorts is the same as runCreate but installs a
 // listenerFactory that simulates the given ports as already-bound. It
 // exists so port-conflict cases can drive the pre-flight deterministically
@@ -1163,7 +1176,7 @@ func TestCreate_DataDir_HappyPath_AddsVolumeArgAndCreatesDir(t *testing.T) {
 	// drive + uses backslashes). AGENTS.md "Windows CI Gotchas".
 	hostPath := filepath.Join(t.TempDir(), "n4j-data-happy")
 	fake, _, fs, _, stderr, err := runCreateForEphemeral(t,
-		"--name dev --no-store-credential --data-dir "+hostPath)
+		"--name dev --no-store-credential --data-dir "+shlexQuote(hostPath))
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
@@ -1187,7 +1200,7 @@ func TestCreate_DataDir_HappyPath_AddsVolumeArgAndCreatesDir(t *testing.T) {
 func TestCreate_LogsDir_HappyPath_AddsVolumeArg(t *testing.T) {
 	hostPath := filepath.Join(t.TempDir(), "n4j-logs-happy")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
-		"--name dev --no-store-credential --logs-dir "+hostPath)
+		"--name dev --no-store-credential --logs-dir "+shlexQuote(hostPath))
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
@@ -1198,7 +1211,7 @@ func TestCreate_LogsDir_HappyPath_AddsVolumeArg(t *testing.T) {
 func TestCreate_ImportDir_HappyPath_AddsVolumeArg(t *testing.T) {
 	hostPath := filepath.Join(t.TempDir(), "n4j-import-happy")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
-		"--name dev --no-store-credential --import-dir "+hostPath)
+		"--name dev --no-store-credential --import-dir "+shlexQuote(hostPath))
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
@@ -1213,7 +1226,7 @@ func TestCreate_AllVolumeFlags_AppendsThreeUniqueMounts(t *testing.T) {
 	imp := filepath.Join(base, "import")
 	fake, _, _, _, _, err := runCreateForEphemeral(t,
 		fmt.Sprintf("--name dev --no-store-credential --data-dir %s --logs-dir %s --import-dir %s",
-			data, logs, imp))
+			shlexQuote(data), shlexQuote(logs), shlexQuote(imp)))
 	require.NoError(t, err)
 
 	argv := runArgv(t, fake)
