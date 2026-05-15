@@ -166,7 +166,7 @@ tasks:
       six `<button class="install-tab">` elements is already
       `macos, linux, windows, homebrew, pipx, npm` — wrap order falls out
       naturally.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -177,7 +177,7 @@ tasks:
       - "At 375px width the installer bar wraps to two rows of three tabs in order `macOS / Linux / Windows` then `Homebrew / pipx / npm`, both rows visible, no horizontal scrollbar"
       - "At 1024px width the installer bar renders as a single centered `inline-flex` row exactly as today (pixel-identical)"
       - "`git diff` shows changes confined to the existing mobile-nav @media block in `<style>`. No HTML or JS edits."
-    completed_at: null
+    completed_at: 2026-05-15T12:15:00Z
 
   - id: task-006
     title: "Verify installer-bar reflow across breakpoints and interactions"
