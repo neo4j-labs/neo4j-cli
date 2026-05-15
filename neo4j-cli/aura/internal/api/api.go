@@ -123,10 +123,7 @@ func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
 		}
 		return "v1"
 	case AuraApiVersion2:
-		if betaEnabled {
-			return cfg.Aura.BetaPathV2()
-		}
-		return "v2"
+		return cfg.Aura.BetaPathV2()
 	default:
 		panic(fmt.Sprintf("version not set in requests %s", version))
 	}
