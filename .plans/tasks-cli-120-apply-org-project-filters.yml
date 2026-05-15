@@ -1,0 +1,200 @@
+feature: cli-120-apply-org-project-filters
+prd: ./prd-cli-120-apply-org-project-filters.md
+created_at: 2026-05-15T00:00:00Z
+updated_at: 2026-05-15T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add RegisterOrgProjectFlags helper to neo4j-cli/aura/internal/flags/"
+    description: |
+      Create a new file `orgproject.go` in `neo4j-cli/aura/internal/flags/` containing a
+      `RegisterOrgProjectFlags(cmd *cobra.Command)` function that registers `--organization-id`
+      and `--project-id` as persistent string flags, and re-registers `--tenant-id` as a
+      deprecated persistent flag via `cmd.PersistentFlags().MarkDeprecated`. Follow the same
+      pattern as `RegisterWait` in `wait.go`. Include constants for the flag names (e.g.
+      `OrgIDFlag`, `ProjectIDFlag`, `TenantIDFlag`).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`RegisterOrgProjectFlags` is exported from `neo4j-cli/aura/internal/flags/`"
+      - "`--organization-id` and `--project-id` are registered as persistent string flags"
+      - "`--tenant-id` is registered as a deprecated persistent flag with message 'use --project-id instead'"
+      - "Flag name constants are defined and used by the registration function"
+      - "`make test` and `make lint` pass"
+    completed_at: null
+
+  - id: task-002
+    title: "Create ResolveAndValidateOrgProject helper in utils/ with unit tests"
+    description: |
+      Add `ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error)`
+      to `neo4j-cli/aura/internal/subcommands/utils/`. Implement the full resolution order from
+      REQ-F-001 and REQ-F-002: flags first, then `aura.default-context`, then the `default-tenant`
+      migration error, then generic missing-field errors. After resolving both IDs, call
+      `GET /organizations/{orgID}/projects` (v2beta1) and confirm the project is in the list;
+      return `"could not find project {projectID} in organization {orgID}"` if absent.
+      Write a colocated `*_test.go` with table-driven tests covering all resolution branches.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Org resolves from `--organization-id` flag, then org portion of `aura.default-context`"
+      - "Project resolves from `--project-id`, then deprecated `--tenant-id`, then project portion of `aura.default-context`"
+      - "Returns migration message when `default-tenant` is set but `aura.default-context` is not"
+      - "Calls v2beta1 list-projects and returns 'could not find project' error when project absent from list"
+      - "Unit tests cover: org from flag, org from context, missing org, project from flag, project from deprecated flag, project from context, migration error, missing project, project-not-in-org"
+      - "`make test` and `make lint` pass"
+    completed_at: null
+
+  - id: task-003
+    title: "Add RenameResponseField helper and update tenant_id field lists"
+    description: |
+      Add a `RenameResponseField(from, to string)` helper (or equivalent) in
+      `neo4j-cli/aura/internal/subcommands/utils/` that renames a key in a `map[string]any`
+      response (and across a `[]map[string]any` list response). This helper will be called in each
+      affected command before `output.PrintBody` to rename `tenant_id` to `project_id`.
+      Also update every `output.PrintBody` field list across instance, customermanagedkey, and
+      graphanalytics commands that currently references `"tenant_id"` to use `"project_id"` instead.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Helper correctly renames the specified key in both single-item and list response maps"
+      - "All `output.PrintBody` field lists in affected commands use `\"project_id\"` not `\"tenant_id\"`"
+      - "JSON, table, and toon output all show `project_id` as the field name"
+      - "Unit tests cover single-map rename, list-map rename, and no-op when key is absent"
+      - "`make test` and `make lint` pass"
+    completed_at: null
+
+  - id: task-004
+    title: "Apply org/project enforcement to instance list and instance create"
+    description: |
+      Call `flags.RegisterOrgProjectFlags` on the `instance` parent command in `NewCmd`.
+      Remove the leaf-level `--tenant-id` flag from `instance list`. Update `instance list`
+      to call `ResolveAndValidateOrgProject` then pass the resolved projectID as the `tenantId`
+      query parameter. Update `instance create` to call `ResolveAndValidateOrgProject` then
+      inject the resolved projectID as `tenantId` in the POST body. Apply `RenameResponseField`
+      to responses and update field lists. Add or update colocated tests.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`--organization-id`, `--project-id`, and deprecated `--tenant-id` are available on all instance subcommands via persistent flag inheritance"
+      - "`instance list` passes resolved projectID as `tenantId` query param; results are scoped to that tenant"
+      - "`instance create` passes resolved projectID as `tenantId` in the POST body"
+      - "Both commands fail with a clear error when org or project cannot be resolved"
+      - "Output shows `project_id` instead of `tenant_id` in all formats"
+      - "Table-driven tests cover happy path (flags), happy path (context), missing org, missing project, project-not-in-org"
+    completed_at: null
+
+  - id: task-005
+    title: "Apply org/project enforcement to instance get, delete, update, pause, resume"
+    description: |
+      Update `instance get`, `instance delete`, `instance update`, `instance pause`, and
+      `instance resume` to call `ResolveAndValidateOrgProject` then perform a pre-flight
+      `GET /instances/{id}` to verify the instance's `tenant_id` matches the resolved projectID.
+      For mutating commands (delete, update, pause, resume), this ownership check must complete
+      successfully before the mutating API call is issued. Apply `RenameResponseField` to any
+      responses surfaced to the user and update field lists. Add or update colocated tests.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Each command calls `ResolveAndValidateOrgProject` before any API call"
+      - "A pre-flight `GET /instances/{id}` verifies `tenant_id` matches the resolved projectID"
+      - "Mutating calls (delete, update, pause, resume) are not issued if ownership check fails"
+      - "Failure message is 'could not find instance {id} in project {projectID}'"
+      - "Output shows `project_id` instead of `tenant_id` in all formats"
+      - "Table-driven tests cover happy path, missing org/project, project-not-in-org, and resource-not-in-tenant"
+    completed_at: null
+
+  - id: task-006
+    title: "Apply org/project enforcement to instance snapshot commands"
+    description: |
+      Update all `instance snapshot` leaf commands (list, create, restore, and any others) to
+      call `ResolveAndValidateOrgProject`, then perform a pre-flight `GET /instances/{instanceId}`
+      to verify the parent instance belongs to the resolved tenant before executing the snapshot
+      operation. Because `--organization-id` and `--project-id` are persistent on the `instance`
+      parent, no additional flag registration is needed in the snapshot group. Apply
+      `RenameResponseField` where snapshot responses include `tenant_id`. Add or update colocated tests.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "All snapshot leaf commands call `ResolveAndValidateOrgProject` at the top of `RunE`"
+      - "Pre-flight `GET /instances/{id}` verifies the parent instance belongs to the resolved tenant"
+      - "Snapshot operations are not issued if the parent instance ownership check fails"
+      - "Flags are inherited from the `instance` parent; no duplicate registration in the snapshot group"
+      - "Table-driven tests cover happy path, project-not-in-org, and instance-not-in-tenant"
+    completed_at: null
+
+  - id: task-007
+    title: "Apply org/project enforcement to customermanagedkey commands"
+    description: |
+      Call `flags.RegisterOrgProjectFlags` on the `customermanagedkey` parent command in `NewCmd`.
+      Update `customermanagedkey list` to call `ResolveAndValidateOrgProject` and pass the resolved
+      projectID as the `tenantId` query parameter. Update `customermanagedkey create` to validate
+      and inject projectID into the request body. For any command targeting a specific resource
+      (e.g. delete), add a pre-flight fetch to verify `tenant_id` matches before the mutating call.
+      Apply `RenameResponseField` and update field lists. Add or update colocated tests.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`--organization-id`, `--project-id`, and deprecated `--tenant-id` available on all cmek subcommands"
+      - "`customermanagedkey list` results are scoped to the resolved tenant"
+      - "`customermanagedkey create` passes resolved projectID as `tenantId` in the request body"
+      - "Resource-targeting commands verify ownership before any mutating call"
+      - "Output shows `project_id` instead of `tenant_id` in all formats"
+      - "Table-driven tests cover happy path, missing org/project, project-not-in-org, and resource-not-in-tenant"
+    completed_at: null
+
+  - id: task-008
+    title: "Apply org/project enforcement to graphanalytics session commands"
+    description: |
+      Call `flags.RegisterOrgProjectFlags` on the `graphanalytics session` parent command in `NewCmd`.
+      Update `graphanalytics session list` to call `ResolveAndValidateOrgProject` and pass the
+      resolved projectID as the `tenantId` query parameter. Update `graphanalytics session create`
+      to validate and inject projectID into the request body. For any command targeting a specific
+      session resource, add a pre-flight fetch to verify `tenant_id` matches before the mutating call.
+      Apply `RenameResponseField` and update field lists. Add or update colocated tests.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`--organization-id`, `--project-id`, and deprecated `--tenant-id` available on all graphanalytics session subcommands"
+      - "`graphanalytics session list` results are scoped to the resolved tenant"
+      - "`graphanalytics session create` passes resolved projectID as `tenantId` in the request body"
+      - "Resource-targeting commands verify ownership before any mutating call"
+      - "Output shows `project_id` instead of `tenant_id` in all formats"
+      - "Table-driven tests cover happy path, missing org/project, project-not-in-org, and resource-not-in-tenant"
+    completed_at: null
+
+  - id: task-009
+    title: "Regenerate skill bundles, add changelog entry, run final gates"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` to
+      regenerate skill bundles after all flag and help-text changes. Verify `TestGenerator_RoundTrip`
+      and `TestAllLeafCommands_HaveExamples` pass. Add a changelog entry via
+      `changie new --projects neo4j-cli --kind Minor --body "..."` noting that org/project are now
+      required for all instance, cmek, and graphanalytics session commands and that `--tenant-id`
+      is deprecated in favour of `--project-id`. Confirm `make test`, `make fmt-check`, and
+      `make lint` all pass cleanly.
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces no diff against committed bundle files"
+      - "`TestGenerator_RoundTrip` passes"
+      - "`TestAllLeafCommands_HaveExamples` passes"
+      - "A changelog entry exists under `.changes/unreleased/` with `kind: Minor` and a user-facing description of the org/project enforcement and `--tenant-id` deprecation"
+      - "`make test`, `make fmt-check`, and `make lint` all pass"
+    completed_at: null
