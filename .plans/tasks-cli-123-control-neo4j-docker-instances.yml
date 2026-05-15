@@ -1,7 +1,7 @@
 feature: cli-123-control-neo4j-docker-instances
 prd: ./prd-cli-123-control-neo4j-docker-instances.md
 created_at: 2026-05-15T12:00:00Z
-updated_at: 2026-05-15T12:00:00Z
+updated_at: 2026-05-15T20:30:00Z
 
 tasks:
   - id: task-001
@@ -297,3 +297,72 @@ tasks:
       - "Manual verification of the PRD acceptance criteria scenarios documented (pass/fail per scenario)"
       - "PR description notes website update is a separate follow-up (REQ-DOC-008)"
     completed_at: 2026-05-15T20:00:00Z
+
+  - id: task-016
+    title: "Distinguish docker Inspect not-found from daemon/permission errors"
+    description: |
+      Today every `client.Inspect` error is funneled into the unknown-name `clierr.NewUsageError` (REQ-F-032 wording) by `docker get`, `docker start`, `docker stop`, and `docker delete`. That hides genuine operational failures (Docker daemon stopped, socket permission denied, rootless misconfig, daemon timeout) behind a misleading "no managed container named X" message — users chase ghosts instead of starting Docker.
+      Fix by adding a typed sentinel error in `neo4j-cli/internal/subcommands/docker/client.go`:
+      ```go
+      // ErrNotFound signals that docker inspect reported the container does not exist.
+      // All other docker errors (daemon down, permission denied, timeout, etc.) are
+      // returned with their underlying stderr/exit-code information preserved.
+      var ErrNotFound = errors.New("docker: container not found")
+      ```
+      In `execClient.Inspect`: when `docker inspect` exits non-zero, scan captured stderr for the substring `"No such "` (covers both "No such object" and "No such container" — stable across Docker versions for ≥7 years). On match, wrap and return `fmt.Errorf("%w: %s", ErrNotFound, name)`. Otherwise return a wrapped error that surfaces the docker stderr verbatim (already redacted via `redactArgs` for the argv portion if applicable) so the user can see "Cannot connect to the Docker daemon" etc.
+      Update each leaf's check to switch on `errors.Is(err, docker.ErrNotFound)`:
+      - `get.go`, `start.go`, `stop.go`, `delete.go`: `if errors.Is(err, docker.ErrNotFound) { return unknownNameError(name) }; if err != nil { return err }`. Same `unknownNameError` helper they already share (or inline construction matching the existing wording).
+      - Non-managed (Managed == false) path stays unchanged — that's a separate branch that returns the same unknown-name error.
+      Update `helpers_test.go` so `fakeDockerClient` can return either `docker.ErrNotFound` or any other error per call (an `InspectErr` field plus an optional sentinel toggle is the lightest seam). Update existing missing-container test cases across `get_test.go`, `start_test.go`, `stop_test.go`, `delete_test.go` to use `ErrNotFound` specifically; add at least one case per leaf where a daemon-down style error propagates through (verify the user sees the original message, not unknown-name).
+      Add a unit test in `client_test.go` (or a new test file) that constructs a fake `*exec.Cmd` failure with stderr `"Error: No such object: foo"` and asserts `Inspect` returns an error matching `errors.Is(err, ErrNotFound)`. Add a second case where stderr is `"Cannot connect to the Docker daemon"` and assert `errors.Is(err, ErrNotFound)` is FALSE.
+      Update the `Long:` strings on `get`/`start`/`stop`/`delete` to mention what happens on a daemon error vs an unknown name (one short sentence; bundle regen required).
+      No PRD requirement changes — this is a UX refinement to REQ-F-032 / REQ-F-043 / REQ-F-053.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/docker/client.go exports an ErrNotFound sentinel; execClient.Inspect wraps it only when docker stderr contains 'No such '"
+      - "get/start/stop/delete each use errors.Is(err, ErrNotFound) → unknown-name; any other Inspect error propagates with the original docker stderr visible"
+      - "fakeDockerClient supports returning ErrNotFound or an arbitrary error per call; existing missing-container tests updated; new daemon-down test cases added for each of the four leaves"
+      - "client_test.go (or equivalent) covers 'No such object' stderr → ErrNotFound and 'Cannot connect to the Docker daemon' stderr → NOT ErrNotFound"
+      - "Long: text on get/start/stop/delete mentions the daemon-error path; skill bundle regenerated (go generate ./neo4j-cli/internal/skill/...) and committed"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
+
+  - id: task-017
+    title: "TCP fallback for 'docker start --wait' when no stored credential"
+    description: |
+      Today `docker start <name> --wait` requires a stored dbms credential to authenticate the Bolt handshake; without one it returns `clierr.NewUsageError("--wait on 'docker start' requires a stored dbms credential for %q ...")`. That makes `--wait` unusable for anyone who ran `--no-store-credential` at create time (or who manages credentials externally). Fall back to a TCP-only probe instead of erroring.
+      Add a new probe in `neo4j-cli/internal/subcommands/docker/bolt_ready.go`:
+      ```go
+      // WaitForBoltTCP polls a TCP connection to host:port until it accepts (server is
+      // listening) or timeout elapses. This is a weaker readiness check than
+      // WaitForBolt — Neo4j may bind the port briefly before it is ready to handle
+      // Bolt handshakes — but it is the best we can do without credentials.
+      func WaitForBoltTCP(ctx context.Context, host string, port int, timeout time.Duration) error
+      ```
+      Implementation: same poll cadence as `WaitForBolt` (use the existing `pollInterval` seam). On each poll attempt `net.Dial("tcp", host:port)` with a short per-attempt timeout (~500ms); on success close the conn immediately and return nil. On the overall `timeout` deadline return `clierr.NewUsageError("container started but TCP port %d did not open within %s; check 'docker logs <name>'", port, timeout)`. Add a `tcpDialFn` package var seam matching the existing `probeBoltFn` pattern so tests can simulate success-after-N or always-fail without a real socket.
+      In `neo4j-cli/internal/subcommands/docker/start.go`, change the `--wait` flow:
+      1. Inspect (already happens) → get bolt port from labels.
+      2. Look up credential via `cfg.Credentials.Dbms.Get(name)`.
+      3. If credential exists: use `WaitForBolt(...)` as today (authenticated handshake, strongest signal).
+      4. If credential is missing (the `clierr.UsageError` "could not find credential" from credentials/dbms.go — match by `errors.As` on the typed error, OR by the existence check `cfg.Credentials.Dbms.Get` returns `nil, err`): write `info: no stored credential for <name>; falling back to TCP probe (not authenticated)\n` to `cmd.ErrOrStderr()`, then call `WaitForBoltTCP(ctx, "localhost", boltPort, waitTimeout)`.
+      Remove the hard `--wait requires stored credential` error path. Keep the "container is non-managed" and other Inspect errors unchanged (those still error out via task-016's funnel).
+      Update `start_test.go`:
+      - Existing `--wait happy / --wait timeout / --wait without credential` cases get reshuffled. Keep authenticated happy/timeout cases. Replace the no-credential-error case with a no-credential-TCP-fallback case: fake `tcpDialFn` returns nil on first call → success; stderr contains the "falling back to TCP probe" info line; `probeBoltFn` is NOT called (assert via a counter).
+      - Add a no-credential-TCP-timeout case: fake `tcpDialFn` always errors → timeout error; container is NOT torn down.
+      Add `bolt_ready_test.go` cases for `WaitForBoltTCP`: immediate success, success after N retries, timeout, ctx cancelled.
+      Update `Long:`/`Example:` on `start` to mention the fallback ("--wait uses the stored dbms credential when present, otherwise falls back to a TCP-only readiness probe"). Bundle regen required.
+      No PRD requirement changes — this is a UX refinement to REQ-F-018 (carry the auth-optional behavior over from `create --wait`-style guarantees to `start --wait`).
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "bolt_ready.go exports WaitForBoltTCP(ctx, host, port, timeout); uses pollInterval; injectable via tcpDialFn package var; timeout returns clierr.UsageError"
+      - "start.go --wait flow uses WaitForBolt when a dbms credential exists and falls back to WaitForBoltTCP otherwise, with a stderr info line announcing the fallback"
+      - "Old 'requires a stored dbms credential' usage-error path is removed"
+      - "start_test.go covers authenticated happy + timeout, TCP-fallback happy + timeout, container-not-torn-down on TCP timeout, info line emitted on fallback, and probeBoltFn NOT invoked when no credential"
+      - "bolt_ready_test.go covers WaitForBoltTCP immediate / after-N / timeout / ctx-cancelled"
+      - "start.go Long: + Example: mention the fallback; skill bundle regenerated and committed"
+      - "make fmt-check, make lint, make test, make license-check all pass"
+    completed_at: null
