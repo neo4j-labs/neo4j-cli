@@ -31,7 +31,7 @@ tasks:
       GET /organizations/{organizationId}/projects/{projectId}. Each function must use
       AuraApiVersion2 and define the corresponding response struct types. Add unit tests
       using the existing httptest mock helpers.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "ListOrganizations() calls GET /organizations with AuraApiVersion2"
@@ -40,7 +40,7 @@ tasks:
       - "GetProject(orgID, projectID) calls GET /organizations/{orgID}/projects/{projectID} with AuraApiVersion2"
       - "Response structs defined for all four endpoints"
       - "Unit tests cover success and error (404, 5xx) cases for each method"
-    completed_at: null
+    completed_at: 2026-05-15T13:00:00Z
 
   - id: task-003
     title: "Remove config project subsystem"
