@@ -5,6 +5,7 @@ package docker
 
 import (
 	"errors"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -180,4 +181,85 @@ func TestClassifyInspectError(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAltRuntimeHint_PodmanMissing verifies altRuntimeHint returns the empty
+// string when the injected lookPath stub reports podman is not on PATH. An
+// empty return means "no alternative detected" — the caller appends nothing
+// to the docker-missing usage error so the message ends with the existing
+// install hint and a single period.
+func TestAltRuntimeHint_PodmanMissing(t *testing.T) {
+	stub := func(name string) (string, error) {
+		return "", exec.ErrNotFound
+	}
+	got := altRuntimeHint(stub)
+	assert.Empty(t, got, "expected empty string when podman is not on PATH, got %q", got)
+}
+
+// TestAltRuntimeHint_PodmanPresent verifies altRuntimeHint returns a hint
+// referencing podman, the literal `alias docker=podman` shell example, and
+// the Windows PowerShell `Set-Alias docker podman` alternative when the
+// injected lookPath stub reports podman is on PATH. The leading space is
+// intentional: it sits after the existing usage error's terminating period
+// so the concatenation reads as a single well-formed sentence.
+func TestAltRuntimeHint_PodmanPresent(t *testing.T) {
+	stub := func(name string) (string, error) {
+		assert.Equal(t, "podman", name, "altRuntimeHint should only look up podman")
+		return "/usr/local/bin/podman", nil
+	}
+	got := altRuntimeHint(stub)
+	require.NotEmpty(t, got, "expected a hint string when podman is on PATH")
+	assert.True(t, got[0] == ' ', "hint must begin with a leading space (got %q)", got)
+	assert.Contains(t, got, "podman is a drop-in")
+	assert.Contains(t, got, "`alias docker=podman`")
+	assert.Contains(t, got, "`Set-Alias docker podman`")
+}
+
+// TestResolve_DockerMissing_NoPodman drives execClient.resolve() with PATH
+// emptied so the real exec.LookPath miss fires for docker, and lookPathFn
+// swapped to a stub that reports podman is NOT on PATH. The returned usage
+// error must carry the standard install hint and must NOT mention podman.
+func TestResolve_DockerMissing_NoPodman(t *testing.T) {
+	t.Setenv("PATH", "")
+
+	orig := lookPathFn
+	lookPathFn = func(name string) (string, error) {
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() { lookPathFn = orig })
+
+	ec := &execClient{}
+	_, err := ec.resolve()
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "docker not found in PATH")
+	assert.Contains(t, msg, "install Docker Desktop")
+	assert.NotContains(t, msg, "podman", "podman hint must be omitted when podman is not on PATH")
+}
+
+// TestResolve_DockerMissing_PodmanPresent drives execClient.resolve() with
+// PATH emptied (forcing the docker miss) and lookPathFn swapped to a stub
+// that reports podman IS on PATH. The returned usage error must carry both
+// the standard install hint AND the podman-alias suggestion so operators
+// who already have podman installed see the one-step workaround.
+func TestResolve_DockerMissing_PodmanPresent(t *testing.T) {
+	t.Setenv("PATH", "")
+
+	orig := lookPathFn
+	lookPathFn = func(name string) (string, error) {
+		if name == "podman" {
+			return "/usr/local/bin/podman", nil
+		}
+		return "", exec.ErrNotFound
+	}
+	t.Cleanup(func() { lookPathFn = orig })
+
+	ec := &execClient{}
+	_, err := ec.resolve()
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "docker not found in PATH")
+	assert.Contains(t, msg, "install Docker Desktop")
+	assert.Contains(t, msg, "podman is a drop-in")
+	assert.Contains(t, msg, "`alias docker=podman`")
 }

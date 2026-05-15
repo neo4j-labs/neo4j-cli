@@ -908,7 +908,7 @@ tasks:
       # ... or run on a host with podman but no docker:
       ```
       Expect either: the standard "install Docker Desktop" message (no podman on PATH), OR the same message followed by the podman-alias suggestion when podman is detected.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -920,4 +920,4 @@ tasks:
       - "README.md \"Local Neo4j (Docker)\" mentions the podman-alias workaround briefly (one paragraph)"
       - "No skill bundle regen needed (error message is not in --help text)"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T15:45:00Z

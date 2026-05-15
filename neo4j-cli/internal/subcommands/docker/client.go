@@ -17,6 +17,31 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 )
 
+// lookPathFn is the injectable seam used by altRuntimeHint to detect
+// alternative container runtimes (currently podman) on PATH. Production
+// wires exec.LookPath; tests swap a deterministic stub so the docker-
+// missing error path can be exercised against both "podman present" and
+// "podman missing" branches without touching the host PATH.
+var lookPathFn = exec.LookPath
+
+// altRuntimeHint returns a non-empty string describing an alternative
+// container runtime that the operator can alias as `docker` when the real
+// docker binary is missing from PATH. Currently checks for podman. The
+// result is appended to the docker-missing usage error; an empty return
+// means "no alternative detected, use the default message".
+//
+// Backticks around shell tokens are emitted as literal characters so the
+// suggestion reads cleanly in plain terminals — the message is rendered
+// through fmt-style format, not a markdown renderer.
+func altRuntimeHint(lookPath func(string) (string, error)) string {
+	if _, err := lookPath("podman"); err == nil {
+		return " It looks like you have podman installed; podman is a drop-in for the docker CLI." +
+			" Aliasing it as `docker` (e.g. `alias docker=podman` in your shell rc," +
+			" or `Set-Alias docker podman` on Windows PowerShell) will let neo4j-cli use it."
+	}
+	return ""
+}
+
 // ErrNotFound signals that `docker inspect` reported the container does not
 // exist. All other docker errors (daemon down, permission denied, timeout,
 // rootless misconfig, etc.) are returned with their underlying stderr/exit-code
@@ -94,7 +119,8 @@ func (c *execClient) resolve() (string, error) {
 	})
 	if c.lookupErr != nil {
 		return "", clierr.NewUsageError(
-			"docker not found in PATH — install Docker Desktop (https://www.docker.com/products/docker-desktop/) or the docker CLI",
+			"docker not found in PATH — install Docker Desktop (https://www.docker.com/products/docker-desktop/) or the docker CLI.%s",
+			altRuntimeHint(lookPathFn),
 		)
 	}
 	return c.dockerPath, nil

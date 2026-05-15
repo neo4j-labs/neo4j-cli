@@ -386,3 +386,8 @@ $ docker ps -a --filter "name=neo4j-cli-smoke" --format "{{.Names}}"
 ```
 
 All four phases pass; no leftover container after either run. Default-suite gates (make test/fmt-check/lint/license-check) all green.
+
+## TASK-026 — 2026-05-15T15:45:00Z
+Extended `execClient.resolve()`'s docker-missing usage error to append a podman-alias hint when podman is detected on PATH. New `altRuntimeHint(lookPath)` pure helper + `lookPathFn` package var seam isolate the podman check; existing `sync.Once` docker cache untouched. Tests: direct `altRuntimeHint` coverage for both branches + two `execClient.resolve()` cases via `PATH=""` + `lookPathFn` stub. Manual verify on machine without podman: `PATH=/usr/bin bin/neo4j-cli docker list` → "...or the docker CLI." (single period, no double, no podman mention). AGENTS.md Docker Subsystem Notes gained one-line entry; README "Local Neo4j (Docker)" gained one-paragraph workaround note. All gates green (test, fmt-check, lint, license-check). No skill bundle regen needed — error string is not surfaced via --help.
+Files: ~neo4j-cli/internal/subcommands/docker/client.go, ~neo4j-cli/internal/subcommands/docker/client_test.go, ~AGENTS.md, ~README.md
+Decisions: kept the existing `TestExecClient_LookupMissingDocker` test untouched — under `PATH=""` the real `exec.LookPath("podman")` misses cleanly so the existing "no podman hint" assertions still hold; no need to invasively swap lookPathFn there.
