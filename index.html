@@ -1603,6 +1603,32 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
+  // ---------- Mobile nav toggle ----------
+  const navToggle = document.getElementById('navToggle');
+  const topNav = document.getElementById('topNav');
+  if (navToggle && topNav) {
+    const closeNav = () => {
+      topNav.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.setAttribute('aria-label', 'Open menu');
+    };
+    navToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = topNav.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    });
+    topNav.addEventListener('click', (e) => {
+      if (e.target.tagName === 'A') closeNav();
+    });
+    document.addEventListener('click', (e) => {
+      if (!topNav.contains(e.target) && !navToggle.contains(e.target)) closeNav();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeNav();
+    });
+  }
+
   // ---------- Toast ----------
   const toast = document.getElementById('toast');
   const toastText = document.getElementById('toastText');

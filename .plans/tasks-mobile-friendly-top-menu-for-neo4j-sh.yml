@@ -87,7 +87,7 @@ tasks:
       script still loads safely if the markup ever drifts. No IIFE wrapper —
       match the flat style of the existing theme-toggle and sticky-header
       blocks above it.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -98,7 +98,7 @@ tasks:
       - "Clicking outside both `#topNav` and `#navToggle` closes the dropdown"
       - "Pressing Escape closes the dropdown"
       - "No console errors when the page loads (verified in Chrome DevTools console)"
-    completed_at: null
+    completed_at: 2026-05-15T11:00:00Z
 
   - id: task-004
     title: "Verify mobile menu at multiple breakpoints and interactions"
