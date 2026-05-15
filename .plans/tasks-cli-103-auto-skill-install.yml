@@ -175,7 +175,8 @@ tasks:
       3. `=1` but `system` raises: method returns without propagating the error.
       Document local run: `ruby distribution/homebrew/tests/post_install_test.rb`
       No Homebrew installation required — pure Ruby stdlib only.
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T13:00:00Z
     dependencies:
       - task-002
     acceptance_criteria:

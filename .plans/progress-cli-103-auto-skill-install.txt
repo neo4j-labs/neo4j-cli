@@ -184,3 +184,29 @@ Key Decisions:
 - .gitignore added to prevent accidental git add of node_modules/ (268+ packages).
 
 Next Task: task-009
+
+================================================================================
+TASK-009: Add Ruby minitest behavioral tests for Homebrew post_install block
+Date: 2026-05-15T13:00:00Z
+================================================================================
+
+Summary:
+Created a Ruby minitest suite for the Homebrew post_install block. The helper
+module (post_install.rb) mirrors the goreleaser body exactly so tests stay in
+sync with the shipped formula. FormulaStub overrides system() to return a
+configurable bool (matching real Homebrew semantics — system never raises).
+4 tests: env=1 calls system with correct path, env unset skips, env=0 skips,
+env=1+system returns false still returns true.
+
+Files Changed:
+- distribution/homebrew/post_install.rb (created — PostInstallHelper module with post_install method body)
+- distribution/homebrew/tests/post_install_test.rb (created — 4 minitest cases)
+- .goreleaser.yaml (reverted begin/rescue added by agent — Homebrew system never raises, only returns false)
+
+Key Decisions:
+- Removed begin/rescue from .goreleaser.yaml and post_install.rb: Homebrew's system DSL returns false on failure, never raises. The rescue block was dead code that diverged from real Homebrew semantics.
+- FormulaStub.system_return attribute (not system_error) models the realistic failure mode (false return).
+- Test 1 uses /opt/homebrew/bin to exercise path interpolation with a distinctive value.
+- Tests use cross-referencing comments between post_install.rb and .goreleaser.yaml to flag sync requirement.
+
+Next Task: task-010
