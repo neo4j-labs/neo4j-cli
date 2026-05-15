@@ -5,8 +5,6 @@ package credentials
 
 import (
 	"encoding/json"
-	"errors"
-	"os"
 
 	"github.com/spf13/afero"
 )
@@ -18,9 +16,6 @@ import (
 func ReloadAuraCredential(fs afero.Fs, filePath, name string) (*AuraCredential, bool) {
 	data, err := afero.ReadFile(fs, filePath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, false
-		}
 		return nil, false
 	}
 
