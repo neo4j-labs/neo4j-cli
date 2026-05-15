@@ -252,6 +252,37 @@
     :root:not([data-theme="light"]) .theme-toggle .moon { display: block; }
   }
 
+  /* ---------- Mobile nav ---------- */
+  .nav-toggle { display: none; }
+  .nav-toggle .close { display: none; }
+  .nav-toggle[aria-expanded="true"] .open { display: none; }
+  .nav-toggle[aria-expanded="true"] .close { display: block; }
+
+  @media (max-width: 640px) {
+    header.top .inner { gap: 8px; }
+    .brand-tag { display: none; }
+    .nav-toggle { display: inline-flex; }
+    .theme-toggle { margin-left: auto; }
+
+    nav.top-nav {
+      position: absolute;
+      top: 56px;
+      left: 16px;
+      right: 16px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      padding: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-overlay);
+      display: none;
+    }
+    nav.top-nav.open { display: flex; }
+    nav.top-nav a { padding: 10px 12px; font-size: 14px; }
+  }
+
   /* ---------- Hero ---------- */
   .hero {
     position: relative;
@@ -436,6 +467,20 @@
     box-shadow: var(--shadow-raised);
   }
   .install-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  @media (max-width: 640px) {
+    .install-tabs {
+      display: flex;
+      width: 100%;
+      flex-wrap: wrap;
+      margin: 0 0 14px;
+    }
+    .install-tab {
+      flex: 1 1 calc(33.333% - 2px);
+      justify-content: center;
+      padding: 10px 12px;
+    }
+  }
 
   /* ---------- Toast ---------- */
   .toast {
@@ -954,7 +999,7 @@
       <span class="name">neo4j<span class="dash">-</span>cli</span>
       <span class="brand-tag">labs</span>
     </a>
-    <nav class="top-nav">
+    <nav class="top-nav" id="topNav">
       <a href="#examples">Examples</a>
       <a href="#examples" data-activate-tab="reference">Reference</a>
       <a href="#quickstart">Quickstart</a>
@@ -967,6 +1012,14 @@
       </svg>
       <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+    <button class="icon-btn nav-toggle" id="navToggle" aria-label="Open menu" aria-controls="topNav" aria-expanded="false">
+      <svg class="open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 6h18M3 12h18M3 18h18"></path>
+      </svg>
+      <svg class="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 6l12 12M6 18L18 6"></path>
       </svg>
     </button>
   </div>
@@ -1564,6 +1617,32 @@
   const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
+
+  // ---------- Mobile nav toggle ----------
+  const navToggle = document.getElementById('navToggle');
+  const topNav = document.getElementById('topNav');
+  if (navToggle && topNav) {
+    const closeNav = () => {
+      topNav.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.setAttribute('aria-label', 'Open menu');
+    };
+    navToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = topNav.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    });
+    topNav.addEventListener('click', (e) => {
+      if (e.target.tagName === 'A') closeNav();
+    });
+    document.addEventListener('click', (e) => {
+      if (!topNav.contains(e.target) && !navToggle.contains(e.target)) closeNav();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeNav();
+    });
+  }
 
   // ---------- Toast ----------
   const toast = document.getElementById('toast');
