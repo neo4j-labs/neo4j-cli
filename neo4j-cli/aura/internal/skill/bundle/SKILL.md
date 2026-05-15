@@ -21,6 +21,7 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 | Command | Description |
 |---------|-------------|
 | [`config`](references/config.md) | Manage and view configuration values |
+| [`context`](references/context.md) | Manage the active organization and project context |
 | [`credential`](references/credential.md) | Manage and view credential values |
 | [`customer-managed-key`](references/customer-managed-key.md) | Relates to Customer Managed Keys |
 | [`graph-analytics`](references/graph-analytics.md) | Relates to Aura Graph Analytics |

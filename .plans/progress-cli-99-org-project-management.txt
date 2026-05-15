@@ -1,3 +1,7 @@
+## TASK-007 — 2026-05-15T00:00:00Z
+Added aura context use command accepting positional {org}/{project} slug or --organization-id + --project-id flags, delegating to validateAndSetDefaultContext. Both forms are mutually exclusive with clear errors.
+Files: ~neo4j-cli/aura/internal/subcommands/context/context.go, +neo4j-cli/aura/internal/subcommands/context/use.go, +neo4j-cli/aura/internal/subcommands/context/use_test.go, ~neo4j-cli/aura/aura.go
+
 ## TASK-006 — 2026-05-15T00:00:00Z
 Added aura project list and project get commands resolving org from --organization-id flag or aura.default-context. Both commands support --format json|table|toon with table-driven tests.
 Files: +neo4j-cli/aura/internal/subcommands/project/project.go, +neo4j-cli/aura/internal/subcommands/project/list.go, +neo4j-cli/aura/internal/subcommands/project/list_test.go, +neo4j-cli/aura/internal/subcommands/project/get.go, +neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/aura.go

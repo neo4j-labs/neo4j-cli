@@ -133,7 +133,7 @@ tasks:
       the two forms are mutually exclusive. Delegates validation and persistence to
       validateAndSetDefaultContext. Fails clearly when org or project is missing, or when
       both forms are mixed. Includes Example field and colocated use_test.go.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -144,7 +144,7 @@ tasks:
       - "Delegates to validateAndSetDefaultContext (not duplicating API call logic)"
       - "Example field present, flush-left, ≥3 invocations"
       - "Table-driven tests cover all error cases and the success path"
-    completed_at: null
+    completed_at: 2026-05-15T00:00:00Z
 
   - id: task-008
     title: "Add aura context list command"
