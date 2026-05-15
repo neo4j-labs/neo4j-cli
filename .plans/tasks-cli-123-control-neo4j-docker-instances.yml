@@ -317,7 +317,7 @@ tasks:
       Add a unit test in `client_test.go` (or a new test file) that constructs a fake `*exec.Cmd` failure with stderr `"Error: No such object: foo"` and asserts `Inspect` returns an error matching `errors.Is(err, ErrNotFound)`. Add a second case where stderr is `"Cannot connect to the Docker daemon"` and assert `errors.Is(err, ErrNotFound)` is FALSE.
       Update the `Long:` strings on `get`/`start`/`stop`/`delete` to mention what happens on a daemon error vs an unknown name (one short sentence; bundle regen required).
       No PRD requirement changes — this is a UX refinement to REQ-F-032 / REQ-F-043 / REQ-F-053.
-    status: pending
+    status: completed
     dependencies:
       - task-015
       - task-018
@@ -328,7 +328,7 @@ tasks:
       - "client_test.go (or equivalent) covers 'No such object' stderr → ErrNotFound and 'Cannot connect to the Docker daemon' stderr → NOT ErrNotFound"
       - "Long: text on get/start/stop/delete mentions the daemon-error path; skill bundle regenerated (go generate ./neo4j-cli/internal/skill/...) and committed"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T21:55:00Z
 
   - id: task-017
     title: "TCP fallback for 'docker start --wait' when no stored credential"

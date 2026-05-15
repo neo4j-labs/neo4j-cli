@@ -320,6 +320,25 @@ func TestDelete_TooManyArgs_CobraUsageError(t *testing.T) {
 	assert.Empty(t, s.fake.RemoveForceCalls)
 }
 
+func TestDelete_InspectDaemonError_Propagated(t *testing.T) {
+	// A non-not-found Inspect error (daemon down, permission denied, …)
+	// propagates verbatim — the operator must see the real cause, not a
+	// misleading "no managed container" message. RemoveForce must NOT fire.
+	withStdinIsTerminal(t, true)
+	s := newDeleteSetup(t, nil, nil, "y\n")
+	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
+		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	}
+
+	err := s.cmd.run("dev --force")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Cannot connect to the Docker daemon",
+		"daemon errors must surface verbatim so the operator can fix the real cause")
+	assert.NotContains(t, err.Error(), "no managed container named",
+		"daemon errors must NOT be funneled into the unknown-name message")
+	assert.Empty(t, s.fake.RemoveForceCalls, "RemoveForce must not fire when Inspect reports a daemon error")
+}
+
 func TestDelete_HasWriteAnnotation(t *testing.T) {
 	// REQ-F-050: delete is a write operation; the --rw gate relies on the
 	// "write" annotation being set on the leaf.

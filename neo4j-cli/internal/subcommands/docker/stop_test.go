@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -215,8 +216,12 @@ func TestStop_Wait_HappyPath_EphemeralCleanedUpAfterStop(t *testing.T) {
 			// Pre-flight: return the managed running container.
 			return managedRunningContainerForStop(name), nil
 		}
-		// After the Stop call the ephemeral container is gone.
-		return Container{}, errors.New("Error: No such container: dev")
+		// After the Stop call the ephemeral container is gone — mirror
+		// execClient.Inspect's contract by wrapping ErrNotFound. The bare
+		// error fallback in inspectExited is still tested elsewhere; this
+		// case exercises the primary errors.Is path the production client
+		// surfaces.
+		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 
 	require.NoError(t, s.cmd.run("dev --wait"))
@@ -226,7 +231,7 @@ func TestStop_Wait_HappyPath_EphemeralCleanedUpAfterStop(t *testing.T) {
 	// Sanity: a subsequent `docker get` should return unknown-name because
 	// the ephemeral container has been cleaned up. Drive the get leaf
 	// through the same fake to verify the contract end-to-end. The fake's
-	// InspectFn now returns "no such container" so get's error funnel fires.
+	// InspectFn now returns ErrNotFound, so get's unknown-name branch fires.
 	getCmd := NewCmd(s.cfg)
 	getOut := bytes.NewBuffer(nil)
 	getErr := bytes.NewBuffer(nil)
@@ -306,4 +311,23 @@ func TestStop_TooManyArgs_CobraUsageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "accepts 1 arg")
 	assert.Empty(t, s.fake.InspectCalls)
 	assert.Empty(t, s.fake.StopCalls)
+}
+
+func TestStop_InspectDaemonError_Propagated(t *testing.T) {
+	// A non-not-found pre-flight Inspect error (daemon down, permission
+	// denied, …) propagates verbatim — the operator must see the real
+	// cause, not a misleading "no managed container" message. Stop must
+	// NOT fire.
+	s := newStopSetup(t, nil)
+	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
+		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	}
+
+	err := s.cmd.run("dev")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Cannot connect to the Docker daemon",
+		"daemon errors must surface verbatim so the operator can fix the real cause")
+	assert.NotContains(t, err.Error(), "no managed container named",
+		"daemon errors must NOT be funneled into the unknown-name message")
+	assert.Empty(t, s.fake.StopCalls, "Stop must not fire when Inspect reports a daemon error")
 }

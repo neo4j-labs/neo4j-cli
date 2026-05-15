@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -15,6 +16,15 @@ import (
 
 	"github.com/neo4j/cli/common/clierr"
 )
+
+// ErrNotFound signals that `docker inspect` reported the container does not
+// exist. All other docker errors (daemon down, permission denied, timeout,
+// rootless misconfig, etc.) are returned with their underlying stderr/exit-code
+// information preserved so the operator sees what actually broke instead of a
+// misleading "no such container" message. Leaf commands compare with
+// errors.Is(err, ErrNotFound) and translate to the documented unknown-name
+// usage error only on that match.
+var ErrNotFound = errors.New("docker: container not found")
 
 // dockerClient abstracts the host `docker` CLI. The default execClient shells
 // out via os/exec; tests inject a fake (see helpers_test.go). Every method
@@ -181,12 +191,37 @@ func (c *execClient) PsAll(ctx context.Context, filters []string) ([]PsEntry, er
 func (c *execClient) Inspect(ctx context.Context, name string) (Container, error) {
 	out, err := c.run(ctx, "inspect", name)
 	if err != nil {
-		// docker exits non-zero on missing containers; surface as the
-		// caller's chosen NotFound shape. Leaves wrap this further with
-		// the REQ-F-032 hint pointing at `docker list`.
-		return Container{}, err
+		// Classify the error so leaves can distinguish "container missing"
+		// (REQ-F-032 unknown-name message) from operational failures (daemon
+		// down, permission denied, rootless misconfig). Operational errors
+		// propagate with docker's stderr verbatim so the operator can act on
+		// the real cause instead of chasing a phantom container.
+		return Container{}, classifyInspectError(err, name)
 	}
 	return parseInspectOutput(name, out)
+}
+
+// classifyInspectError converts the wrapped error returned by c.run when
+// invoking `docker inspect` into either an ErrNotFound wrap (when docker's
+// stderr reported the container is missing) or the original error (for any
+// other failure shape). Docker's stderr wording for missing containers is
+// stable across versions: "Error: No such object: <name>" (modern, since
+// ~2018) or "Error: No such container: <name>" (older). Matching the shared
+// "No such " substring covers both variants.
+//
+// Note: c.run already wraps the captured docker stderr inside a
+// clierr.UsageError whose message string contains the original stderr text,
+// so we classify by substring on err.Error() rather than re-running exec or
+// peeking at the buffer. Pulled out into its own function so client_test.go
+// can drive the classification without needing a real docker binary.
+func classifyInspectError(runErr error, name string) error {
+	if runErr == nil {
+		return nil
+	}
+	if strings.Contains(runErr.Error(), "No such ") {
+		return fmt.Errorf("%w: %s", ErrNotFound, name)
+	}
+	return runErr
 }
 
 // parsePsOutput decodes the output of

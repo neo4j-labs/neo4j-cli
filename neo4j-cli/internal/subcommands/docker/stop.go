@@ -5,6 +5,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -43,7 +44,9 @@ func newStopCmd(cfg *clicfg.Config) *cobra.Command {
 			"unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. " +
 			"Pass --wait to block until the container has actually exited (60s timeout). " +
 			"Ephemeral containers (`--rm`) are removed by Docker the moment they exit, so a " +
-			"subsequent `neo4j-cli docker get` will return the same unknown-name error.",
+			"subsequent `neo4j-cli docker get` will return the same unknown-name error. " +
+			"Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced " +
+			"verbatim and are distinct from the unknown-name error.",
 		Example: `# Stop a managed container by name
 neo4j-cli docker stop dev --rw
 
@@ -59,14 +62,17 @@ neo4j-cli docker stop dev --await --rw`,
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers
-			// before mutating any daemon state (REQ-F-043). Any Inspect error
-			// — missing container, removed ephemeral, daemon unreachable — is
-			// funneled into the documented unknown-name message; mirrors the
-			// pattern used by `get` and `start`.
+			// before mutating any daemon state (REQ-F-043). Only the
+			// "container does not exist" branch maps to unknown-name; other
+			// Inspect errors (daemon down, permission denied, …) propagate
+			// verbatim so the operator can fix the real cause.
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return unknownContainerError(name)
+				if errors.Is(err, ErrNotFound) {
+					return unknownContainerError(name)
+				}
+				return err
 			}
 			if !container.Managed {
 				cmd.SilenceUsage = true
@@ -135,17 +141,21 @@ func waitForExit(ctx context.Context, client dockerClient, name string, timeout 
 }
 
 // inspectExited returns true when the container is observably gone:
-// Inspect reports State.Running == false, OR Inspect errors with a
-// missing-container shape (ephemeral `--rm` cleaned up after exit).
-// Any other Inspect error is treated as transient — the poll loop will
-// keep retrying within the deadline.
+// Inspect reports State.Running == false, OR Inspect returns ErrNotFound
+// (ephemeral `--rm` cleaned up after exit). Any other Inspect error is
+// treated as transient — the poll loop will keep retrying within the
+// deadline.
 func inspectExited(ctx context.Context, client dockerClient, name string) bool {
 	c, err := client.Inspect(ctx, name)
 	if err != nil {
-		// "no such container" / "No such object" is the daemon's wording when
-		// an ephemeral container has been removed after exit. Treat it as
-		// the natural terminal state for stop --wait. Other errors (daemon
-		// unreachable, etc.) are transient — fall through to the poll loop.
+		// Primary: typed sentinel wrapped by execClient.Inspect.
+		if errors.Is(err, ErrNotFound) {
+			return true
+		}
+		// Defensive: a test fake or future client variant might return a
+		// bare error rather than ErrNotFound. The canonical docker wording
+		// ("no such container" / "no such object") is still the terminal
+		// signal for an ephemeral container that was removed after exit.
 		msg := strings.ToLower(err.Error())
 		if strings.Contains(msg, "no such container") || strings.Contains(msg, "no such object") {
 			return true

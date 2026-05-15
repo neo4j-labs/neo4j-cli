@@ -5,6 +5,7 @@ package docker
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -57,7 +58,9 @@ func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 			"Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names " +
 			"return a usage error pointing at `neo4j-cli docker list`. " +
 			"On a TTY, you are prompted to confirm before deletion; non-TTY callers MUST pass --force to " +
-			"confirm. A missing dbms credential is NOT an error — the container is still removed.",
+			"confirm. A missing dbms credential is NOT an error — the container is still removed. " +
+			"Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim " +
+			"and are distinct from the unknown-name error.",
 		Example: `# Delete a managed container; prompts on a TTY
 neo4j-cli docker delete dev --rw
 
@@ -73,14 +76,17 @@ neo4j-cli docker delete dev --force --rw && neo4j-cli docker list --format json`
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers
-			// before mutating any daemon state (REQ-F-053). Any Inspect error
-			// — missing container, removed ephemeral, daemon unreachable — is
-			// funneled into the documented unknown-name message; mirrors the
-			// pattern used by get / start / stop.
+			// before mutating any daemon state (REQ-F-053). Only the
+			// "container does not exist" branch maps to unknown-name; other
+			// Inspect errors (daemon down, permission denied, …) propagate
+			// verbatim so the operator can fix the real cause.
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return unknownContainerError(name)
+				if errors.Is(err, ErrNotFound) {
+					return unknownContainerError(name)
+				}
+				return err
 			}
 			if !container.Managed {
 				cmd.SilenceUsage = true

@@ -4,6 +4,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -45,7 +46,9 @@ func newStartCmd(cfg *clicfg.Config) *cobra.Command {
 			"--wait requires a stored dbms credential for the container (the credential supplies " +
 			"the password used to authenticate the readiness probe). " +
 			"Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to " +
-			"start one after it has exited surfaces the same unknown-name error.",
+			"start one after it has exited surfaces the same unknown-name error. " +
+			"Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced " +
+			"verbatim and are distinct from the unknown-name error.",
 		Example: `# Start a managed container by name
 neo4j-cli docker start dev --rw
 
@@ -61,15 +64,17 @@ neo4j-cli docker start dev --await --rw`,
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers
-			// before mutating any daemon state (REQ-F-043). Any Inspect error
-			// — missing container, removed ephemeral, daemon unreachable — is
-			// funneled into the documented unknown-name message; see `get.go`
-			// for the rationale (docker stderr wording is not stable across
-			// daemon versions, and the unknown-name hint is always actionable).
+			// before mutating any daemon state (REQ-F-043). Only the
+			// "container does not exist" branch maps to unknown-name; other
+			// Inspect errors (daemon down, permission denied, …) propagate
+			// verbatim so the operator can fix the real cause.
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
 				cmd.SilenceUsage = true
-				return unknownContainerError(name)
+				if errors.Is(err, ErrNotFound) {
+					return unknownContainerError(name)
+				}
+				return err
 			}
 			if !container.Managed {
 				cmd.SilenceUsage = true

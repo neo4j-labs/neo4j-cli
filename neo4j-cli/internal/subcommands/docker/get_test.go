@@ -197,15 +197,15 @@ func TestGet_FormatTable_RendersAllNineColumnsAndRow(t *testing.T) {
 	}
 }
 
-func TestGet_InspectErrorTreatedAsUnknown(t *testing.T) {
-	// A non-not-found docker error (e.g. daemon unreachable) is still
-	// funneled into the unknown-name shape per the leaf's defensive choice
-	// — Docker's stderr can change across versions and the unknown-name
-	// hint is always actionable. Confirm via a fake InspectFn returning a
-	// bespoke error.
+func TestGet_DaemonError_Propagated(t *testing.T) {
+	// A non-not-found docker error (daemon down, socket permission denied,
+	// rootless misconfig, etc.) propagates verbatim — the operator must
+	// see the real cause instead of a misleading unknown-name message.
+	// Drive via a fake InspectFn returning the canonical "Cannot connect
+	// to the Docker daemon" string so the assertion is on stable wording.
 	fake := newFakeDockerClient()
 	fake.InspectFn = func(ctx context.Context, name string) (Container, error) {
-		return Container{}, fmt.Errorf("Cannot connect to the Docker daemon")
+		return Container{}, fmt.Errorf("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 	origFactory := clientFactory
 	clientFactory = func() dockerClient { return fake }
@@ -228,5 +228,8 @@ func TestGet_InspectErrorTreatedAsUnknown(t *testing.T) {
 
 	err := cmd.Execute()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `no managed container named "dev"`)
+	assert.Contains(t, err.Error(), "Cannot connect to the Docker daemon",
+		"daemon errors must surface verbatim so the operator can fix the real cause")
+	assert.NotContains(t, err.Error(), "no managed container named",
+		"daemon errors must NOT be funneled into the unknown-name message")
 }

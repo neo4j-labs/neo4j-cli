@@ -88,7 +88,11 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 	}
 	c, ok := f.Containers[name]
 	if !ok {
-		return Container{}, fmt.Errorf("no such container: %s", name)
+		// Default-miss matches execClient.Inspect's contract: a missing
+		// container is signalled via ErrNotFound, not a bare error. Tests
+		// that need to simulate a daemon-down style failure should set
+		// InspectFn explicitly.
+		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return c, nil
 }

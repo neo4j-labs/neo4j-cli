@@ -65,7 +65,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 Remove a Neo4j container and its dbms credential
 
-Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. On a TTY, you are prompted to confirm before deletion; non-TTY callers MUST pass --force to confirm. A missing dbms credential is NOT an error — the container is still removed.
+Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. On a TTY, you are prompted to confirm before deletion; non-TTY callers MUST pass --force to confirm. A missing dbms credential is NOT an error — the container is still removed. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker delete <name> [flags]`
 
@@ -92,7 +92,7 @@ neo4j-cli docker delete dev --force --rw && neo4j-cli docker list --format json
 
 Show details of a Neo4j container managed by neo4j-cli
 
-Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, uri (neo4j://localhost:<bolt-port>), and image. Containers that exist in Docker but lack the managed label are treated as unknown; the error message points at `neo4j-cli docker list` so the operator can see the actual set of managed containers.
+Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, uri (neo4j://localhost:<bolt-port>), and image. Containers that exist in Docker but lack the managed label are treated as unknown; the error message points at `neo4j-cli docker list` so the operator can see the actual set of managed containers. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error so you can tell a missing container apart from a missing daemon.
 
 Usage: `neo4j-cli docker get <name>`
 
@@ -146,7 +146,7 @@ neo4j-cli docker list --format toon
 
 Start a stopped Neo4j container managed by neo4j-cli
 
-Start a stopped Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); --wait requires a stored dbms credential for the container (the credential supplies the password used to authenticate the readiness probe). Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to start one after it has exited surfaces the same unknown-name error.
+Start a stopped Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container's Bolt endpoint accepts sessions (60s timeout); --wait requires a stored dbms credential for the container (the credential supplies the password used to authenticate the readiness probe). Ephemeral containers (`--rm`) are removed by Docker when they stop, so attempting to start one after it has exited surfaces the same unknown-name error. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker start <name> [flags]`
 
@@ -173,7 +173,7 @@ neo4j-cli docker start dev --await --rw
 
 Stop a running Neo4j container managed by neo4j-cli
 
-Stop a running Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container has actually exited (60s timeout). Ephemeral containers (`--rm`) are removed by Docker the moment they exit, so a subsequent `neo4j-cli docker get` will return the same unknown-name error.
+Stop a running Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container has actually exited (60s timeout). Ephemeral containers (`--rm`) are removed by Docker the moment they exit, so a subsequent `neo4j-cli docker get` will return the same unknown-name error. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker stop <name> [flags]`
 

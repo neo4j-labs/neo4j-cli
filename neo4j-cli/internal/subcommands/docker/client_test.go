@@ -4,9 +4,11 @@
 package docker
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRedactArgs verifies that the argv-redaction helper used by execClient.run
@@ -75,6 +77,107 @@ func TestRedactArgs(t *testing.T) {
 			got := redactArgs(tc.in)
 			assert.Equal(t, tc.want, got)
 			assert.Equal(t, inCopy, tc.in, "redactArgs must not mutate its input slice")
+		})
+	}
+}
+
+// TestClassifyInspectError exercises the stderr-substring classifier that
+// execClient.Inspect uses to distinguish "container does not exist" from
+// operational docker failures (daemon down, permission denied, rootless
+// misconfig, …). The classifier is pulled out into its own function so we
+// can drive it with crafted error strings without needing a real docker
+// binary; the substring contract documented on classifyInspectError must
+// match docker's stable stderr wording for missing containers across modern
+// daemon versions.
+func TestClassifyInspectError(t *testing.T) {
+	cases := []struct {
+		name           string
+		in             error
+		wantNotFound   bool
+		wantContainsIn bool // assert returned message contains the name (only on ErrNotFound)
+		wantSame       bool // assert returned error == input (operational pass-through)
+	}{
+		{
+			name:           "nil input returns nil",
+			in:             nil,
+			wantNotFound:   false,
+			wantContainsIn: false,
+			wantSame:       false, // nil case is asserted separately
+		},
+		{
+			name:           "modern docker 'No such object' stderr",
+			in:             errors.New("docker inspect ghost: Error: No such object: ghost"),
+			wantNotFound:   true,
+			wantContainsIn: true,
+		},
+		{
+			name:           "legacy docker 'No such container' stderr",
+			in:             errors.New("docker inspect ghost: Error: No such container: ghost"),
+			wantNotFound:   true,
+			wantContainsIn: true,
+		},
+		{
+			name:         "daemon down error preserved verbatim",
+			in:           errors.New("docker inspect dev: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"),
+			wantNotFound: false,
+			wantSame:     true,
+		},
+		{
+			name:         "permission denied error preserved verbatim",
+			in:           errors.New("docker inspect dev: permission denied while trying to connect to the Docker daemon socket"),
+			wantNotFound: false,
+			wantSame:     true,
+		},
+		{
+			name:         "rootless misconfig error preserved verbatim",
+			in:           errors.New("docker inspect dev: Got permission denied while trying to connect to the Docker daemon socket at unix:///run/user/1000/docker.sock"),
+			wantNotFound: false,
+			wantSame:     true,
+		},
+		{
+			name:         "context deadline preserved verbatim",
+			in:           errors.New("docker inspect dev: signal: killed"),
+			wantNotFound: false,
+			wantSame:     true,
+		},
+		{
+			name:         "arbitrary unknown error preserved verbatim",
+			in:           errors.New("something else entirely"),
+			wantNotFound: false,
+			wantSame:     true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyInspectError(tc.in, "ghost")
+
+			if tc.in == nil {
+				assert.NoError(t, got, "nil input must return nil")
+				return
+			}
+
+			require.Error(t, got)
+			if tc.wantNotFound {
+				assert.True(t, errors.Is(got, ErrNotFound),
+					"expected errors.Is(_, ErrNotFound) for missing-container stderr, got %v", got)
+				if tc.wantContainsIn {
+					assert.Contains(t, got.Error(), "ghost",
+						"ErrNotFound wrap should mention the container name")
+				}
+			} else {
+				assert.False(t, errors.Is(got, ErrNotFound),
+					"operational error must NOT match ErrNotFound, got %v", got)
+				if tc.wantSame {
+					// Operational errors must propagate verbatim — same
+					// underlying value so the stderr the operator needs to
+					// read is preserved exactly.
+					assert.Equal(t, tc.in, got,
+						"operational error must be returned verbatim (no wrap)")
+					assert.Equal(t, tc.in.Error(), got.Error(),
+						"error message must be unchanged on operational pass-through")
+				}
+			}
 		})
 	}
 }

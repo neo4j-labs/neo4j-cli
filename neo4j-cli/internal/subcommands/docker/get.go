@@ -4,6 +4,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -29,7 +30,9 @@ func newGetCmd(cfg *clicfg.Config) *cobra.Command {
 			"Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, " +
 			"uri (neo4j://localhost:<bolt-port>), and image. " +
 			"Containers that exist in Docker but lack the managed label are treated as unknown; the error message " +
-			"points at `neo4j-cli docker list` so the operator can see the actual set of managed containers.",
+			"points at `neo4j-cli docker list` so the operator can see the actual set of managed containers. " +
+			"Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are " +
+			"distinct from the unknown-name error so you can tell a missing container apart from a missing daemon.",
 		Example: `# Show details of a managed container by name
 neo4j-cli docker get dev
 
@@ -46,17 +49,16 @@ neo4j-cli docker get dev --format toon`,
 
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
-				// Treat any inspect error as an unknown-name condition: the
-				// shelled `docker inspect` exits non-zero with "No such
-				// container" stderr when the name is missing, and the fake
-				// returns a bare `no such container` error. Either way, the
-				// REQ-F-032 contract is that the operator sees the same
-				// usage error with the `docker list` hint. We do NOT leak
-				// the underlying docker stderr — its wording can change
-				// across daemon versions, and the unknown-name message is
-				// already actionable.
 				cmd.SilenceUsage = true
-				return unknownContainerError(name)
+				// REQ-F-032: only the "container does not exist" branch maps
+				// to the unknown-name usage error. Operational failures
+				// (daemon down, permission denied, rootless misconfig, …)
+				// propagate verbatim so the operator can fix the real cause
+				// instead of chasing a phantom container.
+				if errors.Is(err, ErrNotFound) {
+					return unknownContainerError(name)
+				}
+				return err
 			}
 
 			// REQ-F-032: containers that exist in Docker but lack the

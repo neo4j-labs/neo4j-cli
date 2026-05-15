@@ -271,3 +271,21 @@ func TestStart_TooManyArgs_CobraUsageError(t *testing.T) {
 	assert.Empty(t, s.fake.InspectCalls)
 	assert.Empty(t, s.fake.StartCalls)
 }
+
+func TestStart_InspectDaemonError_Propagated(t *testing.T) {
+	// A non-not-found Inspect error (daemon down, permission denied, …)
+	// propagates verbatim — the operator must see the real cause, not a
+	// misleading "no managed container" message. Start must NOT fire.
+	s := newStartSetup(t, nil, nil)
+	s.fake.InspectFn = func(_ context.Context, _ string) (Container, error) {
+		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
+	}
+
+	err := s.cmd.run("dev")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Cannot connect to the Docker daemon",
+		"daemon errors must surface verbatim so the operator can fix the real cause")
+	assert.NotContains(t, err.Error(), "no managed container named",
+		"daemon errors must NOT be funneled into the unknown-name message")
+	assert.Empty(t, s.fake.StartCalls, "Start must not fire when Inspect reports a daemon error")
+}
