@@ -63,6 +63,37 @@ invoked directly by each installer script.
   This hook only fires for stable releases (`skip_upload: auto` gates
   prerelease formula pushes).
 
+- REQ-F-005: Behavioral tests for `install-neo4j-cli.sh` using bats-core must
+  be added under `distribution/installation-scripts/tests/`. Tests must mock
+  the `neo4j-cli` binary with a stub script (records invocations to a temp
+  file) and verify:
+  1. With `NEO4J_CLI_AUTO_INSTALL_SKILL=1`: the stub is called with
+     `skill install --rw`.
+  2. With env var unset or `=0`: the stub is never called.
+  3. With `=1` but the stub exits non-zero: the install script still exits 0.
+- REQ-F-006: Behavioral tests for `install-neo4j-cli.ps1` using Pester must
+  be added under `distribution/installation-scripts/tests/`. Tests must mock
+  the `neo4j-cli` invocation (via a stub `.ps1` or function override) and
+  verify the same three cases as REQ-F-005.
+- REQ-F-007: Behavioral tests for the npm postinstall hook must be added under
+  `distribution/npm/cli/`. Tests must mock the invocation of
+  `bin/neo4j-cli.js` (e.g. via Jest module mocking or a child_process stub)
+  and verify:
+  1. With `NEO4J_CLI_AUTO_INSTALL_SKILL=1`: the mock receives `skill install
+     --rw`.
+  2. With env var unset or `=0`: the mock is never invoked.
+  3. With `=1` but the mock throws: the postinstall script exits 0 and does
+     not propagate the error.
+- REQ-F-008: Behavioral tests for the Homebrew `post_install` Ruby block must
+  be added under `distribution/homebrew/tests/`. Tests must source or `eval`
+  the Ruby snippet extracted from `.goreleaser.yaml` with a stubbed `system`
+  method (records calls) and verify the same three cases as REQ-F-005.
+- REQ-F-009: A new GitHub Actions workflow
+  (`.github/workflows/installer-tests.yml`) must run all installer tests on
+  pull requests. Shell (bats-core) tests run on `ubuntu-latest` and
+  `macos-latest`; Pester tests run on `windows-latest`; npm/Jest tests run on
+  all three platforms; Ruby tests run on `ubuntu-latest`.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Installer scripts must be resilient to binary-not-found, "no
@@ -71,6 +102,50 @@ invoked directly by each installer script.
 - REQ-NF-002: No new Go code or cobra commands are introduced. The existing
   `skill install` command is used as-is. `make test`, `make generate-check`,
   and all gate targets must pass without modification to the Go codebase.
+- REQ-NF-003: All installer tests must run without a real `neo4j-cli` binary
+  installed. All binary invocations must be intercepted by stubs/mocks.
+- REQ-NF-004: Installer tests must be runnable locally with a single command
+  per channel (e.g. `bats distribution/installation-scripts/tests/`,
+  `Invoke-Pester`, `npm test`, `ruby -Ilib:test`) in addition to running in
+  CI.
+
+## Testing Strategy
+
+### bats-core (shell)
+
+`bats-core` provides a `@test` function DSL for POSIX shell scripts. Each test
+can override `PATH` to inject a stub `neo4j-cli` script that writes its
+arguments to a temp file so assertions can confirm whether and how the binary
+was called. Tests live in
+`distribution/installation-scripts/tests/install-neo4j-cli.bats`. Install
+bats-core via Homebrew (`brew install bats-core`) or npm
+(`npm install --save-dev bats`); the CI workflow installs it via `apt-get` /
+Homebrew action.
+
+### Pester (PowerShell)
+
+Pester v5 is the standard PowerShell test framework. Tests live in
+`distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1`. The
+mock strategy replaces `neo4j-cli` with a PowerShell function that captures
+its arguments before the script under test runs. Pester is pre-installed on
+GitHub-hosted `windows-latest` runners.
+
+### Jest (npm)
+
+The postinstall script entry point (`distribution/npm/cli/postinstall.js`) is
+extracted from the inline `package.json.tmpl` script into a separate file so
+Jest can `require` and test it in isolation. Jest is added as a dev dependency.
+`NEO4J_CLI_AUTO_INSTALL_SKILL` is set/unset via `process.env` in each test
+case; the `neo4j-cli.js` invocation is mocked via `jest.mock`.
+
+### Ruby minitest (Homebrew)
+
+The `post_install` Ruby snippet is extracted verbatim into
+`distribution/homebrew/tests/post_install_test.rb`. The test uses Ruby's
+built-in `minitest` and overrides the `system` kernel method with a lambda that
+records calls, allowing assertions that `system` is called with the expected
+arguments when the env var is `"1"` and not called otherwise. No Homebrew
+installation is required.
 
 ## Technical Considerations
 
@@ -119,6 +194,15 @@ Edit them there — changes go through normal PR review and are validated by the
 - [ ] `make test`, `make fmt-check`, `make lint` all pass with no Go changes.
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff in bundle.
 - [ ] Changelog entry added (`make changelog`).
+- [ ] `bats distribution/installation-scripts/tests/` passes on macOS and Linux.
+- [ ] Shell tests confirm stub called with `skill install --rw` when `=1`, not called otherwise, and failure suppressed.
+- [ ] `Invoke-Pester distribution/installation-scripts/tests/` passes on Windows.
+- [ ] PowerShell tests confirm same three cases as shell tests.
+- [ ] `npm test` in `distribution/npm/cli/` passes on all platforms.
+- [ ] npm tests confirm mock receives `skill install --rw` when `=1`, not called otherwise, and error caught.
+- [ ] `ruby distribution/homebrew/tests/post_install_test.rb` passes.
+- [ ] Ruby tests confirm `system` called with correct args when `=1`, not called otherwise.
+- [ ] `installer-tests.yml` workflow runs and passes on a sample PR.
 
 ## Out of Scope
 

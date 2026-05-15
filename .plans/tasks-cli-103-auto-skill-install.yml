@@ -1,7 +1,7 @@
 feature: cli-103-auto-skill-install
 prd: ./prd-cli-103-auto-skill-install.md
 created_at: 2026-05-14T00:00:00Z
-updated_at: 2026-05-14T00:00:00Z
+updated_at: 2026-05-15T00:00:00Z
 
 tasks:
   - id: task-001
@@ -95,3 +95,112 @@ tasks:
       - "The body mentions `NEO4J_CLI_AUTO_INSTALL_SKILL=1` and the three channels (npm, Homebrew, curl)"
       - "`make changelog` (or `changie batch`) succeeds without errors"
     completed_at: 2026-05-14T15:48:51Z
+
+  - id: task-006
+    title: "Add bats-core behavioral tests for install-neo4j-cli.sh"
+    description: |
+      Create `distribution/installation-scripts/tests/install-neo4j-cli.bats`
+      using bats-core. Each test injects a stub `neo4j-cli` script into PATH
+      that records its arguments to a temp file. Test cases:
+      1. `NEO4J_CLI_AUTO_INSTALL_SKILL=1`: stub is called with `skill install --rw`.
+      2. Env var unset or `=0`: stub is never called.
+      3. `=1` but stub exits non-zero: install script still exits 0.
+      Document local run command in the test file header:
+      `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`
+    status: not_started
+    dependencies: []
+    acceptance_criteria:
+      - "All three test cases pass via `bats distribution/installation-scripts/tests/`"
+      - "Tests pass on macOS and Linux without a real neo4j-cli binary installed"
+      - "Stub script records invocations; assertions check the recorded args"
+      - "`shellcheck` passes on the bats file and the stub helper"
+
+  - id: task-007
+    title: "Add Pester behavioral tests for install-neo4j-cli.ps1"
+    description: |
+      Create `distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1`
+      using Pester v5. Override `neo4j-cli` as a PowerShell function (or use
+      Mock) before dot-sourcing the installer to capture invocations. Test cases:
+      1. `$env:NEO4J_CLI_AUTO_INSTALL_SKILL = '1'`: mock receives `skill install --rw`.
+      2. Env var unset or any non-`'1'` value: mock is never called.
+      3. `=1` but mock throws: installer script still exits cleanly (no terminating error).
+      Document local run command: `Invoke-Pester distribution/installation-scripts/tests/`
+    status: not_started
+    dependencies: []
+    acceptance_criteria:
+      - "All three test cases pass via `Invoke-Pester` on Windows"
+      - "Tests run without a real neo4j-cli binary installed"
+      - "Pester `Mock` or function stub captures invocation arguments"
+      - "Test file has Windows line endings (CRLF)"
+
+  - id: task-008
+    title: "Extract npm postinstall logic to testable module and add Jest tests"
+    description: |
+      Extract the inline postinstall logic from `distribution/npm/cli/package.json.tmpl`
+      into `distribution/npm/cli/postinstall.js`. Update the `scripts.postinstall`
+      entry in the template to call `node postinstall.js`. Add Jest as a dev
+      dependency in `distribution/npm/cli/package.json.tmpl` (or a separate
+      `package.json` for tests). Create `distribution/npm/cli/postinstall.test.js`
+      with test cases:
+      1. `process.env.NEO4J_CLI_AUTO_INSTALL_SKILL = '1'`: mock receives
+         `skill install --rw` args.
+      2. Env var unset or `=0`: mock never called.
+      3. `=1` but mock throws: postinstall exits 0 (error caught).
+      Use `jest.mock` or a manual stub for the `bin/neo4j-cli.js` invocation.
+      Document local run: `npm test` from `distribution/npm/cli/`.
+    status: not_started
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All three Jest test cases pass via `npm test` on macOS, Linux, and Windows"
+      - "Tests run without a real neo4j-cli binary installed"
+      - "`make npm-publish-dry` still passes after extracting postinstall.js"
+      - "postinstall.js has the Neo4j copyright header"
+
+  - id: task-009
+    title: "Add Ruby minitest behavioral tests for Homebrew post_install block"
+    description: |
+      Create `distribution/homebrew/tests/post_install_test.rb`. Extract the
+      `post_install` Ruby snippet from `.goreleaser.yaml` into a helper
+      (`distribution/homebrew/post_install.rb`) that can be `require`d. In the
+      test, override the `system` kernel method with a lambda that records calls,
+      set/unset `ENV['NEO4J_CLI_AUTO_INSTALL_SKILL']`, then invoke the method.
+      Test cases:
+      1. `ENV['NEO4J_CLI_AUTO_INSTALL_SKILL'] = '1'`: `system` called with
+         the correct binary path and `skill install --rw` args.
+      2. Env var unset or `=0`: `system` never called.
+      3. `=1` but `system` raises: method returns without propagating the error.
+      Document local run: `ruby distribution/homebrew/tests/post_install_test.rb`
+      No Homebrew installation required — pure Ruby stdlib only.
+    status: not_started
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "All three minitest cases pass via `ruby distribution/homebrew/tests/post_install_test.rb`"
+      - "Tests run without Homebrew or neo4j-cli installed"
+      - "Helper file has the Neo4j copyright header"
+      - "`post_install.rb` helper is referenced from `.goreleaser.yaml` (or kept in sync with it)"
+
+  - id: task-010
+    title: "Add installer-tests.yml GitHub Actions workflow"
+    description: |
+      Create `.github/workflows/installer-tests.yml` that runs all installer
+      behavioral tests on every pull request and push to main:
+      - bats-core tests: `ubuntu-latest` and `macos-latest`
+        (install bats-core via `apt-get` or `brew`)
+      - Pester tests: `windows-latest` (Pester v5 pre-installed)
+      - Jest tests: matrix of `ubuntu-latest`, `macos-latest`, `windows-latest`
+        (install node, run `npm ci && npm test` in `distribution/npm/cli/`)
+      - Ruby minitest tests: `ubuntu-latest` (Ruby pre-installed)
+      The workflow must not require any secrets or external services.
+    status: not_started
+    dependencies:
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "Workflow triggers on `pull_request` and `push` to `main`"
+      - "All four job types pass on a sample PR"
+      - "Workflow fails fast if any test suite fails (exit code propagated)"
+      - "Workflow file passes `actionlint` (or equivalent YAML validation)"
