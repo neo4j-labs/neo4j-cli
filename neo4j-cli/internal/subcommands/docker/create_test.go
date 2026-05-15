@@ -1310,8 +1310,23 @@ func TestExpandHostPath(t *testing.T) {
 	// Drive expandHostPath directly to cover the unit (independent of the
 	// cobra flow). The seam-based tests above exercise the full pipeline;
 	// these pin the helper contract.
-	withHomeDirFn(t, "/home/op")
-	t.Setenv("EXAMPLE_DIR", "/srv/example")
+	//
+	// Expected values are computed via filepath.Abs/Join so the test is
+	// cross-platform: on Windows filepath.Abs prepends the current drive
+	// and converts to backslashes (AGENTS.md "Windows CI Gotchas"). Use
+	// t.TempDir() to source platform-native absolute paths for the home
+	// and env-var-pointed dirs; they're never actually written to.
+	home := t.TempDir()
+	exampleDir := t.TempDir()
+	withHomeDirFn(t, home)
+	t.Setenv("EXAMPLE_DIR", exampleDir)
+
+	// Build a platform-appropriate absolute path the helper should accept
+	// unchanged (after filepath.Abs/Clean): "/var/data" on POSIX,
+	// "<drive>:\var\data" on Windows.
+	absoluteIn := filepath.Join(string(filepath.Separator), "var", "data")
+	absoluteWant, err := filepath.Abs(absoluteIn)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name string
@@ -1319,11 +1334,11 @@ func TestExpandHostPath(t *testing.T) {
 		want string
 	}{
 		{"empty stays empty", "", ""},
-		{"tilde alone", "~", "/home/op"},
-		{"tilde slash", "~/x", "/home/op/x"},
-		{"env var", "$EXAMPLE_DIR/x", "/srv/example/x"},
-		{"braced env var", "${EXAMPLE_DIR}/x", "/srv/example/x"},
-		{"absolute unchanged", "/var/data", "/var/data"},
+		{"tilde alone", "~", home},
+		{"tilde slash", "~/x", filepath.Join(home, "x")},
+		{"env var", "$EXAMPLE_DIR/x", filepath.Join(exampleDir, "x")},
+		{"braced env var", "${EXAMPLE_DIR}/x", filepath.Join(exampleDir, "x")},
+		{"absolute unchanged", absoluteIn, absoluteWant},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
