@@ -157,3 +157,30 @@ Key Decisions:
   so stub gaps produce warnings rather than test failures.
 
 Next Task: task-008
+
+================================================================================
+TASK-008: Extract npm postinstall logic to testable module and add Jest tests
+Date: 2026-05-15T12:00:00Z
+================================================================================
+
+Summary:
+Refactored bin/postinstall.js to export a run() function for testability, then
+added Jest tests covering all four guard-logic cases. A separate dev-only
+package.json (not part of the published package) drives `npm test`. A
+.gitignore prevents node_modules/ and package-lock.json from being committed.
+
+Files Changed:
+- distribution/npm/cli/bin/postinstall.js (modified — added module.exports { run } and restructured for testability)
+- distribution/npm/cli/package.json.tmpl (modified — postinstall now calls `node bin/postinstall.js` instead of inline script)
+- distribution/npm/cli/postinstall.test.js (created — 4 Jest test cases)
+- distribution/npm/cli/package.json (created — dev-only, not published; jest ^29 dev dep, testEnvironment: node)
+- distribution/npm/cli/.gitignore (created — excludes node_modules/ and package-lock.json)
+
+Key Decisions:
+- postinstall.js lives in bin/ (not root) so it's included in the published `files` array and co-located with the shim.
+- Separate package.json for tests (not modifying package.json.tmpl) keeps devDependencies out of the published package.
+- jest.doMock used instead of jest.mock to avoid hoisting — needed because mock must reference closure variables (spawnMock).
+- jest.resetModules() per test call ensures each test gets a fresh module with a clean process.env state.
+- .gitignore added to prevent accidental git add of node_modules/ (268+ packages).
+
+Next Task: task-009

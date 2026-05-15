@@ -150,7 +150,8 @@ tasks:
       3. `=1` but mock throws: postinstall exits 0 (error caught).
       Use `jest.mock` or a manual stub for the `bin/neo4j-cli.js` invocation.
       Document local run: `npm test` from `distribution/npm/cli/`.
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T12:00:00Z
     dependencies:
       - task-001
     acceptance_criteria:
