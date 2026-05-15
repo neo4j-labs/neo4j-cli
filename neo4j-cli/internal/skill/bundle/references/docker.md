@@ -52,3 +52,30 @@ neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw
 ```
 
+## neo4j-cli docker list
+
+List Neo4j containers managed by neo4j-cli
+
+List all Neo4j Docker containers carrying the `org.neo4j.cli.managed=true` label. Renders one row per container with name, status (Docker's human-readable state), edition, version, bolt-port, http-port, and ephemeral. Unmanaged containers (no label) are excluded. An empty result renders as an empty table or empty JSON array (exit 0).
+
+Usage: `neo4j-cli docker list`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--format` | string | - | Format to print console output in, from a choice of [default, json, table, toon]. (agents: prefer toon) |
+
+Examples:
+
+```
+# List managed Neo4j containers as a table
+neo4j-cli docker list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli docker list --format json
+
+# Emit TOON for token-efficient ingestion by agents
+neo4j-cli docker list --format toon
+```
+

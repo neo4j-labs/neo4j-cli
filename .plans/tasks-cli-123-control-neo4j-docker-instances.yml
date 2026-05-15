@@ -149,7 +149,7 @@ tasks:
       Empty result renders as an empty table or empty JSON array — no error (REQ-F-022).
       Add `list_test.go` table-driven: no managed containers; one running; one running + one exited; mixed managed + unmanaged (unmanaged filtered out).
       Provide a flush-left `Example:` block satisfying TestAllLeafCommands_HaveExamples (≥3 invocations, at least one `--format json`).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -158,7 +158,7 @@ tasks:
       - "Unmanaged containers (no label) are excluded"
       - "--format json|table|toon all produce well-formed output"
       - "list.go has a flush-left Example block; TestAllLeafCommands_HaveExamples covers it"
-    completed_at: null
+    completed_at: 2026-05-15T16:35:00Z
 
   - id: task-009
     title: "docker get <name>"
