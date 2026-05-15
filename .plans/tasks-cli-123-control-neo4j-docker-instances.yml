@@ -581,7 +581,7 @@ tasks:
       No PRD change. This is a defect fix on the existing REQ-F-011 image-resolution contract.
 
       Process learning (for future agents working on this repo): registry tag patterns must be verified against the canonical source (Docker Hub `_/neo4j` page or v2 tags API) before being encoded into Go logic. Assuming `<latest>-enterprise` from the `<version>-enterprise` pattern was wrong and reproducible against any default `docker create`.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -592,7 +592,7 @@ tasks:
       - "AGENTS.md gains a one-line note about the latest+enterprise → `neo4j:enterprise` mapping under Docker Subsystem Notes"
       - "Live verification: `bin/neo4j-cli docker create --name htest --rw` (no other flags) actually pulls + runs against a real docker daemon; followed by `bin/neo4j-cli docker delete htest --force --rw`"
       - "make fmt-check, make lint, make test, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-15T13:30:00Z
 
   - id: task-023
     title: "Rename `--env-file` → `--env-out-file` on `docker create` (hard rename, no alias)"

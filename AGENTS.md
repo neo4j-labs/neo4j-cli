@@ -210,6 +210,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - `bolt_ready.go` exports `WaitForBolt(ctx, uri, user, pass, timeout)` and is reused by both `create --wait` and `start --wait`. It uses the vendored `neo4j-go-driver` from `neo4j-cli/query/`; on timeout it returns a `clierr.UsageError` pointing at `docker logs <name>`. `stop --wait` polls `dockerClient.Inspect` for `State.Running == false` instead.
 - `create` auto-suffixes name collisions against BOTH `dockerClient.PsAll` AND `credentials.DbmsCredentials.List()` so the chosen name is unique across both surfaces; the chosen name is used for the container, the stored credential, and the env-file header.
 - `--ephemeral` adds `--rm` to `docker run`, labels the container `ephemeral=true`, skips credential persistence, and emits the `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout — or to `--env-file <path>` (mode 0600 via `cfg.Aura.Fs()`) when set. The blob is consumed by `query --env <path>`.
+- Image tag mapping: `--edition enterprise --version latest` → `neo4j:enterprise` (NOT `neo4j:latest-enterprise`, which is unpublished); explicit versions → `neo4j:<version>-enterprise`. Verify any new edition/version logic against `https://hub.docker.com/_/neo4j` before assuming a tag pattern.
 
 ## Cobra Help / Skill Bundle Rendering Notes
 

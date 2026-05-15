@@ -240,3 +240,52 @@ Files: ~README.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/s
 Dropped redundant per-leaf `flags.RegisterOutputFlag` calls from docker `list.go` and `get.go`; `--format` is registered persistently on the neo4j-cli root (app.go) and inherits to every subcommand via cobra. Removed the now-unused `common/flags` import from both files; replaced each removed call with a short comment pointing at the root. `create.go` was already aligned (never registered per-leaf). Test-side `flags.RegisterOutputFlag(cmd, cfg)` calls in `list_test.go`, `get_test.go`, and `create_test.go` preserved — those build their own root cmds independent of `app.NewCmd` and still need a local registration for test isolation. Bundle regen produced a clean diff in `references/docker.md` (the per-leaf `--format` row no longer renders on get/list since the flag is now globally inherited).
 Files: ~neo4j-cli/internal/subcommands/docker/list.go, ~neo4j-cli/internal/subcommands/docker/get.go, ~neo4j-cli/internal/skill/bundle/references/docker.md
 Verification: bin/neo4j-cli docker {list,get,create} --help all show `--format` under "Global Flags" via root inheritance; full gate suite (test, lint, fmt-check, license-check, build) green.
+
+## TASK-022 — 2026-05-15T13:30:00Z
+Fixed default `docker create` (`--version latest --edition enterprise`) producing the unpublished tag `neo4j:latest-enterprise`. Image-resolution branch in create.go now special-cases `version=="latest" && edition=="enterprise"` → bare `neo4j:enterprise` (canonical Docker Hub tag for latest-enterprise), explicit versions remain `neo4j:<version>-enterprise`, community unchanged. Updated default-enterprise argv assertion + three env-file blob header strings in create_test.go; added two regression tests (`TestCreate_EnterpriseExplicitVersion_UsesVersionEnterpriseSuffix` pins `5.26-enterprise` path, `TestCreate_EnterpriseLatest_UsesBareEnterpriseTag` pins the fix). AGENTS.md Docker Subsystem Notes gains a one-line image-tag mapping note. PRD acceptance criterion line 205 updated (`image=neo4j:enterprise`).
+Files: ~neo4j-cli/internal/subcommands/docker/create.go, ~neo4j-cli/internal/subcommands/docker/create_test.go, ~AGENTS.md, ~.plans/prd-cli-123-control-neo4j-docker-instances.md
+Decisions: synthetic `neo4j:latest-enterprise` strings in parsers_test.go, list_test.go, get_test.go, client_test.go left as-is — they're fixture strings for redaction/parser/list/get tests that don't depend on what create.go produces; updating would be churn-only and task scope was explicitly `create_test.go`. No skill-bundle regen required (no Long/Example text changes).
+
+## Live verification — task-022
+Ran against local docker daemon after green gates:
+
+```
+$ bin/neo4j-cli docker create --name htest --rw
+[
+	{
+		"bolt-port": 7687,
+		"edition": "enterprise",
+		"http-port": 7474,
+		"name": "htest",
+		"password": "5AAMRb4fp4_sg9gHeRofcQ",
+		"uri": "neo4j://localhost:7687",
+		"username": "neo4j",
+		"version": "latest"
+	}
+]
+
+$ bin/neo4j-cli docker list --format json
+[
+	{
+		"bolt-port": "7687",
+		"edition": "enterprise",
+		"ephemeral": false,
+		"http-port": "7474",
+		"name": "htest",
+		"status": "Up 3 seconds",
+		"version": "latest"
+	}
+]
+
+$ bin/neo4j-cli docker delete htest --force --rw
+(no output, exit 0)
+
+$ docker ps -a --filter name=htest
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+(empty — container removed)
+
+$ bin/neo4j-cli credential dbms list --format json | grep -i htest
+(empty — credential removed)
+```
+
+Fix confirmed: `create` succeeded with the real `neo4j:enterprise` tag (no "manifest not found" error), `list` showed the running container, `delete` removed both the container and the dbms credential.

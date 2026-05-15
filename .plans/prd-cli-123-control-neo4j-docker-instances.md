@@ -202,7 +202,7 @@ The tree is implemented by shelling out to the `docker` CLI via `os/exec` — no
 - [ ] `bin/neo4j-cli docker create --name dev --edition enterprise --accept-license --rw` passes `NEO4J_ACCEPT_LICENSE_AGREEMENT=yes` to the container.
 - [ ] `bin/neo4j-cli docker create --name dev --edition community --rw` passes no `NEO4J_ACCEPT_LICENSE_AGREEMENT` env var and pulls `neo4j:latest` (community tag).
 - [ ] Port-conflict pre-flight: occupy 7687, run `create` → exits non-zero with a `clierr.UsageError` naming `--bolt-port`.
-- [ ] `bin/neo4j-cli docker get dev --format json` returns JSON with `name`, `status`, `edition=enterprise`, `version=latest`, `bolt-port=7687`, `http-port=7474`, `ephemeral=false`, `uri=neo4j://localhost:7687`, `image=neo4j:latest-enterprise`.
+- [ ] `bin/neo4j-cli docker get dev --format json` returns JSON with `name`, `status`, `edition=enterprise`, `version=latest`, `bolt-port=7687`, `http-port=7474`, `ephemeral=false`, `uri=neo4j://localhost:7687`, `image=neo4j:enterprise`.
 - [ ] `bin/neo4j-cli docker list --format table` includes the columns listed in REQ-F-021.
 - [ ] `bin/neo4j-cli query --credential dev "RETURN 1"` returns `1`.
 - [ ] `bin/neo4j-cli docker stop dev --rw --wait` exits cleanly; `docker ps -a` shows the container Exited.

@@ -194,11 +194,18 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				resolvedPassword = base64.RawURLEncoding.EncodeToString(buf)
 			}
 
-			// Resolve image: community → neo4j:<version>; enterprise →
-			// neo4j:<version>-enterprise (REQ-F-011).
+			// Resolve image (REQ-F-011). Tag scheme verified against
+			// https://hub.docker.com/_/neo4j and the v2 tags API:
+			//   - community + any version → neo4j:<version>      (latest, 5, 5.26, 2026.04, …)
+			//   - enterprise + explicit version → neo4j:<version>-enterprise
+			//   - enterprise + "latest" → neo4j:enterprise        (Docker Hub does NOT publish neo4j:latest-enterprise)
 			image := "neo4j:" + version
 			if edition == "enterprise" {
-				image = "neo4j:" + version + "-enterprise"
+				if version == "latest" {
+					image = "neo4j:enterprise"
+				} else {
+					image = "neo4j:" + version + "-enterprise"
+				}
 			}
 
 			// Build the docker run argv. Order matters for tests asserting

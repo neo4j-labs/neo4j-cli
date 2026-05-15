@@ -181,8 +181,9 @@ func TestCreate_HappyPath_StoresCredentialAndSetsExpectedArgs(t *testing.T) {
 	} {
 		assert.True(t, containsPair(argv, "--label", lbl), "argv missing label %q: %v", lbl, argv)
 	}
-	// Image is last; enterprise → -enterprise suffix.
-	assert.Equal(t, "neo4j:latest-enterprise", argv[len(argv)-1])
+	// Image is last; default enterprise + latest → bare `neo4j:enterprise`
+	// (Docker Hub does NOT publish a `latest-enterprise` tag).
+	assert.Equal(t, "neo4j:enterprise", argv[len(argv)-1])
 
 	// Credential persisted with name=dev, the generated password, and a
 	// localhost URI keyed off --bolt-port.
@@ -212,6 +213,29 @@ func TestCreate_CommunityEdition_NoLicenseEnvAndPlainImageTag(t *testing.T) {
 	}
 	assert.True(t, containsPair(argv, "--label", LabelEdition+"=community"))
 	assert.Equal(t, "neo4j:latest", argv[len(argv)-1], "community image must NOT carry -enterprise suffix")
+}
+
+// Regression guard for the explicit-version enterprise path: `--version 5.26
+// --edition enterprise` MUST still produce `neo4j:5.26-enterprise`. Pins the
+// versioned branch so a future refactor of the image-resolution block can't
+// re-break it while fixing the `latest` case.
+func TestCreate_EnterpriseExplicitVersion_UsesVersionEnterpriseSuffix(t *testing.T) {
+	fake, _, _, err := runCreate(t, "--name dev --version 5.26 --edition enterprise --no-store-credential")
+	require.NoError(t, err)
+	argv := runArgv(t, fake)
+	assert.Equal(t, "neo4j:5.26-enterprise", argv[len(argv)-1],
+		"enterprise + explicit version must map to neo4j:<version>-enterprise")
+}
+
+// Pin the bug fix: `--version latest --edition enterprise` MUST resolve to
+// the bare `neo4j:enterprise` tag because Docker Hub does NOT publish
+// `neo4j:latest-enterprise`. This is the case the operator hit live.
+func TestCreate_EnterpriseLatest_UsesBareEnterpriseTag(t *testing.T) {
+	fake, _, _, err := runCreate(t, "--name dev --version latest --edition enterprise --no-store-credential")
+	require.NoError(t, err)
+	argv := runArgv(t, fake)
+	assert.Equal(t, "neo4j:enterprise", argv[len(argv)-1],
+		"enterprise + latest must map to bare neo4j:enterprise (Docker Hub does NOT publish neo4j:latest-enterprise)")
 }
 
 func TestCreate_EnterpriseAcceptLicense_UpgradesToYes(t *testing.T) {
@@ -779,7 +803,7 @@ func TestCreate_Ephemeral_HappyPath_EmitsEnvBlobAndSkipsCredential(t *testing.T)
 	// lines, in the documented order), in plain text — NOT through the
 	// table/JSON renderer.
 	expectedBlob := fmt.Sprintf(
-		"# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
+		"# neo4j-cli docker — tmp @ neo4j:enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
 		expectedPassword,
 	)
 	assert.Equal(t, expectedBlob, stdout, "stdout must be the literal env-file blob")
@@ -819,7 +843,7 @@ func TestCreate_Ephemeral_EnvFile_WritesFileAndStaysSilent(t *testing.T) {
 	contents, readErr := afero.ReadFile(fs, envPath)
 	require.NoError(t, readErr)
 	expectedBlob := fmt.Sprintf(
-		"# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
+		"# neo4j-cli docker — tmp @ neo4j:enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=%s\nNEO4J_DATABASE=neo4j\n",
 		expectedPassword,
 	)
 	assert.Equal(t, expectedBlob, string(contents))
@@ -1000,7 +1024,7 @@ func TestWriteEnvFile_ReplacesPreExistingSymlink_OsFs(t *testing.T) {
 	require.NoError(t, os.Symlink(otherPath, envPath))
 
 	fs := afero.NewOsFs()
-	const blob = "# neo4j-cli docker — tmp @ neo4j:latest-enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\nNEO4J_DATABASE=neo4j\n"
+	const blob = "# neo4j-cli docker — tmp @ neo4j:enterprise\nNEO4J_URI=neo4j://localhost:7687\nNEO4J_USERNAME=neo4j\nNEO4J_PASSWORD=p\nNEO4J_DATABASE=neo4j\n"
 	require.NoError(t, writeEnvFile(fs, envPath, blob))
 
 	// envPath must now be a REGULAR file (symlink replaced) with mode 0600
