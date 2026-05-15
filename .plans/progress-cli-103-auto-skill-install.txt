@@ -125,3 +125,35 @@ Key Decisions:
   run_installer's explicit env block.
 
 Next Task: task-007
+
+================================================================================
+TASK-007: Add Pester behavioral tests for install-neo4j-cli.ps1
+Date: 2026-05-15T10:00:00Z
+================================================================================
+
+Summary:
+Created Pester v5 behavioral tests for the NEO4J_CLI_AUTO_INSTALL_SKILL guard
+in install-neo4j-cli.ps1. Tests run the installer as a pwsh subprocess with all
+heavyweight cmdlets (Invoke-WebRequest, Expand-Archive, Get-FileHash, Get-Content)
+stubbed via function overrides written to a temp wrapper .ps1 file. A neo4j-cli.cmd
+stub records invocations via the NEO4J_CALLS_FILE env var. 4 test cases covering
+env=1 (called), env unset (not called), env=0 (not called), env=1+fail (still exits 0).
+File has CRLF line endings (226 CRLF, 0 LF-only). pwsh not available locally;
+windows-latest CI is the gate.
+
+Files Changed:
+- distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 (created — Pester v5 test suite with 4 test cases)
+
+Key Decisions:
+- Used neo4j-cli.cmd stub (not .ps1) because Windows resolves bare `& neo4j-cli`
+  to .cmd/.bat before .ps1 when searching PATH — this ensures the stub is actually
+  found and invoked by the installer's `& neo4j-cli skill install --rw` call.
+- Passed callsFile path via NEO4J_CALLS_FILE env var (not embedded literal) to
+  avoid escaping complexity with backslashes and quotes in nested strings.
+- Wrote the subprocess command to a temp .ps1 file and invoked it with `pwsh -File`
+  (not -Command) to eliminate all quoting/escaping issues with the large command block.
+- Stub overwrites `Add-ToUserPath` to suppress registry PATH mutation in tests.
+- Test wrapper uses `Set-StrictMode -Off` and `$ErrorActionPreference = 'Continue'`
+  so stub gaps produce warnings rather than test failures.
+
+Next Task: task-008

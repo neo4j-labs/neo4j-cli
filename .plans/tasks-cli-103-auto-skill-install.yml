@@ -126,7 +126,8 @@ tasks:
       2. Env var unset or any non-`'1'` value: mock is never called.
       3. `=1` but mock throws: installer script still exits cleanly (no terminating error).
       Document local run command: `Invoke-Pester distribution/installation-scripts/tests/`
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T10:00:00Z
     dependencies: []
     acceptance_criteria:
       - "All three test cases pass via `Invoke-Pester` on Windows"

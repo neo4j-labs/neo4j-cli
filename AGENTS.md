@@ -224,6 +224,14 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## PowerShell Installer Test Notes
+
+- **Use `.cmd` stubs, not `.ps1`**: When testing PowerShell installer scripts that call `& neo4j-cli`, put the stub in a `.cmd` file (not `.ps1`). Windows resolves bare `& neo4j-cli` to `.cmd`/`.bat` before `.ps1` when scanning PATH — a `.ps1` stub is often silently skipped.
+- **Write subprocess commands to a temp `.ps1` file**: Pass the wrapper script via `pwsh -File <path>` rather than `pwsh -Command <big-string>`. This avoids escaping backslashes, single-quotes, and `$` signs in nested here-strings.
+- **Pass paths via env vars**: When stub scripts need to write to a file (e.g. a calls-recorder), pass the path via an environment variable (e.g. `$env:NEO4J_CALLS_FILE`) rather than embedding it as a literal string — avoids escaping backslashes on Windows paths.
+- **CRLF for `.ps1` files**: Any `.ps1` file in `distribution/installation-scripts/` must have Windows CRLF line endings. After writing with any tool on macOS/Linux, convert with `python3 -c "..."` (unix2dos not available by default on macOS). Verify with: `python3 -c "import sys; ... count b'\\r\\n'"`.
+- `pwsh` is not installed by default on macOS dev machines — Pester tests are gated on `windows-latest` CI. Validate syntax locally by reading the file; don't block task completion on local Pester execution.
+
 ---
 
 _This AGENTS.md was generated using agent-based project discovery._
