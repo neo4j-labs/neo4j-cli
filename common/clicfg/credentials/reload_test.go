@@ -5,6 +5,7 @@ package credentials_test
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,6 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type openErrFs struct {
+	afero.Fs
+}
+
+func (fs openErrFs) Open(name string) (afero.File, error) {
+	return nil, os.ErrPermission
+}
 
 // credentialsPath is the expected path of the credentials file within the
 // testfs layout.
@@ -108,6 +117,20 @@ func TestReloadAuraCredential_ReturnsFalseWhenAuraKeyAbsent(t *testing.T) {
 	writeCredsJSON(t, fs, map[string]any{"dbms": map[string]any{}})
 
 	cred, ok := credentials.ReloadAuraCredential(fs, credentialsPath(), "any")
+	assert.False(t, ok)
+	assert.Nil(t, cred)
+}
+
+func TestReloadAuraCredential_ReturnsFalseWhenReadFails(t *testing.T) {
+	fs := openErrFs{Fs: afero.NewMemMapFs()}
+
+	var (
+		cred *credentials.AuraCredential
+		ok   bool
+	)
+	require.NotPanics(t, func() {
+		cred, ok = credentials.ReloadAuraCredential(fs, credentialsPath(), "any")
+	})
 	assert.False(t, ok)
 	assert.Nil(t, cred)
 }

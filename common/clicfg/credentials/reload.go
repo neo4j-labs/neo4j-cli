@@ -5,8 +5,9 @@ package credentials
 
 import (
 	"encoding/json"
+	"errors"
+	"os"
 
-	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/spf13/afero"
 )
 
@@ -15,8 +16,11 @@ import (
 // It returns nil, false on any error: file missing, parse error, or the
 // named credential not found. It never panics.
 func ReloadAuraCredential(fs afero.Fs, filePath, name string) (*AuraCredential, bool) {
-	data := fileutils.ReadFileSafe(fs, filePath)
-	if len(data) == 0 {
+	data, err := afero.ReadFile(fs, filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, false
+		}
 		return nil, false
 	}
 
