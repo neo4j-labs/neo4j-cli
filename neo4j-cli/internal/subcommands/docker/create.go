@@ -4,6 +4,7 @@
 package docker
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -11,12 +12,19 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
+
+// maxNameSuffix caps the auto-suffix walk for name-collision resolution
+// (REQ-F-014). The contract is `<name>-1` … `<name>-99`; exceeding it is
+// almost certainly operator error (stale containers piling up) and we
+// surface that explicitly rather than spinning forever.
+const maxNameSuffix = 99
 
 // clientFactory is the injectable seam for the dockerClient used by leaves.
 // Production wires the exec-backed client (client.go newClient); tests swap
@@ -41,9 +49,10 @@ var listenerFactory = func(port int) (net.Listener, error) {
 // which is well above the entropy floor for a local Bolt password.
 const generatedPasswordBytes = 16
 
-// newCreateCmd builds the `neo4j-cli docker create` leaf — the minimum-viable
-// happy path (no port-conflict pre-flight, no name-collision auto-suffix, no
-// --wait, no --ephemeral, no --env-file; those land in tasks 4–7).
+// newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
+// the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
+// (REQ-F-014) before touching docker so a clash never leaves a half-created
+// container behind. --wait, --ephemeral, and --env-file land in later tasks.
 func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		name              string
@@ -75,7 +84,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"store a matching dbms credential so `neo4j-cli query --credential <name>` can connect immediately. " +
 			"The container carries `org.neo4j.cli.managed=true` plus a small set of metadata labels — " +
 			"Docker itself is the source of truth, no separate state file is maintained. " +
-			"When --password is omitted, a 16-byte base64 URL-safe password is generated and surfaced in the output.",
+			"When --password is omitted, a 16-byte base64 URL-safe password is generated and surfaced in the output. " +
+			"If --name collides with an existing container or stored dbms credential, the chosen name is auto-suffixed " +
+			"(`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -107,6 +118,20 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				return err
 			}
 
+			// Name-collision pre-flight (REQ-F-014). Enumerate ALL container
+			// names from docker (managed or not — docker enforces global name
+			// uniqueness) AND every stored dbms credential name. Pick the
+			// requested name when free; otherwise try <name>-1 … <name>-99.
+			client := clientFactory()
+			ctx := cmd.Context()
+			chosenName, err := resolveContainerName(ctx, client, cfg, name)
+			if err != nil {
+				return err
+			}
+			if chosenName != name {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: name %q already in use; using %q\n", name, chosenName)
+			}
+
 			// Resolve password: honour --password verbatim, otherwise generate
 			// crypto/rand bytes and base64 URL-safe encode without padding
 			// (REQ-F-015). The seam lets tests assert determinism.
@@ -128,7 +153,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			// Build the docker run argv. Order matters for tests asserting
 			// shape; keep ports → env → labels → image (last).
-			argv := []string{"--name", name}
+			argv := []string{"--name", chosenName}
 			argv = append(argv, "-p", fmt.Sprintf("%d:7474", httpPort))
 			argv = append(argv, "-p", fmt.Sprintf("%d:7687", boltPort))
 			argv = append(argv, "-e", "NEO4J_AUTH=neo4j/"+resolvedPassword)
@@ -147,8 +172,6 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			argv = append(argv, "--label", LabelEphemeral+"=false")
 			argv = append(argv, image)
 
-			client := clientFactory()
-			ctx := cmd.Context()
 			if _, err := client.Run(ctx, argv); err != nil {
 				// dockerClient.Run already wraps stderr verbatim (REQ-F-061)
 				// in a clierr.UsageError, so we surface as-is.
@@ -165,7 +188,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				if cfg.Credentials == nil || cfg.Credentials.Dbms == nil {
 					return clierr.NewUsageError("credential storage is not available; use --%s to skip storing credentials locally", noStoreCredentialFlag)
 				}
-				if err := cfg.Credentials.Dbms.Add(name, "neo4j", resolvedPassword, "neo4j", uri); err != nil {
+				if err := cfg.Credentials.Dbms.Add(chosenName, "neo4j", resolvedPassword, "neo4j", uri); err != nil {
 					return err
 				}
 			}
@@ -173,7 +196,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// Render the result. Field order mirrors what an operator wants
 			// at a glance: identity, image identity, ports, connection details.
 			row := map[string]any{
-				"name":      name,
+				"name":      chosenName,
 				"edition":   edition,
 				"version":   version,
 				"bolt-port": boltPort,
@@ -236,4 +259,62 @@ func checkPortFree(port int, flagName string) error {
 	}
 	_ = ln.Close()
 	return nil
+}
+
+// resolveContainerName implements the REQ-F-014 name-collision contract.
+// It enumerates existing names from docker (all containers, managed or
+// not — docker enforces global container-name uniqueness) and from the
+// stored dbms credentials, then returns the requested name when free or
+// the first non-colliding `<name>-<i>` suffix in 1..maxNameSuffix.
+// Returns a clierr.UsageError when every suffix in that range is taken
+// so the operator gets a clear "pick a different --name" hint.
+func resolveContainerName(ctx context.Context, client dockerClient, cfg *clicfg.Config, requested string) (string, error) {
+	used, err := collectUsedNames(ctx, client, cfg)
+	if err != nil {
+		return "", err
+	}
+	if _, taken := used[requested]; !taken {
+		return requested, nil
+	}
+	for i := 1; i <= maxNameSuffix; i++ {
+		candidate := fmt.Sprintf("%s-%d", requested, i)
+		if _, taken := used[candidate]; !taken {
+			return candidate, nil
+		}
+	}
+	return "", clierr.NewUsageError(
+		"could not find a free name for %q after trying %s-1 through %s-%d; pass --name <other>",
+		requested, requested, requested, maxNameSuffix,
+	)
+}
+
+// collectUsedNames merges docker container names (from PsAll, unfiltered so
+// unmanaged containers count too) with stored dbms credential names into a
+// single set used for collision detection. The set is conservative: any
+// PsEntry.Names value gets split on `,` and trimmed because Docker emits
+// multi-name entries as a comma-separated string.
+func collectUsedNames(ctx context.Context, client dockerClient, cfg *clicfg.Config) (map[string]struct{}, error) {
+	used := map[string]struct{}{}
+
+	entries, err := client.PsAll(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		for _, n := range strings.Split(entry.Names, ",") {
+			n = strings.TrimSpace(n)
+			if n != "" {
+				used[n] = struct{}{}
+			}
+		}
+	}
+
+	if cfg != nil && cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
+		for _, cred := range cfg.Credentials.Dbms.List() {
+			if cred != nil && cred.Name != "" {
+				used[cred.Name] = struct{}{}
+			}
+		}
+	}
+	return used, nil
 }

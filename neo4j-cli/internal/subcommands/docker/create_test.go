@@ -385,6 +385,146 @@ func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
 	require.Len(t, fake.RunCalls, 1, "docker run must execute exactly once after a clean pre-flight")
 }
 
+// runCreateWithSeed is the same as runCreateWithOccupiedPorts but lets the
+// caller pre-populate the fake docker client's PsAll-returned names AND the
+// dbms credential store before the command runs. Used by name-collision tests
+// (REQ-F-014) so they can assert auto-suffix behaviour against deterministic
+// state without leaking real docker / credential I/O.
+func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credentialNames []string) (*fakeDockerClient, *clicfg.Config, string, string, error) {
+	t.Helper()
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	// Seed dbms credentials. Each call to Add gives the credential a fresh
+	// URI so the entries are distinguishable but otherwise meaningless to
+	// the collision check (which only inspects names).
+	for i, n := range credentialNames {
+		require.NoError(t, cfg.Credentials.Dbms.Add(n, "neo4j", "pw", "neo4j", fmt.Sprintf("neo4j://localhost:%d", 7700+i)))
+	}
+
+	fake := newFakeDockerClient()
+	for _, n := range dockerNames {
+		fake.PsEntries = append(fake.PsEntries, PsEntry{Names: n})
+	}
+	origFactory := clientFactory
+	clientFactory = func() dockerClient { return fake }
+	t.Cleanup(func() { clientFactory = origFactory })
+
+	stubListenerFactory(t)
+
+	cmd := NewCmd(cfg)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+
+	argv, splitErr := shlex.Split(args)
+	require.NoError(t, splitErr)
+	cmd.SetArgs(append([]string{"create"}, argv...))
+
+	execErr := cmd.Execute()
+	return fake, cfg, out.String(), errBuf.String(), execErr
+}
+
+func TestCreate_NameCollision_NoCollision_UsesRequestedName(t *testing.T) {
+	fake, cfg, stdout, stderr, err := runCreateWithSeed(t, "--name dev --format json", nil, nil)
+	require.NoError(t, err)
+
+	// stderr must NOT carry an info: line because the requested name was free.
+	assert.NotContains(t, stderr, "info: name")
+
+	// Container created with the requested name; credential stored under it.
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "--name", "dev"), "argv missing --name dev: %v", argv)
+	_, getErr := cfg.Credentials.Dbms.Get("dev")
+	assert.NoError(t, getErr)
+
+	// Rendered output reflects the chosen name.
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "dev", rows[0]["name"])
+}
+
+func TestCreate_NameCollision_DockerOnly_Suffixes(t *testing.T) {
+	// docker already has a container called "dev"; credentials are empty.
+	fake, cfg, stdout, stderr, err := runCreateWithSeed(t, "--name dev --format json", []string{"dev"}, nil)
+	require.NoError(t, err)
+
+	// stderr names both the requested and the chosen name.
+	assert.Contains(t, stderr, `info: name "dev" already in use; using "dev-1"`)
+
+	// Container created with the suffixed name; credential stored under the
+	// suffixed name.
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "--name", "dev-1"), "argv missing --name dev-1: %v", argv)
+	_, getErr := cfg.Credentials.Dbms.Get("dev-1")
+	assert.NoError(t, getErr)
+	_, getErrOriginal := cfg.Credentials.Dbms.Get("dev")
+	assert.Error(t, getErrOriginal, "no credential should be stored under the original requested name")
+
+	// Rendered output mirrors the chosen name.
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "dev-1", rows[0]["name"])
+}
+
+func TestCreate_NameCollision_CredentialOnly_Suffixes(t *testing.T) {
+	// docker is empty; a dbms credential called "dev" already exists.
+	fake, cfg, _, stderr, err := runCreateWithSeed(t, "--name dev", nil, []string{"dev"})
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr, `info: name "dev" already in use; using "dev-1"`)
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "--name", "dev-1"), "argv missing --name dev-1: %v", argv)
+	_, getErr := cfg.Credentials.Dbms.Get("dev-1")
+	assert.NoError(t, getErr)
+}
+
+func TestCreate_NameCollision_Cascading_WalksPastDockerAndCredential(t *testing.T) {
+	// Existing docker containers: "dev", "dev-2"; existing credential: "dev-1".
+	// Expected chosen name: "dev-3".
+	fake, cfg, stdout, stderr, err := runCreateWithSeed(t,
+		"--name dev --format json",
+		[]string{"dev", "dev-2"},
+		[]string{"dev-1"},
+	)
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr, `info: name "dev" already in use; using "dev-3"`)
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "--name", "dev-3"), "argv missing --name dev-3: %v", argv)
+	_, getErr := cfg.Credentials.Dbms.Get("dev-3")
+	assert.NoError(t, getErr)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "dev-3", rows[0]["name"])
+}
+
+func TestCreate_NameCollision_All99Taken_ReturnsUsageError(t *testing.T) {
+	// docker has "dev"; credentials hold "dev-1" through "dev-99". No free
+	// suffix in the documented range → usage error, no docker run executed.
+	credentialNames := make([]string, 0, maxNameSuffix)
+	for i := 1; i <= maxNameSuffix; i++ {
+		credentialNames = append(credentialNames, fmt.Sprintf("dev-%d", i))
+	}
+	fake, _, _, _, err := runCreateWithSeed(t, "--name dev --no-store-credential", []string{"dev"}, credentialNames)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dev-1")
+	assert.Contains(t, err.Error(), fmt.Sprintf("dev-%d", maxNameSuffix))
+	assert.Empty(t, fake.RunCalls, "docker run must not execute when no free name is available")
+}
+
 func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
 	// Equal-ports check must fire BEFORE any Listen call so the operator
 	// sees the conflict instead of a misleading "port in use" error.

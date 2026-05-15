@@ -10,7 +10,7 @@ Usage: `neo4j-cli docker`
 
 Create a local Neo4j Docker container
 
-Create a local Neo4j Docker container via `docker run -d` and (unless --no-store-credential) store a matching dbms credential so `neo4j-cli query --credential <name>` can connect immediately. The container carries `org.neo4j.cli.managed=true` plus a small set of metadata labels — Docker itself is the source of truth, no separate state file is maintained. When --password is omitted, a 16-byte base64 URL-safe password is generated and surfaced in the output.
+Create a local Neo4j Docker container via `docker run -d` and (unless --no-store-credential) store a matching dbms credential so `neo4j-cli query --credential <name>` can connect immediately. The container carries `org.neo4j.cli.managed=true` plus a small set of metadata labels — Docker itself is the source of truth, no separate state file is maintained. When --password is omitted, a 16-byte base64 URL-safe password is generated and surfaced in the output. If --name collides with an existing container or stored dbms credential, the chosen name is auto-suffixed (`<name>-1`, `<name>-2`, …) and the chosen name is logged to stderr.
 
 Usage: `neo4j-cli docker create [flags]`
 

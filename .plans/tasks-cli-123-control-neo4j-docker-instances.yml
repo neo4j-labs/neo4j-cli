@@ -91,7 +91,7 @@ tasks:
       If `<name>` exists in either set, try `<name>-1`, `<name>-2`, … up to `<name>-99`; if all 99 are taken, return `clierr.NewUsageError` (REQ-F-014).
       On a successful suffix, write `info: name "dev" already in use; using "dev-1"` to stderr (use `cmd.ErrOrStderr()`); use the chosen name for the container, the credential, the env-file header, and the rendered output.
       Extend `create_test.go` with cases: no collision → uses given name; one collision → uses `-1`; cascading collisions (`dev`, `dev-1`, `dev-2` all taken) → uses `dev-3`; 99 collisions → error.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -100,7 +100,7 @@ tasks:
       - "Cascading collisions resolved by incrementing the suffix"
       - "All 99 suffixes taken → clierr.UsageError; no side effects"
       - "Chosen name is used for container, credential, and output; verified in create_test.go"
-    completed_at: null
+    completed_at: 2026-05-15T15:05:00Z
 
   - id: task-006
     title: "docker create — --wait integration"
