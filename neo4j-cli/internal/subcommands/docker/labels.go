@@ -38,6 +38,12 @@ type Container struct {
 	URI       string `json:"uri,omitempty"`
 	Image     string `json:"image,omitempty"`
 	Managed   bool   `json:"-"`
+	// Running mirrors `docker inspect <name>` top-level `.State.Running` bool
+	// — true while the container is up, false once it has exited. Consumed by
+	// `docker stop --wait` (task-011) to decide when the daemon-side stop has
+	// actually completed. Like Managed this is a per-call control bit and not
+	// serialised into rendered output.
+	Running bool `json:"-"`
 }
 
 // Inspect is a thin convenience over dockerClient.Inspect so leaves (`get`,

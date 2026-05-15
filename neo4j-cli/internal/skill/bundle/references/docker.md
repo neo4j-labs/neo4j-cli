@@ -6,6 +6,7 @@
 - [neo4j-cli docker get](#neo4j-cli-docker-get)
 - [neo4j-cli docker list](#neo4j-cli-docker-list)
 - [neo4j-cli docker start](#neo4j-cli-docker-start)
+- [neo4j-cli docker stop](#neo4j-cli-docker-stop)
 
 Manage local Neo4j containers via Docker
 
@@ -138,5 +139,32 @@ neo4j-cli docker start dev --wait --rw
 
 # Same as above using the deprecated --await alias
 neo4j-cli docker start dev --await --rw
+```
+
+## neo4j-cli docker stop
+
+Stop a running Neo4j container managed by neo4j-cli
+
+Stop a running Neo4j Docker container by name. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Pass --wait to block until the container has actually exited (60s timeout). Ephemeral containers (`--rm`) are removed by Docker the moment they exit, so a subsequent `neo4j-cli docker get` will return the same unknown-name error.
+
+Usage: `neo4j-cli docker stop <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--wait` | bool | false | Wait until the container has exited before returning. |
+
+Examples:
+
+```
+# Stop a managed container by name
+neo4j-cli docker stop dev --rw
+
+# Stop and block until the container has fully exited before returning
+neo4j-cli docker stop dev --wait --rw
+
+# Same as above using the deprecated --await alias
+neo4j-cli docker stop dev --await --rw
 ```
 
