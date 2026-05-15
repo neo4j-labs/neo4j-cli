@@ -225,7 +225,8 @@ tasks:
         Errors if `ruby` is not on PATH.
       - `test-installer`: aggregate target that calls all four sub-targets in order.
       Follow existing Makefile conventions (tabs, `.PHONY`, section placement).
-    status: not_started
+    status: completed
+    completed_at: 2026-05-15T15:00:00Z
     dependencies:
       - task-006
       - task-007

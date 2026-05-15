@@ -233,3 +233,30 @@ Key Decisions:
 - actions/checkout pinned to SHA matching the repo's existing workflow convention.
 
 Next Task: task-011
+
+================================================================================
+TASK-011: Add test-installer Makefile targets
+Date: 2026-05-15T15:00:00Z
+================================================================================
+
+Summary:
+Added five Makefile targets for local developer convenience: test-installer-sh
+(bats, errors if absent), test-installer-ps1 (Pester via pwsh, graceful skip
+if pwsh not found), test-installer-npm (Jest via npm ci && npm test),
+test-installer-rb (Ruby minitest), and test-installer (aggregate). All five
+targets are declared under .PHONY and placed in a new "## Installer Tests"
+section at the end of the Makefile.
+
+Files Changed:
+- Makefile (modified — added test-installer* targets and .PHONY entries)
+
+Key Decisions:
+- The test-installer-ps1 graceful-skip required a single multi-line if/else/fi
+  block (not two separate recipe lines) because Make executes each recipe line
+  in its own shell — an `exit 0` in `{ ...; exit 0; }` only exits that line's
+  shell; the next recipe line runs pwsh regardless. The if/else/fi approach
+  keeps the skip logic and the pwsh invocation in a single shell execution.
+- test-installer-npm uses `cd ... && npm ci && npm test` as a single recipe
+  line; the cd scopes correctly because it's a single shell invocation.
+
+Next Task: All tasks complete
