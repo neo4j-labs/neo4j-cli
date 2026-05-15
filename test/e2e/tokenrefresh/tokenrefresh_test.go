@@ -145,6 +145,19 @@ func canRedirectConfigDir() bool {
 	return runtime.GOOS != "darwin"
 }
 
+// seedConfig writes an empty config.json so parallel subprocesses don't race
+// on viper.SafeWriteConfig (which uses O_EXCL and fails with "file exists" if
+// two processes both see the file absent and try to create it simultaneously).
+func seedConfig(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+}
+
 // seedExpiredCreds writes credentials.json with a token whose expiry is in the
 // past, forcing every subprocess into the token-refresh code path.
 func seedExpiredCreds(t *testing.T, dir string) {
@@ -258,6 +271,7 @@ func TestParallelTokenRefresh_NoRace(t *testing.T) {
 
 	home := t.TempDir()
 	credsDir := configDirFor(home)
+	seedConfig(t, credsDir)
 	seedExpiredCreds(t, credsDir)
 
 	srv, refreshCount := mockServer(t)
