@@ -1,0 +1,299 @@
+feature: cli-123-control-neo4j-docker-instances
+prd: ./prd-cli-123-control-neo4j-docker-instances.md
+created_at: 2026-05-15T12:00:00Z
+updated_at: 2026-05-15T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold docker package: dockerClient interface, labels, parent cmd, app mount"
+    description: |
+      Create `neo4j-cli/internal/subcommands/docker/` with the package skeleton.
+      `client.go` defines a `dockerClient` interface (Run, Start, Stop, RemoveForce, PsAll, Inspect) with a default `execClient` that shells out via `os/exec` and caches the result of `exec.LookPath("docker")`; missing docker returns a `clierr.NewUsageError` with the install hint (REQ-F-060, REQ-F-061).
+      `labels.go` exports label key constants (`org.neo4j.cli.managed`, `...edition`, `...version`, `...bolt-port`, `...http-port`, `...ephemeral`) and a `Container` metadata struct with an `Inspect(name)` helper that returns it.
+      `docker.go` defines `NewCmd(cfg *clicfg.Config) *cobra.Command` with `Use: "docker"`, `Short`, and `Long` (≤80 lines per AGENTS.md "Cobra Command Layout"); leaves are added in later tasks.
+      Mount in `neo4j-cli/app/app.go` via `cmd.AddCommand(docker.NewCmd(cfg))` between the existing `query` and `skill` lines.
+      Add `helpers_test.go` with a `fakeDockerClient` implementing the interface for use by all leaf tests.
+      Every new `.go` file carries the Neo4j copyright header.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/docker/{client.go,labels.go,docker.go,helpers_test.go} exist"
+      - "dockerClient interface defines Run/Start/Stop/RemoveForce/PsAll/Inspect; execClient lazily calls exec.LookPath(\"docker\") once and caches"
+      - "Missing docker returns clierr.NewUsageError(\"docker not found in PATH — install Docker Desktop ... or the docker CLI\")"
+      - "label key constants live in labels.go with the org.neo4j.cli.* keys; Container struct + Inspect(name) implemented against the interface"
+      - "docker.NewCmd is mounted in neo4j-cli/app/app.go alongside the existing root subcommands"
+      - "All new files carry the Neo4j copyright header; make license-check is clean"
+      - "go build ./... succeeds; go test ./neo4j-cli/internal/subcommands/docker/... passes (interface-level smoke test only)"
+    completed_at: null
+
+  - id: task-002
+    title: "Bolt readiness probe (bolt_ready.go) reusing the vendored neo4j-go-driver"
+    description: |
+      Add `bolt_ready.go` exporting `WaitForBolt(ctx context.Context, uri, user, pass string, timeout time.Duration) error`.
+      Use the neo4j-go-driver already vendored by `neo4j-cli/query/` (REQ-F-018, REQ-NF-001) — open a session, run `RETURN 1`, close.
+      Poll every 500ms until the handshake succeeds or `timeout` elapses; on timeout return `clierr.NewUsageError("container started but Bolt did not become ready within %s; check 'docker logs <name>'", timeout)`.
+      Add `bolt_ready_test.go` with a unit test using a closed listener (immediate refusal → poll continues → timeout fires) and a fake-listener that accepts after N polls.
+      If the import introduces a cycle with `clicfg`, fall back to `net.Dial` + a raw Bolt v5 hello frame and document the choice in a comment.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "WaitForBolt(ctx, uri, user, pass, timeout) returns nil once a Bolt handshake succeeds"
+      - "On timeout returns a clierr.UsageError naming the duration and pointing at 'docker logs <name>'"
+      - "Reuses the neo4j-go-driver from query/ (or falls back to net.Dial + Bolt v5 hello with an inline comment explaining why)"
+      - "bolt_ready_test.go covers: immediate success, success after N retries, timeout"
+      - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
+    completed_at: null
+
+  - id: task-003
+    title: "docker create — basic happy path (no ephemeral, no collision, no port-conflict, no wait)"
+    description: |
+      Add `create.go` with `newCreateCmd(cfg) *cobra.Command`. Register flags: `--name` (required), `--version` (default `latest`), `--edition` (default `enterprise`), `--accept-license`, `--bolt-port` (default 7687), `--http-port` (default 7474), `--password`, `--no-store-credential`. Defer `--ephemeral`, `--env-file`, `--wait` to later tasks.
+      `RunE` invokes `dockerClient.Run` with the right `-p`/`-e`/labels per REQ-F-011 and REQ-F-012, then (unless `--no-store-credential`) calls `credentials.DbmsCredentials.Add(name, "neo4j", password, "neo4j", "neo4j://localhost:<bolt-port>")`.
+      Generate the password with `crypto/rand` (16 bytes → base64 URL-safe, no padding) when `--password` is unset (REQ-F-015). Surface it as a column / JSON field in the rendered output (no extra stderr echo).
+      Annotations include `"write": "true"`; register `--format` via `flags.RegisterOutputFlag`.
+      Provide a flush-left `Example:` block (≥3 invocations, `--rw` on each, `--format json` on at least one) per REQ-F-005.
+      Add `create_test.go` covering: happy path stores credential; `--no-store-credential` skips persistence; `--edition community` omits the license env var; `--edition enterprise` passes `eval`; `--accept-license` upgrades to `yes`; `--password` is honored when set; `crypto/rand` is used when unset (assert via injectable randSource).
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "docker create with no flags except --name --rw runs an enterprise container, stores a dbms credential, emits password in rendered output"
+      - "--edition community → no NEO4J_ACCEPT_LICENSE_AGREEMENT env var; --edition enterprise → 'eval'; --edition enterprise --accept-license → 'yes'"
+      - "--no-store-credential skips credential persistence; container still runs with the generated password"
+      - "Generated password is 16 bytes from crypto/rand, base64 URL-safe; surfaced in --format json output"
+      - "create.go and create_test.go carry copyright headers; go test ./neo4j-cli/internal/subcommands/docker/... passes"
+      - "create has Annotations write:true, supports --rw, registers --format, and has a flush-left Example block satisfying TestAllLeafCommands_HaveExamples"
+    completed_at: null
+
+  - id: task-004
+    title: "docker create — port-conflict pre-flight"
+    description: |
+      Before calling `dockerClient.Run`, attempt `net.Listen("tcp", fmt.Sprintf(":%d", port))` on each of `--bolt-port` and `--http-port`; close immediately if it binds (REQ-F-013).
+      On bind failure return `clierr.NewUsageError("port %d is in use on the host. Pass --%s <other> to pick a free port.", port, flagName)` — flag name is `bolt-port` or `http-port` depending on which one conflicted.
+      Make the listener factory injectable so tests can simulate conflicts deterministically.
+      Extend `create_test.go` with cases: 7687 occupied → error names --bolt-port; 7474 occupied → error names --http-port; both free → succeeds; same port for bolt and http → error.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Occupying 7687 before create → clierr.UsageError mentions 'port 7687' and '--bolt-port'"
+      - "Occupying 7474 before create → clierr.UsageError mentions 'port 7474' and '--http-port'"
+      - "--bolt-port and --http-port set to the same value → usage error"
+      - "Pre-flight uses net.Listen on tcp; test harness injects a fake listener factory"
+      - "go test ./neo4j-cli/internal/subcommands/docker/... passes including the new cases"
+    completed_at: null
+
+  - id: task-005
+    title: "docker create — name-collision auto-suffix"
+    description: |
+      After flag parsing but before any side effect, enumerate existing names from (a) `dockerClient.PsAll` (all containers, managed or not) and (b) `credentials.DbmsCredentials.List()`.
+      If `<name>` exists in either set, try `<name>-1`, `<name>-2`, … up to `<name>-99`; if all 99 are taken, return `clierr.NewUsageError` (REQ-F-014).
+      On a successful suffix, write `info: name "dev" already in use; using "dev-1"` to stderr (use `cmd.ErrOrStderr()`); use the chosen name for the container, the credential, the env-file header, and the rendered output.
+      Extend `create_test.go` with cases: no collision → uses given name; one collision → uses `-1`; cascading collisions (`dev`, `dev-1`, `dev-2` all taken) → uses `dev-3`; 99 collisions → error.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Container name collides with existing docker ps → auto-suffixed; info message on stderr names both the requested and chosen name"
+      - "Credential collision (no docker collision) also triggers auto-suffix"
+      - "Cascading collisions resolved by incrementing the suffix"
+      - "All 99 suffixes taken → clierr.UsageError; no side effects"
+      - "Chosen name is used for container, credential, and output; verified in create_test.go"
+    completed_at: null
+
+  - id: task-006
+    title: "docker create — --wait integration"
+    description: |
+      Add `--wait` to `create` via `flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")` so it matches `aura instance` conventions (per AGENTS.md and the `flags.RegisterWait` helper introduced in CLI-87).
+      When `--wait` is set, after `docker run` succeeds call `WaitForBolt(ctx, "neo4j://localhost:<bolt-port>", "neo4j", password, 60*time.Second)` (REQ-F-018). On timeout, return the error but leave the container running.
+      Print a single `info: waiting for Bolt on localhost:<port>...` line to stderr before polling.
+      Extend `create_test.go` with cases: `--wait` happy path (fake bolt readiness returns nil immediately); `--wait` timeout (fake returns context deadline) → error returned, container not torn down.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "--wait registered via flags.RegisterWait; --await alias is inherited from the helper"
+      - "create --wait succeeds when Bolt becomes ready within 60s; error on timeout"
+      - "On timeout, the container is left running (no rm/stop call observed by fake client)"
+      - "Stderr shows 'info: waiting for Bolt on localhost:<port>...' before polling"
+      - "Bolt timeout fixed at 60s; no --wait-timeout flag in v1"
+    completed_at: null
+
+  - id: task-007
+    title: "docker create — --ephemeral and --env-file"
+    description: |
+      Add `--ephemeral` and `--env-file <path>` flags.
+      When `--ephemeral`: pass `--rm` to `docker run`; set label `org.neo4j.cli.ephemeral=true`; skip credential persistence; build the `.env` blob per REQ-F-017 (header `# neo4j-cli docker — <name> @ <image>` + `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`).
+      If `--env-file <path>` is set, write the blob via `os.OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, 0600)` through `cfg.Aura.Fs()` and stay silent on stdout. Otherwise emit the blob to stdout.
+      `--env-file` without `--ephemeral` → `clierr.NewUsageError("--env-file requires --ephemeral")`.
+      `--no-store-credential` is incompatible with `--ephemeral` (ephemeral already skips persistence) → usage error.
+      Extend `create_test.go` with cases: ephemeral happy path (no credential stored, label ephemeral=true, stdout = env blob); ephemeral + env-file (file written with 0600, stdout silent); env-file without ephemeral → error; ephemeral + no-store-credential → error.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "--ephemeral adds --rm to docker run, labels container ephemeral=true, skips DbmsCredentials.Add"
+      - ".env blob has the comment header and exactly four NEO4J_* lines, in the documented order"
+      - "--env-file <path> writes 0600 file via cfg.Aura.Fs() and produces empty stdout"
+      - "--env-file without --ephemeral and --ephemeral with --no-store-credential both return usage errors"
+      - "Env var names match query --env consumers (NEO4J_URI/USERNAME/PASSWORD/DATABASE)"
+    completed_at: null
+
+  - id: task-008
+    title: "docker list"
+    description: |
+      Add `list.go` with `newListCmd(cfg)`. Calls `dockerClient.PsAll` filtered by `--filter label=org.neo4j.cli.managed=true` (REQ-F-020) and renders columns `name`, `status`, `edition`, `version`, `bolt-port`, `http-port`, `ephemeral` (REQ-F-021).
+      Register `--format json|table|toon` via `flags.RegisterOutputFlag`; reuse the shared output renderer used by credential / config commands (confirm import path at impl time).
+      Empty result renders as an empty table or empty JSON array — no error (REQ-F-022).
+      Add `list_test.go` table-driven: no managed containers; one running; one running + one exited; mixed managed + unmanaged (unmanaged filtered out).
+      Provide a flush-left `Example:` block satisfying TestAllLeafCommands_HaveExamples (≥3 invocations, at least one `--format json`).
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "docker list filters by label=org.neo4j.cli.managed=true and renders the 7 documented fields"
+      - "Empty result is an empty table/JSON array, exit 0"
+      - "Unmanaged containers (no label) are excluded"
+      - "--format json|table|toon all produce well-formed output"
+      - "list.go has a flush-left Example block; TestAllLeafCommands_HaveExamples covers it"
+    completed_at: null
+
+  - id: task-009
+    title: "docker get <name>"
+    description: |
+      Add `get.go` with `newGetCmd(cfg)`. Takes exactly one positional arg (`cobra.ExactArgs(1)`). Calls `dockerClient.Inspect(name)`; refuses non-managed containers (REQ-F-032).
+      Output fields include everything from `list` plus `uri` (`neo4j://localhost:<bolt-port>`) and `image` (REQ-F-031).
+      Unknown name → `clierr.NewUsageError("no managed container named %q (use 'neo4j-cli docker list' to see managed containers)", name)`.
+      Add `get_test.go` table-driven: managed container exists → renders fields; container exists but unmanaged → unknown error; container missing → unknown error; `--format json` round-trips through fake client.
+      Flush-left `Example:` block (≥3 invocations, at least one `--format json`).
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "docker get <name> renders 9 documented fields including uri and image"
+      - "Unmanaged or missing container returns the documented usage error"
+      - "Args validated via cobra.ExactArgs(1)"
+      - "--format json|table|toon all produce well-formed output"
+      - "get.go has a flush-left Example block; TestAllLeafCommands_HaveExamples covers it"
+    completed_at: null
+
+  - id: task-010
+    title: "docker start <name>"
+    description: |
+      Add `start.go` with `newStartCmd(cfg)`. Shells `docker start <name>` via `dockerClient.Start` (REQ-F-040). `Annotations: write:true`; `cobra.ExactArgs(1)`; `flags.RegisterWait` for `--wait` (REQ-F-041 — uses WaitForBolt from task-002).
+      Non-managed container → unknown-name error per REQ-F-043. Ephemeral container already removed → REQ-F-042 error.
+      Add `start_test.go`: happy path; --wait happy path; --wait timeout; non-managed → error; missing ephemeral → REQ-F-042 message.
+      Flush-left `Example:` block with `--rw` on every invocation.
+    status: pending
+    dependencies:
+      - task-002
+      - task-001
+    acceptance_criteria:
+      - "docker start <name> --rw starts the container; --wait blocks until Bolt is ready (60s timeout)"
+      - "Non-managed container → unknown-name usage error; no docker start call observed"
+      - "Ephemeral-already-removed → REQ-F-042 usage error verbatim"
+      - "start.go has Annotations write:true, Example block, copyright header"
+      - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
+    completed_at: null
+
+  - id: task-011
+    title: "docker stop <name>"
+    description: |
+      Add `stop.go` with `newStopCmd(cfg)`. Shells `docker stop <name>` via `dockerClient.Stop` (REQ-F-040). `Annotations: write:true`; `cobra.ExactArgs(1)`; `flags.RegisterWait` for `--wait` (REQ-F-041 — for stop, --wait polls dockerClient.Inspect until State.Running == false, 60s timeout).
+      Non-managed container → unknown-name error.
+      Add `stop_test.go`: happy path; --wait happy path (fake reports exited after N polls); --wait timeout; non-managed → error.
+      Flush-left `Example:` block.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "docker stop <name> --rw stops the container; --wait blocks until State.Running == false (60s timeout)"
+      - "Non-managed container → unknown-name usage error"
+      - "For ephemeral containers, --rm means the container is gone after stop; tests verify subsequent get returns unknown-name"
+      - "stop.go has Annotations write:true, Example block, copyright header"
+      - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
+    completed_at: null
+
+  - id: task-012
+    title: "docker delete <name> with TTY confirmation prompt"
+    description: |
+      Add `delete.go` with `newDeleteCmd(cfg)`. `Annotations: write:true`; `cobra.ExactArgs(1)`; `--force` boolean flag.
+      Logic: refuse non-managed containers (REQ-F-053). TTY check via `term.IsTerminal(int(os.Stdin.Fd()))` (or reuse an existing common/ helper — search before adding): on TTY without `--force`, prompt `Delete container <name> and its dbms credential? [y/N]` (default N); on non-TTY without `--force`, return `clierr.NewUsageError("non-TTY caller must pass --force to confirm deletion")` (REQ-F-052).
+      On confirmation: shell `docker rm -f <name>` via `dockerClient.RemoveForce`; then call `credentials.DbmsCredentials.Remove(name)` best-effort (missing credential is not an error) per REQ-F-050 and REQ-F-054.
+      Add `delete_test.go` table-driven: TTY + y → both removed; TTY + N → neither touched; non-TTY + no --force → usage error; --force → both removed without prompt; missing credential → still succeeds.
+      Flush-left `Example:` block with `--rw`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "TTY caller without --force is prompted; 'y' confirms, 'N'/default cancels"
+      - "Non-TTY caller without --force exits non-zero with the REQ-F-052 message"
+      - "--force skips the prompt regardless of TTY"
+      - "Successful delete removes both container (docker rm -f) and matching dbms credential; missing credential is not an error"
+      - "Non-managed container refused with unknown-name error; no docker rm call observed"
+      - "delete.go has Annotations write:true, Example block, copyright header"
+    completed_at: null
+
+  - id: task-013
+    title: "Regenerate skill bundle and verify TestGenerator_RoundTrip"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to regenerate `neo4j-cli/internal/skill/bundle/SKILL.md` and produce `bundle/references/docker.md` (REQ-DOC-005).
+      Confirm `TestGenerator_RoundTrip` in `neo4j-cli/internal/skill/...` passes.
+      Inspect `bundle/references/docker.md` — every leaf renders with its Example block; flush-left, no ragged indent (per AGENTS.md "Cobra Help / Skill Bundle Rendering Notes").
+      Commit the regenerated bundle files in this iteration.
+    status: pending
+    dependencies:
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+      - task-012
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs cleanly"
+      - "bundle/references/docker.md exists and renders every leaf with its Example block"
+      - "TestGenerator_RoundTrip passes"
+      - "Regenerated bundle files are committed (no make generate-check drift)"
+    completed_at: null
+
+  - id: task-014
+    title: "Docs: README, AGENTS.md, skill description.txt, skill additions.md"
+    description: |
+      Update documentation surfaces per REQ-DOC-001 … REQ-DOC-004:
+      - `README.md`: add a "Local Neo4j (Docker)" section after the existing Aura/query sections with `create` → `query --credential <name>` → `delete` flow plus the `--ephemeral` + `--env-file` → `query --env <path>` flow.
+      - `AGENTS.md` (the `CLAUDE.md` symlink): under "Architecture", point at `neo4j-cli/internal/subcommands/docker/` and note Docker is source-of-truth (label-based, no separate state file).
+      - `neo4j-cli/internal/skill/description.txt`: extend the single paragraph so the skill triggers on "docker", "local neo4j", "start/stop a Neo4j container". Stay ≤1024 chars, third person.
+      - `neo4j-cli/internal/skill/additions.md`: add a section with copy-paste examples for the docker subtree plus a note covering `--ephemeral` + `--env-file` → `query --env`.
+      If `CONTRIBUTING.md` has a "Commands" / "Add a new command" subsection, list the docker tree there (REQ-DOC-006).
+      Re-run `go generate ./neo4j-cli/internal/skill/...` after editing `description.txt` / `additions.md` so the bundle SKILL.md picks up the new content; commit the regenerated bundle alongside.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "README.md has a 'Local Neo4j (Docker)' section with the two documented flows"
+      - "AGENTS.md mentions the new subtree and the label-based state model"
+      - "description.txt extended (third person, ≤1024 chars) so the skill triggers on docker / local neo4j phrasing"
+      - "additions.md has a docker subsection plus the --ephemeral/--env-file → query --env note"
+      - "Skill bundle regenerated after the description/additions edits; no make generate-check drift"
+    completed_at: null
+
+  - id: task-015
+    title: "Changelog entry, security review, final gates"
+    description: |
+      Add a single Minor changie entry:
+      `changie new --projects neo4j-cli --kind Minor --body "Add 'docker' command tree for managing local Neo4j containers"` — or hand-author a YAML under `.changes/unreleased/` per AGENTS.md "Changie Notes" if changie isn't installed (REQ-DOC-007).
+      Run the `golang-security` skill on the new docker package + changes to credentials handling (memory: "Security review gate"); address any findings before merge.
+      Run the full gate suite: `make fmt-check && make lint && make test && make license-check && make generate-check`. All must be green.
+      Manually run the verification scenarios from the PRD's Acceptance Criteria section against a local Docker daemon (happy path, ephemeral flow, port conflict, name collision, missing docker, TTY prompt) and capture pass/fail in the iteration notes.
+    status: pending
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "One Minor changie entry exists under .changes/unreleased/ for neo4j-cli project referencing CLI-123"
+      - "golang-security skill run; any findings addressed or explicitly waived in the PR description"
+      - "make fmt-check, make lint, make test, make license-check, and make generate-check all pass"
+      - "Manual verification of the PRD acceptance criteria scenarios documented (pass/fail per scenario)"
+      - "PR description notes website update is a separate follow-up (REQ-DOC-008)"
+    completed_at: null
