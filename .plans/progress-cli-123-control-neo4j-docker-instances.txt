@@ -52,3 +52,8 @@ Added `neo4j-cli docker stop <name>` leaf: inspect-then-managed gate, dockerClie
 Files: +neo4j-cli/internal/subcommands/docker/stop.go, +neo4j-cli/internal/subcommands/docker/stop_test.go, ~neo4j-cli/internal/subcommands/docker/docker.go, ~neo4j-cli/internal/subcommands/docker/labels.go, ~neo4j-cli/internal/skill/bundle/references/docker.md
 Decisions: added Container.Running (json:"-") so stop --wait has a metadata-only readiness signal; deliberately NOT requiring a stored dbms credential for stop --wait (unlike start --wait) since the running-state check is not authenticated.
 
+## TASK-012 — 2026-05-15T18:05:00Z
+Added `neo4j-cli docker delete <name>` leaf (REQ-F-050..F-054): inspect-then-managed gate, TTY prompt via stdinIsTerminal seam (golang.org/x/term already vendored), --force bypass, dockerClient.RemoveForce then best-effort cfg.Credentials.Dbms.Remove (missing-credential prefix swallow per REQ-F-050). Non-TTY without --force errors verbatim per REQ-F-052; cancel writes `cancelled.` to stderr and exits 0. 14 table-driven tests cover y/Y/yes/n/empty TTY input, non-TTY usage error, --force on TTY and non-TTY, unmanaged → unknown-name, missing → unknown-name, missing-credential success, RemoveForce error preserves credential, args validation, and write-annotation presence.
+Files: +delete.go, +delete_test.go, ~docker.go, ~bundle/references/docker.md
+Decisions: stdinIsTerminal as a package-var seam (mirrors common/flags pattern) — no PTY required for tests; missing-credential detected by prefix-match on DbmsCredentials.Remove's "could not find credential with name" wording so any future shape change surfaces verbatim rather than silently passing.
+

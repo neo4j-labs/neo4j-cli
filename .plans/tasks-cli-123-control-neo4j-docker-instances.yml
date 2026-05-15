@@ -224,7 +224,7 @@ tasks:
       On confirmation: shell `docker rm -f <name>` via `dockerClient.RemoveForce`; then call `credentials.DbmsCredentials.Remove(name)` best-effort (missing credential is not an error) per REQ-F-050 and REQ-F-054.
       Add `delete_test.go` table-driven: TTY + y → both removed; TTY + N → neither touched; non-TTY + no --force → usage error; --force → both removed without prompt; missing credential → still succeeds.
       Flush-left `Example:` block with `--rw`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -234,7 +234,7 @@ tasks:
       - "Successful delete removes both container (docker rm -f) and matching dbms credential; missing credential is not an error"
       - "Non-managed container refused with unknown-name error; no docker rm call observed"
       - "delete.go has Annotations write:true, Example block, copyright header"
-    completed_at: null
+    completed_at: 2026-05-15T18:05:00Z
 
   - id: task-013
     title: "Regenerate skill bundle and verify TestGenerator_RoundTrip"

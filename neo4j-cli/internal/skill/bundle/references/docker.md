@@ -3,6 +3,7 @@
 ## Contents
 
 - [neo4j-cli docker create](#neo4j-cli-docker-create)
+- [neo4j-cli docker delete](#neo4j-cli-docker-delete)
 - [neo4j-cli docker get](#neo4j-cli-docker-get)
 - [neo4j-cli docker list](#neo4j-cli-docker-list)
 - [neo4j-cli docker start](#neo4j-cli-docker-start)
@@ -58,6 +59,33 @@ neo4j-cli docker create --name tmp --ephemeral --env-file /tmp/n.env --rw
 
 # Create an enterprise container with the commercial license accepted and a custom password (no credential stored)
 neo4j-cli docker create --name licensed --edition enterprise --accept-license --password mysecret --no-store-credential --rw
+```
+
+## neo4j-cli docker delete
+
+Remove a Neo4j container and its dbms credential
+
+Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. On a TTY, you are prompted to confirm before deletion; non-TTY callers MUST pass --force to confirm. A missing dbms credential is NOT an error — the container is still removed.
+
+Usage: `neo4j-cli docker delete <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Skip the TTY confirmation prompt. Required for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a managed container; prompts on a TTY
+neo4j-cli docker delete dev --rw
+
+# Skip the prompt (required for scripts / non-TTY callers)
+neo4j-cli docker delete dev --force --rw
+
+# Delete and confirm by listing remaining managed containers
+neo4j-cli docker delete dev --force --rw && neo4j-cli docker list --format json
 ```
 
 ## neo4j-cli docker get
