@@ -31,7 +31,7 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 
 - REQ-F-002: Add `aura project list` command that calls `GET /organizations/{organizationId}/projects` on v2beta1. Requires either `--organization-id <id>` flag (highest priority) or the org portion of `aura.default-context` (split on `/`, take the left side) as a fallback; fails with a clear error if neither is available. Always lists all projects within the resolved org; does not filter by the project portion of `aura.default-context`.
 
-- REQ-F-003: Add `aura project get <id>` command that calls `GET /organizations/{organizationId}/projects/{projectId}` on v2beta1. Uses the same org resolution order as REQ-F-002.
+- REQ-F-003: Add `aura project get <id>` command. **Temporary implementation**: because `GET /organizations/{organizationId}/projects/{projectId}` has not yet been added to v2beta1, the command must fall back to the v1 `GET /tenants/{projectId}` endpoint (`AuraApiVersion1`) and pass the response through as-is. The `--organization-id` flag is accepted but not used in the v1 call (org resolution is not required). This fallback must be replaced with the v2beta1 endpoint once it ships.
 
 - REQ-F-004: Deprecate (do not remove) `aura tenant list` and `aura tenant get`. Both commands must remain functional but: (a) be hidden from `--help` output and skill bundles, and (b) print a deprecation warning to stderr on every invocation (e.g., `"Warning: 'aura tenant list' is deprecated and will be removed in a future release. Use 'aura project list' instead."`). Removal is deferred to a later breaking-change release and noted in the changelog.
 
@@ -50,15 +50,19 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 - REQ-F-012: Add `aura context use` command. Accepts a context via either:
   - Positional argument: `{organizationId}/{projectId}` slug (split on first `/`)
   - Flags: `--organization-id <id>` and `--project-id <id>`
-  Both org and project must always be provided by one of these two forms; if either is missing, fail with a clear error. The two forms are mutually exclusive — if both are provided simultaneously, fail with a clear error. Validates the org/project pair by calling `GET /organizations/{organizationId}/projects/{projectId}` on v2beta1; fails if the API returns 404 or an error. On success, writes `aura.default-context` as `{organizationId}/{projectId}` to config. There is no interactive mode.
+  Both org and project must always be provided by one of these two forms; if either is missing, fail with a clear error. The two forms are mutually exclusive — if both are provided simultaneously, fail with a clear error. Validates the org/project pair by calling `GET /organizations/{organizationId}/projects` on v2beta1 and confirming `{projectId}` appears in the returned list; fails with a clear error if the project is not found or the API returns an error. On success, writes `aura.default-context` as `{organizationId}/{projectId}` to config. There is no interactive mode.
 
-- REQ-F-013: `neo4j-cli config set aura.default-context <org-id>/<project-id>` must also be supported. It must apply the same validation as `context use` (same shared function: parse the slug, call `GET /organizations/{organizationId}/projects/{projectId}` on v2beta1, fail on 404 or API error, persist only on success). The `aura.default-context` key must be added to the valid settable keys for `config set`.
+- REQ-F-013: `neo4j-cli config set aura.default-context <org-id>/<project-id>` must also be supported. It must apply the same validation as `context use` (same shared function: parse the slug, call `GET /organizations/{organizationId}/projects` on v2beta1 and confirm the project ID is in the returned list, fail if not found or on API error, persist only on success). The `aura.default-context` key must be added to the valid settable keys for `config set`.
 
 - REQ-F-014: Update `cfg.Aura.DefaultTenant()` to use the following resolution order: (1) project portion of `aura.default-context` (right side of `/`) — primary source; (2) `default-tenant` config key — legacy fallback only. This ensures the following non-beta commands continue to work without requiring `--tenant-id`: `instance list`, `instance create`, `customermanagedkey list`, `customermanagedkey create`, `graphanalytics session list`, `graphanalytics session create`. The `--tenant-id` flag name on these commands is unchanged in this PR (renaming is out of scope).
 
 - REQ-F-015: As part of this PR, create a Linear issue in the CLI working group (CLI) team to track the hard removal of the deprecated `aura tenant list` and `aura tenant get` commands. The issue should reference this PR and note that removal is blocked until a suitable deprecation window has passed.
 
 - REQ-F-016: Add `aura organization get <id>` command that calls `GET /organizations/{organizationId}` on the v2beta1 API and outputs the organization details in `--format json|table|toon`. The command takes the organization ID as a positional argument.
+
+- REQ-F-017: Update `aura project get <id>` to call v1 `GET /tenants/{projectId}` (`AuraApiVersion1`) instead of the v2beta1 single-project endpoint (which does not yet exist). The response is passed through as-is. The `--organization-id` flag is accepted but unused. This is a temporary workaround; see Technical Considerations.
+
+- REQ-F-018: Update `validateAndSetDefaultContext` (shared by `context use` and `config set aura.default-context`) to validate the project by calling `GET /organizations/{organizationId}/projects` on v2beta1 and confirming the project ID is present in the returned list, rather than calling the non-existent single-project GET endpoint. Return a clear "project not found in organization" error when the ID is absent from the list. This is a temporary workaround; see Technical Considerations.
 
 ### Non-Functional Requirements
 
@@ -78,6 +82,12 @@ This work is a prerequisite for any future v2 command additions (blocked by CLI-
 
 ### API version routing
 The existing `api.MakeRequest` function supports `AuraApiVersion1` and `AuraApiVersion2`. All new organization, project, and context commands must use `AuraApiVersion2` (v2beta1: `https://api.neo4j.io/v2beta1`). The existing credential/token flow already works for both v1 and v2 — no auth changes are needed.
+
+### Temporary v1 fallback for `project get`
+The `GET /organizations/{organizationId}/projects/{projectId}` endpoint has not yet been added to v2beta1. Until it ships, `aura project get <id>` must call the v1 `GET /tenants/{projectId}` endpoint (`AuraApiVersion1`) and pass the response through as-is. The `--organization-id` flag should still be accepted by the command (for forward compatibility) but is not used in the actual API call. Once the v2beta1 single-project endpoint is available, REQ-F-003 and task-014 must be revisited to switch over.
+
+### List-based validation in `validateAndSetDefaultContext`
+Because `GET /organizations/{organizationId}/projects/{projectId}` is not yet available on v2beta1, the `validateAndSetDefaultContext` helper must validate the org/project pair by calling `GET /organizations/{organizationId}/projects` (the list endpoint) and checking whether the project ID appears in the returned list. If the list call fails or the project ID is not present, return a clear error and do not persist. This is a temporary workaround; once the single-project endpoint ships, the validation should switch to a direct GET.
 
 ### Organization resolution order
 Both `project list`, `project get`, and `context use` need an organization ID. Resolution order:
@@ -122,9 +132,9 @@ go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
 - [ ] `neo4j-cli aura organization list` returns organization data from v2beta1 in all three output formats. It does not read or use `aura.default-context`.
 - [ ] `neo4j-cli aura organization get <id>` returns organization details from v2beta1 in all three output formats.
 - [ ] `neo4j-cli aura project list` returns project data for the resolved org; fails with a clear error if neither `--organization-id` nor the org portion of `aura.default-context` is available. It does not filter by the project portion of `aura.default-context`.
-- [ ] `neo4j-cli aura project get <id>` returns project details using the same org resolution as `project list`.
+- [ ] `neo4j-cli aura project get <id>` returns project details via v1 `GET /tenants/{id}`, passing the response through as-is.
 - [ ] `neo4j-cli aura context list` returns a flat list of all org/project pairs across all orgs; each entry has `context`, `organizationId`, `projectId`, `projectName`, and `default` fields. Exactly one entry has `default: true` when `aura.default-context` is set and matches that entry; all entries have `default: false` when `aura.default-context` is unset.
-- [ ] `neo4j-cli aura context use <org-id>/<project-id>` validates the pair against v2beta1 and writes `aura.default-context`.
+- [ ] `neo4j-cli aura context use <org-id>/<project-id>` validates the pair by listing v2beta1 projects for the org and confirming the project ID is present, then writes `aura.default-context`.
 - [ ] `neo4j-cli aura context use --organization-id <id> --project-id <id>` validates and writes `aura.default-context` identically to the positional form.
 - [ ] `neo4j-cli aura context use` fails with a clear error when org or project is missing, or when both positional and flag forms are mixed.
 - [ ] `neo4j-cli aura tenant list` and `neo4j-cli aura tenant get` still function but are hidden from `--help` and print a deprecation warning to stderr.
