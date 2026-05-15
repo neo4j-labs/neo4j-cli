@@ -59,6 +59,10 @@ neo4j-cli ships with a built-in agent skill bundle that teaches AI assistants (C
 neo4j-cli skill install --rw
 ```
 
+Or auto-install at CLI install time by prefixing any installer (curl, PowerShell, Homebrew, npm) with `NEO4J_CLI_AUTO_INSTALL_SKILL=1`. Strictly opt-in; any failure is suppressed so the binary install always succeeds.
+
+Installed skill bundles are auto-refreshed in the background whenever the binary version changes, so agents always get up-to-date tool documentation without manual reinstall. Disable with `neo4j-cli config set skill-auto-refresh false --rw`.
+
 `--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
 
 Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills

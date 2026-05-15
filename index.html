@@ -1359,9 +1359,9 @@
 <span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
 
 <span class="info">▸</span> detecting installed agents…
-<span class="ok">✓</span> claude-code     installed (v1.2.0)
-<span class="ok">✓</span> cursor          installed (v1.2.0)
-<span class="ok">✓</span> windsurf        installed (v1.2.0)
+<span class="ok">✓</span> claude-code     installed (v1.3.0)
+<span class="ok">✓</span> cursor          installed (v1.3.0)
+<span class="ok">✓</span> windsurf        installed (v1.3.0)
 <span class="info">○</span> copilot         not detected — skipped
 <span class="info">○</span> gemini-cli      not detected — skipped
 <span class="info">○</span> codex           not detected — skipped
@@ -1371,16 +1371,16 @@
 <span class="comment"># check for version drift across all agents</span>
 <span class="prompt">$</span> neo4j-cli skill check
 
-<span class="ok">✓</span> claude-code     v1.2.0  up to date
-<span class="ok">✓</span> cursor          v1.2.0  up to date
-<span class="info">!</span> windsurf        v1.1.0  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
+<span class="ok">✓</span> claude-code     v1.3.0  up to date
+<span class="ok">✓</span> cursor          v1.3.0  up to date
+<span class="info">!</span> windsurf        v1.2.0  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
 
 <span class="comment"># update the outdated one</span>
 <span class="prompt">$</span> neo4j-cli skill install windsurf <span class="flag">--rw</span>
 
-<span class="ok">✓</span> windsurf        updated to v1.2.0
+<span class="ok">✓</span> windsurf        updated to v1.3.0
 
-<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.2.0.</span></span></pre>
+<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.3.0.</span></span></pre>
       </div>
 
       <!-- embed -->
@@ -1453,7 +1453,8 @@
 <span class="prompt">$</span> neo4j-cli update check              <span class="comment"># report availability, exit 1 if newer</span>
 <span class="prompt">$</span> neo4j-cli update <span class="flag">--pre-releases</span>     <span class="comment"># opt into alpha/beta/rc tags</span>
 <span class="prompt">$</span> neo4j-cli update <span class="flag">--version</span> v1.0.0   <span class="comment"># pin or downgrade</span></pre>
-              <p>Verify: <code>neo4j-cli --help</code>. Installed skill bundles are refreshed automatically after a successful update.</p>
+              <p>Verify: <code>neo4j-cli --help</code>. Installed skill bundles are refreshed automatically whenever the binary version changes (disable with <code>neo4j-cli config set skill-auto-refresh false</code>).</p>
+              <p>Prefix any installer with <code>NEO4J_CLI_AUTO_INSTALL_SKILL=1</code> to auto-run <code>skill install --rw</code> after the binary is placed — supported on curl, PowerShell, Homebrew, and npm. Strictly opt-in; omit the prefix to skip skill installation.</p>
             </div>
           </details>
           <!-- END:docs:install -->
@@ -1557,7 +1558,7 @@
 <span class="prompt">$</span> neo4j-cli skill check                     <span class="comment"># version drift vs running binary</span>
 <span class="prompt">$</span> neo4j-cli skill remove [agent]            <span class="comment"># idempotent</span></pre>
               <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.</p>
-              <p>Skills are refreshed automatically after <code>neo4j-cli update</code>. The bundle covers Aura, Bolt queries, schema introspection, embeddings, credentials, and the write gate — everything agents need to drive the CLI correctly.</p>
+              <p>Installed skill bundles are refreshed automatically in the background whenever the binary version changes (after <code>neo4j-cli update</code>, a Homebrew/npm/pipx upgrade, or any other in-place swap). Opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>. The bundle covers Aura, Bolt queries, schema introspection, embeddings, credentials, and the write gate — everything agents need to drive the CLI correctly.</p>
             </div>
           </details>
           <!-- END:docs:skills -->
