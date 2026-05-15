@@ -50,7 +50,7 @@ tasks:
       files). Remove the aura-projects config storage key and the AuraProject struct from
       common/clicfg/projects/. Clean up all references in clicfg.go and anywhere else that
       imports or uses these types. Verify make test still passes after deletion.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/aura/internal/subcommands/config/project/ directory no longer exists"
@@ -58,7 +58,7 @@ tasks:
       - "aura config project add/use/list/remove commands no longer registered"
       - "No compilation errors or dangling references after removal"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-05-15T14:00:00Z
 
   - id: task-004
     title: "Implement validateAndSetDefaultContext shared helper"

@@ -1,3 +1,8 @@
+## TASK-003 — 2026-05-15T14:00:00Z
+Removed config/project subcommand tree, common/clicfg/projects/ package, and all aura-projects references; migrated SetDefaultProjectInConfig and utils/projectflags.go to use aura.default-context slug directly; added DefaultContext() accessor to AuraConfig.
+Files: -neo4j-cli/aura/internal/subcommands/config/project/, -common/clicfg/projects/projects.go, -neo4j-cli/aura/config.go, ~common/clicfg/clicfg.go, ~neo4j-cli/aura/internal/subcommands/config/config.go, ~neo4j-cli/internal/subcommands/config/config.go, ~neo4j-cli/aura/internal/subcommands/utils/projectflags.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+Decisions: SetDefaultProjectInConfig now calls SetConfigValue("aura.default-context", orgId+"/"+projectId); SetProjectFlagsAsRequired/SetProjetDefaults parse the slug via strings.LastIndex, matching the same logic as DefaultTenant().
+
 ## TASK-002 — 2026-05-15T13:00:00Z
 Added ListOrganizations, GetOrganization, ListProjects, and GetProject wrapper functions to the api package with typed response structs; tests use raw httptest servers and SetBetaEnabled(true) to route to /v2beta1/* paths.
 Files: +neo4j-cli/aura/internal/api/organization.go, +neo4j-cli/aura/internal/api/organization_test.go
