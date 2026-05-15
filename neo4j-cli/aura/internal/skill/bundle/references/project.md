@@ -24,19 +24,19 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--organization-id` | string | - | Organization ID (defaults to org portion of aura.default-context) |
+| `--organization-id` | string | - | Organization ID (accepted for forward compatibility; not used in the API call) |
 
 Examples:
 
 ```
-# Get project details (using default organization from aura.default-context)
+# Get project details by ID
 neo4j-cli aura project get 00000000-0000-0000-0000-000000000000
 
-# Get project details with an explicit organization ID
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000001
-
 # Emit JSON for scripting
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000001 --format json
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the project name
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
 ```
 
 ## aura-cli project list

@@ -1,3 +1,7 @@
+## TASK-014 — 2026-05-15T19:30:00Z
+Updated aura project get to call GET /tenants/{id} on v1 (AuraApiVersion1) instead of the non-existent v2beta1 single-project endpoint; removed org ID resolution logic, kept --organization-id flag for forward compatibility; updated tests to mock /v1/tenants/{id}; regenerated skill bundles.
+Files: ~neo4j-cli/aura/internal/subcommands/project/get.go, ~neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/internal/skill/bundle/references/project.md
+
 ## TASK-012 — 2026-05-15T14:40:00Z
 Added changie Minor entry describing organization/project/context commands, aura.default-context config key, and tenant deprecation; created Linear issue CLI-126 in neo4j-cli-workinggroup for hard removal of deprecated tenant commands after deprecation window.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260515-120000.yaml, ~.plans/tasks-cli-99-org-project-management.yml

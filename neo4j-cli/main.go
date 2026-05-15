@@ -16,11 +16,10 @@ import (
 	"github.com/spf13/afero"
 )
 
-// recoverPanic prints a redacted "unexpected error" line to w and re-panics.
+// recoverPanic prints a redacted "unexpected error" line to w.
 // Extracted so the redaction format is unit-testable without invoking main().
 func recoverPanic(w io.Writer, args []string, r any) {
-	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j/cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
-	panic(r)
+	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
 }
 
 // exitCodeFor maps an error returned by cmd.Execute to a process exit code.

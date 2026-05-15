@@ -12,7 +12,6 @@ import (
 )
 
 func TestGetProject(t *testing.T) {
-	const orgID = "org-111"
 	const projectID = "proj-222"
 
 	for _, tc := range []struct {
@@ -47,15 +46,13 @@ func TestGetProject(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("aura.beta-enabled", true)
-
 			mockHandler := helper.NewRequestHandlerMock(
-				fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, projectID),
+				fmt.Sprintf("/v1/tenants/%s", projectID),
 				tc.status,
 				tc.body,
 			)
 
-			helper.ExecuteCommand(fmt.Sprintf("project get %s --organization-id=%s", projectID, orgID))
+			helper.ExecuteCommand(fmt.Sprintf("project get %s", projectID))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -70,72 +67,32 @@ func TestGetProject(t *testing.T) {
 	}
 }
 
-func TestGetProjectFromDefaultContext(t *testing.T) {
+func TestGetProjectOrganizationIdFlagAcceptedButNotUsed(t *testing.T) {
+	const projectID = "proj-222"
 	const orgID = "org-111"
-	const defaultProjectID = "proj-default"
-	const getProjectID = "proj-222"
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetDefaultProjectInConfig(orgID, defaultProjectID)
-
+	// Only mock the v1 tenants endpoint — passing --organization-id must not change the API call
 	mockHandler := helper.NewRequestHandlerMock(
-		fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", orgID, getProjectID),
+		fmt.Sprintf("/v1/tenants/%s", projectID),
 		http.StatusOK,
 		`{"data": {"id": "proj-222", "name": "My Project"}}`,
 	)
 
-	helper.ExecuteCommand(fmt.Sprintf("project get %s", getProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("project get %s --organization-id=%s", projectID, orgID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 	helper.AsssertOk()
 }
 
-func TestGetProjectWithFlagOverridesContext(t *testing.T) {
-	const contextOrgID = "org-from-context"
-	const flagOrgID = "org-from-flag"
-	const defaultProjectID = "proj-default"
-	const getProjectID = "proj-222"
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetConfigValue("aura.beta-enabled", true)
-	helper.SetDefaultProjectInConfig(contextOrgID, defaultProjectID)
-
-	mockHandler := helper.NewRequestHandlerMock(
-		fmt.Sprintf("/v2beta1/organizations/%s/projects/%s", flagOrgID, getProjectID),
-		http.StatusOK,
-		`{"data": {"id": "proj-222", "name": "My Project"}}`,
-	)
-
-	helper.ExecuteCommand(fmt.Sprintf("project get %s --organization-id=%s", getProjectID, flagOrgID))
-
-	mockHandler.AssertCalledTimes(1)
-	helper.AsssertOk()
-}
-
-func TestGetProjectMissingOrganizationId(t *testing.T) {
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetConfigValue("aura.beta-enabled", true)
-
-	helper.ExecuteCommand("project get proj-222")
-
-	helper.AssertErrContainsStrings([]string{"organization-id", "aura.default-context"})
-}
-
 func TestGetProjectMissingPositionalArg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
-
-	helper.ExecuteCommand("project get --organization-id=org-111")
+	helper.ExecuteCommand("project get")
 
 	helper.AssertErrContainsStrings([]string{"accepts 1 arg(s)"})
 }

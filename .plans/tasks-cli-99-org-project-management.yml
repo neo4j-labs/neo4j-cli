@@ -283,7 +283,7 @@ tasks:
       the RunE (--organization-id flag may be kept for forward compatibility but should not
       be required or used). Update get_test.go to mock the v1 /tenants/{id} path instead
       of the v2beta1 path. This is a temporary workaround.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "aura project get <id> calls GET /tenants/{id} on v1 (not v2beta1)"
@@ -291,7 +291,7 @@ tasks:
       - "Response is passed through as-is via output.PrintBody"
       - "Tests mock /v1/tenants/{id} and cover success and API error (404) cases"
       - "make test, make fmt-check, and make lint all pass"
-    completed_at: null
+    completed_at: 2026-05-15T19:30:00Z
 
   - id: task-015
     title: "Update validateAndSetDefaultContext to use list-based project validation"

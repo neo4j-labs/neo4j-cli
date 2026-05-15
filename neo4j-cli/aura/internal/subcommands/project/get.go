@@ -20,30 +20,22 @@ func newGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Returns project details",
 		Long:  "This subcommand returns details about a specific Aura project.",
-		Example: `# Get project details (using default organization from aura.default-context)
+		Example: `# Get project details by ID
 neo4j-cli aura project get 00000000-0000-0000-0000-000000000000
 
-# Get project details with an explicit organization ID
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000001
-
 # Emit JSON for scripting
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000001 --format json`,
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the project name
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			projectID := args[0]
 
-			orgID := organizationId
-			if orgID == "" {
-				orgID = resolveOrgFromContext(cfg)
-			}
-			if orgID == "" {
-				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-context is not configured")
-			}
-
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/organizations/%s/projects/%s", orgID, projectID), &api.RequestConfig{
+			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/tenants/%s", projectID), &api.RequestConfig{
 				Method:  http.MethodGet,
-				Version: api.AuraApiVersion2,
+				Version: api.AuraApiVersion1,
 			})
 			if err != nil {
 				return err
@@ -57,7 +49,8 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-i
 		},
 	}
 
-	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (defaults to org portion of aura.default-context)")
+	// --organization-id is accepted for forward compatibility but not required and not used.
+	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (accepted for forward compatibility; not used in the API call)")
 
 	return cmd
 }
