@@ -5,24 +5,23 @@ package flags
 
 import (
 	"github.com/spf13/cobra"
+
+	commonflags "github.com/neo4j/cli/common/flags"
 )
 
 // WaitFlag is the canonical name of the synchronous-wait flag for async commands.
-const WaitFlag = "wait"
+// Re-exported from common/flags so call sites that already imported the aura
+// flags package keep building without churn.
+const WaitFlag = commonflags.WaitFlag
 
 // AwaitFlagAlias is the deprecated alias retained for one release after CLI-87.
-// Removal is tracked in CLI-111.
-const AwaitFlagAlias = "await"
+// Removal is tracked in CLI-111. Re-exported from common/flags.
+const AwaitFlagAlias = commonflags.AwaitFlagAlias
 
 // RegisterWait registers --wait on cmd bound to wait, plus the deprecated --await
-// alias bound to the same *bool. The alias is hidden from --help and emits cobra's
-// standard "Flag --await has been deprecated, use --wait instead" message on use.
+// alias bound to the same *bool. Delegates to common/flags.RegisterWait so the
+// docker subtree (outside aura/internal) and the aura subtree share one
+// canonical implementation.
 func RegisterWait(cmd *cobra.Command, wait *bool, helpText string) {
-	cmd.Flags().BoolVar(wait, WaitFlag, false, helpText)
-	cmd.Flags().BoolVar(wait, AwaitFlagAlias, false, helpText)
-	if err := cmd.Flags().MarkDeprecated(AwaitFlagAlias, "use --wait instead"); err != nil {
-		// MarkDeprecated only fails if the flag is unregistered or the message is empty;
-		// both are programmer errors, panic so they surface in tests.
-		panic(err)
-	}
+	commonflags.RegisterWait(cmd, wait, helpText)
 }

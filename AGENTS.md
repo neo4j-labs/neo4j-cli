@@ -61,6 +61,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details and output testi
 - **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 - **Name test files per command**, not per package — use `get_test.go`, `set_test.go`, `list_test.go` mirroring the source files; put shared helpers in `helpers_test.go`. Avoid aggregating all tests in a single `config_test.go`.
 - **Never use `afero.NewOsFs()` in query package tests** — the dev machine has real credentials at `~/Library/Preferences/neo4j/cli/credentials.json`. Tests using a real FS will fail if any dbms credential is stored. Always use `testfs.GetTestFs(`{"format":"json"}`, "{}")` (empty credentials) even when testing dotenv walk-up; write the dotenv into the memFs at `filepath.Join(t.TempDir(), ".env")` and `t.Chdir(tmp)` so `os.Getwd()`+`cfg.Aura.Fs()` finds it.
+- **`afero.MemMapFs` quirks**: (1) no symlink support — `Symlink`/`Lstat` are not implemented, so symlink-replacement paths must be exercised against `afero.NewOsFs()` + `t.TempDir()`; (2) `OpenFile` creates files in non-existent parent dirs implicitly, which does NOT reflect production `OsFs` behaviour — missing-dir error paths must also use `OsFs`. Outside the query package both are safe because they don't touch the user's credentials.
 
 ## Architecture
 
@@ -209,6 +210,19 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 ## query Subsystem Notes
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
+
+## Docker Subsystem Notes
+
+`neo4j-cli/internal/subcommands/docker/` runs local Neo4j by shelling out to the host `docker` CLI. Docker itself is the source-of-truth: managed containers carry `org.neo4j.cli.managed=true` plus metadata labels (`...edition`, `...version`, `...bolt-port`, `...http-port`, `...ephemeral`) and the `list`/`get`/`start`/`stop`/`delete` leaves discover state via `docker ps`/`docker inspect` — no separate state file is maintained.
+
+- `client.go` defines the `dockerClient` interface (`Run`, `Start`, `Stop`, `RemoveForce`, `PsAll`, `Inspect`); the default `execClient` shells out and caches `exec.LookPath("docker")`. The package-level `clientFactory` var is the test seam — `helpers_test.go` swaps in a `fakeDockerClient` for every leaf test.
+- `bolt_ready.go` exports `WaitForBolt(ctx, uri, user, pass, timeout)` and is reused by both `create --wait` and `start --wait`. It uses the vendored `neo4j-go-driver` from `neo4j-cli/query/`; on timeout it returns a `clierr.UsageError` pointing at `docker logs <name>`. `stop --wait` polls `dockerClient.Inspect` for `State.Running == false` instead.
+- `create` auto-suffixes name collisions against BOTH `dockerClient.PsAll` AND `credentials.DbmsCredentials.List()` so the chosen name is unique across both surfaces; the chosen name is used for the container, the stored credential, and the env-file header.
+- `--ephemeral` adds `--rm` to `docker run`, labels the container `ephemeral=true`, skips credential persistence, and emits the `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout — or to `--env-out-file <path>` (mode 0600 via `cfg.Aura.Fs()`) when set. The blob is consumed by `query --env <path>`.
+- Image tag mapping: `--edition enterprise --version latest` → `neo4j:enterprise` (NOT `neo4j:latest-enterprise`, which is unpublished); explicit versions → `neo4j:<version>-enterprise`. Verify any new edition/version logic against `https://hub.docker.com/_/neo4j` before assuming a tag pattern.
+- Volume flags (`--data-dir`/`--logs-dir`/`--import-dir`) bind-mount host paths to `/data`/`/logs`/`/import`; empty-default = no mount; paths support `~`/`$VAR` expansion via the package-local `expandHostPath` helper (`homeDirFn` test seam); missing dirs are created at 0o755; incompatible with `--ephemeral`.
+- Live-docker smoke test: `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs a create→list→get→delete lifecycle against the host Docker daemon. NOT part of `make test`. Skips cleanly when `docker` is not on PATH (belt-and-braces — also gated by the `smoke` build tag).
+- Missing-`docker` error suggests `alias docker=podman` when podman is also detected on PATH; podman lookup goes through the `lookPathFn` package var seam in `client.go`.
 
 ## Cobra Help / Skill Bundle Rendering Notes
 
