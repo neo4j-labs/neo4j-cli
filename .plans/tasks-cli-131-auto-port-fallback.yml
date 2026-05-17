@@ -134,7 +134,7 @@ tasks:
       bundle files should diff. The `TestGenerator_RoundTrip` test is the
       enforcement gate.
       See PRD REQ-F-035.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -143,7 +143,7 @@ tasks:
       - "`bundle/SKILL.md` and `bundle/references/docker.md` reflect the updated wording"
       - "Only expected files appear in `git status` after generate; no unrelated drift"
       - "`go test ./neo4j-cli/internal/skill/...` passes (`TestGenerator_RoundTrip` green)"
-    completed_at: null
+    completed_at: 2026-05-17T10:00:00Z
 
   - id: task-006
     title: "Add changelog entry and run final gates"
