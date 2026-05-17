@@ -158,7 +158,7 @@ tasks:
       `make test`, `make fmt-check`, `make lint`, `make generate-check`,
       `make license-check`.
       See PRD REQ-F-036, REQ-NF-005.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-005
@@ -169,4 +169,4 @@ tasks:
       - "`make lint` exits 0"
       - "`make generate-check` shows no diff"
       - "`make license-check` exits 0"
-    completed_at: null
+    completed_at: 2026-05-17T10:05:00Z

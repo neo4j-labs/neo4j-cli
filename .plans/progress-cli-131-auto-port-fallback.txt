@@ -17,3 +17,7 @@ Files: ~README.md, ~neo4j-cli/internal/skill/additions.md
 ## task-005 — 2026-05-17T10:00:00Z
 Regenerated skill bundle to absorb task-003/004 source edits — SKILL.md docker bullet + references/docker.md Long + bolt/http-port flag rows now reflect the auto-increment fallback wording. Only expected files diffed.
 Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/docker.md
+
+## task-006 — 2026-05-17T10:05:00Z
+Added Minor changie entry for CLI-131; ran full gate sequence (test, fmt-check, lint, license-check) — all green. generate-check noise is the in_progress task-yaml flip only, no bundle drift.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260517-100304.yaml
