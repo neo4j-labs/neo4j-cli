@@ -5,3 +5,7 @@ Files: ~neo4j-cli/internal/subcommands/docker/create.go
 ## task-002 — 2026-05-17T08:30:00Z
 Rewrote three `TestCreate_PortPreflight` subtests to assert resolved fallback pair + stderr info-line (kept happy-path & equal-ports subtests). Added `TestCreate_AutoPortFallback_{DefaultsTaken,PreservesOffset,Exhausted,NoNarrationOnHappyPath}`. Added `runCreateWithOccupiedPortsAndStderr` helper exposing stderr.
 Files: ~neo4j-cli/internal/subcommands/docker/create_test.go
+
+## task-003 — 2026-05-17T09:00:00Z
+Appended fallback-contract sentence to docker-create Long before volume-flag block; added "Auto-incremented along with --{http,bolt}-port if taken." to bolt/http port flag Usage. Bundle drift expected (gated by task-005).
+Files: ~neo4j-cli/internal/subcommands/docker/create.go

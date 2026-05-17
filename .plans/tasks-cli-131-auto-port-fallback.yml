@@ -93,7 +93,7 @@ tasks:
       end of the paragraph, before the trailing volume-flag block, so the
       paragraph flow stays coherent.
       See PRD REQ-F-030 through REQ-F-032.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -101,7 +101,7 @@ tasks:
       - "`--http-port` Usage string contains `Auto-incremented along with --bolt-port if taken`"
       - "`Long:` paragraph contains the literal sentence about `100 attempts` and `reported on stderr`"
       - "`./bin/neo4j-cli docker create --help` renders the new text without breaking the existing layout"
-    completed_at: null
+    completed_at: 2026-05-17T09:00:00Z
 
   - id: task-004
     title: "Update README.md and additions.md port wording"

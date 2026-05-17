@@ -136,6 +136,8 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"`neo4j-cli query --env <path>`. The env-file is written via a temp file in the same directory and " +
 			"atomically renamed; a pre-existing symlink at the target path is REPLACED by a regular file (the " +
 			"symlink is not followed). " +
+			"When the requested --bolt-port and --http-port pair is taken, both ports are auto-incremented by " +
+			"the same offset (up to 100 attempts) and the chosen pair is reported on stderr. " +
 			"Use --data-dir / --logs-dir / --import-dir to bind-mount host directories at /data, /logs, /import " +
 			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
 			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
@@ -392,8 +394,8 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().StringVar(&version, versionFlag, "latest", "Neo4j version tag (e.g. 5.20, latest).")
 	cmd.Flags().StringVar(&edition, editionFlag, "enterprise", `Neo4j edition. Must be one of "community" or "enterprise".`)
 	cmd.Flags().BoolVar(&acceptLicense, acceptLicenseFlag, false, "Accept the Neo4j Commercial License (sets NEO4J_ACCEPT_LICENSE_AGREEMENT=yes; default is eval). Ignored for community edition.")
-	cmd.Flags().IntVar(&boltPort, boltPortFlag, 7687, "Host port to publish for Bolt (container 7687).")
-	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474).")
+	cmd.Flags().IntVar(&boltPort, boltPortFlag, 7687, "Host port to publish for Bolt (container 7687). Auto-incremented along with --http-port if taken.")
+	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474). Auto-incremented along with --bolt-port if taken.")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
