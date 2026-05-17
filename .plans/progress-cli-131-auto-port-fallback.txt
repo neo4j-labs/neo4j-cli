@@ -9,3 +9,7 @@ Files: ~neo4j-cli/internal/subcommands/docker/create_test.go
 ## task-003 — 2026-05-17T09:00:00Z
 Appended fallback-contract sentence to docker-create Long before volume-flag block; added "Auto-incremented along with --{http,bolt}-port if taken." to bolt/http port flag Usage. Bundle drift expected (gated by task-005).
 Files: ~neo4j-cli/internal/subcommands/docker/create.go
+
+## task-004 — 2026-05-17T09:30:00Z
+Mirrored auto-increment-pair sentence into README docker-ports paragraph and additions.md docker bullet (one inserted sentence each, no reflow). Bundle drift expected (gated by task-005).
+Files: ~README.md, ~neo4j-cli/internal/skill/additions.md

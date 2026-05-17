@@ -114,13 +114,13 @@ tasks:
       `neo4j-cli/internal/skill/additions.md` line 17.
       Keep tone consistent with surrounding text; do not reflow unrelated lines.
       See PRD REQ-F-033, REQ-F-034.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`README.md` mentions `auto-incremented` (or equivalent) in the docker ports paragraph"
       - "`neo4j-cli/internal/skill/additions.md` mirrors the same wording change"
       - "No unrelated lines are reflowed or reordered"
-    completed_at: null
+    completed_at: 2026-05-17T09:30:00Z
 
   - id: task-005
     title: "Regenerate skill bundle"

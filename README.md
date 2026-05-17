@@ -108,7 +108,7 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 
 If you use podman instead of docker, you can alias it (`alias docker=podman` in your shell rc, or `Set-Alias docker podman` in Windows PowerShell). `neo4j-cli docker` shells out to whatever resolves as `docker` on your `PATH` — it doesn't care which runtime backs it.
 
-Defaults: enterprise edition with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` to upgrade to the commercial license (`=yes`). Use `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. If `--name` collides with an existing container or stored `dbms` credential, an auto-suffix (`<name>-1`, `<name>-2`, …) is chosen and logged to stderr.
+Defaults: enterprise edition with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` to upgrade to the commercial license (`=yes`). Use `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. When the requested pair is taken, both ports are auto-incremented by the same offset until a free pair is found. If `--name` collides with an existing container or stored `dbms` credential, an auto-suffix (`<name>-1`, `<name>-2`, …) is chosen and logged to stderr.
 
 ### Persistent flow (stored credential)
 
