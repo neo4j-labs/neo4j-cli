@@ -46,6 +46,21 @@ jobs:
             - name: Test
               run: make test
 
+            # Docker smoke tests: exercise the docker subtree against a REAL
+            # docker daemon (lifecycle create/list/get/delete, plus the
+            # CLI-131 auto-port-fallback flow). Gated by:
+            #   - `//go:build smoke` tag at file top, so the default
+            #     `make test` invocation never compiles these tests.
+            #   - runtime `exec.LookPath("docker")` check that t.Skips when
+            #     docker is missing, so accidental runs on docker-less
+            #     hosts no-op safely.
+            # Only ubuntu-latest: GitHub-hosted macOS / Windows runners do
+            # not ship docker. Expect ~30s on first run for the neo4j:
+            # enterprise image pull; subsequent runs are ~5s.
+            - name: Docker smoke tests
+              if: matrix.os == 'ubuntu-latest'
+              run: go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...
+
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
               run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...

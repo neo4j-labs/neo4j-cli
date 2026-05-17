@@ -1,0 +1,27 @@
+## task-001 — 2026-05-17T08:00:00Z
+Replaced `checkPortFree` with `portFree` + `findFreePortPair` walking offsets 0..99 over both ports; on resolution-diff emit `info: ports A/B in use; using C/D (bolt/http)` on stderr. Equal-ports guard kept in front of the loop.
+Files: ~neo4j-cli/internal/subcommands/docker/create.go
+
+## task-002 — 2026-05-17T08:30:00Z
+Rewrote three `TestCreate_PortPreflight` subtests to assert resolved fallback pair + stderr info-line (kept happy-path & equal-ports subtests). Added `TestCreate_AutoPortFallback_{DefaultsTaken,PreservesOffset,Exhausted,NoNarrationOnHappyPath}`. Added `runCreateWithOccupiedPortsAndStderr` helper exposing stderr.
+Files: ~neo4j-cli/internal/subcommands/docker/create_test.go
+
+## task-003 — 2026-05-17T09:00:00Z
+Appended fallback-contract sentence to docker-create Long before volume-flag block; added "Auto-incremented along with --{http,bolt}-port if taken." to bolt/http port flag Usage. Bundle drift expected (gated by task-005).
+Files: ~neo4j-cli/internal/subcommands/docker/create.go
+
+## task-004 — 2026-05-17T09:30:00Z
+Mirrored auto-increment-pair sentence into README docker-ports paragraph and additions.md docker bullet (one inserted sentence each, no reflow). Bundle drift expected (gated by task-005).
+Files: ~README.md, ~neo4j-cli/internal/skill/additions.md
+
+## task-005 — 2026-05-17T10:00:00Z
+Regenerated skill bundle to absorb task-003/004 source edits — SKILL.md docker bullet + references/docker.md Long + bolt/http-port flag rows now reflect the auto-increment fallback wording. Only expected files diffed.
+Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/docker.md
+
+## task-006 — 2026-05-17T10:05:00Z
+Added Minor changie entry for CLI-131; ran full gate sequence (test, fmt-check, lint, license-check) — all green. generate-check noise is the in_progress task-yaml flip only, no bundle drift.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260517-100304.yaml
+
+## task-007 — 2026-05-17T10:30:00Z
+Added `TestSmoke_PortFallback` covering the real-docker auto-port-fallback path (A holds P/Q; B requests same pair, asserts higher pair with matching offset, stderr info-line, `get --format json` row, and `docker inspect` label parity). Wired `Docker smoke tests` CI step on ubuntu-latest only — gated by smoke build tag + docker-LookPath skip, comment block explains ~30s first-pull cost.
+Files: ~neo4j-cli/internal/subcommands/docker/smoke_test.go, ~.github/workflows/test.yml
