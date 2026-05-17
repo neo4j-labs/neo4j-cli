@@ -148,6 +148,130 @@ func TestSmoke_Lifecycle(t *testing.T) {
 		"docker delete should have removed the container; docker ps still reports: %q", string(out))
 }
 
+// TestSmoke_PortFallback exercises the auto-port-fallback path (CLI-131)
+// against a REAL docker daemon. Like TestSmoke_Lifecycle it is gated behind
+// the `//go:build smoke` tag plus a runtime `exec.LookPath("docker")` skip.
+//
+// The flow:
+//   - pick two distinct ephemeral free host ports (P, Q).
+//   - create container A bound to (P, Q) so those ports are genuinely in
+//     use by the docker daemon at the OS level.
+//   - create container B requesting the SAME (P, Q). The fallback loop
+//     in create.go must walk the pair upward by the same offset until a
+//     free pair is found, narrate the resolution on stderr, and bake the
+//     resolved pair into both the `docker run -p` argv and the container
+//     labels.
+//   - assert B's stderr carries the `info: ports P/Q in use; using ...`
+//     line; parse `get <B-name> --format json` and confirm bolt-port /
+//     http-port / uri all reflect the resolved (higher) pair; confirm
+//     the offset is >= 1 and identical on both ports (preserved-delta
+//     invariant from REQ-F-004).
+//   - cross-check the container labels via `docker inspect` so a future
+//     regression that desyncs the label set from the published ports
+//     gets caught here.
+//
+// Cleanup runs even on partial failure: both containers are best-effort
+// `docker rm -f`'d so an aborted run never leaks managed containers.
+//
+// NOT part of `make test`; expect ~5s when neo4j:enterprise is cached,
+// ~30s on first pull (same cost profile as TestSmoke_Lifecycle).
+func TestSmoke_PortFallback(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not on PATH; skipping live smoke")
+	}
+
+	// Distinct base names so list/get can't accidentally cross-match.
+	stamp := time.Now().UnixNano()
+	nameA := fmt.Sprintf("neo4j-cli-smoke-fb-a-%d", stamp)
+	nameB := fmt.Sprintf("neo4j-cli-smoke-fb-b-%d", stamp)
+
+	boltPort := pickFreePort(t)
+	httpPort := pickFreePort(t)
+	require.NotEqual(t, boltPort, httpPort, "free-port helper handed out the same port twice")
+
+	// Best-effort cleanup for BOTH containers — runs even if a phase fails.
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "rm", "-f", nameA).Run()
+		_ = exec.Command("docker", "rm", "-f", nameB).Run()
+	})
+
+	// Hermetic config — see TestSmoke_Lifecycle for the rationale.
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+
+	// Phase 1 — create container A on the chosen pair. After this the host
+	// ports P and Q are genuinely in use, so the next create's listener
+	// pre-flight will see them as taken.
+	_, _, err = runDockerSubcommand(t, cfg, "create",
+		"--name", nameA,
+		"--no-store-credential",
+		"--bolt-port", strconv.Itoa(boltPort),
+		"--http-port", strconv.Itoa(httpPort),
+		"--rw",
+	)
+	require.NoError(t, err, "create A failed")
+
+	// Phase 2 — request the SAME pair for container B. The fallback loop
+	// must resolve to (boltPort+offset, httpPort+offset) for some offset>=1.
+	_, stderrB, err := runDockerSubcommand(t, cfg, "create",
+		"--name", nameB,
+		"--no-store-credential",
+		"--bolt-port", strconv.Itoa(boltPort),
+		"--http-port", strconv.Itoa(httpPort),
+		"--rw",
+	)
+	require.NoError(t, err, "create B failed; stderr=%s", stderrB)
+
+	// Phase 3 — stderr must carry the resolution narration. We assert the
+	// prefix (request side) and that "using" appears; the resolved pair
+	// is value-checked via `get --format json` below for a single source
+	// of truth.
+	wantPrefix := fmt.Sprintf("info: ports %d/%d in use; using ", boltPort, httpPort)
+	assert.Contains(t, stderrB, wantPrefix,
+		"stderr B missing fallback narration prefix; stderr=%s", stderrB)
+
+	// Phase 4 — pull B's resolved ports via `get --format json` and compute
+	// the offset. The bolt-port / http-port fields are strings (label-derived)
+	// so we coerce via asString + strconv.Atoi.
+	getStdout, _, err := runDockerSubcommand(t, cfg, "get", nameB, "--format", "json")
+	require.NoError(t, err, "get B failed")
+
+	var getRows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(getStdout), &getRows), "get stdout is not JSON: %s", getStdout)
+	require.Len(t, getRows, 1, "get must emit exactly one row; got %s", getStdout)
+	row := getRows[0]
+
+	resolvedBolt, err := strconv.Atoi(asString(row["bolt-port"]))
+	require.NoError(t, err, "B bolt-port not parseable; row=%v", row)
+	resolvedHTTP, err := strconv.Atoi(asString(row["http-port"]))
+	require.NoError(t, err, "B http-port not parseable; row=%v", row)
+
+	boltOffset := resolvedBolt - boltPort
+	httpOffset := resolvedHTTP - httpPort
+	assert.GreaterOrEqual(t, boltOffset, 1, "B bolt-port should have walked at least 1 (was %d, started %d)", resolvedBolt, boltPort)
+	assert.Equal(t, boltOffset, httpOffset, "preserved-delta invariant: bolt and http offsets must match (got bolt=%d http=%d)", boltOffset, httpOffset)
+
+	// uri must reflect the resolved bolt port — operators copy/paste this.
+	assert.Equal(t, fmt.Sprintf("neo4j://localhost:%d", resolvedBolt), asString(row["uri"]), "B uri mismatch")
+
+	// Phase 5 — cross-check container labels via `docker inspect` so a
+	// regression that desyncs labels from the published port set is caught.
+	// `--format '{{json .Config.Labels}}'` keeps the parse trivial.
+	inspectOut, inspectErr := exec.Command("docker", "inspect",
+		"--format", "{{json .Config.Labels}}", nameB,
+	).Output()
+	require.NoError(t, inspectErr, "docker inspect B failed")
+
+	var labels map[string]string
+	require.NoError(t, json.Unmarshal(inspectOut, &labels), "docker inspect labels JSON parse failed: %s", string(inspectOut))
+	assert.Equal(t, strconv.Itoa(resolvedBolt), labels[LabelBoltPort], "label %s desync", LabelBoltPort)
+	assert.Equal(t, strconv.Itoa(resolvedHTTP), labels[LabelHTTPPort], "label %s desync", LabelHTTPPort)
+}
+
 // pickFreePort allocates and immediately releases a TCP port on 127.0.0.1.
 // The tiny TOCTOU window between Close and `docker run -p` claiming the
 // port is acceptable for a dev-only smoke test; the OS rarely re-uses an

@@ -21,3 +21,7 @@ Files: ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bund
 ## task-006 — 2026-05-17T10:05:00Z
 Added Minor changie entry for CLI-131; ran full gate sequence (test, fmt-check, lint, license-check) — all green. generate-check noise is the in_progress task-yaml flip only, no bundle drift.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260517-100304.yaml
+
+## task-007 — 2026-05-17T10:30:00Z
+Added `TestSmoke_PortFallback` covering the real-docker auto-port-fallback path (A holds P/Q; B requests same pair, asserts higher pair with matching offset, stderr info-line, `get --format json` row, and `docker inspect` label parity). Wired `Docker smoke tests` CI step on ubuntu-latest only — gated by smoke build tag + docker-LookPath skip, comment block explains ~30s first-pull cost.
+Files: ~neo4j-cli/internal/subcommands/docker/smoke_test.go, ~.github/workflows/test.yml

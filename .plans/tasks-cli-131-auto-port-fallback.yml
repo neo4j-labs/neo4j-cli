@@ -196,7 +196,7 @@ tasks:
         - Add a short comment block above the step explaining the gate, the ~30s first-pull cost, and that the test t.Skips when docker is missing.
       (c) No changelog entry — internal CI/test wiring is not user-facing per AGENTS.md "Build System" guidance.
       Verification: run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` locally with docker running; both smoke tests must pass. Push and confirm the new CI step turns green.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -208,4 +208,4 @@ tasks:
       - "`.github/workflows/test.yml` runs `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` on ubuntu-latest"
       - "Local run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` passes with docker running"
       - "PR CI shows the new `Docker smoke tests` check green"
-    completed_at: null
+    completed_at: 2026-05-17T10:30:00Z
