@@ -1,7 +1,7 @@
 feature: cli-131-auto-port-fallback
 prd: ./prd-cli-131-auto-port-fallback.md
 created_at: 2026-05-17T07:46:05Z
-updated_at: 2026-05-17T07:46:05Z
+updated_at: 2026-05-17T08:09:24Z
 
 tasks:
   - id: task-001
@@ -170,3 +170,42 @@ tasks:
       - "`make generate-check` shows no diff"
       - "`make license-check` exits 0"
     completed_at: 2026-05-17T10:05:00Z
+
+  - id: task-007
+    title: "Add real-docker port-fallback smoke test and wire smoke tag into CI"
+    description: |
+      Close the real-docker coverage gap surfaced during PR review: the
+      existing `TestSmoke_Lifecycle` in
+      `neo4j-cli/internal/subcommands/docker/smoke_test.go` allocates two
+      ephemeral free ports up front via `pickFreePort`, so it never exercises
+      the new fallback loop. Additionally, the `//go:build smoke` tag is not
+      wired into CI anywhere — smoke tests only run when a developer manually
+      passes `-tags=smoke` locally.
+      (a) Add `TestSmoke_PortFallback` to `smoke_test.go`:
+        - Skip on `exec.LookPath("docker")` miss like `TestSmoke_Lifecycle`.
+        - Pick a free port pair (`pickFreePort` ×2; assert distinct).
+        - Create container A on that pair via `runDockerSubcommand("create", ..., --bolt-port P, --http-port Q, --rw, --no-store-credential)`. Register cleanup.
+        - Create container B with the SAME `--bolt-port P --http-port Q` and a distinct name. Capture stderr. Register cleanup.
+        - Assert B's stderr contains `info: ports P/Q in use; using` and that the resolved pair is `(P+offset, Q+offset)` for some offset >= 1 with the same offset on both ports.
+        - Parse `get <B-name> --format json` and assert `bolt-port` / `http-port` match the resolved pair and `uri == neo4j://localhost:<resolved-bolt>`.
+        - (Optional) `exec.Command("docker", "inspect", ...)` to confirm container labels `org.neo4j.cli.bolt-port` / `org.neo4j.cli.http-port` carry the resolved values.
+      (b) Wire smoke tests into CI in `.github/workflows/test.yml`:
+        - Add a step `name: Docker smoke tests` AFTER the existing `Test` step.
+        - `if: matrix.os == 'ubuntu-latest'` (GH macOS / Windows runners don't ship docker).
+        - `run: go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...`
+        - Add a short comment block above the step explaining the gate, the ~30s first-pull cost, and that the test t.Skips when docker is missing.
+      (c) No changelog entry — internal CI/test wiring is not user-facing per AGENTS.md "Build System" guidance.
+      Verification: run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` locally with docker running; both smoke tests must pass. Push and confirm the new CI step turns green.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`TestSmoke_PortFallback` exists in `smoke_test.go` behind the same build tag and docker-LookPath skip"
+      - "Test creates A on a fixed pair, creates B requesting the same pair, asserts B lands on a higher pair with the same offset on both ports"
+      - "Test asserts the `info: ports A/B in use; using C/D (bolt/http)` substring appears in B's stderr"
+      - "Test asserts B's `get --format json` row shows the resolved bolt-port / http-port / uri"
+      - "`.github/workflows/test.yml` runs `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` on ubuntu-latest"
+      - "Local run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` passes with docker running"
+      - "PR CI shows the new `Docker smoke tests` check green"
+    completed_at: null
