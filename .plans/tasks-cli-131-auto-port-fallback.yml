@@ -27,7 +27,7 @@ tasks:
       in place AND IN FRONT OF the loop call.
       (g) Delete the now-unused `checkPortFree` helper (lines 498–505).
       See PRD REQ-F-001 through REQ-F-007, REQ-F-010, REQ-F-011.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`maxPortOffset = 100` constant exists with a comment referencing `maxNameSuffix`"
@@ -37,7 +37,7 @@ tasks:
       - "Stderr `info: ports A/B in use; using C/D (bolt/http)` line fires only when the resolved pair differs from the requested pair"
       - "`checkPortFree` is deleted; no callers remain"
       - "`go build ./...` succeeds"
-    completed_at: null
+    completed_at: 2026-05-17T08:00:00Z
 
   - id: task-002
     title: "Update existing port-preflight tests and add fallback tests in `create_test.go`"

@@ -38,6 +38,12 @@ var homeDirFn = os.UserHomeDir
 // surface that explicitly rather than spinning forever.
 const maxNameSuffix = 99
 
+// maxPortOffset caps the port-pair fallback walk (REQ-F-002). Parity with
+// `maxNameSuffix=99`: 100 offsets (0..99) is enough headroom for everyday
+// collisions but not so high that exhaustion silently hides a deeper bug
+// (e.g. stale containers piling up on the host).
+const maxPortOffset = 100
+
 // clientFactory is the injectable seam for the dockerClient used by leaves.
 // Production wires the exec-backed client (client.go newClient); tests swap
 // in a fakeDockerClient (helpers_test.go) without touching the leaf code.
@@ -198,19 +204,24 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				}
 			}
 
-			// Port-conflict pre-flight (REQ-F-013). Run BEFORE any docker
-			// side effect so a port clash never leaves a half-created
-			// container behind. Equal-ports check fires first so we don't
-			// confusingly succeed on the first Listen and then fail on the
-			// second with the same port number in both error messages.
+			// Port-conflict pre-flight (REQ-F-013, REQ-F-001..007). Run BEFORE
+			// any docker side effect so a port clash never leaves a half-
+			// created container behind. Equal-ports check fires first so we
+			// don't confusingly walk the loop with a pair that can never be
+			// valid. On clash we auto-increment BOTH ports by the same
+			// offset (up to maxPortOffset) so the bolt/http delta the
+			// operator picked is preserved.
 			if boltPort == httpPort {
 				return clierr.NewUsageError("--%s and --%s must be different (got %d for both)", boltPortFlag, httpPortFlag, boltPort)
 			}
-			if err := checkPortFree(boltPort, boltPortFlag); err != nil {
+			reqBoltPort, reqHTTPPort := boltPort, httpPort
+			resolvedBolt, resolvedHTTP, err := findFreePortPair(reqBoltPort, reqHTTPPort)
+			if err != nil {
 				return err
 			}
-			if err := checkPortFree(httpPort, httpPortFlag); err != nil {
-				return err
+			boltPort, httpPort = resolvedBolt, resolvedHTTP
+			if boltPort != reqBoltPort || httpPort != reqHTTPPort {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "info: ports %d/%d in use; using %d/%d (bolt/http)\n", reqBoltPort, reqHTTPPort, boltPort, httpPort)
 			}
 
 			// Name-collision pre-flight (REQ-F-014). Enumerate ALL container
@@ -490,18 +501,39 @@ func (s singleRow) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.AsArray())
 }
 
-// checkPortFree binds and immediately releases a TCP listener on the given
-// host port via the listenerFactory seam. On bind failure it returns a
-// usage error naming both the port and the flag the operator can override
-// (REQ-F-013). On success the listener is closed before returning so the
-// real `docker run` call can claim the port a moment later.
-func checkPortFree(port int, flagName string) error {
+// portFree binds and immediately releases a TCP listener on the given host
+// port via the listenerFactory seam. Returns true when the port is free
+// (i.e. the listener bound successfully); false otherwise. On success the
+// listener is closed before returning so the real `docker run` call can
+// claim the port a moment later.
+func portFree(port int) bool {
 	ln, err := listenerFactory(port)
 	if err != nil {
-		return clierr.NewUsageError("port %d is in use on the host. Pass --%s <other> to pick a free port.", port, flagName)
+		return false
 	}
 	_ = ln.Close()
-	return nil
+	return true
+}
+
+// findFreePortPair walks the port-pair fallback loop (REQ-F-001..007).
+// Starting from (boltStart, httpStart) it tries offsets 0..maxPortOffset-1,
+// returning the first pair where BOTH ports bind successfully. The same
+// offset is applied to both ports so the operator's bolt/http delta is
+// preserved across the fallback. On exhaustion a clierr.UsageError points
+// the operator at --bolt-port / --http-port so they can pin a free pair
+// explicitly.
+func findFreePortPair(boltStart, httpStart int) (int, int, error) {
+	for offset := 0; offset < maxPortOffset; offset++ {
+		bolt := boltStart + offset
+		http := httpStart + offset
+		if portFree(bolt) && portFree(http) {
+			return bolt, http, nil
+		}
+	}
+	return 0, 0, clierr.NewUsageError(
+		"could not find a free port pair starting at %d/%d after %d attempts; pass --bolt-port / --http-port",
+		boltStart, httpStart, maxPortOffset,
+	)
 }
 
 // resolveContainerName implements the REQ-F-014 name-collision contract.

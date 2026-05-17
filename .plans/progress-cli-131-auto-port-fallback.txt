@@ -1,0 +1,3 @@
+## task-001 — 2026-05-17T08:00:00Z
+Replaced `checkPortFree` with `portFree` + `findFreePortPair` walking offsets 0..99 over both ports; on resolution-diff emit `info: ports A/B in use; using C/D (bolt/http)` on stderr. Equal-ports guard kept in front of the loop.
+Files: ~neo4j-cli/internal/subcommands/docker/create.go
