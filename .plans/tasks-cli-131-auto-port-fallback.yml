@@ -65,7 +65,7 @@ tasks:
       free; assert no `info: ports` substring appears on stderr.
       All new tests must use the existing `stubListenerFactory` seam (lines 55–77).
       See PRD REQ-F-040 through REQ-F-045.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -76,7 +76,7 @@ tasks:
       - "`TestCreate_AutoPortFallback_NoNarrationOnHappyPath` greps stderr for the `info: ports` substring and asserts it is absent"
       - "All tests use `stubListenerFactory`; no new listener seam is introduced"
       - "`go test ./neo4j-cli/internal/subcommands/docker/...` passes"
-    completed_at: null
+    completed_at: 2026-05-17T08:30:00Z
 
   - id: task-003
     title: "Update flag help and cobra Long for `docker create`"

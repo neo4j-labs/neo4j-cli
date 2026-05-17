@@ -111,6 +111,16 @@ func shlexQuote(s string) string {
 // without ever opening a real socket.
 func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int) (*fakeDockerClient, *clicfg.Config, string, error) {
 	t.Helper()
+	fake, cfg, stdout, _, err := runCreateWithOccupiedPortsAndStderr(t, args, occupiedPorts...)
+	return fake, cfg, stdout, err
+}
+
+// runCreateWithOccupiedPortsAndStderr mirrors runCreateWithOccupiedPorts but
+// additionally surfaces stderr. The port-fallback path narrates the resolved
+// pair on stderr (REQ-F-004), so any test that asserts that narration — or
+// its absence on the happy path — needs the stderr buffer.
+func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPorts ...int) (*fakeDockerClient, *clicfg.Config, string, string, error) {
+	t.Helper()
 
 	fs, err := testfs.GetTestFs(`{}`, `{
 		"dbms": {"credentials": [], "default-credential": ""},
@@ -139,7 +149,7 @@ func runCreateWithOccupiedPorts(t *testing.T, args string, occupiedPorts ...int)
 	cmd.SetArgs(append([]string{"create"}, argv...))
 
 	execErr := cmd.Execute()
-	return fake, cfg, out.String(), execErr
+	return fake, cfg, out.String(), errBuf.String(), execErr
 }
 
 // runArgv returns the recorded argv from the fake client's first Run call.
@@ -336,37 +346,52 @@ func TestCreate_InvalidEdition_ReturnsUsageError(t *testing.T) {
 }
 
 func TestCreate_PortPreflight(t *testing.T) {
+	// REQ-F-001..007: when the requested bolt/http pair is taken, BOTH ports
+	// are auto-incremented by the same offset until a free pair is found.
+	// Each subtest asserts either the fallback shape (resolved pair, stderr
+	// info: line, argv reflects resolved ports) OR the equal-ports guard
+	// (still a usage error BEFORE any Listen probes).
 	tests := []struct {
-		name            string
-		args            string
-		occupied        []int
+		name     string
+		args     string
+		occupied []int
+		// fallback-shape fields. wantBolt / wantHTTP are the expected resolved
+		// pair (0 means "no fallback expected; defaults applied"). wantInfoSub
+		// is the substring expected on stderr — empty means the info: line
+		// MUST NOT fire (happy path).
+		wantBolt    int
+		wantHTTP    int
+		wantInfoSub string
+		// error-shape fields. wantErr=true skips the fallback assertions and
+		// instead asserts the error message contains each substring.
 		wantErr         bool
 		wantErrContains []string
 		// wantRun is the expected number of recorded docker run invocations.
-		// All conflict cases must be 0 — pre-flight runs BEFORE any docker
-		// side effect (REQ-F-013).
 		wantRun int
 	}{
 		{
-			name:    "both ports free succeeds",
-			args:    "--name dev --no-store-credential",
+			name:     "both ports free succeeds",
+			args:     "--name dev --no-store-credential",
+			wantBolt: 7687, wantHTTP: 7474,
 			wantRun: 1,
 		},
 		{
-			name:            "bolt port occupied surfaces --bolt-port hint",
-			args:            "--name dev --no-store-credential",
-			occupied:        []int{7687},
-			wantErr:         true,
-			wantErrContains: []string{"port 7687", "--bolt-port"},
-			wantRun:         0,
+			name:     "bolt port occupied surfaces --bolt-port hint",
+			args:     "--name dev --no-store-credential",
+			occupied: []int{7687},
+			// REQ-F-002/003: same offset on both, default start (7687/7474) →
+			// offset=1 lands on (7688, 7475).
+			wantBolt: 7688, wantHTTP: 7475,
+			wantInfoSub: "info: ports 7687/7474 in use; using 7688/7475 (bolt/http)",
+			wantRun:     1,
 		},
 		{
-			name:            "http port occupied surfaces --http-port hint",
-			args:            "--name dev --no-store-credential",
-			occupied:        []int{7474},
-			wantErr:         true,
-			wantErrContains: []string{"port 7474", "--http-port"},
-			wantRun:         0,
+			name:     "http port occupied surfaces --http-port hint",
+			args:     "--name dev --no-store-credential",
+			occupied: []int{7474},
+			wantBolt: 7688, wantHTTP: 7475,
+			wantInfoSub: "info: ports 7687/7474 in use; using 7688/7475 (bolt/http)",
+			wantRun:     1,
 		},
 		{
 			name:            "equal ports rejected before any Listen",
@@ -376,18 +401,20 @@ func TestCreate_PortPreflight(t *testing.T) {
 			wantRun:         0,
 		},
 		{
-			name:            "custom bolt port occupied is named correctly",
-			args:            "--name dev --bolt-port 9999 --http-port 9000 --no-store-credential",
-			occupied:        []int{9999},
-			wantErr:         true,
-			wantErrContains: []string{"port 9999", "--bolt-port"},
-			wantRun:         0,
+			name:     "custom bolt port occupied is named correctly",
+			args:     "--name dev --bolt-port 9999 --http-port 9000 --no-store-credential",
+			occupied: []int{9999},
+			// User-supplied start (9999/9000) with 9999 busy → fallback to
+			// (10000, 9001), preserving the operator's bolt/http delta.
+			wantBolt: 10000, wantHTTP: 9001,
+			wantInfoSub: "info: ports 9999/9000 in use; using 10000/9001 (bolt/http)",
+			wantRun:     1,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fake, _, _, err := runCreateWithOccupiedPorts(t, tc.args, tc.occupied...)
+			fake, _, _, stderr, err := runCreateWithOccupiedPortsAndStderr(t, tc.args, tc.occupied...)
 			if tc.wantErr {
 				require.Error(t, err)
 				for _, sub := range tc.wantErrContains {
@@ -395,6 +422,19 @@ func TestCreate_PortPreflight(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				if tc.wantInfoSub == "" {
+					assert.NotContains(t, stderr, "info: ports",
+						"happy path must not narrate a port fallback: %q", stderr)
+				} else {
+					assert.Contains(t, stderr, tc.wantInfoSub)
+				}
+				if tc.wantRun > 0 {
+					argv := runArgv(t, fake)
+					assert.True(t, containsPair(argv, "-p", fmt.Sprintf("%d:7687", tc.wantBolt)),
+						"argv missing -p %d:7687: %v", tc.wantBolt, argv)
+					assert.True(t, containsPair(argv, "-p", fmt.Sprintf("%d:7474", tc.wantHTTP)),
+						"argv missing -p %d:7474: %v", tc.wantHTTP, argv)
+				}
 			}
 			assert.Len(t, fake.RunCalls, tc.wantRun)
 		})
@@ -427,6 +467,84 @@ func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 	require.Equal(t, []int{7688, 7475}, *probed, "pre-flight must probe --bolt-port then --http-port")
 	require.Len(t, fake.RunCalls, 1, "docker run must execute exactly once after a clean pre-flight")
+}
+
+// TestCreate_AutoPortFallback_DefaultsTaken — REQ-F-001..004. Both defaults
+// (7687/7474) are busy; the loop advances by offset=1, lands on (7688/7475),
+// emits the documented info: line on stderr, and the resolved pair flows
+// through to argv and the rendered output row.
+func TestCreate_AutoPortFallback_DefaultsTaken(t *testing.T) {
+	fake, _, stdout, stderr, err := runCreateWithOccupiedPortsAndStderr(t,
+		"--name dev --no-store-credential --format json", 7687, 7474)
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr, "info: ports 7687/7474 in use; using 7688/7475 (bolt/http)")
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "-p", "7475:7474"), "argv missing HTTP -p mapping: %v", argv)
+	assert.True(t, containsPair(argv, "-p", "7688:7687"), "argv missing Bolt -p mapping: %v", argv)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.EqualValues(t, 7688, rows[0]["bolt-port"])
+	assert.EqualValues(t, 7475, rows[0]["http-port"])
+	assert.Equal(t, "neo4j://localhost:7688", rows[0]["uri"])
+}
+
+// TestCreate_AutoPortFallback_PreservesOffset — REQ-F-003. Both ports get
+// the same offset applied, so the operator's bolt/http delta survives the
+// fallback. Here --bolt-port 8000 (busy) and --http-port 9000 (free) must
+// still both advance by 1 to (8001, 9001), NOT just bolt.
+func TestCreate_AutoPortFallback_PreservesOffset(t *testing.T) {
+	fake, _, stdout, stderr, err := runCreateWithOccupiedPortsAndStderr(t,
+		"--name dev --no-store-credential --bolt-port 8000 --http-port 9000 --format json", 8000)
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr, "info: ports 8000/9000 in use; using 8001/9001 (bolt/http)")
+
+	argv := runArgv(t, fake)
+	assert.True(t, containsPair(argv, "-p", "8001:7687"), "argv missing Bolt -p mapping: %v", argv)
+	assert.True(t, containsPair(argv, "-p", "9001:7474"), "argv missing HTTP -p mapping: %v", argv)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.EqualValues(t, 8001, rows[0]["bolt-port"])
+	assert.EqualValues(t, 9001, rows[0]["http-port"])
+}
+
+// TestCreate_AutoPortFallback_Exhausted — REQ-F-005..007. The loop caps at
+// maxPortOffset=100 attempts; when every port in [7687, 7786] AND
+// [7474, 7573] is busy, no offset 0..99 produces a free pair. The error
+// must name the requested start pair, the cap, and the flag hints — and
+// docker run must NOT be invoked.
+func TestCreate_AutoPortFallback_Exhausted(t *testing.T) {
+	occupied := make([]int, 0, 2*maxPortOffset)
+	for i := 0; i < maxPortOffset; i++ {
+		occupied = append(occupied, 7687+i)
+		occupied = append(occupied, 7474+i)
+	}
+	fake, _, _, _, err := runCreateWithOccupiedPortsAndStderr(t,
+		"--name dev --no-store-credential", occupied...)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "7687/7474", "error must name the requested start pair: %s", msg)
+	assert.Contains(t, msg, "100", "error must name the attempt cap: %s", msg)
+	assert.Contains(t, msg, "--bolt-port")
+	assert.Contains(t, msg, "--http-port")
+	assert.Empty(t, fake.RunCalls, "docker run must NOT execute when the fallback loop exhausts")
+}
+
+// TestCreate_AutoPortFallback_NoNarrationOnHappyPath — REQ-F-004. On a
+// no-conflict invocation the info: line MUST stay silent so we don't
+// pollute normal output with diagnostics.
+func TestCreate_AutoPortFallback_NoNarrationOnHappyPath(t *testing.T) {
+	_, _, _, stderr, err := runCreateWithOccupiedPortsAndStderr(t,
+		"--name dev --no-store-credential")
+	require.NoError(t, err)
+	assert.NotContains(t, stderr, "info: ports",
+		"happy-path stderr must not narrate any port fallback: %q", stderr)
 }
 
 // runCreateWithSeed is the same as runCreateWithOccupiedPorts but lets the
