@@ -18,6 +18,8 @@ func TestGetInstance(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
@@ -36,7 +38,7 @@ func TestGetInstance(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -49,10 +51,10 @@ func TestGetInstance(t *testing.T) {
 		"memory": "8GB",
 		"metrics_integration_url": "YOUR_METRICS_INTEGRATION_ENDPOINT",
 		"name": "Production",
+		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
 		"status": "running",
 		"storage": "16GB",
-		"tenant_id": "YOUR_TENANT_ID",
 		"type": "enterprise-db"
 	  }
 	}`)
@@ -62,6 +64,8 @@ func TestGetInstanceWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
@@ -80,7 +84,7 @@ func TestGetInstanceWithTrailingNewline(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s\"\n\"", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s\"\n\" --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -93,10 +97,10 @@ func TestGetInstanceWithTrailingNewline(t *testing.T) {
 		"memory": "8GB",
 		"metrics_integration_url": "YOUR_METRICS_INTEGRATION_ENDPOINT",
 		"name": "Production",
+		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
 		"status": "running",
 		"storage": "16GB",
-		"tenant_id": "YOUR_TENANT_ID",
 		"type": "enterprise-db"
 	  }
 	}`)
@@ -106,6 +110,8 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
@@ -113,7 +119,7 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 				"id": "2f49c2b3",
 				"name": "Production",
 				"status": "running",
-				"project_id": "YOUR_PROJECT_ID",
+				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"connection_url": "YOUR_CONNECTION_URL",
 				"metrics_integration_url": "YOUR_METRICS_INTEGRATION_ENDPOINT",
@@ -126,17 +132,17 @@ func TestGetEnterpriseInstanceWithTableOutput(t *testing.T) {
 
 	helper.SetConfigValue("format", "table")
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOut(`
-┌──────────┬────────────┬─────────────────┬─────────┬─────────────────────┬────────────────┬──────────────┬───────────────┬────────┬─────────┬─────────────────────────┬───────────────────────────────────┐
-│ ID       │ NAME       │ PROJECT_ID      │ STATUS  │ CONNECTION_URL      │ CLOUD_PROVIDER │ REGION       │ TYPE          │ MEMORY │ STORAGE │ CUSTOMER_MANAGED_KEY_ID │ METRICS_INTEGRATION_URL           │
-├──────────┼────────────┼─────────────────┼─────────┼─────────────────────┼────────────────┼──────────────┼───────────────┼────────┼─────────┼─────────────────────────┼───────────────────────────────────┤
-│ 2f49c2b3 │ Production │ YOUR_PROJECT_ID │ running │ YOUR_CONNECTION_URL │ gcp            │ europe-west1 │ enterprise-db │ 8GB    │ 16GB    │                         │ YOUR_METRICS_INTEGRATION_ENDPOINT │
-└──────────┴────────────┴─────────────────┴─────────┴─────────────────────┴────────────────┴──────────────┴───────────────┴────────┴─────────┴─────────────────────────┴───────────────────────────────────┘
+┌──────────┬────────────┬────────────────┬─────────┬─────────────────────┬────────────────┬──────────────┬───────────────┬────────┬─────────┬─────────────────────────┬───────────────────────────────────┐
+│ ID       │ NAME       │ PROJECT_ID     │ STATUS  │ CONNECTION_URL      │ CLOUD_PROVIDER │ REGION       │ TYPE          │ MEMORY │ STORAGE │ CUSTOMER_MANAGED_KEY_ID │ METRICS_INTEGRATION_URL           │
+├──────────┼────────────┼────────────────┼─────────┼─────────────────────┼────────────────┼──────────────┼───────────────┼────────┼─────────┼─────────────────────────┼───────────────────────────────────┤
+│ 2f49c2b3 │ Production │ YOUR_TENANT_ID │ running │ YOUR_CONNECTION_URL │ gcp            │ europe-west1 │ enterprise-db │ 8GB    │ 16GB    │                         │ YOUR_METRICS_INTEGRATION_ENDPOINT │
+└──────────┴────────────┴────────────────┴─────────┴─────────────────────┴────────────────┴──────────────┴───────────────┴────────┴─────────┴─────────────────────────┴───────────────────────────────────┘
 `)
 
 }
@@ -145,6 +151,8 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
@@ -152,7 +160,7 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 				"id": "2f49c2b3",
 				"name": "Production",
 				"status": "running",
-				"project_id": "YOUR_PROJECT_ID",
+				"tenant_id": "YOUR_TENANT_ID",
 				"cloud_provider": "gcp",
 				"connection_url": "YOUR_CONNECTION_URL",
 				"region": "europe-west1",
@@ -164,24 +172,125 @@ func TestGetProfessionalInstanceWithTableOutput(t *testing.T) {
 
 	helper.SetConfigValue("format", "table")
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOut(`
-┌──────────┬────────────┬─────────────────┬─────────┬─────────────────────┬────────────────┬──────────────┬─────────────────┬────────┬─────────┬─────────────────────────┐
-│ ID       │ NAME       │ PROJECT_ID      │ STATUS  │ CONNECTION_URL      │ CLOUD_PROVIDER │ REGION       │ TYPE            │ MEMORY │ STORAGE │ CUSTOMER_MANAGED_KEY_ID │
-├──────────┼────────────┼─────────────────┼─────────┼─────────────────────┼────────────────┼──────────────┼─────────────────┼────────┼─────────┼─────────────────────────┤
-│ 2f49c2b3 │ Production │ YOUR_PROJECT_ID │ running │ YOUR_CONNECTION_URL │ gcp            │ europe-west1 │ professional-db │ 8GB    │ 16GB    │                         │
-└──────────┴────────────┴─────────────────┴─────────┴─────────────────────┴────────────────┴──────────────┴─────────────────┴────────┴─────────┴─────────────────────────┘
+┌──────────┬────────────┬────────────────┬─────────┬─────────────────────┬────────────────┬──────────────┬─────────────────┬────────┬─────────┬─────────────────────────┐
+│ ID       │ NAME       │ PROJECT_ID     │ STATUS  │ CONNECTION_URL      │ CLOUD_PROVIDER │ REGION       │ TYPE            │ MEMORY │ STORAGE │ CUSTOMER_MANAGED_KEY_ID │
+├──────────┼────────────┼────────────────┼─────────┼─────────────────────┼────────────────┼──────────────┼─────────────────┼────────┼─────────┼─────────────────────────┤
+│ 2f49c2b3 │ Production │ YOUR_TENANT_ID │ running │ YOUR_CONNECTION_URL │ gcp            │ europe-west1 │ professional-db │ 8GB    │ 16GB    │                         │
+└──────────┴────────────┴────────────────┴─────────┴─────────────────────┴────────────────┴──────────────┴─────────────────┴────────┴─────────┴─────────────────────────┘
 `)
 
+}
+
+func TestGetInstanceWithDefaultWorkspace(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetDefaultProjectInConfig(testListOrgID, testListProjectID)
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+			"data": {
+				"id": "2f49c2b3",
+				"name": "Production",
+				"status": "running",
+				"tenant_id": "YOUR_TENANT_ID",
+				"cloud_provider": "gcp",
+				"connection_url": "YOUR_CONNECTION_URL",
+				"region": "europe-west1",
+				"type": "enterprise-db",
+				"memory": "8GB",
+				"storage": "16GB"
+			}
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AsssertOk()
+}
+
+func TestGetInstanceMissingOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	instanceId := "2f49c2b3"
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+
+	helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+}
+
+func TestGetInstanceMissingProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	instanceId := "2f49c2b3"
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s", instanceId, testListOrgID))
+
+	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+}
+
+func TestGetInstanceProjectNotInOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock(
+		"/v2beta1/organizations/"+testListOrgID+"/projects",
+		http.StatusOK,
+		`{"data": []}`,
+	)
+
+	instanceId := "2f49c2b3"
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id unknown-project", instanceId, testListOrgID))
+
+	helper.AssertErr("Error: could not find project unknown-project in organization " + testListOrgID)
+}
+
+func TestGetInstanceNotInProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+	otherProject := "other-project-id"
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+			"data": {
+				"id": "2f49c2b3",
+				"name": "Production",
+				"status": "running",
+				"tenant_id": "other-project-id",
+				"cloud_provider": "gcp",
+				"connection_url": "YOUR_CONNECTION_URL",
+				"region": "europe-west1",
+				"type": "enterprise-db",
+				"memory": "8GB",
+				"storage": "16GB"
+			}
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
+
+	_ = otherProject
+	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
 }
 
 func TestGetInstanceNotFoundError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
+
+	registerProjectsMock(&helper)
 
 	instanceId := "2f49c2b3"
 
@@ -194,7 +303,7 @@ func TestGetInstanceNotFoundError(t *testing.T) {
 		]
 	}`, instanceId))
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -226,6 +335,8 @@ func TestUnauthorizedAccessTokenRefresh(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
+			registerProjectsMock(&helper)
+
 			instanceId := "2f49c2b3"
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), statusCode, `{
@@ -238,7 +349,7 @@ func TestUnauthorizedAccessTokenRefresh(t *testing.T) {
 				]
 			}`)
 
-			helper.ExecuteCommand(fmt.Sprintf("instance get %s", instanceId))
+			helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodGet)

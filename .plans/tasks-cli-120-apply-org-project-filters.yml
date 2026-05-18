@@ -96,7 +96,7 @@ tasks:
       For mutating commands (delete, update, pause, resume), this ownership check must complete
       successfully before the mutating API call is issued. Apply `RenameResponseField` to any
       responses surfaced to the user and update field lists. Add or update colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -106,7 +106,7 @@ tasks:
       - "Failure message is 'could not find instance {id} in project {projectID}'"
       - "Output shows `project_id` instead of `tenant_id` in all formats"
       - "Table-driven tests cover happy path, missing org/project, project-not-in-org, and resource-not-in-tenant"
-    completed_at: null
+    completed_at: "2026-05-18T04:00:00Z"
 
   - id: task-006
     title: "Apply org/project enforcement to instance snapshot commands"
