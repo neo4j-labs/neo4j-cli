@@ -1,0 +1,136 @@
+feature: unknown-subcommand-exits-2
+prd: ./prd-unknown-subcommand-exits-2.md
+created_at: 2026-05-18T16:00:00Z
+updated_at: 2026-05-18T16:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Wrap SuggestSubcommand error as clierr.NewUsageError (exit 2)"
+    description: |
+      Change the single behavioural defect: `common/clicmd/suggest.go:42` currently
+      returns `fmt.Errorf(...)`, an untyped error that `neo4j-cli/main.go:exitCodeFor`
+      maps to exit 1 (or 0 when cobra intercepts). Replace with
+      `clierr.NewUsageError(...)` preserving the exact existing message format
+      (`unknown command %q for %q%s` with the `suggestionsSuffix(...)` block).
+      Add `"github.com/neo4j/cli/common/clierr"` to imports; keep `"fmt"` (still
+      used by `suggestionsSuffix`'s `fmt.Fprintf`). Update the doc comment on
+      `SuggestSubcommand` (lines 21-37) to state the returned error is a
+      `*clierr.CLIError` with exit code 2. Extend `common/clicmd/suggest_test.go`
+      tests (`TestSuggestSubcommand_UnknownReturnsWrappedError`,
+      `TestApplySuggestionsToParents_RecursesDepth2AndBeyond`) so every
+      error-returning assertion also checks `errors.As(err, &ce)` with
+      `ce.Code == 2`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`common/clicmd/suggest.go:42` calls `clierr.NewUsageError(...)` and no longer calls `fmt.Errorf` on that line"
+      - "Existing message format `unknown command %q for %q<suffix>` is preserved verbatim"
+      - "`SuggestSubcommand` still returns `nil` when `len(args) == 0`"
+      - "Unit tests in `common/clicmd/suggest_test.go` assert the returned error is a `*clierr.CLIError` with `Code == 2`"
+      - "`make fmt-check && make lint && go test ./common/clicmd/...` clean"
+    completed_at: null
+
+  - id: task-002
+    title: "Extend TestSuggestionsForTypos to cover depth-2 + depth-4 and assert exit 2"
+    description: |
+      Extend `neo4j-cli/app/app_suggest_test.go` `TestSuggestionsForTypos`
+      (lines 21-94) to lock the exit-code contract at every nesting level via
+      the live `app.NewCmd(cfg)` tree. Two new table rows: `["aura", "foo"]`
+      (depth 2 — direct aura parent typo, not currently covered) and
+      `["aura", "instance", "snapshot", "foo"]` (depth 4 — nested-parent typo,
+      not currently covered). Existing rows (`configg list`, `updaet`,
+      `config lsit`, `aura insance list`, `credential aura-clent add`) stay.
+      Add an `errors.As(execErr, &ce)` + `assert.Equal(t, 2, ce.Code)`
+      assertion that runs for every row.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`TestSuggestionsForTypos` table includes a row exercising `[\"aura\", \"foo\"]` (depth 2)"
+      - "`TestSuggestionsForTypos` table includes a row exercising `[\"aura\", \"instance\", \"snapshot\", \"foo\"]` (depth 4)"
+      - "Every row asserts the returned `execErr` unwraps via `errors.As` to `*clierr.CLIError` with `Code == 2`"
+      - "Existing rows (depths 1, 2, 3) and existing assertions still pass"
+      - "`TestSuggestionsDoNotShadowRunnableCommands` still passes (no regression on runnable parents)"
+      - "`go test ./neo4j-cli/app/...` clean"
+    completed_at: null
+
+  - id: task-003
+    title: "Add unknown_subcommand_usage_2 e2e scenario to TestExitCodes"
+    description: |
+      Lock the `os.Exit` wiring end-to-end via the real binary subprocess (the
+      in-process tests in `app_suggest_test.go` only check `cmd.Execute()`'s
+      return value, not the actual process exit). Add a scenario to the
+      `TestExitCodes` table in `test/e2e/exitcodes/exitcodes_test.go:271`:
+
+        {
+            name:       "unknown_subcommand_usage_2",
+            args:       []string{"aura", "instance", "lis"},
+            wantExit:   2,
+            skipServer: true,
+        },
+
+      This complements the existing `bad_flag_usage_2` row by covering the
+      unknown-subcommand path through the same exit-code wiring.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`TestExitCodes` scenarios table includes the `unknown_subcommand_usage_2` entry with `wantExit: 2` and `skipServer: true`"
+      - "Args slice is `[\"aura\", \"instance\", \"lis\"]` (the canonical CLI-141 repro)"
+      - "`go test ./test/e2e/exitcodes/...` clean"
+    completed_at: null
+
+  - id: task-004
+    title: "Add Patch changelog entry"
+    description: |
+      User-facing exit-code change requires a changelog entry per AGENTS.md.
+      Run:
+
+        changie new --projects neo4j-cli --kind Patch \
+          --body "Unknown subcommands now exit 2 (usage_error) at every nesting level instead of falling through to a help dump with the wrong exit code."
+
+      Verify the resulting YAML file lands under `.changes/unreleased/` with
+      filename `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` and contains the
+      `project: neo4j-cli`, `kind: Patch`, `body: <text>`, `time: <RFC3339>`
+      fields. If changie isn't installed locally, hand-author the file per
+      AGENTS.md "Changie Notes".
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "One new YAML file under `.changes/unreleased/` named `neo4j-cli-Patch-*.yaml`"
+      - "The file's `project` field is `neo4j-cli`, `kind` is `Patch`"
+      - "The `body` mentions the exit-code change (exit 2 / usage_error)"
+      - "`time` field is a valid RFC3339 timestamp"
+    completed_at: null
+
+  - id: task-005
+    title: "Run full local gates and manual smoke"
+    description: |
+      Final verification gate. Run the full local CI-equivalent suite and
+      manually verify every nesting level exits 2.
+
+      Gates: `make fmt-check`, `make lint`, `make test`.
+
+      Manual smoke (each must exit 2):
+        go run ./neo4j-cli configg                          ; echo $?
+        go run ./neo4j-cli aura foo                         ; echo $?
+        go run ./neo4j-cli aura instance lis                ; echo $?
+        go run ./neo4j-cli aura instance snapshot foo       ; echo $?
+
+      Regression smoke (each must exit 0 and print help):
+        go run ./neo4j-cli aura --help
+        go run ./neo4j-cli aura instance --help
+        go run ./neo4j-cli aura instance snapshot --help
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make fmt-check` passes"
+      - "`make lint` passes"
+      - "`make test` passes"
+      - "All four manual exit-2 smoke commands exit with code 2"
+      - "All three manual help-smoke commands exit with code 0 and print help"
+    completed_at: null
