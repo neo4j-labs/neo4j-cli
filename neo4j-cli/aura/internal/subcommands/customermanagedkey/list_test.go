@@ -16,6 +16,8 @@ func TestListCustomerManagedKeys(t *testing.T) {
 		helper := testutils.NewAuraTestHelper(t)
 		defer helper.Close()
 
+		registerProjectsMock(&helper)
+
 		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{
 		"data": [
 			{
@@ -26,6 +28,48 @@ func TestListCustomerManagedKeys(t *testing.T) {
 			{
 				"id": "0d971cc4-f703-40fd-8c5c-f5ec134f6c84",
 				"name": "Dev Key",
+				"tenant_id": "YOUR_TENANT_ID"
+			}
+		]
+		}`)
+
+		helper.ExecuteCommand(fmt.Sprintf("%s list --organization-id %s --project-id %s", command, testOrgID, testProjectID))
+
+		mockHandler.AssertCalledTimes(1)
+		mockHandler.AssertCalledWithMethod(http.MethodGet)
+		mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
+
+		helper.AssertOutJson(`{
+			"data": [
+				{
+					"id": "f15cc45b-1c29-44e8-911f-3ba719f70ed7",
+					"name": "Production Key",
+					"project_id": "YOUR_TENANT_ID"
+				},
+				{
+					"id": "0d971cc4-f703-40fd-8c5c-f5ec134f6c84",
+					"name": "Dev Key",
+					"project_id": "YOUR_TENANT_ID"
+				}
+			]
+		}
+		`)
+	}
+}
+
+func TestListCustomerManagedKeysWithDefaultWorkspace(t *testing.T) {
+	for _, command := range []string{"customer-managed-key", "cmk"} {
+		helper := testutils.NewAuraTestHelper(t)
+		defer helper.Close()
+
+		helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
+		registerProjectsMock(&helper)
+
+		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{
+		"data": [
+			{
+				"id": "f15cc45b-1c29-44e8-911f-3ba719f70ed7",
+				"name": "Production Key",
 				"tenant_id": "YOUR_TENANT_ID"
 			}
 		]
@@ -35,66 +79,65 @@ func TestListCustomerManagedKeys(t *testing.T) {
 
 		mockHandler.AssertCalledTimes(1)
 		mockHandler.AssertCalledWithMethod(http.MethodGet)
+		mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 
 		helper.AssertOutJson(`{
 			"data": [
 				{
 					"id": "f15cc45b-1c29-44e8-911f-3ba719f70ed7",
 					"name": "Production Key",
-					"tenant_id": "YOUR_TENANT_ID"
-				},
-				{
-					"id": "0d971cc4-f703-40fd-8c5c-f5ec134f6c84",
-					"name": "Dev Key",
-					"tenant_id": "YOUR_TENANT_ID"
+					"project_id": "YOUR_TENANT_ID"
 				}
 			]
-		}
-		`)
+		}`)
 	}
 }
 
-func TestListCustomerManagedKeysWithTenantId(t *testing.T) {
+func TestListCustomerManagedKeysMissingOrg(t *testing.T) {
 	for _, command := range []string{"customer-managed-key", "cmk"} {
 		helper := testutils.NewAuraTestHelper(t)
 		defer helper.Close()
 
-		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{
-		"data": [
-			{
-				"id": "f15cc45b-1c29-44e8-911f-3ba719f70ed7",
-				"name": "Production Key",
-				"tenant_id": "YOUR_TENANT_ID"
-			},
-			{
-				"id": "0d971cc4-f703-40fd-8c5c-f5ec134f6c84",
-				"name": "Dev Key",
-				"tenant_id": "YOUR_TENANT_ID"
-			}
-		]
-		}`)
+		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{"data": []}`)
 
-		helper.ExecuteCommand(fmt.Sprintf("%s list --tenant-id 1234", command))
+		helper.ExecuteCommand(fmt.Sprintf("%s list", command))
 
-		mockHandler.AssertCalledTimes(1)
-		mockHandler.AssertCalledWithMethod(http.MethodGet)
-		mockHandler.AssertCalledWithQueryParam("tenantId", "1234")
+		mockHandler.AssertCalledTimes(0)
+		helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+	}
+}
 
-		helper.AssertOutJson(`{
-			"data": [
-				{
-					"id": "f15cc45b-1c29-44e8-911f-3ba719f70ed7",
-					"name": "Production Key",
-					"tenant_id": "YOUR_TENANT_ID"
-				},
-				{
-					"id": "0d971cc4-f703-40fd-8c5c-f5ec134f6c84",
-					"name": "Dev Key",
-					"tenant_id": "YOUR_TENANT_ID"
-				}
-			]
-		}
-		`)
+func TestListCustomerManagedKeysMissingProject(t *testing.T) {
+	for _, command := range []string{"customer-managed-key", "cmk"} {
+		helper := testutils.NewAuraTestHelper(t)
+		defer helper.Close()
+
+		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{"data": []}`)
+
+		helper.ExecuteCommand(fmt.Sprintf("%s list --organization-id %s", command, testOrgID))
+
+		mockHandler.AssertCalledTimes(0)
+		helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+	}
+}
+
+func TestListCustomerManagedKeysProjectNotInOrg(t *testing.T) {
+	for _, command := range []string{"customer-managed-key", "cmk"} {
+		helper := testutils.NewAuraTestHelper(t)
+		defer helper.Close()
+
+		helper.NewRequestHandlerMock(
+			"/v2beta1/organizations/"+testOrgID+"/projects",
+			http.StatusOK,
+			`{"data": []}`,
+		)
+
+		mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{"data": []}`)
+
+		helper.ExecuteCommand(fmt.Sprintf("%s list --organization-id %s --project-id unknown-project", command, testOrgID))
+
+		mockHandler.AssertCalledTimes(0)
+		helper.AssertErr("Error: could not find project unknown-project in organization " + testOrgID)
 	}
 }
 
@@ -114,8 +157,8 @@ func TestListCustomerManagedKeysWithCredentialFlag(t *testing.T) {
 		name    string
 		command string
 	}{
-		{name: "--credential flag", command: "customer-managed-key list --credential named-cred"},
-		{name: "-c shorthand", command: "customer-managed-key list -c named-cred"},
+		{name: "--credential flag", command: fmt.Sprintf("customer-managed-key list --organization-id %s --project-id %s --credential named-cred", testOrgID, testProjectID)},
+		{name: "-c shorthand", command: fmt.Sprintf("customer-managed-key list --organization-id %s --project-id %s -c named-cred", testOrgID, testProjectID)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
@@ -133,6 +176,12 @@ func TestListCustomerManagedKeysWithCredentialFlag(t *testing.T) {
 				},
 				"default-credential": "",
 			})
+
+			helper.NewRequestHandlerMock(
+				"/v2beta1/organizations/"+testOrgID+"/projects",
+				http.StatusOK,
+				`{"data": [{"id": "`+testProjectID+`", "name": "Test Project"}]}`,
+			)
 
 			mockHandler := helper.NewRequestHandlerMock("/v1/customer-managed-keys", http.StatusOK, `{"data": []}`)
 

@@ -26,3 +26,7 @@ Decisions: Removed local `--tenant-id` flag from both `list` and `create`; the d
 ## TASK-006 — 2026-05-18T05:00:00Z
 Updated all `instance snapshot` leaf commands (list, create, restore) to call `ResolveAndValidateOrgProject` then `FetchAndVerifyInstanceInProject` before executing snapshot operations; flags inherited from `instance` parent with no duplicate registration; table-driven tests added covering happy path, project-not-in-org, and instance-not-in-tenant.
 Files: ~neo4j-cli/aura/internal/subcommands/instance/snapshot/{list,create,restore}.go, ~neo4j-cli/aura/internal/subcommands/instance/snapshot/{list,create,restore}_test.go
+
+## TASK-007 — 2026-05-18T06:00:00Z
+Added `RegisterOrgProjectFlags` to `customermanagedkey` parent; updated `list` to pass resolved projectID as `tenantId` query param; updated `create` to inject projectID into request body; added pre-flight ownership check in `get` and `delete` via `FetchAndVerifyInstanceInProject`-equivalent; applied `RenameResponseField`; added `FetchAndVerifyCmekInProject` helper in `resolve.go`; regenerated skill bundles.
+Files: ~neo4j-cli/aura/internal/subcommands/customermanagedkey/{customermanagedkey,list,create,get,delete}.go, ~neo4j-cli/aura/internal/subcommands/customermanagedkey/{list,create,get,delete}_test.go, +neo4j-cli/aura/internal/subcommands/customermanagedkey/helpers_test.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve.go

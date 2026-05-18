@@ -123,3 +123,39 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 
 	return resBody, nil
 }
+
+// FetchAndVerifyCMKInProject performs a GET /customer-managed-keys/{cmkID} and
+// checks that the key's tenant_id matches projectID. It returns the raw
+// response body so the caller can reuse it for output (avoiding a second
+// round-trip in read-only commands such as "customer-managed-key get").
+//
+// If the key exists but belongs to a different project the function
+// returns (nil, "could not find customer-managed-key {cmkID} in project {projectID}").
+func FetchAndVerifyCMKInProject(cfg *clicfg.Config, cmkID, projectID string) ([]byte, error) {
+	path := fmt.Sprintf("/customer-managed-keys/%s", cmkID)
+	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+		Method: http.MethodGet,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		// Non-200 was already turned into an error by MakeRequest; reaching
+		// here with a non-200 should not happen, but guard defensively.
+		return resBody, nil
+	}
+
+	responseData := api.ParseBody(resBody)
+	cmk, err := responseData.GetSingleOrError()
+	if err != nil {
+		return nil, err
+	}
+
+	tenantID, _ := cmk["tenant_id"].(string)
+	if tenantID != projectID {
+		return nil, fmt.Errorf("could not find customer-managed-key %s in project %s", cmkID, projectID)
+	}
+
+	return resBody, nil
+}
