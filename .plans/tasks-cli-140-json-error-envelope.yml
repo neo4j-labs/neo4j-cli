@@ -14,7 +14,7 @@ tasks:
       exit codes 1–8. Add the two fluent setters WithResource(t, id) and WithSuggestion(s) returning *CLIError. Extend
       common/clierr/error_test.go (create if missing) with table-driven tests per constructor asserting Code + CodeName +
       Retryable; cover the setters and the chain pattern.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CLIError struct in common/clierr/error.go has the five new fields with documented types"
@@ -23,7 +23,7 @@ tasks:
       - "WithResource and WithSuggestion mutate the receiver in place and return *CLIError for chaining"
       - "Table-driven tests assert (Code, CodeName, Retryable) for each constructor; setter tests cover chained mutation"
       - "make test passes; no new lint findings"
-    completed_at: null
+    completed_at: 2026-05-18T14:30:00Z
 
   - id: task-002
     title: "Add envelope types and Render function in common/clierr/render.go"
