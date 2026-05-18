@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add feature-flag registry; rename aura.beta-enabled to flag.aura-beta (legacy key still read until CLI-134)
-time: 2026-05-18T14:40:09.16376+02:00

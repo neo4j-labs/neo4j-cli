@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Unknown subcommands now exit 2 (usage_error) at every nesting level instead of falling through to a help dump with the wrong exit code.
-time: 2026-05-18T16:38:44.808997+02:00
