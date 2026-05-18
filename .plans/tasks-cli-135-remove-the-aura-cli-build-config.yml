@@ -172,7 +172,7 @@ tasks:
       from the Commands block; remove the dual `GORELEASER_CURRENT_TAG=dev
       AURA_CLI_VERSION=dev` snapshot example, leaving only the
       single-project form. Satisfies REQ-F-009.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -180,7 +180,7 @@ tasks:
       - "Makefile-targets table contains no rows mentioning aura"
       - "'Dual-Binary GoReleaser Setup' section is removed"
       - "Markdown renders cleanly"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-010
     title: "Rewrite .agents/deployment.md as single-binary"

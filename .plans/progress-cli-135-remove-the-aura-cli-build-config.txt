@@ -26,3 +26,7 @@ Files: ~CHANGELOG.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
 ## TASK-008 — 2026-05-18T00:00:00Z
 Scrubbed aura-cli prose from `RELEASING.md`: single-binary framing in intro, "What gets released" table reduced to neo4j-cli binary + npm + Homebrew, dropped "Aura-cli is not published" paragraph, rewrote changie example to `--projects neo4j-cli` only, and stripped `AURA_CLI_VERSION`/`include_aura`/`CHANGELOG-aura` from Steps 2–4.
 Files: ~RELEASING.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-009 — 2026-05-18T00:00:00Z
+Rewrote `.agents/build.md` as single-binary docs: removed `build-aura`/`run-aura` rows, deleted "Dual-Binary GoReleaser Setup" section, collapsed Changelog to single-project narrative, dropped the dual `AURA_CLI_VERSION=dev` snapshot example.
+Files: ~.agents/build.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
