@@ -90,7 +90,7 @@ tasks:
       (not `security-review`). If the security check still fails to install the
       plugin, apply the REQ-F-004 fallback in the next task; otherwise mark this
       task complete.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -99,7 +99,7 @@ tasks:
       - "Security workflow reaches the `Enforce verdict` step (verdict may be pass or fail — what matters is reaching it)."
       - "Conventions workflow reaches its `Enforce verdict` step as before."
       - "If either acceptance fails, task-006 is unblocked; otherwise task-006 is closed as not-needed."
-    completed_at: null
+    completed_at: 2026-05-18T13:00:00Z
 
   - id: task-006
     title: "Fallback: switch marketplace.json source to git+https if insteadOf is insufficient"
@@ -112,14 +112,14 @@ tasks:
       unchanged. Decide whether to keep or remove the insteadOf step from task-002
       based on which combination verifies green. Re-push, re-verify on the same PR.
       Satisfies REQ-F-004. Close as not-needed if task-005 already passes.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - "Either: task-005 already passed and this task is closed without changes; OR `.claude-plugin/marketplace.json` updated with `source: git` + explicit https url, pin values unchanged."
       - "If changes were made, re-pushed branch causes `Claude Review — Security` to install the plugin successfully on the next run."
       - "Decision on the insteadOf step (kept as belt-and-braces or removed as redundant) is reflected in the final diff."
-    completed_at: null
+    completed_at: 2026-05-18T13:00:00Z
 
   - id: task-007
     title: "Mark PR ready for review and merge"
