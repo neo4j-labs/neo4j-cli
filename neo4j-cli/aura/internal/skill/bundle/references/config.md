@@ -13,8 +13,8 @@ Usage: `aura-cli config get <key>`
 Examples:
 
 ```
-# Get the default tenant configured for the Aura CLI
-neo4j-cli aura config get default-tenant
+# Get the default workspace configured for the Aura CLI
+neo4j-cli aura config get default-workspace
 
 # Get the Aura API base URL and emit JSON for scripting
 neo4j-cli aura config get base-url --format json
@@ -38,8 +38,8 @@ neo4j-cli aura config list
 # Emit configuration as JSON for scripting
 neo4j-cli aura config list --format json
 
-# Pipe through jq to print just the default-tenant value
-neo4j-cli aura config list --format json | jq -r '."default-tenant"'
+# Pipe through jq to print just the default-workspace value
+neo4j-cli aura config list --format json | jq -r '."default-workspace"'
 ```
 
 ## aura-cli config set
@@ -51,8 +51,8 @@ Usage: `aura-cli config set <key> <value>`
 Examples:
 
 ```
-# Set the default tenant used by aura commands
-neo4j-cli aura config set default-tenant 00000000-0000-0000-0000-000000000000 --rw
+# Set the default workspace used by aura commands
+neo4j-cli aura config set default-workspace 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
 
 # Override the Aura API base URL (for staging environments)
 neo4j-cli aura config set base-url https://api.neo4j.io/v1 --rw

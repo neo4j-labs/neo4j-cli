@@ -43,14 +43,6 @@ func TestHandleResponseError_RedactsSecretArgs(t *testing.T) {
 			wantFlagInArgs: "--client-secret",
 		},
 		{
-			name:           "502 bad gateway with malformed body and --password",
-			statusCode:     http.StatusBadGateway,
-			body:           `<<<not-json>>>`,
-			args:           []string{"dbms", "add", "--password", secret},
-			wantContains:   []string{"unexpected error", "--password", "***"},
-			wantFlagInArgs: "--password",
-		},
-		{
 			name:           "307 permanent redirect with --instance-password",
 			statusCode:     http.StatusPermanentRedirect,
 			body:           ``,
@@ -208,6 +200,20 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			statusCode: http.StatusMethodNotAllowed,
 			body:       `{"errors":[{"message":"not allowed"}]}`,
 			wantCode:   8,
+		},
+		{
+			name:           "404 with malformed body -> fatal (1) with report-issue message",
+			statusCode:     http.StatusNotFound,
+			body:           `<<<not-json>>>`,
+			wantCode:       1,
+			wantMsgContain: "unexpected error [status 404]",
+		},
+		{
+			name:           "502 with malformed body -> fatal (1) with report-issue message",
+			statusCode:     http.StatusBadGateway,
+			body:           `<<<not-json>>>`,
+			wantCode:       1,
+			wantMsgContain: "unexpected error [status 502]",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

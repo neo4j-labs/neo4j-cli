@@ -26,9 +26,15 @@
 - [neo4j-cli aura instance snapshot get](#neo4j-cli-aura-instance-snapshot-get)
 - [neo4j-cli aura instance snapshot list](#neo4j-cli-aura-instance-snapshot-list)
 - [neo4j-cli aura instance update](#neo4j-cli-aura-instance-update)
-- [neo4j-cli aura tenant](#neo4j-cli-aura-tenant)
-- [neo4j-cli aura tenant get](#neo4j-cli-aura-tenant-get)
-- [neo4j-cli aura tenant list](#neo4j-cli-aura-tenant-list)
+- [neo4j-cli aura organization](#neo4j-cli-aura-organization)
+- [neo4j-cli aura organization get](#neo4j-cli-aura-organization-get)
+- [neo4j-cli aura organization list](#neo4j-cli-aura-organization-list)
+- [neo4j-cli aura project](#neo4j-cli-aura-project)
+- [neo4j-cli aura project get](#neo4j-cli-aura-project-get)
+- [neo4j-cli aura project list](#neo4j-cli-aura-project-list)
+- [neo4j-cli aura workspace](#neo4j-cli-aura-workspace)
+- [neo4j-cli aura workspace list](#neo4j-cli-aura-workspace-list)
+- [neo4j-cli aura workspace use](#neo4j-cli-aura-workspace-use)
 
 Allows you to programmatically provision and manage your Aura resources
 
@@ -651,11 +657,11 @@ neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB
 neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json
 ```
 
-## neo4j-cli aura tenant
+## neo4j-cli aura organization
 
-Relates to an Aura Tenant
+Manage Aura organizations
 
-Usage: `neo4j-cli aura tenant`
+Usage: `neo4j-cli aura organization`
 
 Flags:
 
@@ -665,45 +671,182 @@ Flags:
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
 
-### neo4j-cli aura tenant get
+### neo4j-cli aura organization get
 
-Returns tenant details
+Returns organization details
 
-This subcommand returns details about a specific Aura Tenant.
+This subcommand returns details about a specific Aura organization.
 
-Usage: `neo4j-cli aura tenant get <id>`
-
-Examples:
-
-```
-# Get details of a tenant by ID
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
-
-# Get tenant details and emit JSON for scripting
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
-
-# Pipe details through jq to extract the tenant name
-neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
-```
-
-### neo4j-cli aura tenant list
-
-Returns a list of tenants
-
-This subcommand returns a list containing a summary of each of your Aura Tenants. To find out more about a specific Tenant, retrieve the details using the get subcommand.
-
-Usage: `neo4j-cli aura tenant list`
+Usage: `neo4j-cli aura organization get <id>`
 
 Examples:
 
 ```
-# List all tenants the current user has access to
-neo4j-cli aura tenant list
+# Get details of an organization by ID
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format json
+
+# Pipe details through jq to extract the organization name
+neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'
+```
+
+### neo4j-cli aura organization list
+
+Returns a list of organizations
+
+This subcommand returns a list of Aura organizations accessible to the current user.
+
+Usage: `neo4j-cli aura organization list`
+
+Examples:
+
+```
+# List all organizations the current user has access to
+neo4j-cli aura organization list
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura tenant list --format json
+neo4j-cli aura organization list --format json
 
-# Pipe tenant ids through jq for a follow-up command
-neo4j-cli aura tenant list --format json | jq -r '.data[].id'
+# Pipe organization ids through jq for a follow-up command
+neo4j-cli aura organization list --format json | jq -r '.data[].id'
+```
+
+## neo4j-cli aura project
+
+Manage Aura projects
+
+Usage: `neo4j-cli aura project`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura project get
+
+Returns project details
+
+This subcommand returns details about a specific Aura project.
+
+Usage: `neo4j-cli aura project get <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID (defaults to org portion of aura.default-workspace) |
+
+Examples:
+
+```
+# Get project details by ID (uses org from aura.default-workspace)
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000
+
+# Get project details in a specific organization
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 11111111-1111-1111-1111-111111111111
+
+# Emit JSON for scripting
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json
+```
+
+### neo4j-cli aura project list
+
+Returns a list of projects
+
+This subcommand returns a list of Aura projects within the given organization.
+
+Usage: `neo4j-cli aura project list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID (defaults to org portion of aura.default-workspace) |
+
+Examples:
+
+```
+# List all projects in the default organization (from aura.default-workspace)
+neo4j-cli aura project list
+
+# List projects in a specific organization
+neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-000000000000
+
+# Emit JSON for scripting
+neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-000000000000 --format json
+```
+
+## neo4j-cli aura workspace
+
+Manage the active organization and project workspace
+
+Usage: `neo4j-cli aura workspace`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura workspace list
+
+Returns a flat list of all accessible organization/project workspaces
+
+This subcommand lists all organization/project pairs accessible to the current user.
+Each entry includes the workspace slug ({organizationId}/{projectId}), the organization and
+project IDs and names, and whether this entry is the currently active default workspace.
+
+Usage: `neo4j-cli aura workspace list`
+
+Examples:
+
+```
+# List all accessible workspaces in table format
+neo4j-cli aura workspace list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura workspace list --format json
+
+# Find the active workspace via jq
+neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default == true) | .workspace'
+```
+
+### neo4j-cli aura workspace use
+
+Sets the active organization and project workspace
+
+This subcommand sets the active organization and project workspace used by default
+in subsequent commands. Accepts either a positional {organizationId}/{projectId} slug
+or the --organization-id and --project-id flags (but not both).
+
+The workspace is validated against the Aura API before being persisted.
+
+Usage: `neo4j-cli aura workspace use [organizationId/projectId] [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project ID |
+
+Examples:
+
+```
+# Set workspace using positional slug
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
+
+# Set workspace using flags
+neo4j-cli aura workspace use --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Verify the workspace was set after switching
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw && neo4j-cli aura workspace list --format json
 ```
 

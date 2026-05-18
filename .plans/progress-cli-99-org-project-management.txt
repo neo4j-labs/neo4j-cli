@@ -1,0 +1,78 @@
+## TASK-018 — 2026-05-18T12:00:00Z
+Fixed stale `context`/`default-context` references in README.md: renamed the section heading, all `context list`/`context use` command examples, the jq `.context` field reference, and `default-context` config key references to their `workspace`/`default-workspace` equivalents; all gates (make test, make fmt-check, make lint) pass.
+Files: ~README.md, ~.plans/tasks-cli-99-org-project-management.yml
+
+## TASK-017 — 2026-05-18T11:00:00Z
+Updated all callers outside workspace/ to use the new default-workspace config key: removed DefaultContext() from clicfg, updated DefaultWorkspace()/DefaultTenant() to read aura.default-workspace, updated validAuraConfigKeys, updated all Example text and error messages in aura/project/config/utils, updated all test files; regenerated skill bundles.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/clicfg_test.go, ~neo4j-cli/aura/internal/subcommands/config/set.go, ~neo4j-cli/aura/internal/subcommands/config/get.go, ~neo4j-cli/aura/internal/subcommands/config/list.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go, ~neo4j-cli/aura/internal/subcommands/config/list_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go, ~neo4j-cli/aura/internal/subcommands/utils/projectflags.go, ~neo4j-cli/aura/internal/subcommands/project/list.go, ~neo4j-cli/aura/internal/subcommands/project/list_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go, ~neo4j-cli/internal/subcommands/config/get.go, ~neo4j-cli/internal/subcommands/config/set.go, ~neo4j-cli/internal/subcommands/config/get_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go, ~neo4j-cli/aura/internal/skill/bundle/references/config.md, ~neo4j-cli/internal/skill/bundle/references/config.md
+
+## TASK-016 — 2026-05-18T10:00:00Z
+Renamed neo4j-cli/aura/internal/subcommands/context/ to workspace/; updated all package names, function names (ValidateAndSetDefaultWorkspace), struct names (workspaceEntry), JSON tags ("workspace"), and config key (default-workspace); added DefaultWorkspace() to clicfg.go; updated aura.go to import and mount workspace; updated config/set.go to import workspace and call ValidateAndSetDefaultWorkspace; regenerated skill bundles.
+Files: +neo4j-cli/aura/internal/subcommands/workspace/workspace.go, +neo4j-cli/aura/internal/subcommands/workspace/validate.go, +neo4j-cli/aura/internal/subcommands/workspace/list.go, +neo4j-cli/aura/internal/subcommands/workspace/use.go, +neo4j-cli/aura/internal/subcommands/workspace/validate_test.go, +neo4j-cli/aura/internal/subcommands/workspace/use_test.go, +neo4j-cli/aura/internal/subcommands/workspace/list_test.go, -neo4j-cli/aura/internal/subcommands/context/, ~neo4j-cli/aura/aura.go, ~neo4j-cli/aura/internal/subcommands/config/set.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go, ~common/clicfg/clicfg.go, ~neo4j-cli/aura/internal/skill/bundle/references/workspace.md
+Decisions: DefaultWorkspace() added to clicfg.go alongside DefaultContext() (not yet removed — task-017 handles full caller migration); config/set.go updated in task-016 (not task-017) since deleting context/ would break compilation otherwise.
+
+## TASK-015 — 2026-05-15T20:00:00Z
+Updated validateAndSetDefaultContext to call GET /organizations/{orgId}/projects (list endpoint) and check if projectId appears in the results, returning a clear error when absent; updated validate_test.go, use_test.go, and config/set_test.go to mock the list endpoint with project-found, project-not-found, API-error, and empty-list cases.
+Files: ~neo4j-cli/aura/internal/subcommands/context/validate.go, ~neo4j-cli/aura/internal/subcommands/context/validate_test.go, ~neo4j-cli/aura/internal/subcommands/context/use_test.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go
+
+## TASK-014 — 2026-05-15T19:30:00Z
+Updated aura project get to call GET /tenants/{id} on v1 (AuraApiVersion1) instead of the non-existent v2beta1 single-project endpoint; removed org ID resolution logic, kept --organization-id flag for forward compatibility; updated tests to mock /v1/tenants/{id}; regenerated skill bundles.
+Files: ~neo4j-cli/aura/internal/subcommands/project/get.go, ~neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/internal/skill/bundle/references/project.md
+
+## TASK-012 — 2026-05-15T14:40:00Z
+Added changie Minor entry describing organization/project/context commands, aura.default-context config key, and tenant deprecation; created Linear issue CLI-126 in neo4j-cli-workinggroup for hard removal of deprecated tenant commands after deprecation window.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260515-120000.yaml, ~.plans/tasks-cli-99-org-project-management.yml
+
+## TASK-011 — 2026-05-15T18:00:00Z
+Verified skill bundles are up to date; go generate produced no drift, TestGenerator_RoundTrip passed, tenant.md absent from aura bundle, organization.md/project.md/context.md all present with content.
+Files: ~.plans/tasks-cli-99-org-project-management.yml
+
+## TASK-013 — 2026-05-15T00:00:00Z
+Added aura organization get <id> leaf calling GET /organizations/{id} on v2beta1 with --format json|table|toon support and table-driven tests for success, 404, and missing-arg cases.
+Files: ~neo4j-cli/aura/internal/subcommands/organization/organization.go, +neo4j-cli/aura/internal/subcommands/organization/get.go, +neo4j-cli/aura/internal/subcommands/organization/get_test.go
+
+## TASK-010 — 2026-05-15T00:00:00Z
+Deprecated aura tenant list and tenant get by setting Hidden=true on parent and leaves, printing deprecation warnings to stderr in each RunE pointing to project list and organization get replacements. Skill bundles regenerated.
+Files: ~neo4j-cli/aura/internal/subcommands/tenant/tenant.go, ~neo4j-cli/aura/internal/subcommands/tenant/list.go, ~neo4j-cli/aura/internal/subcommands/tenant/list_test.go, ~neo4j-cli/aura/internal/subcommands/tenant/get.go, ~neo4j-cli/aura/internal/subcommands/tenant/get_test.go, -neo4j-cli/aura/internal/skill/bundle/references/tenant.md
+
+## TASK-009 — 2026-05-15T00:00:00Z
+Wired aura config set default-context through ValidateAndSetDefaultContext for API validation before persistence. Note: neo4j-cli root config set path skips validation due to Go internal package boundary (neo4j-cli/internal cannot import neo4j-cli/aura/internal).
+Files: ~neo4j-cli/aura/internal/subcommands/config/set.go, ~neo4j-cli/aura/internal/subcommands/config/set_test.go, ~neo4j-cli/internal/subcommands/config/set_test.go
+Decisions: neo4j-cli root path validation skipped — internal package boundary prevents cross-tree import
+
+## TASK-008 — 2026-05-15T17:00:00Z
+Added aura context list command that fans out across all orgs/projects, assembling a flat list with context, organizationId, projectId, projectName, and default fields; default=true only when the entry matches aura.default-context; regenerated both skill bundles.
+Files: +neo4j-cli/aura/internal/subcommands/context/list.go, +neo4j-cli/aura/internal/subcommands/context/list_test.go, ~neo4j-cli/aura/internal/subcommands/context/context.go, ~neo4j-cli/aura/internal/skill/bundle/*, ~neo4j-cli/internal/skill/bundle/*
+Decisions: Custom contextListResponse type with AsArray() and MarshalJSON() wraps entries in {"data":[...]} for JSON consistency with other list commands.
+
+## TASK-007 — 2026-05-15T00:00:00Z
+Added aura context use command accepting positional {org}/{project} slug or --organization-id + --project-id flags, delegating to validateAndSetDefaultContext. Both forms are mutually exclusive with clear errors.
+Files: ~neo4j-cli/aura/internal/subcommands/context/context.go, +neo4j-cli/aura/internal/subcommands/context/use.go, +neo4j-cli/aura/internal/subcommands/context/use_test.go, ~neo4j-cli/aura/aura.go
+
+## TASK-006 — 2026-05-15T00:00:00Z
+Added aura project list and project get commands resolving org from --organization-id flag or aura.default-context. Both commands support --format json|table|toon with table-driven tests.
+Files: +neo4j-cli/aura/internal/subcommands/project/project.go, +neo4j-cli/aura/internal/subcommands/project/list.go, +neo4j-cli/aura/internal/subcommands/project/list_test.go, +neo4j-cli/aura/internal/subcommands/project/get.go, +neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/aura.go
+
+## TASK-005 — 2026-05-15T16:00:00Z
+Created organization subcommand with parent (organization.go) and list leaf (list.go); calls GET /organizations via AuraApiVersion2 using MakeRequest + PrintBody pattern consistent with tenant list; table-driven tests cover success, empty list, API error, invalid format, and credential flag; registered in aura.go; regenerated both aura and neo4j-cli skill bundles.
+Files: +neo4j-cli/aura/internal/subcommands/organization/organization.go, +neo4j-cli/aura/internal/subcommands/organization/list.go, +neo4j-cli/aura/internal/subcommands/organization/list_test.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/aura/internal/skill/bundle/*, ~neo4j-cli/internal/skill/bundle/*
+
+## TASK-004 — 2026-05-15T15:00:00Z
+Created context package with ValidateAndSetDefaultContext helper; parses {orgId}/{projectId} slug, calls GetProject() on v2beta1, persists aura.default-context on success, returns clear errors for all failure paths; table-driven tests cover no-slash, empty-org, empty-project, 404, 500, and success cases.
+Files: +neo4j-cli/aura/internal/subcommands/context/context.go, +neo4j-cli/aura/internal/subcommands/context/validate.go, +neo4j-cli/aura/internal/subcommands/context/validate_test.go
+Decisions: cfg.Aura.Set writes to FS only (not viper in-memory); tests verify persistence via testfs.GetTestConfig+gjson rather than cfg.Aura.DefaultContext().
+
+## TASK-003 — 2026-05-15T14:00:00Z
+Removed config/project subcommand tree, common/clicfg/projects/ package, and all aura-projects references; migrated SetDefaultProjectInConfig and utils/projectflags.go to use aura.default-context slug directly; added DefaultContext() accessor to AuraConfig.
+Files: -neo4j-cli/aura/internal/subcommands/config/project/, -common/clicfg/projects/projects.go, -neo4j-cli/aura/config.go, ~common/clicfg/clicfg.go, ~neo4j-cli/aura/internal/subcommands/config/config.go, ~neo4j-cli/internal/subcommands/config/config.go, ~neo4j-cli/aura/internal/subcommands/utils/projectflags.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+Decisions: SetDefaultProjectInConfig now calls SetConfigValue("aura.default-context", orgId+"/"+projectId); SetProjectFlagsAsRequired/SetProjetDefaults parse the slug via strings.LastIndex, matching the same logic as DefaultTenant().
+
+## TASK-002 — 2026-05-15T13:00:00Z
+Added ListOrganizations, GetOrganization, ListProjects, and GetProject wrapper functions to the api package with typed response structs; tests use raw httptest servers and SetBetaEnabled(true) to route to /v2beta1/* paths.
+Files: +neo4j-cli/aura/internal/api/organization.go, +neo4j-cli/aura/internal/api/organization_test.go
+Decisions: SetBetaEnabled(true) required in tests because AuraApiVersion2 routes to "v2beta1" only when beta is enabled; without it, the path would be "v2" and not match the mock handlers.
+
+## TASK-001 — 2026-05-15T12:30:00Z
+Replaced `default-tenant` with `default-context` in validAuraConfigKeys; updated DefaultTenant() to resolve from the project portion of aura.default-context first, falling back to legacy aura.default-tenant; regenerated skill bundles and updated all affected tests.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/clicfg_test.go, ~neo4j-cli/aura/internal/subcommands/config/get.go, ~neo4j-cli/aura/internal/subcommands/config/set.go, ~neo4j-cli/aura/internal/subcommands/config/list.go, ~neo4j-cli/aura/internal/subcommands/config/list_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go, ~neo4j-cli/internal/subcommands/config/get.go, ~neo4j-cli/internal/subcommands/config/set.go, ~neo4j-cli/internal/subcommands/config/get_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go, ~neo4j-cli/internal/subcommands/config/set_test.go
+Decisions: DefaultTenant() uses strings.LastIndex to handle slugs with multiple slashes (takes rightmost segment).

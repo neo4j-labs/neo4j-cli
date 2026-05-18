@@ -18,9 +18,10 @@ import (
 
 func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <id>",
-		Short: "Returns tenant details",
-		Long:  "This subcommand returns details about a specific Aura Tenant.",
+		Hidden: true,
+		Use:    "get <id>",
+		Short:  "Returns tenant details",
+		Long:   "This subcommand returns details about a specific Aura Tenant.",
 		Example: `# Get details of a tenant by ID
 neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000
 
@@ -31,6 +32,7 @@ neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json
 neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: 'aura tenant get' is deprecated and will be removed in a future release. Use 'aura organization get' instead.") //nolint:errcheck // deprecation warning to stderr; write errors are not actionable
 			tenantId := strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/tenants/%s", tenantId)
 

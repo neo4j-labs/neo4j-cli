@@ -19,7 +19,10 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/dataapi"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/organization"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/project"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/tenant"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
 )
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
@@ -30,8 +33,11 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: cfg.Version,
 	}
 
+	cmd.AddCommand(workspace.NewCmd(cfg))
 	cmd.AddCommand(customermanagedkey.NewCmd(cfg))
 	cmd.AddCommand(instance.NewCmd(cfg))
+	cmd.AddCommand(organization.NewCmd(cfg))
+	cmd.AddCommand(project.NewCmd(cfg))
 	cmd.AddCommand(tenant.NewCmd(cfg))
 	cmd.AddCommand(graphanalytics.NewCmd(cfg))
 	if cfg.Aura.AuraBetaEnabled() {

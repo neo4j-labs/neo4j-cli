@@ -68,12 +68,6 @@ func TestConfigSet(t *testing.T) {
 			wantConfigValue: "https://example.com",
 		},
 		{
-			name:            "set aura.default-tenant with rw writes to aura.default-tenant",
-			command:         "config set --rw aura.default-tenant my-tenant",
-			wantConfigKey:   "aura.default-tenant",
-			wantConfigValue: "my-tenant",
-		},
-		{
 			name:    "set aura.format with rw returns error (global-only key)",
 			command: "config set --rw aura.format json",
 			wantErr: `Error: invalid config key: "aura.format" is a global key and cannot be addressed with the "aura." prefix`,

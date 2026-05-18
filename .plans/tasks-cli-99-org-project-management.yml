@@ -1,0 +1,468 @@
+feature: cli-99-org-project-management
+prd: ./prd-cli-99-org-project-management.md
+created_at: 2026-05-15T00:00:00Z
+updated_at: 2026-05-18T10:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Update config layer: validAuraConfigKeys and DefaultTenant() resolution"
+    description: |
+      In common/clicfg, add `default-workspace` to validAuraConfigKeys (both get and set) and
+      remove `default-tenant`. Update cfg.Aura.DefaultTenant() to resolve in this order:
+      (1) project portion of aura.default-workspace (split on '/', take right side);
+      (2) default-tenant config key as legacy fallback. Add tests covering both resolution
+      paths and the case where neither is set.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "aura config set/get/list accepts default-workspace and rejects default-tenant"
+      - "DefaultTenant() returns the project portion of aura.default-workspace when set"
+      - "DefaultTenant() falls back to default-tenant when aura.default-workspace is unset"
+      - "DefaultTenant() returns empty string when neither is set"
+      - "Unit tests pass for all DefaultTenant() resolution cases"
+    completed_at: 2026-05-15T12:30:00Z
+
+  - id: task-002
+    title: "Add v2beta1 API client methods for organizations and projects"
+    description: |
+      In neo4j-cli/aura/internal/api, add functions for the four v2beta1 endpoints needed:
+      GET /organizations, GET /organizations/{organizationId},
+      GET /organizations/{organizationId}/projects, and
+      GET /organizations/{organizationId}/projects/{projectId}. Each function must use
+      AuraApiVersion2 and define the corresponding response struct types. Add unit tests
+      using the existing httptest mock helpers.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "ListOrganizations() calls GET /organizations with AuraApiVersion2"
+      - "GetOrganization(orgID) calls GET /organizations/{orgID} with AuraApiVersion2"
+      - "ListProjects(orgID) calls GET /organizations/{orgID}/projects with AuraApiVersion2"
+      - "GetProject(orgID, projectID) calls GET /organizations/{orgID}/projects/{projectID} with AuraApiVersion2"
+      - "Response structs defined for all four endpoints"
+      - "Unit tests cover success and error (404, 5xx) cases for each method"
+    completed_at: 2026-05-15T13:00:00Z
+
+  - id: task-003
+    title: "Remove config project subsystem"
+    description: |
+      Delete the neo4j-cli/aura/internal/subcommands/config/project/ subcommand directory
+      and all its files (project.go, add.go, use.go, list.go, remove.go and their _test.go
+      files). Remove the aura-projects config storage key and the AuraProject struct from
+      common/clicfg/projects/. Clean up all references in clicfg.go and anywhere else that
+      imports or uses these types. Verify make test still passes after deletion.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/subcommands/config/project/ directory no longer exists"
+      - "AuraProject struct and aura-projects key removed from common/clicfg/"
+      - "aura config project add/use/list/remove commands no longer registered"
+      - "No compilation errors or dangling references after removal"
+      - "make test passes"
+    completed_at: 2026-05-15T14:00:00Z
+
+  - id: task-004
+    title: "Implement validateAndSetDefaultWorkspace shared helper"
+    description: |
+      Create a shared helper function (e.g. validateAndSetDefaultWorkspace) in an appropriate
+      package (e.g. neo4j-cli/aura/internal/subcommands/workspace/ or a shared util package).
+      It must parse a {organizationId}/{projectId} slug, call GetProject() on v2beta1 to
+      verify the pair exists, and on success write aura.default-workspace to config. Fail with
+      clear errors on missing slash, invalid format, 404, or other API errors. Add
+      table-driven unit tests for all error paths and the success path.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Fails with clear error when slug has no '/'"
+      - "Fails with clear error when org or project portion is empty"
+      - "Calls GET /organizations/{orgID}/projects/{projectID} to validate the pair"
+      - "Persists aura.default-workspace only on successful API validation"
+      - "Returns API error (including 404) without persisting if validation fails"
+      - "Table-driven tests cover all error paths and success path"
+    completed_at: 2026-05-15T15:00:00Z
+
+  - id: task-005
+    title: "Add aura organization list command"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/organization/ with organization.go (parent)
+      and list.go (leaf). The leaf calls ListOrganizations() via AuraApiVersion2 and renders
+      output via RegisterOutputFlag (json/table/toon). Include a flush-left Example field
+      with ≥3 invocations. Register the organization subcommand in aura.go. Add colocated
+      list_test.go with table-driven tests using the mock HTTP server.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "aura organization list calls GET /organizations on v2beta1"
+      - "Supports --format json, table, and toon"
+      - "Does not read or use aura.default-workspace"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Registered in aura.go and visible in aura --help"
+      - "Table-driven tests cover success and API error cases"
+    completed_at: 2026-05-15T16:00:00Z
+
+  - id: task-006
+    title: "Add aura project list and project get commands"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/project/ with project.go (parent), list.go,
+      get.go, and their _test.go files. Both leaves resolve the organization ID using the
+      order: --organization-id flag > org portion of aura.default-workspace > hard error.
+      list calls ListProjects(orgID); get <id> calls GetProject(orgID, projectID). Both
+      support --format json|table|toon. Register the project subcommand in aura.go.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "aura project list resolves org from --organization-id then aura.default-workspace"
+      - "aura project list fails with a clear error when no org source is available"
+      - "aura project list does not filter by the project portion of aura.default-workspace"
+      - "aura project get <id> uses the same org resolution as project list"
+      - "Both commands support --format json, table, and toon"
+      - "Example fields present, flush-left, ≥3 invocations on each leaf"
+      - "Table-driven tests cover org resolution paths and API error cases"
+    completed_at: 2026-05-15T00:00:00Z
+
+  - id: task-007
+    title: "Add aura workspace use command"
+    description: |
+      Create use.go under neo4j-cli/aura/internal/subcommands/workspace/ (create the
+      directory and workspace.go parent first). The workspace use leaf accepts either a
+      positional {organizationId}/{projectId} slug or --organization-id + --project-id flags;
+      the two forms are mutually exclusive. Delegates validation and persistence to
+      validateAndSetDefaultWorkspace. Fails clearly when org or project is missing, or when
+      both forms are mixed. Includes Example field and colocated use_test.go.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Positional slug form writes aura.default-workspace after successful validation"
+      - "Flag form (--organization-id + --project-id) writes aura.default-workspace identically"
+      - "Fails with clear error when either org or project is missing"
+      - "Fails with clear error when both positional and flag forms are provided"
+      - "Delegates to validateAndSetDefaultWorkspace (not duplicating API call logic)"
+      - "Example field present, flush-left, ≥3 invocations"
+      - "Table-driven tests cover all error cases and the success path"
+    completed_at: 2026-05-15T00:00:00Z
+
+  - id: task-008
+    title: "Add aura workspace list command"
+    description: |
+      Add list.go under neo4j-cli/aura/internal/subcommands/workspace/. The command fans out:
+      calls ListOrganizations() then ListProjects(orgID) for each org, assembles a flat list
+      of entries each containing workspace, organizationId, projectId, projectName, and a
+      default boolean (true when the entry matches aura.default-workspace, false otherwise
+      including when aura.default-workspace is unset). Supports --format json|table|toon.
+      Add colocated list_test.go. Register workspace subcommand in aura.go.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Returns flat list of all org/project pairs across all accessible orgs"
+      - "Each entry contains workspace, organizationId, projectId, projectName, default fields"
+      - "Exactly one entry has default=true when aura.default-workspace matches it"
+      - "All entries have default=false when aura.default-workspace is unset"
+      - "Supports --format json, table, and toon"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Table-driven tests cover default=true, default=false, and empty org list cases"
+    completed_at: 2026-05-15T17:00:00Z
+
+  - id: task-009
+    title: "Wire config set aura.default-workspace to shared validation helper"
+    description: |
+      In the aura config set command handler, detect when the key is default-workspace and
+      route to validateAndSetDefaultWorkspace instead of the generic config write path. This
+      ensures config set aura.default-workspace applies the same v2beta1 API validation as
+      workspace use. Update config set tests to cover the default-workspace key path including
+      validation failure and success cases.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "neo4j-cli config set aura.default-workspace <slug> calls validateAndSetDefaultWorkspace"
+      - "Fails with clear error on invalid slug format, 404, or API error"
+      - "Persists aura.default-workspace only on successful validation"
+      - "Generic config set still works for other keys (auth-url, base-url)"
+      - "Tests cover success, invalid slug, and API error paths"
+    completed_at: 2026-05-15T00:00:00Z
+
+  - id: task-010
+    title: "Deprecate aura tenant list and tenant get commands"
+    description: |
+      In neo4j-cli/aura/internal/subcommands/tenant/, set cmd.Hidden = true on the list
+      and get leaf commands and on the tenant parent command. Add a deprecation warning
+      printed to cmd.ErrOrStderr() at the top of each leaf's RunE (e.g. "Warning: 'aura
+      tenant list' is deprecated and will be removed in a future release. Use 'aura project
+      list' instead."). Update TestAllLeafCommands_HaveExamples to skip hidden commands.
+      Add tests verifying the warning appears on stderr.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "aura tenant list and aura tenant get are hidden from --help output"
+      - "aura tenant parent command is hidden from aura --help"
+      - "Deprecation warning printed to stderr when aura tenant list is invoked"
+      - "Deprecation warning printed to stderr when aura tenant get is invoked"
+      - "Commands still return correct data (functionality preserved)"
+      - "TestAllLeafCommands_HaveExamples skips hidden commands and passes"
+    completed_at: 2026-05-15T00:00:00Z
+
+  - id: task-011
+    title: "Regenerate skill bundles and verify TestGenerator_RoundTrip"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
+      to regenerate skill bundles after all command-tree changes (new organization, project,
+      workspace commands; hidden tenant commands; removed config project commands). Confirm
+      TestGenerator_RoundTrip passes. Verify that deprecated tenant commands do not appear
+      in the generated bundle and that all new commands are represented correctly.
+    status: completed
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-013
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "go generate ./neo4j-cli/aura/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "Deprecated tenant commands absent from generated skill bundle"
+      - "organization list/get, project list/get, workspace list/use present in bundle"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: 2026-05-15T18:00:00Z
+
+  - id: task-012
+    title: "Add changelog entry and create Linear issue for tenant removal"
+    description: |
+      Add a changelog entry using changie (kind: Minor) describing the new organization,
+      project, and workspace commands, the replacement of the config project subsystem with
+      aura.default-workspace, and noting that aura tenant list/get are deprecated and will be
+      removed in a future release. Then create a Linear issue in the CLI working group (CLI)
+      team to track the hard removal of the deprecated tenant commands, referencing this PR.
+    status: completed
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "Changelog entry created under .changes/unreleased/ with kind: Minor"
+      - "Changelog body mentions new commands (organization list, project list/get, workspace list/use)"
+      - "Changelog body notes aura tenant list/get deprecation and future removal"
+      - "Linear issue created in CLI team for hard removal of tenant commands"
+      - "Linear issue references this PR and notes removal is blocked on deprecation window"
+    completed_at: 2026-05-15T14:40:00Z
+
+  - id: task-013
+    title: "Add aura organization get command"
+    description: |
+      Add get.go to neo4j-cli/aura/internal/subcommands/organization/ (alongside the existing
+      list.go created in task-005). The leaf takes a positional organization ID argument and
+      calls GetOrganization(orgID) via AuraApiVersion2, rendering output via RegisterOutputFlag
+      (json/table/toon). Include a flush-left Example field with ≥3 invocations. Register
+      the get leaf in organization.go. Add colocated get_test.go with table-driven tests.
+    status: completed
+    dependencies:
+      - task-002
+      - task-005
+    acceptance_criteria:
+      - "aura organization get <id> calls GET /organizations/{id} on v2beta1"
+      - "Supports --format json, table, and toon"
+      - "Fails with a clear error when no ID argument is provided"
+      - "Example field present, flush-left, ≥3 invocations including one --format json"
+      - "Table-driven tests cover success, missing arg, and API error (404) cases"
+    completed_at: 2026-05-15T00:00:00Z
+
+  - id: task-014
+    title: "Update project get to use v1 /tenants/{id} endpoint"
+    description: |
+      The GET /organizations/{orgId}/projects/{projectId} endpoint does not yet exist on
+      v2beta1. Update neo4j-cli/aura/internal/subcommands/project/get.go to call the v1
+      GET /tenants/{projectId} endpoint (AuraApiVersion1) instead, passing the response
+      through as-is via output.PrintBody. Remove the organization ID resolution logic from
+      the RunE (--organization-id flag may be kept for forward compatibility but should not
+      be required or used). Update get_test.go to mock the v1 /tenants/{id} path instead
+      of the v2beta1 path. This is a temporary workaround.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "aura project get <id> calls GET /tenants/{id} on v1 (not v2beta1)"
+      - "--organization-id flag is accepted but not required and not used in the API call"
+      - "Response is passed through as-is via output.PrintBody"
+      - "Tests mock /v1/tenants/{id} and cover success and API error (404) cases"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: 2026-05-15T19:30:00Z
+
+  - id: task-015
+    title: "Update validateAndSetDefaultWorkspace to use list-based project validation"
+    description: |
+      The GET /organizations/{orgId}/projects/{projectId} endpoint does not yet exist on
+      v2beta1. Update the validateAndSetDefaultWorkspace helper in
+      neo4j-cli/aura/internal/subcommands/workspace/validate.go to validate the project by
+      calling GET /organizations/{orgId}/projects (AuraApiVersion2) and checking whether
+      the projectId appears in the returned list, rather than calling the non-existent
+      single-project GET. Return a clear error ("project <id> not found in organization
+      <orgId>") when the project is absent from the list. Update validate_test.go to mock
+      the list endpoint and cover: project found (success), project not found (clear error),
+      list API error, and empty list cases.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "validateAndSetDefaultWorkspace calls GET /organizations/{orgId}/projects to validate"
+      - "Returns clear error when projectId is absent from the list response"
+      - "Returns clear error when the list API call fails"
+      - "Persists aura.default-workspace only when project ID is confirmed in the list"
+      - "Tests cover project-found, project-not-found, API-error, and empty-list cases"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: 2026-05-15T20:00:00Z
+
+  - id: task-016
+    title: "Rename context subcommand package to workspace"
+    description: |
+      Rename neo4j-cli/aura/internal/subcommands/context/ to .../workspace/ and update
+      everything inside it:
+      - Rename context.go to workspace.go; change the Go package name from `context` to
+        `workspace` across all five files (context.go/workspace.go, list.go, use.go,
+        validate.go and the three _test.go files).
+      - In workspace.go change Use: "context" to Use: "workspace" and update the command's
+        Short/Long/Example text.
+      - In validate.go rename ValidateAndSetDefaultContext to ValidateAndSetDefaultWorkspace
+        and update the comment and the cfg.Aura.Set("default-context", slug) call to
+        cfg.Aura.Set("default-workspace", slug).
+      - In list.go rename contextEntry → workspaceEntry, contextListResponse →
+        workspaceListResponse, the json tag "context" on the slug field → "workspace",
+        the AsArray() key "context" → "workspace", the call cfg.Aura.DefaultContext() →
+        cfg.Aura.DefaultWorkspace(), and the column list passed to PrintBodyMap
+        ("context" → "workspace").
+      - In use.go update the call from ValidateAndSetDefaultContext to
+        ValidateAndSetDefaultWorkspace and update Example text.
+      - Update all three _test.go files: rename test functions (TestValidateAndSetDefaultContext
+        → TestValidateAndSetDefaultWorkspace, readPersistedDefaultContext →
+        readPersistedDefaultWorkspace), update the import path from
+        .../subcommands/context to .../subcommands/workspace, and replace all
+        "aura.default-context" / "default-context" string literals with the workspace
+        equivalents.
+      - Update neo4j-cli/aura/aura.go: change the import from .../subcommands/context to
+        .../subcommands/workspace and the mount call from context.NewCmd to workspace.NewCmd.
+    status: completed
+    completed_at: 2026-05-18T10:00:00Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/subcommands/context/ directory no longer exists"
+      - "neo4j-cli/aura/internal/subcommands/workspace/ directory exists with all files"
+      - "Go package name is workspace in all files in the new directory"
+      - "cobra Use field is \"workspace\" in workspace.go"
+      - "ValidateAndSetDefaultWorkspace is the exported function name in validate.go"
+      - "cfg.Aura.Set(\"default-workspace\", slug) is used in validate.go (not default-context)"
+      - "workspaceEntry struct has json tag \"workspace\" (not \"context\")"
+      - "cfg.Aura.DefaultWorkspace() called in list.go (not DefaultContext)"
+      - "aura.go imports and mounts the workspace package"
+      - "make test, make fmt-check, and make lint all pass"
+
+  - id: task-017
+    title: "Update all callers outside workspace/ to use new names and config key"
+    description: |
+      Update every file outside neo4j-cli/aura/internal/subcommands/workspace/ that
+      references the old context names or default-context config key:
+
+      common/clicfg/clicfg.go:
+      - Change validAuraConfigKeys entry from "default-context" to "default-workspace".
+      - Rename DefaultContext() → DefaultWorkspace() and update the viper key inside it
+        from "aura.default-context" to "aura.default-workspace".
+      - Update DefaultTenant(): change the viper.GetString call from "aura.default-context"
+        to "aura.default-workspace".
+      - Update the comment above DefaultTenant() that references aura.default-context.
+
+      common/clicfg/clicfg_test.go:
+      - Replace all "default-context" string literals with "default-workspace".
+      - Rename the test that uses wantKey: "default-context" → "default-workspace".
+      - Update test names like "returns project portion of aura.default-context" to reference
+        aura.default-workspace.
+
+      neo4j-cli/aura/internal/subcommands/config/set.go:
+      - Update import alias from auracontext ".../subcommands/context" to
+        auraw ".../subcommands/workspace" (or similar).
+      - Change key == "default-context" guard → key == "default-workspace".
+      - Change auracontext.ValidateAndSetDefaultContext → auraw.ValidateAndSetDefaultWorkspace.
+      - Update Example text: "default-context" → "default-workspace".
+
+      neo4j-cli/aura/internal/subcommands/config/get.go:
+      - Update Example text: "default-context" → "default-workspace".
+
+      neo4j-cli/aura/internal/subcommands/config/list.go:
+      - Update Example text and comment: "default-context" → "default-workspace".
+
+      neo4j-cli/aura/internal/subcommands/config/set_test.go:
+      - Rename TestSetDefaultContext → TestSetDefaultWorkspace.
+      - Replace all "default-context" / "aura.default-context" string literals.
+
+      neo4j-cli/aura/internal/subcommands/config/list_test.go:
+      - Replace "default-context" assertion strings with "default-workspace".
+
+      neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go:
+      - Replace "default-context": null with "default-workspace": null in the fixture JSON.
+
+      neo4j-cli/aura/internal/subcommands/utils/projectflags.go:
+      - Replace cfg.Aura.DefaultContext() → cfg.Aura.DefaultWorkspace().
+      - Update all comments referencing aura.default-context → aura.default-workspace.
+
+      neo4j-cli/aura/internal/subcommands/project/list.go:
+      - Replace cfg.Aura.DefaultContext() → cfg.Aura.DefaultWorkspace().
+      - Update Example text, error message, flag description, and comment: all
+        "aura.default-context" → "aura.default-workspace".
+
+      neo4j-cli/aura/internal/subcommands/project/list_test.go:
+      - Update the assertion that checks for "aura.default-context" in the error output.
+
+      neo4j-cli/aura/internal/test/testutils/auratesthelper.go:
+      - Change helper.SetConfigValue("aura.default-context", ...) →
+        helper.SetConfigValue("aura.default-workspace", ...).
+
+      neo4j-cli/internal/subcommands/config/get.go:
+      - Update Example text: "aura.default-context" → "aura.default-workspace".
+
+      neo4j-cli/internal/subcommands/config/set.go:
+      - Update Example text: "aura.default-context" → "aura.default-workspace".
+    status: completed
+    completed_at: 2026-05-18T11:00:00Z
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "validAuraConfigKeys contains \"default-workspace\", not \"default-context\""
+      - "AuraConfig.DefaultWorkspace() exists; DefaultContext() has been removed"
+      - "DefaultTenant() reads aura.default-workspace (not aura.default-context)"
+      - "config/set.go imports workspace package and calls ValidateAndSetDefaultWorkspace"
+      - "config/set.go guards on key == \"default-workspace\""
+      - "All Example fields in aura config get/set/list reference default-workspace"
+      - "neo4j-cli config get/set examples reference aura.default-workspace"
+      - "project/list.go calls DefaultWorkspace() and error/flag text says aura.default-workspace"
+      - "auratesthelper.go sets aura.default-workspace"
+      - "No remaining references to DefaultContext(), default-context, or aura.default-context anywhere in source or test files"
+      - "make test, make fmt-check, and make lint all pass"
+
+  - id: task-018
+    title: "Regenerate skill bundles after workspace rename and run all gates"
+    description: |
+      After tasks 016 and 017 are complete, regenerate the skill bundles to pick up the
+      renamed workspace subcommand (was context) and the updated default-workspace config
+      key in help text and examples:
+
+        go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...
+
+      Verify TestGenerator_RoundTrip passes (no bundle drift). Run all project gates:
+      make test, make fmt-check, and make lint. Fix any issues surfaced.
+    status: completed
+    completed_at: 2026-05-18T12:00:00Z
+    dependencies:
+      - task-016
+      - task-017
+    acceptance_criteria:
+      - "go generate runs without error on both skill targets"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "Skill bundle references workspace list/use (not context list/use)"
+      - "Skill bundle references default-workspace (not default-context)"
+      - "make test passes (all tests green)"
+      - "make fmt-check passes (no unformatted files)"
+      - "make lint passes (no lint errors)"

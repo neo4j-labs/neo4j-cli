@@ -94,7 +94,18 @@ func TestListTenantsWithCredentialFlag(t *testing.T) {
 			helper.ExecuteCommand(tc.command)
 
 			mockHandler.AssertCalledTimes(1)
-			helper.AsssertOk()
+			helper.AssertErrContainsStrings([]string{"Warning: 'aura tenant list' is deprecated and will be removed in a future release. Use 'aura project list' instead."})
 		})
 	}
+}
+
+func TestListTenants_DeprecationWarning(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock("/v1/tenants", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand("tenant list")
+
+	helper.AssertErrContainsStrings([]string{"Warning: 'aura tenant list' is deprecated and will be removed in a future release. Use 'aura project list' instead."})
 }

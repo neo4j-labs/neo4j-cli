@@ -16,7 +16,6 @@ import (
 	"github.com/neo4j/cli/common/analytics"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
-	"github.com/neo4j/cli/common/clicfg/projects"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
@@ -126,7 +125,6 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	// }
 
 	credentials := credentials.NewCredentials(fs, ConfigPrefix)
-	projects := projects.NewAuraConfigProjects(fs, fullConfigPath)
 
 	logger := slog.Default()
 
@@ -141,7 +139,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh"},
 	}
 
-	validAuraConfigKeys := []string{"auth-url", "base-url", "default-tenant"}
+	validAuraConfigKeys := []string{"auth-url", "base-url", "default-workspace"}
 	if scope == AuraScope {
 		validAuraConfigKeys = append(validAuraConfigKeys, globalConfig.ValidConfigKeys...)
 	}
@@ -155,7 +153,6 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 				Interval:   20,
 			},
 			ValidConfigKeys: validAuraConfigKeys,
-			Projects:        projects,
 		},
 		Global:      globalConfig,
 		Credentials: credentials,
@@ -200,33 +197,12 @@ type PrintableConfigEntry struct {
 }
 
 func (e PrintableConfigEntry) AsArray() []map[string]any {
-	if e.Key == "aura-projects" {
-		valueMap := e.Value.(map[string]interface{})
-		defaultProject := valueMap["default"].(string)
-		projects := valueMap["projects"].(map[string]interface{})
-		res := make([]map[string]any, len(projects))
-		for projectName, projectData := range projects {
-			projectMap := projectData.(map[string]interface{})
-			res = append(res, map[string]any{
-				"name":            projectName,
-				"organization-id": projectMap["organization-id"],
-				"project-id":      projectMap["project-id"],
-				"default":         projectName == defaultProject,
-			})
-		}
-		return res
-	}
-
 	return []map[string]any{
 		{"key": e.Key, "value": e.Value},
 	}
 }
 
 func (e PrintableConfigEntry) MarshalJSON() ([]byte, error) {
-	if e.Key == "aura-projects" {
-		return json.Marshal(e.Value)
-	}
-
 	return json.Marshal(map[string]any{
 		e.Key: e.Value,
 	})
@@ -269,8 +245,6 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("format", "default")
 	Viper.SetDefault("telemetry", true)
 	Viper.SetDefault("skill-auto-refresh", true)
-	// TODO: should this become aura.projects?
-	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
 
 type AuraConfig struct {
@@ -278,7 +252,6 @@ type AuraConfig struct {
 	fs               afero.Fs
 	pollingOverride  PollingConfig
 	ValidConfigKeys  []string
-	Projects         *projects.AuraConfigProjects
 	betaEnabled      bool
 	activeCredential *credentials.AuraCredential
 }
@@ -296,10 +269,6 @@ func (config *AuraConfig) Get(key string) interface{} {
 	// Bit of a hack for a global config key - it's fine with just the one value but if we're adding more we should refactor
 	// TODO: refactor this for global config keys to be properly namespaced (i.e. "format" vs "aura.format") and remove this special case
 	if key == "format" {
-		return config.viper.Get(key)
-	}
-	// TODO: this hack should be fixed by renaming to aura.projects
-	if key == "aura-projects" {
 		return config.viper.Get(key)
 	}
 	return config.viper.Get(fmt.Sprintf("aura.%s", key))
@@ -389,7 +358,24 @@ func (config *AuraConfig) ActiveCredential() *credentials.AuraCredential {
 	return config.activeCredential
 }
 
+// DefaultWorkspace returns the raw value of aura.default-workspace (e.g. "{orgId}/{projectId}").
+// Returns an empty string when not set.
+func (config *AuraConfig) DefaultWorkspace() string {
+	return config.viper.GetString("aura.default-workspace")
+}
+
+// DefaultTenant resolves the default tenant/project ID for Aura commands.
+// Resolution order:
+//  1. Project portion of aura.default-workspace (the part after the '/' in "{orgId}/{projectId}").
+//  2. Legacy aura.default-tenant config key as a fallback.
+//
+// Returns an empty string when neither is set.
 func (config *AuraConfig) DefaultTenant() string {
+	if ctx := config.viper.GetString("aura.default-workspace"); ctx != "" {
+		if idx := strings.LastIndex(ctx, "/"); idx >= 0 {
+			return ctx[idx+1:]
+		}
+	}
 	return config.viper.GetString("aura.default-tenant")
 }
 

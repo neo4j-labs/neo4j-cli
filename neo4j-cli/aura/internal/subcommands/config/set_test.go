@@ -4,6 +4,8 @@
 package config_test
 
 import (
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
@@ -56,4 +58,87 @@ func TestSetBetaEnabledConfig(t *testing.T) {
 	helper.ExecuteCommand("config set beta-enabled false --rw")
 
 	helper.AssertErr("Error: invalid config key specified: beta-enabled")
+}
+
+func TestSetDefaultWorkspace(t *testing.T) {
+	const orgID = "org-111"
+	const projectID = "proj-222"
+	const slug = orgID + "/" + projectID
+
+	for _, tc := range []struct {
+		name        string
+		slug        string
+		status      int
+		body        string
+		wantContext string
+		wantErr     string
+	}{
+		{
+			name:        "success persists default-workspace",
+			slug:        slug,
+			status:      http.StatusOK,
+			body:        fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
+			wantContext: slug,
+		},
+		{
+			name:    "project not found in list returns clear error",
+			slug:    slug,
+			status:  http.StatusOK,
+			body:    `{"data": [{"id": "other-proj", "name": "Other Project"}]}`,
+			wantErr: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
+		},
+		{
+			name:    "404 from list API returns error without persisting",
+			slug:    slug,
+			status:  http.StatusNotFound,
+			body:    `{"errors": [{"message": "organization not found"}]}`,
+			wantErr: "organization not found",
+		},
+		{
+			name:    "API error returns error without persisting",
+			slug:    slug,
+			status:  http.StatusInternalServerError,
+			body:    `{"errors": [{"message": "internal server error"}]}`,
+			wantErr: "internal server error",
+		},
+		{
+			name:    "invalid slug without slash returns error",
+			slug:    "noslash",
+			wantErr: "expected format {organizationId}/{projectId}",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := testutils.NewAuraTestHelper(t)
+			defer helper.Close()
+
+			helper.SetConfigValue("aura.beta-enabled", true)
+
+			if tc.status != 0 {
+				mockHandler := helper.NewRequestHandlerMock(
+					fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
+					tc.status,
+					tc.body,
+				)
+
+				helper.ExecuteCommand(fmt.Sprintf("config set default-workspace %s --rw", tc.slug))
+
+				if tc.wantErr != "" {
+					helper.AssertErrContainsStrings([]string{tc.wantErr})
+					return
+				}
+
+				helper.AsssertOk()
+				helper.AssertConfigValue("aura.default-workspace", tc.wantContext)
+				mockHandler.AssertCalledTimes(1)
+				mockHandler.AssertCalledWithMethod(http.MethodGet)
+				return
+			}
+
+			helper.ExecuteCommand(fmt.Sprintf("config set default-workspace %s --rw", tc.slug))
+
+			if tc.wantErr != "" {
+				helper.AssertErrContainsStrings([]string{tc.wantErr})
+			}
+		})
+	}
 }

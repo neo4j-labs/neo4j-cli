@@ -18,8 +18,8 @@ neo4j-cli config set format json --rw
 # Disable telemetry
 neo4j-cli config set telemetry false --rw
 
-# Set the default Aura tenant via dot-notation
-neo4j-cli config set aura.default-tenant my-tenant-id --rw`,
+# Set the default Aura workspace via dot-notation
+neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 		Annotations: map[string]string{"write": "true"},
 		ValidArgs:   validSetArgs(cfg),
 		Args: func(cmd *cobra.Command, args []string) error {
