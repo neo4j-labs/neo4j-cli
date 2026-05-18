@@ -89,7 +89,7 @@ tasks:
       steps.changed.outputs.include_neo4j == 'true'` guards from the
       `Upload dist artifact` and `Upload release-meta artifact` steps.
       Satisfies REQ-F-006.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -97,7 +97,7 @@ tasks:
       - "`Write release-meta.json` step emits a JSON payload with key `version` only"
       - "`Upload dist artifact` and `Upload release-meta artifact` steps run unconditionally (no `if:` guard)"
       - "File parses as valid YAML (`yq eval '.' .github/workflows/release.yml` exits 0)"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-006
     title: "Strip include_neo4j consumer side from publish-npm.yml"

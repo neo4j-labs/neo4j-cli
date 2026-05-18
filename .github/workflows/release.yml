@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.versions.outputs.neo4j }}
-      include_neo4j: ${{ steps.changed.outputs.include_neo4j }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -34,24 +33,10 @@ jobs:
           NEO4J_VERSION=$(echo "${{ steps.latest-neo4j.outputs.output }}" | sed 's/^neo4j-cli//')
           echo "neo4j=$NEO4J_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Detect changed changelogs
-        id: changed
-        run: |
-          # Detect which changelogs were updated in this commit; surface as job
-          # outputs so downstream workflows (e.g. publish-npm.yml) can gate on
-          # whether neo4j-cli was actually released in this run.
-          CHANGED_FILES=$(git diff HEAD~1 --name-only)
-          INCLUDE_NEO4J="false"
-          if echo "$CHANGED_FILES" | grep -q "CHANGELOG-neo4j.md"; then
-            INCLUDE_NEO4J="true"
-          fi
-          echo "include_neo4j=$INCLUDE_NEO4J" >> $GITHUB_OUTPUT
-
       - name: Generate release notes
         run: |
           NEO4J_VERSION="${{ steps.versions.outputs.neo4j }}"
           NEO4J_CHANGES_FILE=".changes/neo4j-cli/${NEO4J_VERSION}.md"
-          INCLUDE_NEO4J="${{ steps.changed.outputs.include_neo4j }}"
           # Extract the changelog body: skip the first line (## vX.Y.Z - DATE header)
           # Guard: only read the file if it exists
           NEO4J_BODY=""
@@ -62,11 +47,9 @@ jobs:
             printf '## Versions\n\n'
             printf -- '- neo4j-cli: %s\n' "${NEO4J_VERSION}"
             printf '\n## Changes\n\n'
-            if [ "$INCLUDE_NEO4J" = "true" ]; then
-              printf '### neo4j-cli\n\n'
-              printf '%s\n' "${NEO4J_BODY}"
-              printf '\n'
-            fi
+            printf '### neo4j-cli\n\n'
+            printf '%s\n' "${NEO4J_BODY}"
+            printf '\n'
           } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Add env vars
@@ -97,24 +80,16 @@ jobs:
           MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
 
       - name: Write release-meta.json
-        if: steps.changed.outputs.include_neo4j == 'true'
         env:
           NEO4J_VERSION_TAG: ${{ steps.versions.outputs.neo4j }}
-          INCLUDE_NEO4J: ${{ steps.changed.outputs.include_neo4j }}
         run: |
           # Compact metadata blob consumed by publish-npm.yml's workflow_run path.
-          # Only emitted when neo4j-cli was actually released in this run; the
-          # downstream workflow also gates on the include_neo4j job output.
           # Strip the leading `v` from the GoReleaser tag — publish-npm.yml expects
           # bare semver (its regex rejects a leading v and it prepends v itself).
           NEO4J_VERSION="${NEO4J_VERSION_TAG#v}"
-          printf '{"version":"%s","include_neo4j":%s}\n' \
-            "${NEO4J_VERSION}" \
-            "${INCLUDE_NEO4J}" \
-            > release-meta.json
+          printf '{"version":"%s"}\n' "${NEO4J_VERSION}" > release-meta.json
 
       - name: Upload dist artifact
-        if: steps.changed.outputs.include_neo4j == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
@@ -123,7 +98,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload release-meta artifact
-        if: steps.changed.outputs.include_neo4j == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-meta

@@ -10,3 +10,7 @@ Files: -neo4j-cli/aura/cmd/main.go, -neo4j-cli/aura/cmd/main_test.go, ~AGENTS.md
 Deleted entire `neo4j-cli/aura/internal/skill/` subtree (embed.go, description.txt, additions.md, gen/, install_e2e_test.go, bundle/) and dropped the now-dangling `common/skill` + `binskill` imports plus the `skill.NewCmd` mount from `NewStandaloneCmd` in `aura.go`. Pulled task-004 forward because deleting the skill package would otherwise break the build mid-iteration.
 Files: -neo4j-cli/aura/internal/skill/** (14 files), ~neo4j-cli/aura/aura.go, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
 Decisions: Tasks merged into a single commit since they are inseparable (deleting target package breaks the import).
+
+## TASK-005 — 2026-05-18T00:00:00Z
+Stripped `include_neo4j` producer side from `.github/workflows/release.yml`: removed `Detect changed changelogs` step, job-level output, all `if:` guards on Write/Upload steps, and trimmed `release-meta.json` payload to `{"version":"…"}`.
+Files: ~.github/workflows/release.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
