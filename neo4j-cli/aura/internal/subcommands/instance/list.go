@@ -29,6 +29,7 @@ neo4j-cli aura instance list
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -39,8 +40,6 @@ neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000
 			queryParams := map[string]string{
 				"tenantId": projectID,
 			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
 				QueryParams: queryParams,

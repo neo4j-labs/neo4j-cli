@@ -31,12 +31,11 @@ neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 0
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
 				return err

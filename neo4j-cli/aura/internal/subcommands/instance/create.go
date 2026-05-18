@@ -113,6 +113,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -120,7 +121,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 			// Auto-generate a default name when --name is omitted.
 			if name == "" {
-				cmd.SilenceUsage = true
 				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
 					Method:      http.MethodGet,
 					QueryParams: map[string]string{"tenantId": resolvedProjectID},
@@ -166,7 +166,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				body["customer_managed_key_id"] = customerManagedKeyId
 			}
 
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,

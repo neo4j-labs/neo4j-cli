@@ -57,6 +57,7 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -83,8 +84,6 @@ Creating a session is an asynchronous operation that can be waited for with --wa
 			if region != "" {
 				body["region"] = region
 			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/graph-analytics/sessions", &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,

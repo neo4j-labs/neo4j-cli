@@ -31,6 +31,7 @@ neo4j-cli aura graph-analytics session list --organization-id 00000000-0000-0000
 
 Use --organization-id and --project-id to specify which project's sessions to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -44,8 +45,6 @@ Use --organization-id and --project-id to specify which project's sessions to li
 			if instanceId != "" {
 				queryParams["instanceId"] = instanceId
 			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
 				QueryParams: queryParams,

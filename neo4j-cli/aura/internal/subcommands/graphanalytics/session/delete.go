@@ -33,12 +33,11 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 		RunE: func(cmd *cobra.Command, args []string) error {
 			sessionID := strings.TrimSpace(args[0])
 
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			// Pre-flight ownership check.
 			if _, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID); err != nil {

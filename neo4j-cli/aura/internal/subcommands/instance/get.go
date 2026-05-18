@@ -31,12 +31,11 @@ neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-0
 		RunE: func(cmd *cobra.Command, args []string) error {
 			instanceId := strings.TrimSpace(args[0])
 
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 			resBody, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID)
 			if err != nil {
 				return err

@@ -54,6 +54,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 # Create a key and emit JSON for scripting
 neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -67,8 +68,6 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 				"key_id":         keyId,
 				"tenant_id":      projectID,
 			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/customer-managed-keys", &api.RequestConfig{
 				Method:   http.MethodPost,
 				PostBody: body,

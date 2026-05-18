@@ -30,6 +30,7 @@ neo4j-cli aura customer-managed-key list
 neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -39,8 +40,6 @@ neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-00
 			queryParams := map[string]string{
 				"tenantId": projectID,
 			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
 				QueryParams: queryParams,

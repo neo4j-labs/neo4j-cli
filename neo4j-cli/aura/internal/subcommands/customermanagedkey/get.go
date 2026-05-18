@@ -30,12 +30,11 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --o
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmkID := strings.TrimSpace(args[0])
 
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 			resBody, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID)
 			if err != nil {
 				return err
