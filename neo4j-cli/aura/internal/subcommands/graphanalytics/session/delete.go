@@ -37,14 +37,14 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 				return err
 			}
 
+			cmd.SilenceUsage = true
+
 			// Pre-flight ownership check.
 			if _, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID); err != nil {
 				return err
 			}
 
 			path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodDelete,
 			})

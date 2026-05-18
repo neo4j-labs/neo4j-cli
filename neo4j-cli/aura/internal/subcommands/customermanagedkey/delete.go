@@ -39,13 +39,14 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 				return err
 			}
 
+			cmd.SilenceUsage = true
+
 			// Pre-flight ownership check.
 			if _, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID); err != nil {
 				return err
 			}
 
 			path := fmt.Sprintf("/customer-managed-keys/%s", cmkID)
-			cmd.SilenceUsage = true
 			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodDelete,
 			})

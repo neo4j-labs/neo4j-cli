@@ -43,14 +43,14 @@ neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --organizatio
 				return err
 			}
 
+			cmd.SilenceUsage = true
+
 			// Pre-flight ownership check.
 			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
 				return err
 			}
 
 			path := fmt.Sprintf("/instances/%s/pause", instanceID)
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodPost,
 			})
