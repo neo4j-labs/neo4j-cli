@@ -46,7 +46,7 @@ tasks:
       `bundle/` subtree (`SKILL.md` + `references/*.md`). After this,
       no `go:generate` directive remains anywhere under
       `neo4j-cli/aura/`. Satisfies REQ-F-002.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -54,7 +54,7 @@ tasks:
       - "`git ls-files neo4j-cli/aura/internal/skill/` returns nothing"
       - "`grep -rn 'go:generate' neo4j-cli/aura/` returns zero hits"
       - "`go build ./...` exits 0"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-004
     title: "Drop the skill mount from NewStandaloneCmd in aura.go"
@@ -68,7 +68,7 @@ tasks:
       registration, `FlagErrorFunc`, `config` mount, `credential`
       mount. Keep `NewStandaloneCmd` exported. Satisfies REQ-F-003 and
       REQ-F-004.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -76,7 +76,7 @@ tasks:
       - "`neo4j-cli/aura/aura.go` no longer contains a `skill.NewCmd(` call"
       - "`aura.NewStandaloneCmd` remains declared, exported, and still mounts `config` + `credential` + `--rw`"
       - "`go build ./...` exits 0 and `make lint` reports no `unused` warning against `NewStandaloneCmd`"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-005
     title: "Strip include_neo4j producer side from release.yml"
