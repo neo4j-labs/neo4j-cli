@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Emit structured error envelope to stdout when --format=json or --format=toon and a command fails (CLI-140)
+time: 2026-05-18T15:20:25.581982+02:00

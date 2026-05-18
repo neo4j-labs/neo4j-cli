@@ -139,7 +139,7 @@ tasks:
       make generate-check (the last to confirm no unexpected skill-bundle drift; run `go generate
       ./neo4j-cli/internal/skill/...` and diff regardless). Rebuild via make build and run the two manual smoke
       commands from the PRD to confirm both modes behave as specified.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -148,7 +148,7 @@ tasks:
       - "Manual smoke `./bin/neo4j-cli aura instance list --bad-flag --format=json` returns exit 2, stdout is a valid envelope with code=usage_error, exit_code=2"
       - "Manual smoke `./bin/neo4j-cli aura instance list --bad-flag` returns exit 2, stderr matches the new plaintext shape (`Error: ... (exit 2)`), stdout empty"
       - "No skill-bundle drift introduced (git diff after go generate is empty for bundle paths)"
-    completed_at: null
+    completed_at: 2026-05-18T15:25:00Z
 
   - id: task-008
     title: "Emit error envelope in toon mode (--format=toon)"

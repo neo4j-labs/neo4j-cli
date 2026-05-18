@@ -29,3 +29,7 @@ Decisions: extractEnvelope scans backwards for `{...}` lines because cobra dumps
 ## TASK-008 — 2026-05-18T18:00:00Z
 Added toon-mode branch to Render: switch{json,toon} dispatches to envelope encoders, others fall through to plaintext+suggestion. New marshalEnvelopeToon helper uses the JSON->any->toon.Marshal hop with WithLengthMarkers to match common/output. Tests cover 3 CodeNames, untyped fallback, and suggestion behaviour in toon mode; removed "toon" from PlaintextMode table.
 Files: ~common/clierr/render.go, ~common/clierr/render_test.go
+
+## TASK-007 — 2026-05-18T15:25:00Z
+Added neo4j-cli Minor changelog entry covering both --format=json and --format=toon error envelope shipping in CLI-140. All gates clean (fmt-check, lint, test); generate-check diff was only the mid-task YAML flip per AGENTS.md note. Three manual smokes pass: json envelope on stdout + plaintext on stderr, plaintext-only on stderr with `(exit 2)`, toon envelope on stdout.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260518-152025.yaml
