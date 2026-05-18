@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: Org/project context is now enforced for all instance, customer-managed-key, and graph-analytics session commands; --organization-id and --project-id flags resolve the target project and --tenant-id is deprecated in favour of --project-id
+body: Aura workspace is now applied to all instance, customer-managed-key, and graph-analytics session commands; --organization-id and --project-id flags resolve the target project and --tenant-id is deprecated in favour of --project-id
 time: 2026-05-18T13:37:00.838822+01:00
