@@ -453,7 +453,8 @@ tasks:
 
       Verify TestGenerator_RoundTrip passes (no bundle drift). Run all project gates:
       make test, make fmt-check, and make lint. Fix any issues surfaced.
-    status: not_started
+    status: completed
+    completed_at: 2026-05-18T12:00:00Z
     dependencies:
       - task-016
       - task-017
