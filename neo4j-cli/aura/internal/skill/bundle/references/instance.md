@@ -265,13 +265,13 @@ Examples:
 
 ```
 # Take an on-demand snapshot of an instance
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Take a snapshot and wait until it is ready
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --wait --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Take a snapshot and emit JSON for scripting
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --rw --format json
+neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 ```
 
 ### aura-cli instance snapshot get
@@ -292,13 +292,13 @@ Examples:
 
 ```
 # Get details of a snapshot by its ID
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Check whether a snapshot is exportable via jq
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.exportable'
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.exportable'
 ```
 
 ### aura-cli instance snapshot list
@@ -320,13 +320,13 @@ Examples:
 
 ```
 # List today's snapshots for an instance
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # List snapshots for a specific date
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --date 2025-01-15
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --date 2025-01-15
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --format json
+neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ## aura-cli instance update

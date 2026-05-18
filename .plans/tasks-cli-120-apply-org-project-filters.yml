@@ -117,7 +117,7 @@ tasks:
       operation. Because `--organization-id` and `--project-id` are persistent on the `instance`
       parent, no additional flag registration is needed in the snapshot group. Apply
       `RenameResponseField` where snapshot responses include `tenant_id`. Add or update colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -126,7 +126,7 @@ tasks:
       - "Snapshot operations are not issued if the parent instance ownership check fails"
       - "Flags are inherited from the `instance` parent; no duplicate registration in the snapshot group"
       - "Table-driven tests cover happy path, project-not-in-org, and instance-not-in-tenant"
-    completed_at: null
+    completed_at: "2026-05-18T05:00:00Z"
 
   - id: task-007
     title: "Apply org/project enforcement to customermanagedkey commands"
