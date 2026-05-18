@@ -119,6 +119,35 @@ func TestCancelImportJobWithCredentialFlag(t *testing.T) {
 	}
 }
 
+func TestCancelImportJobWithTrailingNewline(t *testing.T) {
+	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
+	jobId := "87d485b4-73fc-4a7f-bb03-720f4672947e"
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs/%s/cancellation", organizationId, projectId, jobId), http.StatusOK, fmt.Sprintf(`
+		{
+			"data": {"id": "%s"}
+		}
+	`, jobId))
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	helper.ExecuteCommand(fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s --rw %s\"\n\"", organizationId, projectId, jobId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodPost)
+
+	helper.AssertErr("")
+	helper.AssertOutJson(fmt.Sprintf(`
+		{
+			"data": {"id": "%s"}
+		}
+	`, jobId))
+}
+
 func TestCancelImportJobError(t *testing.T) {
 	organizationId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
 	projectId := "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
