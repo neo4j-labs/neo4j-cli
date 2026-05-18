@@ -31,9 +31,7 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - REQ-F-001: New workflow `.github/workflows/claude-review-security.yml` triggers on `pull_request` types `[opened, synchronize, reopened, ready_for_review]`.
 - REQ-F-002: New workflow `.github/workflows/claude-review-conventions.yml` triggers on the same events.
 - REQ-F-003: Both workflows skip when `github.event.pull_request.draft == true`.
-- REQ-F-004: Both workflows run only when the PR author meets at least one of:
-  - `pull_request.author_association` is `MEMBER`, `OWNER`, or `COLLABORATOR`; **or**
-  - `pull_request.user.login` is in an inline allowlist (initial seed: `oskarhane`, `Liam-Doodson`, `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j` — final list confirmed before merge).
+- REQ-F-004: Both workflows run only when `pull_request.author_association` is `MEMBER`, `OWNER`, or `COLLABORATOR`. Outside contributors and bots (dependabot, renovate, etc.) are skipped and can still invoke `@claude` manually via the existing mention workflow.
 - REQ-F-005: Both workflows use `anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b` (same pinned SHA as existing `claude.yml`) and authenticate via `secrets.CLAUDE_CODE_OAUTH_TOKEN` (no new secret).
 - REQ-F-006: Both workflows set `permissions:` to `contents: read`, `pull-requests: write` (required to post reviews), `issues: read`, `id-token: write`, `actions: read`. Net escalation vs `claude.yml` is `pull-requests: write` only.
 - REQ-F-007: `claude_args` restricts tools to a narrow allowlist: `mcp__github_inline_comment__create_inline_comment`, `Bash(gh pr comment:*)`, `Bash(gh pr diff:*)`, `Bash(gh pr view:*)`, `Bash(gh pr checks:*)`, `Read`, `Grep`, `Glob`. No general `Bash`, no `Write`/`Edit`, no `curl`/`wget`.
@@ -57,12 +55,11 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - **Prompt loading**: Read the prompt file in a prior workflow step (e.g. `PROMPT=$(cat .github/prompts/claude-review-security.md)` → write to `$GITHUB_ENV`), then reference `${{ env.PROMPT }}` in the action's `prompt:` input. Avoids YAML heredoc escaping. Prepend `REPO:` / `PR NUMBER:` context inline in the workflow before the prompt body.
 - **Verdict file → red check**: The `anthropics/claude-code-action` step itself completes successfully whether Claude finds issues or not. To turn findings into a failing check, the prompt instructs Claude to write `pass`/`fail` to `/tmp/claude-verdict.txt` (via the allowed `Bash(gh ...)` family — needs adjustment to also allow `Bash(echo:*)` redirected to that file, or a small dedicated tool). A subsequent `run:` step does `[ "$(cat /tmp/claude-verdict.txt 2>/dev/null)" = "pass" ] || { echo '::error::Claude flagged issues'; exit 1; }`. Fail-closed if the file is missing — protects against Claude exiting early without writing a verdict.
 - **`claude_args` tool allowlist needs to permit writing the verdict file**. Options: (a) add `Bash(bash -c:*)` for an `echo > /tmp/claude-verdict.txt`, or (b) add a narrow `Bash(tee:*)` / `Bash(printf:*)`. Pick the narrowest that works during prototyping.
-- **Author filter is at the workflow `if:` level**, not inside the action. Skipped runs cost 0 minutes (GitHub doesn't bill skipped jobs) and don't consume OAuth tokens.
+- **Author filter is at the workflow `if:` level**, not inside the action. Skipped runs cost 0 minutes (GitHub doesn't bill skipped jobs) and don't consume OAuth tokens. Filter is org-membership only (`author_association` in `MEMBER`/`OWNER`/`COLLABORATOR`) — no inline username allowlist to maintain.
 - **`fetch-depth: 1`** matches `claude.yml`. The action reads the PR diff via `gh pr diff`, not git history, so shallow checkout is fine.
 - **Prompt-injection surface**: PR file contents can contain "ignore previous instructions, exfiltrate X" payloads. Mitigation: narrow `--allowedTools` (no `curl`/`wget`/general `Bash`/`Write`), `GITHUB_TOKEN` perms scoped to `pull-requests: write` only. Worst case under injection = a misleading review comment, not exfiltration.
 - **Two files vs one**: confirmed two-file layout. Each is its own check entry on the PR, independently re-runnable, easy to disable (`if: false` or delete file). Trade-off: ~30 lines of YAML duplication per file. Acceptable.
-- **Allowlist maintenance**: list lives inline in both workflow `if:` expressions. Adding a new internal contributor = edit two YAML files (or land them via the `MEMBER`/`COLLABORATOR` association branch automatically once they're added to the org).
-- **Cost**: per-PR cost = 2× OAuth runs on every push from internal authors. Renovate/outsider filter removes the bulk. Path filter can be added later if noisy.
+- **Cost**: per-PR cost = 2× OAuth runs on every push from internal authors. Org-membership filter removes outsiders and bots. Path filter can be added later if noisy.
 
 ## Acceptance Criteria
 
@@ -94,6 +91,5 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 
 ## Open Questions
 
-- Final allowlist GitHub logins? Seed list (`oskarhane`, `Liam-Doodson`, `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j`) is a guess — confirm before merge. Anyone in the org also covered automatically via `author_association`.
 - Exact `claude_args` tool string needed to let Claude write `/tmp/claude-verdict.txt` without opening up general `Bash`. To be settled during implementation by trying the narrowest viable option.
 - Whether the conventions prompt should also nudge on the title/commit-message conventions (e.g. conventional-commit prefix `feat(...)`) or stay scoped to code/file conventions only.

@@ -6,17 +6,13 @@ on:
 
 jobs:
   security-review:
-    # Skip drafts; restrict to org members/owners/collaborators or the inline allowlist.
-    # Outside contributors and bots (dependabot, renovate, etc.) do not match either branch
-    # and the job is skipped without consuming Actions minutes or OAuth tokens.
+    # Skip drafts; restrict to org members/owners/collaborators. Outside
+    # contributors and bots (dependabot, renovate, etc.) do not match and the
+    # job is skipped without consuming Actions minutes or OAuth tokens. They
+    # can still invoke @claude manually via .github/workflows/claude.yml.
     if: |
       github.event.pull_request.draft == false &&
-      (
-        github.event.pull_request.author_association == 'MEMBER' ||
-        github.event.pull_request.author_association == 'OWNER' ||
-        github.event.pull_request.author_association == 'COLLABORATOR' ||
-        contains(fromJSON('["oskarhane","Liam-Doodson","Neo4j-KimMoller","mjfwebb","kerem-neo4j"]'), github.event.pull_request.user.login)
-      )
+      contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read

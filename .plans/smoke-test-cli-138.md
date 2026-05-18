@@ -115,13 +115,13 @@ Fail criteria:
 
 ---
 
-## Scenario 3 — Non-allowlisted author / bot (skip entirely)
+## Scenario 3 — Non-member author / bot (skip entirely)
 
-Goal: PR opened by an author NOT in `MEMBER/OWNER/COLLABORATOR` and NOT
-in the inline allowlist results in zero billable runs.
+Goal: PR opened by an author NOT in `MEMBER/OWNER/COLLABORATOR` results
+in zero billable runs.
 
-This is hardest to simulate cleanly without a second account. Three
-options, easiest first:
+This is hardest to simulate cleanly without a second account. Two
+options:
 
 **Option A (recommended) — wait for organic bot PR.** Watch the Actions
 tab for the next Renovate or Dependabot PR. Verify:
@@ -136,14 +136,8 @@ gh run list --workflow=claude-review-security.yml --branch <bot branch>
 # Expect empty.
 ```
 
-**Option B — fork-based PR from a personal account not in the allowlist.**
-Push a branch from a personal account that is not an org member and not
-in the inline allowlist. Same verification as Option A.
-
-**Option C — temporarily remove yourself from the allowlist** in a test
-PR (do NOT merge). Open a draft, flip to ready, observe skip. Revert
-the allowlist change before closing the PR. This is risky — prefer A
-or B.
+**Option B — fork-based PR from a personal account that is not a
+neo4j-labs org member.** Same verification as Option A.
 
 Pass criteria:
 - `gh pr checks` shows no rows for either review workflow.
@@ -383,7 +377,7 @@ This runbook covers all eight task-005 acceptance criteria:
 | -- | -------- |
 | Clean PR shows both checks green | 1 |
 | Draft skip + ready trigger | 2 |
-| Bot / non-allowlisted skip | 3 |
+| Bot / non-member skip | 3 |
 | Convention-violation flips red | 4 |
 | Security-smell flips red | 5 |
 | Second push = second comment | 6 |

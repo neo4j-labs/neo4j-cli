@@ -157,3 +157,28 @@ tasks:
       the 7 acceptance scenarios. Static validation + local gates done;
       runbook at .plans/smoke-test-cli-138.md covers all 7 scenarios.
     completed_at: 2026-05-18T09:21:04Z
+
+  - id: task-006
+    title: "Drop inline username allowlist; rely on author_association only"
+    description: |
+      Originally both workflows gated on `author_association` OR an
+      inline JSON list of GitHub logins (`oskarhane`, `Liam-Doodson`,
+      `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j`). The list duplicates
+      across two files, rots when people join/leave the org, and adds
+      no coverage that org membership doesn't already give. Drop it.
+      `if:` becomes a single `contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), ...)`
+      check. Outside contributors and bots still skip; they can invoke
+      `@claude` manually via the existing mention workflow. Updates the
+      PRD (REQ-F-004, Technical Considerations, Open Questions) and
+      the smoke-test runbook scenario 3 to match.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "Both workflow `if:` blocks contain only the draft check + a single `contains(fromJSON('[\"MEMBER\",\"OWNER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association)` clause"
+      - "No reference to `oskarhane`, `Liam-Doodson`, `Neo4j-KimMoller`, `mjfwebb`, or `kerem-neo4j` remains in either workflow file"
+      - "PRD REQ-F-004 rewritten to org-membership only; the allowlist open question is removed"
+      - "Smoke-test runbook scenario 3 no longer mentions the allowlist (heading + body updated)"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: 2026-05-18T00:00:00Z
