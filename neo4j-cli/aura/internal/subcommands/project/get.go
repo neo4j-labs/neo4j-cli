@@ -20,19 +20,43 @@ func newGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Returns project details",
 		Long:  "This subcommand returns details about a specific Aura project.",
-		Example: `# Get project details by ID
+		Example: `# Get project details by ID (uses org from aura.default-workspace)
 neo4j-cli aura project get 00000000-0000-0000-0000-000000000000
 
-# Emit JSON for scripting
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json
+# Get project details in a specific organization
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-id 11111111-1111-1111-1111-111111111111
 
-# Pipe details through jq to extract the project name
-neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
+# Emit JSON for scripting
+neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			projectID := args[0]
 
+			orgID := organizationId
+			if orgID == "" {
+				orgID = resolveOrgFromWorkspace(cfg)
+			}
+			if orgID == "" {
+				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-workspace is not configured")
+			}
+
 			cmd.SilenceUsage = true
+
+			projects, err := api.ListProjects(cfg, orgID)
+			if err != nil {
+				return err
+			}
+			found := false
+			for _, p := range projects.Data {
+				if p.Id == projectID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("project %s not found in organization %s", projectID, orgID)
+			}
+
 			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/tenants/%s", projectID), &api.RequestConfig{
 				Method:  http.MethodGet,
 				Version: api.AuraApiVersion1,
@@ -49,8 +73,7 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json | 
 		},
 	}
 
-	// --organization-id is accepted for forward compatibility but not required and not used.
-	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (accepted for forward compatibility; not used in the API call)")
+	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (defaults to org portion of aura.default-workspace)")
 
 	return cmd
 }
