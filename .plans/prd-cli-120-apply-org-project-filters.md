@@ -2,11 +2,11 @@
 
 ## Overview
 
-CLI-99 established the org/project hierarchy: `aura.default-context`, the `organization` and `project` command groups, and the `context use` workflow. CLI-120 applies that hierarchy to every existing v1 API command. Every command that calls the v1 API — instance, customer-managed-key, and graph-analytics session — must now resolve and validate an org/project pair before executing. This enforces the security and scoping guarantees of the v2 hierarchy while keeping v1 as the wire protocol for these resource types.
+CLI-99 established the org/project hierarchy: `aura.default-workspace`, the `organization` and `project` command groups, and the `workspace use` workflow. CLI-120 applies that hierarchy to every existing v1 API command. Every command that calls the v1 API — instance, customer-managed-key, and graph-analytics session — must now resolve and validate an org/project pair before executing. This enforces the security and scoping guarantees of the v2 hierarchy while keeping v1 as the wire protocol for these resource types.
 
 ## Goals
 
-- Require a resolved organization and project for every v1 Aura command, sourced from explicit flags or `aura.default-context`.
+- Require a resolved organization and project for every v1 Aura command, sourced from explicit flags or `aura.default-workspace`.
 - Validate at runtime that the project belongs to the organization via the v2beta1 list-projects endpoint.
 - For list commands, filter results to the resolved project's tenant ID via the existing `tenantId` query parameter.
 - For get/update/delete/pause/resume commands, verify the target resource belongs to the resolved tenant before any mutating API call.
@@ -28,11 +28,11 @@ CLI-99 established the org/project hierarchy: `aura.default-context`, the `organ
 
 **Org/project resolution (shared across all affected commands)**
 
-- REQ-F-001: Add `--organization-id <id>` as a persistent flag on the `instance`, `customermanagedkey`, and `graphanalytics session` parent command groups (i.e. registered in `NewCmd`, propagated to all leaves). Resolution order: (1) `--organization-id` flag; (2) org portion of `aura.default-context` (left of `/`); (3) fail with a clear error: `"no organization specified; set a default context with 'aura context use <org-id>/<project-id>' or pass '--organization-id'"`.
+- REQ-F-001: Add `--organization-id <id>` as a persistent flag on the `instance`, `customermanagedkey`, and `graphanalytics session` parent command groups (i.e. registered in `NewCmd`, propagated to all leaves). Resolution order: (1) `--organization-id` flag; (2) org portion of `aura.default-workspace` (left of `/`); (3) fail with a clear error: `"no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'"`.
 
-- REQ-F-002: Add `--project-id <id>` as a persistent flag on the same parent command groups. Resolution order: (1) `--project-id` flag; (2) `--tenant-id` flag (deprecated — Cobra's `MarkDeprecated` prints a standard warning to stderr automatically and keeps the flag functional); (3) project portion of `aura.default-context` (right of `/`); (4) if `default-tenant` is set but `aura.default-context` is not, fail with a migration message: `"No default context set. Run 'aura context use <org-id>/<project-id>' to migrate from the legacy default-tenant setting."`; (5) fail with a clear error: `"no project specified; set a default context with 'aura context use <org-id>/<project-id>' or pass '--project-id'"`.
+- REQ-F-002: Add `--project-id <id>` as a persistent flag on the same parent command groups. Resolution order: (1) `--project-id` flag; (2) `--tenant-id` flag (deprecated — Cobra's `MarkDeprecated` prints a standard warning to stderr automatically and keeps the flag functional); (3) project portion of `aura.default-workspace` (right of `/`); (4) if `default-tenant` is set but `aura.default-workspace` is not, fail with a migration message: `"No default workspace set. Run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting."`; (5) fail with a clear error: `"no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'"`.
 
-- REQ-F-003: Extract a shared `ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error)` helper, placed in `neo4j-cli/aura/internal/subcommands/utils/`. The function: (1) applies the resolution order from REQ-F-001 and REQ-F-002; (2) calls `GET /organizations/{orgID}/projects` (v2beta1) to list projects; (3) confirms the resolved projectID appears in the returned list; (4) returns a clear `"could not find project {projectID} in organization {organizationID}"` error if absent. All affected commands call this helper at the top of `RunE`, before any other API call.
+- REQ-F-003: Extract a shared `ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error)` helper, placed in `neo4j-cli/aura/internal/subcommands/utils/`. The function: (1) applies the resolution order from REQ-F-001 and REQ-F-002; (2) calls `GET /organizations/{orgID}/projects` (v2beta1) to list projects; (3) confirms the resolved projectID appears in the returned list; (4) returns a clear `"could not find project {projectID} in organization {organizationID}"` error if absent. All affected commands call this helper at the top of `RunE`, before any other API call. Reuse `api.ListProjects` already used by `ValidateAndSetDefaultWorkspace` in `workspace/validate.go`.
 
 - REQ-F-004: All pre-flight calls (the v2beta1 project list, and any resource-ownership GET) are silent — no output to stdout or stderr unless an error occurs.
 
@@ -82,7 +82,7 @@ CLI-99 established the org/project hierarchy: `aura.default-context`, the `organ
 
 ### Non-Functional Requirements
 
-- REQ-NF-001: `ResolveAndValidateOrgProject` must have unit tests covering: org from flag, org from context, missing org error, project from flag, project from deprecated `--tenant-id`, project from context, `default-tenant`-only migration error, missing project error, project-not-in-org error.
+- REQ-NF-001: `ResolveAndValidateOrgProject` must have unit tests covering: org from flag, org from workspace config, missing org error, project from flag, project from deprecated `--tenant-id`, project from workspace config, `default-tenant`-only migration error, missing project error, project-not-in-org error.
 
 - REQ-NF-002: Each affected command's `*_test.go` must include table-driven test cases for: happy path (flags), happy path (context), missing org, missing project, project not in org, and (for get/delete/update) resource not in tenant.
 
@@ -102,10 +102,10 @@ CLI-99 established the org/project hierarchy: `aura.default-context`, the `organ
 A `RegisterOrgProjectFlags(cmd *cobra.Command)` helper in `neo4j-cli/aura/internal/flags/` registers `--organization-id`, `--project-id`, and the deprecated `--tenant-id` as persistent flags (via `cmd.PersistentFlags()`), following the same pattern as `RegisterWait` in `wait.go`. Each of the three affected parent commands (`instance`, `customermanagedkey`, `graphanalytics session`) calls this helper once in `NewCmd`. Persistent flags propagate automatically to all child commands, including nested groups like `instance snapshot`, so no leaf-level registration is needed. `common/flags` is not the right home — it contains cross-CLI generic infrastructure, whereas these flags are Aura-specific.
 
 ### `ResolveAndValidateOrgProject` placement and signature
-The helper lives in `neo4j-cli/aura/internal/subcommands/utils/` alongside existing shared helpers. It takes `*cobra.Command` (to read flags and detect `Changed()`), `*clicfg.Config` (to read `aura.default-context` and `default-tenant`), and makes API calls directly (matching the existing pattern used by `validateAndSetDefaultContext` in `context/validate.go`). Return `(orgID, projectID string, err error)`.
+The helper lives in `neo4j-cli/aura/internal/subcommands/utils/` alongside existing shared helpers. It takes `*cobra.Command` (to read flags and detect `Changed()`), `*clicfg.Config` (to read `aura.default-workspace` and `default-tenant`), and makes API calls directly (matching the existing pattern used by `ValidateAndSetDefaultWorkspace` in `workspace/validate.go`). Return `(orgID, projectID string, err error)`.
 
 ### Detecting the `default-tenant`-only migration case
-After failing to resolve the org from `--organization-id` and `aura.default-context`, check whether `cfg.Aura.Get("default-tenant")` is non-empty. If it is, return the migration message (REQ-F-002 step 4) rather than the generic missing-org error. This surfaces the migration path specifically for users who previously relied on `default-tenant`.
+After failing to resolve the org from `--organization-id` and `aura.default-workspace`, check whether `cfg.Aura.Get("default-tenant")` is non-empty. If it is, return the migration message (REQ-F-002 step 4) rather than the generic missing-org error. This surfaces the migration path specifically for users who previously relied on `default-tenant`.
 
 ### Ownership check for get/delete/update/pause/resume
 The pre-flight `GET /instances/{id}` (or equivalent) needed for ownership verification in REQ-F-011, REQ-F-013, REQ-F-014, REQ-F-015, REQ-F-022, and REQ-F-032 adds one extra round-trip. This is acceptable since it is a read-only call and protects against accidental cross-tenant mutations. The response body is discarded after the `tenant_id` check; the subsequent command issues its own API call as normal.
@@ -114,7 +114,7 @@ The pre-flight `GET /instances/{id}` (or equivalent) needed for ownership verifi
 Currently `instance list` has an optional `--tenant-id` leaf flag for filtering. With CLI-120, this flag is superseded by the persistent `--project-id` (which is now required rather than optional). Remove the leaf-level `--tenant-id` from `instance list`; the persistent deprecated `--tenant-id` on the parent covers backwards compatibility.
 
 ### Reuse of existing v2beta1 helpers
-`context/validate.go` already contains `validateAndSetDefaultContext`, which calls `api.ListProjects`. `ResolveAndValidateOrgProject` should call `api.ListProjects` directly (the same underlying function) rather than duplicating the HTTP call logic. If `api.ListProjects` is not already exported as a standalone function, extract it.
+`workspace/validate.go` already contains `ValidateAndSetDefaultWorkspace`, which calls `api.ListProjects`. `ResolveAndValidateOrgProject` should call `api.ListProjects` directly (the same underlying function) rather than duplicating the HTTP call logic. If `api.ListProjects` is not already exported as a standalone function, extract it.
 
 ### Snapshot sub-group nesting
 `aura instance snapshot *` is a nested command group. Because `--organization-id` and `--project-id` are persistent on the `instance` parent, they propagate through the `snapshot` parent to each snapshot leaf automatically. No extra flag registration is needed in the snapshot group.
@@ -126,8 +126,8 @@ The v1 API returns `tenant_id` in response bodies. Since the CLI renders output 
 
 - [ ] `--organization-id` and `--project-id` flags are present (via inheritance) on all `aura instance`, `aura customermanagedkey`, and `aura graphanalytics session` leaf commands.
 - [ ] `--tenant-id` is deprecated with a Cobra warning; `--project-id` is the replacement; both are functionally equivalent during the deprecation window.
-- [ ] Running any affected command without org+project (and no `aura.default-context`) fails with a clear error message before any API call.
-- [ ] Running any affected command with only `default-tenant` set (no `aura.default-context`) fails with the migration message directing the user to `aura context use`.
+- [ ] Running any affected command without org+project (and no `aura.default-workspace`) fails with a clear error message before any API call.
+- [ ] Running any affected command with only `default-tenant` set (no `aura.default-workspace`) fails with the migration message directing the user to `aura workspace use`.
 - [ ] Running any affected command with a project not in the given org fails with "project not found in organization" before any mutating API call.
 - [ ] `aura instance list` results are scoped to the resolved tenant ID.
 - [ ] `aura instance get/delete/update/pause/resume <id>` fails with a clear ownership error if the instance's `tenant_id` does not match the resolved project, before any mutating call.

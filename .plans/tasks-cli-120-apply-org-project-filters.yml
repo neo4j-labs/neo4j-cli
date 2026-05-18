@@ -1,7 +1,7 @@
 feature: cli-120-apply-org-project-filters
 prd: ./prd-cli-120-apply-org-project-filters.md
 created_at: 2026-05-15T00:00:00Z
-updated_at: 2026-05-15T00:00:00Z
+updated_at: 2026-05-18T00:00:00Z
 
 tasks:
   - id: task-001
@@ -28,7 +28,7 @@ tasks:
     description: |
       Add `ResolveAndValidateOrgProject(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string, err error)`
       to `neo4j-cli/aura/internal/subcommands/utils/`. Implement the full resolution order from
-      REQ-F-001 and REQ-F-002: flags first, then `aura.default-context`, then the `default-tenant`
+      REQ-F-001 and REQ-F-002: flags first, then `aura.default-workspace`, then the `default-tenant`
       migration error, then generic missing-field errors. After resolving both IDs, call
       `GET /organizations/{orgID}/projects` (v2beta1) and confirm the project is in the list;
       return `"could not find project {projectID} in organization {orgID}"` if absent.
@@ -37,11 +37,11 @@ tasks:
     dependencies:
       - task-001
     acceptance_criteria:
-      - "Org resolves from `--organization-id` flag, then org portion of `aura.default-context`"
-      - "Project resolves from `--project-id`, then deprecated `--tenant-id`, then project portion of `aura.default-context`"
-      - "Returns migration message when `default-tenant` is set but `aura.default-context` is not"
+      - "Org resolves from `--organization-id` flag, then org portion of `aura.default-workspace`"
+      - "Project resolves from `--project-id`, then deprecated `--tenant-id`, then project portion of `aura.default-workspace`"
+      - "Returns migration message when `default-tenant` is set but `aura.default-workspace` is not"
       - "Calls v2beta1 list-projects and returns 'could not find project' error when project absent from list"
-      - "Unit tests cover: org from flag, org from context, missing org, project from flag, project from deprecated flag, project from context, migration error, missing project, project-not-in-org"
+      - "Unit tests cover: org from flag, org from workspace config, missing org, project from flag, project from deprecated flag, project from workspace config, migration error, missing project, project-not-in-org"
       - "`make test` and `make lint` pass"
     completed_at: null
 
@@ -84,7 +84,7 @@ tasks:
       - "`instance create` passes resolved projectID as `tenantId` in the POST body"
       - "Both commands fail with a clear error when org or project cannot be resolved"
       - "Output shows `project_id` instead of `tenant_id` in all formats"
-      - "Table-driven tests cover happy path (flags), happy path (context), missing org, missing project, project-not-in-org"
+      - "Table-driven tests cover happy path (flags), happy path (workspace config), missing org, missing project, project-not-in-org"
     completed_at: null
 
   - id: task-005
