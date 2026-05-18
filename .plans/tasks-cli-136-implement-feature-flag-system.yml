@@ -28,7 +28,8 @@ tasks:
       one-shot legacy debug log assertion, FlagNameToEnv table, and
       SetFromConfigCmd happy + unhappy paths. Standalone — no caller
       touches it yet, so this task compiles cleanly on its own.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T14:30:00Z
     dependencies: []
     acceptance_criteria:
       - "`common/clicfg/flags.go` exists with `Flag` struct, exported `Registry` map containing exactly one entry `flag.aura-beta` populated per REQ-F-001, `FlagSet` type, and `FlagNameToEnv` helper"

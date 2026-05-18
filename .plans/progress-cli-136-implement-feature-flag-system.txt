@@ -1,0 +1,4 @@
+## task-001 — 2026-05-18T14:30:00Z
+Built common/clicfg/flags.go: Flag struct, Registry seeded with flag.aura-beta (IntroducedIn 1.4.0), FlagSet (overrides + legacyLogOnce), Enabled/SetForTest/SetFromConfigCmd, FlagNameToEnv. Standalone; no callers yet.
+Files: +common/clicfg/flags.go, +common/clicfg/flags_test.go, ~.plans/tasks-cli-136-implement-feature-flag-system.yml
+Decisions: sjson dot-escape (`\.`) keeps flag key flat in config.json; viper.GetBool reads both flat and nested.
