@@ -103,7 +103,7 @@ tasks:
       Verify agentcontext JSON exposes 'upgrade' in the update command's
       aliases array. No `go generate` is needed (the skill-bundle renderer
       only reads Short/Long, not Aliases/Args).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -115,4 +115,4 @@ tasks:
       - "make lint is clean"
       - "Manual: ./bin/neo4j-cli config lsit, ./bin/neo4j-cli aura insance list, ./bin/neo4j-cli credential aura-clent add each print 'Did you mean' and exit non-zero"
       - "Manual: ./bin/neo4j-cli upgrade --help and ./bin/neo4j-cli upgrade check resolve successfully"
-    completed_at: null
+    completed_at: 2026-05-18T10:00:00Z
