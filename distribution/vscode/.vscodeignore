@@ -1,0 +1,17 @@
+# Source — compiled to out/ which IS included
+src/**
+tsconfig.json
+
+# Dev tooling
+node_modules/**
+.vscode-test/**
+.eslintrc*
+.prettierrc*
+
+# Build artefacts not needed in the vsix
+*.map
+publish.sh
+README-maintainer.md
+
+# OS noise
+.DS_Store

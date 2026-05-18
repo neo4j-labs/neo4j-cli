@@ -1,0 +1,108 @@
+name: publish-vscode
+
+# Publishes the Neo4j CLI VS Code extension to the VS Code Marketplace and Open VSX.
+#
+# Two triggers:
+#   - workflow_run (auto): fires after `release` succeeds. Reuses the dist/
+#     and release-meta.json artifacts uploaded by release.yml.
+#   - workflow_dispatch (manual): for failure recovery. Downloads existing GH
+#     release archives via `gh release download`, mirrors publish-npm.yml.
+#
+# Secrets required:
+#   VSCE_PAT   VS Code Marketplace personal access token (publisher: neo4j)
+#   OVSX_PAT   Open VSX access token (namespace: neo4j)
+
+on:
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "neo4j-cli version (no leading v), e.g. 1.4.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      # ----- workflow_run path: pull dist/ + release-meta.json from release.yml -----
+
+      - name: Download release-meta artifact (auto)
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-meta
+          path: ${{ runner.temp }}/release-meta
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Parse version from release-meta (auto)
+        if: github.event_name == 'workflow_run'
+        id: meta_auto
+        run: |
+          VERSION=$(jq -r '.version' "${{ runner.temp }}/release-meta/release-meta.json")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download dist artifacts (auto)
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      # ----- workflow_dispatch path: fetch archives from the GH release -----
+
+      - name: Download release archives (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p dist
+          gh release download "v${VERSION}" --dir dist --pattern "*.tar.gz" --pattern "*.zip"
+          cd dist
+          for f in *.tar.gz; do tar -xzf "$f"; done
+          for f in *.zip; do unzip -q "$f"; done
+
+      - name: Resolve version (manual)
+        if: github.event_name == 'workflow_dispatch'
+        id: meta_manual
+        run: echo "version=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+      # ----- shared publish step -----
+
+      - name: Set VERSION
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ steps.meta_manual.outputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ steps.meta_auto.outputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        env:
+          DIST_DIR: ${{ github.workspace }}/dist
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: bash distribution/vscode/publish.sh "${{ steps.version.outputs.value }}"

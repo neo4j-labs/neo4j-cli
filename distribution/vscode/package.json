@@ -1,0 +1,173 @@
+{
+  "name": "neo4j-cli",
+  "displayName": "Neo4j",
+  "description": "Spin up Neo4j instances, run Cypher queries, and explore your graph schema — without leaving VS Code",
+  "version": "0.0.1",
+  "publisher": "neo4j",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neo4j/cli"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["neo4j", "cypher", "aura", "graph", "database"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "neo4j-cli.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "neo4j-cli.connect",
+        "title": "Connect",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "neo4j-cli.disconnect",
+        "title": "Disconnect"
+      },
+      {
+        "command": "neo4j-cli.runQuery",
+        "title": "Neo4j: Run Cypher Query",
+        "icon": "$(play)"
+      },
+      {
+        "command": "neo4j-cli.createDocker",
+        "title": "Neo4j: Create Local Instance",
+        "icon": "$(add)"
+      },
+      {
+        "command": "neo4j-cli.deleteInstance",
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "neo4j-cli.writeEnv",
+        "title": "Neo4j: Write .env"
+      },
+      {
+        "command": "neo4j-cli.showConnections",
+        "title": "Neo4j: Show Connections"
+      },
+      {
+        "command": "neo4j-cli.selectWorkspace",
+        "title": "Neo4j: Select Aura Workspace"
+      }
+    ],
+    "views": {
+      "neo4j-sidebar": [
+        {
+          "id": "neo4j.connections",
+          "name": "Connections"
+        },
+        {
+          "id": "neo4j.schema",
+          "name": "Schema"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "neo4j-sidebar",
+          "title": "Neo4j",
+          "icon": "$(database)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "neo4j-cli.refresh",
+          "when": "view == neo4j.connections",
+          "group": "navigation"
+        },
+        {
+          "command": "neo4j-cli.createDocker",
+          "when": "view == neo4j.connections",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "neo4j-cli.connect",
+          "when": "view == neo4j.connections && viewItem =~ /^connection/",
+          "group": "inline@1"
+        },
+        {
+          "command": "neo4j-cli.disconnect",
+          "when": "view == neo4j.connections && viewItem == connectionActive",
+          "group": "1_actions"
+        },
+        {
+          "command": "neo4j-cli.writeEnv",
+          "when": "view == neo4j.connections && viewItem == connectionActive",
+          "group": "1_actions"
+        },
+        {
+          "command": "neo4j-cli.deleteInstance",
+          "when": "view == neo4j.connections && viewItem =~ /^connection/",
+          "group": "2_danger"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "neo4j-cli.runQuery",
+          "when": "resourceLangId == cypher",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "neo4j-cli.runQuery",
+          "when": "editorLangId == cypher",
+          "group": "neo4j@1"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "cypher",
+        "aliases": ["Cypher", "cypher"],
+        "extensions": [".cypher", ".cql"]
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "neo4j-cli.runQuery",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus && editorLangId == cypher"
+      }
+    ],
+    "configuration": {
+      "title": "Neo4j",
+      "properties": {
+        "neo4j-cli.binaryPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the neo4j-cli binary. Leave empty to use the bundled binary or system PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "ovsx": "^0.9.0",
+    "typescript": "^5.3.0"
+  }
+}
