@@ -124,6 +124,40 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 	return resBody, nil
 }
 
+// FetchAndVerifySessionInProject performs a GET /graph-analytics/sessions/{sessionID}
+// and checks that the session's tenant_id matches projectID. It returns the raw
+// response body so the caller can reuse it for output (avoiding a second
+// round-trip in read-only commands such as "graph-analytics session get").
+//
+// If the session exists but belongs to a different project the function
+// returns (nil, "could not find session {sessionID} in project {projectID}").
+func FetchAndVerifySessionInProject(cfg *clicfg.Config, sessionID, projectID string) ([]byte, error) {
+	path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
+	resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+		Method: http.MethodGet,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return resBody, nil
+	}
+
+	responseData := api.ParseBody(resBody)
+	session, err := responseData.GetSingleOrError()
+	if err != nil {
+		return nil, err
+	}
+
+	tenantID, _ := session["tenant_id"].(string)
+	if tenantID != projectID {
+		return nil, fmt.Errorf("could not find session %s in project %s", sessionID, projectID)
+	}
+
+	return resBody, nil
+}
+
 // FetchAndVerifyCMKInProject performs a GET /customer-managed-keys/{cmkID} and
 // checks that the key's tenant_id matches projectID. It returns the raw
 // response body so the caller can reuse it for output (avoiding a second

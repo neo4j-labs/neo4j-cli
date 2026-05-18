@@ -4,6 +4,7 @@
 package session_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -13,6 +14,8 @@ import (
 func TestCreateAttachedSession(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
+
+	registerProjectsMock(&helper)
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
@@ -24,7 +27,7 @@ func TestCreateAttachedSession(t *testing.T) {
     "created_at": "2025-04-04T09:32:35Z",
     "host": "559c94c7-15de43fg.ORCHESTRA.neo4j.io",
     "expiry_date": "2025-04-11T09:32:35Z",
-    "tenant_id": "YOUR_PROJECT_ID",
+    "tenant_id": "`+testProjectID+`",
     "ttl": "8m",
     "user_id": "YOUR_USER_ID",
     "cloud_provider": "gcp",
@@ -32,11 +35,11 @@ func TestCreateAttachedSession(t *testing.T) {
   }
 }`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --rw")
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --organization-id %s --project-id %s --rw", testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"instance_id":"559c94c7","memory":"4GB","name":"session1"}`)
+	mockHandler.AssertCalledWithBody(fmt.Sprintf(`{"instance_id":"559c94c7","memory":"4GB","name":"session1","tenant_id":"%s"}`, testProjectID))
 
 	helper.AssertErr("")
 	helper.AssertOutJson(`{
@@ -49,9 +52,9 @@ func TestCreateAttachedSession(t *testing.T) {
     "instance_id": "559c94c7",
     "memory": "4GB",
     "name": "people-and-fruits-with-db",
+    "project_id": "YOUR_PROJECT_ID",
     "region": "europe-west1",
     "status": "",
-    "tenant_id": "YOUR_PROJECT_ID",
     "ttl": "8m",
     "user_id": "YOUR_USER_ID"
   }
@@ -61,6 +64,8 @@ func TestCreateAttachedSession(t *testing.T) {
 func TestCreateStandAloneSession(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
+
+	registerProjectsMock(&helper)
 
 	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
@@ -74,17 +79,17 @@ func TestCreateStandAloneSession(t *testing.T) {
     "expiry_date": "2025-04-11T09:32:35Z",
     "ttl": "8m",
     "user_id": "YOUR_USER_ID",
-    "tenant_id": "YOUR_PROJECT_ID",
+    "tenant_id": "`+testProjectID+`",
     "cloud_provider": "gcp",
     "region": "europe-west1"
   }
 }`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --tenant-id YOUR_PROJECT_ID --rw")
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --organization-id %s --project-id %s --rw", testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
-	mockHandler.AssertCalledWithBody(`{"cloud_provider":"gcp","memory":"4GB","name":"session1","region":"europe-west1","tenant_id":"YOUR_PROJECT_ID"}`)
+	mockHandler.AssertCalledWithBody(fmt.Sprintf(`{"cloud_provider":"gcp","memory":"4GB","name":"session1","region":"europe-west1","tenant_id":"%s"}`, testProjectID))
 
 	helper.AssertOutJson(`{
   "data": {
@@ -96,18 +101,93 @@ func TestCreateStandAloneSession(t *testing.T) {
     "instance_id": "",
     "memory": "4GB",
     "name": "people-and-fruits-with-db",
+    "project_id": "YOUR_PROJECT_ID",
     "region": "europe-west1",
     "status": "",
-    "tenant_id": "YOUR_PROJECT_ID",
     "ttl": "8m",
     "user_id": "YOUR_USER_ID"
   }
 }`)
 }
 
+func TestCreateSessionWithDefaultWorkspace(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{
+  "data": {
+    "id": "s-15de43fg",
+    "name": "ws-session",
+    "memory": "4GB",
+    "instance_id": "",
+    "status": "",
+    "created_at": "2025-04-04T09:32:35Z",
+    "host": "s-15de43fg.ORCHESTRA.neo4j.io",
+    "expiry_date": "2025-04-11T09:32:35Z",
+    "ttl": "8m",
+    "user_id": "YOUR_USER_ID",
+    "tenant_id": "`+testProjectID+`",
+    "cloud_provider": "gcp",
+    "region": "europe-west1"
+  }
+}`)
+
+	helper.ExecuteCommand("graph-analytics session create --name ws-session --memory 4GB --region europe-west1 --cloud-provider gcp --rw")
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodPost)
+}
+
+func TestCreateSessionMissingOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+
+	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --rw")
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+}
+
+func TestCreateSessionMissingProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --organization-id %s --rw", testOrgID))
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+}
+
+func TestCreateSessionProjectNotInOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock(
+		"/v2beta1/organizations/"+testOrgID+"/projects",
+		http.StatusOK,
+		`{"data": []}`,
+	)
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusAccepted, `{"data": {}}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --region europe-west1 --cloud-provider gcp --organization-id %s --project-id unknown-project --rw", testOrgID))
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: could not find project unknown-project in organization " + testOrgID)
+}
+
 func TestCreateSessionWithWait(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
+
+	registerProjectsMock(&helper)
 
 	createMock := helper.NewRequestHandlerMock("POST /v1/graph-analytics/sessions", http.StatusAccepted, `{
   "data": {
@@ -121,7 +201,7 @@ func TestCreateSessionWithWait(t *testing.T) {
     "expiry_date": "2025-04-11T09:32:35Z",
     "ttl": "8m",
     "user_id": "YOUR_USER_ID",
-    "tenant_id": "YOUR_PROJECT_ID",
+    "tenant_id": "`+testProjectID+`",
     "cloud_provider": "gcp",
     "region": "europe-west1"
   }
@@ -139,11 +219,11 @@ func TestCreateSessionWithWait(t *testing.T) {
 			}
 		}`)
 
-	helper.ExecuteCommand("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --wait --rw")
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session create --name session1 --memory 4GB --instance-id 559c94c7 --organization-id %s --project-id %s --wait --rw", testOrgID, testProjectID))
 
 	createMock.AssertCalledTimes(1)
 	createMock.AssertCalledWithMethod(http.MethodPost)
-	createMock.AssertCalledWithBody(`{"instance_id":"559c94c7","memory":"4GB","name":"session1"}`)
+	createMock.AssertCalledWithBody(fmt.Sprintf(`{"instance_id":"559c94c7","memory":"4GB","name":"session1","tenant_id":"%s"}`, testProjectID))
 
 	getMock.AssertCalledTimes(2)
 	getMock.AssertCalledWithMethod(http.MethodGet)
@@ -159,9 +239,9 @@ func TestCreateSessionWithWait(t *testing.T) {
 		"instance_id": "559c94c7",
 		"memory": "4GB",
 		"name": "people-and-fruits-with-db",
+		"project_id": "YOUR_PROJECT_ID",
 		"region": "europe-west1",
 		"status": "",
-		"tenant_id": "YOUR_PROJECT_ID",
 		"ttl": "8m",
 		"user_id": "YOUR_USER_ID"
 	}

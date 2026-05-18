@@ -189,13 +189,15 @@ Flags:
 |------|------|---------|-------------|
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
 
 #### neo4j-cli aura graph-analytics session create
 
 Creates a new Aura Graph Analytics Serverless session
 
-This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
-				Creating a session is an asynchronous operation that can be waited for with --wait.
+This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project is found, one will be created. A Session is either attached to an AuraDB, or standalone.
+Creating a session is an asynchronous operation that can be waited for with --wait.
 
 Usage: `neo4j-cli aura graph-analytics session create [flags]`
 
@@ -208,21 +210,20 @@ Flags:
 | `--memory` | string | - | (required) The size of the session memory in GB. |
 | `--name` | string | - | (required) The name of the session. |
 | `--region` | string | - | The region where the session is hosted. |
-| `--tenant-id` | string | - | The Aura project/tenant ID |
 | `--ttl` | string | - | This optional parameter specifies the time-to-live of the session. The session will be marked as expired if the session was unused for the provided duration. |
 | `--wait` | bool | false | Waits until created session is ready. |
 
 Examples:
 
 ```
-# Create a standalone session in a specific project/tenant on AWS
-neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
+# Create a standalone session in a specific project on AWS
+neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1
 
 # Create a session attached to an existing Aura instance and wait until ready
-neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --wait
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait
 
 # Create a session with a TTL and emit JSON for scripting
-neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json
+neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --ttl 1h --format json
 ```
 
 #### neo4j-cli aura graph-analytics session delete
@@ -237,13 +238,13 @@ Examples:
 
 ```
 # Delete a session by ID
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Delete a session and emit JSON for scripting
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw --format json
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 
 # Delete a session, suppressing all stdout output
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw > /dev/null
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw > /dev/null
 ```
 
 #### neo4j-cli aura graph-analytics session get
@@ -258,25 +259,22 @@ Examples:
 
 ```
 # Get a session by ID
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Render the session as a TOON table
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format toon
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format toon
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format json
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 #### neo4j-cli aura graph-analytics session list
 
 Returns a list of Graph Analytics Serverless sessions
 
-This subcommand returns a list containing a summary of each of your Graph Analytics Serverless session
-				By default, this subcommand lists all sessions a user has access to across all projects.
-				You can filter sessions in a particular project/tenant using:
-				--organization-id <organization-id>
-				--tenant-id <tenant-id>
-				--instance-id <instance-id>
+This subcommand returns a list containing a summary of each of your Graph Analytics Serverless sessions in the specified project.
+
+Use --organization-id and --project-id to specify which project's sessions to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
 
 Usage: `neo4j-cli aura graph-analytics session list [flags]`
 
@@ -285,20 +283,18 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | An optional Instance ID to filter for sessions attached to an instance |
-| `--organization-id` | string | - | An optional Organization ID to filter sessions in an organization |
-| `--tenant-id` | string | - | An optional Project ID to filter sessions in a project/tenant |
 
 Examples:
 
 ```
-# List all Graph Analytics sessions the current user has access to
+# List all Graph Analytics sessions in a project
+neo4j-cli aura graph-analytics session list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List sessions using a configured default workspace
 neo4j-cli aura graph-analytics session list
 
-# List sessions in a specific project/tenant
-neo4j-cli aura graph-analytics session list --tenant-id 00000000-0000-0000-0000-000000000000
-
 # List sessions attached to a specific instance and emit JSON for scripting
-neo4j-cli aura graph-analytics session list --instance-id 00000000 --format json
+neo4j-cli aura graph-analytics session list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --instance-id 00000000 --format json
 ```
 
 ## neo4j-cli aura instance

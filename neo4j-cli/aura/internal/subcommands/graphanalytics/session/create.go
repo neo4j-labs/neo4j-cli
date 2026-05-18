@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		memory        string
 		ttl           string
 		instance_id   string
-		tenant_id     string
 		cloudProvider string
 		region        string
 		wait          bool
@@ -31,7 +31,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		memoryFlag        = "memory"
 		ttlFlag           = "ttl"
 		instanceIdFlag    = "instance-id"
-		tenantIdFlag      = "tenant-id"
 		cloudProviderFlag = "cloud-provider"
 		regionFlag        = "region"
 	)
@@ -40,35 +39,33 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "create",
 		Short:       "Creates a new Aura Graph Analytics Serverless session",
-		Example: `# Create a standalone session in a specific project/tenant on AWS
-neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1
+		Example: `# Create a standalone session in a specific project on AWS
+neo4j-cli aura graph-analytics session create --rw --name my-session --memory 8GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1
 
 # Create a session attached to an existing Aura instance and wait until ready
-neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --wait
+neo4j-cli aura graph-analytics session create --rw --name attached-session --memory 8GB --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait
 
 # Create a session with a TTL and emit JSON for scripting
-neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --ttl 1h --format json`,
-		Long: `This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project/tenant is found, one will be created. A Session is either attached to an AuraDB, or standalone.
-				Creating a session is an asynchronous operation that can be waited for with --wait.`,
+neo4j-cli aura graph-analytics session create --rw --name scripted-session --memory 4GB --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --ttl 1h --format json`,
+		Long: `This subcommand gets or creates a Aura Graph Analytics Serverless session. If no Session with a matching name and project is found, one will be created. A Session is either attached to an AuraDB, or standalone.
+Creating a session is an asynchronous operation that can be waited for with --wait.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if instance_id == "" {
 				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 				cmd.MarkFlagRequired(regionFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
-				if cfg.Aura.DefaultTenant() != "" {
-					cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-				}
 			}
-
-			cmd.MarkFlagRequired(nameFlag)   //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-			cmd.MarkFlagRequired(memoryFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
 			body := map[string]any{
-				"name":   name,
-				"memory": memory,
+				"name":      name,
+				"memory":    memory,
+				"tenant_id": projectID,
 			}
 
 			if ttl != "" {
@@ -87,12 +84,6 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 				body["region"] = region
 			}
 
-			if tenant_id == "" && instance_id == "" {
-				body["tenant_id"] = cfg.Aura.DefaultTenant()
-			} else if tenant_id != "" {
-				body["tenant_id"] = tenant_id
-			}
-
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/graph-analytics/sessions", &api.RequestConfig{
 				PostBody: body,
@@ -104,7 +95,9 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 
 			// NOTE: Return 202 if new session gets created and 200 if existing session was found
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "memory", "status", "created_at"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "memory", "status", "created_at"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -134,8 +127,6 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the session.")
 	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
-	cmd.Flags().StringVar(&tenant_id, tenantIdFlag, "", "The Aura project/tenant ID")
 
 	cmd.Flags().StringVar(&cloudProvider, cloudProviderFlag, "", "The cloud provider hosting the session.")
 	cmd.Flags().StringVar(&region, regionFlag, "", "The region where the session is hosted.")

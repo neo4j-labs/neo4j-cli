@@ -160,7 +160,7 @@ tasks:
       to validate and inject projectID into the request body. For any command targeting a specific
       session resource, add a pre-flight fetch to verify `tenant_id` matches before the mutating call.
       Apply `RenameResponseField` and update field lists. Add or update colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -172,7 +172,7 @@ tasks:
       - "Resource-targeting commands verify ownership before any mutating call"
       - "Output shows `project_id` instead of `tenant_id` in all formats"
       - "Table-driven tests cover happy path, missing org/project, project-not-in-org, and resource-not-in-tenant"
-    completed_at: null
+    completed_at: "2026-05-18T07:00:00Z"
 
   - id: task-009
     title: "Regenerate skill bundles, add changelog entry, run final gates"
