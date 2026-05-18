@@ -29,7 +29,7 @@ tasks:
       (plugin installer shells out to git clone, runner has no SSH key, public-repo
       HTTPS needs no auth). Do not touch any other step, the marketplace pin, prompts,
       or tool allowlists. Satisfies REQ-F-001.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "A comment above the run command explains the SSH-no-key rationale."
       - "`git diff origin/main -- .github/workflows/claude-review-security.yml` shows ONLY the added step (no other changes)."
       - "YAML still parses (`yq '.jobs.\"security-review\".steps[].name' .github/workflows/claude-review-security.yml` lists the new step name)."
-    completed_at: null
+    completed_at: 2026-05-18T12:15:00Z
 
   - id: task-003
     title: "Rename conventions workflow job + step to disambiguate check name"

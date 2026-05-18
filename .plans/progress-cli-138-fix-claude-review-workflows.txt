@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-18T12:05:00Z
 Bootstrap task verified: branch oskar/cli-138-fix-claude-review-workflows checked out with PRD/tasks commit only ahead of main, working tree clean.
 Files: ~.plans/tasks-cli-138-fix-claude-review-workflows.yml
+
+## TASK-002 — 2026-05-18T12:15:00Z
+Added "Force HTTPS for github.com git clones" step between Install govulncheck and Load security prompt into env. Sets git insteadOf so the Claude plugin installer's git clone uses HTTPS (no SSH key on runner). YAML parses; diff scoped to the new step.
+Files: .github/workflows/claude-review-security.yml
