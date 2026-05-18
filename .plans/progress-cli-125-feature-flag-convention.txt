@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-18T00:00:00Z
+Wrote .agents/feature-flags.md (52 lines) capturing flag.<area>-<feature> naming, default-false lifecycle, env+config override surface, registry shape, unknown-key handling, and aura.beta-enabled → flag.aura-beta migration with four touch points.
+Files: +.agents/feature-flags.md

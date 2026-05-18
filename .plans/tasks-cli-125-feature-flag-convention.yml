@@ -21,7 +21,7 @@ tasks:
       (`common/clicfg/clicfg.go:32`, `clicfg.go:281`, `clicfg.go:371-377`,
       `common/clicfg/auratesthelper.go:68-70`) and cite Linear CLI-125 and
       CLI-134 in "See also". Keep the rendered doc ≤60 lines.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.agents/feature-flags.md` exists and `wc -l` reports ≤60 lines"
@@ -29,7 +29,7 @@ tasks:
       - "`grep -n 'flag:' .agents/feature-flags.md` returns no matches"
       - "`grep -nE 'flag\\.(aura-beta|docker-command|secrets-os-keystore)' .agents/feature-flags.md` returns at least one hit per example"
       - "`grep -n 'common/clicfg/clicfg.go:32' .agents/feature-flags.md` and `grep -n 'auratesthelper.go:68-70' .agents/feature-flags.md` both match; `grep -n 'CLI-125' .agents/feature-flags.md` and `grep -n 'CLI-134' .agents/feature-flags.md` both match"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-002
     title: "Add Feature Flag Notes pointer to AGENTS.md"
