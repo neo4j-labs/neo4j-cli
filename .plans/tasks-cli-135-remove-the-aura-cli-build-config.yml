@@ -1,0 +1,318 @@
+feature: cli-135-remove-the-aura-cli-build-config
+prd: ./prd-cli-135-remove-the-aura-cli-build-config.md
+created_at: 2026-05-18T00:00:00Z
+updated_at: 2026-05-18T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Create feature branch off main"
+    description: |
+      Create and check out a working branch named
+      `oskar/cli-135-remove-the-aura-cli-build-config` from a clean
+      `main`. All subsequent commits land on this branch. Satisfies
+      REQ-NF-011 and unblocks every later task.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Branch `oskar/cli-135-remove-the-aura-cli-build-config` is created off the latest `main`"
+      - "The branch is checked out as the working branch"
+      - "`git status` reports a clean working tree before edits begin"
+      - "`main` has no new commits added by this PRD's work"
+    completed_at: null
+
+  - id: task-002
+    title: "Delete the standalone aura entrypoint directory"
+    description: |
+      Remove `neo4j-cli/aura/cmd/` (and its only file `main.go`) so the
+      historical standalone-aura `package main` no longer compiles on
+      `go build ./...`. Nothing else in the repo references this path
+      after the prior release-config cleanup. Satisfies REQ-F-001.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Directory `neo4j-cli/aura/cmd/` does not exist on disk"
+      - "`git ls-files neo4j-cli/aura/cmd/` returns nothing"
+      - "`go build ./...` exits 0 with no compile error referencing the deleted package"
+      - "No remaining file under `neo4j-cli/aura/` imports `package main` for an aura standalone binary"
+    completed_at: null
+
+  - id: task-003
+    title: "Delete the aura skill bundle subsystem recursively"
+    description: |
+      Remove `neo4j-cli/aura/internal/skill/` in full: `embed.go`,
+      `description.txt`, `additions.md`, `gen/main.go`,
+      `gen/main_test.go`, `install_e2e_test.go`, and the entire
+      `bundle/` subtree (`SKILL.md` + `references/*.md`). After this,
+      no `go:generate` directive remains anywhere under
+      `neo4j-cli/aura/`. Satisfies REQ-F-002.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Directory `neo4j-cli/aura/internal/skill/` does not exist on disk"
+      - "`git ls-files neo4j-cli/aura/internal/skill/` returns nothing"
+      - "`grep -rn 'go:generate' neo4j-cli/aura/` returns zero hits"
+      - "`go build ./...` exits 0"
+    completed_at: null
+
+  - id: task-004
+    title: "Drop the skill mount from NewStandaloneCmd in aura.go"
+    description: |
+      Edit `neo4j-cli/aura/aura.go` to remove the two imports
+      `"github.com/neo4j/cli/common/skill"` and
+      `binskill "github.com/neo4j/cli/neo4j-cli/aura/internal/skill"`,
+      and to drop the `cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle,
+      "aura-cli"))` line inside `NewStandaloneCmd`. Preserve every
+      other responsibility of `NewStandaloneCmd` — `--rw` flag
+      registration, `FlagErrorFunc`, `config` mount, `credential`
+      mount. Keep `NewStandaloneCmd` exported. Satisfies REQ-F-003 and
+      REQ-F-004.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`neo4j-cli/aura/aura.go` no longer imports `common/skill` or the deleted `aura/internal/skill` package"
+      - "`neo4j-cli/aura/aura.go` no longer contains a `skill.NewCmd(` call"
+      - "`aura.NewStandaloneCmd` remains declared, exported, and still mounts `config` + `credential` + `--rw`"
+      - "`go build ./...` exits 0 and `make lint` reports no `unused` warning against `NewStandaloneCmd`"
+    completed_at: null
+
+  - id: task-005
+    title: "Strip include_neo4j producer side from release.yml"
+    description: |
+      Edit `.github/workflows/release.yml`: delete the `Detect changed
+      changelogs` step (currently lines 37–48), drop the `include_neo4j`
+      job-level output line, change the `Write release-meta.json` step
+      to emit `{"version":"<ver>"}` only (no `include_neo4j` field)
+      and run unconditionally, and remove the `if:
+      steps.changed.outputs.include_neo4j == 'true'` guards from the
+      `Upload dist artifact` and `Upload release-meta artifact` steps.
+      Satisfies REQ-F-006.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`.github/workflows/release.yml` contains zero occurrences of `include_neo4j`, `INCLUDE_NEO4J`, `aura-cli`, `AURA_CLI_VERSION`, or `CHANGELOG-aura`"
+      - "`Write release-meta.json` step emits a JSON payload with key `version` only"
+      - "`Upload dist artifact` and `Upload release-meta artifact` steps run unconditionally (no `if:` guard)"
+      - "File parses as valid YAML (`yq eval '.' .github/workflows/release.yml` exits 0)"
+    completed_at: null
+
+  - id: task-006
+    title: "Strip include_neo4j consumer side from publish-npm.yml"
+    description: |
+      Edit `.github/workflows/publish-npm.yml`: delete the step `Skip
+      — aura-cli-only release (auto)` at line 89; remove the leading
+      comment fragment at line 8 referencing aura-cli-only release
+      runs; remove the `Parse release-meta` step's
+      read/validate/echo of `INCLUDE_NEO4J`/`include_neo4j`; remove
+      every per-step `steps.meta.outputs.include_neo4j == 'true'`
+      `if:` guard (download dist, verify checksums, publish, etc.).
+      The workflow_run success gate at the top of the job stays.
+      Satisfies REQ-F-005.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "`.github/workflows/publish-npm.yml` contains zero occurrences of `aura-cli`, `aura_cli`, `INCLUDE_NEO4J`, or `include_neo4j`"
+      - "The `Skip — aura-cli-only release (auto)` step is removed"
+      - "The `Parse release-meta` step emits only `version` as a step output"
+      - "File parses as valid YAML and `actionlint` (if available) reports no new errors"
+    completed_at: null
+
+  - id: task-007
+    title: "Collapse CHANGELOG.md to single-binary plus historical pointer"
+    description: |
+      Edit the top-level `CHANGELOG.md` so it describes a single
+      released binary (`neo4j-cli`, see `CHANGELOG-neo4j.md`) and
+      includes one short trailing line noting that the historical
+      `CHANGELOG-aura.md` covers the now-discontinued standalone
+      aura-cli. Satisfies REQ-F-007.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`CHANGELOG.md` describes only the `neo4j-cli` binary as the released artefact"
+      - "`CHANGELOG.md` contains exactly one mention of `CHANGELOG-aura.md`, framed as historical"
+      - "`CHANGELOG-aura.md` is byte-identical to its pre-PR contents"
+      - "Markdown renders cleanly (no broken list bullets or headings)"
+    completed_at: null
+
+  - id: task-008
+    title: "Scrub aura-cli prose from RELEASING.md"
+    description: |
+      Edit `RELEASING.md` to read as a single-binary release doc: drop
+      the `aura-cli` row from the "What gets released" table; remove
+      the "Aura-cli is not published to npm or Homebrew" paragraph;
+      rewrite the `changie new --projects ...` non-interactive example
+      to list `neo4j-cli` only; remove every reference to
+      `CHANGELOG-aura.md`, `include_aura`, and `AURA_CLI_VERSION` in
+      Steps 2 and 3; drop the top-of-file framing "for `aura-cli` and
+      `neo4j-cli`". Satisfies REQ-F-008.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`RELEASING.md` contains zero occurrences of `AURA_CLI_VERSION`, `include_aura`, or 'Aura-cli is not published'"
+      - "`changie new` non-interactive example lists `neo4j-cli` only"
+      - "'What gets released' table contains one row each for the `neo4j-cli` binary, the `@neo4j-labs/cli` npm package, and the Homebrew formula"
+      - "Markdown headings and table syntax render cleanly"
+    completed_at: null
+
+  - id: task-009
+    title: "Rewrite .agents/build.md as single-binary"
+    description: |
+      Edit `.agents/build.md`: drop the `build-aura` and `run-aura`
+      rows from the Makefile-targets table; rewrite the `build` row to
+      describe a single `bin/neo4j-cli` output; delete the
+      "Dual-Binary GoReleaser Setup" section; collapse the Changelog
+      section to a single-project narrative (drop the `--projects
+      aura-cli` example); remove the `make run-aura` shell example
+      from the Commands block; remove the dual `GORELEASER_CURRENT_TAG=dev
+      AURA_CLI_VERSION=dev` snapshot example, leaving only the
+      single-project form. Satisfies REQ-F-009.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`.agents/build.md` contains zero occurrences of `aura-cli`, `build-aura`, `run-aura`, or `AURA_CLI_VERSION`"
+      - "Makefile-targets table contains no rows mentioning aura"
+      - "'Dual-Binary GoReleaser Setup' section is removed"
+      - "Markdown renders cleanly"
+    completed_at: null
+
+  - id: task-010
+    title: "Rewrite .agents/deployment.md as single-binary"
+    description: |
+      Edit `.agents/deployment.md`: remove the "Dual-Binary Releases"
+      and "Dual-Version Injection" sections; rewrite "Strategy",
+      "Release Flow", and "macOS Code Signing" so they no longer
+      reference aura-cli, `AURA_CLI_VERSION`, or `CHANGELOG-aura.md`;
+      collapse "Versioning Policy" to single-project content or
+      delete it entirely; remove the
+      `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev` snapshot
+      example. Satisfies REQ-F-010.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`.agents/deployment.md` contains zero occurrences of `aura-cli`, `AURA_CLI_VERSION`, `INCLUDE_AURA`, or `CHANGELOG-aura`"
+      - "'Dual-Binary Releases' and 'Dual-Version Injection' sections are removed"
+      - "'Strategy' paragraph references only `CHANGELOG-neo4j.md` as the release trigger"
+      - "Markdown renders cleanly"
+    completed_at: null
+
+  - id: task-011
+    title: "Trim aura-cli bullets from .agents/repo-layout.md"
+    description: |
+      Edit `.agents/repo-layout.md`: delete the bullet that describes
+      the aura-cli generator importing `aura.NewStandaloneCmd` (line
+      17); delete the `AuraBetaEnabled` aura-cli-bundle bullet (line
+      18); rewrite the "Skill cobra mount" bullet (line 19) to mention
+      only the super-CLI mount in `app.NewCmd` and drop the
+      "aura.NewStandaloneCmd" half; remove the trailing "Same applies
+      to any new top-level mount on `aura.NewStandaloneCmd` (aura-cli
+      bundle)" clause in line 21. Satisfies REQ-F-011.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`.agents/repo-layout.md` contains zero occurrences of `aura-cli` or `aura-cli bundle`"
+      - "The 'Skill cobra mount' bullet references only `app.NewCmd` as the mount site"
+      - "The 'aura-cli generator imports' bullet is removed"
+      - "Markdown renders cleanly"
+    completed_at: null
+
+  - id: task-012
+    title: "Scrub aura-cli mentions from distribution/npm/README.md"
+    description: |
+      Edit `distribution/npm/README.md`: drop the `CHANGELOG-aura.md`
+      clause from the release.yml description (around line 183);
+      rewrite the "uploads ... only on neo4j-cli release runs"
+      phrasing to reflect that the workflow now always uploads; remove
+      the "Aura-cli-only release cycles skip via the `include_neo4j`
+      gate" sentence (around line 188). Satisfies REQ-F-012.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`distribution/npm/README.md` contains zero occurrences of `CHANGELOG-aura.md`, `aura-cli`, or `include_neo4j` rationale"
+      - "The release.yml description sentence references only `CHANGELOG-neo4j.md`"
+      - "The publish-npm.yml description no longer mentions the aura-cli skip path"
+      - "Markdown renders cleanly"
+    completed_at: null
+
+  - id: task-013
+    title: "Update AGENTS.md dual-credential and dual-bundle paragraphs"
+    description: |
+      Edit `AGENTS.md`: rewrite the bullet under "Makefile Notes" that
+      describes `aura-client` credential living in TWO places and
+      requiring two `go generate` invocations. The new wording must
+      note that the `neo4j-cli/aura/internal/subcommands/credential/`
+      package still exists (mounted by `NewStandaloneCmd`) but no
+      longer drives a second bundle regeneration. Update or remove
+      any other AGENTS.md paragraph that still asserts an aura-cli
+      bundle is generated separately. Leave the standalone-CLI
+      template paragraph alone. Satisfies REQ-F-013.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The 'aura-client credential cmd lives in TWO places' bullet no longer instructs the reader to run `go generate ./neo4j-cli/aura/internal/skill/...`"
+      - "AGENTS.md contains no statement asserting that aura has its own generated skill bundle"
+      - "The 'Adding a new standalone CLI in the future = copy the template' paragraph is preserved"
+      - "Markdown renders cleanly"
+    completed_at: null
+
+  - id: task-014
+    title: "Run full local gate set"
+    description: |
+      With every previous task merged into the branch, run the
+      complete gate set and confirm green: `make build`, `make test`,
+      `make fmt-check`, `make lint`, `make generate-check`,
+      `make license-check`, `make snapshot`, plus `go build ./...`
+      and the final grep gate
+      `grep -rn 'aura-cli\|AURA_CLI_VERSION\|CHANGELOG-aura\|include_aura\|/aura/cmd\|/aura/internal/skill' . --exclude-dir=.git --exclude-dir=.plans --exclude-dir=.changes --exclude=CHANGELOG-aura.md`.
+      Satisfies REQ-NF-001 through REQ-NF-010.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+      - task-012
+      - task-013
+    acceptance_criteria:
+      - "`make build` `make test` `make fmt-check` `make lint` `make generate-check` `make license-check` all exit 0"
+      - "`make snapshot` produces `bin/neo4j-cli` and no `bin/aura-cli`"
+      - "`go build ./...` exits 0"
+      - "The final grep gate returns zero hits (or only the intentional `CHANGELOG.md` pointer footnote and the deleted-file-deletion entries inside `.plans/archive/`)"
+    completed_at: null
+
+  - id: task-015
+    title: "Add changie entry, push branch, open PR"
+    description: |
+      Create a `neo4j-cli` changie entry of kind `Patch` describing
+      the build-config removal (body suggestion: "Remove residual
+      aura-cli source/build artifacts (standalone entrypoint, skill
+      bundle subsystem, dead workflow gating, stale docs)."). Push
+      the branch `oskar/cli-135-remove-the-aura-cli-build-config` and
+      open a PR against `main` linking back to Linear CLI-135 and to
+      `.plans/prd-cli-135-remove-the-aura-cli-build-config.md`.
+      Satisfies REQ-F-014 and closes the work loop.
+    status: pending
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`.changes/unreleased/neo4j-cli-Patch-*.yaml` exists with `project: neo4j-cli`, `kind: Patch`, body describing the removal"
+      - "Branch `oskar/cli-135-remove-the-aura-cli-build-config` is pushed to origin with upstream tracking"
+      - "PR is opened against `main`; description references CLI-135 and the PRD path"
+      - "CI matrix (ubuntu, windows, macos) reports green on the PR"
+    completed_at: null
