@@ -29,13 +29,13 @@ tasks:
       `CLAUDE.md` is a symlink to `AGENTS.md`. After task-001 this is
       wrong. Delete the bullet entirely (do not rewrite it). No other
       AGENTS.md edits.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "The bullet `- \\`CLAUDE.md\\` is a symlink to \\`AGENTS.md\\` ...` is removed from AGENTS.md"
       - "No other line in AGENTS.md is modified"
       - "The remaining bullet about `CONTRIBUTING.md` under 'Repo Doc Notes' is preserved"
-    completed_at: null
+    completed_at: 2026-05-18T10:30:00Z
 
   - id: task-003
     title: "Verify gates: make test, fmt-check, lint, license-check, generate-check"

@@ -141,7 +141,6 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 
 ## Repo Doc Notes
 
-- `CLAUDE.md` is a symlink to `AGENTS.md` (`ls -la` confirms). Edit `AGENTS.md` once — both surfaces update. Don't write to `CLAUDE.md` directly.
 - Contributor-facing workflows (e.g. `make generate` / add-new-CLI procedure) live in `CONTRIBUTING.md` "Development" subsections. AGENTS.md Architecture orients readers and links to CONTRIBUTING.md for the procedure rather than duplicating it.
 
 ## Website (neo4j.sh)
