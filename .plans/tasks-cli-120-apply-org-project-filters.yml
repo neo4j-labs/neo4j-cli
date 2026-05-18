@@ -33,7 +33,7 @@ tasks:
       `GET /organizations/{orgID}/projects` (v2beta1) and confirm the project is in the list;
       return `"could not find project {projectID} in organization {orgID}"` if absent.
       Write a colocated `*_test.go` with table-driven tests covering all resolution branches.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -43,7 +43,7 @@ tasks:
       - "Calls v2beta1 list-projects and returns 'could not find project' error when project absent from list"
       - "Unit tests cover: org from flag, org from workspace config, missing org, project from flag, project from deprecated flag, project from workspace config, migration error, missing project, project-not-in-org"
       - "`make test` and `make lint` pass"
-    completed_at: null
+    completed_at: "2026-05-18T01:00:00Z"
 
   - id: task-003
     title: "Add RenameResponseField helper and update tenant_id field lists"

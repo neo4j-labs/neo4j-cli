@@ -2,3 +2,8 @@
 Added `RegisterOrgProjectFlags` to `neo4j-cli/aura/internal/flags/` with constants `OrgIDFlag`, `ProjectIDFlag`, `TenantIDFlag`; registers `--organization-id` and `--project-id` as persistent flags plus deprecated `--tenant-id` alias.
 Files: +neo4j-cli/aura/internal/flags/orgproject.go, +neo4j-cli/aura/internal/flags/orgproject_test.go
 Decisions: Persistent flag deprecation warnings go to os.Stderr (not cobra's cmd.SetErr), so tests assert `f.Deprecated` field directly rather than capturing output.
+
+## TASK-002 — 2026-05-18T01:00:00Z
+Added `ResolveAndValidateOrgProject` to `neo4j-cli/aura/internal/subcommands/utils/resolve.go`; resolves org/project from flags then `aura.default-workspace`, handles legacy `default-tenant` migration message, then validates project membership via `api.ListProjects`. Table-driven unit tests cover all 9 resolution branches.
+Files: +neo4j-cli/aura/internal/subcommands/utils/resolve.go, +neo4j-cli/aura/internal/subcommands/utils/resolve_test.go
+Decisions: Migration message lowercased to satisfy staticcheck (error strings must not start with capital or end with punctuation).

@@ -1,0 +1,290 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package utils_test
+
+import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
+	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	testOrgID     = "org-abc-123"
+	testProjectID = "proj-def-456"
+)
+
+// listProjectsPath is the v2beta1 path cobra test servers must handle.
+const listProjectsPath = "/v2beta1/organizations/" + testOrgID + "/projects"
+
+// listProjectsSuccessBody is a response body that includes testProjectID.
+const listProjectsSuccessBody = `{"data": [{"id": "` + testProjectID + `", "name": "My Project"}]}`
+
+// listProjectsEmptyBody is a response body with no projects.
+const listProjectsEmptyBody = `{"data": []}`
+
+// buildTestServer creates an httptest.Server that:
+//   - responds to /oauth/token with a dummy token
+//   - responds to projectsPath (if non-empty) with the given status and body
+func buildTestServer(t *testing.T, projectsPath string, status int, body string) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"access_token":"tok","expires_in":3600,"token_type":"bearer"}`)) //nolint:errcheck
+	})
+	if projectsPath != "" {
+		mux.HandleFunc(projectsPath, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(status)
+			if body != "" {
+				w.Write([]byte(body)) //nolint:errcheck
+			}
+		})
+	}
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// buildTestConfig creates a *clicfg.Config pointing at the given server URL.
+// extraCfg is an optional JSON fragment merged into the aura object (e.g.
+// `"default-workspace": "org/proj"`).
+func buildTestConfig(t *testing.T, serverURL, extraCfg string) *clicfg.Config {
+	t.Helper()
+
+	cfgJSON := fmt.Sprintf(`{
+		"format": "json",
+		"aura": {
+			"auth-url": "%s/oauth/token",
+			"base-url": "%s",
+			"beta-enabled": true
+			%s
+		}
+	}`, serverURL, serverURL, extraCfg)
+
+	credJSON := `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"tok","token-expiry":9999999999}],
+			"default-credential": "c"
+		}
+	}`
+
+	fs, err := testfs.GetTestFs(cfgJSON, credJSON)
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cfg.Aura.SetBetaEnabled(true)
+	return cfg
+}
+
+// newTestCmd creates a cobra.Command with org/project flags registered (as
+// persistent) and parses the given args. It does NOT execute a RunE.
+func newTestCmd(t *testing.T, args []string) *cobra.Command {
+	t.Helper()
+	cmd := &cobra.Command{
+		Use:  "test",
+		RunE: func(cmd *cobra.Command, args []string) error { return nil },
+	}
+	flags.RegisterOrgProjectFlags(cmd)
+	cmd.SetArgs(args)
+	// Execute so cobra parses the args and marks Changed() flags.
+	require.NoError(t, cmd.Execute())
+	return cmd
+}
+
+func TestResolveAndValidateOrgProject_OrgFromFlag(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--project-id", testProjectID})
+
+	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, testOrgID, gotOrg)
+	assert.Equal(t, testProjectID, gotProject)
+}
+
+func TestResolveAndValidateOrgProject_OrgFromWorkspaceConfig(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
+	extraCfg := fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID)
+	cfg := buildTestConfig(t, srv.URL, extraCfg)
+
+	cmd := newTestCmd(t, []string{})
+
+	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, testOrgID, gotOrg)
+	assert.Equal(t, testProjectID, gotProject)
+}
+
+func TestResolveAndValidateOrgProject_MissingOrg(t *testing.T) {
+	srv := buildTestServer(t, "", 0, "")
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--project-id", testProjectID})
+
+	_, _, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no organization specified")
+	assert.Contains(t, err.Error(), "--organization-id")
+}
+
+func TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet(t *testing.T) {
+	srv := buildTestServer(t, "", 0, "")
+	extraCfg := `, "default-tenant": "legacy-tenant-id"`
+	cfg := buildTestConfig(t, srv.URL, extraCfg)
+
+	cmd := newTestCmd(t, []string{})
+
+	_, _, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no default workspace set")
+	assert.Contains(t, err.Error(), "aura workspace use")
+}
+
+func TestResolveAndValidateOrgProject_ProjectFromFlag(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--project-id", testProjectID})
+
+	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, testOrgID, gotOrg)
+	assert.Equal(t, testProjectID, gotProject)
+}
+
+func TestResolveAndValidateOrgProject_ProjectFromDeprecatedTenantIDFlag(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--tenant-id", testProjectID})
+
+	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, testOrgID, gotOrg)
+	assert.Equal(t, testProjectID, gotProject)
+}
+
+func TestResolveAndValidateOrgProject_ProjectFromWorkspaceConfig(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
+	extraCfg := fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID)
+	cfg := buildTestConfig(t, srv.URL, extraCfg)
+
+	cmd := newTestCmd(t, []string{})
+
+	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, testOrgID, gotOrg)
+	assert.Equal(t, testProjectID, gotProject)
+}
+
+func TestResolveAndValidateOrgProject_MissingProject(t *testing.T) {
+	srv := buildTestServer(t, "", 0, "")
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID})
+
+	_, _, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no project specified")
+	assert.Contains(t, err.Error(), "--project-id")
+}
+
+func TestResolveAndValidateOrgProject_ProjectNotInOrg(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsEmptyBody)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--project-id", testProjectID})
+
+	_, _, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not find project")
+	assert.Contains(t, err.Error(), testProjectID)
+	assert.Contains(t, err.Error(), testOrgID)
+}
+
+func TestResolveAndValidateOrgProject_APIError(t *testing.T) {
+	srv := buildTestServer(t, listProjectsPath, http.StatusInternalServerError, `{"errors": [{"message": "internal server error"}]}`)
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--project-id", testProjectID})
+
+	_, _, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "internal server error")
+}
+
+func TestResolveAndValidateOrgProject_TableDrivenResolutionOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		args           []string
+		extraCfg       string
+		serverStatus   int
+		serverBody     string
+		wantOrg        string
+		wantProject    string
+		wantErrContain string
+	}{
+		{
+			name:         "flags take precedence over workspace config",
+			args:         []string{"--organization-id", testOrgID, "--project-id", testProjectID},
+			extraCfg:     `, "default-workspace": "other-org/other-proj"`,
+			serverStatus: http.StatusOK,
+			serverBody:   listProjectsSuccessBody,
+			wantOrg:      testOrgID,
+			wantProject:  testProjectID,
+		},
+		{
+			name:         "project-id flag takes precedence over tenant-id flag",
+			args:         []string{"--organization-id", testOrgID, "--project-id", testProjectID, "--tenant-id", "ignored-tenant"},
+			serverStatus: http.StatusOK,
+			serverBody:   listProjectsSuccessBody,
+			wantOrg:      testOrgID,
+			wantProject:  testProjectID,
+		},
+		{
+			name:         "project from tenant-id when project-id absent",
+			args:         []string{"--organization-id", testOrgID, "--tenant-id", testProjectID},
+			serverStatus: http.StatusOK,
+			serverBody:   listProjectsSuccessBody,
+			wantOrg:      testOrgID,
+			wantProject:  testProjectID,
+		},
+		{
+			name:           "project-not-in-org returns clear error",
+			args:           []string{"--organization-id", testOrgID, "--project-id", "unknown-proj"},
+			serverStatus:   http.StatusOK,
+			serverBody:     listProjectsSuccessBody,
+			wantErrContain: "could not find project unknown-proj in organization " + testOrgID,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := buildTestServer(t, listProjectsPath, tc.serverStatus, tc.serverBody)
+			cfg := buildTestConfig(t, srv.URL, tc.extraCfg)
+
+			cmd := newTestCmd(t, tc.args)
+
+			gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+
+			if tc.wantErrContain != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContain)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantOrg, gotOrg)
+			assert.Equal(t, tc.wantProject, gotProject)
+		})
+	}
+}
