@@ -212,7 +212,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					delete(instance, "password")
 				}
 
-				fields := []string{"id", "name", "tenant_id", "connection_url", "username"}
+				fields := []string{"id", "name", "project_id", "connection_url", "username"}
 				if !noCredentialPrint {
 					fields = append(fields, "password")
 				}

@@ -71,7 +71,7 @@ neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-
 			}
 
 			if statusCode == http.StatusAccepted {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
 			}
 
 			if wait {

@@ -63,7 +63,7 @@ neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-re
 			}
 
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 			return nil
 		},

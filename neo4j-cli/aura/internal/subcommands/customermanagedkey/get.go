@@ -38,7 +38,7 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --f
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 			}
 

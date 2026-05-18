@@ -7,3 +7,8 @@ Decisions: Persistent flag deprecation warnings go to os.Stderr (not cobra's cmd
 Added `ResolveAndValidateOrgProject` to `neo4j-cli/aura/internal/subcommands/utils/resolve.go`; resolves org/project from flags then `aura.default-workspace`, handles legacy `default-tenant` migration message, then validates project membership via `api.ListProjects`. Table-driven unit tests cover all 9 resolution branches.
 Files: +neo4j-cli/aura/internal/subcommands/utils/resolve.go, +neo4j-cli/aura/internal/subcommands/utils/resolve_test.go
 Decisions: Migration message lowercased to satisfy staticcheck (error strings must not start with capital or end with punctuation).
+
+## TASK-003 — 2026-05-18T02:00:00Z
+Added `RenameResponseField` helper to `utils/rename.go` that renames a key in `api.ResponseData` preserving the single vs list envelope shape. Updated all `output.PrintBody` field lists in instance, customermanagedkey, and graphanalytics/session commands to use `project_id` instead of `tenant_id`. Updated two table-output tests in `get_test.go` to use `project_id` in mock responses and expected output.
+Files: +neo4j-cli/aura/internal/subcommands/utils/rename.go, +neo4j-cli/aura/internal/subcommands/utils/rename_test.go, ~neo4j-cli/aura/internal/subcommands/instance/{list,get,create,delete,update,pause,resume,overwrite}.go, ~neo4j-cli/aura/internal/subcommands/instance/get_test.go, ~neo4j-cli/aura/internal/subcommands/customermanagedkey/{get,list,create}.go, ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/{get,list,create}.go
+Decisions: `RenameResponseField` type-switches on `api.SingleValueResponseData` to preserve JSON envelope shape; default case handles list and any future response types.

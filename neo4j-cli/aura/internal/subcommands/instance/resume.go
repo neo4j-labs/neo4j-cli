@@ -51,7 +51,7 @@ neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --forma
 
 			// NOTE: Instance resume should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

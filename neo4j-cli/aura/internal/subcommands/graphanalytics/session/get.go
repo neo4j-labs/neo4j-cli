@@ -46,7 +46,7 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 					"status",
 					"created_at",
 					"user_id",
-					"tenant_id",
+					"project_id",
 					"cloud_provider",
 					"region",
 					"host",

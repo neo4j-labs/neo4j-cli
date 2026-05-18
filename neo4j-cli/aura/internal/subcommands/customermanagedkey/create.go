@@ -86,7 +86,7 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 			}
 			// NOTE: Instance delete should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

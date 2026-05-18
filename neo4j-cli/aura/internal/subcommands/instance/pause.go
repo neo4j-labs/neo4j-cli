@@ -47,7 +47,7 @@ neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format
 
 			// NOTE: Instance pause should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "tenant_id", "connection_url", "cloud_provider", "region", "type", "memory"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "project_id", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 			return nil
 		},

@@ -54,7 +54,7 @@ tasks:
       affected command before `output.PrintBody` to rename `tenant_id` to `project_id`.
       Also update every `output.PrintBody` field list across instance, customermanagedkey, and
       graphanalytics commands that currently references `"tenant_id"` to use `"project_id"` instead.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Helper correctly renames the specified key in both single-item and list response maps"
@@ -62,7 +62,7 @@ tasks:
       - "JSON, table, and toon output all show `project_id` as the field name"
       - "Unit tests cover single-map rename, list-map rename, and no-op when key is absent"
       - "`make test` and `make lint` pass"
-    completed_at: null
+    completed_at: "2026-05-18T02:00:00Z"
 
   - id: task-004
     title: "Apply org/project enforcement to instance list and instance create"

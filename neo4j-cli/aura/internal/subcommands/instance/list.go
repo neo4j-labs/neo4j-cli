@@ -47,7 +47,7 @@ neo4j-cli aura instance list --format json`,
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "cloud_provider"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "cloud_provider"})
 			}
 			return nil
 		},

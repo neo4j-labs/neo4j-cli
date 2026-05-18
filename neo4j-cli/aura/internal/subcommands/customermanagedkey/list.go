@@ -46,7 +46,7 @@ neo4j-cli aura customer-managed-key list --format json`,
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id"})
 
 			}
 

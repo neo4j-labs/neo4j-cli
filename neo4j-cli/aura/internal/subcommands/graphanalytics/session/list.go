@@ -59,7 +59,7 @@ neo4j-cli aura graph-analytics session list --instance-id 00000000 --format json
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "tenant_id", "cloud_provider", "ttl"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "project_id", "cloud_provider", "ttl"})
 			}
 			return nil
 		},

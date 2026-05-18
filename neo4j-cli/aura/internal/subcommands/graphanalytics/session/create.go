@@ -104,7 +104,7 @@ neo4j-cli aura graph-analytics session create --rw --name scripted-session --mem
 
 			// NOTE: Return 202 if new session gets created and 200 if existing session was found
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "memory", "status", "created_at"})
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "project_id", "memory", "status", "created_at"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for session to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

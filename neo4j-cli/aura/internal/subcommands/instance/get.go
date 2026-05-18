@@ -57,7 +57,7 @@ neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json |
 func getFields(resBody []byte) ([]string, error) {
 	responseBody := api.ParseBody(resBody)
 
-	fields := []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
+	fields := []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
 	instance, err := responseBody.GetSingleOrError()
 	if err != nil {
 		return nil, err
