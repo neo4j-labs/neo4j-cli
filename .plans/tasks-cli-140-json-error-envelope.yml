@@ -57,7 +57,7 @@ tasks:
       cfg.Global.Format()) between cfg.Events.Flush() (line 67) and os.Exit(exitCodeFor(err)) (line 70). Keep
       exitCodeFor exactly as-is. Extend neo4j-cli/main_test.go with at least one happy-path JSON test and one plaintext
       test driving clierr.Render via bytes.Buffer (mirrors the TestExitCodeFor extraction pattern).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -66,7 +66,7 @@ tasks:
       - "main_test.go covers JSON-mode and plaintext-mode rendering with byte-exact assertions for at least one CodeName each"
       - "Running ./bin/neo4j-cli (rebuilt) on a failing command no longer produces cobra's double `Error:` print"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-05-18T15:30:00Z
 
   - id: task-004
     title: "Rebuild agentcontext errorCodes map from clierr exports"

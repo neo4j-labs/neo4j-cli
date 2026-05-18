@@ -67,6 +67,7 @@ func main() {
 	cfg.Events.Flush() // Send out any remaining events
 
 	if err != nil {
+		clierr.Render(err, os.Stdout, os.Stderr, cfg.Global.Format())
 		os.Exit(exitCodeFor(err))
 	}
 }

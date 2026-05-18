@@ -5,3 +5,8 @@ Files: ~common/clierr/error.go, ~common/clierr/error_test.go, ~.plans/tasks-cli-
 ## TASK-002 — 2026-05-18T15:00:00Z
 Added Envelope/EnvelopeBody types, (*CLIError).BuildEnvelope pure projection, and Render(err, stdout, stderr, format) dispatcher; JSON mode emits envelope to stdout + summary to stderr, other formats write summary + optional suggestion to stderr only; untyped err wrapped as fatal_error, nil is no-op.
 Files: +common/clierr/render.go, +common/clierr/render_test.go
+
+## TASK-003 — 2026-05-18T15:30:00Z
+Set SilenceErrors on neo4j-cli root cobra cmd and wired clierr.Render between Events.Flush and os.Exit in main.go so failed commands emit the structured envelope (json) or one-line summary+suggestion (plaintext). Added JSON-mode and plaintext-mode tests in main_test.go.
+Files: ~neo4j-cli/app/app.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: Flag-parse errors fire before --format is bound so they fall through to plaintext; not in scope to fix here.
