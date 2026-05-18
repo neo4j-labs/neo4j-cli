@@ -6,7 +6,6 @@ package instance
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -30,7 +29,7 @@ neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json
 neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.connection_url'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			instanceId := strings.TrimSpace(args[0])
+			instanceId := args[0]
 			path := fmt.Sprintf("/instances/%s", instanceId)
 
 			cmd.SilenceUsage = true

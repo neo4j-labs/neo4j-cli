@@ -6,7 +6,6 @@ package instance
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -47,7 +46,7 @@ neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-
 neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			instanceId := strings.TrimSpace(args[0])
+			instanceId := args[0]
 			path := fmt.Sprintf("/instances/%s/overwrite", instanceId)
 
 			cmd.SilenceUsage = true
