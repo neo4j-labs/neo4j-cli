@@ -4,6 +4,8 @@
 package session
 
 import (
+	"strings"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -26,7 +28,7 @@ neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 
 neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Long: `This subcommand returns the details of a Graph Analytics Serverless session.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sessionID := args[0]
+			sessionID := strings.TrimSpace(args[0])
 
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {

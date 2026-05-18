@@ -1,0 +1,21 @@
+## task-001 — 2026-05-18T07:30:00Z
+Added common/clicmd package with SuggestSubcommand Args validator and idempotent ApplySuggestionsToParents walker; unit tests cover all three guards and depth-3 recursion.
+Files: +common/clicmd/suggest.go, +common/clicmd/suggest_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+Decisions: replicated cobra's unexported findSuggestions formatting (incl. lazy default of SuggestionsMinimumDistance=2) because exported SuggestionsFor returns []string and otherwise yields zero suggestions when the field is 0.
+
+## task-002 — 2026-05-18T07:50:00Z
+Wired clicmd.ApplySuggestionsToParents into app.NewCmd and added integration tests covering root + nested typos (configg/updaet/lsit/insance/aura-clent) plus a non-shadow regression for update/query/config-set --help.
+Files: ~neo4j-cli/app/app.go, +neo4j-cli/app/app_suggest_test.go, ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go, ~neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+Decisions: walker also installs a help-printing RunE on matched parents because cobra only invokes Args validators on Runnable commands; commands are tagged with SuggestionsRunEAnnotation so TestAllLeafCommands_HaveExamples can skip them without losing coverage on hand-authored runnable parents like `query`.
+
+## task-003 — 2026-05-18T08:10:00Z
+Added `upgrade` alias on the update cobra command plus TestUpdateCmd_UpgradeAlias verifying Aliases membership and root.Find resolution for both `upgrade` and `upgrade check`; agent-context JSON now surfaces ["upgrade"] under update.aliases.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+
+## task-004 — 2026-05-18T09:40:00Z
+Added changie Patch entry for the upgrade alias + suggestions feature via `changie new`; gates green (test/lint/fmt-check).
+Files: +.changes/unreleased/neo4j-cli-Patch-20260518-093803.yaml, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+
+## task-005 — 2026-05-18T10:00:00Z
+Verification-only: ran make test/fmt-check/lint (all clean) and the five manual smoke commands (config lsit / aura insance list / credential aura-clent add print 'Did you mean' with exit 1; upgrade --help and upgrade check --help resolve with exit 0).
+Files: ~.plans/tasks-cli-70-update-alias-and-suggestions.yml, ~.plans/progress-cli-70-update-alias-and-suggestions.txt

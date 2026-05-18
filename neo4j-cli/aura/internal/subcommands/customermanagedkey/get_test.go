@@ -123,6 +123,22 @@ func TestGetCustomerManagedKeyNotInProject(t *testing.T) {
 	}
 }
 
+func TestGetCustomerManagedKeyWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	cmkId := "8c764aed-8eb3-4a1c-92f6-e4ef0c7a6ed9"
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusOK, cmkGetBody(cmkId, testProjectID))
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key get %s\"\n\" --organization-id %s --project-id %s", cmkId, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+}
+
 func TestGetCustomerManagedKeyNotFoundError(t *testing.T) {
 	for _, command := range []string{"customer-managed-key", "cmk"} {
 		helper := testutils.NewAuraTestHelper(t)

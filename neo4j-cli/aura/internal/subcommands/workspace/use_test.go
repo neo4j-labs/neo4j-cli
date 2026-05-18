@@ -100,6 +100,30 @@ func TestWorkspaceUseWithFlags(t *testing.T) {
 	helper.AssertConfigValue("aura.default-workspace", slug)
 }
 
+func TestWorkspaceUseWithTrailingNewline(t *testing.T) {
+	const orgID = "org-111"
+	const projectID = "proj-222"
+	const slug = orgID + "/" + projectID
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	mockHandler := helper.NewRequestHandlerMock(
+		fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
+		http.StatusOK,
+		fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
+	)
+
+	helper.ExecuteCommand(fmt.Sprintf("workspace use %s\"\n\" --rw", slug))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+	helper.AsssertOk()
+	helper.AssertConfigValue("aura.default-workspace", slug)
+}
+
 func TestWorkspaceUseMixedFormError(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-222"

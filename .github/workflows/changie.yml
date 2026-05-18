@@ -62,7 +62,7 @@ jobs:
 
           PR_TITLE="Release neo4j-cli ${NEO4J_VERSION}"
           PR_BRANCH="release/neo4j-cli-${NEO4J_VERSION}"
-          PR_BODY="$(printf '## Release neo4j-cli %s\n\n- **neo4j-cli** %s — see [CHANGELOG-neo4j.md](CHANGELOG-neo4j.md)' "${NEO4J_VERSION}" "${NEO4J_VERSION}")"
+          PR_BODY="$(printf '## Release neo4j-cli %s\n\n- **neo4j-cli** %s — see [CHANGELOG.md](CHANGELOG.md)' "${NEO4J_VERSION}" "${NEO4J_VERSION}")"
 
           echo "pr_title=${PR_TITLE}" >> $GITHUB_OUTPUT
           echo "pr_branch=${PR_BRANCH}" >> $GITHUB_OUTPUT

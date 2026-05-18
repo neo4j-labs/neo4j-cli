@@ -107,6 +107,22 @@ func TestGetSessionNotInProject(t *testing.T) {
 	helper.AssertErr(fmt.Sprintf("Error: could not find session %s in project %s", testSessionID, testProjectID))
 }
 
+func TestGetSessionWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	sessionId := "559c94c7-15de43fg"
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session get %s\"\n\" --organization-id %s --project-id %s", sessionId, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+}
+
 func TestGetSessionError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

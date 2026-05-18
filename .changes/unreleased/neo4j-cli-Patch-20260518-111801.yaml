@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Remove residual aura-cli source/build artifacts (standalone entrypoint, skill bundle subsystem, dead workflow gating, stale docs).
+time: 2026-05-18T11:18:01.50137+02:00

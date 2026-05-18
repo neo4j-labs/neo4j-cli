@@ -156,6 +156,36 @@ func TestDeleteInstanceNotInProject(t *testing.T) {
 	helper.AssertUsageNotShown()
 }
 
+func TestDeleteInstanceWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+
+	// Single mock: GET (pre-flight ownership check) then DELETE.
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
+		"data": {
+		  "id": "2f49c2b3",
+		  "name": "Production",
+		  "status": "deleting",
+		  "connection_url": "YOUR_CONNECTION_URL",
+		  "tenant_id": "YOUR_TENANT_ID",
+		  "cloud_provider": "gcp",
+		  "memory": "8GB",
+		  "region": "europe-west1",
+		  "type": "enterprise-db"
+		}
+	  }`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s\"\n\" --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}
+
 func TestDeleteInstanceError(t *testing.T) {
 	testCases := []struct {
 		statusCode    int

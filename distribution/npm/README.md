@@ -164,11 +164,11 @@ harmless if left in place.
 ```
 release.yml (build + GH release via GoReleaser)
     │
-    └── uploads dist/ + release-meta.json artifacts; surfaces include_neo4j
+    └── uploads dist/ + release-meta.json artifacts
         │
         └── publish-npm.yml (workflow_run, gated on workflow_run.conclusion == 'success')
             │
-            └── parses release-meta.json, gates on include_neo4j == 'true'
+            └── parses release-meta.json for version
                 └── distribution/npm/publish.sh (8 platforms → wrapper)
 
 publish-npm.yml (workflow_dispatch, manual; for failure recovery)
@@ -180,12 +180,10 @@ publish-npm.yml (workflow_dispatch, manual; for failure recovery)
   `dist/neo4j-cli_<version>_<OS>_<arch>/neo4j-cli[.exe]`. The
   `archives.name_template` defines the dir layout `publish.sh` expects.
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
-  triggers on `CHANGELOG-neo4j.md` / `CHANGELOG-aura.md` changes. Surfaces
-  `include_neo4j` and `version` as job outputs; uploads `dist/` +
-  `release-meta.json` artifacts (only on neo4j-cli release runs).
+  triggers on `CHANGELOG.md` changes. Surfaces `version` as a job
+  output; uploads `dist/` + `release-meta.json` artifacts.
 - [`.github/workflows/publish-npm.yml`](../../.github/workflows/publish-npm.yml)
   — auto path on `workflow_run`; manual `workflow_dispatch` for recovery.
-  Aura-cli-only release cycles skip via the `include_neo4j` gate.
 
 ## Failure recovery
 

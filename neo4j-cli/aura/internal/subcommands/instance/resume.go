@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -40,7 +41,7 @@ neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-000
 neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			instanceID := args[0]
+			instanceID := strings.TrimSpace(args[0])
 
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {

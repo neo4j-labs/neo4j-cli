@@ -6,6 +6,7 @@ package authprovider
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -35,7 +36,8 @@ neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api g
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, args[0])
+			authProviderId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodDelete,

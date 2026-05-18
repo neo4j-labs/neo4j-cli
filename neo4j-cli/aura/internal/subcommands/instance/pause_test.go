@@ -137,6 +137,38 @@ func TestPauseInstanceNotInProject(t *testing.T) {
 	helper.AssertUsageNotShown()
 }
 
+func TestPauseInstanceWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+
+	// Pre-flight GET for ownership check.
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+
+	// Actual POST pause.
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s/pause", instanceId), http.StatusAccepted, `{
+		"data": {
+		  "id": "2f49c2b3",
+		  "name": "Production",
+		  "status": "pausing",
+		  "connection_url": "YOUR_CONNECTION_URL",
+		  "tenant_id": "YOUR_TENANT_ID",
+		  "cloud_provider": "gcp",
+		  "memory": "8GB",
+		  "region": "europe-west1",
+		  "type": "enterprise-db"
+		}
+	  }`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance pause %s\"\n\" --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodPost)
+}
+
 func TestPauseInstanceError(t *testing.T) {
 	testCases := []struct {
 		statusCode    int

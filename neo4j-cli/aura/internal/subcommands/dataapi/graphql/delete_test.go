@@ -42,3 +42,26 @@ func TestDeleteGraphQLDataApi(t *testing.T) {
         }
 	}`)
 }
+
+func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	instanceId := "2f49c2b3"
+	dataApiId := "afdb4e9d"
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{
+			"data": {
+                "id": "afdb4e9d",
+                "name": "friendly-name",
+                "status": "ready",
+                "url": "https://afdb4e9d.28be6e4d8d3e836019.graphql.neo4j.io/graphql"
+        	}
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql delete --format json --instance-id %s %s\"\n\" --rw", instanceId, dataApiId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}

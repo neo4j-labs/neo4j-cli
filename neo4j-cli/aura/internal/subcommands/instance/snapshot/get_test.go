@@ -132,3 +132,31 @@ func TestGetSnapshotInstanceNotInProject(t *testing.T) {
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testProjectID))
 }
+
+func TestGetSnapshotWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+	snapshotId := "afdb4e9d-6ba6-4d45-b951-f82843dcbca6"
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s/snapshots/%s", instanceId, snapshotId), http.StatusOK, `{
+			"data": {
+				"exportable": true,
+				"instance_id": "7261d20a",
+				"profile": "AdHoc",
+				"snapshot_id": "afdb4e9d-6ba6-4d45-b951-f82843dcbca6",
+				"status": "Completed",
+				"timestamp": "2024-09-12T13:51:45Z"
+			}
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance snapshot get --format json --instance-id %s --organization-id %s --project-id %s %s\"\n\"", instanceId, testOrgID, testProjectID, snapshotId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+}

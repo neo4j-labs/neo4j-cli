@@ -22,6 +22,32 @@ func TestSetConfig(t *testing.T) {
 	helper.AssertConfigValue("aura.auth-url", "test")
 }
 
+func TestSetConfigWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.OverwriteConfig("{}")
+
+	helper.ExecuteCommand(fmt.Sprintf("config set %s\"\n\" test --rw", "auth-url"))
+
+	helper.AssertConfigValue("aura.auth-url", "test")
+}
+
+// Regression guard for REQ-F-007: passing `auth-url\n` must NOT
+// produce an "invalid argument" error from the manual config-key
+// validation; the key is trimmed inside the Args func before
+// IsValidConfigKey runs.
+func TestSetConfigTrailingNewlineDoesNotSurfaceInvalidArgument(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.OverwriteConfig("{}")
+
+	helper.ExecuteCommand(fmt.Sprintf("config set %s\"\n\" test --rw", "auth-url"))
+
+	helper.AssertErr("")
+}
+
 func TestSetConfigWithInvalidConfigKey(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

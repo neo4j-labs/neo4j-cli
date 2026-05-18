@@ -90,8 +90,9 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "update",
-		Short: "Self-update the neo4j-cli binary",
+		Use:     "update",
+		Aliases: []string{"upgrade"},
+		Short:   "Self-update the neo4j-cli binary",
 		Long: "Self-update the neo4j-cli binary by downloading the latest GitHub release and atomically " +
 			"swapping it in place. By default only stable semver tags are considered; pass `--pre-releases` " +
 			"to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager " +

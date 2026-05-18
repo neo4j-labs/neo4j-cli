@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  security-review:
+  conventions-review:
     # Skip drafts; restrict to org members/owners/collaborators. Outside
     # contributors and bots (dependabot, renovate, etc.) do not match and the
     # job is skipped without consuming Actions minutes or OAuth tokens. They
@@ -34,7 +34,7 @@ jobs:
             echo 'PROMPT_EOF'
           } >> "$GITHUB_ENV"
 
-      - name: Run Claude Code (security review)
+      - name: Run Claude Code (conventions review)
         id: claude
         uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
         with:
@@ -60,11 +60,51 @@ jobs:
       - name: Enforce verdict
         # Fail-closed: missing verdict file is treated as fail so an early Claude
         # exit (or tool denial) cannot silently pass the check.
+        #
+        # Robustness: Claude has been observed to post the mandated summary
+        # comment but skip the final verdict-file write (PR #132 on 2026-05-18,
+        # twice). The comment is the user-facing artifact AND carries a
+        # mandated marker line (`**Conventions review:** ✅ no issues found`
+        # or `**Conventions review:** ⚠️ N issue(s) flagged inline`). When
+        # the verdict file is empty we fall back to scraping the latest
+        # claude[bot] PR comment that contains the kind marker.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_KIND: "Conventions review"
         run: |
-          verdict="$(cat /tmp/claude-verdict.txt 2>/dev/null || true)"
-          echo "Claude verdict: '${verdict}'"
+          set -uo pipefail
+
+          verdict=""
+          if [ -s /tmp/claude-verdict.txt ]; then
+            verdict="$(tr -d '[:space:]' < /tmp/claude-verdict.txt)"
+            echo "Verdict from file: '${verdict}'"
+          else
+            echo "Verdict file empty/missing; will scrape PR comment fallback."
+          fi
+
+          if [ -z "${verdict}" ]; then
+            latest="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --jq 'map(select(.user.login == "claude[bot]"
+                                and (.body | contains("**'"${REVIEW_KIND}"':**"))))
+                    | sort_by(.created_at)
+                    | last
+                    | .body // ""')"
+            if [ -z "${latest}" ]; then
+              echo "No claude[bot] comment with the ${REVIEW_KIND} marker found."
+            elif echo "${latest}" | grep -qF '⚠️'; then
+              verdict="fail"
+              echo "Verdict from comment: 'fail' (⚠️ marker)"
+            elif echo "${latest}" | grep -qF '✅'; then
+              verdict="pass"
+              echo "Verdict from comment: 'pass' (✅ marker, no ⚠️)"
+            else
+              echo "Latest claude[bot] comment had neither ✅ nor ⚠️ marker."
+            fi
+          fi
+
           if [ "${verdict}" = "pass" ]; then
             exit 0
           fi
-          echo "::error::Claude conventions review flagged issues"
+          echo "::error::Claude conventions review did not produce a pass verdict (file='/tmp/claude-verdict.txt'; comment-fallback also did not yield pass)"
           exit 1

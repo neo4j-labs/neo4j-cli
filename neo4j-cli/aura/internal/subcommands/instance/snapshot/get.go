@@ -6,6 +6,7 @@ package snapshot
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -42,7 +43,8 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 				return err
 			}
 
-			path := fmt.Sprintf("/instances/%s/snapshots/%s", instanceId, args[0])
+			snapshotId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/instances/%s/snapshots/%s", instanceId, snapshotId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodGet,

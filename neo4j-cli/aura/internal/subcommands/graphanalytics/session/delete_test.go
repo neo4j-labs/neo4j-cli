@@ -97,6 +97,27 @@ func TestDeleteSessionNotInProject(t *testing.T) {
 	helper.AssertUsageNotShown()
 }
 
+func TestDeleteSessionWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	sessionId := "42-24"
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", sessionId), http.StatusOK, sessionGetBody(sessionId, testProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
+		"data": {
+		  "id": "42-24"
+		}
+	  }`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw", sessionId, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}
+
 func TestDeleteSessionError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

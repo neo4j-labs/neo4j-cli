@@ -4,6 +4,8 @@
 package credential
 
 import (
+	"strings"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +25,8 @@ neo4j-cli aura credential use staging --rw
 neo4j-cli aura credential use my-creds --rw && neo4j-cli aura credential list --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Aura.SetDefault(args[0])
+			credName := strings.TrimSpace(args[0])
+			return cfg.Credentials.Aura.SetDefault(credName)
 		},
 	}
 }

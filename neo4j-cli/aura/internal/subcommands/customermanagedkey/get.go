@@ -4,6 +4,8 @@
 package customermanagedkey
 
 import (
+	"strings"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -26,7 +28,7 @@ neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --o
 neo4j-cli aura customer-managed-key get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmkID := args[0]
+			cmkID := strings.TrimSpace(args[0])
 
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
