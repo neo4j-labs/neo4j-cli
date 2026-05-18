@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: 'Add organization list/get, project list/get, and context list/use commands; replace config project subsystem with aura.default-context config key; deprecate aura tenant list/get (use project list and organization get instead — removal planned for a future release)'
+body: 'Add organization list/get, project list/get, and workspace list/use commands; replace config project subsystem with aura.default-workspace key; deprecate aura tenant list/get (use project list and organization get instead — removal planned for a future release)'
 time: 2026-05-15T12:00:00+00:00
