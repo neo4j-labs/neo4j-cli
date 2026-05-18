@@ -42,7 +42,7 @@ tasks:
       `config lsit`, `aura insance list`, `credential aura-clent add`) stay.
       Add an `errors.As(execErr, &ce)` + `assert.Equal(t, 2, ce.Code)`
       assertion that runs for every row.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -52,7 +52,7 @@ tasks:
       - "Existing rows (depths 1, 2, 3) and existing assertions still pass"
       - "`TestSuggestionsDoNotShadowRunnableCommands` still passes (no regression on runnable parents)"
       - "`go test ./neo4j-cli/app/...` clean"
-    completed_at: null
+    completed_at: 2026-05-18T17:00:00Z
 
   - id: task-003
     title: "Add unknown_subcommand_usage_2 e2e scenario to TestExitCodes"

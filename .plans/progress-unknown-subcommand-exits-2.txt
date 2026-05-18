@@ -1,3 +1,8 @@
 ## task-001 — 2026-05-18T16:30:00Z
 Wrapped SuggestSubcommand return in clierr.NewUsageError so unknown-subcommand typos at any nesting level map to exit 2; tests assert *clierr.CLIError with Code==2.
 Files: ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go
+
+## task-002 — 2026-05-18T17:00:00Z
+Extended TestSuggestionsForTypos with depth-2 (aura foo) + depth-4 (aura instance snapshot foo) rows; every row now asserts execErr unwraps to *clierr.CLIError with Code==2.
+Files: ~neo4j-cli/app/app_suggest_test.go
+Decisions: "Did you mean" assertion gated on len(tc.suggestions)>0 since arbitrary typos like "foo" may not produce cobra SuggestionsFor candidates.
