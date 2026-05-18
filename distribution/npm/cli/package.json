@@ -1,0 +1,14 @@
+{
+  "name": "@neo4j-labs/cli-tests",
+  "private": true,
+  "description": "Dev-only package for running Jest tests in distribution/npm/cli/. Not published to npm.",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

@@ -186,6 +186,11 @@ try {
     Write-Host ""
     Write-Ok "Done! Run 'neo4j-cli --help' to get started."
 
+    # -- Auto-install skill (opt-in) ------------------------------------------
+    if ($env:NEO4J_CLI_AUTO_INSTALL_SKILL -eq "1") {
+        try { & neo4j-cli skill install --rw } catch { }
+    }
+
 } finally {
     # Always clean up temp files
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue

@@ -75,6 +75,10 @@ brews:
       bin.install "neo4j-cli"
     test: |
       assert_match version.to_s, shell_output("#{bin}/neo4j-cli --version")
+    post_install: |
+      return unless ENV["NEO4J_CLI_AUTO_INSTALL_SKILL"] == "1"
+      system "#{bin}/neo4j-cli", "skill", "install", "--rw"
+      true
 
 notarize:
   macos:

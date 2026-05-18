@@ -1,0 +1,262 @@
+================================================================================
+TASK-001: Add NEO4J_CLI_AUTO_INSTALL_SKILL postinstall hook to npm package template
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added a `postinstall` npm lifecycle hook to the `@neo4j-labs/cli` package template.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set, `npm install -g @neo4j-labs/cli`
+automatically runs `neo4j-cli skill install --rw` after binary placement. Any
+failure is silently suppressed so npm install is never aborted.
+
+Files Changed:
+- distribution/npm/cli/bin/postinstall.js (created — Node.js postinstall hook script)
+- distribution/npm/cli/package.json.tmpl (modified — added scripts.postinstall and postinstall.js to files array)
+- distribution/npm/publish.sh (modified — copies postinstall.js to wrapper build dir)
+
+Key Decisions:
+- Implemented postinstall logic in a separate `bin/postinstall.js` file (not inline in package.json scripts) to keep the logic readable and testable
+- Used `process.execPath` to invoke the shim so the same Node.js binary runs both scripts
+- Used `spawnSync` with `{ stdio: 'inherit' }` for consistent output passthrough
+- Always exits 0 at end of postinstall.js — non-zero exit from skill install is not propagated
+- `postinstall.js` does NOT need chmod +x since it's invoked via `node bin/postinstall.js`
+
+Next Task: task-002
+
+================================================================================
+TASK-004: Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.ps1
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added an opt-in auto-skill-install block to the Windows PowerShell installer.
+When `$env:NEO4J_CLI_AUTO_INSTALL_SKILL` equals `"1"`, the script calls
+`neo4j-cli skill install --rw` after placing the binary in PATH. Any failure
+is suppressed via try/catch so the overall install is never aborted.
+
+Files Changed:
+- distribution/installation-scripts/install-neo4j-cli.ps1 (modified — added env var guard block before finally cleanup)
+
+Key Decisions:
+- Used `try { & neo4j-cli skill install --rw } catch { }` — the empty catch block swallows all errors silently
+- Used `& neo4j-cli` (call operator) rather than full path `$Destination` so the block works correctly after PATH is updated
+- Placed block after "Done!" message and before `} finally {` so it runs only on successful install, not on error paths
+- CRLF line endings verified after edit: 196 CRLF, 0 LF-only — no unix2dos step needed (Edit tool preserved them)
+- Comment follows existing `# -- Section ---` dashes style used throughout the file
+
+Next Task: task-005
+
+================================================================================
+TASK-002: Add post_install Ruby block to Homebrew formula via .goreleaser.yaml
+Date: 2026-05-14T10:00:00Z
+================================================================================
+
+Summary:
+Added a `post_install` field to the `brews:` block in `.goreleaser.yaml`.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set at brew install time, the generated
+Homebrew formula's `post_install` method calls `neo4j-cli skill install --rw`.
+Validated by running `goreleaser release --snapshot --skip=publish --clean` and
+inspecting `dist/homebrew/Formula/neo4j-cli.rb`.
+
+Files Changed:
+- .goreleaser.yaml (modified — added post_install field to brews block)
+
+Key Decisions:
+- GoReleaser wraps the `post_install:` string value in `def post_install ... end`
+  automatically, so only the method BODY (not the def/end) should be provided.
+  The initial attempt included the def/end wrapper, resulting in a nested def.
+- `return unless ENV[...] == "1"` is idiomatic Ruby guard clause (early return).
+- Trailing `true` return is Ruby best practice to avoid nil return from system().
+- `make snapshot` (single-target) does NOT generate the Homebrew formula —
+  must use `goreleaser release --snapshot --skip=publish --clean` (full build).
+
+Next Task: task-003 (already in_progress per task file)
+
+================================================================================
+TASK-003: Add NEO4J_CLI_AUTO_INSTALL_SKILL guard to install-neo4j-cli.sh
+Date: 2026-05-14T00:00:00Z
+================================================================================
+
+Summary:
+Added an opt-in auto-skill-install block to the POSIX shell installer.
+When `NEO4J_CLI_AUTO_INSTALL_SKILL=1` is set, the script calls
+`neo4j-cli skill install --rw` after placing the binary. Any failure is
+suppressed via `|| true` so the overall install is never aborted.
+
+Files Changed:
+- distribution/installation-scripts/install-neo4j-cli.sh (modified — added env var guard block after --version confirmation, before PATH check)
+
+Key Decisions:
+- Used `"$INSTALLED_PATH" skill install --rw || true` (absolute path via existing variable) rather than bare `neo4j-cli`, because INSTALL_DIR may not be on PATH yet at this point in the script — using the absolute path guarantees the binary is found regardless of PATH state
+- Placed block after `"$INSTALLED_PATH" --version` confirmation and before the PATH-check section, matching the logical flow: binary is confirmed present, then skill install runs, then PATH advice is given
+- `${NEO4J_CLI_AUTO_INSTALL_SKILL:-}` default-expansion is shellcheck-safe with `set -u` in effect
+
+Next Task: task-005
+
+================================================================================
+TASK-006: Add bats-core behavioral tests for install-neo4j-cli.sh
+Date: 2026-05-15T00:00:00Z
+================================================================================
+
+Summary:
+Created bats-core behavioral tests covering the NEO4J_CLI_AUTO_INSTALL_SKILL
+feature in install-neo4j-cli.sh. Tests use a complete stub environment (curl,
+tar, sha256sum, shasum, uname, sudo, neo4j-cli) injected via PATH prepending.
+All 4 test cases pass on macOS (bats 1.13.0). shellcheck passes with no warnings.
+
+Files Changed:
+- distribution/installation-scripts/tests/install-neo4j-cli.bats (created — bats test suite with 4 test cases)
+
+Key Decisions:
+- The installer monolith cannot be partially sourced, so all external commands
+  are stubbed via a STUBS_DIR prepended to PATH. This includes curl, tar,
+  sha256sum, shasum, uname, and sudo.
+- The curl stub for the checksums file writes a fake sha256 line matching the
+  archive filename (derived from the checksums filename) so grep succeeds. The
+  uname stub always returns Linux/x86_64, coordinating with the checksums stub.
+- The tar stub creates a recording neo4j-cli binary (not just a blank file) that
+  appends to STUB_CALLS (exported env var) and respects NEO4J_CLI_STUB_EXIT.
+  This ensures the mv'd binary (which overwrites our pre-seeded INSTALL_DIR stub)
+  still records calls correctly.
+- NEO4J_CLI_STUB_EXIT env var controls skill subcommand exit code, enabling
+  test 3 (fail scenario) without rewriting the stub file per test.
+- bats `run` prefix-env mechanism passes NEO4J_CLI_AUTO_INSTALL_SKILL into the
+  child bash process; STUB_CALLS and INSTALL_DIR are also forwarded via
+  run_installer's explicit env block.
+
+Next Task: task-007
+
+================================================================================
+TASK-007: Add Pester behavioral tests for install-neo4j-cli.ps1
+Date: 2026-05-15T10:00:00Z
+================================================================================
+
+Summary:
+Created Pester v5 behavioral tests for the NEO4J_CLI_AUTO_INSTALL_SKILL guard
+in install-neo4j-cli.ps1. Tests run the installer as a pwsh subprocess with all
+heavyweight cmdlets (Invoke-WebRequest, Expand-Archive, Get-FileHash, Get-Content)
+stubbed via function overrides written to a temp wrapper .ps1 file. A neo4j-cli.cmd
+stub records invocations via the NEO4J_CALLS_FILE env var. 4 test cases covering
+env=1 (called), env unset (not called), env=0 (not called), env=1+fail (still exits 0).
+File has CRLF line endings (226 CRLF, 0 LF-only). pwsh not available locally;
+windows-latest CI is the gate.
+
+Files Changed:
+- distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 (created — Pester v5 test suite with 4 test cases)
+
+Key Decisions:
+- Used neo4j-cli.cmd stub (not .ps1) because Windows resolves bare `& neo4j-cli`
+  to .cmd/.bat before .ps1 when searching PATH — this ensures the stub is actually
+  found and invoked by the installer's `& neo4j-cli skill install --rw` call.
+- Passed callsFile path via NEO4J_CALLS_FILE env var (not embedded literal) to
+  avoid escaping complexity with backslashes and quotes in nested strings.
+- Wrote the subprocess command to a temp .ps1 file and invoked it with `pwsh -File`
+  (not -Command) to eliminate all quoting/escaping issues with the large command block.
+- Stub overwrites `Add-ToUserPath` to suppress registry PATH mutation in tests.
+- Test wrapper uses `Set-StrictMode -Off` and `$ErrorActionPreference = 'Continue'`
+  so stub gaps produce warnings rather than test failures.
+
+Next Task: task-008
+
+================================================================================
+TASK-008: Extract npm postinstall logic to testable module and add Jest tests
+Date: 2026-05-15T12:00:00Z
+================================================================================
+
+Summary:
+Refactored bin/postinstall.js to export a run() function for testability, then
+added Jest tests covering all four guard-logic cases. A separate dev-only
+package.json (not part of the published package) drives `npm test`. A
+.gitignore prevents node_modules/ and package-lock.json from being committed.
+
+Files Changed:
+- distribution/npm/cli/bin/postinstall.js (modified — added module.exports { run } and restructured for testability)
+- distribution/npm/cli/package.json.tmpl (modified — postinstall now calls `node bin/postinstall.js` instead of inline script)
+- distribution/npm/cli/postinstall.test.js (created — 4 Jest test cases)
+- distribution/npm/cli/package.json (created — dev-only, not published; jest ^29 dev dep, testEnvironment: node)
+- distribution/npm/cli/.gitignore (created — excludes node_modules/ and package-lock.json)
+
+Key Decisions:
+- postinstall.js lives in bin/ (not root) so it's included in the published `files` array and co-located with the shim.
+- Separate package.json for tests (not modifying package.json.tmpl) keeps devDependencies out of the published package.
+- jest.doMock used instead of jest.mock to avoid hoisting — needed because mock must reference closure variables (spawnMock).
+- jest.resetModules() per test call ensures each test gets a fresh module with a clean process.env state.
+- .gitignore added to prevent accidental git add of node_modules/ (268+ packages).
+
+Next Task: task-009
+
+================================================================================
+TASK-009: Add Ruby minitest behavioral tests for Homebrew post_install block
+Date: 2026-05-15T13:00:00Z
+================================================================================
+
+Summary:
+Created a Ruby minitest suite for the Homebrew post_install block. The helper
+module (post_install.rb) mirrors the goreleaser body exactly so tests stay in
+sync with the shipped formula. FormulaStub overrides system() to return a
+configurable bool (matching real Homebrew semantics — system never raises).
+4 tests: env=1 calls system with correct path, env unset skips, env=0 skips,
+env=1+system returns false still returns true.
+
+Files Changed:
+- distribution/homebrew/post_install.rb (created — PostInstallHelper module with post_install method body)
+- distribution/homebrew/tests/post_install_test.rb (created — 4 minitest cases)
+- .goreleaser.yaml (reverted begin/rescue added by agent — Homebrew system never raises, only returns false)
+
+Key Decisions:
+- Removed begin/rescue from .goreleaser.yaml and post_install.rb: Homebrew's system DSL returns false on failure, never raises. The rescue block was dead code that diverged from real Homebrew semantics.
+- FormulaStub.system_return attribute (not system_error) models the realistic failure mode (false return).
+- Test 1 uses /opt/homebrew/bin to exercise path interpolation with a distinctive value.
+- Tests use cross-referencing comments between post_install.rb and .goreleaser.yaml to flag sync requirement.
+
+Next Task: task-010
+
+================================================================================
+TASK-010: Add installer-tests.yml GitHub Actions workflow
+Date: 2026-05-15T14:30:00Z
+================================================================================
+
+Summary:
+Created .github/workflows/installer-tests.yml with four jobs covering all
+installer test suites: bats (ubuntu+macos), Pester (windows), Jest (all three
+platforms), and Ruby minitest (ubuntu). Follows existing workflow conventions
+(pinned SHA checkout, permissions block, fail-fast: false on matrices).
+
+Files Changed:
+- .github/workflows/installer-tests.yml (created — four-job workflow)
+
+Key Decisions:
+- Ubuntu bats install uses `sudo npm install -g bats` (not apt-get) because the
+  apt package ships bats 1.1/1.2 which is rejected by `bats_require_minimum_version 1.5.0` in the test file. npm gives a modern bats-core release.
+- npm-tests step uses `working-directory: distribution/npm/cli` (not `cd &&`) to avoid shell portability issues across ubuntu/macos/windows runners.
+- Pester invocation omits -PassThru; Pester v5 exits non-zero on test failure by default, so exit code propagation is automatic.
+- actions/checkout pinned to SHA matching the repo's existing workflow convention.
+
+Next Task: task-011
+
+================================================================================
+TASK-011: Add test-installer Makefile targets
+Date: 2026-05-15T15:00:00Z
+================================================================================
+
+Summary:
+Added five Makefile targets for local developer convenience: test-installer-sh
+(bats, errors if absent), test-installer-ps1 (Pester via pwsh, graceful skip
+if pwsh not found), test-installer-npm (Jest via npm ci && npm test),
+test-installer-rb (Ruby minitest), and test-installer (aggregate). All five
+targets are declared under .PHONY and placed in a new "## Installer Tests"
+section at the end of the Makefile.
+
+Files Changed:
+- Makefile (modified — added test-installer* targets and .PHONY entries)
+
+Key Decisions:
+- The test-installer-ps1 graceful-skip required a single multi-line if/else/fi
+  block (not two separate recipe lines) because Make executes each recipe line
+  in its own shell — an `exit 0` in `{ ...; exit 0; }` only exits that line's
+  shell; the next recipe line runs pwsh regardless. The if/else/fi approach
+  keeps the skip logic and the pwsh invocation in a single shell execution.
+- test-installer-npm uses `cd ... && npm ci && npm test` as a single recipe
+  line; the cd scopes correctly because it's a single shell invocation.
+
+Next Task: All tasks complete

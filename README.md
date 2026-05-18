@@ -3,17 +3,19 @@
 ## Installation
 
 ```bash
-curl -sSfL https://neo4j.sh/install.sh | bash
+NEO4J_CLI_AUTO_INSTALL_SKILL=1 curl -sSfL https://neo4j.sh/install.sh | bash
 ```
+
+Setting `NEO4J_CLI_AUTO_INSTALL_SKILL=1` automatically runs `neo4j-cli skill install --rw` after the binary is placed, so AI agent skill bundles are ready immediately. Omit the prefix to skip skill installation.
 
 Verify with `neo4j-cli --help`.
 
 #### Alternatives
 
-- **Homebrew**: `brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
-- **npm**: `npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
+- **Homebrew**: `NEO4J_CLI_AUTO_INSTALL_SKILL=1 brew install neo4j-labs/tap/neo4j-cli` (stable releases only; prereleases ship via npm/PyPI).
+- **npm**: `NEO4J_CLI_AUTO_INSTALL_SKILL=1 npm i -g @neo4j-labs/cli` (also works with `pnpm add -g` / `yarn global add`). Prereleases: `@alpha`, `@beta`, `@rc`, `@next`. Platform matrix: [`distribution/npm/cli/README.md`](./distribution/npm/cli/README.md).
 - **PyPI**: `pip install neo4j-cli`, `pipx install neo4j-cli`, or `uv tool install neo4j-cli`. One-shot: `uvx -i neo4j-cli <commands>`. Pin a prerelease with `==`, e.g. `pipx install neo4j-cli==0.1.0a6`.
-- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest).
+- **Prebuilt archive**: grab your OS/arch from [releases](https://github.com/neo4j-labs/neo4j-cli/releases/latest), place the binary on your `PATH`, then run `neo4j-cli skill install --rw`.
 
 ### Self-update
 
@@ -99,6 +101,67 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 ```
 
 `aura tenant list` shows tenant IDs. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
+
+## Local Neo4j (Docker)
+
+`neo4j-cli docker` runs Neo4j locally by shelling out to the host `docker` CLI. Managed containers carry the `org.neo4j.cli.managed=true` label — Docker is the source of truth, no separate state file is maintained. Requires Docker Desktop (or the `docker` CLI) on `PATH`.
+
+If you use podman instead of docker, you can alias it (`alias docker=podman` in your shell rc, or `Set-Alias docker podman` in Windows PowerShell). `neo4j-cli docker` shells out to whatever resolves as `docker` on your `PATH` — it doesn't care which runtime backs it.
+
+Defaults: enterprise edition with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` to upgrade to the commercial license (`=yes`). Use `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. When the requested pair is taken, both ports are auto-incremented by the same offset until a free pair is found. If `--name` collides with an existing container or stored `dbms` credential, an auto-suffix (`<name>-1`, `<name>-2`, …) is chosen and logged to stderr.
+
+### Persistent flow (stored credential)
+
+```bash
+# Create a managed container; a 16-byte password is generated and stored as a dbms credential
+neo4j-cli docker create --name dev --wait --rw
+
+# Run Cypher via the stored credential
+neo4j-cli query --credential dev 'RETURN 1 AS n'
+
+# Inspect / list managed containers
+neo4j-cli docker list --format toon
+neo4j-cli docker get dev --format json
+
+# Stop / start
+neo4j-cli docker stop dev --rw
+neo4j-cli docker start dev --wait --rw
+
+# Remove both container and stored credential (TTY prompts; non-TTY requires --force)
+neo4j-cli docker delete dev --force --rw
+```
+
+Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, or `--no-store-credential` if you want neither a stored credential nor the rendered password.
+
+### Persisting data across container deletes
+
+By default the Neo4j data, logs, and import dirs live in the container layer and are lost on `docker delete`. Bind-mount a host directory with `--data-dir`, `--logs-dir`, or `--import-dir` to keep them:
+
+```bash
+# Persist data on the host so it survives delete + recreate
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw
+neo4j-cli docker delete dev --force --rw
+neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses the same data
+```
+
+`--logs-dir` and `--import-dir` mount `/logs` and `/import` similarly. Each flag is optional and independent; combine any subset. Paths support `~` (HOME) and environment-variable expansion, and missing directories are created at mode 0o755. All three flags are incompatible with `--ephemeral` (which is, by definition, disposable). Note: the Neo4j container's entrypoint adjusts ownership of the mounted directories at startup; expect them to show up under the container's neo4j UID on the host after first start.
+
+### Ephemeral flow (env-file into `query --env`)
+
+```bash
+# Throwaway container (`docker run --rm`); no credential persisted; env-file written for query --env
+neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --wait --rw
+
+# Connect using the emitted env-file
+neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
+
+# Container is auto-removed by Docker when stopped — nothing to delete
+neo4j-cli docker stop tmp --rw
+```
+
+Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) is emitted to stdout for piping. `--wait` blocks until Bolt is reachable (60s timeout); on timeout the container is left running so you can inspect `docker logs <name>`.
+
+`--env-out-file` writes via a temp file in the target's directory and atomically renames it into place; a pre-existing symlink at the path is replaced by a regular file (the symlink is not followed). Use a non-symlink target if you rely on the path being a symlink.
 
 ## Querying Neo4j
 

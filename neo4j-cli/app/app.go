@@ -15,9 +15,11 @@ import (
 	"github.com/neo4j/cli/common/skill"
 	"github.com/neo4j/cli/neo4j-cli/aura"
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
+	"github.com/neo4j/cli/neo4j-cli/internal/skillrefresh"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/update"
 	"github.com/neo4j/cli/neo4j-cli/internal/versioncheck"
 	"github.com/neo4j/cli/neo4j-cli/query"
@@ -62,6 +64,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		}
 		versioncheck.MaybeHint(cmd, cfg, Version)
 		versioncheck.Schedule(cmd.Context(), cfg, Version)
+		skillrefresh.MaybeRefresh(cmd.Context(), cmd, cfg, binskill.Bundle, "neo4j-cli")
 		return nil
 	}
 
@@ -71,6 +74,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(credential.NewCredentialCmd(cfg))
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
+	cmd.AddCommand(docker.NewCmd(cfg))
 	cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(update.NewCmd(cfg, binskill.Bundle, "neo4j-cli"))
 	cmd.AddCommand(agentcontext.NewCmd(cfg, Version))

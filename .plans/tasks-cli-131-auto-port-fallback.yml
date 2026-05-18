@@ -1,0 +1,211 @@
+feature: cli-131-auto-port-fallback
+prd: ./prd-cli-131-auto-port-fallback.md
+created_at: 2026-05-17T07:46:05Z
+updated_at: 2026-05-17T08:09:24Z
+
+tasks:
+  - id: task-001
+    title: "Implement port-pair fallback loop in `create.go`"
+    description: |
+      Edit `neo4j-cli/internal/subcommands/docker/create.go`:
+      (a) Add `const maxPortOffset = 100` next to `maxNameSuffix` (line 39) with
+      a comment citing parity with `maxNameSuffix=99`.
+      (b) Add a `portFree(port int) bool` helper that wraps `listenerFactory(port)`
+      + `ln.Close()`, returning `true` on successful bind.
+      (c) Add `findFreePortPair(boltStart, httpStart int) (bolt, http int, err error)`
+      that iterates `offset = 0 … maxPortOffset-1`, returns the first pair where
+      both `portFree` calls succeed, or returns `clierr.NewUsageError(
+      "could not find a free port pair starting at %d/%d after %d attempts; pass --bolt-port / --http-port",
+      boltStart, httpStart, maxPortOffset)` on exhaustion.
+      (d) In `RunE`, replace the two `checkPortFree(boltPort, ...)` +
+      `checkPortFree(httpPort, ...)` calls (lines ~209–214) with one call to
+      `findFreePortPair`; reassign the local `boltPort` / `httpPort` to the
+      resolved values BEFORE any downstream code reads them.
+      (e) When the resolved pair differs from the requested pair, emit
+      `fmt.Fprintf(cmd.ErrOrStderr(), "info: ports %d/%d in use; using %d/%d (bolt/http)\n", reqBolt, reqHttp, boltPort, httpPort)`.
+      (f) Keep the equal-ports guard `if boltPort == httpPort { ... }` (lines 206–208)
+      in place AND IN FRONT OF the loop call.
+      (g) Delete the now-unused `checkPortFree` helper (lines 498–505).
+      See PRD REQ-F-001 through REQ-F-007, REQ-F-010, REQ-F-011.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`maxPortOffset = 100` constant exists with a comment referencing `maxNameSuffix`"
+      - "`portFree` and `findFreePortPair` helpers exist and route through `listenerFactory`"
+      - "`RunE` reassigns `boltPort` and `httpPort` to the resolved values before argv build / label set / credential persist"
+      - "Equal-ports guard runs BEFORE the new loop"
+      - "Stderr `info: ports A/B in use; using C/D (bolt/http)` line fires only when the resolved pair differs from the requested pair"
+      - "`checkPortFree` is deleted; no callers remain"
+      - "`go build ./...` succeeds"
+    completed_at: 2026-05-17T08:00:00Z
+
+  - id: task-002
+    title: "Update existing port-preflight tests and add fallback tests in `create_test.go`"
+    description: |
+      Edit `neo4j-cli/internal/subcommands/docker/create_test.go`:
+      (a) Rewrite the three subtests inside `TestCreate_PortPreflight` (lines
+      351–383) that previously expected `clierr.UsageError`:
+      `"bolt port occupied surfaces --bolt-port hint"` → assert fallback lands
+      on `(7688, 7475)` and the stderr `info:` line fires.
+      `"http port occupied surfaces --http-port hint"` → same flip.
+      `"custom bolt port occupied is named correctly"` → assert fallback to the
+      next free pair from the user-supplied start.
+      (b) KEEP `"equal ports rejected before any Listen"` UNCHANGED.
+      (c) Add `TestCreate_AutoPortFallback_DefaultsTaken` — mark 7687 + 7474 busy,
+      expect resolved `(7688, 7475)`, assert the `info:` line on stderr, the
+      argv carries `-p 7475:7474 -p 7688:7687`, and the rendered output row
+      has `bolt-port=7688 http-port=7475 uri=neo4j://localhost:7688`.
+      (d) Add `TestCreate_AutoPortFallback_PreservesOffset` — args
+      `--bolt-port 8000 --http-port 9000`, mark 8000 busy, expect `(8001, 9001)`.
+      (e) Add `TestCreate_AutoPortFallback_Exhausted` — mark every port in
+      `[7687, 7786]` AND `[7474, 7573]` busy; expect `clierr.UsageError` whose
+      message names the start pair `7687/7474` and the cap `100`; assert
+      `docker run` is NOT invoked.
+      (f) Add `TestCreate_AutoPortFallback_NoNarrationOnHappyPath` — defaults
+      free; assert no `info: ports` substring appears on stderr.
+      All new tests must use the existing `stubListenerFactory` seam (lines 55–77).
+      See PRD REQ-F-040 through REQ-F-045.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The three rewritten subtests assert the resolved fallback pair instead of an error"
+      - "The equal-ports subtest is unchanged"
+      - "Four new tests exist with the names listed in the description"
+      - "`TestCreate_AutoPortFallback_Exhausted` verifies the error message names both the start pair and `100`, and asserts `fake.RunCalls` is empty"
+      - "`TestCreate_AutoPortFallback_NoNarrationOnHappyPath` greps stderr for the `info: ports` substring and asserts it is absent"
+      - "All tests use `stubListenerFactory`; no new listener seam is introduced"
+      - "`go test ./neo4j-cli/internal/subcommands/docker/...` passes"
+    completed_at: 2026-05-17T08:30:00Z
+
+  - id: task-003
+    title: "Update flag help and cobra Long for `docker create`"
+    description: |
+      Edit `neo4j-cli/internal/subcommands/docker/create.go`:
+      (a) Change `--bolt-port` flag Usage (line ~384) to:
+      `"Host port to publish for Bolt (container 7687). Auto-incremented along with --http-port if taken."`
+      (b) Change `--http-port` flag Usage (line ~385) to:
+      `"Host port to publish for the HTTP browser (container 7474). Auto-incremented along with --bolt-port if taken."`
+      (c) Append one sentence to the cobra `Long:` paragraph (lines 118–136) so
+      `--help` carries the fallback contract:
+      `"When the requested --bolt-port and --http-port pair is taken, both ports are auto-incremented by the same offset (up to 100 attempts) and the chosen pair is reported on stderr."`
+      Keep the existing Long verbatim otherwise; place the new sentence at the
+      end of the paragraph, before the trailing volume-flag block, so the
+      paragraph flow stays coherent.
+      See PRD REQ-F-030 through REQ-F-032.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`--bolt-port` Usage string contains `Auto-incremented along with --http-port if taken`"
+      - "`--http-port` Usage string contains `Auto-incremented along with --bolt-port if taken`"
+      - "`Long:` paragraph contains the literal sentence about `100 attempts` and `reported on stderr`"
+      - "`./bin/neo4j-cli docker create --help` renders the new text without breaking the existing layout"
+    completed_at: 2026-05-17T09:00:00Z
+
+  - id: task-004
+    title: "Update README.md and additions.md port wording"
+    description: |
+      (a) Edit `README.md` line 111: replace
+      `"Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`."`
+      with wording that mentions the auto-increment fallback, e.g.:
+      `"Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. When the requested pair is taken, both ports are auto-incremented by the same offset until a free pair is found."`
+      (b) Mirror the same wording change in
+      `neo4j-cli/internal/skill/additions.md` line 17.
+      Keep tone consistent with surrounding text; do not reflow unrelated lines.
+      See PRD REQ-F-033, REQ-F-034.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`README.md` mentions `auto-incremented` (or equivalent) in the docker ports paragraph"
+      - "`neo4j-cli/internal/skill/additions.md` mirrors the same wording change"
+      - "No unrelated lines are reflowed or reordered"
+    completed_at: 2026-05-17T09:30:00Z
+
+  - id: task-005
+    title: "Regenerate skill bundle"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` from repo root to refresh
+      the skill bundle so `neo4j-cli/internal/skill/bundle/SKILL.md` (line 51)
+      and `neo4j-cli/internal/skill/bundle/references/docker.md` (flag table at
+      lines 31, 36; example at line 52) pick up the new cobra Long, flag help,
+      and additions.md wording.
+      Verify with `make generate-check` on a clean tree — only the expected
+      bundle files should diff. The `TestGenerator_RoundTrip` test is the
+      enforcement gate.
+      See PRD REQ-F-035.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` exits 0"
+      - "`bundle/SKILL.md` and `bundle/references/docker.md` reflect the updated wording"
+      - "Only expected files appear in `git status` after generate; no unrelated drift"
+      - "`go test ./neo4j-cli/internal/skill/...` passes (`TestGenerator_RoundTrip` green)"
+    completed_at: 2026-05-17T10:00:00Z
+
+  - id: task-006
+    title: "Add changelog entry and run final gates"
+    description: |
+      (a) Add a `Minor` changelog entry — either via
+      `changie new --projects neo4j-cli --kind Minor --body "docker create: auto-increment host ports when defaults are taken (CLI-131)"`
+      or by hand-authoring a file under `.changes/unreleased/` named
+      `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` with fields
+      `project: neo4j-cli`, `kind: Minor`, `body: 'docker create: auto-increment host ports when defaults are taken (CLI-131)'`,
+      `time: <RFC3339>`.
+      (b) Run the full gate sequence and confirm green:
+      `make test`, `make fmt-check`, `make lint`, `make generate-check`,
+      `make license-check`.
+      See PRD REQ-F-036, REQ-NF-005.
+    status: completed
+    dependencies:
+      - task-002
+      - task-005
+    acceptance_criteria:
+      - "A new `Minor` change file exists under `.changes/unreleased/` referencing CLI-131"
+      - "`make test` passes"
+      - "`make fmt-check` produces no output"
+      - "`make lint` exits 0"
+      - "`make generate-check` shows no diff"
+      - "`make license-check` exits 0"
+    completed_at: 2026-05-17T10:05:00Z
+
+  - id: task-007
+    title: "Add real-docker port-fallback smoke test and wire smoke tag into CI"
+    description: |
+      Close the real-docker coverage gap surfaced during PR review: the
+      existing `TestSmoke_Lifecycle` in
+      `neo4j-cli/internal/subcommands/docker/smoke_test.go` allocates two
+      ephemeral free ports up front via `pickFreePort`, so it never exercises
+      the new fallback loop. Additionally, the `//go:build smoke` tag is not
+      wired into CI anywhere — smoke tests only run when a developer manually
+      passes `-tags=smoke` locally.
+      (a) Add `TestSmoke_PortFallback` to `smoke_test.go`:
+        - Skip on `exec.LookPath("docker")` miss like `TestSmoke_Lifecycle`.
+        - Pick a free port pair (`pickFreePort` ×2; assert distinct).
+        - Create container A on that pair via `runDockerSubcommand("create", ..., --bolt-port P, --http-port Q, --rw, --no-store-credential)`. Register cleanup.
+        - Create container B with the SAME `--bolt-port P --http-port Q` and a distinct name. Capture stderr. Register cleanup.
+        - Assert B's stderr contains `info: ports P/Q in use; using` and that the resolved pair is `(P+offset, Q+offset)` for some offset >= 1 with the same offset on both ports.
+        - Parse `get <B-name> --format json` and assert `bolt-port` / `http-port` match the resolved pair and `uri == neo4j://localhost:<resolved-bolt>`.
+        - (Optional) `exec.Command("docker", "inspect", ...)` to confirm container labels `org.neo4j.cli.bolt-port` / `org.neo4j.cli.http-port` carry the resolved values.
+      (b) Wire smoke tests into CI in `.github/workflows/test.yml`:
+        - Add a step `name: Docker smoke tests` AFTER the existing `Test` step.
+        - `if: matrix.os == 'ubuntu-latest'` (GH macOS / Windows runners don't ship docker).
+        - `run: go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...`
+        - Add a short comment block above the step explaining the gate, the ~30s first-pull cost, and that the test t.Skips when docker is missing.
+      (c) No changelog entry — internal CI/test wiring is not user-facing per AGENTS.md "Build System" guidance.
+      Verification: run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` locally with docker running; both smoke tests must pass. Push and confirm the new CI step turns green.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`TestSmoke_PortFallback` exists in `smoke_test.go` behind the same build tag and docker-LookPath skip"
+      - "Test creates A on a fixed pair, creates B requesting the same pair, asserts B lands on a higher pair with the same offset on both ports"
+      - "Test asserts the `info: ports A/B in use; using C/D (bolt/http)` substring appears in B's stderr"
+      - "Test asserts B's `get --format json` row shows the resolved bolt-port / http-port / uri"
+      - "`.github/workflows/test.yml` runs `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` on ubuntu-latest"
+      - "Local run `go test -tags=smoke -count=1 -v ./neo4j-cli/internal/subcommands/docker/...` passes with docker running"
+      - "PR CI shows the new `Docker smoke tests` check green"
+    completed_at: 2026-05-17T10:30:00Z

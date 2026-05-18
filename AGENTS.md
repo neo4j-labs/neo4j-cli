@@ -61,6 +61,7 @@ See [`.agents/testing.md`](.agents/testing.md) for full details and output testi
 - **Prefer table-driven tests** (`for _, tc := range []struct{...}{...}`) when writing new tests — they reduce duplication and make it easy to add cases later
 - **Name test files per command**, not per package — use `get_test.go`, `set_test.go`, `list_test.go` mirroring the source files; put shared helpers in `helpers_test.go`. Avoid aggregating all tests in a single `config_test.go`.
 - **Never use `afero.NewOsFs()` in query package tests** — the dev machine has real credentials at `~/Library/Preferences/neo4j/cli/credentials.json`. Tests using a real FS will fail if any dbms credential is stored. Always use `testfs.GetTestFs(`{"format":"json"}`, "{}")` (empty credentials) even when testing dotenv walk-up; write the dotenv into the memFs at `filepath.Join(t.TempDir(), ".env")` and `t.Chdir(tmp)` so `os.Getwd()`+`cfg.Aura.Fs()` finds it.
+- **`afero.MemMapFs` quirks**: (1) no symlink support — `Symlink`/`Lstat` are not implemented, so symlink-replacement paths must be exercised against `afero.NewOsFs()` + `t.TempDir()`; (2) `OpenFile` creates files in non-existent parent dirs implicitly, which does NOT reflect production `OsFs` behaviour — missing-dir error paths must also use `OsFs`. Outside the query package both are safe because they don't touch the user's credentials.
 
 ## Architecture
 
@@ -115,6 +116,8 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - macOS binaries are code-signed and notarized
 - The release version comes from `GORELEASER_CURRENT_TAG` (set by the GoReleaser action)
 - `release-notes.md` is generated with a `## Changes` section (neo4j-cli changelog body) before GoReleaser runs
+- GoReleaser `brews.post_install:` takes the method **body** only — GoReleaser wraps it in `def post_install ... end` automatically. Do NOT include the `def`/`end` yourself or you get a nested def in the formula.
+- `make snapshot` (single-target) does **not** generate the Homebrew formula. To validate formula output locally run `GORELEASER_CURRENT_TAG=dev goreleaser release --snapshot --skip=publish --clean` (full multi-platform build) and inspect `dist/homebrew/Formula/neo4j-cli.rb`.
 
 ## Makefile Notes
 
@@ -138,7 +141,6 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 
 ## Repo Doc Notes
 
-- `CLAUDE.md` is a symlink to `AGENTS.md` (`ls -la` confirms). Edit `AGENTS.md` once — both surfaces update. Don't write to `CLAUDE.md` directly.
 - Contributor-facing workflows (e.g. `make generate` / add-new-CLI procedure) live in `CONTRIBUTING.md` "Development" subsections. AGENTS.md Architecture orients readers and links to CONTRIBUTING.md for the procedure rather than duplicating it.
 
 ## Website (neo4j.sh)
@@ -175,6 +177,13 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Installer Script Testing Notes
+
+- Bats-core tests for `install-neo4j-cli.sh` live in `distribution/installation-scripts/tests/install-neo4j-cli.bats`. Run with `bats distribution/installation-scripts/tests/` (install bats-core via `brew install bats-core` or `apt-get install bats`).
+- The installer is a monolith; tests stub ALL external commands (curl, tar, sha256sum, shasum, uname, sudo) via a `STUBS_DIR` prepended to `PATH`. The curl stub for the checksums file must emit a fake sha256 line matching the archive filename so `grep <archive> checksums.txt | sha256sum -c` succeeds.
+- The tar stub creates a recording `neo4j-cli` binary (using `STUB_CALLS` env var) — this is critical because the installer `mv`s the tar-extracted binary to `INSTALL_DIR`, overwriting any pre-seeded stub. The recording logic must be embedded in what tar creates.
+- Always run `shellcheck` on `.bats` files; use `local stub_path=...` to avoid SC2097/SC2098 when constructing a `PATH=...` prefix that references other variables in the same assignment.
+
 ## npm Distribution Notes
 
 See [`distribution/npm/README.md`](distribution/npm/README.md).
@@ -201,6 +210,19 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
 
+## Docker Subsystem Notes
+
+`neo4j-cli/internal/subcommands/docker/` runs local Neo4j by shelling out to the host `docker` CLI. Docker itself is the source-of-truth: managed containers carry `org.neo4j.cli.managed=true` plus metadata labels (`...edition`, `...version`, `...bolt-port`, `...http-port`, `...ephemeral`) and the `list`/`get`/`start`/`stop`/`delete` leaves discover state via `docker ps`/`docker inspect` — no separate state file is maintained.
+
+- `client.go` defines the `dockerClient` interface (`Run`, `Start`, `Stop`, `RemoveForce`, `PsAll`, `Inspect`); the default `execClient` shells out and caches `exec.LookPath("docker")`. The package-level `clientFactory` var is the test seam — `helpers_test.go` swaps in a `fakeDockerClient` for every leaf test.
+- `bolt_ready.go` exports `WaitForBolt(ctx, uri, user, pass, timeout)` and is reused by both `create --wait` and `start --wait`. It uses the vendored `neo4j-go-driver` from `neo4j-cli/query/`; on timeout it returns a `clierr.UsageError` pointing at `docker logs <name>`. `stop --wait` polls `dockerClient.Inspect` for `State.Running == false` instead.
+- `create` auto-suffixes name collisions against BOTH `dockerClient.PsAll` AND `credentials.DbmsCredentials.List()` so the chosen name is unique across both surfaces; the chosen name is used for the container, the stored credential, and the env-file header.
+- `--ephemeral` adds `--rm` to `docker run`, labels the container `ephemeral=true`, skips credential persistence, and emits the `.env` blob (`NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` / `NEO4J_DATABASE`) to stdout — or to `--env-out-file <path>` (mode 0600 via `cfg.Aura.Fs()`) when set. The blob is consumed by `query --env <path>`.
+- Image tag mapping: `--edition enterprise --version latest` → `neo4j:enterprise` (NOT `neo4j:latest-enterprise`, which is unpublished); explicit versions → `neo4j:<version>-enterprise`. Verify any new edition/version logic against `https://hub.docker.com/_/neo4j` before assuming a tag pattern.
+- Volume flags (`--data-dir`/`--logs-dir`/`--import-dir`) bind-mount host paths to `/data`/`/logs`/`/import`; empty-default = no mount; paths support `~`/`$VAR` expansion via the package-local `expandHostPath` helper (`homeDirFn` test seam); missing dirs are created at 0o755; incompatible with `--ephemeral`.
+- Live-docker smoke test: `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs a create→list→get→delete lifecycle against the host Docker daemon. NOT part of `make test`. Skips cleanly when `docker` is not on PATH (belt-and-braces — also gated by the `smoke` build tag).
+- Missing-`docker` error suggests `alias docker=podman` when podman is also detected on PATH; podman lookup goes through the `lookPathFn` package var seam in `client.go`.
+
 ## Cobra Help / Skill Bundle Rendering Notes
 
 - `common/skill/render/render.go:235` strips a cobra command's `Example` field via `strings.TrimSpace` before wrapping it in a fenced code block. The leading 2-space "cobra convention" indent is therefore stripped from the FIRST line only and preserved on subsequent lines, producing a ragged block. Write multi-line Examples with NO leading indent so the rendered bundle stays flush-left and consistent.
@@ -214,6 +236,14 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 ## Agent Context Notes
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
+
+## PowerShell Installer Test Notes
+
+- **Use `.cmd` stubs, not `.ps1`**: When testing PowerShell installer scripts that call `& neo4j-cli`, put the stub in a `.cmd` file (not `.ps1`). Windows resolves bare `& neo4j-cli` to `.cmd`/`.bat` before `.ps1` when scanning PATH — a `.ps1` stub is often silently skipped.
+- **Write subprocess commands to a temp `.ps1` file**: Pass the wrapper script via `pwsh -File <path>` rather than `pwsh -Command <big-string>`. This avoids escaping backslashes, single-quotes, and `$` signs in nested here-strings.
+- **Pass paths via env vars**: When stub scripts need to write to a file (e.g. a calls-recorder), pass the path via an environment variable (e.g. `$env:NEO4J_CALLS_FILE`) rather than embedding it as a literal string — avoids escaping backslashes on Windows paths.
+- **CRLF for `.ps1` files**: Any `.ps1` file in `distribution/installation-scripts/` must have Windows CRLF line endings. After writing with any tool on macOS/Linux, convert with `python3 -c "..."` (unix2dos not available by default on macOS). Verify with: `python3 -c "import sys; ... count b'\\r\\n'"`.
+- `pwsh` is not installed by default on macOS dev machines — Pester tests are gated on `windows-latest` CI. Validate syntax locally by reading the file; don't block task completion on local Pester execution.
 
 ---
 

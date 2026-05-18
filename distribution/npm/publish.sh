@@ -190,6 +190,7 @@ rm -rf "$WRAPPER_DIR"
 mkdir -p "${WRAPPER_DIR}/bin"
 cp -p "${DIST_DIR}/bin/neo4j-cli.js" "${WRAPPER_DIR}/bin/neo4j-cli.js"
 chmod +x "${WRAPPER_DIR}/bin/neo4j-cli.js"
+cp -p "${DIST_DIR}/bin/postinstall.js" "${WRAPPER_DIR}/bin/postinstall.js"
 
 # Ship the user-facing README if it exists (task-009 will add it; this script tolerates absence).
 if [ -f "${DIST_DIR}/README.md" ]; then

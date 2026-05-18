@@ -138,7 +138,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh"},
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-tenant"}
@@ -268,6 +268,7 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("aura.auth-url", DefaultAuraAuthUrl)
 	Viper.SetDefault("format", "default")
 	Viper.SetDefault("telemetry", true)
+	Viper.SetDefault("skill-auto-refresh", true)
 	// TODO: should this become aura.projects?
 	Viper.SetDefault("aura-projects", projects.AuraProjects{Default: "", Projects: map[string]*projects.AuraProject{}})
 }
@@ -452,6 +453,12 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	if key == "telemetry" {
 		if value != "true" && value != "false" {
 			return clierr.NewUsageError("invalid value for 'telemetry': %s (valid values: true, false)", value)
+		}
+	}
+
+	if key == "skill-auto-refresh" {
+		if value != "true" && value != "false" {
+			return clierr.NewUsageError("invalid value for 'skill-auto-refresh': %s (valid values: true, false)", value)
 		}
 	}
 

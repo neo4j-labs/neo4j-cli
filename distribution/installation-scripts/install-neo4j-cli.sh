@@ -167,6 +167,11 @@ success "Installed → ${BOLD}${INSTALLED_PATH}${RESET}"
 echo ""
 "$INSTALLED_PATH" --version 2>/dev/null || true
 
+# ── Auto-install skill ────────────────────────
+if [ "${NEO4J_CLI_AUTO_INSTALL_SKILL:-}" = "1" ]; then
+  "$INSTALLED_PATH" skill install --rw || true
+fi
+
 # ── PATH check ────────────────────────────────
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*)

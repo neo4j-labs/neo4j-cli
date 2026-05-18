@@ -1,0 +1,70 @@
+name: Installer Tests
+
+on:
+    push:
+        branches: ["main"]
+    pull_request:
+        branches: ["main"]
+
+permissions:
+    contents: read
+
+jobs:
+    shell-tests:
+        name: bats (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Install bats-core (Ubuntu)
+              if: runner.os == 'Linux'
+              run: sudo npm install -g bats
+
+            - name: Install bats-core (macOS)
+              if: runner.os == 'macOS'
+              run: brew install bats-core
+
+            - name: Run bats tests
+              run: bats distribution/installation-scripts/tests/install-neo4j-cli.bats
+
+    powershell-tests:
+        name: Pester (windows-latest)
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Run Pester tests
+              shell: pwsh
+              run: Invoke-Pester -Path distribution/installation-scripts/tests/install-neo4j-cli.Tests.ps1 -Output Detailed
+
+    npm-tests:
+        name: Jest (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Set up Node
+              uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+              with:
+                  node-version: "20"
+
+            - name: Run Jest tests
+              working-directory: distribution/npm/cli
+              run: npm ci && npm test
+
+    ruby-tests:
+        name: Ruby minitest (ubuntu-latest)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+            - name: Run Ruby minitest
+              run: ruby distribution/homebrew/tests/post_install_test.rb
