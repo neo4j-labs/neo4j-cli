@@ -10,6 +10,7 @@ package app
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicmd"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/common/skill"
@@ -80,6 +81,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(agentcontext.NewCmd(cfg, Version))
 
 	cobra.EnableTraverseRunHooks = true
+
+	clicmd.ApplySuggestionsToParents(cmd)
 
 	return cmd
 }

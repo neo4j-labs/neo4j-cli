@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicmd"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -227,7 +228,14 @@ func TestAllLeafCommands_HaveExamples(t *testing.T) {
 
 	var walk func(c *cobra.Command, path string)
 	walk = func(c *cobra.Command, path string) {
-		if c.Runnable() {
+		// Skip parent commands whose RunE was auto-installed by the
+		// clicmd suggestion walker — they are nominally Runnable only so
+		// that cobra invokes the Args validator that emits 'Did you mean'
+		// hints for nested typos; their user-visible behaviour is still
+		// to print help, so they do not need a hand-authored Example.
+		if c.Annotations[clicmd.SuggestionsRunEAnnotation] == "true" {
+			// fall through to recurse into children
+		} else if c.Runnable() {
 			firstLine := strings.SplitN(c.Example, "\n", 2)[0]
 			assert.NotEmpty(t, c.Example,
 				"command %q must have a non-empty Example: field (REQ-F-001 / REQ-F-015)", path)
