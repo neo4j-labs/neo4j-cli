@@ -40,7 +40,8 @@ tasks:
       existing `use_test.go` / `remove_test.go`: feed a trailing-newline
       input, assert the stored default / removed entry uses the clean
       name. Commit as a single commit on the same branch.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T13:00:00Z
     dependencies:
       - task-001
     acceptance_criteria:
