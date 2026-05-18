@@ -253,7 +253,7 @@ tasks:
       any other AGENTS.md paragraph that still asserts an aura-cli
       bundle is generated separately. Leave the standalone-CLI
       template paragraph alone. Satisfies REQ-F-013.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -261,7 +261,7 @@ tasks:
       - "AGENTS.md contains no statement asserting that aura has its own generated skill bundle"
       - "The 'Adding a new standalone CLI in the future = copy the template' paragraph is preserved"
       - "Markdown renders cleanly"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-014
     title: "Run full local gate set"

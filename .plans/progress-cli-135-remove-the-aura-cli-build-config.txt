@@ -42,3 +42,8 @@ Files: ~.agents/repo-layout.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-
 ## TASK-012 — 2026-05-18T00:00:00Z
 Scrubbed aura-cli mentions from `distribution/npm/README.md`: release-flow ASCII tree no longer surfaces `include_neo4j`, release.yml bullet now lists `CHANGELOG-neo4j.md` only and drops the "(only on neo4j-cli release runs)" clause, dropped the "Aura-cli-only release cycles skip" sentence from the publish-npm.yml bullet.
 Files: ~distribution/npm/README.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-013 — 2026-05-18T00:00:00Z
+Rewrote AGENTS.md dual-bundle/dual-credential paragraphs to single-binary form: dropped `aura/internal/skill/...` from the `ValidFormatValues` go-generate line, reworked the `aura-client` "TWO places" bullet to note the standalone-aura credential package still exists (mounted by `NewStandaloneCmd`) but no longer drives a second bundle, and rewrote the Repo Layout "Aura SKILL.md" bullet to drop the aura side entirely. Preserved the "Adding a new standalone CLI" template paragraph.
+Files: ~AGENTS.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+Decisions: `make generate-check` flags AGENTS.md edits as "stale" but AGENTS.md itself documents this as expected noise — only `internal/skill/bundle/**` paths matter for the gate.
