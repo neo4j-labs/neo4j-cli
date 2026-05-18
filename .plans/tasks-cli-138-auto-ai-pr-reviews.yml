@@ -229,7 +229,7 @@ tasks:
           general `Bash`, `Write`, `Edit`, `curl`, or `wget`.
       Do not touch `claude-review-conventions.yml`. Two files stay
       symmetric except for this addition.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -240,7 +240,7 @@ tasks:
       - "`--allowed-tools` does NOT contain bare `Bash`, `Write`, `Edit`, `curl`, or `wget`"
       - "`.github/workflows/claude-review-conventions.yml` is unchanged on this task's diff"
       - "YAML parses; `make test`, `make fmt-check`, `make lint` pass"
-    completed_at: null
+    completed_at: 2026-05-18T11:00:00Z
 
   - id: task-009
     title: "Rewrite security prompt to invoke golang-security skill in review mode"

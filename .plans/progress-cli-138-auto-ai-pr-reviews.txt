@@ -28,3 +28,8 @@ Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-
 ## task-007 — 2026-05-18T10:00:00Z
 Vendored pinned cc-skills-golang plugin via .claude-plugin/marketplace.json at repo root; marketplace `neo4j-cli-review` owned by `neo4j-labs` with single plugin entry pinned to ref v1.4.0 AND sha e9761db859c6969b77a8fd0e8a243f4f28240211 for reproducible installs.
 Files: +.claude-plugin/marketplace.json, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+
+## task-008 — 2026-05-18T11:00:00Z
+Wired security workflow to install vendored cc-skills-golang plugin: added setup-go (pinned SHA matching test.yml/release.yml/license.yml, go-version-file: go.mod) + govulncheck install steps before the action; added plugin_marketplaces (./) and plugins (cc-skills-golang@neo4j-cli-review) inputs to anthropics/claude-code-action; extended --allowed-tools with Skill + Bash(govulncheck:*) (originals preserved). conventions workflow untouched. Diff vs conventions.yml is exactly the expected scope (name/prompt-path/error-msg + the new go setup + plugin block + allow-list extension). Gates: make test PASS, make fmt-check PASS, make lint PASS (0 issues), YAML parses.
+Files: ~.github/workflows/claude-review-security.yml, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+Decisions: reused setup-go SHA 4a3601121dd01d1626a1e23e37211e3254c1c06c (v6) already pinned in test.yml/release.yml/license.yml for consistency; appended Skill + Bash(govulncheck:*) to the comma-separated allow-list string rather than rewriting to multi-line form — keeps task-006's narrow-list invariant visible at a glance.
