@@ -101,3 +101,24 @@ tasks:
       - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass on the final tip of the branch"
       - "Branch `oskar/cli-139-trim-args0-remaining` pushed to origin; PR opened against `main` on `neo4j-labs/neo4j-cli`"
       - "PR body links https://linear.app/neo4j/issue/CLI-139 and https://github.com/neo4j-labs/neo4j-cli/pull/128, and notes 'no file overlap with PR #127'; CI is green across ubuntu/windows/macos before requesting review"
+
+  - id: task-005
+    title: "Group D (added post-rebase) — trim args[0] in 3 new positional-arg commands"
+    description: |
+      During rebase onto main, CLI-99 (PR #125) was discovered to have
+      added 3 new positional-arg commands not in the original CLI-139
+      enumeration: `project get <id>`, `organization get <id>`, and
+      `workspace use <slug>`. Same bug, same fix. Apply
+      `strings.TrimSpace(args[0])` and add a TestXxxWithTrailingNewline
+      test per file. Workspace/use only trims when the positional slug
+      form is used (`hasSlug` branch); the flags branch reads from
+      flag values which don't carry shell-substitution newlines.
+    status: completed
+    completed_at: 2026-05-18T14:00:00Z
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Files modified: `neo4j-cli/aura/internal/subcommands/project/get.go`, `neo4j-cli/aura/internal/subcommands/organization/get.go`, `neo4j-cli/aura/internal/subcommands/workspace/use.go`"
+      - "Each modified file imports `strings` and applies `strings.TrimSpace(args[0])` before any subsequent use"
+      - "Each fixed file has a new `TestXxxWithTrailingNewline` test asserting the mock handler is hit at the URL containing the clean ID"
+      - "`make test && make fmt-check && make lint` pass on the final tip of the branch"

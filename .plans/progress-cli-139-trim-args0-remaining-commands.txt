@@ -14,3 +14,8 @@ Decisions: Slice mutation inside the Args func is intentional — cobra passes a
 ## TASK-004 — 2026-05-18T13:00:00Z
 Added changie Patch entry for neo4j-cli, ran full gate suite (make test/fmt-check/lint/license-check/generate-check — only diff in generate-check is the expected YAML status flip per AGENTS.md), pushed branch, opened PR against neo4j-labs/neo4j-cli main.
 Files: ~.changes/unreleased/neo4j-cli-Patch-20260518-125635.yaml
+
+## TASK-005 — 2026-05-18T14:00:00Z
+Rebased onto main; CLI-99 (PR #125) had added 3 new positional-arg commands not in original CLI-139 enumeration. Applied same TrimSpace fix to project/get.go, organization/get.go, workspace/use.go (slug branch only). Added one TestXxxWithTrailingNewline per file. Also fixed get_test.go fixture: post-rebase 'default-tenant' is no longer a valid config key (renamed to default-workspace by CLI-99), swapped tests to 'auth-url' and amended into task-003 via fixup+autosquash.
+Files: ~neo4j-cli/aura/internal/subcommands/project/get.go, ~neo4j-cli/aura/internal/subcommands/project/get_test.go, ~neo4j-cli/aura/internal/subcommands/organization/get.go, ~neo4j-cli/aura/internal/subcommands/organization/get_test.go, ~neo4j-cli/aura/internal/subcommands/workspace/use.go, ~neo4j-cli/aura/internal/subcommands/workspace/use_test.go
+Decisions: workspace/use only trims in the positional-slug branch; flag-derived slugs cannot carry shell-substitution newlines.

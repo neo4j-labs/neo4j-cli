@@ -6,6 +6,7 @@ package organization
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -28,7 +29,7 @@ neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format js
 neo4j-cli aura organization get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.name'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			orgID := args[0]
+			orgID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, fmt.Sprintf("/organizations/%s", orgID), &api.RequestConfig{

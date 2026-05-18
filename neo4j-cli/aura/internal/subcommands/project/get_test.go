@@ -128,6 +128,28 @@ func TestGetProjectFromWorkspaceConfig(t *testing.T) {
 	helper.AsssertOk()
 }
 
+func TestGetProjectWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	listHandler := helper.NewRequestHandlerMock(
+		fmt.Sprintf("/v2beta1/organizations/%s/projects", testOrgID),
+		http.StatusOK,
+		listProjectsBody(testProjectID),
+	)
+	getHandler := helper.NewRequestHandlerMock(
+		fmt.Sprintf("/v1/tenants/%s", testProjectID),
+		http.StatusOK,
+		`{"data": {"id": "proj-222", "name": "My Project"}}`,
+	)
+
+	helper.ExecuteCommand(fmt.Sprintf("project get %s\"\n\" --organization-id=%s", testProjectID, testOrgID))
+
+	listHandler.AssertCalledTimes(1)
+	getHandler.AssertCalledTimes(1)
+	helper.AsssertOk()
+}
+
 func TestGetProjectMissingOrg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
