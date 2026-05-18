@@ -78,7 +78,6 @@ neo4j-cli/
   main.go                  # thin entrypoint; mounts aura subcommand as "aura"
   internal/skill/          # per-binary skill template (bundle, description.txt, additions.md, gen/)
   aura/
-    cmd/main.go            # historical standalone entrypoint (compiled but not built/shipped)
     aura.go                # Root command, registers subcommands
     internal/
       api/                 # HTTP client for Neo4j Aura REST API
@@ -107,7 +106,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 
 ## Deployment
 
-DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG-neo4j.md` updates on `main`
+DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md` updates on `main`
 
 See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, release workflow, and GoReleaser gotchas.
 
@@ -126,9 +125,9 @@ See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, relea
 - `license-check` requires a Unix shell (`find` + `xargs`); won't work natively on Windows
 - `make generate` runs `go generate ./...`; `make generate-check` runs generate then `git diff --exit-code` (CI gate). Wired in `.github/workflows/test.yml` between Build and Lint, runs on full OS matrix.
 - Drift sim: editing a bundle file directly to test generate-check is futile — `go generate` overwrites it. Mutate a real cobra-tree input (e.g. a Short string in `app.go`) to simulate stale-bundle detection.
-- Changing `ValidFormatValues` in `common/clicfg/clicfg.go` affects the `--format` flag help text, which is embedded in skill bundle reference docs. Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` after any such change; `TestGenerator_RoundTrip` is the gate that catches stale bundles.
+- Changing `ValidFormatValues` in `common/clicfg/clicfg.go` affects the `--format` flag help text, which is embedded in skill bundle reference docs. Run `go generate ./neo4j-cli/internal/skill/...` after any such change; `TestGenerator_RoundTrip` is the gate that catches stale bundles.
 - Adding any new command to the neo4j-cli command tree (including sub-sub-packages like `credential/dbms/`) also requires `go generate ./neo4j-cli/internal/skill/...` — otherwise `TestGenerator_RoundTrip` fails with a "references/credential.md differs" message. Run this immediately after any command-tree change before the test gate.
-- `aura-client` credential cmd lives in TWO places: `neo4j-cli/internal/subcommands/credential/credential.go` (user-facing `credential aura-client add`, feeds neo4j-cli skill bundle) AND `neo4j-cli/aura/internal/subcommands/credential/add.go` (standalone aura `credential add`, feeds aura standalone skill bundle). Any flag/Long change must hit BOTH for behavioural symmetry AND both `go generate ./neo4j-cli/internal/skill/...` and `go generate ./neo4j-cli/aura/internal/skill/...` must run, otherwise the OTHER tree's `TestGenerator_RoundTrip` fails.
+- `aura-client` credential cmd lives in TWO places: `neo4j-cli/internal/subcommands/credential/credential.go` (user-facing `credential aura-client add`, feeds the neo4j-cli skill bundle — this is the shipped surface) AND `neo4j-cli/aura/internal/subcommands/credential/add.go` (mounted by `aura.NewStandaloneCmd` for in-process/test use only; no longer drives a separate bundle). Any flag/Long change must hit BOTH for behavioural symmetry, but only `go generate ./neo4j-cli/internal/skill/...` needs to run — the aura tree no longer has a generated bundle.
 
 ## Changie Notes
 
@@ -167,7 +166,7 @@ Rendering invariants (e.g. `> ` agent-prompt prefix, single `→ loading skill n
 
 See [`.agents/repo-layout.md`](.agents/repo-layout.md) — gotchas around skill subsystem layout, embed roots, mount points, and bundle regen.
 
-- Aura SKILL.md's Global Flags table lists only `--rw` (not `--format`); `--format` is registered per-subcommand via `RegisterOutputFlag` and surfaces in `references/<cmd>.md`. neo4j-cli SKILL.md DOES list `--format` at root because it's bound globally there. When a flag-description change needs to land in bundle/SKILL.md Global Flags, expect it on the neo4j-cli side only — aura side propagates through references/*.md.
+- neo4j-cli SKILL.md lists `--format` at root because it's bound globally there. Per-subcommand `--format` flags registered via `RegisterOutputFlag` surface in `references/<cmd>.md`. When a flag-description change needs to land in bundle/SKILL.md Global Flags, run `go generate ./neo4j-cli/internal/skill/...` to refresh.
 
 ## Hermetic Test Notes
 

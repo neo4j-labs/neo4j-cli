@@ -1,0 +1,58 @@
+## TASK-001 — 2026-05-18T00:00:00Z
+Verified branch `oskar/cli-135-remove-the-aura-cli-build-config` already created off main and checked out with clean tree.
+Files: ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-002 — 2026-05-18T00:00:00Z
+Deleted `neo4j-cli/aura/cmd/` (main.go + main_test.go) standalone-aura entrypoint; updated AGENTS.md architecture diagram to drop the now-stale `cmd/main.go` line.
+Files: -neo4j-cli/aura/cmd/main.go, -neo4j-cli/aura/cmd/main_test.go, ~AGENTS.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-003+TASK-004 — 2026-05-18T00:00:00Z
+Deleted entire `neo4j-cli/aura/internal/skill/` subtree (embed.go, description.txt, additions.md, gen/, install_e2e_test.go, bundle/) and dropped the now-dangling `common/skill` + `binskill` imports plus the `skill.NewCmd` mount from `NewStandaloneCmd` in `aura.go`. Pulled task-004 forward because deleting the skill package would otherwise break the build mid-iteration.
+Files: -neo4j-cli/aura/internal/skill/** (14 files), ~neo4j-cli/aura/aura.go, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+Decisions: Tasks merged into a single commit since they are inseparable (deleting target package breaks the import).
+
+## TASK-005 — 2026-05-18T00:00:00Z
+Stripped `include_neo4j` producer side from `.github/workflows/release.yml`: removed `Detect changed changelogs` step, job-level output, all `if:` guards on Write/Upload steps, and trimmed `release-meta.json` payload to `{"version":"…"}`.
+Files: ~.github/workflows/release.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-006 — 2026-05-18T00:00:00Z
+Stripped `include_neo4j` consumer side from `.github/workflows/publish-npm.yml`: removed `Skip — aura-cli-only release (auto)` step, dropped `INCLUDE_NEO4J` parse/validate/echo from meta step, removed every per-step `steps.meta.outputs.include_neo4j == 'true'` `if:` guard, refreshed header + job comments. workflow_run conclusion gate preserved.
+Files: ~.github/workflows/publish-npm.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-007 — 2026-05-18T00:00:00Z
+Collapsed top-level `CHANGELOG.md` to single-binary form: now points at `CHANGELOG-neo4j.md` as the released artefact with a trailing historical pointer to `CHANGELOG-aura.md`. `CHANGELOG-aura.md` untouched.
+Files: ~CHANGELOG.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-008 — 2026-05-18T00:00:00Z
+Scrubbed aura-cli prose from `RELEASING.md`: single-binary framing in intro, "What gets released" table reduced to neo4j-cli binary + npm + Homebrew, dropped "Aura-cli is not published" paragraph, rewrote changie example to `--projects neo4j-cli` only, and stripped `AURA_CLI_VERSION`/`include_aura`/`CHANGELOG-aura` from Steps 2–4.
+Files: ~RELEASING.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-009 — 2026-05-18T00:00:00Z
+Rewrote `.agents/build.md` as single-binary docs: removed `build-aura`/`run-aura` rows, deleted "Dual-Binary GoReleaser Setup" section, collapsed Changelog to single-project narrative, dropped the dual `AURA_CLI_VERSION=dev` snapshot example.
+Files: ~.agents/build.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-010 — 2026-05-18T00:00:00Z
+Rewrote `.agents/deployment.md` as single-binary docs: dropped "Dual-Binary Releases", "Versioning Policy", and "Dual-Version Injection" sections; rewrote Strategy/Release Flow/macOS Code Signing/npm Publication to drop aura-cli, `AURA_CLI_VERSION`, `include_neo4j`, and `CHANGELOG-aura` references.
+Files: ~.agents/deployment.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-011 — 2026-05-18T00:00:00Z
+Trimmed aura-cli bullets from `.agents/repo-layout.md`: removed generator-imports bullet, AuraBetaEnabled bullet, the aura-cli half of the Skill cobra mount bullet, and the trailing aura-cli-bundle clause on the regen bullet. Also reworded line 6 NewStandaloneCmd description (was "aura-cli binary") to "kept for generator/test use" so the file has zero aura-cli mentions.
+Files: ~.agents/repo-layout.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-012 — 2026-05-18T00:00:00Z
+Scrubbed aura-cli mentions from `distribution/npm/README.md`: release-flow ASCII tree no longer surfaces `include_neo4j`, release.yml bullet now lists `CHANGELOG-neo4j.md` only and drops the "(only on neo4j-cli release runs)" clause, dropped the "Aura-cli-only release cycles skip" sentence from the publish-npm.yml bullet.
+Files: ~distribution/npm/README.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-013 — 2026-05-18T00:00:00Z
+Rewrote AGENTS.md dual-bundle/dual-credential paragraphs to single-binary form: dropped `aura/internal/skill/...` from the `ValidFormatValues` go-generate line, reworked the `aura-client` "TWO places" bullet to note the standalone-aura credential package still exists (mounted by `NewStandaloneCmd`) but no longer drives a second bundle, and rewrote the Repo Layout "Aura SKILL.md" bullet to drop the aura side entirely. Preserved the "Adding a new standalone CLI" template paragraph.
+Files: ~AGENTS.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+Decisions: `make generate-check` flags AGENTS.md edits as "stale" but AGENTS.md itself documents this as expected noise — only `internal/skill/bundle/**` paths matter for the gate.
+
+## TASK-014 — 2026-05-18T00:00:00Z
+Full local gate set green: `make build`, `make test`, `make fmt-check`, `make lint`, `make license-check`, `make snapshot` (single-target darwin_arm64; `bin/` contains only `neo4j-cli`, no `aura-cli`). Final grep gate residue all expected: CHANGELOG.md pointer footnote (REQ-NF-009 allowed), CHANGELOG-neo4j.md:85 historical line (PRD non-goal), `aura.go:25` `Use: "aura-cli"` + tests in `aura/internal/subcommands/config/*_test.go` + `common/flags/flags{,_test}.go` hint logic (all kept by REQ-F-004 standalone preservation), and `.research/` autoresearch dumps (out of scope). Fixed two stragglers found mid-gate: dropped "standalone aura-cli surface" prose from `neo4j-cli/internal/skill/additions.md` (regenerated `bundle/SKILL.md`) and rewrote two `aura-cli` example references in `common/skill/render/render.go` comments to `neo4j-cli`. `make generate-check` flags only the hone YAML status flip and the paired source+bundle edits (additions.md ↔ bundle/SKILL.md), no actual generator drift.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~common/skill/render/render.go, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-015 — 2026-05-18T09:20:00Z
+Created `Patch` changie entry via `changie new --projects neo4j-cli --kind Patch` with the suggested body wording. Ran full gate set (`make build`/`test`/`fmt-check`/`lint`/`license-check`) — all green. Committed the changie YAML, pushed branch `oskar/cli-135-remove-the-aura-cli-build-config` to origin with upstream tracking, opened PR #127 against main (https://github.com/neo4j-labs/neo4j-cli/pull/127) referencing Linear CLI-135 and the PRD path. PR body confirms `NewStandaloneCmd` preservation and historical changelog preservation.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260518-111801.yaml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+PR: https://github.com/neo4j-labs/neo4j-cli/pull/127

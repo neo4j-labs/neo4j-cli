@@ -4,8 +4,7 @@ name: publish-npm
 #
 # Two triggers:
 #   - workflow_run (auto): fires after `release.yml` succeeds. Reads the dist/
-#     and release-meta.json artifacts uploaded by release.yml, gates on
-#     include_neo4j == 'true' so aura-cli-only release runs are skipped.
+#     and release-meta.json artifacts uploaded by release.yml.
 #   - workflow_dispatch (manual): for failure recovery. Takes a `version` input
 #     (no leading v), downloads existing GH release archives via `gh release
 #     download`, extracts them into the `dist/<archive_basename>/` layout the
@@ -38,10 +37,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Skip the auto path entirely if the upstream release didn't succeed. The
-    # include_neo4j gate is applied per-step below (after we've downloaded the
-    # release-meta.json artifact and parsed it). For workflow_dispatch we
-    # always run.
+    # Skip the auto path entirely if the upstream release didn't succeed. For
+    # workflow_dispatch we always run.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
@@ -64,41 +61,23 @@ jobs:
         id: meta
         if: github.event_name == 'workflow_run'
         run: |
-          # release-meta.json is a compact `{version, include_neo4j}` blob.
-          # Surface both as step outputs so downstream gates and the publish
-          # step can read them uniformly.
+          # release-meta.json is a compact `{version}` blob. Surface version
+          # as a step output so the publish step can read it.
           META_FILE="${{ runner.temp }}/release-meta/release-meta.json"
           if [ ! -f "${META_FILE}" ]; then
             echo "ERROR: release-meta.json not found in artifact" >&2
             exit 1
           fi
           VERSION=$(jq -r '.version' "${META_FILE}")
-          INCLUDE_NEO4J=$(jq -r '.include_neo4j' "${META_FILE}")
           if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "ERROR: Invalid version in release-meta.json: ${VERSION}" >&2
             exit 1
           fi
-          if [[ "${INCLUDE_NEO4J}" != "true" && "${INCLUDE_NEO4J}" != "false" ]]; then
-            echo "ERROR: Invalid include_neo4j in release-meta.json: ${INCLUDE_NEO4J}" >&2
-            exit 1
-          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
-          echo "[publish-npm] auto path: version=${VERSION} include_neo4j=${INCLUDE_NEO4J}"
-
-      - name: Skip — aura-cli-only release (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j != 'true'
-        env:
-          INCLUDE_NEO4J: ${{ steps.meta.outputs.include_neo4j }}
-        run: |
-          echo "[publish-npm] include_neo4j=$INCLUDE_NEO4J — skipping npm publish"
+          echo "[publish-npm] auto path: version=${VERSION}"
 
       - name: Download dist artifact (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j == 'true'
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dist
@@ -109,8 +88,7 @@ jobs:
       - name: Verify dist archives against release checksums (auto)
         if: >-
           github.event_name == 'workflow_run' &&
-          github.event.workflow_run.event == 'push' &&
-          steps.meta.outputs.include_neo4j == 'true'
+          github.event.workflow_run.event == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.meta.outputs.version }}
@@ -136,9 +114,7 @@ jobs:
           ( cd "${DOWNLOADED}" && sha256sum -c "${CHECKSUMS}" )
 
       - name: Prepare dist from downloaded artifact (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j == 'true'
+        if: github.event_name == 'workflow_run'
         run: |
           # The dist artifact carries GoReleaser's full working dir: archives
           # (.tar.gz / .zip) + raw build dirs + metadata. publish.sh reads from
@@ -212,18 +188,12 @@ jobs:
       # ----- common: setup Node + run publish script -----
 
       - name: Setup Node
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         env:
           # workflow_run path reads version from release-meta.json (parsed in
           # `meta` step). workflow_dispatch reads it from the input. Either
