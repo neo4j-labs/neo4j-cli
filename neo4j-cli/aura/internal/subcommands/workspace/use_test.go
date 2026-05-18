@@ -52,7 +52,7 @@ func TestWorkspaceUseWithSlug(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock(
 				fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
@@ -84,7 +84,7 @@ func TestWorkspaceUseWithFlags(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(
 		fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
@@ -108,7 +108,7 @@ func TestWorkspaceUseWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(
 		fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),

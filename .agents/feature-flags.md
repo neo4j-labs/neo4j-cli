@@ -6,7 +6,7 @@ How we name, gate, test, and retire experimental behaviour in `neo4j-cli`; imple
 
 - Prefix `flag.`, then `<area>-<feature>` (lowercase kebab). One area token, one feature token.
 - Examples: `flag.aura-beta`, `flag.docker-command`, `flag.secrets-os-keystore`.
-- Runtime source of truth: a Go `map[string]Flag` registry at `common/clicfg/flags.go` (future home). This doc is the narrative reference.
+- Runtime source of truth: the `Registry` map in `common/clicfg/flags.go`. This doc is the narrative reference.
 
 ## Defaults & lifecycle
 
@@ -28,7 +28,7 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 - Every flag ships with tests for BOTH states while it lives.
 - CI runs the flag-on path explicitly (test build step or env var) until the flag is removed.
-- Aura-side flags use the existing test-helper pattern at `common/clicfg/auratesthelper.go:68-70`.
+- Aura-side tests toggle flags by writing the dotted key (e.g. `flag.aura-beta`) into the helper config JSON via `helper.SetConfigValue` in `neo4j-cli/aura/internal/test/testutils/auratesthelper.go`; the registry's viper binding picks it up — no Go-side bridge.
 
 ## Unknown / removed keys
 
@@ -37,13 +37,7 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 
 ## Migrating aura.beta-enabled
 
-- `aura.beta-enabled` becomes `flag.aura-beta` once the registry lands.
-- Reads of the old key remain accepted (debug-log "deprecated") until CLI-134 ships.
-- Touch points:
-  - `common/clicfg/clicfg.go:32` — `DefaultAuraBetaEnabled` constant.
-  - `common/clicfg/clicfg.go:281` — struct field on `AuraConfig`.
-  - `common/clicfg/clicfg.go:371-377` — `SetBetaEnabled` / `AuraBetaEnabled` getter+setter.
-  - `common/clicfg/auratesthelper.go:68-70` — test seam that reads `aura.beta-enabled` from the helper JSON.
+- Migration completed in CLI-136: production + tests now use `flag.aura-beta` via the `common/clicfg/flags.go` `Registry`. The legacy `aura.beta-enabled` key is still read as a debug-logged fallback until CLI-134 ships physical config cleanup.
 
 ## See also
 

@@ -21,7 +21,7 @@ func TestDeleteDeployment(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
@@ -47,7 +47,7 @@ func TestDeleteDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --rw", deploymentId))
@@ -74,7 +74,7 @@ func TestDeleteDeploymentWithTrailingNewline(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete --organization-id %s --project-id %s --rw %s\"\n\"", organizationId, projectId, deploymentId))
 
@@ -103,7 +103,7 @@ func TestDeleteDeployment_StdoutIsValidJSON(t *testing.T) {
 
 	helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s --rw --format json", deploymentId, organizationId, projectId))
 
 	helper.AssertOutIsValidJSON()
@@ -121,7 +121,7 @@ func TestDeleteDeploymentWhenDeploymentDoesNotExist(t *testing.T) {
 		"error": "Access denied"
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment delete %s --organization-id=%s --project-id=%s --rw", deploymentId, organizationId, projectId))
 

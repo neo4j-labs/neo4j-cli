@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -36,6 +37,49 @@ func exitCodeFor(err error) int {
 		return ce.Code
 	}
 	return 1
+}
+
+// resolveFormatForRender chooses the --format value used to render an error.
+//
+// When cobra's flag-parse step fails (e.g. `--bad-flag`), PersistentPreRunE
+// never runs and viper's "format" key keeps its "default" seed even if the
+// user passed `--format=json` on the command line. To keep the JSON envelope
+// contract honest for failed parses, fall back to a raw scan of args when
+// the bound format is empty or "default". The returned value is one of
+// clicfg.ValidFormatValues or, when no usable hint is found, the original
+// bound value.
+func resolveFormatForRender(args []string, bound string) string {
+	if bound != "" && bound != "default" {
+		return bound
+	}
+	if peeked := peekFormatFromArgs(args); peeked != "" {
+		return peeked
+	}
+	return bound
+}
+
+// peekFormatFromArgs scans args for `--format=<v>` or `--format <v>` and
+// returns the value when it matches clicfg.ValidFormatValues. Used only as
+// the flag-parse-failure fallback in resolveFormatForRender; the canonical
+// binding happens in PersistentPreRunE via flags.BindFormatFromFlag.
+func peekFormatFromArgs(args []string) string {
+	for i, arg := range args {
+		var val string
+		switch {
+		case strings.HasPrefix(arg, "--format="):
+			val = strings.TrimPrefix(arg, "--format=")
+		case arg == "--format" && i+1 < len(args):
+			val = args[i+1]
+		default:
+			continue
+		}
+		for _, v := range clicfg.ValidFormatValues {
+			if val == v {
+				return val
+			}
+		}
+	}
+	return ""
 }
 
 func main() {
@@ -67,6 +111,8 @@ func main() {
 	cfg.Events.Flush() // Send out any remaining events
 
 	if err != nil {
+		format := resolveFormatForRender(os.Args[1:], cfg.Global.Format())
+		clierr.Render(err, os.Stdout, os.Stderr, format)
 		os.Exit(exitCodeFor(err))
 	}
 }

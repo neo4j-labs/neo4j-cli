@@ -27,6 +27,7 @@
 package exitcodes_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -161,9 +162,10 @@ func seedCreds(t *testing.T, dir string) {
 	}
 }
 
-// fixtureServer returns an httptest.Server that responds to /v1/instances with
-// the supplied status, body and optional Retry-After header. /oauth/token is
-// stubbed defensively in case any path bypasses the cached access token.
+// fixtureServer returns an httptest.Server that responds to /v1/instances
+// (and any /v1/instances/<id>[/...] subpath) with the supplied status, body
+// and optional Retry-After header. /oauth/token is stubbed defensively in
+// case any path bypasses the cached access token.
 func fixtureServer(t *testing.T, status int, retryAfter, body string) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -171,14 +173,17 @@ func fixtureServer(t *testing.T, status int, retryAfter, body string) *httptest.
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"access_token":"stub-token","expires_in":3600,"token_type":"bearer"}`))
 	})
-	mux.HandleFunc("/v1/instances", func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
 		if retryAfter != "" {
 			w.Header().Set("Retry-After", retryAfter)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
-	})
+	}
+	mux.HandleFunc("/v1/instances", handler)
+	// Trailing slash registers the subtree handler for /v1/instances/<id>[/...].
+	mux.HandleFunc("/v1/instances/", handler)
 	srv := httptest.NewServer(mux)
 	// Force loopback bind so urlcheck.ValidateRemoteURL accepts http://.
 	if !strings.HasPrefix(srv.URL, "http://127.0.0.1:") && !strings.HasPrefix(srv.URL, "http://localhost:") {
@@ -254,6 +259,12 @@ type scenario struct {
 	// body contains the Retry-After value).
 	wantStderrContains string
 	skipServer         bool // for --bad-flag / no-arg help / --version
+	// JSON envelope assertions: when wantJSONCode is non-empty the test
+	// parses the JSON envelope out of stdout and asserts these fields.
+	wantJSONCode         string
+	wantJSONExitCode     int
+	wantJSONResourceType string
+	wantJSONResourceID   string
 }
 
 // validationBody is a well-formed Aura error envelope.
@@ -280,6 +291,12 @@ func TestExitCodes(t *testing.T) {
 		{
 			name:       "bad_flag_usage_2",
 			args:       []string{"aura", "instance", "list", "--bad-flag"},
+			wantExit:   2,
+			skipServer: true,
+		},
+		{
+			name:       "unknown_subcommand_usage_2",
+			args:       []string{"aura", "instance", "lis"},
 			wantExit:   2,
 			skipServer: true,
 		},
@@ -333,6 +350,35 @@ func TestExitCodes(t *testing.T) {
 			wantExit:   0,
 			skipServer: true,
 		},
+		// --format=json exits the structured envelope on stdout; cobra still
+		// dumps usage info ahead of the envelope on a flag-parse error so the
+		// JSON is extracted from the tail of stdout rather than the whole
+		// buffer. Stderr keeps the one-line `Error: ... (exit N)` summary.
+		{
+			name:               "bad_flag_usage_2_json",
+			args:               []string{"aura", "instance", "list", "--bad-flag", "--format=json"},
+			wantExit:           2,
+			skipServer:         true,
+			wantStderrContains: "Error: unknown flag: --bad-flag (exit 2)",
+			wantJSONCode:       "usage_error",
+			wantJSONExitCode:   2,
+		},
+		// 404 against /v1/instances/<id> exercises the typed-error path with
+		// .WithResource(...) chained on so resource_type and resource_id land
+		// in the JSON envelope. --format binds successfully so stdout holds a
+		// clean JSON envelope (no cobra usage preamble).
+		{
+			name:                 "not_found_404_get_json",
+			args:                 []string{"aura", "instance", "get", "does-not-exist", "--format=json"},
+			status:               http.StatusNotFound,
+			body:                 errBody("instance not found"),
+			wantExit:             3,
+			wantStderrContains:   "Error: ",
+			wantJSONCode:         "not_found",
+			wantJSONExitCode:     3,
+			wantJSONResourceType: "instance",
+			wantJSONResourceID:   "does-not-exist",
+		},
 	}
 
 	for _, tc := range scenarios {
@@ -360,6 +406,65 @@ func TestExitCodes(t *testing.T) {
 						tc.name, tc.wantStderrContains, stdout, stderr)
 				}
 			}
+			if tc.wantJSONCode != "" {
+				assertJSONEnvelope(t, tc, stdout)
+			}
 		})
+	}
+}
+
+// jsonEnvelope mirrors the shape clierr.Envelope marshals on stdout. Declared
+// locally so the e2e package stays decoupled from clierr's internal layout.
+type jsonEnvelope struct {
+	Error struct {
+		Code         string `json:"code"`
+		ExitCode     int    `json:"exit_code"`
+		Message      string `json:"message"`
+		ResourceType string `json:"resource_type,omitempty"`
+		ResourceID   string `json:"resource_id,omitempty"`
+		Retryable    bool   `json:"retryable"`
+	} `json:"error"`
+}
+
+// extractEnvelope finds the JSON envelope inside stdout. The cobra flag-parse
+// path dumps usage info ahead of the envelope when a flag is rejected, so we
+// scan for the last line beginning with `{` and treat it as the envelope.
+func extractEnvelope(stdout string) (string, bool) {
+	stdout = strings.TrimRight(stdout, "\n")
+	lines := strings.Split(stdout, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
+			return line, true
+		}
+	}
+	return "", false
+}
+
+func assertJSONEnvelope(t *testing.T, tc scenario, stdout string) {
+	t.Helper()
+	payload, ok := extractEnvelope(stdout)
+	if !ok {
+		t.Fatalf("%s: no JSON envelope found on stdout\nstdout:\n%s", tc.name, stdout)
+	}
+	var env jsonEnvelope
+	if err := json.Unmarshal([]byte(payload), &env); err != nil {
+		t.Fatalf("%s: stdout envelope is not valid JSON: %v\npayload:\n%s", tc.name, err, payload)
+	}
+	if env.Error.Code != tc.wantJSONCode {
+		t.Fatalf("%s: envelope code = %q (want %q)\npayload:\n%s",
+			tc.name, env.Error.Code, tc.wantJSONCode, payload)
+	}
+	if env.Error.ExitCode != tc.wantJSONExitCode {
+		t.Fatalf("%s: envelope exit_code = %d (want %d)\npayload:\n%s",
+			tc.name, env.Error.ExitCode, tc.wantJSONExitCode, payload)
+	}
+	if tc.wantJSONResourceType != "" && env.Error.ResourceType != tc.wantJSONResourceType {
+		t.Fatalf("%s: envelope resource_type = %q (want %q)\npayload:\n%s",
+			tc.name, env.Error.ResourceType, tc.wantJSONResourceType, payload)
+	}
+	if tc.wantJSONResourceID != "" && env.Error.ResourceID != tc.wantJSONResourceID {
+		t.Fatalf("%s: envelope resource_id = %q (want %q)\npayload:\n%s",
+			tc.name, env.Error.ResourceID, tc.wantJSONResourceID, payload)
 	}
 }

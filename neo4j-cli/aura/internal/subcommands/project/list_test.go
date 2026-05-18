@@ -62,7 +62,7 @@ func TestListProjects(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock(
 				fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),
@@ -92,7 +92,7 @@ func TestListProjectsFromDefaultWorkspace(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetDefaultProjectInConfig(orgID, projectID)
 
 	mockHandler := helper.NewRequestHandlerMock(
@@ -116,7 +116,7 @@ func TestListProjectsWithFlagOverridesContext(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetDefaultProjectInConfig(contextOrgID, projectID)
 
 	mockHandler := helper.NewRequestHandlerMock(
@@ -135,7 +135,7 @@ func TestListProjectsMissingOrganizationId(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	helper.ExecuteCommand("project list")
 
@@ -178,7 +178,7 @@ func TestListProjectsWithCredentialFlag(t *testing.T) {
 				"default-credential": "",
 			})
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock(
 				fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),

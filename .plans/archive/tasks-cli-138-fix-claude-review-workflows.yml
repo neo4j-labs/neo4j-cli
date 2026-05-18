@@ -129,7 +129,7 @@ tasks:
       any required reviews and the standard checks (CodeQL, Test, License, etc.)
       to settle, then merge to main using the repo's standard merge style. No
       changelog entry required.
-    status: pending
+    status: cancelled
     dependencies:
       - task-005
       - task-006

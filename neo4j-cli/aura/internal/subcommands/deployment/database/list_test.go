@@ -60,7 +60,7 @@ func TestListDeploymentDatabase(t *testing.T) {
 		]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment database list --deployment-id=%s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
@@ -158,7 +158,7 @@ func TestListDeploymentDatabaseWithOrganizationAndProjectIdFromConfig(t *testing
 		]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment database list --deployment-id=%s", deploymentId))
@@ -257,7 +257,7 @@ func TestListDeploymentDatabaseWithTableOutput(t *testing.T) {
 		]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment database list --deployment-id=%s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
@@ -286,7 +286,7 @@ func TestListDeploymentDatabasesWithNoData(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment database list --deployment-id=%s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 

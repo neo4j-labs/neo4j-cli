@@ -21,7 +21,7 @@ func TestCreateImportJob(t *testing.T) {
 		}
 	`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	helper.ExecuteCommand("import job create --organization-id=f607bebe-0cc0-4166-b60c-b4eed69ee7ee  --project-id=f607bebe-0cc0-4166-b60c-b4eed69ee7ee --import-model-id=e01cdc6d-2f50-4f46-b04b-8ec8fc8de839 --db-id=07e49cf5 --import-type=bulk --rw")
 
@@ -60,7 +60,7 @@ func TestCreateImportJobWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		}
 	`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand("import job create --import-model-id=e01cdc6d-2f50-4f46-b04b-8ec8fc8de839 --db-id=07e49cf5 --rw")
 
@@ -169,7 +169,7 @@ func TestCreateImportJobError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs", organizationId, projectId), testCase.statusCode, testCase.returnBody)
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			helper.ExecuteCommand(testCase.executeCommand)
 

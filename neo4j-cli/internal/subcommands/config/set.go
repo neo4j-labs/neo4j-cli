@@ -45,6 +45,12 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 			case clicfg.AuraScope:
 				cfg.Aura.Set(bareKey, value)
 				return nil
+			case clicfg.FlagScope:
+				if err := cfg.Flags.SetFromConfigCmd(bareKey, value); err != nil {
+					cmd.SilenceUsage = true
+					return err
+				}
+				return nil
 			default:
 				if err := cfg.Global.Set(bareKey, value); err != nil {
 					cmd.SilenceUsage = true

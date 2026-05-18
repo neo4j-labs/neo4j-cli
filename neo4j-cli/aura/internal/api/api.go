@@ -114,7 +114,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 }
 
 func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
-	betaEnabled := cfg.Aura.AuraBetaEnabled()
+	betaEnabled := cfg.Flags.Enabled("flag.aura-beta")
 
 	switch version {
 	case AuraApiVersion1:

@@ -78,6 +78,19 @@ func TestResolveConfigKey(t *testing.T) {
 			scope:   clicfg.GlobalScope,
 			wantErr: `invalid config key: "unknown"`,
 		},
+		{
+			name:          "registered flag.aura-beta resolves to flag namespace with full key preserved",
+			key:           "flag.aura-beta",
+			scope:         clicfg.GlobalScope,
+			wantNamespace: clicfg.FlagScope,
+			wantKey:       "flag.aura-beta",
+		},
+		{
+			name:    "unknown flag.* key is rejected as unrecognised",
+			key:     "flag.unknown-thing",
+			scope:   clicfg.GlobalScope,
+			wantErr: `invalid config key: "flag.unknown-thing"`,
+		},
 	}
 
 	for _, tc := range tests {

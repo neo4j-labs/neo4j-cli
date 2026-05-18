@@ -35,7 +35,7 @@ func TestListDeployment(t *testing.T) {
 		}]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -84,7 +84,7 @@ func TestListDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 				}]
 				}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand("deployment list")
@@ -134,7 +134,7 @@ func TestListDeploymentWithTableOutput(t *testing.T) {
 		}]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -162,7 +162,7 @@ func TestListDeploymentsWithNoDeployments(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -183,7 +183,7 @@ func TestListDeploymentsWithMissingProjectId(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --organization-id=%s", organizationId))
 
@@ -203,7 +203,7 @@ func TestListDeploymentsWithMissingOrganizationId(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment list --project-id=%s", projectId))
 
@@ -248,7 +248,7 @@ func TestListDeploymentsWithCredentialFlag(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments", organizationId, projectId), http.StatusOK, `{"data": []}`)
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 			helper.SetConfigValue("format", "json")
 			helper.ExecuteCommand(tc.command)
 

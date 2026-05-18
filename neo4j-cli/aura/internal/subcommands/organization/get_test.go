@@ -46,7 +46,7 @@ func TestGetOrganization(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock(
 				fmt.Sprintf("/v2beta1/organizations/%s", orgID),
@@ -75,7 +75,7 @@ func TestGetOrganizationWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(
 		fmt.Sprintf("/v2beta1/organizations/%s", orgID),
@@ -93,7 +93,7 @@ func TestGetOrganizationMissingPositionalArg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	helper.ExecuteCommand("organization get")
 

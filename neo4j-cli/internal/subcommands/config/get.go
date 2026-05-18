@@ -39,12 +39,21 @@ neo4j-cli config get format --format json
 # Get an aura-scoped key via dot-notation
 neo4j-cli config get aura.default-workspace --format json`,
 		ValidArgs: validGetArgs(cfg),
-		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.ExactArgs(1)(cmd, args); err != nil {
+				return err
+			}
+
+			// Validate the key via the resolver — rejects unrecognised or shadowed keys.
+			_, _, err := clicfg.ResolveConfigKey(args[0], cfg)
+			return err
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			scope, bareKey, err := clicfg.ResolveConfigKey(key, cfg)
 			if err != nil {
+				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -53,6 +62,9 @@ neo4j-cli config get aura.default-workspace --format json`,
 				entry := cfg.Aura.GetPrintable(bareKey)
 				// Display with the "aura." prefix so the user sees the full dot-notation key
 				entry.Key = fmt.Sprintf("aura.%s", bareKey)
+				output.PrintBodyMap(cmd, cfg, entry, configPrintFields)
+			case clicfg.FlagScope:
+				entry := clicfg.PrintableConfigEntry{Key: bareKey, Value: cfg.Flags.Enabled(bareKey)}
 				output.PrintBodyMap(cmd, cfg, entry, configPrintFields)
 			default:
 				output.PrintBodyMap(cmd, cfg, cfg.Global.GetPrintable(bareKey), configPrintFields)

@@ -43,7 +43,7 @@ func TestGetDeployment(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
@@ -107,7 +107,7 @@ func TestGetDeploymentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s", deploymentId))
@@ -172,7 +172,7 @@ func TestGetDeploymentWithTrailingNewline(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get --organization-id=%s --project-id=%s %s\"\n\"", organizationId, projectId, deploymentId))
 
@@ -236,7 +236,7 @@ func TestGetDeploymentWithTableOutput(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "table")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
@@ -264,7 +264,7 @@ func TestGetDeploymentWithMissingProjectId(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s", deploymentId, organizationId))
 
@@ -285,7 +285,7 @@ func TestGetDeploymentWithMissingOrganizationId(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --project-id=%s", deploymentId, projectId))
 
@@ -306,7 +306,7 @@ func TestGetDeploymentWithMissingArgs(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -327,7 +327,7 @@ func TestGetDeploymentWithInvalidDeploymentId(t *testing.T) {
 		"errors": [{"message": "cannot parse UUID  87703862-f8b7-4712-b7eb-d0eef69cb53"}]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 
@@ -349,7 +349,7 @@ func TestGetDeploymentWhenDeploymentDoesNotExist(t *testing.T) {
 		"error": "Access denied"
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment get %s --organization-id=%s --project-id=%s", deploymentId, organizationId, projectId))
 

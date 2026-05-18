@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -57,17 +58,22 @@ var exitCodes = map[string]string{
 
 // errorCodes mirrors the constructors in common/clierr/error.go. Each
 // `error.code` string maps 1:1 to a process exit code in `exitCodes`.
-// Wording matches REQ-F-009. Adding a new constructor over there means
-// adding an entry here.
-var errorCodes = map[string]string{
-	"fatal_error":      "unrecoverable internal failure",
-	"usage_error":      "invalid flag, missing argument, or other input rejection",
-	"not_found":        "resource doesn't exist",
-	"auth_error":       "authentication or authorization failed",
-	"conflict":         "request conflicts with current resource state",
-	"validation_error": "input payload rejected by validation",
-	"rate_limited":     "upstream signalled rate limit; retry after the hinted delay",
-	"upstream_error":   "transient API failure; retry may succeed",
+// Wording matches REQ-F-009. The map is rebuilt at package init from the
+// canonical clierr.Codes table so that adding a new constructor over
+// there auto-surfaces here — no duplicated source of truth.
+var errorCodes = buildErrorCodes()
+
+// buildErrorCodes projects clierr.Codes into the
+// `map[codeName]description` shape consumed by the agent-context JSON
+// envelope. Kept as a private constructor so callers see a value, not a
+// closure, and so a regression in clierr is caught by the existing
+// agent-context tests (which assert all eight enum strings are present).
+func buildErrorCodes() map[string]string {
+	out := make(map[string]string, len(clierr.Codes))
+	for code, meta := range clierr.Codes {
+		out[meta.Name] = clierr.CodeDescriptions[code]
+	}
+	return out
 }
 
 // Context is the top-level JSON envelope. Field order in the struct

@@ -1,0 +1,35 @@
+## TASK-001 — 2026-05-18T14:30:00Z
+Extended CLIError with CodeName/Retryable/ResourceType/ResourceID/Suggestion fields, changed constructor returns to *CLIError, added Codes/CodeNames/CodeDescriptions closed-enum tables, and WithResource/WithSuggestion fluent setters.
+Files: ~common/clierr/error.go, ~common/clierr/error_test.go, ~.plans/tasks-cli-140-json-error-envelope.yml
+
+## TASK-002 — 2026-05-18T15:00:00Z
+Added Envelope/EnvelopeBody types, (*CLIError).BuildEnvelope pure projection, and Render(err, stdout, stderr, format) dispatcher; JSON mode emits envelope to stdout + summary to stderr, other formats write summary + optional suggestion to stderr only; untyped err wrapped as fatal_error, nil is no-op.
+Files: +common/clierr/render.go, +common/clierr/render_test.go
+
+## TASK-003 — 2026-05-18T15:30:00Z
+Set SilenceErrors on neo4j-cli root cobra cmd and wired clierr.Render between Events.Flush and os.Exit in main.go so failed commands emit the structured envelope (json) or one-line summary+suggestion (plaintext). Added JSON-mode and plaintext-mode tests in main_test.go.
+Files: ~neo4j-cli/app/app.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: Flag-parse errors fire before --format is bound so they fall through to plaintext; not in scope to fix here.
+
+## TASK-004 — 2026-05-18T16:00:00Z
+Replaced agentcontext build.go hardcoded errorCodes map with buildErrorCodes() projecting clierr.Codes (Name→Description); added TestErrorCodesInSyncWithClierr locking the projection byte-equality. No JSON-envelope shape change.
+Files: ~neo4j-cli/internal/subcommands/agentcontext/build.go, ~neo4j-cli/internal/subcommands/agentcontext/build_test.go
+Decisions: No circular import (clierr leaf); kept agentcontext-side gate test even though derivation is structural, to guard against a future hand-rolled re-introduction.
+
+## TASK-005 — 2026-05-18T16:45:00Z
+404 branch in handleResponseError now chains .WithResource onto NewNotFoundError; added parseResourceFromRequest helper (skips version segment, singularises plural) and trailing-s singularise. Table-driven tests cover instance/tenant/CMK paths, nested subpaths, short/empty/nil request paths, plus end-to-end 404 -> typed *CLIError ResourceType/ResourceID assertions.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+Decisions: Used trailing-s strip not a static plural→singular map; Aura plurals are uniform and the helper falls back to the raw segment for non-s endings.
+
+## TASK-006 — 2026-05-18T17:30:00Z
+Added two --format=json e2e cases (bad_flag_usage_2_json + not_found_404_get_json) and JSON envelope assertion helpers in exitcodes_test.go; fixture mux now also serves /v1/instances/<id> subpaths. Closed the flag-parse format gap by adding resolveFormatForRender + peekFormatFromArgs in main.go so a failed flag-parse with --format=json still emits the JSON envelope; covered by table-driven unit test.
+Files: ~test/e2e/exitcodes/exitcodes_test.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: extractEnvelope scans backwards for `{...}` lines because cobra dumps the usage block to stdout ahead of the envelope on flag-parse failure; peek picks first --format hit (last-wins would only matter for repeated flags in failed parses).
+
+## TASK-008 — 2026-05-18T18:00:00Z
+Added toon-mode branch to Render: switch{json,toon} dispatches to envelope encoders, others fall through to plaintext+suggestion. New marshalEnvelopeToon helper uses the JSON->any->toon.Marshal hop with WithLengthMarkers to match common/output. Tests cover 3 CodeNames, untyped fallback, and suggestion behaviour in toon mode; removed "toon" from PlaintextMode table.
+Files: ~common/clierr/render.go, ~common/clierr/render_test.go
+
+## TASK-007 — 2026-05-18T15:25:00Z
+Added neo4j-cli Minor changelog entry covering both --format=json and --format=toon error envelope shipping in CLI-140. All gates clean (fmt-check, lint, test); generate-check diff was only the mid-task YAML flip per AGENTS.md note. Three manual smokes pass: json envelope on stdout + plaintext on stderr, plaintext-only on stderr with `(exit 2)`, toon envelope on stdout.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260518-152025.yaml

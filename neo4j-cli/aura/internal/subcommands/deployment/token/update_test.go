@@ -25,7 +25,7 @@ func TestUpdateDeploymentToken(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
@@ -54,7 +54,7 @@ func TestUpdateDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --rw", deploymentId))
@@ -82,7 +82,7 @@ func TestUpdateDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {
 		"error": "Access denied"
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token update --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
