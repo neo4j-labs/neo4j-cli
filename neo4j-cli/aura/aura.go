@@ -5,7 +5,6 @@ package aura
 
 import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/context"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/deployment"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
 	_import "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/import"
@@ -23,6 +22,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/organization"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/project"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/tenant"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
 )
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
@@ -33,7 +33,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: cfg.Version,
 	}
 
-	cmd.AddCommand(context.NewCmd(cfg))
+	cmd.AddCommand(workspace.NewCmd(cfg))
 	cmd.AddCommand(customermanagedkey.NewCmd(cfg))
 	cmd.AddCommand(instance.NewCmd(cfg))
 	cmd.AddCommand(organization.NewCmd(cfg))

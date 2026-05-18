@@ -345,7 +345,8 @@ tasks:
         equivalents.
       - Update neo4j-cli/aura/aura.go: change the import from .../subcommands/context to
         .../subcommands/workspace and the mount call from context.NewCmd to workspace.NewCmd.
-    status: not_started
+    status: completed
+    completed_at: 2026-05-18T10:00:00Z
     dependencies:
       - task-001
     acceptance_criteria:

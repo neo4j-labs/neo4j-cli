@@ -128,7 +128,7 @@ func TestSetDefaultContext(t *testing.T) {
 				}
 
 				helper.AsssertOk()
-				helper.AssertConfigValue("aura.default-context", tc.wantContext)
+				helper.AssertConfigValue("aura.default-workspace", tc.wantContext)
 				mockHandler.AssertCalledTimes(1)
 				mockHandler.AssertCalledWithMethod(http.MethodGet)
 				return

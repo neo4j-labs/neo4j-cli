@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package context_test
+package workspace_test
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/context"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,14 +46,14 @@ func buildValidateTestConfig(t *testing.T, serverURL string) *clicfg.Config {
 	return cfg
 }
 
-// readPersistedDefaultContext reads the raw config file from the FS associated with cfg
-// and returns the aura.default-context value as stored on disk. This is necessary because
+// readPersistedDefaultWorkspace reads the raw config file from the FS associated with cfg
+// and returns the aura.default-workspace value as stored on disk. This is necessary because
 // AuraConfig.Set writes to the filesystem but does not update viper's in-memory state.
-func readPersistedDefaultContext(t *testing.T, cfg *clicfg.Config) string {
+func readPersistedDefaultWorkspace(t *testing.T, cfg *clicfg.Config) string {
 	t.Helper()
 	raw, err := testfs.GetTestConfig(cfg.Aura.Fs())
 	require.NoError(t, err)
-	return gjson.Get(raw, "aura.default-context").String()
+	return gjson.Get(raw, "aura.default-workspace").String()
 }
 
 func buildValidateTestServer(t *testing.T, path string, status int, body string) *httptest.Server {
@@ -76,7 +76,7 @@ func buildValidateTestServer(t *testing.T, path string, status int, body string)
 	return srv
 }
 
-func TestValidateAndSetDefaultContext(t *testing.T) {
+func TestValidateAndSetDefaultWorkspace(t *testing.T) {
 	const orgID = "org-abc-123"
 	const projectID = "proj-def-456"
 	const slug = orgID + "/" + projectID
@@ -90,7 +90,7 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 		serverBody     string
 		wantErr        bool
 		wantErrContain string
-		wantContext    string
+		wantWorkspace  string
 	}{
 		{
 			name:           "no slash in slug returns error",
@@ -147,12 +147,12 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 			wantErrContain: fmt.Sprintf("project %q not found in organization %q", projectID, orgID),
 		},
 		{
-			name:         "success persists aura.default-context when project found in list",
-			slug:         slug,
-			serverPath:   listProjectsPath,
-			serverStatus: http.StatusOK,
-			serverBody:   fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}, {"id": "other-proj-111", "name": "Other Project"}]}`, projectID),
-			wantContext:  slug,
+			name:          "success persists aura.default-workspace when project found in list",
+			slug:          slug,
+			serverPath:    listProjectsPath,
+			serverStatus:  http.StatusOK,
+			serverBody:    fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}, {"id": "other-proj-111", "name": "Other Project"}]}`, projectID),
+			wantWorkspace: slug,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -167,7 +167,7 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 				cfg = buildValidateTestConfig(t, srv.URL)
 			}
 
-			err := context.ValidateAndSetDefaultContext(cfg, tc.slug)
+			err := workspace.ValidateAndSetDefaultWorkspace(cfg, tc.slug)
 
 			if tc.wantErr {
 				require.Error(t, err)
@@ -175,12 +175,12 @@ func TestValidateAndSetDefaultContext(t *testing.T) {
 					assert.Contains(t, err.Error(), tc.wantErrContain)
 				}
 				// Verify nothing was persisted on error
-				assert.Empty(t, readPersistedDefaultContext(t, cfg))
+				assert.Empty(t, readPersistedDefaultWorkspace(t, cfg))
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantContext, readPersistedDefaultContext(t, cfg))
+			assert.Equal(t, tc.wantWorkspace, readPersistedDefaultWorkspace(t, cfg))
 		})
 	}
 }

@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package context_test
+package workspace_test
 
 import (
 	"fmt"
@@ -11,23 +11,23 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
-func TestContextUseWithSlug(t *testing.T) {
+func TestWorkspaceUseWithSlug(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-222"
 	const slug = orgID + "/" + projectID
 
 	for _, tc := range []struct {
-		name        string
-		status      int
-		body        string
-		wantContext string
-		wantErr     string
+		name          string
+		status        int
+		body          string
+		wantWorkspace string
+		wantErr       string
 	}{
 		{
-			name:        "success with positional slug",
-			status:      http.StatusOK,
-			body:        fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
-			wantContext: slug,
+			name:          "success with positional slug",
+			status:        http.StatusOK,
+			body:          fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
+			wantWorkspace: slug,
 		},
 		{
 			name:    "project not found in list returns clear error",
@@ -60,7 +60,7 @@ func TestContextUseWithSlug(t *testing.T) {
 				tc.body,
 			)
 
-			helper.ExecuteCommand(fmt.Sprintf("context use %s --rw", slug))
+			helper.ExecuteCommand(fmt.Sprintf("workspace use %s --rw", slug))
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -71,12 +71,12 @@ func TestContextUseWithSlug(t *testing.T) {
 			}
 
 			helper.AsssertOk()
-			helper.AssertConfigValue("aura.default-context", tc.wantContext)
+			helper.AssertConfigValue("aura.default-workspace", tc.wantWorkspace)
 		})
 	}
 }
 
-func TestContextUseWithFlags(t *testing.T) {
+func TestWorkspaceUseWithFlags(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-222"
 	const slug = orgID + "/" + projectID
@@ -92,15 +92,15 @@ func TestContextUseWithFlags(t *testing.T) {
 		fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
 	)
 
-	helper.ExecuteCommand(fmt.Sprintf("context use --organization-id=%s --project-id=%s --rw", orgID, projectID))
+	helper.ExecuteCommand(fmt.Sprintf("workspace use --organization-id=%s --project-id=%s --rw", orgID, projectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 	helper.AsssertOk()
-	helper.AssertConfigValue("aura.default-context", slug)
+	helper.AssertConfigValue("aura.default-workspace", slug)
 }
 
-func TestContextUseMixedFormError(t *testing.T) {
+func TestWorkspaceUseMixedFormError(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-222"
 	const slug = orgID + "/" + projectID
@@ -108,52 +108,52 @@ func TestContextUseMixedFormError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand(fmt.Sprintf("context use %s --organization-id=%s --rw", slug, orgID))
+	helper.ExecuteCommand(fmt.Sprintf("workspace use %s --organization-id=%s --rw", slug, orgID))
 
 	helper.AssertErrContainsStrings([]string{"mutually exclusive"})
 }
 
-func TestContextUseMissingOrganizationId(t *testing.T) {
+func TestWorkspaceUseMissingOrganizationId(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context use --project-id=proj-222 --rw")
+	helper.ExecuteCommand("workspace use --project-id=proj-222 --rw")
 
 	helper.AssertErrContainsStrings([]string{"organization-id"})
 }
 
-func TestContextUseMissingProjectId(t *testing.T) {
+func TestWorkspaceUseMissingProjectId(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context use --organization-id=org-111 --rw")
+	helper.ExecuteCommand("workspace use --organization-id=org-111 --rw")
 
 	helper.AssertErrContainsStrings([]string{"project-id"})
 }
 
-func TestContextUseInvalidSlugNoSlash(t *testing.T) {
+func TestWorkspaceUseInvalidSlugNoSlash(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context use noslash --rw")
+	helper.ExecuteCommand("workspace use noslash --rw")
 
 	helper.AssertErrContainsStrings([]string{"expected format {organizationId}/{projectId}"})
 }
 
-func TestContextUseEmptyOrgInSlug(t *testing.T) {
+func TestWorkspaceUseEmptyOrgInSlug(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context use /proj-222 --rw")
+	helper.ExecuteCommand("workspace use /proj-222 --rw")
 
 	helper.AssertErrContainsStrings([]string{"organization ID must not be empty"})
 }
 
-func TestContextUseEmptyProjectInSlug(t *testing.T) {
+func TestWorkspaceUseEmptyProjectInSlug(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context use org-111/ --rw")
+	helper.ExecuteCommand("workspace use org-111/ --rw")
 
 	helper.AssertErrContainsStrings([]string{"project ID must not be empty"})
 }

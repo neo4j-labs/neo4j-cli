@@ -364,6 +364,12 @@ func (config *AuraConfig) DefaultContext() string {
 	return config.viper.GetString("aura.default-context")
 }
 
+// DefaultWorkspace returns the raw value of aura.default-workspace (e.g. "{orgId}/{projectId}").
+// Returns an empty string when not set.
+func (config *AuraConfig) DefaultWorkspace() string {
+	return config.viper.GetString("aura.default-workspace")
+}
+
 // DefaultTenant resolves the default tenant/project ID for Aura commands.
 // Resolution order:
 //  1. Project portion of aura.default-context (the part after the '/' in "{orgId}/{projectId}").

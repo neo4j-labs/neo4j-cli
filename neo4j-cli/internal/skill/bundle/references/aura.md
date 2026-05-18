@@ -2,9 +2,6 @@
 
 ## Contents
 
-- [neo4j-cli aura context](#neo4j-cli-aura-context)
-- [neo4j-cli aura context list](#neo4j-cli-aura-context-list)
-- [neo4j-cli aura context use](#neo4j-cli-aura-context-use)
 - [neo4j-cli aura customer-managed-key](#neo4j-cli-aura-customer-managed-key)
 - [neo4j-cli aura customer-managed-key create](#neo4j-cli-aura-customer-managed-key-create)
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
@@ -35,81 +32,15 @@
 - [neo4j-cli aura project](#neo4j-cli-aura-project)
 - [neo4j-cli aura project get](#neo4j-cli-aura-project-get)
 - [neo4j-cli aura project list](#neo4j-cli-aura-project-list)
+- [neo4j-cli aura workspace](#neo4j-cli-aura-workspace)
+- [neo4j-cli aura workspace list](#neo4j-cli-aura-workspace-list)
+- [neo4j-cli aura workspace use](#neo4j-cli-aura-workspace-use)
 
 Allows you to programmatically provision and manage your Aura resources
 
 Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.
 
 Usage: `neo4j-cli aura`
-
-## neo4j-cli aura context
-
-Manage the active organization and project context
-
-Usage: `neo4j-cli aura context`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--auth-url` | string | - |  |
-| `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
-
-### neo4j-cli aura context list
-
-Returns a flat list of all accessible organization/project contexts
-
-This subcommand lists all organization/project pairs accessible to the current user.
-Each entry includes the context slug ({organizationId}/{projectId}), the organization and
-project IDs and names, and whether this entry is the currently active default context.
-
-Usage: `neo4j-cli aura context list`
-
-Examples:
-
-```
-# List all accessible contexts in table format
-neo4j-cli aura context list
-
-# Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura context list --format json
-
-# Find the active context via jq
-neo4j-cli aura context list --format json | jq -r '.data[] | select(.default == true) | .context'
-```
-
-### neo4j-cli aura context use
-
-Sets the active organization and project context
-
-This subcommand sets the active organization and project context used by default
-in subsequent commands. Accepts either a positional {organizationId}/{projectId} slug
-or the --organization-id and --project-id flags (but not both).
-
-The context is validated against the Aura API before being persisted.
-
-Usage: `neo4j-cli aura context use [organizationId/projectId] [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project ID |
-
-Examples:
-
-```
-# Set context using positional slug
-neo4j-cli aura context use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
-
-# Set context using flags
-neo4j-cli aura context use --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
-
-# Verify the context was set after switching
-neo4j-cli aura context use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw && neo4j-cli aura context list --format json
-```
 
 ## neo4j-cli aura customer-managed-key
 
@@ -848,5 +779,74 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 
 # Emit JSON for scripting
 neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-000000000000 --format json
+```
+
+## neo4j-cli aura workspace
+
+Manage the active organization and project workspace
+
+Usage: `neo4j-cli aura workspace`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura workspace list
+
+Returns a flat list of all accessible organization/project workspaces
+
+This subcommand lists all organization/project pairs accessible to the current user.
+Each entry includes the workspace slug ({organizationId}/{projectId}), the organization and
+project IDs and names, and whether this entry is the currently active default workspace.
+
+Usage: `neo4j-cli aura workspace list`
+
+Examples:
+
+```
+# List all accessible workspaces in table format
+neo4j-cli aura workspace list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli aura workspace list --format json
+
+# Find the active workspace via jq
+neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default == true) | .workspace'
+```
+
+### neo4j-cli aura workspace use
+
+Sets the active organization and project workspace
+
+This subcommand sets the active organization and project workspace used by default
+in subsequent commands. Accepts either a positional {organizationId}/{projectId} slug
+or the --organization-id and --project-id flags (but not both).
+
+The workspace is validated against the Aura API before being persisted.
+
+Usage: `neo4j-cli aura workspace use [organizationId/projectId] [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project ID |
+
+Examples:
+
+```
+# Set workspace using positional slug
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
+
+# Set workspace using flags
+neo4j-cli aura workspace use --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Verify the workspace was set after switching
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw && neo4j-cli aura workspace list --format json
 ```
 

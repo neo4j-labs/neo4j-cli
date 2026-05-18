@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package context
+package workspace
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
@@ -11,8 +11,8 @@ import (
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "context",
-		Short: "Manage the active organization and project context",
+		Use:   "workspace",
+		Short: "Manage the active organization and project workspace",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cfg.Aura.BindBaseUrl(cmd.Flags().Lookup("base-url"))
 			cfg.Aura.BindAuthUrl(cmd.Flags().Lookup("auth-url"))

@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package context
+package workspace
 
 import (
 	"fmt"
@@ -16,21 +16,21 @@ func newUseCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "use [organizationId/projectId]",
-		Short: "Sets the active organization and project context",
-		Long: `This subcommand sets the active organization and project context used by default
+		Short: "Sets the active organization and project workspace",
+		Long: `This subcommand sets the active organization and project workspace used by default
 in subsequent commands. Accepts either a positional {organizationId}/{projectId} slug
 or the --organization-id and --project-id flags (but not both).
 
-The context is validated against the Aura API before being persisted.`,
+The workspace is validated against the Aura API before being persisted.`,
 		Annotations: map[string]string{"write": "true"},
-		Example: `# Set context using positional slug
-neo4j-cli aura context use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
+		Example: `# Set workspace using positional slug
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw
 
-# Set context using flags
-neo4j-cli aura context use --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+# Set workspace using flags
+neo4j-cli aura workspace use --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
-# Verify the context was set after switching
-neo4j-cli aura context use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw && neo4j-cli aura context list --format json`,
+# Verify the workspace was set after switching
+neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111 --rw && neo4j-cli aura workspace list --format json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			hasSlug := len(args) == 1
@@ -55,7 +55,7 @@ neo4j-cli aura context use 00000000-0000-0000-0000-000000000000/11111111-1111-11
 			}
 
 			cmd.SilenceUsage = true
-			return ValidateAndSetDefaultContext(cfg, slug)
+			return ValidateAndSetDefaultWorkspace(cfg, slug)
 		},
 	}
 

@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package context_test
+package workspace_test
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
-func TestContextList(t *testing.T) {
+func TestWorkspaceList(t *testing.T) {
 	const org1ID = "org-aaa"
 	const org2ID = "org-bbb"
 	const proj1ID = "proj-111"
@@ -19,17 +19,17 @@ func TestContextList(t *testing.T) {
 	const proj3ID = "proj-333"
 
 	for _, tc := range []struct {
-		name           string
-		defaultContext string
-		orgsBody       string
-		proj1Body      string
-		proj2Body      string
-		wantOutJSON    string
-		wantErr        string
+		name             string
+		defaultWorkspace string
+		orgsBody         string
+		proj1Body        string
+		proj2Body        string
+		wantOutJSON      string
+		wantErr          string
 	}{
 		{
-			name:           "two orgs with projects, default matches first entry",
-			defaultContext: fmt.Sprintf("%s/%s", org1ID, proj1ID),
+			name:             "two orgs with projects, default matches first entry",
+			defaultWorkspace: fmt.Sprintf("%s/%s", org1ID, proj1ID),
 			orgsBody: fmt.Sprintf(`{
 				"data": [
 					{"id": "%s", "name": "Org Alpha"},
@@ -50,21 +50,21 @@ func TestContextList(t *testing.T) {
 			wantOutJSON: fmt.Sprintf(`{
 				"data": [
 					{
-						"context": "%s/%s",
+						"workspace": "%s/%s",
 						"organizationId": "%s",
 						"projectId": "%s",
 						"projectName": "Project One",
 						"default": true
 					},
 					{
-						"context": "%s/%s",
+						"workspace": "%s/%s",
 						"organizationId": "%s",
 						"projectId": "%s",
 						"projectName": "Project Two",
 						"default": false
 					},
 					{
-						"context": "%s/%s",
+						"workspace": "%s/%s",
 						"organizationId": "%s",
 						"projectId": "%s",
 						"projectName": "Project Three",
@@ -76,8 +76,8 @@ func TestContextList(t *testing.T) {
 				org2ID, proj3ID, org2ID, proj3ID),
 		},
 		{
-			name:           "no default context set — all entries have default=false",
-			defaultContext: "",
+			name:             "no default workspace set — all entries have default=false",
+			defaultWorkspace: "",
 			orgsBody: fmt.Sprintf(`{
 				"data": [
 					{"id": "%s", "name": "Org Alpha"}
@@ -91,7 +91,7 @@ func TestContextList(t *testing.T) {
 			wantOutJSON: fmt.Sprintf(`{
 				"data": [
 					{
-						"context": "%s/%s",
+						"workspace": "%s/%s",
 						"organizationId": "%s",
 						"projectId": "%s",
 						"projectName": "Project One",
@@ -101,10 +101,10 @@ func TestContextList(t *testing.T) {
 			}`, org1ID, proj1ID, org1ID, proj1ID),
 		},
 		{
-			name:           "empty org list returns empty data array",
-			defaultContext: "",
-			orgsBody:       `{"data": []}`,
-			wantOutJSON:    `{"data": []}`,
+			name:             "empty org list returns empty data array",
+			defaultWorkspace: "",
+			orgsBody:         `{"data": []}`,
+			wantOutJSON:      `{"data": []}`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -112,8 +112,8 @@ func TestContextList(t *testing.T) {
 			defer helper.Close()
 
 			helper.SetConfigValue("aura.beta-enabled", true)
-			if tc.defaultContext != "" {
-				helper.SetConfigValue("aura.default-context", tc.defaultContext)
+			if tc.defaultWorkspace != "" {
+				helper.SetConfigValue("aura.default-workspace", tc.defaultWorkspace)
 			}
 
 			orgsHandler := helper.NewRequestHandlerMock("/v2beta1/organizations", http.StatusOK, tc.orgsBody)
@@ -133,7 +133,7 @@ func TestContextList(t *testing.T) {
 				)
 			}
 
-			helper.ExecuteCommand("context list --format json")
+			helper.ExecuteCommand("workspace list --format json")
 
 			orgsHandler.AssertCalledTimes(1)
 			orgsHandler.AssertCalledWithMethod(http.MethodGet)
@@ -148,7 +148,7 @@ func TestContextList(t *testing.T) {
 	}
 }
 
-func TestContextListAPIError(t *testing.T) {
+func TestWorkspaceListAPIError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -160,12 +160,12 @@ func TestContextListAPIError(t *testing.T) {
 		`{"errors": [{"message": "internal server error"}]}`,
 	)
 
-	helper.ExecuteCommand("context list")
+	helper.ExecuteCommand("workspace list")
 
 	helper.AssertErrContainsStrings([]string{"failed to list organizations", "internal server error"})
 }
 
-func TestContextListProjectsAPIError(t *testing.T) {
+func TestWorkspaceListProjectsAPIError(t *testing.T) {
 	const orgID = "org-aaa"
 
 	helper := testutils.NewAuraTestHelper(t)
@@ -184,16 +184,16 @@ func TestContextListProjectsAPIError(t *testing.T) {
 		`{"errors": [{"message": "projects fetch failed"}]}`,
 	)
 
-	helper.ExecuteCommand("context list")
+	helper.ExecuteCommand("workspace list")
 
 	helper.AssertErrContainsStrings([]string{"failed to list projects", "projects fetch failed"})
 }
 
-func TestContextListWithInvalidFormat(t *testing.T) {
+func TestWorkspaceListWithInvalidFormat(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.ExecuteCommand("context list --format invalid")
+	helper.ExecuteCommand("workspace list --format invalid")
 
 	helper.AssertErr("Error: invalid format value specified: invalid")
 }
