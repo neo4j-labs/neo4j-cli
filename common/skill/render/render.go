@@ -40,7 +40,7 @@ const referenceTOCThreshold = 100
 type Options struct {
 	// Name is the skill name, embedded into the SKILL.md frontmatter.
 	// Must be lowercase letters/digits/hyphens, ≤64 chars. Typically the
-	// binary name (e.g. "neo4j-cli", "aura-cli").
+	// binary name (e.g. "neo4j-cli").
 	Name string
 
 	// Description is the third-person frontmatter description (≤1024
@@ -249,9 +249,9 @@ func walkRender(buf *bytes.Buffer, headings *[]string, binName string, cmd *cobr
 }
 
 // commandPath returns the heading text for `cmd`: "<binName> <cmd path>".
-// E.g. for "instance list" under "aura-cli": "aura-cli instance list".
+// E.g. for "instance list" under "neo4j-cli": "neo4j-cli instance list".
 func commandPath(binName string, cmd *cobra.Command) string {
-	// CommandPath returns full path including root, e.g. "aura-cli instance list".
+	// CommandPath returns full path including root, e.g. "neo4j-cli instance list".
 	cp := strings.TrimSpace(cmd.CommandPath())
 	if cp != "" {
 		return cp

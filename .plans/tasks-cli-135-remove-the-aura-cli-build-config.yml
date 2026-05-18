@@ -273,7 +273,7 @@ tasks:
       and the final grep gate
       `grep -rn 'aura-cli\|AURA_CLI_VERSION\|CHANGELOG-aura\|include_aura\|/aura/cmd\|/aura/internal/skill' . --exclude-dir=.git --exclude-dir=.plans --exclude-dir=.changes --exclude=CHANGELOG-aura.md`.
       Satisfies REQ-NF-001 through REQ-NF-010.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -292,7 +292,7 @@ tasks:
       - "`make snapshot` produces `bin/neo4j-cli` and no `bin/aura-cli`"
       - "`go build ./...` exits 0"
       - "The final grep gate returns zero hits (or only the intentional `CHANGELOG.md` pointer footnote and the deleted-file-deletion entries inside `.plans/archive/`)"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-015
     title: "Add changie entry, push branch, open PR"
