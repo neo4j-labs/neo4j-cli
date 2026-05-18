@@ -15,9 +15,13 @@ func TestUpdateMemory(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusAccepted, `{
+	// Single mock: GET (pre-flight) then PATCH.
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
 		"data": {
 			"id": "2f49c2b3",
 			"name": "Production",
@@ -31,9 +35,9 @@ func TestUpdateMemory(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --rw", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
 	mockHandler.AssertCalledWithBody(`{"memory":"8GB"}`)
 
@@ -44,9 +48,9 @@ func TestUpdateMemory(t *testing.T) {
 		"id": "2f49c2b3",
 		"memory": "8GB",
 		"name": "Production",
+		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
 		"status": "updating",
-		"tenant_id": "YOUR_TENANT_ID",
 		"type": "enterprise-db"
 	  }
 	}`)
@@ -56,9 +60,12 @@ func TestUpdateName(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, `{
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusOK, `{
 		"data": {
 			"id": "2f49c2b3",
 			"name": "New Name",
@@ -72,9 +79,9 @@ func TestUpdateName(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --rw`, instanceId))
+	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --organization-id %s --project-id %s --rw`, instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
 	mockHandler.AssertCalledWithBody(`{"name":"New Name"}`)
 
@@ -85,9 +92,9 @@ func TestUpdateName(t *testing.T) {
 		"id": "2f49c2b3",
 		"memory": "4GB",
 		"name": "New Name",
+		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
 		"status": "updating",
-		"tenant_id": "YOUR_TENANT_ID",
 		"type": "enterprise-db"
 	  }
 	}`)
@@ -97,9 +104,12 @@ func TestUpdateMemoryAndName(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusAccepted, `{
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
 		"data": {
 			"id": "2f49c2b3",
 			"name": "New Name",
@@ -113,9 +123,9 @@ func TestUpdateMemoryAndName(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --rw`, instanceId))
+	helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --organization-id %s --project-id %s --rw`, instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
 	mockHandler.AssertCalledWithBody(`{"memory":"8GB","name":"New Name"}`)
 
@@ -126,9 +136,9 @@ func TestUpdateMemoryAndName(t *testing.T) {
 		"id": "2f49c2b3",
 		"memory": "8GB",
 		"name": "New Name",
+		"project_id": "YOUR_TENANT_ID",
 		"region": "europe-west1",
 		"status": "updating",
-		"tenant_id": "YOUR_TENANT_ID",
 		"type": "enterprise-db"
 	  }
 	}`)
@@ -138,9 +148,13 @@ func TestUpdateInstanceWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+
 	instanceId := "2f49c2b3"
 
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusAccepted, `{
+	// Single mock: GET (pre-flight) then PATCH.
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
 		"data": {
 			"id": "2f49c2b3",
 			"name": "Production",
@@ -154,9 +168,9 @@ func TestUpdateInstanceWithTrailingNewline(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance update %s\"\n\" --memory 8GB --rw", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s\"\n\" --memory 8GB --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
 
-	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
 }
 
@@ -174,6 +188,86 @@ func TestUpdateErrorsWithNoFlags(t *testing.T) {
 
 	helper.AssertErr(`Error: at least one of the flags in the group [memory name] is required
 `)
+}
+
+func TestUpdateInstanceWithDefaultWorkspace(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetDefaultProjectInConfig(testListOrgID, testListProjectID)
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "Production",
+			"status": "updating",
+			"connection_url": "YOUR_CONNECTION_URL",
+			"tenant_id": "YOUR_TENANT_ID",
+			"cloud_provider": "gcp",
+			"memory": "8GB",
+			"region": "europe-west1",
+			"type": "enterprise-db"
+		}
+	}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --rw", instanceId))
+
+	mockHandler.AssertCalledTimes(2)
+	helper.AsssertOk()
+}
+
+func TestUpdateInstanceMissingOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --rw", "2f49c2b3"))
+
+	helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+}
+
+func TestUpdateInstanceMissingProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --organization-id %s --rw", "2f49c2b3", testListOrgID))
+
+	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+}
+
+func TestUpdateInstanceProjectNotInOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock(
+		"/v2beta1/organizations/"+testListOrgID+"/projects",
+		http.StatusOK,
+		`{"data": []}`,
+	)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --organization-id %s --project-id unknown-project --rw", "2f49c2b3", testListOrgID))
+
+	helper.AssertErr("Error: could not find project unknown-project in organization " + testListOrgID)
+}
+
+func TestUpdateInstanceNotInProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	instanceId := "2f49c2b3"
+
+	// Instance belongs to a different project.
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, "other-project-id"))
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+
+	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
+	helper.AssertUsageNotShown()
 }
 
 func TestUpdateInstanceError(t *testing.T) {
@@ -213,13 +307,17 @@ func TestUpdateInstanceError(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
+			registerProjectsMock(&helper)
+
 			instanceId := "2f49c2b3"
 
-			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), testCase.statusCode, testCase.returnBody)
+			// First call GET (pre-flight OK), second call PATCH (error).
+			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+			mockHandler.AddResponse(testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --rw`, instanceId))
+			helper.ExecuteCommand(fmt.Sprintf(`instance update %s --name "New Name" --memory 8GB --organization-id %s --project-id %s --rw`, instanceId, testListOrgID, testListProjectID))
 
-			mockHandler.AssertCalledTimes(1)
+			mockHandler.AssertCalledTimes(2)
 			mockHandler.AssertCalledWithMethod(http.MethodPatch)
 
 			helper.AssertOut("")

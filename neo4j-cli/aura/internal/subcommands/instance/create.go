@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		memory               flags.Memory
 		name                 string
 		_type                flags.InstanceType
-		tenantId             string
 		cloudProvider        flags.CloudProvider
 		customerManagedKeyId string
 		vectorOptimized      bool
@@ -39,7 +39,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		memoryFlag               = "memory"
 		nameFlag                 = "name"
 		typeFlag                 = "type"
-		tenantIdFlag             = "tenant-id"
 		cloudProviderFlag        = "cloud-provider"
 		customerManagedKeyIdFlag = "customer-managed-key-id"
 		vectorOptimizedFlag      = "vector-optimized"
@@ -54,13 +53,13 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create",
 		Short:       "Creates a new instance",
 		Example: `# Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --type free-db --wait --rw
+neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free-db --wait --rw
 
 # Create a professional-db instance on AWS (us-east-1, N. Virginia)
-neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
 
 # Create a professional-db instance on GCP and emit JSON for scripting
-neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB --format json`,
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json`,
 		Long: `This subcommand starts the creation process of an Aura instance.
 
 Region identifiers follow each cloud provider's own naming convention: AWS uses identifiers such as us-east-1, Azure uses identifiers such as eastus, and GCP uses identifiers such as us-central1.
@@ -69,7 +68,7 @@ If you're unsure of possible configurations, run 'tenant get' to discover the fu
 
 Creating an instance is an asynchronous operation that can be waited for with --wait. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
-This subcommand returns your instance ID, initial credentials, connection URL along with your tenant id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
+This subcommand returns your instance ID, initial credentials, connection URL along with your project id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
 
 For Enterprise instances you can specify a --customer-managed-key-id flag to use a Customer Managed Key for encryption.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -97,10 +96,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				return errors.New(`"--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional-db"`)
 			}
 
-			if cfg.Aura.DefaultTenant() == "" {
-				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-			}
-
 			credentialNameChanged := cmd.Flags().Changed(credentialNameFlag)
 
 			if credentialNameChanged && noCredentialStorage {
@@ -118,18 +113,17 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve tenant ID before using it for default name generation.
-			resolvedTenantId := tenantId
-			if resolvedTenantId == "" {
-				resolvedTenantId = cfg.Aura.DefaultTenant()
+			cmd.SilenceUsage = true
+			_, resolvedProjectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
 
 			// Auto-generate a default name when --name is omitted.
 			if name == "" {
-				cmd.SilenceUsage = true
 				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
 					Method:      http.MethodGet,
-					QueryParams: map[string]string{"tenantId": resolvedTenantId},
+					QueryParams: map[string]string{"tenantId": resolvedProjectID},
 				})
 				if listErr != nil {
 					return listErr
@@ -150,7 +144,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				"name":           name,
 				"type":           _type,
 				"cloud_provider": cloudProvider,
-				"tenant_id":      resolvedTenantId,
+				"tenant_id":      resolvedProjectID,
 			}
 
 			if _type == "free-db" {
@@ -172,7 +166,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				body["customer_managed_key_id"] = customerManagedKeyId
 			}
 
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,
@@ -212,7 +205,11 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 					delete(instance, "password")
 				}
 
-				fields := []string{"id", "name", "tenant_id", "connection_url", "username"}
+				// Rename tenant_id -> project_id before output
+				renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")
+				renamedInstance, _ := renamed.GetSingleOrError()
+
+				fields := []string{"id", "name", "project_id", "connection_url", "username"}
 				if !noCredentialPrint {
 					fields = append(fields, "password")
 				}
@@ -221,7 +218,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				}
 				fields = append(fields, "cloud_provider", "region", "type")
 
-				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(instance), fields)
+				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(renamedInstance), fields)
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -250,8 +247,6 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 
 	cmd.Flags().Var(&_type, typeFlag, `(required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds".`)
 	cmd.MarkFlagRequired(typeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
-	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, `The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp".`)
 

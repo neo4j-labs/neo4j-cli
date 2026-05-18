@@ -4,13 +4,12 @@
 package session
 
 import (
-	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,35 +19,38 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Get a Graph Analytics Serverless session",
 		Example: `# Get a session by ID
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Render the session as a TOON table
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format toon
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format toon
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --format json`,
+neo4j-cli aura graph-analytics session get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Long: `This subcommand returns the details of a Graph Analytics Serverless session.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sessionId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionId)
+			sessionID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodGet,
-			})
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			resBody, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID)
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{
+			if resBody != nil {
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{
 					"id",
 					"name",
 					"memory",
 					"status",
 					"created_at",
 					"user_id",
-					"tenant_id",
+					"project_id",
 					"cloud_provider",
 					"region",
 					"host",

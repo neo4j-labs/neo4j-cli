@@ -4,6 +4,7 @@
 package session_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -14,44 +15,47 @@ func TestListSessions(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{ "data": [
-						{
-						  "id": "s-04de43fe-67ab-4",
-						  "name": "people-and-fruits",
-						  "memory": "8GB",
-						  "instance_id": null,
-						  "status": "Ready",
-						  "created_at": "2025-04-04T09:32:35Z",
-						  "host": "s-04de43fe-67ab-4-gds.ORCHESTRA.neo4j.io",
-						  "expiry_date": "2025-04-11T09:32:35Z",
-						  "ttl": "20m0s",
-						  "user_id": "YOUR_USER_ID",
-						  "tenant_id": "YOUR_PROJECT_ID",
-						  "cloud_provider": "azure",
-						  "region": "francecentral"
-						},
-						{
-						  "id": "559c94c7-15de43fg",
-						  "name": "people-and-fruits-with-db",
-						  "memory": "4GB",
-						  "instance_id": "559c94c7",
-						  "status": "Creating",
-						  "created_at": "2025-04-04T09:32:35Z",
-						  "host": "559c94c7-15de43fg.ORCHESTRA.neo4j.io",
-						  "expiry_date": null,
-						  "ttl": null,
-						  "user_id": "YOUR_USER_ID",
-						  "tenant_id": "YOUR_PROJECT_ID",
-						  "cloud_provider": "gcp",
-						  "region": "europe-west1"
-						}
-				]
-			}`)
+	registerProjectsMock(&helper)
 
-	helper.ExecuteCommand("graph-analytics session list")
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{ "data": [
+					{
+					  "id": "s-04de43fe-67ab-4",
+					  "name": "people-and-fruits",
+					  "memory": "8GB",
+					  "instance_id": null,
+					  "status": "Ready",
+					  "created_at": "2025-04-04T09:32:35Z",
+					  "host": "s-04de43fe-67ab-4-gds.ORCHESTRA.neo4j.io",
+					  "expiry_date": "2025-04-11T09:32:35Z",
+					  "ttl": "20m0s",
+					  "user_id": "YOUR_USER_ID",
+					  "tenant_id": "`+testProjectID+`",
+					  "cloud_provider": "azure",
+					  "region": "francecentral"
+					},
+					{
+					  "id": "559c94c7-15de43fg",
+					  "name": "people-and-fruits-with-db",
+					  "memory": "4GB",
+					  "instance_id": "559c94c7",
+					  "status": "Creating",
+					  "created_at": "2025-04-04T09:32:35Z",
+					  "host": "559c94c7-15de43fg.ORCHESTRA.neo4j.io",
+					  "expiry_date": null,
+					  "ttl": null,
+					  "user_id": "YOUR_USER_ID",
+					  "tenant_id": "`+testProjectID+`",
+					  "cloud_provider": "gcp",
+					  "region": "europe-west1"
+					}
+			]
+		}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s --project-id %s", testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
+	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 
 	helper.AssertOutJson(`{
 	"data": [
@@ -64,9 +68,9 @@ func TestListSessions(t *testing.T) {
 			"instance_id": null,
 			"memory": "8GB",
 			"name": "people-and-fruits",
+			"project_id": "YOUR_PROJECT_ID",
 			"region": "francecentral",
 			"status": "Ready",
-			"tenant_id": "YOUR_PROJECT_ID",
 			"ttl": "20m0s",
 			"user_id": "YOUR_USER_ID"
 		},
@@ -79,9 +83,9 @@ func TestListSessions(t *testing.T) {
 			"instance_id": "559c94c7",
 			"memory": "4GB",
 			"name": "people-and-fruits-with-db",
+			"project_id": "YOUR_PROJECT_ID",
 			"region": "europe-west1",
 			"status": "Creating",
-			"tenant_id": "YOUR_PROJECT_ID",
 			"ttl": null,
 			"user_id": "YOUR_USER_ID"
 		}
@@ -89,28 +93,85 @@ func TestListSessions(t *testing.T) {
 }`)
 }
 
-func TestListSessionsWithFilters(t *testing.T) {
+func TestListSessionsWithDefaultWorkspace(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{
-			"data": []
-		}`)
+	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
+	registerProjectsMock(&helper)
 
-	helper.ExecuteCommand("graph-analytics session list --tenant-id my-tenant-id --organization-id my-org-id --instance-id my-instance-id")
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand("graph-analytics session list")
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
-	mockHandler.AssertCalledWithQueryParam("tenantId", "my-tenant-id")
-	mockHandler.AssertCalledWithQueryParam("organizationId", "my-org-id")
-	mockHandler.AssertCalledWithQueryParam("instanceId", "my-instance-id")
+	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
 
-	helper.AssertOutJson(`{
-	  "data": []
-	}`)
+	helper.AssertOutJson(`{"data": []}`)
 }
 
-func TestListCustomerManagedKeysWithInvalidOutput(t *testing.T) {
+func TestListSessionsWithInstanceFilter(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s --project-id %s --instance-id my-instance-id", testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+	mockHandler.AssertCalledWithQueryParam("tenantId", testProjectID)
+	mockHandler.AssertCalledWithQueryParam("instanceId", "my-instance-id")
+
+	helper.AssertOutJson(`{"data": []}`)
+}
+
+func TestListSessionsMissingOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand("graph-analytics session list")
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+}
+
+func TestListSessionsMissingProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s", testOrgID))
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+}
+
+func TestListSessionsProjectNotInOrg(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.NewRequestHandlerMock(
+		"/v2beta1/organizations/"+testOrgID+"/projects",
+		http.StatusOK,
+		`{"data": []}`,
+	)
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session list --organization-id %s --project-id unknown-project", testOrgID))
+
+	mockHandler.AssertCalledTimes(0)
+	helper.AssertErr("Error: could not find project unknown-project in organization " + testOrgID)
+}
+
+func TestListSessionsWithInvalidOutput(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
@@ -124,8 +185,8 @@ func TestListSessionsWithCredentialFlag(t *testing.T) {
 		name    string
 		command string
 	}{
-		{name: "--credential flag", command: "graph-analytics session list --credential named-cred"},
-		{name: "-c shorthand", command: "graph-analytics session list -c named-cred"},
+		{name: "--credential flag", command: fmt.Sprintf("graph-analytics session list --organization-id %s --project-id %s --credential named-cred", testOrgID, testProjectID)},
+		{name: "-c shorthand", command: fmt.Sprintf("graph-analytics session list --organization-id %s --project-id %s -c named-cred", testOrgID, testProjectID)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
@@ -143,6 +204,12 @@ func TestListSessionsWithCredentialFlag(t *testing.T) {
 				},
 				"default-credential": "",
 			})
+
+			helper.NewRequestHandlerMock(
+				"/v2beta1/organizations/"+testOrgID+"/projects",
+				http.StatusOK,
+				`{"data": [{"id": "`+testProjectID+`", "name": "Test Project"}]}`,
+			)
 
 			mockHandler := helper.NewRequestHandlerMock("/v1/graph-analytics/sessions", http.StatusOK, `{"data": []}`)
 

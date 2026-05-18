@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -27,19 +28,29 @@ The pause time depends on the amount of data stored in the instance; larger quan
 
 If another operation is being performed on the instance you are trying to pause, an error will be returned that indicates that the pause operation cannot be performed.`,
 		Example: `# Pause an Aura instance
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Pause an instance and emit the response as JSON
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 
 # Pause and pipe the response status through jq
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'`,
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			instanceId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/instances/%s/pause", instanceId)
+			instanceID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			// Pre-flight ownership check.
+			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
+				return err
+			}
+
+			path := fmt.Sprintf("/instances/%s/pause", instanceID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodPost,
 			})
@@ -49,7 +60,9 @@ neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format
 
 			// NOTE: Instance pause should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "tenant_id", "connection_url", "cloud_provider", "region", "type", "memory"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "status", "project_id", "connection_url", "cloud_provider", "region", "type", "memory"})
 			}
 			return nil
 		},

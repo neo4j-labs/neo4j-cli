@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -38,19 +39,29 @@ The overwrite process mimics the 'Clone to existing' functionality of the Aura C
 If only --source-instance-id is provided, a new snapshot of that instance is created and used for overwriting. Alternatively, you can specify an additional --source-snapshot-id to use a specific snapshot for overwriting, from --source-instance-id provided, otherwise as a snapshot of the instance being overwritten. The snapshot specified must be exportable.
 		`,
 		Example: `# Overwrite an instance with a fresh snapshot of a source instance
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Overwrite using a specific exportable snapshot and wait until ready
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Overwrite and emit JSON for scripting
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			instanceId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/instances/%s/overwrite", instanceId)
 
 			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			// Pre-flight ownership check.
+			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+				return err
+			}
+
+			path := fmt.Sprintf("/instances/%s/overwrite", instanceId)
 
 			postBody := make(map[string]any)
 			if sourceInstanceId == "" {
@@ -71,7 +82,9 @@ neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-
 			}
 
 			if statusCode == http.StatusAccepted {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"})
 			}
 
 			if wait {

@@ -5,6 +5,7 @@ package session
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +29,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.PersistentFlags().String("auth-url", "", "")
 	cmd.PersistentFlags().String("base-url", "", "")
+
+	auraflags.RegisterOrgProjectFlags(cmd)
 
 	return cmd
 }

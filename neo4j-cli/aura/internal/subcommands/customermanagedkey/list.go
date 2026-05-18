@@ -9,34 +9,37 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
 func NewListCmd(cfg *clicfg.Config) *cobra.Command {
-	var tenantId string
-
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of customer managed keys",
-		Long: `This subcommand returns a list containing a summary of each of your customer managed keys. To find out more about a specific key, retrieve the details using the get subcommand.
+		Long: `This subcommand returns a list containing a summary of each of your customer managed keys in the specified project. To find out more about a specific key, retrieve the details using the get subcommand.
 
-You can filter keys in a particular tenant using --tenant-id. If the tenant flag is not specified, this endpoint lists all keys a user has access to across all tenants.`,
-		Example: `# List all customer managed keys the current user has access to
+Use --organization-id and --project-id to specify which project's keys to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.`,
+		Example: `# List all customer managed keys in a project
+neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List keys using a configured default workspace
 neo4j-cli aura customer-managed-key list
 
-# List keys in a specific tenant
-neo4j-cli aura customer-managed-key list --tenant-id 00000000-0000-0000-0000-000000000000
-
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura customer-managed-key list --format json`,
+neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := "/customer-managed-keys"
-			queryParams := make(map[string]string)
-			if tenantId != "" {
-				queryParams["tenantId"] = tenantId
-			}
 			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			path := "/customer-managed-keys"
+			queryParams := map[string]string{
+				"tenantId": projectID,
+			}
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
 				QueryParams: queryParams,
@@ -46,15 +49,14 @@ neo4j-cli aura customer-managed-key list --format json`,
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id"})
-
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id"})
 			}
 
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&tenantId, "tenant-id", "", "An optional Tenant ID to filter customer managed keys in a tenant")
 
 	return cmd
 }

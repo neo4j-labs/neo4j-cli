@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -31,19 +32,29 @@ Resuming an instance is an asynchronous operation. You can poll the current stat
 
 If another operation is being performed on the instance you are trying to resume, an error will be returned that indicates that resume cannot be performed.`,
 		Example: `# Resume a paused Aura instance
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Resume and wait until the instance is ready
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --wait --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Resume and emit the response as JSON for scripting
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json`,
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			instanceId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/instances/%s/resume", instanceId)
+			instanceID := strings.TrimSpace(args[0])
 
 			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			// Pre-flight ownership check.
+			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
+				return err
+			}
+
+			path := fmt.Sprintf("/instances/%s/resume", instanceID)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodPost,
 			})
@@ -53,7 +64,9 @@ neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --forma
 
 			// NOTE: Instance resume should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

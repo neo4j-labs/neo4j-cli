@@ -99,7 +99,7 @@ neo4j-cli aura project get <project-id>
 
 ### Setting a default workspace
 
-Use `workspace use` to set a default `{organizationId}/{projectId}` pair. Once set, commands that require an organization ID (such as `project list`) resolve it automatically without requiring `--organization-id` each time. It also supplies the default project ID for `instance` commands when `--tenant-id` is omitted.
+All Aura resource commands (`instance`, `instance snapshot`, `customer-managed-key`, `graph-analytics session`) require `--organization-id` and `--project-id` to scope the request to a project. `workspace use` sets a default `{organizationId}/{projectId}` pair so these flags can be omitted. Explicit `--organization-id`/`--project-id` flags always override the workspace default when present.
 
 ```bash
 # Discover available workspaces (all org/project pairs)
@@ -120,21 +120,25 @@ neo4j-cli config set aura.default-workspace <org-id>/<project-id> --rw
 ### List your instances
 
 ```bash
+# With a default workspace configured
 neo4j-cli aura instance list --format table
+
+# With explicit flags
+neo4j-cli aura instance list --organization-id <org-id> --project-id <project-id> --format table
 ```
 
 ### Create an instance
 
 ```bash
-# Free-db — no cloud provider, region, or memory required
-neo4j-cli aura instance create --name my-free-db --type free-db --tenant-id <project-id> --rw
+# Free-db — no cloud provider, region, or memory required (workspace already set)
+neo4j-cli aura instance create --name my-free-db --type free-db --rw
 
-# Professional-db on AWS, waiting for readiness
+# Professional-db on AWS, waiting for readiness (with explicit flags)
 neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-provider aws \
-  --region us-east-1 --memory 4GB --tenant-id <project-id> --wait --rw
+  --region us-east-1 --memory 4GB --organization-id <org-id> --project-id <project-id> --wait --rw
 ```
 
-`--tenant-id` accepts a project ID. When `aura workspace use` has been run, `--tenant-id` can be omitted and the project from the active workspace is used. Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
+Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
 ## Local Neo4j (Docker)
 

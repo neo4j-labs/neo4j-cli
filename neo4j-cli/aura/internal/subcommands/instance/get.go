@@ -4,8 +4,6 @@
 package instance
 
 import (
-	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,6 +11,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 )
 
 func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
@@ -21,32 +20,35 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Returns instance details",
 		Long:  "This endpoint returns details about a specific Aura Instance.",
 		Example: `# Get details of an instance by ID
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Pipe details through jq to extract the connection URL
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json | jq -r '.data.connection_url'`,
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.connection_url'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			instanceId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/instances/%s", instanceId)
 
 			cmd.SilenceUsage = true
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodGet,
-			})
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			resBody, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID)
 			if err != nil {
 				return err
 			}
 
-			if statusCode == http.StatusOK {
+			if resBody != nil {
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
 				fields, err := getFields(resBody)
 				if err != nil {
 					return err
 				}
-				output.PrintBody(cmd, cfg, resBody, fields)
+				output.PrintBodyMap(cmd, cfg, renamed, fields)
 			}
 
 			return nil
@@ -57,7 +59,7 @@ neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json |
 func getFields(resBody []byte) ([]string, error) {
 	responseBody := api.ParseBody(resBody)
 
-	fields := []string{"id", "name", "tenant_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
+	fields := []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory", "storage", "customer_managed_key_id"}
 	instance, err := responseBody.GetSingleOrError()
 	if err != nil {
 		return nil, err

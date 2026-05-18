@@ -9,35 +9,37 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
 func NewListCmd(cfg *clicfg.Config) *cobra.Command {
-	var tenantId string
-
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of instances",
-		Long: `This subcommand returns a list containing a summary of each of your Aura instances. To find out more about a specific instance, retrieve the details using the get subcommand.
+		Long: `This subcommand returns a list containing a summary of each of your Aura instances in the specified project. To find out more about a specific instance, retrieve the details using the get subcommand.
 
-You can filter instances in a particular tenant using --tenant-id. If the tenant flag is not specified, this subcommand lists all instances a user has access to across all tenants.`,
-		Example: `# List all instances the current user has access to
+Use --organization-id and --project-id to specify which project's instances to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.`,
+		Example: `# List instances in a project (using flags)
+neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List instances using a configured default workspace
 neo4j-cli aura instance list
 
-# List instances in a specific tenant
-neo4j-cli aura instance list --tenant-id 00000000-0000-0000-0000-000000000000
-
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura instance list --format json`,
+neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := "/instances"
-
-			queryParams := make(map[string]string)
-			if tenantId != "" {
-				queryParams["tenantId"] = tenantId
+			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
 
-			cmd.SilenceUsage = true
+			path := "/instances"
+
+			queryParams := map[string]string{
+				"tenantId": projectID,
+			}
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:      http.MethodGet,
 				QueryParams: queryParams,
@@ -47,13 +49,13 @@ neo4j-cli aura instance list --format json`,
 			}
 
 			if statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "cloud_provider"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "cloud_provider"})
 			}
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&tenantId, "tenant-id", "", "An optional Tenant ID to filter instances in a tenant")
 
 	return cmd
 }

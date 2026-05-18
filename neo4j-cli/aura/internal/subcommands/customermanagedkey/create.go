@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		region        string
 		name          string
 		instanceType  flags.InstanceType
-		tenantId      string
 		cloudProvider flags.CloudProvider
 		keyId         string
 		wait          bool
@@ -30,7 +30,6 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		regionFlag        = "region"
 		nameFlag          = "name"
 		instanceTypeFlag  = "type"
-		tenantIdFlag      = "tenant-id"
 		cloudProviderFlag = "cloud-provider"
 		keyIdFlag         = "key-id"
 	)
@@ -47,36 +46,28 @@ You can poll the current status of this operation by periodically getting the ke
 
 Once the key has a status of ready you can use it for creating new instances by setting the --customer-managed-key-id flag.`,
 		Example: `# Create a customer managed key (AWS-hosted instance)
-neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Create a key and wait until it is ready before returning
-neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --wait --rw
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Create a key and emit JSON for scripting
-neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --tenant-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cfg.Aura.DefaultTenant() == "" {
-				cmd.MarkFlagRequired(tenantIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --type enterprise-db --cloud-provider aws --key-id arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
 
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
 			body := map[string]any{
 				"region":         region,
 				"name":           name,
 				"instance_type":  instanceType,
 				"cloud_provider": cloudProvider,
 				"key_id":         keyId,
+				"tenant_id":      projectID,
 			}
-
-			if tenantId == "" {
-				body["tenant_id"] = cfg.Aura.DefaultTenant()
-			} else {
-				body["tenant_id"] = tenantId
-			}
-
-			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, "/customer-managed-keys", &api.RequestConfig{
 				Method:   http.MethodPost,
 				PostBody: body,
@@ -86,7 +77,9 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 			}
 			// NOTE: Instance delete should not return OK (200), it always returns 202
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "tenant_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "created", "cloud_provider", "key_id", "region", "type"})
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for customer managed key to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -118,8 +111,6 @@ neo4j-cli aura customer-managed-key create --name my-key --region us-east-1 --ty
 
 	cmd.Flags().Var(&instanceType, instanceTypeFlag, "(required) The type of the instance.")
 	cmd.MarkFlagRequired(instanceTypeFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
-	cmd.Flags().StringVar(&tenantId, tenantIdFlag, "", "The Aura tenant/project ID")
 
 	cmd.Flags().Var(&cloudProvider, cloudProviderFlag, "(required) The cloud provider hosting the instance.")
 	cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
