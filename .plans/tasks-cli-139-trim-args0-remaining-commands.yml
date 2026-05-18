@@ -91,7 +91,8 @@ tasks:
       ticket and PR #128, and notes that PR #127 has zero file overlap so
       no rebase dance is required. Do NOT request review until CI is
       green.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T13:00:00Z
     dependencies:
       - task-003
     acceptance_criteria:
