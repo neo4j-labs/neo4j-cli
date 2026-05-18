@@ -1,0 +1,154 @@
+feature: cli-138-auto-ai-pr-reviews
+prd: ./prd-cli-138-auto-ai-pr-reviews.md
+created_at: 2026-05-18T00:00:00Z
+updated_at: 2026-05-18T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Author security-review prompt at .github/prompts/claude-review-security.md"
+    description: |
+      Write the standalone prompt body used by the security review
+      workflow. Scope mirrors the in-repo `golang-security` skill:
+      injection (SQL, command, XSS), cryptography, filesystem safety,
+      network security, cookies, secrets management, memory safety,
+      logging. Must instruct Claude to (a) read `gh pr diff` and only
+      relevant files; (b) post inline comments for concrete issues via
+      `mcp__github_inline_comment__create_inline_comment`; (c) post one
+      top-level summary via `gh pr comment` ending with `**Security
+      review:** ✅ no issues found` or `⚠️ N issue(s) flagged inline`;
+      (d) write a single word (`pass` or `fail`) to
+      `/tmp/claude-verdict.txt` as the very last action. On PRs with no
+      Go changes, emit a one-line "no security-relevant changes"
+      comment and `pass`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "File `.github/prompts/claude-review-security.md` exists"
+      - "Prompt explicitly enumerates the golang-security focus areas (injection, crypto, filesystem, network, cookies, secrets, memory, logging)"
+      - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
+      - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
+      - "Prompt instructs Claude to no-op (summary + `pass`) when the diff contains no Go file changes"
+    completed_at: null
+
+  - id: task-002
+    title: "Author conventions-review prompt at .github/prompts/claude-review-conventions.md"
+    description: |
+      Write the standalone prompt body used by the conventions review
+      workflow. Scope: AGENTS.md gates — cobra one-file-per-leaf layout,
+      license header on new `.go` files, changelog entry under
+      `.changes/unreleased/` for user-facing changes (with internal/CI
+      exception), skill-bundle regen after touching commands reachable
+      from `app.NewCmd`, non-empty `Example:` field on new leaf
+      commands, `gofmt`/lint hygiene reminder, singular-noun +
+      `<resource> <action>` command form, `--format`/`--wait`
+      conventions. Same output contract as the security prompt:
+      inline comments for issues, one top-level summary with explicit
+      verdict line, write `pass`/`fail` to `/tmp/claude-verdict.txt` as
+      the final step. AGENTS.md loads automatically via CLAUDE.md's
+      `@AGENTS.md` include, so reference rules by name; don't inline
+      them verbatim.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "File `.github/prompts/claude-review-conventions.md` exists"
+      - "Prompt enumerates the AGENTS.md gates listed in PRD REQ-F-012"
+      - "Prompt instructs Claude to consult AGENTS.md (already loaded via CLAUDE.md include) rather than inlining the rules"
+      - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
+      - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
+    completed_at: null
+
+  - id: task-003
+    title: "Add .github/workflows/claude-review-security.yml with verdict-to-red-check mechanism"
+    description: |
+      Create the security review workflow. Triggers on `pull_request`
+      types `[opened, synchronize, reopened, ready_for_review]`. Skips
+      drafts and PRs whose author is not a MEMBER/OWNER/COLLABORATOR
+      and not in the inline allowlist (`oskarhane`, `Liam-Doodson`,
+      `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j`). Permissions:
+      `contents: read`, `pull-requests: write`, `issues: read`,
+      `id-token: write`, `actions: read`. Steps: (1) checkout with
+      `fetch-depth: 1` using the pinned SHA already in claude.yml;
+      (2) load prompt body from `.github/prompts/claude-review-security.md`
+      into `$GITHUB_ENV` via `cat`; (3) run `anthropics/claude-code-action`
+      at the same pinned SHA as `claude.yml` with
+      `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+      `prompt:` = `REPO:` + `PR NUMBER:` header + `${{ env.PROMPT }}`,
+      and `claude_args` with the narrow tool allowlist from PRD REQ-F-007
+      plus whatever minimal addition lets Claude write the verdict file
+      (settle on the narrowest viable form — e.g. `Bash(bash:*)` or
+      `Bash(tee:*)`); (4) enforce verdict step that does
+      `[ "$(cat /tmp/claude-verdict.txt 2>/dev/null)" = "pass" ] || { echo "::error::Claude security review flagged issues"; exit 1; }`
+      so a `fail` verdict (or missing file) turns the check red.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "File `.github/workflows/claude-review-security.yml` exists and parses as valid GitHub Actions YAML"
+      - "Triggers on `pull_request` with types `[opened, synchronize, reopened, ready_for_review]`"
+      - "`if:` expression skips drafts AND restricts to MEMBER/OWNER/COLLABORATOR or the seeded allowlist of GitHub logins"
+      - "Action SHA matches the one pinned in `.github/workflows/claude.yml`"
+      - "`permissions:` block matches PRD REQ-F-006 (only `pull-requests: write` is escalated vs `claude.yml`)"
+      - "`claude_args` uses a narrow `--allowedTools` list (no general `Bash`, no `Write`/`Edit`, no `curl`/`wget`)"
+      - "Prompt body is loaded from `.github/prompts/claude-review-security.md` (not inlined in YAML)"
+      - "A subsequent step reads `/tmp/claude-verdict.txt` and exits non-zero when the contents are not `pass` (fail-closed if missing)"
+    completed_at: null
+
+  - id: task-004
+    title: "Add .github/workflows/claude-review-conventions.yml mirroring the security workflow"
+    description: |
+      Create the conventions review workflow as a near-mirror of
+      `claude-review-security.yml` from task-003. Only differences:
+      (a) `name:` is `Claude Review — Conventions`; (b) the loaded
+      prompt is `.github/prompts/claude-review-conventions.md`; (c) the
+      enforce-verdict error message reads "Claude conventions review
+      flagged issues". Author filter, triggers, permissions, action
+      SHA, tool allowlist, and verdict mechanism are identical to
+      task-003. Two files are intentional — each is its own check on
+      the PR, independently re-runnable.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "File `.github/workflows/claude-review-conventions.yml` exists and parses as valid GitHub Actions YAML"
+      - "Triggers, `if:` author filter, permissions, action SHA, and `claude_args` exactly match `claude-review-security.yml` modulo prompt path and error message"
+      - "Prompt body is loaded from `.github/prompts/claude-review-conventions.md`"
+      - "Workflow `name:` is `Claude Review — Conventions`"
+      - "Enforce-verdict step exits non-zero on `fail` or missing verdict file with a conventions-specific error message"
+    completed_at: null
+
+  - id: task-005
+    title: "Smoke-test on a PR: green path, both red paths, draft skip, bot skip, mention coexistence"
+    description: |
+      End-to-end smoke test on a real PR after the workflows merge to
+      main. Verify: (1) opening a clean non-draft PR from
+      `@oskarhane` triggers both checks, posts a summary, finishes
+      green ✅ within 5 minutes; (2) opening a draft PR triggers
+      neither workflow until `ready_for_review`; (3) opening a PR from
+      `dependabot[bot]` / `renovate[bot]` (or any non-allowlisted
+      account) shows both workflows skipped (no billable run);
+      (4) introducing a deliberate convention violation (e.g. new leaf
+      cobra command with no `Example:` field) flips the conventions
+      check to red ❌ with an explanatory inline comment;
+      (5) introducing a deliberate security smell (e.g.
+      `exec.Command("sh", "-c", userInput)`) flips the security check
+      to red ❌; (6) pushing a second commit to the same PR produces a
+      **new** review comment (not an edit); (7) commenting `@claude
+      help` on the test PR still triggers the existing `claude.yml`
+      mention workflow. Also run `make test && make fmt-check && make
+      lint` locally before merge — should be no-op since no Go code is
+      touched.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "Clean test PR shows both checks green ✅ with a `✅ no issues found` summary line"
+      - "Draft PR shows neither workflow running; promoting to ready-for-review triggers both"
+      - "Bot or non-allowlisted-author PR shows both workflows skipped (Actions tab confirms no run)"
+      - "Convention-violation PR shows conventions check red ❌ with an inline comment naming the violation"
+      - "Security-smell PR shows security check red ❌ with an inline comment naming the smell"
+      - "Second push to the test PR produces a second review comment (timeline shows two distinct top-level summaries)"
+      - "`@claude help` comment on the test PR still triggers `claude.yml` (existing mention behaviour preserved)"
+      - "`make test`, `make fmt-check`, `make lint` pass locally on the branch"
+    completed_at: null
