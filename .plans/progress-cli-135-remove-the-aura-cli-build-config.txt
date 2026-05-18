@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-18T00:00:00Z
 Verified branch `oskar/cli-135-remove-the-aura-cli-build-config` already created off main and checked out with clean tree.
 Files: ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-002 — 2026-05-18T00:00:00Z
+Deleted `neo4j-cli/aura/cmd/` (main.go + main_test.go) standalone-aura entrypoint; updated AGENTS.md architecture diagram to drop the now-stale `cmd/main.go` line.
+Files: -neo4j-cli/aura/cmd/main.go, -neo4j-cli/aura/cmd/main_test.go, ~AGENTS.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml

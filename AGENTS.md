@@ -78,7 +78,6 @@ neo4j-cli/
   main.go                  # thin entrypoint; mounts aura subcommand as "aura"
   internal/skill/          # per-binary skill template (bundle, description.txt, additions.md, gen/)
   aura/
-    cmd/main.go            # historical standalone entrypoint (compiled but not built/shipped)
     aura.go                # Root command, registers subcommands
     internal/
       api/                 # HTTP client for Neo4j Aura REST API

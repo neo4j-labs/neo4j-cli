@@ -27,7 +27,7 @@ tasks:
       historical standalone-aura `package main` no longer compiles on
       `go build ./...`. Nothing else in the repo references this path
       after the prior release-config cleanup. Satisfies REQ-F-001.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -35,7 +35,7 @@ tasks:
       - "`git ls-files neo4j-cli/aura/cmd/` returns nothing"
       - "`go build ./...` exits 0 with no compile error referencing the deleted package"
       - "No remaining file under `neo4j-cli/aura/` imports `package main` for an aura standalone binary"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-003
     title: "Delete the aura skill bundle subsystem recursively"
