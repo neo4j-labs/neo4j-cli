@@ -455,13 +455,13 @@ Examples:
 
 ```
 # Overwrite an instance with a fresh snapshot of a source instance
-neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Overwrite using a specific exportable snapshot and wait until ready
-neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Overwrite and emit JSON for scripting
-neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --rw --format json
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 ```
 
 ### neo4j-cli aura instance pause
