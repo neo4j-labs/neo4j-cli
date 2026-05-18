@@ -25,7 +25,7 @@ func TestCreateDeployment(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --organization-id %s --project-id %s --rw", name, organizationId, projectId))
 
@@ -54,7 +54,7 @@ func TestCreateDeploymentWithOrganizationAndProjectIdFromDefaultProject(t *testi
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --rw", name))
@@ -84,7 +84,7 @@ func TestCreateDeploymentWithConnectionUrl(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment create --name \"%s\" --connection-url \"http://localhost:7876\" --organization-id %s --project-id %s --rw", name, organizationId, projectId))
 
@@ -110,7 +110,7 @@ func TestCreateDeploymentWithMissingName(t *testing.T) {
 		"data": []
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment create --organization-id=%s --project-id=%s --rw", organizationId, projectId))
 
@@ -131,7 +131,7 @@ func TestCreateDeploymentWithTooLongName(t *testing.T) {
 		"errors": [{"message": "Name must be between 1 and 30 characters"}]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment create --name=\"%s\" --organization-id=%s --project-id=%s --rw", name, organizationId, projectId))
 

@@ -28,7 +28,6 @@ var ConfigPrefix string
 const (
 	DefaultAuraBaseUrl      = "https://api.neo4j.io"
 	DefaultAuraAuthUrl      = "https://api.neo4j.io/oauth/token"
-	DefaultAuraBetaEnabled  = false
 	DefaultmixpanelEndpoint = "https://api.mixpanel.com"
 	DefaultmixpanelToken    = "4bfb2414ab973c741b6f067bf06d5575"
 )
@@ -42,12 +41,14 @@ const (
 	AuraScope   ConfigScope = "aura"
 	SkillsScope ConfigScope = "skills"
 	QueryScope  ConfigScope = "query"
+	FlagScope   ConfigScope = "flag"
 )
 
 type Config struct {
 	Version     string
 	Aura        *AuraConfig
 	Global      *GlobalConfig
+	Flags       *FlagSet
 	Credentials *credentials.Credentials
 	Events      analytics.Service // Look to refactor this in the future , pull this into an application struct
 	scope       ConfigScope
@@ -154,7 +155,12 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 			},
 			ValidConfigKeys: validAuraConfigKeys,
 		},
-		Global:      globalConfig,
+		Global: globalConfig,
+		Flags: &FlagSet{
+			viper:      Viper,
+			fs:         fs,
+			configPath: fullConfigPath,
+		},
 		Credentials: credentials,
 		Events:      events,
 		scope:       scope,
@@ -237,6 +243,13 @@ func (d PrintableConfigData) MarshalJSON() ([]byte, error) {
 func bindEnvironmentVariables(Viper *viper.Viper) {
 	Viper.BindEnv("aura.base-url", "AURA_BASE_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
 	Viper.BindEnv("aura.auth-url", "AURA_AUTH_URL") //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+
+	// Bind one env var per registered feature flag. Names are derived
+	// purely from the flag name via FlagNameToEnv (e.g. "flag.aura-beta"
+	// -> "NEO4J_CLI_FLAG_AURA_BETA").
+	for name := range Registry {
+		Viper.BindEnv(name, FlagNameToEnv(name)) //nolint:errcheck // BindEnv only errors on zero key args, which cannot happen here
+	}
 }
 
 func setDefaultValues(Viper *viper.Viper) {
@@ -245,6 +258,12 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("format", "default")
 	Viper.SetDefault("telemetry", true)
 	Viper.SetDefault("skill-auto-refresh", true)
+
+	// Feature-flag defaults are intentionally NOT seeded into viper:
+	// viper.IsSet returns true whenever a default is registered, which
+	// would defeat both the primary "explicitly set" detection and the
+	// legacy-fallback gate in FlagSet.Enabled. The default lives in the
+	// Registry and is the final precedence layer in FlagSet.Enabled.
 }
 
 type AuraConfig struct {
@@ -252,7 +271,6 @@ type AuraConfig struct {
 	fs               afero.Fs
 	pollingOverride  PollingConfig
 	ValidConfigKeys  []string
-	betaEnabled      bool
 	activeCredential *credentials.AuraCredential
 }
 
@@ -336,14 +354,6 @@ func (config *AuraConfig) BindAuthUrl(flag *pflag.Flag) {
 	if err := config.viper.BindPFlag("aura.auth-url", flag); err != nil {
 		panic(err)
 	}
-}
-
-func (config *AuraConfig) SetBetaEnabled(enabled bool) {
-	config.betaEnabled = enabled
-}
-
-func (config *AuraConfig) AuraBetaEnabled() bool {
-	return config.betaEnabled
 }
 
 // SetActiveCredential stores a per-invocation credential override. The value is
@@ -470,17 +480,29 @@ func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {
 }
 
 // ResolveConfigKey resolves a dot-notation key string against the provided Config
-// and returns which namespace it belongs to (GlobalScope or AuraScope) and the bare
-// key name (without the "aura." prefix).
+// and returns which namespace it belongs to (GlobalScope, AuraScope, or FlagScope)
+// and the resolved key name.
 //
 // Rules:
+//   - Keys prefixed with "flag." resolve to FlagScope if registered, with the
+//     full dotted name preserved; unknown flag.* keys are rejected.
 //   - Keys prefixed with "aura." resolve to AuraScope; the prefix is stripped.
 //   - All other keys resolve to GlobalScope.
 //   - Keys that exist in GlobalScope (e.g. "format") can never be addressed via
 //     the "aura." prefix — "aura.format" is always rejected as invalid.
-//   - Unrecognised keys in either namespace return an error.
+//   - Unrecognised keys in any namespace return an error.
 func ResolveConfigKey(key string, cfg *Config) (ConfigScope, string, error) {
-	const auraPrefix = "aura."
+	const (
+		auraPrefix = "aura."
+		flagPrefix = "flag."
+	)
+
+	if strings.HasPrefix(key, flagPrefix) {
+		if _, ok := Registry[key]; !ok {
+			return "", "", clierr.NewUsageError("invalid config key: %q", key)
+		}
+		return FlagScope, key, nil
+	}
 
 	if strings.HasPrefix(key, auraPrefix) {
 		bareKey := strings.TrimPrefix(key, auraPrefix)
@@ -497,7 +519,7 @@ func ResolveConfigKey(key string, cfg *Config) (ConfigScope, string, error) {
 		return AuraScope, bareKey, nil
 	}
 
-	// No "aura." prefix — must be a global key
+	// No prefix — must be a global key
 	if !cfg.Global.IsValidConfigKey(key) {
 		return "", "", clierr.NewUsageError("invalid config key: %q", key)
 	}

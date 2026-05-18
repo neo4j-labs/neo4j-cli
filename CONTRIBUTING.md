@@ -69,6 +69,10 @@ To add agent-skill support to a new standalone binary:
 3. Mount the subcommand in the binary's entrypoint: `cmd.AddCommand(skill.NewCmd(cfg, binskill.Bundle, "<newcli>"))`.
 4. Run `go run ./<newcli>/internal/skill/gen` to bootstrap `bundle/`, then commit the result. No edits to `common/skill/` are needed.
 
+### Feature flags
+
+Opt-in experimental behaviour is gated via the registry at `common/clicfg/flags.go`. Add an entry there, then gate code with `cfg.Flags.Enabled("flag.<area>-<feature>")`. Users can enable a flag via `neo4j-cli config set flag.<area>-<feature> true` or `NEO4J_CLI_FLAG_<AREA>_<FEATURE>=1`. Default to `false`; delete the flag and its gated branch in the same PR on GA. Full convention: [`.agents/feature-flags.md`](.agents/feature-flags.md).
+
 ### Releasing
 
 The full release lifecycle (changelog → Release PR → GitHub Release → npm publish) is documented in [`RELEASING.md`](RELEASING.md). The short version: add a changelog entry on your PR, merge normally, and `changie` opens a separate Release PR — merging *that* is what ships binaries and npm packages.

@@ -15,7 +15,7 @@ func TestDeleteGraphQLDataApi(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
@@ -47,7 +47,7 @@ func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"

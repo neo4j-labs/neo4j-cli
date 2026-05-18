@@ -25,7 +25,7 @@ func TestCreateDeploymentToken(t *testing.T) {
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
@@ -54,7 +54,7 @@ func TestCreateDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 		}
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --rw", deploymentId))
@@ -82,7 +82,7 @@ func TestCreateDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {
 		"error": "Access denied"
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
@@ -105,7 +105,7 @@ func TestCreateDeploymentTokenWhenDeploymentAlreadyHasAToken(t *testing.T) {
 		"errors": [{"message": "failed to create api key: failed to save new api key: no rows in result set]"}]
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token create --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 

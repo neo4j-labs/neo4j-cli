@@ -21,7 +21,7 @@ func TestDeleteDeploymentToken(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token delete --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
@@ -47,7 +47,7 @@ func TestDeleteDeploymentTokenWithOrganizationAndProjectIdFromConfig(t *testing.
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId), http.StatusNoContent, "")
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("deployment token delete --deployment-id %s --rw", deploymentId))
@@ -76,7 +76,7 @@ func TestDeleteDeploymentTokenWhenDeploymentDoesNotExist(t *testing.T) {
 		"error": "Access denied"
 	}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("deployment token delete --deployment-id %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 

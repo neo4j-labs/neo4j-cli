@@ -15,7 +15,7 @@ func TestListGraphQLDataApis(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{
@@ -80,7 +80,7 @@ func TestListGraphQLDataApisWithCredentialFlag(t *testing.T) {
 				"default-credential": "",
 			})
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{"data": []}`)
 

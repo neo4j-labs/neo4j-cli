@@ -38,7 +38,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(project.NewCmd(cfg))
 	cmd.AddCommand(tenant.NewCmd(cfg))
 	cmd.AddCommand(graphanalytics.NewCmd(cfg))
-	if cfg.Aura.AuraBetaEnabled() {
+	if cfg.Flags.Enabled("flag.aura-beta") {
 		cmd.AddCommand(dataapi.NewCmd(cfg))
 		cmd.AddCommand(_import.NewCmd(cfg))
 		cmd.AddCommand(deployment.NewCmd(cfg))
