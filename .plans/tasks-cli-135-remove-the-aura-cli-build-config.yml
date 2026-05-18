@@ -233,7 +233,7 @@ tasks:
       phrasing to reflect that the workflow now always uploads; remove
       the "Aura-cli-only release cycles skip via the `include_neo4j`
       gate" sentence (around line 188). Satisfies REQ-F-012.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -241,9 +241,7 @@ tasks:
       - "The release.yml description sentence references only `CHANGELOG-neo4j.md`"
       - "The publish-npm.yml description no longer mentions the aura-cli skip path"
       - "Markdown renders cleanly"
-    completed_at: null
-
-  - id: task-013
+    completed_at: 2026-05-18T00:00:00Z
     title: "Update AGENTS.md dual-credential and dual-bundle paragraphs"
     description: |
       Edit `AGENTS.md`: rewrite the bullet under "Makefile Notes" that
