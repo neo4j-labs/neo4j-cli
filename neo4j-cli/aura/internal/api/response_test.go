@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -247,6 +248,99 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			if tc.statusCode == http.StatusTooManyRequests {
 				assert.Equal(t, tc.header.Get("Retry-After"), ce.RetryAfter, "RetryAfter struct field should mirror header")
 			}
+		})
+	}
+}
+
+// TestParseResourceFromRequest exercises the URL-path -> (resourceType,
+// resourceID) helper used by the 404 branch. Aura paths follow
+// `/<version>/<plural>/<id>[/...]`; unrecognised or short paths must yield
+// empty strings so the envelope omitempty drops both fields.
+func TestParseResourceFromRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		path     string
+		wantType string
+		wantID   string
+	}{
+		{name: "v1 instances with id", path: "/v1/instances/abc123", wantType: "instance", wantID: "abc123"},
+		{name: "v1 tenants with id", path: "/v1/tenants/tnt-1", wantType: "tenant", wantID: "tnt-1"},
+		{name: "v1beta5 instances with nested subpath", path: "/v1beta5/instances/abc/data-apis/graphql", wantType: "instance", wantID: "abc"},
+		{name: "v1 customer-managed-keys with id", path: "/v1/customer-managed-keys/cmk-1", wantType: "customer-managed-key", wantID: "cmk-1"},
+		{name: "v1 snapshots nested via instance", path: "/v1/instances/i-1/snapshots/snap-1", wantType: "instance", wantID: "i-1"},
+		{name: "no id segment", path: "/v1/instances", wantType: "", wantID: ""},
+		{name: "version only", path: "/v1", wantType: "", wantID: ""},
+		{name: "empty path", path: "", wantType: "", wantID: ""},
+		{name: "root", path: "/", wantType: "", wantID: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &http.Request{URL: &url.URL{Path: tc.path}}
+			gotType, gotID := parseResourceFromRequest(req)
+			assert.Equal(t, tc.wantType, gotType, "resource type mismatch")
+			assert.Equal(t, tc.wantID, gotID, "resource id mismatch")
+		})
+	}
+
+	t.Run("nil request returns empties", func(t *testing.T) {
+		gotType, gotID := parseResourceFromRequest(nil)
+		assert.Equal(t, "", gotType)
+		assert.Equal(t, "", gotID)
+	})
+
+	t.Run("nil URL returns empties", func(t *testing.T) {
+		gotType, gotID := parseResourceFromRequest(&http.Request{})
+		assert.Equal(t, "", gotType)
+		assert.Equal(t, "", gotID)
+	})
+}
+
+// TestHandleResponseError_NotFound_TagsResource locks the 404 branch: a
+// `/v1/instances/{id}` request that returns 404 must produce a *CLIError
+// whose ResourceType="instance" and ResourceID matches the path segment so
+// the JSON envelope surfaces them under resource_type / resource_id.
+func TestHandleResponseError_NotFound_TagsResource(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		path     string
+		wantType string
+		wantID   string
+	}{
+		{
+			name:     "instance 404 tagged with type+id",
+			path:     "/v1/instances/inst-404",
+			wantType: "instance",
+			wantID:   "inst-404",
+		},
+		{
+			name:     "tenant 404 tagged with type+id",
+			path:     "/v1/tenants/tnt-404",
+			wantType: "tenant",
+			wantID:   "tnt-404",
+		},
+		{
+			name:     "unrecognised short path leaves resource fields empty",
+			path:     "/v1/instances",
+			wantType: "",
+			wantID:   "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &http.Request{URL: &url.URL{Path: tc.path}}
+			res := &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"message":"not found"}]}`)),
+				Header:     http.Header{},
+				Request:    req,
+			}
+
+			err := handleResponseError(res, nil, nil)
+			require.Error(t, err)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce), "errors.As should extract *CLIError; got %T: %v", err, err)
+			assert.Equal(t, 3, ce.Code, "404 must map to exit 3 (not_found)")
+			assert.Equal(t, tc.wantType, ce.ResourceType, "ResourceType mismatch")
+			assert.Equal(t, tc.wantID, ce.ResourceID, "ResourceID mismatch")
 		})
 	}
 }

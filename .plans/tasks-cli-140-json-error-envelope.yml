@@ -99,7 +99,7 @@ tasks:
       that as the resource id. Unrecognised or shorter paths leave both fields empty so omitempty hides them. Add a
       unit test in the same package that exercises a /v1/instances/{id} 404 fixture and asserts the resulting
       *CLIError has ResourceType="instance" and ResourceID="{id}".
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -108,7 +108,7 @@ tasks:
       - "Unrecognised paths leave ResourceType and ResourceID empty so omitempty drops them from the envelope"
       - "New table-driven test exercises a /v1/instances/{id} 404 fixture and asserts the typed *CLIError fields"
       - "No other error sites in response.go are modified in this task"
-    completed_at: null
+    completed_at: 2026-05-18T16:45:00Z
 
   - id: task-006
     title: "Add e2e exitcodes test for --format=json envelope"

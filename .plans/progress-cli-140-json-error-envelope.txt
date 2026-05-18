@@ -15,3 +15,8 @@ Decisions: Flag-parse errors fire before --format is bound so they fall through 
 Replaced agentcontext build.go hardcoded errorCodes map with buildErrorCodes() projecting clierr.Codes (Name→Description); added TestErrorCodesInSyncWithClierr locking the projection byte-equality. No JSON-envelope shape change.
 Files: ~neo4j-cli/internal/subcommands/agentcontext/build.go, ~neo4j-cli/internal/subcommands/agentcontext/build_test.go
 Decisions: No circular import (clierr leaf); kept agentcontext-side gate test even though derivation is structural, to guard against a future hand-rolled re-introduction.
+
+## TASK-005 — 2026-05-18T16:45:00Z
+404 branch in handleResponseError now chains .WithResource onto NewNotFoundError; added parseResourceFromRequest helper (skips version segment, singularises plural) and trailing-s singularise. Table-driven tests cover instance/tenant/CMK paths, nested subpaths, short/empty/nil request paths, plus end-to-end 404 -> typed *CLIError ResourceType/ResourceID assertions.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+Decisions: Used trailing-s strip not a static plural→singular map; Aura plurals are uniform and the helper falls back to the raw segment for non-s endings.
