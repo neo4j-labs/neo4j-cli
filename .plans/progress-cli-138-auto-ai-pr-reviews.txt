@@ -24,3 +24,7 @@ Decisions: runbook lives under .plans/ (not docs/) since it's a one-shot manual 
 ## task-006 — 2026-05-18T00:00:00Z
 Dropped the inline username allowlist from both workflows; `if:` now gates on `author_association` only (MEMBER/OWNER/COLLABORATOR). Removes the maintenance chore of editing two YAML files when people join/leave the org; outside contributors still skip and can use @claude manually. Updated PRD REQ-F-004 + Tech Considerations + Open Questions, and rewrote smoke-test scenario 3 to drop allowlist references.
 Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-review-conventions.yml, ~.plans/prd-cli-138-auto-ai-pr-reviews.md, ~.plans/smoke-test-cli-138.md, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+
+## task-007 — 2026-05-18T10:00:00Z
+Vendored pinned cc-skills-golang plugin via .claude-plugin/marketplace.json at repo root; marketplace `neo4j-cli-review` owned by `neo4j-labs` with single plugin entry pinned to ref v1.4.0 AND sha e9761db859c6969b77a8fd0e8a243f4f28240211 for reproducible installs.
+Files: +.claude-plugin/marketplace.json, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml

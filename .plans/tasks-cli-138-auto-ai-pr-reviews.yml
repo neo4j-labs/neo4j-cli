@@ -196,7 +196,7 @@ tasks:
       human-readable, `sha` enforces exact-commit pinning. No other
       plugins in this marketplace; this file exists solely to give us a
       pin point for the security skill.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "File `.claude-plugin/marketplace.json` exists at repo root and parses as valid JSON"
@@ -205,7 +205,7 @@ tasks:
       - "`plugins` array contains exactly one entry"
       - "Plugin entry has `name: cc-skills-golang`, `source.source: github`, `source.repo: samber/cc-skills-golang`, `source.ref: v1.4.0`, AND `source.sha: e9761db859c6969b77a8fd0e8a243f4f28240211`"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass (new file is not Go)"
-    completed_at: null
+    completed_at: 2026-05-18T10:00:00Z
 
   - id: task-008
     title: "Wire security workflow to install vendored plugin + setup-go + govulncheck"

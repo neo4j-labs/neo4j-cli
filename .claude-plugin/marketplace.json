@@ -1,0 +1,17 @@
+{
+  "name": "neo4j-cli-review",
+  "owner": {
+    "name": "neo4j-labs"
+  },
+  "plugins": [
+    {
+      "name": "cc-skills-golang",
+      "source": {
+        "source": "github",
+        "repo": "samber/cc-skills-golang",
+        "ref": "v1.4.0",
+        "sha": "e9761db859c6969b77a8fd0e8a243f4f28240211"
+      }
+    }
+  ]
+}
