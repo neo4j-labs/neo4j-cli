@@ -4,9 +4,11 @@
 package clicmd
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +46,14 @@ func TestSuggestSubcommand_UnknownReturnsWrappedError(t *testing.T) {
 	}
 	if !strings.Contains(msg, "list") {
 		t.Errorf("expected suggestion to include 'list', got: %q", msg)
+	}
+
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		t.Fatalf("expected error to unwrap to *clierr.CLIError, got %T: %v", err, err)
+	}
+	if ce.Code != 2 {
+		t.Errorf("expected CLIError.Code == 2 (usage_error), got %d", ce.Code)
 	}
 }
 
@@ -166,6 +176,13 @@ func TestApplySuggestionsToParents_RecursesDepth2AndBeyond(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `unknown command "typo"`) {
 		t.Errorf("expected unknown-command error at depth 2, got: %q", err.Error())
+	}
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		t.Fatalf("expected depth-2 error to unwrap to *clierr.CLIError, got %T: %v", err, err)
+	}
+	if ce.Code != 2 {
+		t.Errorf("expected depth-2 CLIError.Code == 2 (usage_error), got %d", ce.Code)
 	}
 }
 

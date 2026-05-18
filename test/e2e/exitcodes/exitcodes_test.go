@@ -295,6 +295,12 @@ func TestExitCodes(t *testing.T) {
 			skipServer: true,
 		},
 		{
+			name:       "unknown_subcommand_usage_2",
+			args:       []string{"aura", "instance", "lis"},
+			wantExit:   2,
+			skipServer: true,
+		},
+		{
 			name:     "not_found_404_exit_3",
 			args:     []string{"aura", "instance", "list"},
 			status:   http.StatusNotFound,

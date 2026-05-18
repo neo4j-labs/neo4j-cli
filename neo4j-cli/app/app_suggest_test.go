@@ -5,10 +5,12 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,6 +62,20 @@ func TestSuggestionsForTypos(t *testing.T) {
 			typo:        "aura-clent",
 			suggestions: []string{"aura-client"},
 		},
+		{
+			// Depth 2 — typo directly under `aura` parent (no suggestions
+			// asserted because `foo` may or may not match any cobra
+			// SuggestionsFor entry).
+			name: "aura foo",
+			args: []string{"aura", "foo"},
+			typo: "foo",
+		},
+		{
+			// Depth 4 — typo under `aura instance snapshot`.
+			name: "aura instance snapshot foo",
+			args: []string{"aura", "instance", "snapshot", "foo"},
+			typo: "foo",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -79,16 +95,24 @@ func TestSuggestionsForTypos(t *testing.T) {
 			require.Error(t, execErr, "expected typo %q to produce an error", tc.typo)
 
 			combined := execErr.Error() + "\n" + errBuf.String()
-			assert.Contains(t, combined, "Did you mean",
-				"expected 'Did you mean' hint for typo %q; got: %q", tc.typo, combined)
-			for _, want := range tc.suggestions {
-				assert.Contains(t, combined, want,
-					"expected suggestion %q for typo %q; got: %q", want, tc.typo, combined)
+			if len(tc.suggestions) > 0 {
+				assert.Contains(t, combined, "Did you mean",
+					"expected 'Did you mean' hint for typo %q; got: %q", tc.typo, combined)
+				for _, want := range tc.suggestions {
+					assert.Contains(t, combined, want,
+						"expected suggestion %q for typo %q; got: %q", want, tc.typo, combined)
+				}
 			}
 			assert.True(t,
 				strings.Contains(combined, `unknown command "`+tc.typo+`"`) ||
 					strings.Contains(combined, `unknown command `+tc.typo),
 				"expected the typo %q to appear as the unknown-command target; got: %q", tc.typo, combined)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(execErr, &ce),
+				"expected execErr to unwrap to *clierr.CLIError for typo %q, got %T: %v", tc.typo, execErr, execErr)
+			assert.Equal(t, 2, ce.Code,
+				"expected CLIError.Code == 2 (usage_error) for typo %q, got %d", tc.typo, ce.Code)
 		})
 	}
 }
