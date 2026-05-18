@@ -1,0 +1,3 @@
+## task-001 — 2026-05-18T16:30:00Z
+Wrapped SuggestSubcommand return in clierr.NewUsageError so unknown-subcommand typos at any nesting level map to exit 2; tests assert *clierr.CLIError with Code==2.
+Files: ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go

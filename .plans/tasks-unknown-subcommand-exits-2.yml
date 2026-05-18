@@ -20,7 +20,7 @@ tasks:
       `TestApplySuggestionsToParents_RecursesDepth2AndBeyond`) so every
       error-returning assertion also checks `errors.As(err, &ce)` with
       `ce.Code == 2`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`common/clicmd/suggest.go:42` calls `clierr.NewUsageError(...)` and no longer calls `fmt.Errorf` on that line"
@@ -28,7 +28,7 @@ tasks:
       - "`SuggestSubcommand` still returns `nil` when `len(args) == 0`"
       - "Unit tests in `common/clicmd/suggest_test.go` assert the returned error is a `*clierr.CLIError` with `Code == 2`"
       - "`make fmt-check && make lint && go test ./common/clicmd/...` clean"
-    completed_at: null
+    completed_at: 2026-05-18T16:30:00Z
 
   - id: task-002
     title: "Extend TestSuggestionsForTypos to cover depth-2 + depth-4 and assert exit 2"

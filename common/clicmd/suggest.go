@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,9 @@ const SuggestionsRunEAnnotation = "clicmd.suggestions.run-e"
 //
 // The error format mirrors cobra's own legacyArgs path
 // (see github.com/spf13/cobra args.go) so the output is indistinguishable
-// from the root-level typo behaviour cobra already produces.
+// from the root-level typo behaviour cobra already produces. The returned
+// error is a *clierr.CLIError with Code == 2 (usage_error), so the top-level
+// main maps unknown-subcommand typos at every nesting level to exit code 2.
 //
 // Cobra only invokes Args validators on Runnable commands (those with Run or
 // RunE set); ApplySuggestionsToParents therefore installs both Args and a
@@ -39,7 +42,7 @@ func SuggestSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	return fmt.Errorf("unknown command %q for %q%s", args[0], cmd.CommandPath(), suggestionsSuffix(cmd, args[0]))
+	return clierr.NewUsageError("unknown command %q for %q%s", args[0], cmd.CommandPath(), suggestionsSuffix(cmd, args[0]))
 }
 
 // suggestionsSuffix replicates the cobra (unexported) findSuggestions
