@@ -4,6 +4,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	auraw "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/workspace"
@@ -28,6 +30,11 @@ neo4j-cli aura config set format json --rw`,
 				return err
 			}
 
+			// Trim args[0] (the key) in place so the validation below
+			// and RunE see the cleaned key. args[1] (the value) is
+			// intentionally left untouched — values may legitimately
+			// contain leading/trailing whitespace.
+			args[0] = strings.TrimSpace(args[0])
 			key := args[0]
 			if !cfg.Aura.IsValidConfigKey(key) {
 				return clierr.NewUsageError("invalid config key specified: %s", key)

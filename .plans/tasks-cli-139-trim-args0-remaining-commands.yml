@@ -68,7 +68,8 @@ tasks:
       succeeds with the trimmed key, (2) regression guard — passing
       `default-tenant\n` does NOT surface an "invalid argument" error.
       Commit as a single commit on the same branch.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T13:30:00Z
     dependencies:
       - task-002
     acceptance_criteria:
