@@ -6,6 +6,7 @@ package deployment
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -48,7 +49,7 @@ neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --for
 				return err
 			}
 
-			deploymentId := args[0]
+			deploymentId := strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId)
 
 			cmd.SilenceUsage = true

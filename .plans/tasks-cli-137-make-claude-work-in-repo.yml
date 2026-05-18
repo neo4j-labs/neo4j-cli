@@ -1,0 +1,57 @@
+feature: cli-137-make-claude-work-in-repo
+prd: ./prd-cli-137-make-claude-work-in-repo.md
+created_at: 2026-05-18T00:00:00Z
+updated_at: 2026-05-18T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Replace CLAUDE.md symlink with real file containing @AGENTS.md"
+    description: |
+      `CLAUDE.md` at repo root is currently a symlink to `AGENTS.md`
+      (`lrwxr-xr-x ... CLAUDE.md -> AGENTS.md`). The `@claude` GitHub
+      Action does not resolve this. Remove the symlink and replace it
+      with a regular file whose only contents are `@AGENTS.md` plus a
+      trailing newline — Claude Code's file-include directive then loads
+      `AGENTS.md` while we keep a single source of truth.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ls -la CLAUDE.md` shows a regular file (e.g. `-rw-r--r--`), not a symlink"
+      - "`cat CLAUDE.md` outputs exactly `@AGENTS.md` followed by one trailing newline"
+      - "`git diff --cached -- CLAUDE.md` (or post-commit `git show`) shows mode change 120000 -> 100644 plus the new blob"
+      - "`AGENTS.md` content is unchanged by this task"
+    completed_at: 2026-05-18T10:00:00Z
+
+  - id: task-002
+    title: "Drop stale 'CLAUDE.md is a symlink' bullet from AGENTS.md"
+    description: |
+      `AGENTS.md` "Repo Doc Notes" contains a bullet stating that
+      `CLAUDE.md` is a symlink to `AGENTS.md`. After task-001 this is
+      wrong. Delete the bullet entirely (do not rewrite it). No other
+      AGENTS.md edits.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "The bullet `- \\`CLAUDE.md\\` is a symlink to \\`AGENTS.md\\` ...` is removed from AGENTS.md"
+      - "No other line in AGENTS.md is modified"
+      - "The remaining bullet about `CONTRIBUTING.md` under 'Repo Doc Notes' is preserved"
+    completed_at: 2026-05-18T10:30:00Z
+
+  - id: task-003
+    title: "Verify gates: make test, fmt-check, lint, license-check, generate-check"
+    description: |
+      Run the standard final gates to confirm no regressions. None of
+      these touch CLAUDE.md, but `make license-check` and
+      `make generate-check` are quick belt-and-braces given a root-file
+      mode change.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`make test` passes"
+      - "`make fmt-check` passes (no gofmt drift)"
+      - "`make lint` passes"
+      - "`make license-check` passes"
+      - "`make generate-check` passes against a clean working tree"
+    completed_at: 2026-05-18T11:00:00Z

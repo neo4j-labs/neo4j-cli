@@ -1,0 +1,11 @@
+## TASK-001 — 2026-05-18T10:00:00Z
+Replaced CLAUDE.md symlink with regular file containing `@AGENTS.md` so the @claude GitHub Action loads project instructions.
+Files: ~CLAUDE.md, ~.plans/tasks-cli-137-make-claude-work-in-repo.yml
+
+## TASK-002 — 2026-05-18T10:30:00Z
+Dropped stale "CLAUDE.md is a symlink" bullet from AGENTS.md Repo Doc Notes; CONTRIBUTING.md bullet preserved.
+Files: ~AGENTS.md, ~.plans/tasks-cli-137-make-claude-work-in-repo.yml
+
+## TASK-003 — 2026-05-18T11:00:00Z
+Verified final gates: test, fmt-check, lint, license-check all clean; generate-check diff limited to expected hone in_progress yaml flip (no bundle drift).
+Files: ~.plans/tasks-cli-137-make-claude-work-in-repo.yml, ~.plans/progress-cli-137-make-claude-work-in-repo.txt

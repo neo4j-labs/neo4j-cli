@@ -6,6 +6,7 @@ package tenant
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -32,7 +33,7 @@ neo4j-cli aura tenant get 00000000-0000-0000-0000-000000000000 --format json | j
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: 'aura tenant get' is deprecated and will be removed in a future release. Use 'aura organization get' instead.") //nolint:errcheck // deprecation warning to stderr; write errors are not actionable
-			tenantId := args[0]
+			tenantId := strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/tenants/%s", tenantId)
 
 			cmd.SilenceUsage = true
