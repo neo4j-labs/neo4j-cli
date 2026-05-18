@@ -105,9 +105,7 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 	}
 
 	if statusCode != http.StatusOK {
-		// Non-200 was already turned into an error by MakeRequest; reaching
-		// here with a non-200 should not happen, but guard defensively.
-		return resBody, nil
+		return nil, fmt.Errorf("unexpected status %d from preflight ownership check", statusCode)
 	}
 
 	responseData := api.ParseBody(resBody)
@@ -141,7 +139,7 @@ func FetchAndVerifySessionInProject(cfg *clicfg.Config, sessionID, projectID str
 	}
 
 	if statusCode != http.StatusOK {
-		return resBody, nil
+		return nil, fmt.Errorf("unexpected status %d from preflight ownership check", statusCode)
 	}
 
 	responseData := api.ParseBody(resBody)
