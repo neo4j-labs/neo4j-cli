@@ -1,0 +1,151 @@
+feature: cli-140-json-error-envelope
+prd: ./prd-cli-140-json-error-envelope.md
+created_at: 2026-05-18T14:00:00Z
+updated_at: 2026-05-18T14:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Extend clierr.CLIError type, constructors, and closed-enum table"
+    description: |
+      In common/clierr/error.go, add the five new fields to CLIError (CodeName, Retryable, ResourceType, ResourceID, Suggestion).
+      Change the eight NewXError constructor return types from error to *CLIError; each constructor populates CodeName and
+      Retryable from a single closed-enum lookup table keyed by exit code. Add a canonical exported table (clierr.CodeNames
+      map[int]string and a parallel CodeDescriptions map, or a single map[int]struct{Name, Description string}) covering
+      exit codes 1–8. Add the two fluent setters WithResource(t, id) and WithSuggestion(s) returning *CLIError. Extend
+      common/clierr/error_test.go (create if missing) with table-driven tests per constructor asserting Code + CodeName +
+      Retryable; cover the setters and the chain pattern.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "CLIError struct in common/clierr/error.go has the five new fields with documented types"
+      - "All eight constructors return *CLIError; existing callers that did `return clierr.NewXError(...)` from error-returning funcs still compile (verified by make test)"
+      - "clierr.CodeNames (and descriptions) is exported and contains all eight entries (fatal_error, usage_error, not_found, auth_error, conflict, validation_error, rate_limited, upstream_error)"
+      - "WithResource and WithSuggestion mutate the receiver in place and return *CLIError for chaining"
+      - "Table-driven tests assert (Code, CodeName, Retryable) for each constructor; setter tests cover chained mutation"
+      - "make test passes; no new lint findings"
+    completed_at: null
+
+  - id: task-002
+    title: "Add envelope types and Render function in common/clierr/render.go"
+    description: |
+      Create common/clierr/render.go exporting: Envelope struct (Error EnvelopeBody json:"error"), EnvelopeBody struct
+      (Code, ExitCode, Message, ResourceType omitempty, ResourceID omitempty, Suggestion omitempty, Retryable — all
+      snake_case JSON tags), BuildEnvelope method on *CLIError, and Render(err error, stdout, stderr io.Writer,
+      format string). Render branches: format=="json" emits JSON envelope to stdout + one-line summary
+      `Error: <message> (exit <N>)` to stderr; any other format writes the same one-line summary to stderr plus an
+      optional second `<suggestion>` line when set, stdout untouched; untyped err is wrapped as fatal_error / exit 1
+      via errors.As; nil err is a no-op. Add common/clierr/render_test.go with table-driven golden tests covering every
+      CodeName in both modes, the untyped-error fallback, the empty-format fallback, and the suggestion-line behaviour.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "common/clierr/render.go exposes Envelope, EnvelopeBody, (*CLIError).BuildEnvelope(), and Render(err, stdout, stderr, format)"
+      - "JSON-mode output is valid JSON with the documented shape; optional fields use omitempty; retryable is always present"
+      - "Plaintext mode appends ` (exit <N>)` to the error line and writes suggestion on a second line when set"
+      - "Untyped errors render as fatal_error / exit 1 in both modes"
+      - "Golden tests cover every CodeName across both modes plus the untyped + empty-format edge cases"
+      - "BuildEnvelope has no I/O — verified by being callable in tests without writers"
+    completed_at: null
+
+  - id: task-003
+    title: "Wire clierr.Render in neo4j-cli/main.go and set SilenceErrors on root"
+    description: |
+      In neo4j-cli/app/app.go (NewCmd), set cmd.SilenceErrors = true on the root command so cobra no longer prints its
+      default error line. Leave SilenceUsage alone — the existing silenceUsageOnError hook in common/flags/ handles
+      RunE-side usage suppression. In neo4j-cli/main.go, insert clierr.Render(err, os.Stdout, os.Stderr,
+      cfg.Global.Format()) between cfg.Events.Flush() (line 67) and os.Exit(exitCodeFor(err)) (line 70). Keep
+      exitCodeFor exactly as-is. Extend neo4j-cli/main_test.go with at least one happy-path JSON test and one plaintext
+      test driving clierr.Render via bytes.Buffer (mirrors the TestExitCodeFor extraction pattern).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Root cobra command in neo4j-cli/app/app.go has SilenceErrors=true; SilenceUsage unchanged"
+      - "main.go calls clierr.Render between Events.Flush() and os.Exit; exitCodeFor signature/logic unchanged"
+      - "main_test.go covers JSON-mode and plaintext-mode rendering with byte-exact assertions for at least one CodeName each"
+      - "Running ./bin/neo4j-cli (rebuilt) on a failing command no longer produces cobra's double `Error:` print"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-004
+    title: "Rebuild agentcontext errorCodes map from clierr exports"
+    description: |
+      Delete the duplicated errorCodes map (and any related hardcoded enum) at
+      neo4j-cli/internal/subcommands/agentcontext/build.go:62-71 and reconstruct it from the new clierr.CodeNames /
+      CodeDescriptions exports at package init. The shape and values of the agent-context JSON envelope must not change
+      — only the data source. If a circular import surfaces (unexpected; clierr is a leaf), fall back to keeping a
+      duplicate plus a TestErrorCodesInSync gate that imports clierr from the agentcontext_test package and asserts
+      equality. Update agentcontext_test.go assertions if they reference the literal map; the public JSON output must
+      remain byte-identical to today's.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "agentcontext/build.go no longer hardcodes the eight error-code strings or descriptions; the map is rebuilt from clierr exports"
+      - "neo4j-cli agent-context JSON output contains the same eight error_codes entries with identical descriptions as before this PR"
+      - "Existing agentcontext_test.go tests pass; any cosmetic updates are minimal"
+      - "If circular import blocks the import path, the fallback TestErrorCodesInSync test is in place and passes"
+      - "make test passes; make generate-check passes (no skill-bundle drift)"
+    completed_at: null
+
+  - id: task-005
+    title: "Seed .WithResource on the 404 path in aura/internal/api/response.go"
+    description: |
+      In neo4j-cli/aura/internal/api/response.go around lines 79–91 (the http.StatusNotFound branch), chain
+      .WithResource(resourceType, resourceID) onto the NewNotFoundError(...) return. Implement a small helper that
+      parses res.Request.URL.Path into segments, skips the version segment (`v1`), and treats the next segment as the
+      plural resource name (singularised — e.g. "instances" → "instance", "tenants" → "tenant") and the segment after
+      that as the resource id. Unrecognised or shorter paths leave both fields empty so omitempty hides them. Add a
+      unit test in the same package that exercises a /v1/instances/{id} 404 fixture and asserts the resulting
+      *CLIError has ResourceType="instance" and ResourceID="{id}".
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "404 branch in response.go chains .WithResource(...) onto NewNotFoundError; helper for URL→(type,id) parse exists and is unit-tested"
+      - "Recognised paths (instances, tenants, snapshots, dataapi/graphql, etc — at least instances and tenants covered) produce singular ResourceType + correct ResourceID"
+      - "Unrecognised paths leave ResourceType and ResourceID empty so omitempty drops them from the envelope"
+      - "New table-driven test exercises a /v1/instances/{id} 404 fixture and asserts the typed *CLIError fields"
+      - "No other error sites in response.go are modified in this task"
+    completed_at: null
+
+  - id: task-006
+    title: "Add e2e exitcodes test for --format=json envelope"
+    description: |
+      Extend test/e2e/exitcodes/exitcodes_test.go (build-tagged e2e_exitcodes) with at least one case asserting the
+      full binary path: invoke `aura instance list --bad-flag --format=json`, expect exit 2, stdout to parse as JSON
+      with error.code == "usage_error" and error.exit_code == 2, and stderr to contain `Error: ... (exit 2)`. If the
+      suite's fixture HTTP server can return a 404, add a second case exercising `aura instance get does-not-exist
+      --format=json` and assert error.code == "not_found" and error.resource_type == "instance". Follow the existing
+      subprocess test scaffolding in that file.
+    status: pending
+    dependencies:
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "exitcodes_test.go has at least one --format=json case asserting exit 2 + valid JSON envelope with code=usage_error"
+      - "JSON envelope assertions cover code, exit_code, and (where applicable) resource_type/resource_id"
+      - "Test file remains build-tagged e2e_exitcodes per existing convention"
+      - "make test runs the e2e suite cleanly (or the existing CI tag handling continues to gate it)"
+    completed_at: null
+
+  - id: task-007
+    title: "Changelog entry, final gates, and manual smoke"
+    description: |
+      Add a changelog entry under .changes/unreleased/ via `make changelog --kind Minor --body "Emit structured JSON
+      error envelope when --format=json and a command fails (CLI-140)"`, or hand-author the YAML following the
+      existing neo4j-cli-Minor-*.yaml shape. Run the full local gate suite: make fmt-check && make lint && make test &&
+      make generate-check (the last to confirm no unexpected skill-bundle drift; run `go generate
+      ./neo4j-cli/internal/skill/...` and diff regardless). Rebuild via make build and run the two manual smoke
+      commands from the PRD to confirm both modes behave as specified.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "A .changes/unreleased/neo4j-cli-Minor-*.yaml entry exists with body mentioning CLI-140 and the JSON error envelope"
+      - "make fmt-check, make lint, make test, and make generate-check all pass on a clean checkout"
+      - "Manual smoke `./bin/neo4j-cli aura instance list --bad-flag --format=json` returns exit 2, stdout is a valid envelope with code=usage_error, exit_code=2"
+      - "Manual smoke `./bin/neo4j-cli aura instance list --bad-flag` returns exit 2, stderr matches the new plaintext shape (`Error: ... (exit 2)`), stdout empty"
+      - "No skill-bundle drift introduced (git diff after go generate is empty for bundle paths)"
+    completed_at: null
