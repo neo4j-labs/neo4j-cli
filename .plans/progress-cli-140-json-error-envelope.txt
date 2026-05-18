@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-18T14:30:00Z
 Extended CLIError with CodeName/Retryable/ResourceType/ResourceID/Suggestion fields, changed constructor returns to *CLIError, added Codes/CodeNames/CodeDescriptions closed-enum tables, and WithResource/WithSuggestion fluent setters.
 Files: ~common/clierr/error.go, ~common/clierr/error_test.go, ~.plans/tasks-cli-140-json-error-envelope.yml
+
+## TASK-002 — 2026-05-18T15:00:00Z
+Added Envelope/EnvelopeBody types, (*CLIError).BuildEnvelope pure projection, and Render(err, stdout, stderr, format) dispatcher; JSON mode emits envelope to stdout + summary to stderr, other formats write summary + optional suggestion to stderr only; untyped err wrapped as fatal_error, nil is no-op.
+Files: +common/clierr/render.go, +common/clierr/render_test.go

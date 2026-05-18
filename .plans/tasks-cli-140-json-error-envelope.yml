@@ -36,7 +36,7 @@ tasks:
       optional second `<suggestion>` line when set, stdout untouched; untyped err is wrapped as fatal_error / exit 1
       via errors.As; nil err is a no-op. Add common/clierr/render_test.go with table-driven golden tests covering every
       CodeName in both modes, the untyped-error fallback, the empty-format fallback, and the suggestion-line behaviour.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - "Untyped errors render as fatal_error / exit 1 in both modes"
       - "Golden tests cover every CodeName across both modes plus the untyped + empty-format edge cases"
       - "BuildEnvelope has no I/O — verified by being callable in tests without writers"
-    completed_at: null
+    completed_at: 2026-05-18T15:00:00Z
 
   - id: task-003
     title: "Wire clierr.Render in neo4j-cli/main.go and set SilenceErrors on root"
