@@ -150,7 +150,7 @@ tasks:
       `CHANGELOG-aura.md`, `include_aura`, and `AURA_CLI_VERSION` in
       Steps 2 and 3; drop the top-of-file framing "for `aura-cli` and
       `neo4j-cli`". Satisfies REQ-F-008.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -158,7 +158,7 @@ tasks:
       - "`changie new` non-interactive example lists `neo4j-cli` only"
       - "'What gets released' table contains one row each for the `neo4j-cli` binary, the `@neo4j-labs/cli` npm package, and the Homebrew formula"
       - "Markdown headings and table syntax render cleanly"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-009
     title: "Rewrite .agents/build.md as single-binary"

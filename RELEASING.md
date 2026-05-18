@@ -1,6 +1,6 @@
 # Releasing
 
-End-to-end release lifecycle for `aura-cli` and `neo4j-cli`. Most of it is automated — your job as a contributor is one changelog entry per PR; everything downstream happens on merge.
+End-to-end release lifecycle for `neo4j-cli`. Most of it is automated — your job as a contributor is one changelog entry per PR; everything downstream happens on merge.
 
 For the why behind individual pieces, see `.agents/deployment.md` (architecture) and `distribution/<channel>/README.md` (channel specifics).
 
@@ -12,16 +12,13 @@ For the why behind individual pieces, see `.agents/deployment.md` (architecture)
 
 ## What gets released
 
-| Artifact | Channel | Versioned independently | Driven by |
-|---|---|---|---|
-| `aura-cli` binaries | GitHub Releases | `aura-cli` changelog | GoReleaser |
-| `neo4j-cli` binaries | GitHub Releases | `neo4j-cli` changelog | GoReleaser |
-| `@neo4j-labs/cli` (super-CLI) | npm | `neo4j-cli` changelog | `publish-npm.yml` |
-| `neo4j-cli` Homebrew formula | `neo4j-labs/homebrew-tap` (stable only) | `neo4j-cli` changelog | GoReleaser (`brews:`) |
+| Artifact | Channel | Driven by |
+|---|---|---|
+| `neo4j-cli` binaries | GitHub Releases | GoReleaser |
+| `@neo4j-labs/cli` (super-CLI) | npm | `publish-npm.yml` |
+| `neo4j-cli` Homebrew formula | `neo4j-labs/homebrew-tap` (stable only) | GoReleaser (`brews:`) |
 
-Aura-cli is **not** published to npm or Homebrew. An aura-cli-only release cycle ships GitHub binaries but skips both downstream channels. See `distribution/npm/README.md` and `distribution/homebrew/README.md` for the gates.
-
-Future channels (pip) will plug in alongside `publish-npm.yml` and follow the same gating rules.
+Future channels (pip) will plug in alongside `publish-npm.yml`.
 
 ## Step 1 — Add a changelog entry on your PR
 
@@ -31,15 +28,13 @@ User-facing changes (new features, bug fixes, behavior changes visible to CLI us
 make changelog
 ```
 
-Interactive: pick one or more projects (`aura-cli`, `neo4j-cli`), a kind (`Major` / `Minor` / `Patch`), and a body. Commit the resulting YAML in `.changes/unreleased/` alongside your code.
+Interactive: pick a kind (`Major` / `Minor` / `Patch`) and a body. Commit the resulting YAML in `.changes/unreleased/` alongside your code.
 
-Because `neo4j-cli` bundles its children, **any user-facing change to `aura-cli` also needs a `neo4j-cli` entry** — select both. Non-interactive form:
+Non-interactive form:
 
 ```bash
-changie new --projects aura-cli --projects neo4j-cli --kind Patch --body "fix instance list pagination"
+changie new --projects neo4j-cli --kind Patch --body "fix instance list pagination"
 ```
-
-Only changes specific to the `neo4j-cli` super-CLI wrapper itself (e.g. the `npm i -g @neo4j-labs/cli` install path, the skill bundle for `neo4j-cli`) need a `neo4j-cli`-only entry.
 
 PR review and merge proceed normally. **Nothing publishes when your feature PR merges.**
 
@@ -47,37 +42,36 @@ PR review and merge proceed normally. **Nothing publishes when your feature PR m
 
 On every push to `main`, `.github/workflows/changie.yml` runs:
 
-1. Detects which projects have unreleased entries (`grep project: aura-cli .changes/unreleased/`, `grep project: neo4j-cli`).
-2. Computes the next pre-release suffix per project (`alpha.N+1`).
-3. Runs `changie batch` per project — folds `.changes/unreleased/*.yaml` into `.changes/<project>/v<version>.md`.
-4. Runs `changie merge` — appends to `CHANGELOG-aura.md` and/or `CHANGELOG-neo4j.md`.
-5. Opens a PR titled `Release neo4j-cli vX.Y.Z` (or `aura-cli`, or both) on a `release/...` branch.
+1. Detects unreleased entries (`grep project: neo4j-cli .changes/unreleased/`).
+2. Computes the next pre-release suffix (`alpha.N+1`).
+3. Runs `changie batch` — folds `.changes/unreleased/*.yaml` into `.changes/neo4j-cli/v<version>.md`.
+4. Runs `changie merge` — appends to `CHANGELOG-neo4j.md`.
+5. Opens a PR titled `Release neo4j-cli vX.Y.Z` on a `release/...` branch.
 
 This PR is the *request* to ship. It contains only changelog updates — no source changes. Review it like any other PR.
 
 ## Step 3 — Merge the Release PR (publish gate)
 
-`.github/workflows/release.yml` triggers on pushes to `main` that touch `CHANGELOG-aura.md` or `CHANGELOG-neo4j.md` — merging the Release PR is what does that.
+`.github/workflows/release.yml` triggers on pushes to `main` that touch `CHANGELOG-neo4j.md` — merging the Release PR is what does that.
 
 The job:
 
-- Reads versions: `changie latest --project aura-cli` and `changie latest --project neo4j-cli`.
-- Computes `include_aura` / `include_neo4j` based on which `CHANGELOG-*.md` files actually changed in the merge commit (one-project releases skip the other).
+- Reads the version: `changie latest --project neo4j-cli`.
 - Runs **GoReleaser**:
-  - Builds 8 archs each for `aura-cli` and `neo4j-cli`: `linux/{amd64,arm64,386}`, `darwin/{amd64,arm64}`, `windows/{amd64,arm64,386}`. Archives are `.tar.gz` (Unix) / `.zip` (Windows).
+  - Builds `neo4j-cli` for 8 archs: `linux/{amd64,arm64,386}`, `darwin/{amd64,arm64}`, `windows/{amd64,arm64,386}`. Archives are `.tar.gz` (Unix) / `.zip` (Windows).
   - Code-signs and notarizes the macOS binaries (`MACOS_SIGN_*`, `MACOS_NOTARY_*` secrets).
   - Creates a **GitHub Release** with all archives + checksums attached and tags the commit (e.g. `v0.2.0-alpha.3`).
-  - Each binary gets its own version stamped at link time (`AURA_CLI_VERSION`, `GORELEASER_CURRENT_TAG`).
-- Surfaces `version` + `include_neo4j` as job outputs.
-- Uploads `dist/` and `release-meta.json` (`{ version, include_neo4j }`) as workflow artifacts for the npm workflow to consume.
+  - The binary version is stamped at link time via `GORELEASER_CURRENT_TAG`.
+- Surfaces `version` as a job output.
+- Uploads `dist/` and `release-meta.json` (`{ version }`) as workflow artifacts for the npm workflow to consume.
 
 Merge of the Release PR = release pushed. There is no manual step here.
 
-## Step 4 — `publish-npm.yml` runs (auto, neo4j-cli only)
+## Step 4 — `publish-npm.yml` runs (auto)
 
 Triggered by `workflow_run` after `release.yml` completes. The job:
 
-- Skips itself if `release.yml` did not succeed, or if `include_neo4j != true` (aura-cli-only release).
+- Skips itself if `release.yml` did not succeed.
 - Downloads the `dist/` artifact from `release.yml`.
 - Authenticates to the registry via npm Trusted Publishers (OIDC); no long-lived token in CI.
 - Runs `distribution/npm/publish.sh`:
@@ -107,7 +101,7 @@ This same flow handles: `@neo4j-labs` org permission needed adjusting; you `npm 
 
 ## Pre-releases vs stable
 
-Today every push to `main` produces an alpha (`alpha.N+1` per project, computed in `changie.yml`). Stable releases are not yet wired into the changie workflow — when they are added, the dist-tag rules in `publish.sh` already handle the difference, and `npm i @neo4j-labs/cli` (no qualifier) will start resolving to the new stable automatically.
+Today every push to `main` produces an alpha (`alpha.N+1`, computed in `changie.yml`). Stable releases are not yet wired into the changie workflow — when they are added, the dist-tag rules in `publish.sh` already handle the difference, and `npm i @neo4j-labs/cli` (no qualifier) will start resolving to the new stable automatically.
 
 To promote an existing alpha to stable later, `npm dist-tag add @neo4j-labs/cli@<version> latest` — no republish needed.
 
@@ -135,5 +129,5 @@ Configured at the repo level. The user owns these.
 - `distribution/npm/README.md` — npm-specific maintainer view (package shape, dist-tag rules, dry-runs)
 - `distribution/homebrew/README.md` — Homebrew tap maintainer view (stable-only cadence, auth prereqs, recovery)
 - `CONTRIBUTING.md` — changelog entries, local builds, repo conventions
-- `.changie.yaml` — multi-project changelog config
+- `.changie.yaml` — changelog config
 - `.goreleaser.yaml` — GoReleaser build matrix, archives, signing
