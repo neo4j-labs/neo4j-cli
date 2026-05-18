@@ -149,3 +149,26 @@ tasks:
       - "Manual smoke `./bin/neo4j-cli aura instance list --bad-flag` returns exit 2, stderr matches the new plaintext shape (`Error: ... (exit 2)`), stdout empty"
       - "No skill-bundle drift introduced (git diff after go generate is empty for bundle paths)"
     completed_at: null
+
+  - id: task-008
+    title: "Emit error envelope in toon mode (--format=toon)"
+    description: |
+      Extend common/clierr/render.go so `--format=toon` also emits a structured error envelope to stdout (encoded
+      with toon.Marshal from github.com/toon-format/toon-go, mirroring common/output/output.go:111-125 which uses
+      `toon.Marshal(v, toon.WithLengthMarkers(true))`) plus the existing one-line `Error: <message> (exit <N>)` summary
+      to stderr. Reuse the existing Envelope/EnvelopeBody types — same data, different encoding. Update Render's switch
+      so json|toon both hit the structured path with the right marshaller, while default|table|"" stay on the
+      plaintext+optional-suggestion path. Extend common/clierr/render_test.go with toon-mode cases for at least two
+      CodeNames plus the untyped-error fallback, asserting the toon output is non-empty, differs from the JSON form,
+      and contains the expected code/exit_code substrings. No bundle regeneration expected (toon error rendering is a
+      runtime path, not a documented command surface) — verify via make generate-check.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Render(...) writes a toon-encoded Envelope to stdout when format==\"toon\" and a one-line summary to stderr"
+      - "JSON and plaintext modes are unchanged byte-for-byte vs task-002 (existing render_test.go cases still pass)"
+      - "render_test.go covers at least two CodeNames and the untyped-error fallback in toon mode"
+      - "Toon encoder uses the same WithLengthMarkers option as common/output/output.go for consistency"
+      - "make fmt-check, make lint, make test, make generate-check all clean"
+    completed_at: null
