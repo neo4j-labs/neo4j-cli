@@ -1,0 +1,45 @@
+## task-001 — 2026-05-18T00:00:00Z
+Authored security-review prompt covering golang-security scope (injection/crypto/filesystem/network/cookies/secrets/memory/logging) with inline-comment + verdict-file output contract; no-op path when diff has no Go changes.
+Files: +.github/prompts/claude-review-security.md
+
+## task-002 — 2026-05-18T00:00:00Z
+Authored conventions-review prompt mirroring security prompt shape; enumerates AGENTS.md gates (cobra layout, license header, changelog, skill-bundle regen, Example field, gofmt/lint, command naming, --format/--wait); references AGENTS.md via CLAUDE.md include instead of inlining rules; no-op path when diff has no changes under neo4j-cli/, common/, or .changes/.
+Files: +.github/prompts/claude-review-conventions.md
+
+## task-003 — 2026-05-18T00:00:00Z
+Added security-review workflow; pinned to same SHAs as claude.yml, narrow --allowed-tools list with Bash(tee:*) as the minimal verdict-write seam, fail-closed enforce-verdict step (missing file = fail).
+Files: +.github/workflows/claude-review-security.yml
+Decisions: chose Bash(tee:*) over Bash(bash:*)/Bash(echo:*) — `echo pass | tee /tmp/claude-verdict.txt` is the narrowest single-tool form; loaded prompt via heredoc-style `PROMPT<<PROMPT_EOF` block to $GITHUB_ENV to avoid escaping issues.
+
+## task-004 — 2026-05-18T00:00:00Z
+Added conventions-review workflow as a literal near-mirror of claude-review-security.yml; diff is exactly 3 lines (name, prompt path, error message) per the task spec.
+Files: +.github/workflows/claude-review-conventions.yml
+Decisions: kept job id `security-review` and step labels referring to "security" verbatim — task explicitly says "do not improve the second file; symmetry matters". Touching internal labels would diverge from the literal mirror without a documented reason.
+
+## TASK-005 — 2026-05-18T09:21:04Z
+Static validation of all four CLI-138 files passed: YAML parses for both workflows; action SHAs match claude.yml (939ae9c...); claude.yml byte-unchanged vs main; if-expression has both author_association branches AND the 5-login inline allowlist; permissions block correct (pull-requests: write only escalation); tool allowlist has no bare Bash/Write/Edit/curl/wget; verdict step exits non-zero on non-pass; each workflow loads its own prompt. Local gates clean: make test PASS, make fmt-check PASS (no output), make lint PASS (0 issues). Live-PR smoke test deferred to human — the 7 acceptance scenarios require post-merge GitHub Actions execution and deliberate violation PRs, which this iteration cannot legitimately drive. Runbook at .plans/smoke-test-cli-138.md covers all 7 scenarios with exact gh commands, pass/fail criteria, and a 3-option rollback section.
+Files: +.plans/smoke-test-cli-138.md, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml, ~.plans/progress-cli-138-auto-ai-pr-reviews.txt
+Decisions: runbook lives under .plans/ (not docs/) since it's a one-shot manual gate, not user-facing docs. Documented three rollback paths (`gh workflow disable`, file deletion, `if: false`) in increasing order of permanence. Bot-skip scenario (3) recommends waiting for organic Renovate/Dependabot PR over manually faking an outside-contributor PR — cheapest correct signal.
+
+## task-006 — 2026-05-18T00:00:00Z
+Dropped the inline username allowlist from both workflows; `if:` now gates on `author_association` only (MEMBER/OWNER/COLLABORATOR). Removes the maintenance chore of editing two YAML files when people join/leave the org; outside contributors still skip and can use @claude manually. Updated PRD REQ-F-004 + Tech Considerations + Open Questions, and rewrote smoke-test scenario 3 to drop allowlist references.
+Files: ~.github/workflows/claude-review-security.yml, ~.github/workflows/claude-review-conventions.yml, ~.plans/prd-cli-138-auto-ai-pr-reviews.md, ~.plans/smoke-test-cli-138.md, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+
+## task-007 — 2026-05-18T10:00:00Z
+Vendored pinned cc-skills-golang plugin via .claude-plugin/marketplace.json at repo root; marketplace `neo4j-cli-review` owned by `neo4j-labs` with single plugin entry pinned to ref v1.4.0 AND sha e9761db859c6969b77a8fd0e8a243f4f28240211 for reproducible installs.
+Files: +.claude-plugin/marketplace.json, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+
+## task-008 — 2026-05-18T11:00:00Z
+Wired security workflow to install vendored cc-skills-golang plugin: added setup-go (pinned SHA matching test.yml/release.yml/license.yml, go-version-file: go.mod) + govulncheck install steps before the action; added plugin_marketplaces (./) and plugins (cc-skills-golang@neo4j-cli-review) inputs to anthropics/claude-code-action; extended --allowed-tools with Skill + Bash(govulncheck:*) (originals preserved). conventions workflow untouched. Diff vs conventions.yml is exactly the expected scope (name/prompt-path/error-msg + the new go setup + plugin block + allow-list extension). Gates: make test PASS, make fmt-check PASS, make lint PASS (0 issues), YAML parses.
+Files: ~.github/workflows/claude-review-security.yml, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml
+Decisions: reused setup-go SHA 4a3601121dd01d1626a1e23e37211e3254c1c06c (v6) already pinned in test.yml/release.yml/license.yml for consistency; appended Skill + Bash(govulncheck:*) to the comma-separated allow-list string rather than rewriting to multi-line form — keeps task-006's narrow-list invariant visible at a glance.
+
+## task-009 — 2026-05-18T12:00:00Z
+Rewrote security prompt to delegate scope to the golang-security skill. Step 1 makes the Skill-tool invocation the FIRST action, pins to review mode, explicitly forbids audit mode citing the 5-parallel-sub-agent cost. Step 2 keeps the no-op path for non-Go PRs (broadened to .go/go.mod/go.sum). Step 3 preserves the inline-comment + top-level-summary contract; Step 4 keeps the pass/fail verdict file; Step 5 adds the loud-failure clause (write fail, post comment naming failure mode, no fallback to hand-rolled checks). Hand-rolled focus-area enumeration removed — skill owns scope. Prompt-injection guardrail preserved verbatim. Gates: make test PASS, make fmt-check PASS, make lint PASS.
+Files: ~.github/prompts/claude-review-security.md
+Decisions: kept invocation form abstract ("via the Skill tool, consult SKILL.md for mode args") rather than hardcoding `Skill(skill=golang-security, mode=review)` — the exact arg syntax depends on the skill's SKILL.md which isn't checked into this repo, and a wrong hardcoded form would silently fail. Letting Claude resolve the args from the installed SKILL.md is the robust path.
+
+## task-010 — 2026-05-18T09:51:43Z
+Extended smoke-test runbook with two new scenarios for the vendored-skill work: Scenario 8 (plugin install succeeds + Skill tool invoked — clean Go PR, greps action logs for both `Adding marketplace: ./` and `Installing plugin: cc-skills-golang@neo4j-cli-review`, asserts skill invocation via summary-comment or run-log signal, expects green check) and Scenario 9 (pin is broken — throwaway branch with sha set to all-zeros, asserts red check + top-level comment naming the failure mode, includes do-not-merge title + revert verification). Updated AC mapping table to add 5 rows (REQ-F-015, REQ-F-018, REQ-F-016, REQ-F-017, REQ-F-019, plus the static marketplace.json pin row). Spot checks: scenario count 7 → 9, no allowlist mentions. Gates: make test PASS, make fmt-check PASS, make lint PASS.
+Files: ~.plans/smoke-test-cli-138.md, ~.plans/tasks-cli-138-auto-ai-pr-reviews.yml, ~.plans/progress-cli-138-auto-ai-pr-reviews.txt
+Decisions: kept both scenarios DEFERRED to the human (consistent with scenarios 1–7 — post-merge GitHub Actions execution); added explicit "DO NOT MERGE" guidance to Scenario 9 setup (title flag, body note, cleanup-revert verification step) so the broken-SHA branch cannot accidentally land on main.

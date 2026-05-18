@@ -1,0 +1,301 @@
+feature: cli-138-auto-ai-pr-reviews
+prd: ./prd-cli-138-auto-ai-pr-reviews.md
+created_at: 2026-05-18T00:00:00Z
+updated_at: 2026-05-18T01:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Author security-review prompt at .github/prompts/claude-review-security.md"
+    description: |
+      Write the standalone prompt body used by the security review
+      workflow. Scope mirrors the in-repo `golang-security` skill:
+      injection (SQL, command, XSS), cryptography, filesystem safety,
+      network security, cookies, secrets management, memory safety,
+      logging. Must instruct Claude to (a) read `gh pr diff` and only
+      relevant files; (b) post inline comments for concrete issues via
+      `mcp__github_inline_comment__create_inline_comment`; (c) post one
+      top-level summary via `gh pr comment` ending with `**Security
+      review:** ✅ no issues found` or `⚠️ N issue(s) flagged inline`;
+      (d) write a single word (`pass` or `fail`) to
+      `/tmp/claude-verdict.txt` as the very last action. On PRs with no
+      Go changes, emit a one-line "no security-relevant changes"
+      comment and `pass`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "File `.github/prompts/claude-review-security.md` exists"
+      - "Prompt explicitly enumerates the golang-security focus areas (injection, crypto, filesystem, network, cookies, secrets, memory, logging)"
+      - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
+      - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
+      - "Prompt instructs Claude to no-op (summary + `pass`) when the diff contains no Go file changes"
+    completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-002
+    title: "Author conventions-review prompt at .github/prompts/claude-review-conventions.md"
+    description: |
+      Write the standalone prompt body used by the conventions review
+      workflow. Scope: AGENTS.md gates — cobra one-file-per-leaf layout,
+      license header on new `.go` files, changelog entry under
+      `.changes/unreleased/` for user-facing changes (with internal/CI
+      exception), skill-bundle regen after touching commands reachable
+      from `app.NewCmd`, non-empty `Example:` field on new leaf
+      commands, `gofmt`/lint hygiene reminder, singular-noun +
+      `<resource> <action>` command form, `--format`/`--wait`
+      conventions. Same output contract as the security prompt:
+      inline comments for issues, one top-level summary with explicit
+      verdict line, write `pass`/`fail` to `/tmp/claude-verdict.txt` as
+      the final step. AGENTS.md loads automatically via CLAUDE.md's
+      `@AGENTS.md` include, so reference rules by name; don't inline
+      them verbatim.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "File `.github/prompts/claude-review-conventions.md` exists"
+      - "Prompt enumerates the AGENTS.md gates listed in PRD REQ-F-012"
+      - "Prompt instructs Claude to consult AGENTS.md (already loaded via CLAUDE.md include) rather than inlining the rules"
+      - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
+      - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
+    completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-003
+    title: "Add .github/workflows/claude-review-security.yml with verdict-to-red-check mechanism"
+    description: |
+      Create the security review workflow. Triggers on `pull_request`
+      types `[opened, synchronize, reopened, ready_for_review]`. Skips
+      drafts and PRs whose author is not a MEMBER/OWNER/COLLABORATOR
+      and not in the inline allowlist (`oskarhane`, `Liam-Doodson`,
+      `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j`). Permissions:
+      `contents: read`, `pull-requests: write`, `issues: read`,
+      `id-token: write`, `actions: read`. Steps: (1) checkout with
+      `fetch-depth: 1` using the pinned SHA already in claude.yml;
+      (2) load prompt body from `.github/prompts/claude-review-security.md`
+      into `$GITHUB_ENV` via `cat`; (3) run `anthropics/claude-code-action`
+      at the same pinned SHA as `claude.yml` with
+      `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`,
+      `prompt:` = `REPO:` + `PR NUMBER:` header + `${{ env.PROMPT }}`,
+      and `claude_args` with the narrow tool allowlist from PRD REQ-F-007
+      plus whatever minimal addition lets Claude write the verdict file
+      (settle on the narrowest viable form — e.g. `Bash(bash:*)` or
+      `Bash(tee:*)`); (4) enforce verdict step that does
+      `[ "$(cat /tmp/claude-verdict.txt 2>/dev/null)" = "pass" ] || { echo "::error::Claude security review flagged issues"; exit 1; }`
+      so a `fail` verdict (or missing file) turns the check red.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "File `.github/workflows/claude-review-security.yml` exists and parses as valid GitHub Actions YAML"
+      - "Triggers on `pull_request` with types `[opened, synchronize, reopened, ready_for_review]`"
+      - "`if:` expression skips drafts AND restricts to MEMBER/OWNER/COLLABORATOR or the seeded allowlist of GitHub logins"
+      - "Action SHA matches the one pinned in `.github/workflows/claude.yml`"
+      - "`permissions:` block matches PRD REQ-F-006 (only `pull-requests: write` is escalated vs `claude.yml`)"
+      - "`claude_args` uses a narrow `--allowedTools` list (no general `Bash`, no `Write`/`Edit`, no `curl`/`wget`)"
+      - "Prompt body is loaded from `.github/prompts/claude-review-security.md` (not inlined in YAML)"
+      - "A subsequent step reads `/tmp/claude-verdict.txt` and exits non-zero when the contents are not `pass` (fail-closed if missing)"
+    completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-004
+    title: "Add .github/workflows/claude-review-conventions.yml mirroring the security workflow"
+    description: |
+      Create the conventions review workflow as a near-mirror of
+      `claude-review-security.yml` from task-003. Only differences:
+      (a) `name:` is `Claude Review — Conventions`; (b) the loaded
+      prompt is `.github/prompts/claude-review-conventions.md`; (c) the
+      enforce-verdict error message reads "Claude conventions review
+      flagged issues". Author filter, triggers, permissions, action
+      SHA, tool allowlist, and verdict mechanism are identical to
+      task-003. Two files are intentional — each is its own check on
+      the PR, independently re-runnable.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "File `.github/workflows/claude-review-conventions.yml` exists and parses as valid GitHub Actions YAML"
+      - "Triggers, `if:` author filter, permissions, action SHA, and `claude_args` exactly match `claude-review-security.yml` modulo prompt path and error message"
+      - "Prompt body is loaded from `.github/prompts/claude-review-conventions.md`"
+      - "Workflow `name:` is `Claude Review — Conventions`"
+      - "Enforce-verdict step exits non-zero on `fail` or missing verdict file with a conventions-specific error message"
+    completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-005
+    title: "Smoke-test on a PR: green path, both red paths, draft skip, bot skip, mention coexistence"
+    description: |
+      End-to-end smoke test on a real PR after the workflows merge to
+      main. Verify: (1) opening a clean non-draft PR from
+      `@oskarhane` triggers both checks, posts a summary, finishes
+      green ✅ within 5 minutes; (2) opening a draft PR triggers
+      neither workflow until `ready_for_review`; (3) opening a PR from
+      `dependabot[bot]` / `renovate[bot]` (or any non-allowlisted
+      account) shows both workflows skipped (no billable run);
+      (4) introducing a deliberate convention violation (e.g. new leaf
+      cobra command with no `Example:` field) flips the conventions
+      check to red ❌ with an explanatory inline comment;
+      (5) introducing a deliberate security smell (e.g.
+      `exec.Command("sh", "-c", userInput)`) flips the security check
+      to red ❌; (6) pushing a second commit to the same PR produces a
+      **new** review comment (not an edit); (7) commenting `@claude
+      help` on the test PR still triggers the existing `claude.yml`
+      mention workflow. Also run `make test && make fmt-check && make
+      lint` locally before merge — should be no-op since no Go code is
+      touched.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "Clean test PR shows both checks green ✅ with a `✅ no issues found` summary line"
+      - "Draft PR shows neither workflow running; promoting to ready-for-review triggers both"
+      - "Bot or non-allowlisted-author PR shows both workflows skipped (Actions tab confirms no run)"
+      - "Convention-violation PR shows conventions check red ❌ with an inline comment naming the violation"
+      - "Security-smell PR shows security check red ❌ with an inline comment naming the smell"
+      - "Second push to the test PR produces a second review comment (timeline shows two distinct top-level summaries)"
+      - "`@claude help` comment on the test PR still triggers `claude.yml` (existing mention behaviour preserved)"
+      - "`make test`, `make fmt-check`, `make lint` pass locally on the branch"
+    status_note: |
+      Live-PR smoke test deferred to the human — the workflows only fire
+      after merge to main, so this iteration cannot legitimately execute
+      the 7 acceptance scenarios. Static validation + local gates done;
+      runbook at .plans/smoke-test-cli-138.md covers all 7 scenarios.
+    completed_at: 2026-05-18T09:21:04Z
+
+  - id: task-006
+    title: "Drop inline username allowlist; rely on author_association only"
+    description: |
+      Originally both workflows gated on `author_association` OR an
+      inline JSON list of GitHub logins (`oskarhane`, `Liam-Doodson`,
+      `Neo4j-KimMoller`, `mjfwebb`, `kerem-neo4j`). The list duplicates
+      across two files, rots when people join/leave the org, and adds
+      no coverage that org membership doesn't already give. Drop it.
+      `if:` becomes a single `contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), ...)`
+      check. Outside contributors and bots still skip; they can invoke
+      `@claude` manually via the existing mention workflow. Updates the
+      PRD (REQ-F-004, Technical Considerations, Open Questions) and
+      the smoke-test runbook scenario 3 to match.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "Both workflow `if:` blocks contain only the draft check + a single `contains(fromJSON('[\"MEMBER\",\"OWNER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association)` clause"
+      - "No reference to `oskarhane`, `Liam-Doodson`, `Neo4j-KimMoller`, `mjfwebb`, or `kerem-neo4j` remains in either workflow file"
+      - "PRD REQ-F-004 rewritten to org-membership only; the allowlist open question is removed"
+      - "Smoke-test runbook scenario 3 no longer mentions the allowlist (heading + body updated)"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-007
+    title: "Vendor pinned cc-skills-golang plugin via local .claude-plugin/marketplace.json"
+    description: |
+      Create `.claude-plugin/marketplace.json` at the repo root with a
+      single-plugin marketplace named `neo4j-cli-review`. The plugin
+      entry is `cc-skills-golang` sourced from github repo
+      `samber/cc-skills-golang`, pinned with BOTH `ref: v1.4.0` AND
+      `sha: e9761db859c6969b77a8fd0e8a243f4f28240211`. Per Claude Code
+      docs (https://code.claude.com/docs/en/plugin-marketplaces),
+      setting both makes the plugin source reproducible — `ref` is
+      human-readable, `sha` enforces exact-commit pinning. No other
+      plugins in this marketplace; this file exists solely to give us a
+      pin point for the security skill.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "File `.claude-plugin/marketplace.json` exists at repo root and parses as valid JSON"
+      - "Marketplace `name` is exactly `neo4j-cli-review`"
+      - "`owner.name` is set (e.g. `neo4j-labs`)"
+      - "`plugins` array contains exactly one entry"
+      - "Plugin entry has `name: cc-skills-golang`, `source.source: github`, `source.repo: samber/cc-skills-golang`, `source.ref: v1.4.0`, AND `source.sha: e9761db859c6969b77a8fd0e8a243f4f28240211`"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass (new file is not Go)"
+    completed_at: 2026-05-18T10:00:00Z
+
+  - id: task-008
+    title: "Wire security workflow to install vendored plugin + setup-go + govulncheck"
+    description: |
+      Update `.github/workflows/claude-review-security.yml`:
+      (a) Add a `setup-go` step BEFORE the action step. Use
+          `actions/setup-go@<pinned-SHA>` and `go-version-file: go.mod`
+          so the toolchain tracks repo state.
+      (b) Add a step that runs
+          `go install golang.org/x/vuln/cmd/govulncheck@latest`. The
+          `golang-security` skill requires `govulncheck` on PATH.
+      (c) Add to the `anthropics/claude-code-action` step:
+          ```
+          plugin_marketplaces: |
+            ./
+          plugins: |
+            cc-skills-golang@neo4j-cli-review
+          ```
+      (d) Extend `--allowed-tools` in `claude_args` with `Skill` and
+          `Bash(govulncheck:*)`. No other broadening — do NOT add
+          general `Bash`, `Write`, `Edit`, `curl`, or `wget`.
+      Do not touch `claude-review-conventions.yml`. Two files stay
+      symmetric except for this addition.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`.github/workflows/claude-review-security.yml` includes a `setup-go` step using `go-version-file: go.mod`"
+      - "Workflow includes a `go install golang.org/x/vuln/cmd/govulncheck@latest` step before the action step"
+      - "Action step has `plugin_marketplaces: ./` and `plugins: cc-skills-golang@neo4j-cli-review`"
+      - "`--allowed-tools` contains `Skill` and `Bash(govulncheck:*)` in addition to the existing narrow list"
+      - "`--allowed-tools` does NOT contain bare `Bash`, `Write`, `Edit`, `curl`, or `wget`"
+      - "`.github/workflows/claude-review-conventions.yml` is unchanged on this task's diff"
+      - "YAML parses; `make test`, `make fmt-check`, `make lint` pass"
+    completed_at: 2026-05-18T11:00:00Z
+
+  - id: task-009
+    title: "Rewrite security prompt to invoke golang-security skill in review mode"
+    description: |
+      Rewrite `.github/prompts/claude-review-security.md` so the FIRST
+      instruction is: "Invoke the `golang-security` skill via the Skill
+      tool. Use review mode (data-flow tracing), NOT audit mode (which
+      spawns 5 parallel sub-agents — too expensive per push)." Drop
+      the existing hand-rolled focus-area enumeration (injection,
+      crypto, filesystem, ...) — the skill owns that scope now. The
+      prompt's job is to (a) trigger the skill, (b) translate its
+      output into the existing inline-comment + top-level summary +
+      verdict-file contract. Keep the no-op path for non-Go PRs (still
+      `pass`). Add a failure-mode clause: if the skill fails (plugin
+      not installed, skill errors, govulncheck missing), write `fail`
+      to `/tmp/claude-verdict.txt` and post a top-level comment naming
+      the failure (e.g. `⚠️ golang-security skill unavailable — pin
+      may be broken`). Do NOT fall back to hand-rolled checks.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "First instruction in the prompt invokes the `golang-security` skill via the `Skill` tool"
+      - "Prompt explicitly pins skill to review mode and forbids audit mode (cite reason: cost)"
+      - "Hand-rolled focus-area list (injection/crypto/filesystem/...) is removed; the skill owns scope"
+      - "Output contract preserved: inline comments + top-level summary with explicit verdict line + `pass`/`fail` to `/tmp/claude-verdict.txt`"
+      - "No-op path for non-Go PRs preserved (emits `pass`)"
+      - "Failure clause: skill failure writes `fail` + posts a top-level comment naming the failure mode; no fallback to hand-rolled checks"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: 2026-05-18T12:00:00Z
+
+  - id: task-010
+    title: "Extend smoke-test runbook with pin-break + skill-success scenarios"
+    description: |
+      Add two scenarios to `.plans/smoke-test-cli-138.md`: (1) a
+      "skill works" scenario — clean Go PR triggers the security
+      workflow, action logs show `Adding marketplace: ./` +
+      `Installing plugin: cc-skills-golang@neo4j-cli-review`, the
+      prompt invokes the Skill tool, the top-level summary mentions
+      the skill or names a finding. (2) a "pin is broken" scenario —
+      on a throwaway branch, edit `.claude-plugin/marketplace.json`
+      to set `sha:` to a non-existent value (e.g. all zeros), push,
+      observe the check fail red with a top-level comment naming the
+      failure mode. Both scenarios are deferred to the human (same
+      reason as the existing scenarios — they require post-merge
+      execution on a real PR). Update the AC mapping table at the
+      bottom of the runbook.
+    status: completed
+    dependencies:
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "`.plans/smoke-test-cli-138.md` has a new scenario verifying the marketplace + plugin install in the action logs"
+      - "Runbook has a new scenario verifying that breaking the SHA pin (on a throwaway branch) turns the check red with a comment naming the failure"
+      - "AC mapping table at the bottom of the runbook includes both new scenarios"
+      - "Runbook still passes its own self-check (no broken cross-references, no allowlist mentions)"
+    completed_at: 2026-05-18T09:51:43Z

@@ -1,0 +1,89 @@
+name: Claude Review — Security
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  security-review:
+    # Skip drafts; restrict to org members/owners/collaborators. Outside
+    # contributors and bots (dependabot, renovate, etc.) do not match and the
+    # job is skipped without consuming Actions minutes or OAuth tokens. They
+    # can still invoke @claude manually via .github/workflows/claude.yml.
+    if: |
+      github.event.pull_request.draft == false &&
+      contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # required so Claude can post review comments via gh / MCP
+      issues: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install govulncheck
+        # Required by the golang-security skill for vulnerability scanning.
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Load security prompt into env
+        run: |
+          {
+            echo 'PROMPT<<PROMPT_EOF'
+            cat .github/prompts/claude-review-security.md
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Run Claude Code (security review)
+        id: claude
+        uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          additional_permissions: |
+            actions: read
+
+          # Install the vendored golang-security skill from the in-repo
+          # marketplace at .claude-plugin/marketplace.json. Pin is enforced
+          # there (ref + sha) so the action sees a reproducible plugin source.
+          plugin_marketplaces: |
+            ./
+          plugins: |
+            cc-skills-golang@neo4j-cli-review
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            ${{ env.PROMPT }}
+
+          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
+          # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
+          # (`echo pass | tee /tmp/claude-verdict.txt`). `Skill` enables invoking
+          # the vendored golang-security plugin; `Bash(govulncheck:*)` lets that
+          # skill shell out to govulncheck. No general `Bash`, no `Write`/`Edit`
+          # on repo files, no `curl`/`wget`.
+          claude_args: >-
+            --allowed-tools
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
+
+      - name: Enforce verdict
+        # Fail-closed: missing verdict file is treated as fail so an early Claude
+        # exit (or tool denial) cannot silently pass the check.
+        run: |
+          verdict="$(cat /tmp/claude-verdict.txt 2>/dev/null || true)"
+          echo "Claude verdict: '${verdict}'"
+          if [ "${verdict}" = "pass" ]; then
+            exit 0
+          fi
+          echo "::error::Claude security review flagged issues"
+          exit 1
