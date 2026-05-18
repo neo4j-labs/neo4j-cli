@@ -68,7 +68,7 @@ tasks:
       on every PR, duplicate `security-review` job id) and the corresponding fix
       for each, links to CLI-138, and notes that no changie entry is required per
       AGENTS.md (internal CI plumbing). Do NOT push to PR #120 or any other PR.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -77,7 +77,7 @@ tasks:
       - "PR opened against base `main` with the title shown above; `gh pr view --json url` returns a usable URL."
       - "PR body explains both defects and both fixes, references CLI-138, and explicitly states no changie entry is needed."
       - "PR is opened in draft state (so we can iterate without auto-pinging reviewers)."
-    completed_at: null
+    completed_at: 2026-05-18T12:35:00Z
 
   - id: task-005
     title: "Verify both Claude Review checks reach a verdict on the fix PR"

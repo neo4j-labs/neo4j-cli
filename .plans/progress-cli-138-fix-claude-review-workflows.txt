@@ -9,3 +9,7 @@ Files: .github/workflows/claude-review-security.yml
 ## TASK-003 — 2026-05-18T12:25:00Z
 Renamed conventions workflow job key security-review -> conventions-review and step "Run Claude Code (security review)" -> "Run Claude Code (conventions review)". Disambiguates the GitHub check name from the security workflow's check. YAML parses; diff is exactly the two rename lines.
 Files: .github/workflows/claude-review-conventions.yml
+
+## TASK-004 — 2026-05-18T12:35:00Z
+Pushed oskar/cli-138-fix-claude-review-workflows to origin and opened draft PR https://github.com/neo4j-labs/neo4j-cli/pull/130 (title "ci: fix Claude Review SSH plugin clone + dedupe job names (CLI-138)"). Body spells out the two defects (SSH plugin clone Permission denied; duplicate security-review job id) and the corresponding fixes (insteadOf git config; rename to conventions-review), links CLI-138, notes no changie required. Verified: isDraft=true, head=oskar/cli-138-fix-claude-review-workflows, base=main, remote sha e8095de.
+Files: (no code diff — PR metadata only)
