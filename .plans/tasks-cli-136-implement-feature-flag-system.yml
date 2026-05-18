@@ -99,7 +99,8 @@ tasks:
       get flag.aura-beta` returning the bool, and a `config list`
       regression guard asserting no `flag.*` key appears in the
       output.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T16:30:00Z
     dependencies:
       - task-002
     acceptance_criteria:

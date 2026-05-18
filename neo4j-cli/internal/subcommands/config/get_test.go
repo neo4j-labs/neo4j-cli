@@ -63,7 +63,7 @@ func TestConfigGet(t *testing.T) {
 		{
 			name:    "get with invalid key returns error",
 			command: `config get invalid-key`,
-			wantErr: `Error: invalid argument "invalid-key" for "neo4j-cli config get"`,
+			wantErr: `Error: invalid config key: "invalid-key"`,
 		},
 		{
 			name:    "get aura.default-workspace returns default (null) value as JSON",
@@ -94,7 +94,7 @@ func TestConfigGet(t *testing.T) {
 		{
 			name:    "get aura.format returns error (format is global-only)",
 			command: "config get aura.format",
-			wantErr: `Error: invalid argument "aura.format" for "neo4j-cli config get"`,
+			wantErr: `Error: invalid config key: "aura.format" is a global key and cannot be addressed with the "aura." prefix`,
 		},
 		{
 			name:    "get aura.base-url returns default value as JSON",
@@ -102,6 +102,31 @@ func TestConfigGet(t *testing.T) {
 			wantOut: `{
 	"aura.base-url": "https://api.neo4j.io"
 }`,
+		},
+		// Feature-flag scope (flag.*)
+		{
+			name:    "get flag.aura-beta returns default false as JSON",
+			command: "config get flag.aura-beta --format json",
+			wantOut: `{
+	"flag.aura-beta": false
+}`,
+		},
+		{
+			name: "get flag.aura-beta returns configured true as JSON",
+			configSetup: func(h *neo4jTestHelper) {
+				h.setConfigValue("flag.aura-beta", true)
+			},
+			command: "config get flag.aura-beta --format json",
+			wantOut: `{
+	"flag.aura-beta": true
+}`,
+		},
+		{
+			name:    "config list does not include any flag.* keys",
+			command: "config list --format json",
+			wantOutFunc: func(t *testing.T, outStr string) {
+				assert.NotContains(t, outStr, "flag.")
+			},
 		},
 	}
 
