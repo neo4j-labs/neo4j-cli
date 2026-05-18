@@ -180,7 +180,7 @@ publish-npm.yml (workflow_dispatch, manual; for failure recovery)
   `dist/neo4j-cli_<version>_<OS>_<arch>/neo4j-cli[.exe]`. The
   `archives.name_template` defines the dir layout `publish.sh` expects.
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
-  triggers on `CHANGELOG-neo4j.md` changes. Surfaces `version` as a job
+  triggers on `CHANGELOG.md` changes. Surfaces `version` as a job
   output; uploads `dist/` + `release-meta.json` artifacts.
 - [`.github/workflows/publish-npm.yml`](../../.github/workflows/publish-npm.yml)
   — auto path on `workflow_run`; manual `workflow_dispatch` for recovery.

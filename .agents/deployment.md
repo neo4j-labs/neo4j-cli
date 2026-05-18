@@ -4,17 +4,17 @@ For the end-to-end contributor-facing release lifecycle, see [`RELEASING.md`](..
 
 ## Strategy: GitHub Releases via GoReleaser, plus npm via `publish-npm.yml`
 
-Releases are triggered automatically when a push to `main` modifies `CHANGELOG-neo4j.md`. `release.yml` runs GoReleaser and publishes the `neo4j-cli` binary to a GitHub Release. `publish-npm.yml` then auto-fires (via `workflow_run`) and publishes `@neo4j-labs/cli` to npm.
+Releases are triggered automatically when a push to `main` modifies `CHANGELOG.md`. `release.yml` runs GoReleaser and publishes the `neo4j-cli` binary to a GitHub Release. `publish-npm.yml` then auto-fires (via `workflow_run`) and publishes `@neo4j-labs/cli` to npm.
 
 ## Release Flow
 
 1. Developer creates a changelog entry with `make changelog` (or `changie new --projects neo4j-cli --kind <kind> --body <body>` non-interactively)
 2. On push to `main`, the `changie` CI workflow:
    - Runs `changie batch auto --project neo4j-cli`
-   - Runs `changie merge` (writes `CHANGELOG-neo4j.md`)
+   - Runs `changie merge` (writes `CHANGELOG.md`)
    - Extracts the version via `changie latest --project neo4j-cli` and strips the `neo4j-cli` prefix with `sed`
    - Opens a release PR titled `Release neo4j-cli vX.Y.Z`
-3. When the release PR is merged (updating `CHANGELOG-neo4j.md`), the `release` workflow fires:
+3. When the release PR is merged (updating `CHANGELOG.md`), the `release` workflow fires:
    - Extracts the version via `changie latest --project neo4j-cli`
    - Generates `release-notes.md` with a `## Changes` section (neo4j-cli body)
    - Sets `GORELEASER_CURRENT_TAG=<version>`
@@ -46,7 +46,7 @@ After `release.yml` succeeds, `.github/workflows/publish-npm.yml` fires via `wor
 
 ## Release Workflow Notes
 
-- Release workflow triggers on `CHANGELOG-neo4j.md` changes (not `CHANGELOG.md`)
+- Release workflow triggers on `CHANGELOG.md` changes
 - Env vars set in an earlier step that need to flow into the GoReleaser action's `env:` block must be re-referenced as `${{ env.<NAME> }}` — GitHub Actions does not auto-forward env vars set by previous steps into action env blocks
 - The neo4j-cli changelog body for a version lives at `.changes/neo4j-cli/<version>.md`; `tail -n +2` strips the `## vX.Y.Z - DATE` header line
 - Job-level `outputs:` block surfaces step outputs to downstream `workflow_run` consumers. To expose a step output, the step needs an `id:` and must `echo "key=val" >> $GITHUB_OUTPUT` — then reference as `${{ steps.<id>.outputs.<key> }}` in the job `outputs:` block. Output is always populated (downstream gates on the value, not whether it was set).

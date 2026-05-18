@@ -81,7 +81,7 @@ Commit the generated files — the `changie` CI workflow batches them and opens 
 
 ## Release Process
 
-Releases are triggered automatically in CI when `CHANGELOG-neo4j.md` is updated on `main`. GoReleaser produces binaries for:
+Releases are triggered automatically in CI when `CHANGELOG.md` is updated on `main`. GoReleaser produces binaries for:
 - `linux/amd64`, `linux/arm64`
 - `windows/amd64`
 - `darwin/amd64`, `darwin/arm64`

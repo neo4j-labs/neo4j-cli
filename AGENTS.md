@@ -106,7 +106,7 @@ Key CLI conventions (see `CONTRIBUTING.md`):
 
 ## Deployment
 
-DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG-neo4j.md` updates on `main`
+DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md` updates on `main`
 
 See [`.agents/deployment.md`](.agents/deployment.md) for changie workflow, release workflow, and GoReleaser gotchas.
 

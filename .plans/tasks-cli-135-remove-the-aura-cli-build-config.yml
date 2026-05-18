@@ -294,6 +294,35 @@ tasks:
       - "The final grep gate returns zero hits (or only the intentional `CHANGELOG.md` pointer footnote and the deleted-file-deletion entries inside `.plans/archive/`)"
     completed_at: 2026-05-18T00:00:00Z
 
+  - id: task-016
+    title: "Collapse CHANGELOG-neo4j.md into CHANGELOG.md"
+    description: |
+      Per Liam's PR review feedback: with only one shipped binary, the
+      redirect-style `CHANGELOG.md` + separate `CHANGELOG-neo4j.md` pair
+      is now redundant. Move the contents of `CHANGELOG-neo4j.md` into
+      `CHANGELOG.md` (replacing the redirect), delete
+      `CHANGELOG-neo4j.md`, and update every reference that still
+      points at the old filename: `.changie.yaml` `projects[].changelog`,
+      `.goreleaser.yaml` `release.extra_files`, the `paths:` trigger in
+      `.github/workflows/release.yml`, the PR body in
+      `.github/workflows/changie.yml`, the historical-pointer line in
+      `.changes/header.tpl.md`, and the doc mentions in `RELEASING.md`,
+      `AGENTS.md`, `.agents/build.md`, `.agents/deployment.md`, and
+      `distribution/npm/README.md`. The `CHANGELOG-aura.md` historical
+      file remains untouched and is now referenced from the new
+      `CHANGELOG.md` header instead.
+    status: completed
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "`CHANGELOG-neo4j.md` does not exist on disk and is not tracked"
+      - "`CHANGELOG.md` contains the version history previously in `CHANGELOG-neo4j.md` plus a one-line historical pointer to `CHANGELOG-aura.md`"
+      - "`.changie.yaml` `projects[0].changelog` is `CHANGELOG.md`"
+      - "`.github/workflows/release.yml` `on.push.paths` lists `CHANGELOG.md` (and not `CHANGELOG-neo4j.md`)"
+      - "`grep -rn 'CHANGELOG-neo4j' .` (excluding `.git`, `.plans`, `.changes`) returns zero hits"
+      - "`make test`, `make fmt-check`, `make lint` all exit 0"
+    completed_at: 2026-05-18T00:00:00Z
+
   - id: task-015
     title: "Add changie entry, push branch, open PR"
     description: |

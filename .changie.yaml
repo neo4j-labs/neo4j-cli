@@ -21,4 +21,4 @@ envPrefix: CHANGIE_
 projects:
     - label: neo4j-cli
       key: neo4j-cli
-      changelog: CHANGELOG-neo4j.md
+      changelog: CHANGELOG.md

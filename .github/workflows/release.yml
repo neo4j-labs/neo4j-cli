@@ -3,7 +3,7 @@ name: release
 on:
   push:
     branches: ["main"]
-    paths: ["CHANGELOG-neo4j.md"]
+    paths: ["CHANGELOG.md"]
 
 jobs:
   release:

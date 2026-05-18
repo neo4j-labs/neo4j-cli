@@ -45,14 +45,14 @@ On every push to `main`, `.github/workflows/changie.yml` runs:
 1. Detects unreleased entries (`grep project: neo4j-cli .changes/unreleased/`).
 2. Computes the next pre-release suffix (`alpha.N+1`).
 3. Runs `changie batch` — folds `.changes/unreleased/*.yaml` into `.changes/neo4j-cli/v<version>.md`.
-4. Runs `changie merge` — appends to `CHANGELOG-neo4j.md`.
+4. Runs `changie merge` — appends to `CHANGELOG.md`.
 5. Opens a PR titled `Release neo4j-cli vX.Y.Z` on a `release/...` branch.
 
 This PR is the *request* to ship. It contains only changelog updates — no source changes. Review it like any other PR.
 
 ## Step 3 — Merge the Release PR (publish gate)
 
-`.github/workflows/release.yml` triggers on pushes to `main` that touch `CHANGELOG-neo4j.md` — merging the Release PR is what does that.
+`.github/workflows/release.yml` triggers on pushes to `main` that touch `CHANGELOG.md` — merging the Release PR is what does that.
 
 The job:
 
