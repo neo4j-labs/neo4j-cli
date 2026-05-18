@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-18T10:00:00Z
+Replaced CLAUDE.md symlink with regular file containing `@AGENTS.md` so the @claude GitHub Action loads project instructions.
+Files: ~CLAUDE.md, ~.plans/tasks-cli-137-make-claude-work-in-repo.yml

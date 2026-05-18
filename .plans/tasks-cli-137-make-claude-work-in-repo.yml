@@ -13,14 +13,14 @@ tasks:
       with a regular file whose only contents are `@AGENTS.md` plus a
       trailing newline — Claude Code's file-include directive then loads
       `AGENTS.md` while we keep a single source of truth.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`ls -la CLAUDE.md` shows a regular file (e.g. `-rw-r--r--`), not a symlink"
       - "`cat CLAUDE.md` outputs exactly `@AGENTS.md` followed by one trailing newline"
       - "`git diff --cached -- CLAUDE.md` (or post-commit `git show`) shows mode change 120000 -> 100644 plus the new blob"
       - "`AGENTS.md` content is unchanged by this task"
-    completed_at: null
+    completed_at: 2026-05-18T10:00:00Z
 
   - id: task-002
     title: "Drop stale 'CLAUDE.md is a symlink' bullet from AGENTS.md"
