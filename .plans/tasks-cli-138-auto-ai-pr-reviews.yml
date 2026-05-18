@@ -47,7 +47,7 @@ tasks:
       the final step. AGENTS.md loads automatically via CLAUDE.md's
       `@AGENTS.md` include, so reference rules by name; don't inline
       them verbatim.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "File `.github/prompts/claude-review-conventions.md` exists"
@@ -55,7 +55,7 @@ tasks:
       - "Prompt instructs Claude to consult AGENTS.md (already loaded via CLAUDE.md include) rather than inlining the rules"
       - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
       - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-003
     title: "Add .github/workflows/claude-review-security.yml with verdict-to-red-check mechanism"

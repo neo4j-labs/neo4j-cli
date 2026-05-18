@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-18T00:00:00Z
 Authored security-review prompt covering golang-security scope (injection/crypto/filesystem/network/cookies/secrets/memory/logging) with inline-comment + verdict-file output contract; no-op path when diff has no Go changes.
 Files: +.github/prompts/claude-review-security.md
+
+## task-002 — 2026-05-18T00:00:00Z
+Authored conventions-review prompt mirroring security prompt shape; enumerates AGENTS.md gates (cobra layout, license header, changelog, skill-bundle regen, Example field, gofmt/lint, command naming, --format/--wait); references AGENTS.md via CLAUDE.md include instead of inlining rules; no-op path when diff has no changes under neo4j-cli/, common/, or .changes/.
+Files: +.github/prompts/claude-review-conventions.md
