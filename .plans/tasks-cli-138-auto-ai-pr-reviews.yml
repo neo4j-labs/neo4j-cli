@@ -259,7 +259,7 @@ tasks:
       to `/tmp/claude-verdict.txt` and post a top-level comment naming
       the failure (e.g. `⚠️ golang-security skill unavailable — pin
       may be broken`). Do NOT fall back to hand-rolled checks.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -270,7 +270,7 @@ tasks:
       - "No-op path for non-Go PRs preserved (emits `pass`)"
       - "Failure clause: skill failure writes `fail` + posts a top-level comment naming the failure mode; no fallback to hand-rolled checks"
       - "`make test`, `make fmt-check`, `make lint` pass"
-    completed_at: null
+    completed_at: 2026-05-18T12:00:00Z
 
   - id: task-010
     title: "Extend smoke-test runbook with pin-break + skill-success scenarios"
