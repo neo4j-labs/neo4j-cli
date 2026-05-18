@@ -105,7 +105,7 @@ tasks:
       SHA, tool allowlist, and verdict mechanism are identical to
       task-003. Two files are intentional — each is its own check on
       the PR, independently re-runnable.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -115,7 +115,7 @@ tasks:
       - "Prompt body is loaded from `.github/prompts/claude-review-conventions.md`"
       - "Workflow `name:` is `Claude Review — Conventions`"
       - "Enforce-verdict step exits non-zero on `fail` or missing verdict file with a conventions-specific error message"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-005
     title: "Smoke-test on a PR: green path, both red paths, draft skip, bot skip, mention coexistence"
