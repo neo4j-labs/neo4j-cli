@@ -595,7 +595,7 @@ func TestGetImportJobById(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs/%s", organizationId, projectId, jobId), http.StatusOK, tt.mockResponse)
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			helper.ExecuteCommand(tt.executeCommand)
 
@@ -644,7 +644,7 @@ func TestGetImportJobByIdWithOrganizationAndProjectIdFromConfig(t *testing.T) {
         "user_id": "f607bebe-0cc0-4166-b60c-b4eed69ee7ee"
     }}`)
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("import job get %s --format=table", jobId))
 
@@ -679,7 +679,7 @@ func TestGetImportJobByIdWithTrailingNewline(t *testing.T) {
         "import_type": "cloud"
     }}`, jobId))
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s\"\n\"", organizationId, projectId, jobId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -763,7 +763,7 @@ func TestGetImportJobError(t *testing.T) {
 
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/import/jobs/%s", organizationId, projectId, jobId), testCase.statusCode, testCase.returnBody)
 
-			helper.SetConfigValue("aura.beta-enabled", true)
+			helper.SetConfigValue("flag.aura-beta", true)
 
 			helper.ExecuteCommand(testCase.executeCommand)
 

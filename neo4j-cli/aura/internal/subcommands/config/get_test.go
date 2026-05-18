@@ -63,7 +63,7 @@ func TestGetConfigBetaEnabled(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("aura.beta-enabled", true)
+	helper.SetConfigValue("flag.aura-beta", true)
 
 	helper.ExecuteCommand("config get beta-enabled")
 

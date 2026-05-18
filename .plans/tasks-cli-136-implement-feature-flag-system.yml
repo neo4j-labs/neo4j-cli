@@ -132,7 +132,8 @@ tasks:
       sweep, run the full test suite — all renamed tests must still
       pass (they now flow through the primary flag.aura-beta path
       rather than the legacy fallback).
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T17:30:00Z
     dependencies:
       - task-002
     acceptance_criteria:

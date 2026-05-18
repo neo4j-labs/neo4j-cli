@@ -145,7 +145,7 @@ func TestNeo4jConfigAuraNoLongerExists(t *testing.T) {
 func TestNeo4jConfigProjectBetaGated(t *testing.T) {
 	t.Run("config project list available when beta enabled", func(t *testing.T) {
 		h := newNeo4jTestHelper(t)
-		h.setConfigValue("aura.beta-enabled", true)
+		h.setConfigValue("flag.aura-beta", true)
 		h.setConfigValue("format", "json")
 		h.executeCommand("config project list")
 		// With no projects configured, the output should succeed with no error

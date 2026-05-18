@@ -12,3 +12,7 @@ Decisions: deviated from task description — skipped Viper.SetDefault on both p
 Wired config set/get to FlagScope. set.go routes to cfg.Flags.SetFromConfigCmd; get.go builds PrintableConfigEntry via cfg.Flags.Enabled. Added set tests (accepted, invalid value, unknown key) and get tests (default false, configured true, list excludes flag.*). Manual smoke verified.
 Files: ~neo4j-cli/internal/subcommands/config/set.go, ~neo4j-cli/internal/subcommands/config/get.go, ~neo4j-cli/internal/subcommands/config/set_test.go, ~neo4j-cli/internal/subcommands/config/get_test.go
 Decisions: get.go Args swapped from cobra.OnlyValidArgs to ResolveConfigKey (matches set.go) — OnlyValidArgs would reject flag.* keys since validGetArgs intentionally excludes them from tab-completion. Two existing get tests rebased onto the ResolveConfigKey error message format.
+
+## task-004 — 2026-05-18T17:30:00Z
+Mechanical rename sweep: aura.beta-enabled → flag.aura-beta across 33 _test.go files (116 occurrences). Excluded common/clicfg/flags.go (LegacyKey value) and common/clicfg/flags_test.go (legacy-path tests). Tests pass via primary registry path; symmetric 117/117 diff.
+Files: ~33 _test.go files under neo4j-cli/aura/internal/subcommands/** plus neo4j-cli/internal/subcommands/config/project_test.go
