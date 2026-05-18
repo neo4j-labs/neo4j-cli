@@ -119,7 +119,7 @@ tasks:
       suite's fixture HTTP server can return a 404, add a second case exercising `aura instance get does-not-exist
       --format=json` and assert error.code == "not_found" and error.resource_type == "instance". Follow the existing
       subprocess test scaffolding in that file.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-005
@@ -128,7 +128,7 @@ tasks:
       - "JSON envelope assertions cover code, exit_code, and (where applicable) resource_type/resource_id"
       - "Test file remains build-tagged e2e_exitcodes per existing convention"
       - "make test runs the e2e suite cleanly (or the existing CI tag handling continues to gate it)"
-    completed_at: null
+    completed_at: 2026-05-18T17:30:00Z
 
   - id: task-007
     title: "Changelog entry, final gates, and manual smoke"

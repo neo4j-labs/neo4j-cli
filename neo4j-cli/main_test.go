@@ -133,3 +133,57 @@ func TestRender_PlaintextMode(t *testing.T) {
 	assert.Empty(t, stdout.String(), "plaintext mode must not write to stdout")
 	assert.Equal(t, "Error: instance missing (exit 3)\ncheck the id\n", stderr.String())
 }
+
+// TestResolveFormatForRender covers the flag-parse-fallback used by main.go
+// to pick a --format value when PersistentPreRunE never ran (e.g. cobra
+// rejected a flag before format binding). When the bound value is already
+// concrete the bound value is returned untouched.
+func TestResolveFormatForRender(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		args  []string
+		bound string
+		want  string
+	}{
+		{
+			name:  "bound concrete value passes through",
+			args:  []string{"aura", "instance", "list", "--format=table"},
+			bound: "json",
+			want:  "json",
+		},
+		{
+			name:  "default bound + --format=json peeks",
+			args:  []string{"aura", "instance", "list", "--bad-flag", "--format=json"},
+			bound: "default",
+			want:  "json",
+		},
+		{
+			name:  "default bound + space-separated --format peeks",
+			args:  []string{"aura", "instance", "list", "--format", "toon", "--bad-flag"},
+			bound: "default",
+			want:  "toon",
+		},
+		{
+			name:  "default bound + no --format stays default",
+			args:  []string{"aura", "instance", "list", "--bad-flag"},
+			bound: "default",
+			want:  "default",
+		},
+		{
+			name:  "default bound + invalid --format value stays default",
+			args:  []string{"aura", "instance", "list", "--format=bogus"},
+			bound: "default",
+			want:  "default",
+		},
+		{
+			name:  "empty bound + --format=json peeks",
+			args:  []string{"--format=json", "anything"},
+			bound: "",
+			want:  "json",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, resolveFormatForRender(tc.args, tc.bound))
+		})
+	}
+}

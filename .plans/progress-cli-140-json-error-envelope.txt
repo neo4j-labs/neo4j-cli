@@ -20,3 +20,8 @@ Decisions: No circular import (clierr leaf); kept agentcontext-side gate test ev
 404 branch in handleResponseError now chains .WithResource onto NewNotFoundError; added parseResourceFromRequest helper (skips version segment, singularises plural) and trailing-s singularise. Table-driven tests cover instance/tenant/CMK paths, nested subpaths, short/empty/nil request paths, plus end-to-end 404 -> typed *CLIError ResourceType/ResourceID assertions.
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
 Decisions: Used trailing-s strip not a static plural→singular map; Aura plurals are uniform and the helper falls back to the raw segment for non-s endings.
+
+## TASK-006 — 2026-05-18T17:30:00Z
+Added two --format=json e2e cases (bad_flag_usage_2_json + not_found_404_get_json) and JSON envelope assertion helpers in exitcodes_test.go; fixture mux now also serves /v1/instances/<id> subpaths. Closed the flag-parse format gap by adding resolveFormatForRender + peekFormatFromArgs in main.go so a failed flag-parse with --format=json still emits the JSON envelope; covered by table-driven unit test.
+Files: ~test/e2e/exitcodes/exitcodes_test.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: extractEnvelope scans backwards for `{...}` lines because cobra dumps the usage block to stdout ahead of the envelope on flag-parse failure; peek picks first --format hit (last-wins would only matter for repeated flags in failed parses).
