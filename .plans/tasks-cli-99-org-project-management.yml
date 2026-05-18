@@ -425,7 +425,8 @@ tasks:
 
       neo4j-cli/internal/subcommands/config/set.go:
       - Update Example text: "aura.default-context" → "aura.default-workspace".
-    status: not_started
+    status: completed
+    completed_at: 2026-05-18T11:00:00Z
     dependencies:
       - task-016
     acceptance_criteria:

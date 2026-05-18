@@ -85,7 +85,7 @@ func TestListProjects(t *testing.T) {
 	}
 }
 
-func TestListProjectsFromDefaultContext(t *testing.T) {
+func TestListProjectsFromDefaultWorkspace(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-999"
 
@@ -139,7 +139,7 @@ func TestListProjectsMissingOrganizationId(t *testing.T) {
 
 	helper.ExecuteCommand("project list")
 
-	helper.AssertErrContainsStrings([]string{"organization-id", "aura.default-context"})
+	helper.AssertErrContainsStrings([]string{"organization-id", "aura.default-workspace"})
 }
 
 func TestListProjectsWithInvalidFormat(t *testing.T) {

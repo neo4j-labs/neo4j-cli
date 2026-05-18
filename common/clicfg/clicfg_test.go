@@ -41,10 +41,10 @@ func TestResolveConfigKey(t *testing.T) {
 		},
 		{
 			name:          "aura-prefixed key resolves to aura namespace with prefix stripped",
-			key:           "aura.default-context",
+			key:           "aura.default-workspace",
 			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.AuraScope,
-			wantKey:       "default-context",
+			wantKey:       "default-workspace",
 		},
 		{
 			name:          "aura.base-url resolves to aura namespace",
@@ -136,17 +136,17 @@ func TestDefaultTenant(t *testing.T) {
 		want       string
 	}{
 		{
-			name:       "returns project portion of aura.default-context when set",
-			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz"}}`,
+			name:       "returns project portion of aura.default-workspace when set",
+			configJSON: `{"aura":{"default-workspace":"org-abc/proj-xyz"}}`,
 			want:       "proj-xyz",
 		},
 		{
-			name:       "returns project portion when context has extra slashes",
-			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz/extra"}}`,
+			name:       "returns project portion when workspace has extra slashes",
+			configJSON: `{"aura":{"default-workspace":"org-abc/proj-xyz/extra"}}`,
 			want:       "extra",
 		},
 		{
-			name:       "falls back to aura.default-tenant when default-context is unset",
+			name:       "falls back to aura.default-tenant when default-workspace is unset",
 			configJSON: `{"aura":{"default-tenant":"legacy-tenant-id"}}`,
 			want:       "legacy-tenant-id",
 		},
@@ -156,8 +156,8 @@ func TestDefaultTenant(t *testing.T) {
 			want:       "",
 		},
 		{
-			name:       "default-context takes priority over default-tenant when both are set",
-			configJSON: `{"aura":{"default-context":"org-abc/proj-xyz","default-tenant":"legacy-tenant-id"}}`,
+			name:       "default-workspace takes priority over default-tenant when both are set",
+			configJSON: `{"aura":{"default-workspace":"org-abc/proj-xyz","default-tenant":"legacy-tenant-id"}}`,
 			want:       "proj-xyz",
 		},
 	}

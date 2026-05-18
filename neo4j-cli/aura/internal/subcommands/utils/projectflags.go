@@ -15,11 +15,11 @@ const (
 	PROJECT_ID_FLAG      = "project-id"
 )
 
-// defaultOrgAndProject parses the aura.default-context slug ("{orgId}/{projectId}")
-// and returns the org and project portions. Returns empty strings when the context
+// defaultOrgAndProject parses the aura.default-workspace slug ("{orgId}/{projectId}")
+// and returns the org and project portions. Returns empty strings when the workspace
 // is not set or does not contain a '/'.
 func defaultOrgAndProject(cfg *clicfg.Config) (orgID, projectID string) {
-	ctx := cfg.Aura.DefaultContext()
+	ctx := cfg.Aura.DefaultWorkspace()
 	if ctx == "" {
 		return "", ""
 	}
@@ -31,7 +31,7 @@ func defaultOrgAndProject(cfg *clicfg.Config) (orgID, projectID string) {
 }
 
 // SetProjectFlagsAsRequired is meant to run in the PreRun of V2 commands to ensure
-// that the flags are marked as required if no values have been set via aura.default-context.
+// that the flags are marked as required if no values have been set via aura.default-workspace.
 func SetProjectFlagsAsRequired(cfg *clicfg.Config, cmd *cobra.Command) error {
 	orgID, projectID := defaultOrgAndProject(cfg)
 
@@ -51,7 +51,7 @@ func SetProjectFlagsAsRequired(cfg *clicfg.Config, cmd *cobra.Command) error {
 }
 
 // SetProjetDefaults is meant to run in the RunE of V2 commands to fill in org/project
-// from aura.default-context when the flags were not provided on the command line.
+// from aura.default-workspace when the flags were not provided on the command line.
 func SetProjetDefaults(cfg *clicfg.Config, organizationId string, projectId string) (string, string, error) {
 	defaultOrg, defaultProject := defaultOrgAndProject(cfg)
 

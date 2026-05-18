@@ -19,8 +19,8 @@ neo4j-cli aura config list
 # Emit configuration as JSON for scripting
 neo4j-cli aura config list --format json
 
-# Pipe through jq to print just the default-context value
-neo4j-cli aura config list --format json | jq -r '."default-context"'`,
+# Pipe through jq to print just the default-workspace value
+neo4j-cli aura config list --format json | jq -r '."default-workspace"'`,
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			output.PrintBodyMap(cmd, cfg, cfg.Printable(), configPrintFields)

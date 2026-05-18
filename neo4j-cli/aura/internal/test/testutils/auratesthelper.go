@@ -109,7 +109,7 @@ func (helper *AuraTestHelper) SeedFile(path, content string) {
 }
 
 func (helper *AuraTestHelper) SetDefaultProjectInConfig(organizationId, projectId string) {
-	helper.SetConfigValue("aura.default-context", organizationId+"/"+projectId)
+	helper.SetConfigValue("aura.default-workspace", organizationId+"/"+projectId)
 }
 
 // Assets no errors were returned

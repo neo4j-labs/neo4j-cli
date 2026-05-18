@@ -26,7 +26,7 @@ func TestConfigList(t *testing.T) {
 			wantOut: `{
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
-	"aura.default-context": null,
+	"aura.default-workspace": null,
 	"format": "default",
 	"skill-auto-refresh": true,
 	"telemetry": true
@@ -41,7 +41,7 @@ func TestConfigList(t *testing.T) {
 			wantOut: `{
 	"aura.auth-url": "https://api.neo4j.io/oauth/token",
 	"aura.base-url": "https://api.neo4j.io",
-	"aura.default-context": null,
+	"aura.default-workspace": null,
 	"format": "json",
 	"skill-auto-refresh": true,
 	"telemetry": true

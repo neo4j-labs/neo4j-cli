@@ -58,6 +58,6 @@ func TestListConfigFormatAppearsOnce(t *testing.T) {
 	outStr := helper.PrintOut()
 	assert.Equal(t, 1, strings.Count(outStr, "format"), "expected \"format\" to appear exactly once in list output")
 	// aura keys must appear without the "aura." prefix
-	assert.Contains(t, outStr, "default-context")
-	assert.NotContains(t, outStr, "aura.default-context")
+	assert.Contains(t, outStr, "default-workspace")
+	assert.NotContains(t, outStr, "aura.default-workspace")
 }

@@ -21,7 +21,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "list",
 		Short: "Returns a list of projects",
 		Long:  "This subcommand returns a list of Aura projects within the given organization.",
-		Example: `# List all projects in the default organization (from aura.default-context)
+		Example: `# List all projects in the default organization (from aura.default-workspace)
 neo4j-cli aura project list
 
 # List projects in a specific organization
@@ -32,10 +32,10 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 		RunE: func(cmd *cobra.Command, args []string) error {
 			orgID := organizationId
 			if orgID == "" {
-				orgID = resolveOrgFromContext(cfg)
+				orgID = resolveOrgFromWorkspace(cfg)
 			}
 			if orgID == "" {
-				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-context is not configured")
+				return fmt.Errorf("required flag \"organization-id\" not set and aura.default-workspace is not configured")
 			}
 
 			cmd.SilenceUsage = true
@@ -55,15 +55,15 @@ neo4j-cli aura project list --organization-id 00000000-0000-0000-0000-0000000000
 		},
 	}
 
-	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (defaults to org portion of aura.default-context)")
+	cmd.Flags().StringVar(&organizationId, "organization-id", "", "Organization ID (defaults to org portion of aura.default-workspace)")
 
 	return cmd
 }
 
-// resolveOrgFromContext returns the organization portion of aura.default-context,
-// or an empty string when not set or the context has no '/'.
-func resolveOrgFromContext(cfg *clicfg.Config) string {
-	ctx := cfg.Aura.DefaultContext()
+// resolveOrgFromWorkspace returns the organization portion of aura.default-workspace,
+// or an empty string when not set or the workspace has no '/'.
+func resolveOrgFromWorkspace(cfg *clicfg.Config) string {
+	ctx := cfg.Aura.DefaultWorkspace()
 	if ctx == "" {
 		return ""
 	}

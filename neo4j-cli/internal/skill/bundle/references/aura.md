@@ -766,12 +766,12 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--organization-id` | string | - | Organization ID (defaults to org portion of aura.default-context) |
+| `--organization-id` | string | - | Organization ID (defaults to org portion of aura.default-workspace) |
 
 Examples:
 
 ```
-# List all projects in the default organization (from aura.default-context)
+# List all projects in the default organization (from aura.default-workspace)
 neo4j-cli aura project list
 
 # List projects in a specific organization

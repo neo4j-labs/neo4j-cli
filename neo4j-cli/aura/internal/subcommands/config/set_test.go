@@ -60,7 +60,7 @@ func TestSetBetaEnabledConfig(t *testing.T) {
 	helper.AssertErr("Error: invalid config key specified: beta-enabled")
 }
 
-func TestSetDefaultContext(t *testing.T) {
+func TestSetDefaultWorkspace(t *testing.T) {
 	const orgID = "org-111"
 	const projectID = "proj-222"
 	const slug = orgID + "/" + projectID
@@ -74,7 +74,7 @@ func TestSetDefaultContext(t *testing.T) {
 		wantErr     string
 	}{
 		{
-			name:        "success persists default-context",
+			name:        "success persists default-workspace",
 			slug:        slug,
 			status:      http.StatusOK,
 			body:        fmt.Sprintf(`{"data": [{"id": "%s", "name": "My Project"}]}`, projectID),
@@ -120,7 +120,7 @@ func TestSetDefaultContext(t *testing.T) {
 					tc.body,
 				)
 
-				helper.ExecuteCommand(fmt.Sprintf("config set default-context %s --rw", tc.slug))
+				helper.ExecuteCommand(fmt.Sprintf("config set default-workspace %s --rw", tc.slug))
 
 				if tc.wantErr != "" {
 					helper.AssertErrContainsStrings([]string{tc.wantErr})
@@ -134,7 +134,7 @@ func TestSetDefaultContext(t *testing.T) {
 				return
 			}
 
-			helper.ExecuteCommand(fmt.Sprintf("config set default-context %s --rw", tc.slug))
+			helper.ExecuteCommand(fmt.Sprintf("config set default-workspace %s --rw", tc.slug))
 
 			if tc.wantErr != "" {
 				helper.AssertErrContainsStrings([]string{tc.wantErr})
