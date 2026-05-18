@@ -134,6 +134,32 @@ func TestUpdateMemoryAndName(t *testing.T) {
 	}`)
 }
 
+func TestUpdateInstanceWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	instanceId := "2f49c2b3"
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusAccepted, `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "Production",
+			"status": "updating",
+			"connection_url": "YOUR_CONNECTION_URL",
+			"tenant_id": "YOUR_TENANT_ID",
+			"cloud_provider": "gcp",
+			"memory": "8GB",
+			"region": "europe-west1",
+			"type": "enterprise-db"
+		}
+	}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("instance update %s\"\n\" --memory 8GB --rw", instanceId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodPatch)
+}
+
 func TestUpdateErrorsWithNoFlags(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

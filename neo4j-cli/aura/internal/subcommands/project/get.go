@@ -6,6 +6,7 @@ package project
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -30,7 +31,7 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --organization-i
 neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			projectID := args[0]
+			projectID := strings.TrimSpace(args[0])
 
 			orgID := organizationId
 			if orgID == "" {

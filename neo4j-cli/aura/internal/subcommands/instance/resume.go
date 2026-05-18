@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -39,7 +40,8 @@ neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --wait --rw
 neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := fmt.Sprintf("/instances/%s/resume", args[0])
+			instanceId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/instances/%s/resume", instanceId)
 
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{

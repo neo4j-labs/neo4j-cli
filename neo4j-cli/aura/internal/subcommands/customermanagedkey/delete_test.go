@@ -39,6 +39,22 @@ func TestDeleteCustomerManagedKey(t *testing.T) {
 	}
 }
 
+func TestDeleteCustomerManagedKeyWithTrailingNewline(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	cmkId := "8c764aed-8eb3-4a1c-92f6-e4ef0c7a6ed9"
+
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusNoContent, "")
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s\"\n\" --rw", cmkId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+
+	helper.AssertErrContainsStrings([]string{fmt.Sprintf("customer-managed-key %s deleted", cmkId)})
+}
+
 // TestDeleteCustomerManagedKey_StdoutIsValidJSON is the CLI-82 regression-pin
 // for the delete-success narration: pre-fix, stdout had "Operation Successful"
 // instead of structured JSON. Reverting the Pattern B fmt.Fprintf/PrintBodyMap

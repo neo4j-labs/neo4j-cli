@@ -5,6 +5,7 @@ package workspace
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/spf13/cobra"
@@ -43,7 +44,7 @@ neo4j-cli aura workspace use 00000000-0000-0000-0000-000000000000/11111111-1111-
 			var slug string
 
 			if hasSlug {
-				slug = args[0]
+				slug = strings.TrimSpace(args[0])
 			} else {
 				if organizationId == "" {
 					return fmt.Errorf("required flag \"organization-id\" not set")

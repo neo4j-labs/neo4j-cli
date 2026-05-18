@@ -69,6 +69,26 @@ func TestGetOrganization(t *testing.T) {
 	}
 }
 
+func TestGetOrganizationWithTrailingNewline(t *testing.T) {
+	const orgID = "org-111"
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetConfigValue("aura.beta-enabled", true)
+
+	mockHandler := helper.NewRequestHandlerMock(
+		fmt.Sprintf("/v2beta1/organizations/%s", orgID),
+		http.StatusOK,
+		`{"data": {"id": "org-111", "name": "Production Org"}}`,
+	)
+
+	helper.ExecuteCommand(fmt.Sprintf("organization get %s\"\n\"", orgID))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+}
+
 func TestGetOrganizationMissingPositionalArg(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()

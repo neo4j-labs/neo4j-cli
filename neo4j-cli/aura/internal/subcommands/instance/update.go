@@ -6,6 +6,7 @@ package instance
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -41,6 +42,7 @@ neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --memory 8GB
 neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-renamed-instance --memory 8GB --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			instanceId := strings.TrimSpace(args[0])
 			body := map[string]any{}
 
 			if memory != "" {
@@ -51,7 +53,7 @@ neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --name my-re
 				body["name"] = name
 			}
 
-			path := fmt.Sprintf("/instances/%s", args[0])
+			path := fmt.Sprintf("/instances/%s", instanceId)
 
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
