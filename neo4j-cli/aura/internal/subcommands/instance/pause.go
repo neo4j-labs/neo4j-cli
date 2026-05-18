@@ -6,6 +6,7 @@ package instance
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -35,7 +36,8 @@ neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format
 neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --rw --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := fmt.Sprintf("/instances/%s/pause", args[0])
+			instanceId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/instances/%s/pause", instanceId)
 
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{

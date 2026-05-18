@@ -6,6 +6,7 @@ package graphql
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -51,6 +52,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --instanc
 neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			graphqlId := strings.TrimSpace(args[0])
 			body := map[string]any{}
 
 			if name != "" {
@@ -79,7 +81,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-de
 			}
 
 			cmd.SilenceUsage = true
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, args[0])
+			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:   http.MethodPatch,
@@ -95,7 +97,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-de
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be updated...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, args[0], api.GraphQLDataApiStatusUpdating)
+					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, graphqlId, api.GraphQLDataApiStatusUpdating)
 					if err != nil {
 						return err
 					}

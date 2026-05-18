@@ -19,7 +19,8 @@ tasks:
       id))`, assert the mock was called exactly once with the trimmed
       path. Commit as a single commit on branch
       `oskar/cli-139-trim-args0-remaining`.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T12:30:00Z
     dependencies: []
     acceptance_criteria:
       - "Files modified: `neo4j-cli/aura/internal/subcommands/instance/{delete,pause,resume,update}.go`, `neo4j-cli/aura/internal/subcommands/instance/snapshot/get.go`, `neo4j-cli/aura/internal/subcommands/customermanagedkey/{get,delete}.go`, `neo4j-cli/aura/internal/subcommands/dataapi/graphql/{get,delete,pause,resume,update}.go`, `neo4j-cli/aura/internal/subcommands/dataapi/graphql/authprovider/{get,delete}.go`, `neo4j-cli/aura/internal/subcommands/graphanalytics/session/{get,delete}.go` — 16 files total"

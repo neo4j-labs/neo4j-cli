@@ -6,6 +6,7 @@ package graphql
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -38,7 +39,8 @@ neo4j-cli aura data-api graphql resume 11111111 --instance-id 00000000 --rw --fo
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/resume", instanceId, args[0])
+			graphqlId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/resume", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method: http.MethodPost,
@@ -53,7 +55,7 @@ neo4j-cli aura data-api graphql resume 11111111 --instance-id 00000000 --rw --fo
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be resumed...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, args[0], api.GraphQLDataApiStatusResuming)
+					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, graphqlId, api.GraphQLDataApiStatusResuming)
 					if err != nil {
 						return err
 					}

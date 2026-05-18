@@ -6,6 +6,7 @@ package session
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
@@ -29,7 +30,8 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --rw > /dev/null`,
 		Long: `This subcommand deletes a Graph Analytics Serverless session by id.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := fmt.Sprintf("/graph-analytics/sessions/%s", args[0])
+			sessionId := strings.TrimSpace(args[0])
+			path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionId)
 
 			cmd.SilenceUsage = true
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
