@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Trim whitespace from positional ID args in remaining aura subcommands (CLI-139)
-time: 2026-05-18T12:56:35.49172+02:00

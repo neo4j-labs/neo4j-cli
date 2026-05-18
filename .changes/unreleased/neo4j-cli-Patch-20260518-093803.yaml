@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Add 'upgrade' alias for the update command and 'did you mean' suggestions for typo'd subcommands
-time: 2026-05-18T09:38:03.08413+02:00

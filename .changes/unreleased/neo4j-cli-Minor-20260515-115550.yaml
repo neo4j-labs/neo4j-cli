@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add 'docker' command tree for managing local Neo4j containers (CLI-123)
-time: 2026-05-15T11:55:50.706656+02:00
