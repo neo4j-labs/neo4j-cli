@@ -1,0 +1,4 @@
+## task-001 — 2026-05-18T07:30:00Z
+Added common/clicmd package with SuggestSubcommand Args validator and idempotent ApplySuggestionsToParents walker; unit tests cover all three guards and depth-3 recursion.
+Files: +common/clicmd/suggest.go, +common/clicmd/suggest_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+Decisions: replicated cobra's unexported findSuggestions formatting (incl. lazy default of SuggestionsMinimumDistance=2) because exported SuggestionsFor returns []string and otherwise yields zero suggestions when the field is 0.
