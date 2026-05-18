@@ -26,6 +26,8 @@ Flags:
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
 
 ## aura-cli instance create
 
@@ -39,7 +41,7 @@ If you're unsure of possible configurations, run 'tenant get' to discover the fu
 
 Creating an instance is an asynchronous operation that can be waited for with --wait. You can poll the current status of this operation by periodically getting the instance details for the instance ID using the get subcommand. Once the status transitions from "creating" to "running" you may begin to use your instance.
 
-This subcommand returns your instance ID, initial credentials, connection URL along with your tenant id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
+This subcommand returns your instance ID, initial credentials, connection URL along with your project id, cloud provider, region, instance type, and the instance name for you to use once the instance is running. It is important to store these initial credentials until you have the chance to login to your running instance and change them.
 
 For Enterprise instances you can specify a --customer-managed-key-id flag to use a Customer Managed Key for encryption.
 
@@ -58,7 +60,6 @@ Flags:
 | `--no-credential-print` | bool | false | Omit the password from the command output. |
 | `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
 | `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'tenant get' to see the full list of supported regions for your tenant. |
-| `--tenant-id` | string | - | The Aura tenant/project ID |
 | `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
 | `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
 | `--version` | string | 5 | The Neo4j version of the instance. |
@@ -68,13 +69,13 @@ Examples:
 
 ```
 # Create a free-db instance (no cloud provider, region, or memory required)
-neo4j-cli aura instance create --type free-db --wait --rw
+neo4j-cli aura instance create --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --type free-db --wait --rw
 
 # Create a professional-db instance on AWS (us-east-1, N. Virginia)
-neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider aws --region us-east-1 --memory 1GB
+neo4j-cli aura instance create --rw --name my-aws-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider aws --region us-east-1 --memory 1GB
 
 # Create a professional-db instance on GCP and emit JSON for scripting
-neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --tenant-id 00000000-0000-0000-0000-000000000000 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
+neo4j-cli aura instance create --rw --name my-gcp-instance --type professional-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --cloud-provider gcp --region europe-west1 --memory 8GB --format json
 ```
 
 ## aura-cli instance delete
@@ -127,29 +128,23 @@ neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --format json |
 
 Returns a list of instances
 
-This subcommand returns a list containing a summary of each of your Aura instances. To find out more about a specific instance, retrieve the details using the get subcommand.
+This subcommand returns a list containing a summary of each of your Aura instances in the specified project. To find out more about a specific instance, retrieve the details using the get subcommand.
 
-You can filter instances in a particular tenant using --tenant-id. If the tenant flag is not specified, this subcommand lists all instances a user has access to across all tenants.
+Use --organization-id and --project-id to specify which project's instances to list, or configure a default with 'aura workspace use <org-id>/<project-id>'.
 
-Usage: `aura-cli instance list [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--tenant-id` | string | - | An optional Tenant ID to filter instances in a tenant |
+Usage: `aura-cli instance list`
 
 Examples:
 
 ```
-# List all instances the current user has access to
+# List instances in a project (using flags)
+neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List instances using a configured default workspace
 neo4j-cli aura instance list
 
-# List instances in a specific tenant
-neo4j-cli aura instance list --tenant-id 00000000-0000-0000-0000-000000000000
-
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura instance list --format json
+neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ## aura-cli instance overwrite

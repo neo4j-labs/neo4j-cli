@@ -73,7 +73,7 @@ tasks:
       query parameter. Update `instance create` to call `ResolveAndValidateOrgProject` then
       inject the resolved projectID as `tenantId` in the POST body. Apply `RenameResponseField`
       to responses and update field lists. Add or update colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -85,7 +85,7 @@ tasks:
       - "Both commands fail with a clear error when org or project cannot be resolved"
       - "Output shows `project_id` instead of `tenant_id` in all formats"
       - "Table-driven tests cover happy path (flags), happy path (workspace config), missing org, missing project, project-not-in-org"
-    completed_at: null
+    completed_at: "2026-05-18T03:00:00Z"
 
   - id: task-005
     title: "Apply org/project enforcement to instance get, delete, update, pause, resume"
