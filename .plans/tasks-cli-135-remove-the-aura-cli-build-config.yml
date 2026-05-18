@@ -214,7 +214,7 @@ tasks:
       "aura.NewStandaloneCmd" half; remove the trailing "Same applies
       to any new top-level mount on `aura.NewStandaloneCmd` (aura-cli
       bundle)" clause in line 21. Satisfies REQ-F-011.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -222,7 +222,7 @@ tasks:
       - "The 'Skill cobra mount' bullet references only `app.NewCmd` as the mount site"
       - "The 'aura-cli generator imports' bullet is removed"
       - "Markdown renders cleanly"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-012
     title: "Scrub aura-cli mentions from distribution/npm/README.md"

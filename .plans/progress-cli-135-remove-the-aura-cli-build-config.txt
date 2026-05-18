@@ -34,3 +34,7 @@ Files: ~.agents/build.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config
 ## TASK-010 — 2026-05-18T00:00:00Z
 Rewrote `.agents/deployment.md` as single-binary docs: dropped "Dual-Binary Releases", "Versioning Policy", and "Dual-Version Injection" sections; rewrote Strategy/Release Flow/macOS Code Signing/npm Publication to drop aura-cli, `AURA_CLI_VERSION`, `include_neo4j`, and `CHANGELOG-aura` references.
 Files: ~.agents/deployment.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-011 — 2026-05-18T00:00:00Z
+Trimmed aura-cli bullets from `.agents/repo-layout.md`: removed generator-imports bullet, AuraBetaEnabled bullet, the aura-cli half of the Skill cobra mount bullet, and the trailing aura-cli-bundle clause on the regen bullet. Also reworded line 6 NewStandaloneCmd description (was "aura-cli binary") to "kept for generator/test use" so the file has zero aura-cli mentions.
+Files: ~.agents/repo-layout.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
