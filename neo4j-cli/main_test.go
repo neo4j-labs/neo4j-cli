@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRecoverPanic_RedactsSecretArgs verifies that the panic-recover path in
@@ -99,6 +101,89 @@ func TestExitCodeFor(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, exitCodeFor(tc.err))
+		})
+	}
+}
+
+// TestRender_JSONMode exercises the json-format branch wired into main.go:
+// stdout holds a parseable envelope, stderr the one-line summary.
+func TestRender_JSONMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	clierr.Render(clierr.NewUsageError("bad flag"), &stdout, &stderr, "json")
+
+	var env clierr.Envelope
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &env), "stdout must be valid JSON envelope")
+	assert.Equal(t, "usage_error", env.Error.Code)
+	assert.Equal(t, 2, env.Error.ExitCode)
+	assert.Equal(t, "bad flag", env.Error.Message)
+	assert.False(t, env.Error.Retryable)
+
+	assert.Equal(t, "Error: bad flag (exit 2)\n", stderr.String())
+}
+
+// TestRender_PlaintextMode exercises the default branch: stdout untouched,
+// stderr gets `Error: ... (exit N)` plus an optional suggestion line.
+func TestRender_PlaintextMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	err := clierr.NewNotFoundError("instance missing").WithSuggestion("check the id")
+	clierr.Render(err, &stdout, &stderr, "default")
+
+	assert.Empty(t, stdout.String(), "plaintext mode must not write to stdout")
+	assert.Equal(t, "Error: instance missing (exit 3)\ncheck the id\n", stderr.String())
+}
+
+// TestResolveFormatForRender covers the flag-parse-fallback used by main.go
+// to pick a --format value when PersistentPreRunE never ran (e.g. cobra
+// rejected a flag before format binding). When the bound value is already
+// concrete the bound value is returned untouched.
+func TestResolveFormatForRender(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		args  []string
+		bound string
+		want  string
+	}{
+		{
+			name:  "bound concrete value passes through",
+			args:  []string{"aura", "instance", "list", "--format=table"},
+			bound: "json",
+			want:  "json",
+		},
+		{
+			name:  "default bound + --format=json peeks",
+			args:  []string{"aura", "instance", "list", "--bad-flag", "--format=json"},
+			bound: "default",
+			want:  "json",
+		},
+		{
+			name:  "default bound + space-separated --format peeks",
+			args:  []string{"aura", "instance", "list", "--format", "toon", "--bad-flag"},
+			bound: "default",
+			want:  "toon",
+		},
+		{
+			name:  "default bound + no --format stays default",
+			args:  []string{"aura", "instance", "list", "--bad-flag"},
+			bound: "default",
+			want:  "default",
+		},
+		{
+			name:  "default bound + invalid --format value stays default",
+			args:  []string{"aura", "instance", "list", "--format=bogus"},
+			bound: "default",
+			want:  "default",
+		},
+		{
+			name:  "empty bound + --format=json peeks",
+			args:  []string{"--format=json", "anything"},
+			bound: "",
+			want:  "json",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, resolveFormatForRender(tc.args, tc.bound))
 		})
 	}
 }

@@ -88,7 +88,8 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewNotFoundError("%s", messages)
+		resourceType, resourceID := parseResourceFromRequest(res.Request)
+		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID)
 	case http.StatusMethodNotAllowed:
 		var errorResponse ErrorResponse
 
@@ -137,6 +138,38 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 	default:
 		panic(clierr.NewFatalError("unexpected status code %d and body %s running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, resBody, clievents.RedactArgs(os.Args[1:])))
 	}
+}
+
+// parseResourceFromRequest extracts a (resourceType, resourceID) pair from
+// the request URL path so the JSON error envelope can surface them on a 404.
+// Paths follow the Aura shape `/<version>/<plural-resource>/<id>[/...]` (e.g.
+// `/v1/instances/abc123` or `/v1beta5/tenants/abc123/metrics-integration`).
+// Returns ("", "") when the request, URL, or path doesn't fit the shape so
+// the envelope omitempty drops both fields rather than emitting noise.
+func parseResourceFromRequest(req *http.Request) (string, string) {
+	if req == nil || req.URL == nil {
+		return "", ""
+	}
+	segments := strings.Split(strings.Trim(req.URL.Path, "/"), "/")
+	// Need at least <version> / <plural> / <id> — three segments.
+	if len(segments) < 3 {
+		return "", ""
+	}
+	// Skip the version segment (segments[0]); segments[1] is the plural
+	// resource name, segments[2] is the resource id.
+	return singularise(segments[1]), segments[2]
+}
+
+// singularise turns the plural resource path segment (e.g. "instances",
+// "tenants", "customer-managed-keys") into its singular form. The Aura API
+// consistently uses simple `-s` plurals so a trailing-s strip is enough;
+// unknown shapes are returned unchanged so the envelope still carries
+// something meaningful.
+func singularise(plural string) string {
+	if strings.HasSuffix(plural, "s") && len(plural) > 1 {
+		return strings.TrimSuffix(plural, "s")
+	}
+	return plural
 }
 
 func getHeaders(credential *credentials.AuraCredential, cfg *clicfg.Config) (http.Header, error) {

@@ -38,6 +38,12 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:   "Allows you to manage Neo4j resources",
 		Long:    "Allows you to manage Neo4j resources. Write operations require --rw.",
 		Version: Version,
+		// Cobra's built-in "Error: <msg>" print is suppressed; main.go's
+		// clierr.Render is the single point of error output so JSON/plaintext
+		// envelope rendering stays consistent. SilenceUsage stays unset — the
+		// existing silenceUsageOnError hook in common/flags handles RunE-side
+		// usage suppression.
+		SilenceErrors: true,
 	}
 
 	flags.RegisterOutputFlag(cmd, cfg)
