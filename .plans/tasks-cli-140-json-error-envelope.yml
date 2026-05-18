@@ -78,7 +78,7 @@ tasks:
       duplicate plus a TestErrorCodesInSync gate that imports clierr from the agentcontext_test package and asserts
       equality. Update agentcontext_test.go assertions if they reference the literal map; the public JSON output must
       remain byte-identical to today's.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -87,7 +87,7 @@ tasks:
       - "Existing agentcontext_test.go tests pass; any cosmetic updates are minimal"
       - "If circular import blocks the import path, the fallback TestErrorCodesInSync test is in place and passes"
       - "make test passes; make generate-check passes (no skill-bundle drift)"
-    completed_at: null
+    completed_at: 2026-05-18T16:00:00Z
 
   - id: task-005
     title: "Seed .WithResource on the 404 path in aura/internal/api/response.go"

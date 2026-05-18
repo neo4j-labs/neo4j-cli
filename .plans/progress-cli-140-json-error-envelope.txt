@@ -10,3 +10,8 @@ Files: +common/clierr/render.go, +common/clierr/render_test.go
 Set SilenceErrors on neo4j-cli root cobra cmd and wired clierr.Render between Events.Flush and os.Exit in main.go so failed commands emit the structured envelope (json) or one-line summary+suggestion (plaintext). Added JSON-mode and plaintext-mode tests in main_test.go.
 Files: ~neo4j-cli/app/app.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
 Decisions: Flag-parse errors fire before --format is bound so they fall through to plaintext; not in scope to fix here.
+
+## TASK-004 — 2026-05-18T16:00:00Z
+Replaced agentcontext build.go hardcoded errorCodes map with buildErrorCodes() projecting clierr.Codes (Name→Description); added TestErrorCodesInSyncWithClierr locking the projection byte-equality. No JSON-envelope shape change.
+Files: ~neo4j-cli/internal/subcommands/agentcontext/build.go, ~neo4j-cli/internal/subcommands/agentcontext/build_test.go
+Decisions: No circular import (clierr leaf); kept agentcontext-side gate test even though derivation is structural, to guard against a future hand-rolled re-introduction.

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,6 +105,21 @@ func TestBuildContext_Envelope(t *testing.T) {
 	} {
 		assert.Contains(t, ctx.ErrorCodes, code, "error_codes must include %q", code)
 	}
+}
+
+// TestErrorCodesInSyncWithClierr locks the projection contract: the
+// agent-context error_codes map must be byte-identical to the
+// (CodeName → Description) projection of clierr.Codes. Since build.go now
+// derives the map at init from clierr exports, this test guards against a
+// regression where the derivation logic drops or mangles an entry, and
+// against drift if anyone reintroduces a hand-rolled duplicate.
+func TestErrorCodesInSyncWithClierr(t *testing.T) {
+	want := map[string]string{}
+	for code, meta := range clierr.Codes {
+		want[meta.Name] = clierr.CodeDescriptions[code]
+	}
+	assert.Equal(t, want, errorCodes,
+		"agentcontext.errorCodes must equal the (name → description) projection of clierr.Codes")
 }
 
 func TestBuildContext_HidesHiddenAndDeprecatedSubcommands(t *testing.T) {
