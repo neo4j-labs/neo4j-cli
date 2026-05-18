@@ -198,9 +198,9 @@ func TestRender_JSONMode(t *testing.T) {
 	}
 }
 
-// TestRender_PlaintextMode covers every format other than "json" — they all
-// behave identically (one-line summary on stderr; optional suggestion on a
-// second stderr line; stdout untouched).
+// TestRender_PlaintextMode covers every format other than "json"/"toon" —
+// they all behave identically (one-line summary on stderr; optional
+// suggestion on a second stderr line; stdout untouched).
 func TestRender_PlaintextMode(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -209,7 +209,6 @@ func TestRender_PlaintextMode(t *testing.T) {
 		{"empty", ""},
 		{"default", "default"},
 		{"table", "table"},
-		{"toon", "toon"},
 		{"unknown", "yaml"},
 	}
 
@@ -342,6 +341,105 @@ func TestRender_ErrorsAsExtraction(t *testing.T) {
 	}
 	if env.Error.ResourceID != "abc" {
 		t.Errorf("envelope.resource_id = %q, want abc", env.Error.ResourceID)
+	}
+}
+
+// TestRender_ToonMode covers --format=toon. The stdout payload must be the
+// envelope encoded as TOON (non-empty, distinct from the JSON encoding, and
+// containing the expected code/exit_code substrings); the stderr payload
+// must be the same one-line summary the JSON path emits.
+func TestRender_ToonMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      *CLIError
+		wantCode string
+		wantExit int
+	}{
+		{"usage", NewUsageError("bad flag"), "usage_error", 2},
+		{"not_found", NewNotFoundError("missing").WithResource("instance", "abc-123"), "not_found", 3},
+		{"rate_limited", NewRateLimitError("30", "rate limited"), "rate_limited", 7},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			Render(error(tc.err), &stdout, &stderr, "toon")
+
+			if stdout.Len() == 0 {
+				t.Fatalf("stdout should be non-empty in toon mode")
+			}
+			if !bytes.HasSuffix(stdout.Bytes(), []byte("\n")) {
+				t.Errorf("stdout should end with a newline; got %q", stdout.String())
+			}
+
+			// TOON output should NOT be byte-identical to the JSON form —
+			// confirms we're going down the toon-marshaller branch, not
+			// accidentally re-using json.Marshal.
+			jsonBuf, err := json.Marshal(tc.err.BuildEnvelope())
+			if err != nil {
+				t.Fatalf("json.Marshal: %v", err)
+			}
+			if bytes.Equal(bytes.TrimRight(stdout.Bytes(), "\n"), jsonBuf) {
+				t.Errorf("toon stdout matches JSON encoding byte-for-byte; want distinct encoding")
+			}
+
+			// TOON is human-readable and includes the field names + scalar
+			// values literally — substring assertions are robust to layout
+			// changes in the encoder.
+			out := stdout.String()
+			if !bytes.Contains(stdout.Bytes(), []byte(tc.wantCode)) {
+				t.Errorf("toon stdout missing code %q\nfull: %s", tc.wantCode, out)
+			}
+			if !bytes.Contains(stdout.Bytes(), []byte(fmt.Sprintf("%d", tc.wantExit))) {
+				t.Errorf("toon stdout missing exit_code %d\nfull: %s", tc.wantExit, out)
+			}
+
+			// stderr: one-line `Error: <msg> (exit <N>)` summary.
+			wantStderr := fmt.Sprintf("Error: %s (exit %d)\n", tc.err.Message, tc.wantExit)
+			if stderr.String() != wantStderr {
+				t.Errorf("stderr = %q, want %q", stderr.String(), wantStderr)
+			}
+		})
+	}
+}
+
+// TestRender_UntypedError_WrappedAsFatal_Toon asserts the untyped-error
+// fallback fires in toon mode too — wraps to fatal_error / exit 1.
+func TestRender_UntypedError_WrappedAsFatal_Toon(t *testing.T) {
+	plain := errors.New("kaboom")
+	var stdout, stderr bytes.Buffer
+	Render(plain, &stdout, &stderr, "toon")
+
+	if stdout.Len() == 0 {
+		t.Fatalf("stdout should be non-empty in toon mode for untyped err")
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("fatal_error")) {
+		t.Errorf("toon stdout missing fatal_error\nfull: %s", stdout.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("kaboom")) {
+		t.Errorf("toon stdout missing message\nfull: %s", stdout.String())
+	}
+
+	wantStderr := "Error: kaboom (exit 1)\n"
+	if stderr.String() != wantStderr {
+		t.Errorf("stderr = %q, want %q", stderr.String(), wantStderr)
+	}
+}
+
+// TestRender_ToonMode_WithSuggestion_StderrSummaryHasNoSuggestion asserts
+// that in toon mode (like JSON mode) the suggestion is carried in the
+// stdout envelope, not duplicated on stderr.
+func TestRender_ToonMode_WithSuggestion_StderrSummaryHasNoSuggestion(t *testing.T) {
+	err := NewUsageError("bad flag").WithSuggestion("try --help")
+	var stdout, stderr bytes.Buffer
+	Render(error(err), &stdout, &stderr, "toon")
+
+	wantStderr := "Error: bad flag (exit 2)\n"
+	if stderr.String() != wantStderr {
+		t.Errorf("stderr = %q, want %q", stderr.String(), wantStderr)
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("try --help")) {
+		t.Errorf("toon stdout missing suggestion\nfull: %s", stdout.String())
 	}
 }
 

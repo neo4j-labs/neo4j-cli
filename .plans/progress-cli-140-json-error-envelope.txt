@@ -25,3 +25,7 @@ Decisions: Used trailing-s strip not a static plural→singular map; Aura plural
 Added two --format=json e2e cases (bad_flag_usage_2_json + not_found_404_get_json) and JSON envelope assertion helpers in exitcodes_test.go; fixture mux now also serves /v1/instances/<id> subpaths. Closed the flag-parse format gap by adding resolveFormatForRender + peekFormatFromArgs in main.go so a failed flag-parse with --format=json still emits the JSON envelope; covered by table-driven unit test.
 Files: ~test/e2e/exitcodes/exitcodes_test.go, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
 Decisions: extractEnvelope scans backwards for `{...}` lines because cobra dumps the usage block to stdout ahead of the envelope on flag-parse failure; peek picks first --format hit (last-wins would only matter for repeated flags in failed parses).
+
+## TASK-008 — 2026-05-18T18:00:00Z
+Added toon-mode branch to Render: switch{json,toon} dispatches to envelope encoders, others fall through to plaintext+suggestion. New marshalEnvelopeToon helper uses the JSON->any->toon.Marshal hop with WithLengthMarkers to match common/output. Tests cover 3 CodeNames, untyped fallback, and suggestion behaviour in toon mode; removed "toon" from PlaintextMode table.
+Files: ~common/clierr/render.go, ~common/clierr/render_test.go

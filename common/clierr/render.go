@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	toon "github.com/toon-format/toon-go"
 )
 
 // Envelope is the top-level wrapper for the JSON error envelope emitted on
@@ -52,9 +54,14 @@ func (e *CLIError) BuildEnvelope() Envelope {
 //
 //   - format == "json": marshal BuildEnvelope() to stdout (trailing newline)
 //     and write a one-line `Error: <message> (exit <N>)` summary to stderr.
-//   - any other format (including "", "default", "table", "toon", unknown
-//     values): write the one-line summary to stderr; if Suggestion is set
-//     write it on a second stderr line; stdout is untouched.
+//   - format == "toon": encode BuildEnvelope() as TOON to stdout (trailing
+//     newline) and write the same one-line summary to stderr. Mirrors the
+//     JSON path — same envelope shape, different on-wire encoding. Uses
+//     the JSON -> any -> toon.Marshal hop so MarshalJSON impls are honoured
+//     (see common/output/output.go:111-125 for the canonical pattern).
+//   - any other format (including "", "default", "table", unknown values):
+//     write the one-line summary to stderr; if Suggestion is set write it
+//     on a second stderr line; stdout is untouched.
 //
 // Errors that are not *CLIError (directly or via errors.As) are wrapped as
 // if they came from NewFatalError — exit 1, code "fatal_error", retryable
@@ -69,10 +76,18 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 		ce = NewFatalError("%s", err.Error())
 	}
 
-	if format == "json" {
+	switch format {
+	case "json":
 		// Marshal to stdout first; if marshalling somehow fails, fall back
 		// to the plaintext path so the user still sees something useful.
 		if buf, mErr := json.Marshal(ce.BuildEnvelope()); mErr == nil {
+			_, _ = stdout.Write(buf)
+			_, _ = io.WriteString(stdout, "\n")
+			_, _ = fmt.Fprintf(stderr, "Error: %s (exit %d)\n", ce.Message, ce.Code)
+			return
+		}
+	case "toon":
+		if buf, mErr := marshalEnvelopeToon(ce.BuildEnvelope()); mErr == nil {
 			_, _ = stdout.Write(buf)
 			_, _ = io.WriteString(stdout, "\n")
 			_, _ = fmt.Fprintf(stderr, "Error: %s (exit %d)\n", ce.Message, ce.Code)
@@ -84,4 +99,20 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 	if ce.Suggestion != "" {
 		_, _ = fmt.Fprintf(stderr, "%s\n", ce.Suggestion)
 	}
+}
+
+// marshalEnvelopeToon serialises the envelope via the JSON -> any -> toon hop
+// used elsewhere in the codebase (see common/output/output.go:112-125). The
+// double conversion is needed because toon.Marshal walks plain `any` values
+// and going via JSON honours any MarshalJSON impls along the way.
+func marshalEnvelopeToon(env Envelope) ([]byte, error) {
+	jsonBytes, err := json.Marshal(env)
+	if err != nil {
+		return nil, err
+	}
+	var v any
+	if err := json.Unmarshal(jsonBytes, &v); err != nil {
+		return nil, err
+	}
+	return toon.Marshal(v, toon.WithLengthMarkers(true))
 }

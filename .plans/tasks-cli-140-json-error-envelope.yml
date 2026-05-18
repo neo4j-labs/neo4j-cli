@@ -162,7 +162,7 @@ tasks:
       CodeNames plus the untyped-error fallback, asserting the toon output is non-empty, differs from the JSON form,
       and contains the expected code/exit_code substrings. No bundle regeneration expected (toon error rendering is a
       runtime path, not a documented command surface) — verify via make generate-check.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -171,4 +171,4 @@ tasks:
       - "render_test.go covers at least two CodeNames and the untyped-error fallback in toon mode"
       - "Toon encoder uses the same WithLengthMarkers option as common/output/output.go for consistency"
       - "make fmt-check, make lint, make test, make generate-check all clean"
-    completed_at: null
+    completed_at: 2026-05-18T18:00:00Z
