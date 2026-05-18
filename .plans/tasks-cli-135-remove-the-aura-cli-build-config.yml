@@ -111,7 +111,7 @@ tasks:
       `if:` guard (download dist, verify checksums, publish, etc.).
       The workflow_run success gate at the top of the job stays.
       Satisfies REQ-F-005.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -119,7 +119,7 @@ tasks:
       - "The `Skip — aura-cli-only release (auto)` step is removed"
       - "The `Parse release-meta` step emits only `version` as a step output"
       - "File parses as valid YAML and `actionlint` (if available) reports no new errors"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-007
     title: "Collapse CHANGELOG.md to single-binary plus historical pointer"

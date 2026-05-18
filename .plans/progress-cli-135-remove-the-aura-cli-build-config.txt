@@ -14,3 +14,7 @@ Decisions: Tasks merged into a single commit since they are inseparable (deletin
 ## TASK-005 — 2026-05-18T00:00:00Z
 Stripped `include_neo4j` producer side from `.github/workflows/release.yml`: removed `Detect changed changelogs` step, job-level output, all `if:` guards on Write/Upload steps, and trimmed `release-meta.json` payload to `{"version":"…"}`.
 Files: ~.github/workflows/release.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-006 — 2026-05-18T00:00:00Z
+Stripped `include_neo4j` consumer side from `.github/workflows/publish-npm.yml`: removed `Skip — aura-cli-only release (auto)` step, dropped `INCLUDE_NEO4J` parse/validate/echo from meta step, removed every per-step `steps.meta.outputs.include_neo4j == 'true'` `if:` guard, refreshed header + job comments. workflow_run conclusion gate preserved.
+Files: ~.github/workflows/publish-npm.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
