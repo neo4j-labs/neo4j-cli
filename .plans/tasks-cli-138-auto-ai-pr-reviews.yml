@@ -20,7 +20,7 @@ tasks:
       `/tmp/claude-verdict.txt` as the very last action. On PRs with no
       Go changes, emit a one-line "no security-relevant changes"
       comment and `pass`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "File `.github/prompts/claude-review-security.md` exists"
@@ -28,7 +28,7 @@ tasks:
       - "Prompt instructs Claude to use `mcp__github_inline_comment__create_inline_comment` for issues and `gh pr comment` for the summary"
       - "Prompt instructs Claude to write `pass` or `fail` to `/tmp/claude-verdict.txt` as the final step"
       - "Prompt instructs Claude to no-op (summary + `pass`) when the diff contains no Go file changes"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-002
     title: "Author conventions-review prompt at .github/prompts/claude-review-conventions.md"
