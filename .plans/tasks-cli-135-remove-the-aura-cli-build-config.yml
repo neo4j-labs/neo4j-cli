@@ -11,14 +11,14 @@ tasks:
       `oskar/cli-135-remove-the-aura-cli-build-config` from a clean
       `main`. All subsequent commits land on this branch. Satisfies
       REQ-NF-011 and unblocks every later task.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Branch `oskar/cli-135-remove-the-aura-cli-build-config` is created off the latest `main`"
       - "The branch is checked out as the working branch"
       - "`git status` reports a clean working tree before edits begin"
       - "`main` has no new commits added by this PRD's work"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-002
     title: "Delete the standalone aura entrypoint directory"
