@@ -2,3 +2,8 @@
 Added common/clicmd package with SuggestSubcommand Args validator and idempotent ApplySuggestionsToParents walker; unit tests cover all three guards and depth-3 recursion.
 Files: +common/clicmd/suggest.go, +common/clicmd/suggest_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
 Decisions: replicated cobra's unexported findSuggestions formatting (incl. lazy default of SuggestionsMinimumDistance=2) because exported SuggestionsFor returns []string and otherwise yields zero suggestions when the field is 0.
+
+## task-002 — 2026-05-18T07:50:00Z
+Wired clicmd.ApplySuggestionsToParents into app.NewCmd and added integration tests covering root + nested typos (configg/updaet/lsit/insance/aura-clent) plus a non-shadow regression for update/query/config-set --help.
+Files: ~neo4j-cli/app/app.go, +neo4j-cli/app/app_suggest_test.go, ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go, ~neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+Decisions: walker also installs a help-printing RunE on matched parents because cobra only invokes Args validators on Runnable commands; commands are tagged with SuggestionsRunEAnnotation so TestAllLeafCommands_HaveExamples can skip them without losing coverage on hand-authored runnable parents like `query`.

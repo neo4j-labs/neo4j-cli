@@ -66,6 +66,20 @@ func TestApplySuggestionsToParents_InstallsOnEligibleParents(t *testing.T) {
 	if leaf.Args != nil {
 		t.Error("expected leaf.Args to remain nil (has Run)")
 	}
+	// The walker installs a help-printing RunE on eligible parents so the
+	// Args validator actually fires under cobra's execute() flow.
+	if root.RunE == nil {
+		t.Error("expected root.RunE to be installed")
+	}
+	if parent.RunE == nil {
+		t.Error("expected parent.RunE to be installed")
+	}
+	if root.Annotations[SuggestionsRunEAnnotation] != "true" {
+		t.Error("expected root annotation marker")
+	}
+	if parent.Annotations[SuggestionsRunEAnnotation] != "true" {
+		t.Error("expected parent annotation marker")
+	}
 }
 
 func TestApplySuggestionsToParents_RespectsRunGuard(t *testing.T) {

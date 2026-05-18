@@ -41,7 +41,7 @@ tasks:
       instance, credential aura-clent add → aura-client; plus regression
       that root-level typos configg list and updaet still produce 'Did you
       mean'.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -50,7 +50,7 @@ tasks:
       - "Root-typo regression cases (configg list, updaet) still produce 'Did you mean' output (REQ-F-006, REQ-F-007)"
       - "go test ./neo4j-cli/app/... passes; TestAllLeafCommands_HaveExamples in agentcontext stays green"
       - "Commands with their own RunE or explicit Args are unaffected (verified by spot-check that update / query / set still work)"
-    completed_at: null
+    completed_at: 2026-05-18T07:50:00Z
 
   - id: task-003
     title: "Add 'upgrade' alias to update command with regression test"

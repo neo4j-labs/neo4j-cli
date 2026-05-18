@@ -11,6 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// SuggestionsRunEAnnotation marks cobra commands whose RunE was installed by
+// ApplySuggestionsToParents (i.e. an auto-injected help-printing RunE on a
+// non-runnable parent). Gates such as TestAllLeafCommands_HaveExamples use
+// this annotation to skip commands the walker made nominally Runnable
+// without changing their user-visible behaviour.
+const SuggestionsRunEAnnotation = "clicmd.suggestions.run-e"
+
 // SuggestSubcommand is a cobra Args validator that returns an "unknown
 // command" error including cobra's SuggestionsFor output. It is intended to
 // be installed on parent commands that have subcommands but no Run logic,
@@ -23,6 +30,11 @@ import (
 // The error format mirrors cobra's own legacyArgs path
 // (see github.com/spf13/cobra args.go) so the output is indistinguishable
 // from the root-level typo behaviour cobra already produces.
+//
+// Cobra only invokes Args validators on Runnable commands (those with Run or
+// RunE set); ApplySuggestionsToParents therefore installs both Args and a
+// help-printing RunE on each eligible parent so the validator actually runs
+// for nested typos.
 func SuggestSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
@@ -66,14 +78,28 @@ func suggestionsSuffix(cmd *cobra.Command, typedName string) string {
 //  3. has no pre-existing Args validator (so we never override an
 //     explicit validator like cobra.ExactArgs(1)).
 //
-// The walk is idempotent and side-effect-free aside from setting Args on
-// matched commands.
+// On every matched parent the walker also installs a RunE that prints help
+// when invoked without args (cobra's default behaviour for non-runnable
+// parents). The RunE is needed because cobra only invokes Args validators on
+// Runnable commands — without it nested typos fall through to a help dump.
+// At len(args) > 0 the Args validator has already returned the suggestion
+// error, so RunE is never reached in that case.
+//
+// The walk is idempotent and side-effect-free aside from setting Args /
+// RunE on matched commands.
 func ApplySuggestionsToParents(root *cobra.Command) {
 	if root == nil {
 		return
 	}
 	if root.HasSubCommands() && root.Run == nil && root.RunE == nil && root.Args == nil {
 		root.Args = SuggestSubcommand
+		root.RunE = func(c *cobra.Command, _ []string) error {
+			return c.Help()
+		}
+		if root.Annotations == nil {
+			root.Annotations = map[string]string{}
+		}
+		root.Annotations[SuggestionsRunEAnnotation] = "true"
 	}
 	for _, child := range root.Commands() {
 		ApplySuggestionsToParents(child)
