@@ -1,0 +1,141 @@
+feature: cli-138-fix-claude-review-workflows
+prd: ./prd-cli-138-fix-claude-review-workflows.md
+created_at: 2026-05-18T12:00:00Z
+updated_at: 2026-05-18T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Create feature branch off main"
+    description: |
+      Verify the working tree is clean and on `main` at the latest origin/main, then
+      create branch `oskar/cli-138-fix-claude-review-workflows`. All subsequent edits
+      land on this branch. No code changes in this task.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Local main is fast-forwarded to origin/main (`git status` clean, `git rev-parse HEAD` == `git rev-parse origin/main`)."
+      - "Branch `oskar/cli-138-fix-claude-review-workflows` exists locally and is checked out."
+      - "Branch has zero commits ahead of main at task end."
+    completed_at: 2026-05-18T12:05:00Z
+
+  - id: task-002
+    title: "Add HTTPS insteadOf step to claude-review-security.yml"
+    description: |
+      Edit `.github/workflows/claude-review-security.yml` to add a new step that
+      rewrites `git@github.com:` URLs to `https://github.com/` via `git config --global
+      url."https://github.com/".insteadOf "git@github.com:"`. Place the step after
+      `Install govulncheck` and before `Load security prompt into env`. Step name:
+      `Force HTTPS for github.com git clones`. Include a comment explaining why
+      (plugin installer shells out to git clone, runner has no SSH key, public-repo
+      HTTPS needs no auth). Do not touch any other step, the marketplace pin, prompts,
+      or tool allowlists. Satisfies REQ-F-001.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The new step exists between `Install govulncheck` and `Load security prompt into env` with name `Force HTTPS for github.com git clones`."
+      - "The step's `run:` line is exactly `git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\"`."
+      - "A comment above the run command explains the SSH-no-key rationale."
+      - "`git diff origin/main -- .github/workflows/claude-review-security.yml` shows ONLY the added step (no other changes)."
+      - "YAML still parses (`yq '.jobs.\"security-review\".steps[].name' .github/workflows/claude-review-security.yml` lists the new step name)."
+    completed_at: 2026-05-18T12:15:00Z
+
+  - id: task-003
+    title: "Rename conventions workflow job + step to disambiguate check name"
+    description: |
+      Edit `.github/workflows/claude-review-conventions.yml`. Rename the job key
+      `jobs.security-review:` to `jobs.conventions-review:` (key only — preserve
+      `if:`, `runs-on:`, `permissions:`, and every step body byte-for-byte except
+      the one step rename below). Rename the step `Run Claude Code (security review)`
+      to `Run Claude Code (conventions review)`. No other step name changes.
+      Satisfies REQ-F-002 and REQ-F-003.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`yq '.jobs | keys' .github/workflows/claude-review-conventions.yml` returns `- conventions-review` and nothing else."
+      - "The step previously named `Run Claude Code (security review)` is now `Run Claude Code (conventions review)`; no other step names changed."
+      - "`if:`, `runs-on:`, `permissions:`, and step bodies (other than the renamed step's `name:`) are byte-identical to origin/main."
+      - "`git diff origin/main -- .github/workflows/claude-review-conventions.yml` shows ONLY the two rename lines."
+    completed_at: 2026-05-18T12:25:00Z
+
+  - id: task-004
+    title: "Push branch and open PR with defect-focused description"
+    description: |
+      Push `oskar/cli-138-fix-claude-review-workflows` to origin and open a PR
+      against `main`. Title: `ci: fix Claude Review SSH plugin clone + dedupe job
+      names (CLI-138)`. Body spells out the two defects (SSH plugin clone failing
+      on every PR, duplicate `security-review` job id) and the corresponding fix
+      for each, links to CLI-138, and notes that no changie entry is required per
+      AGENTS.md (internal CI plumbing). Do NOT push to PR #120 or any other PR.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "Branch pushed to origin (`git ls-remote --heads origin oskar/cli-138-fix-claude-review-workflows` returns a sha)."
+      - "PR opened against base `main` with the title shown above; `gh pr view --json url` returns a usable URL."
+      - "PR body explains both defects and both fixes, references CLI-138, and explicitly states no changie entry is needed."
+      - "PR is opened in draft state (so we can iterate without auto-pinging reviewers)."
+    completed_at: 2026-05-18T12:35:00Z
+
+  - id: task-005
+    title: "Verify both Claude Review checks reach a verdict on the fix PR"
+    description: |
+      Watch the fix PR's check runs via `gh pr checks` and `gh run view --log`.
+      Confirm `Claude Review — Security` reaches the `Enforce verdict` step (logs
+      show `Adding marketplace: ./` → `Installing plugin: cc-skills-golang@neo4j-cli-review`
+      → a successful install line, no `Permission denied (publickey)`). Confirm
+      the conventions check now appears under the GitHub check name `conventions-review`
+      (not `security-review`). If the security check still fails to install the
+      plugin, apply the REQ-F-004 fallback in the next task; otherwise mark this
+      task complete.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`gh pr checks <num> --json name,workflow,conclusion` lists two distinct check names: one ending in `security-review`, one ending in `conventions-review`."
+      - "Security workflow run logs contain a successful `Installing plugin: cc-skills-golang@neo4j-cli-review` line (no SSH `Permission denied`)."
+      - "Security workflow reaches the `Enforce verdict` step (verdict may be pass or fail — what matters is reaching it)."
+      - "Conventions workflow reaches its `Enforce verdict` step as before."
+      - "If either acceptance fails, task-006 is unblocked; otherwise task-006 is closed as not-needed."
+    completed_at: 2026-05-18T13:00:00Z
+
+  - id: task-006
+    title: "Fallback: switch marketplace.json source to git+https if insteadOf is insufficient"
+    description: |
+      ONLY if task-005 reveals that the `insteadOf` rewrite did not unblock the
+      plugin clone: edit `.claude-plugin/marketplace.json` so the `cc-skills-golang`
+      plugin uses `source: git` with `url: https://github.com/samber/cc-skills-golang.git`
+      instead of `source: github` + `repo: samber/cc-skills-golang`. Keep the `ref`
+      (`v1.4.0`) and `sha` (`e9761db859c6969b77a8fd0e8a243f4f28240211`) pin values
+      unchanged. Decide whether to keep or remove the insteadOf step from task-002
+      based on which combination verifies green. Re-push, re-verify on the same PR.
+      Satisfies REQ-F-004. Close as not-needed if task-005 already passes.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "Either: task-005 already passed and this task is closed without changes; OR `.claude-plugin/marketplace.json` updated with `source: git` + explicit https url, pin values unchanged."
+      - "If changes were made, re-pushed branch causes `Claude Review — Security` to install the plugin successfully on the next run."
+      - "Decision on the insteadOf step (kept as belt-and-braces or removed as redundant) is reflected in the final diff."
+    completed_at: 2026-05-18T13:00:00Z
+
+  - id: task-007
+    title: "Mark PR ready for review and merge"
+    description: |
+      Once both Claude Review checks reach a verdict cleanly (per task-005, plus
+      task-006 if it ran), flip the PR from draft to ready-for-review. Wait for
+      any required reviews and the standard checks (CodeQL, Test, License, etc.)
+      to settle, then merge to main using the repo's standard merge style. No
+      changelog entry required.
+    status: pending
+    dependencies:
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "PR is flipped to ready-for-review."
+      - "All required checks on the PR are green (or non-blocking)."
+      - "PR is merged to main; `gh pr view --json merged,mergedAt` confirms merged=true."
+      - "Branch `oskar/cli-138-fix-claude-review-workflows` is deleted on origin after merge."
+    completed_at: null

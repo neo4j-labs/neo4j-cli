@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  security-review:
+  conventions-review:
     # Skip drafts; restrict to org members/owners/collaborators. Outside
     # contributors and bots (dependabot, renovate, etc.) do not match and the
     # job is skipped without consuming Actions minutes or OAuth tokens. They
@@ -34,7 +34,7 @@ jobs:
             echo 'PROMPT_EOF'
           } >> "$GITHUB_ENV"
 
-      - name: Run Claude Code (security review)
+      - name: Run Claude Code (conventions review)
         id: claude
         uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
         with:

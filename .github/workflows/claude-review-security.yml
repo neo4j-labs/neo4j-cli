@@ -35,6 +35,13 @@ jobs:
         # Required by the golang-security skill for vulnerability scanning.
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
+      - name: Force HTTPS for github.com git clones
+        # The Claude Code plugin installer shells out to `git clone` to fetch
+        # marketplace plugins. The runner has no SSH key configured, so any
+        # `git@github.com:` URL fails with `Permission denied (publickey)`.
+        # Rewriting to HTTPS works for public repos without requiring auth.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
       - name: Load security prompt into env
         run: |
           {
