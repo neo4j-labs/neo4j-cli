@@ -16,3 +16,7 @@ Decisions: get.go Args swapped from cobra.OnlyValidArgs to ResolveConfigKey (mat
 ## task-004 — 2026-05-18T17:30:00Z
 Mechanical rename sweep: aura.beta-enabled → flag.aura-beta across 33 _test.go files (116 occurrences). Excluded common/clicfg/flags.go (LegacyKey value) and common/clicfg/flags_test.go (legacy-path tests). Tests pass via primary registry path; symmetric 117/117 diff.
 Files: ~33 _test.go files under neo4j-cli/aura/internal/subcommands/** plus neo4j-cli/internal/subcommands/config/project_test.go
+
+## TASK-005 — 2026-05-18T14:45:00Z
+Refreshed .agents/feature-flags.md (stale paths/line refs removed; Migrating section compressed to a one-line note); added Minor changie entry for the registry + rename. All gates green. PR opened.
+Files: ~.agents/feature-flags.md, +.changes/unreleased/neo4j-cli-Minor-20260518-144009.yaml

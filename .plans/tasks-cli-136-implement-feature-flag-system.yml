@@ -166,7 +166,8 @@ tasks:
       Linear CLI-136 and noting it implements the convention from
       PR #124. Do NOT request review until CI is green across
       ubuntu/windows/macos.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T14:45:00Z
     dependencies:
       - task-003
       - task-004
