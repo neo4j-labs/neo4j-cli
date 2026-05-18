@@ -84,7 +84,7 @@ tasks:
       the YAML at .changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml
       with fields project / kind / body / time (single-quoted body,
       RFC3339 time) per AGENTS.md.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -92,7 +92,7 @@ tasks:
       - "A file .changes/unreleased/neo4j-cli-Patch-<timestamp>.yaml exists"
       - "kind is Patch and project is neo4j-cli"
       - "body text matches: Add 'upgrade' alias for the update command and 'did you mean' suggestions for typo'd subcommands"
-    completed_at: null
+    completed_at: 2026-05-18T09:40:00Z
 
   - id: task-005
     title: "Final verification: gates + manual smoke"

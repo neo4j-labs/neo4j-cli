@@ -11,3 +11,7 @@ Decisions: walker also installs a help-printing RunE on matched parents because 
 ## task-003 — 2026-05-18T08:10:00Z
 Added `upgrade` alias on the update cobra command plus TestUpdateCmd_UpgradeAlias verifying Aliases membership and root.Find resolution for both `upgrade` and `upgrade check`; agent-context JSON now surfaces ["upgrade"] under update.aliases.
 Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
+
+## task-004 — 2026-05-18T09:40:00Z
+Added changie Patch entry for the upgrade alias + suggestions feature via `changie new`; gates green (test/lint/fmt-check).
+Files: +.changes/unreleased/neo4j-cli-Patch-20260518-093803.yaml, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
