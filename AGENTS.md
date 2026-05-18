@@ -178,6 +178,10 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Feature Flag Notes
+
+See [`.agents/feature-flags.md`](.agents/feature-flags.md) — naming (`flag.<area>-<feature>`), default-false lifecycle, override surface (config + env), registry shape, and the `aura.beta-enabled` → `flag.aura-beta` migration.
+
 ## Installer Script Testing Notes
 
 - Bats-core tests for `install-neo4j-cli.sh` live in `distribution/installation-scripts/tests/install-neo4j-cli.bats`. Run with `bats distribution/installation-scripts/tests/` (install bats-core via `brew install bats-core` or `apt-get install bats`).

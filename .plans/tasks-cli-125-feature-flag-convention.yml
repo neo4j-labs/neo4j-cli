@@ -43,7 +43,7 @@ tasks:
       lifecycle, override surface, registry shape, and the `aura.beta-enabled`
       → `flag.aura-beta` migration). Do NOT edit `CLAUDE.md` — it is a symlink
       to `AGENTS.md` per the "Repo Doc Notes" section and updates automatically.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -52,7 +52,7 @@ tasks:
       - "The new subsection sits in the bottom-half index cluster (after Architecture / Build / Testing sections, near Repo Layout Notes / Hermetic Test Notes / Windows CI Gotchas)"
       - "`ls -la CLAUDE.md` still shows it as a symlink resolving to `AGENTS.md` (symlink not broken or replaced)"
       - "`CLAUDE.md` was not edited directly (`git diff --name-only` shows AGENTS.md, not CLAUDE.md)"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-003
     title: "Verify scope, run acceptance checks, commit"
