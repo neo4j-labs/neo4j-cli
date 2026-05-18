@@ -1,0 +1,118 @@
+feature: cli-70-update-alias-and-suggestions
+prd: ./prd-cli-70-update-alias-and-suggestions.md
+created_at: 2026-05-18T07:19:02Z
+updated_at: 2026-05-18T07:19:02Z
+
+tasks:
+  - id: task-001
+    title: "Add SuggestSubcommand helper and walker in common/clicmd package"
+    description: |
+      Create a new shared package common/clicmd/ exporting two symbols:
+      SuggestSubcommand (a cobra Args validator that returns an "unknown
+      command" error including cobra's SuggestionsFor output) and
+      ApplySuggestionsToParents (a recursive walker that installs
+      SuggestSubcommand on every parent command in a tree, gated by three
+      conditions: HasSubCommands(), Run == nil && RunE == nil, Args == nil).
+      Add common/clicmd/suggest_test.go with unit tests against a synthetic
+      multi-level cobra tree, covering the error format, all three guard
+      conditions, and recursion depth ≥ 2. No dependencies beyond cobra and
+      stdlib fmt.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "common/clicmd/suggest.go exports SuggestSubcommand and ApplySuggestionsToParents matching REQ-F-004"
+      - "SuggestSubcommand returns nil when len(args) == 0 and a wrapped error including cmd.SuggestionsFor(args[0]) otherwise"
+      - "ApplySuggestionsToParents skips commands whose Run, RunE, or Args is already non-nil (all three guards covered by unit tests)"
+      - "Unit tests cover recursion to a depth of at least 2 levels"
+      - "go test ./common/clicmd/... passes; gofmt/golangci-lint clean on the new files"
+    completed_at: null
+
+  - id: task-002
+    title: "Wire suggestion walker into root NewCmd with integration tests"
+    description: |
+      In neo4j-cli/app/app.go import common/clicmd and call
+      clicmd.ApplySuggestionsToParents(cmd) as the last statement before
+      `return cmd` in NewCmd. Add neo4j-cli/app/app_suggest_test.go with
+      table-driven integration tests against the real tree built by
+      app.NewCmd(cfg), driving each case via cmd.SetArgs / cmd.SetErr(buf) /
+      cmd.Execute() and using testfs.GetTestFs for the clicfg.Config (per
+      AGENTS.md, never afero.NewOsFs in tests that touch credentials).
+      Coverage: nested typos config lsit → list, aura insance list →
+      instance, credential aura-clent add → aura-client; plus regression
+      that root-level typos configg list and updaet still produce 'Did you
+      mean'.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli/app/app.go calls clicmd.ApplySuggestionsToParents(cmd) before returning, with the import added"
+      - "neo4j-cli/app/app_suggest_test.go covers the nested-typo cases from REQ-F-008, REQ-F-009, REQ-F-010"
+      - "Root-typo regression cases (configg list, updaet) still produce 'Did you mean' output (REQ-F-006, REQ-F-007)"
+      - "go test ./neo4j-cli/app/... passes; TestAllLeafCommands_HaveExamples in agentcontext stays green"
+      - "Commands with their own RunE or explicit Args are unaffected (verified by spot-check that update / query / set still work)"
+    completed_at: null
+
+  - id: task-003
+    title: "Add 'upgrade' alias to update command with regression test"
+    description: |
+      In neo4j-cli/internal/subcommands/update/update.go add
+      Aliases: []string{"upgrade"} to the cobra command returned by NewCmd
+      (around line 92). Add TestUpdateCmd_UpgradeAlias to
+      neo4j-cli/internal/subcommands/update/update_test.go asserting both
+      that the command's Aliases field contains "upgrade" and that
+      resolving the alias from the root tree (e.g. via rootCmd.Find or by
+      executing app.NewCmd with args ["upgrade", "--help"]) returns the
+      update command. Cobra propagates aliases to subcommands so
+      `upgrade check` works automatically — no edit to check.go.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "update.go cobra command has Aliases: []string{\"upgrade\"}"
+      - "TestUpdateCmd_UpgradeAlias passes and asserts the alias is present and resolvable"
+      - "Manual smoke: bin/neo4j-cli upgrade --help prints update help (verified via test or manually)"
+      - "Manual smoke: bin/neo4j-cli upgrade check resolves to the check subcommand"
+      - "agentcontext --format json output contains \"upgrade\" in the update command's aliases array (REQ-NF-003)"
+    completed_at: null
+
+  - id: task-004
+    title: "Add changie entry for the alias and suggestions"
+    description: |
+      Create a changelog entry recording the user-facing change. Prefer
+      `changie new --projects neo4j-cli --kind Patch --body "Add 'upgrade'
+      alias for the update command and 'did you mean' suggestions for
+      typo'd subcommands"`. If changie isn't installed locally, hand-author
+      the YAML at .changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml
+      with fields project / kind / body / time (single-quoted body,
+      RFC3339 time) per AGENTS.md.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "A file .changes/unreleased/neo4j-cli-Patch-<timestamp>.yaml exists"
+      - "kind is Patch and project is neo4j-cli"
+      - "body text matches: Add 'upgrade' alias for the update command and 'did you mean' suggestions for typo'd subcommands"
+    completed_at: null
+
+  - id: task-005
+    title: "Final verification: gates + manual smoke"
+    description: |
+      Run the full local CI gates and the manual smoke commands from the
+      PRD Acceptance Criteria section. Fix any drift surfaced —
+      particularly TestAllLeafCommands_HaveExamples and make fmt-check.
+      Verify agentcontext JSON exposes 'upgrade' in the update command's
+      aliases array. No `go generate` is needed (the skill-bundle renderer
+      only reads Short/Long, not Aliases/Args).
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "make test passes (all packages, both new tests and existing gates)"
+      - "make fmt-check produces no output"
+      - "make lint is clean"
+      - "Manual: ./bin/neo4j-cli config lsit, ./bin/neo4j-cli aura insance list, ./bin/neo4j-cli credential aura-clent add each print 'Did you mean' and exit non-zero"
+      - "Manual: ./bin/neo4j-cli upgrade --help and ./bin/neo4j-cli upgrade check resolve successfully"
+    completed_at: null
