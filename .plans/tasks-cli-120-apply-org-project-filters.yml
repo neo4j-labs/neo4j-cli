@@ -184,7 +184,7 @@ tasks:
       required for all instance, cmek, and graphanalytics session commands and that `--tenant-id`
       is deprecated in favour of `--project-id`. Confirm `make test`, `make fmt-check`, and
       `make lint` all pass cleanly.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -197,4 +197,4 @@ tasks:
       - "`TestAllLeafCommands_HaveExamples` passes"
       - "A changelog entry exists under `.changes/unreleased/` with `kind: Minor` and a user-facing description of the org/project enforcement and `--tenant-id` deprecation"
       - "`make test`, `make fmt-check`, and `make lint` all pass"
-    completed_at: null
+    completed_at: "2026-05-18T13:37:00Z"

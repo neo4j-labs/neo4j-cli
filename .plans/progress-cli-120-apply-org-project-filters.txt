@@ -34,3 +34,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/{session,list
 ## TASK-007 — 2026-05-18T06:00:00Z
 Added `RegisterOrgProjectFlags` to `customermanagedkey` parent; updated `list` to pass resolved projectID as `tenantId` query param; updated `create` to inject projectID into request body; added pre-flight ownership check in `get` and `delete` via `FetchAndVerifyInstanceInProject`-equivalent; applied `RenameResponseField`; added `FetchAndVerifyCmekInProject` helper in `resolve.go`; regenerated skill bundles.
 Files: ~neo4j-cli/aura/internal/subcommands/customermanagedkey/{customermanagedkey,list,create,get,delete}.go, ~neo4j-cli/aura/internal/subcommands/customermanagedkey/{list,create,get,delete}_test.go, +neo4j-cli/aura/internal/subcommands/customermanagedkey/helpers_test.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve.go
+
+## TASK-009 — 2026-05-18T13:37:00Z
+Skill bundles were already up to date from prior tasks; `go generate` produced no diff. Added changelog entry for org/project enforcement and `--tenant-id` deprecation. All gates (`make test`, `make fmt-check`, `make lint`) pass.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260518-133700.yaml
