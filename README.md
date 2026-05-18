@@ -114,7 +114,7 @@ neo4j-cli aura workspace use --organization-id <org-id> --project-id <project-id
 
 # Read or update the workspace directly via config
 neo4j-cli aura config get default-workspace
-neo4j-cli aura config set default-workspace <org-id>/<project-id> --rw
+neo4j-cli config set aura.default-workspace <org-id>/<project-id> --rw
 ```
 
 ### List your instances
