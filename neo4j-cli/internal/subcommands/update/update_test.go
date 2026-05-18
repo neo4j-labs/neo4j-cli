@@ -1379,3 +1379,38 @@ func runWithSplitBuffers(t *testing.T, current string, opts runOpts) (string, st
 	_ = runUpdate(context.Background(), cmd, cfg, opts)
 	return outBuf.String(), errBuf.String()
 }
+
+// TestUpdateCmd_UpgradeAlias pins CLI-70 REQ-F-001: the `update` cobra command
+// exposes `upgrade` as an alias so users typing the more conventional verb land
+// on the self-update flow. Asserts both that the Aliases field is set and that
+// the alias resolves to the same command when mounted on a root tree (cobra's
+// Find walks aliases when matching subcommand names).
+func TestUpdateCmd_UpgradeAlias(t *testing.T) {
+	tfs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(tfs, "v0.1.0", clicfg.GlobalScope)
+
+	updateCmd := NewCmd(cfg, nil, "")
+	assert.Contains(t, updateCmd.Aliases, "upgrade",
+		"update command must expose `upgrade` as an alias (CLI-70 REQ-F-001)")
+
+	// Resolve the alias from a root tree, mirroring how cobra dispatches
+	// `neo4j-cli upgrade ...` at runtime. Find returns the command matched by
+	// either its Use name or any alias.
+	root := &cobra.Command{Use: "neo4j-cli"}
+	root.AddCommand(updateCmd)
+	resolved, _, ferr := root.Find([]string{"upgrade"})
+	require.NoError(t, ferr, "root.Find([]string{\"upgrade\"}) must resolve via the alias")
+	assert.Same(t, updateCmd, resolved,
+		"`upgrade` must resolve to the same *cobra.Command as `update`")
+
+	// The `check` subcommand should be reachable via the alias too — cobra
+	// propagates aliases to subcommands, so `upgrade check` matches the same
+	// leaf as `update check`. Find returns the leaf and an empty remaining-arg
+	// slice when the match is exact.
+	checkResolved, remaining, cferr := root.Find([]string{"upgrade", "check"})
+	require.NoError(t, cferr, "root.Find([]string{\"upgrade\", \"check\"}) must resolve")
+	assert.Empty(t, remaining, "check subcommand must consume the second arg")
+	assert.Equal(t, "check", checkResolved.Name(),
+		"`upgrade check` must resolve to the `check` subcommand under update")
+}

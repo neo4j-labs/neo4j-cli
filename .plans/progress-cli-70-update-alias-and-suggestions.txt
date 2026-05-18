@@ -7,3 +7,7 @@ Decisions: replicated cobra's unexported findSuggestions formatting (incl. lazy 
 Wired clicmd.ApplySuggestionsToParents into app.NewCmd and added integration tests covering root + nested typos (configg/updaet/lsit/insance/aura-clent) plus a non-shadow regression for update/query/config-set --help.
 Files: ~neo4j-cli/app/app.go, +neo4j-cli/app/app_suggest_test.go, ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go, ~neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
 Decisions: walker also installs a help-printing RunE on matched parents because cobra only invokes Args validators on Runnable commands; commands are tagged with SuggestionsRunEAnnotation so TestAllLeafCommands_HaveExamples can skip them without losing coverage on hand-authored runnable parents like `query`.
+
+## task-003 — 2026-05-18T08:10:00Z
+Added `upgrade` alias on the update cobra command plus TestUpdateCmd_UpgradeAlias verifying Aliases membership and root.Find resolution for both `upgrade` and `upgrade check`; agent-context JSON now surfaces ["upgrade"] under update.aliases.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go, ~.plans/tasks-cli-70-update-alias-and-suggestions.yml
