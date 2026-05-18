@@ -102,6 +102,7 @@ func TestDeleteCustomerManagedKeyNotInProject(t *testing.T) {
 	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find customer-managed-key %s in project %s", testCMKID, testProjectID))
+	helper.AssertUsageNotShown()
 }
 
 // TestDeleteCustomerManagedKey_StdoutIsValidJSON is the CLI-82 regression-pin

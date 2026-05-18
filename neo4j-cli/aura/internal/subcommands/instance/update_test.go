@@ -237,6 +237,7 @@ func TestUpdateInstanceNotInProject(t *testing.T) {
 	helper.ExecuteCommand(fmt.Sprintf("instance update %s --memory 8GB --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
+	helper.AssertUsageNotShown()
 }
 
 func TestUpdateInstanceError(t *testing.T) {

@@ -144,6 +144,10 @@ func (helper *AuraTestHelper) PrintErr() string {
 	return string(out)
 }
 
+func (helper *AuraTestHelper) AssertUsageNotShown() {
+	assert.NotContains(helper.t, helper.PrintErr(), "Usage:")
+}
+
 func (helper *AuraTestHelper) AssertOutJson(expected string) {
 	out, err := io.ReadAll(helper.out)
 	assert.Nil(helper.t, err)

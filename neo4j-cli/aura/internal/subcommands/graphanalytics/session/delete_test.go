@@ -94,6 +94,7 @@ func TestDeleteSessionNotInProject(t *testing.T) {
 	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find session %s in project %s", testSessionID, testProjectID))
+	helper.AssertUsageNotShown()
 }
 
 func TestDeleteSessionError(t *testing.T) {

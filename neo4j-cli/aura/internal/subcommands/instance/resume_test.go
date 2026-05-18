@@ -134,6 +134,7 @@ func TestResumeInstanceNotInProject(t *testing.T) {
 	helper.ExecuteCommand(fmt.Sprintf("instance resume %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
+	helper.AssertUsageNotShown()
 }
 
 func TestResumeInstanceError(t *testing.T) {
