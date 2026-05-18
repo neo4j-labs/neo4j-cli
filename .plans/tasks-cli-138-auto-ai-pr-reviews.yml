@@ -79,7 +79,7 @@ tasks:
       `Bash(tee:*)`); (4) enforce verdict step that does
       `[ "$(cat /tmp/claude-verdict.txt 2>/dev/null)" = "pass" ] || { echo "::error::Claude security review flagged issues"; exit 1; }`
       so a `fail` verdict (or missing file) turns the check red.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -91,7 +91,7 @@ tasks:
       - "`claude_args` uses a narrow `--allowedTools` list (no general `Bash`, no `Write`/`Edit`, no `curl`/`wget`)"
       - "Prompt body is loaded from `.github/prompts/claude-review-security.md` (not inlined in YAML)"
       - "A subsequent step reads `/tmp/claude-verdict.txt` and exits non-zero when the contents are not `pass` (fail-closed if missing)"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-004
     title: "Add .github/workflows/claude-review-conventions.yml mirroring the security workflow"

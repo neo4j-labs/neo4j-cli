@@ -5,3 +5,8 @@ Files: +.github/prompts/claude-review-security.md
 ## task-002 — 2026-05-18T00:00:00Z
 Authored conventions-review prompt mirroring security prompt shape; enumerates AGENTS.md gates (cobra layout, license header, changelog, skill-bundle regen, Example field, gofmt/lint, command naming, --format/--wait); references AGENTS.md via CLAUDE.md include instead of inlining rules; no-op path when diff has no changes under neo4j-cli/, common/, or .changes/.
 Files: +.github/prompts/claude-review-conventions.md
+
+## task-003 — 2026-05-18T00:00:00Z
+Added security-review workflow; pinned to same SHAs as claude.yml, narrow --allowed-tools list with Bash(tee:*) as the minimal verdict-write seam, fail-closed enforce-verdict step (missing file = fail).
+Files: +.github/workflows/claude-review-security.yml
+Decisions: chose Bash(tee:*) over Bash(bash:*)/Bash(echo:*) — `echo pass | tee /tmp/claude-verdict.txt` is the narrowest single-tool form; loaded prompt via heredoc-style `PROMPT<<PROMPT_EOF` block to $GITHUB_ENV to avoid escaping issues.

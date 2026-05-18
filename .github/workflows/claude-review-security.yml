@@ -1,0 +1,74 @@
+name: Claude Review — Security
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  security-review:
+    # Skip drafts; restrict to org members/owners/collaborators or the inline allowlist.
+    # Outside contributors and bots (dependabot, renovate, etc.) do not match either branch
+    # and the job is skipped without consuming Actions minutes or OAuth tokens.
+    if: |
+      github.event.pull_request.draft == false &&
+      (
+        github.event.pull_request.author_association == 'MEMBER' ||
+        github.event.pull_request.author_association == 'OWNER' ||
+        github.event.pull_request.author_association == 'COLLABORATOR' ||
+        contains(fromJSON('["oskarhane","Liam-Doodson","Neo4j-KimMoller","mjfwebb","kerem-neo4j"]'), github.event.pull_request.user.login)
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # required so Claude can post review comments via gh / MCP
+      issues: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Load security prompt into env
+        run: |
+          {
+            echo 'PROMPT<<PROMPT_EOF'
+            cat .github/prompts/claude-review-security.md
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_ENV"
+
+      - name: Run Claude Code (security review)
+        id: claude
+        uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          additional_permissions: |
+            actions: read
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            ${{ env.PROMPT }}
+
+          # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
+          # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
+          # (`echo pass | tee /tmp/claude-verdict.txt`). No general `Bash`, no
+          # `Write`/`Edit` on repo files, no `curl`/`wget`.
+          claude_args: >-
+            --allowed-tools
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(tee:*),Read,Grep,Glob"
+
+      - name: Enforce verdict
+        # Fail-closed: missing verdict file is treated as fail so an early Claude
+        # exit (or tool denial) cannot silently pass the check.
+        run: |
+          verdict="$(cat /tmp/claude-verdict.txt 2>/dev/null || true)"
+          echo "Claude verdict: '${verdict}'"
+          if [ "${verdict}" = "pass" ]; then
+            exit 0
+          fi
+          echo "::error::Claude security review flagged issues"
+          exit 1
