@@ -44,7 +44,7 @@ tasks:
       these touch CLAUDE.md, but `make license-check` and
       `make generate-check` are quick belt-and-braces given a root-file
       mode change.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -54,4 +54,4 @@ tasks:
       - "`make lint` passes"
       - "`make license-check` passes"
       - "`make generate-check` passes against a clean working tree"
-    completed_at: null
+    completed_at: 2026-05-18T11:00:00Z
