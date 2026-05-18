@@ -10,3 +10,7 @@ Decisions: "Did you mean" assertion gated on len(tc.suggestions)>0 since arbitra
 ## task-003 — 2026-05-18T17:30:00Z
 Added unknown_subcommand_usage_2 e2e scenario (args ["aura","instance","lis"], wantExit 2) to TestExitCodes, locking the os.Exit wiring for unknown-subcommand typos through the real binary subprocess.
 Files: ~test/e2e/exitcodes/exitcodes_test.go
+
+## task-004 — 2026-05-18T16:40:00Z
+Added Patch changelog entry via changie documenting the unknown-subcommand exit-2 behaviour change.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260518-163844.yaml

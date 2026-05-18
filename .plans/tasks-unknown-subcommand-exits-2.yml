@@ -94,14 +94,14 @@ tasks:
       `project: neo4j-cli`, `kind: Patch`, `body: <text>`, `time: <RFC3339>`
       fields. If changie isn't installed locally, hand-author the file per
       AGENTS.md "Changie Notes".
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "One new YAML file under `.changes/unreleased/` named `neo4j-cli-Patch-*.yaml`"
       - "The file's `project` field is `neo4j-cli`, `kind` is `Patch`"
       - "The `body` mentions the exit-code change (exit 2 / usage_error)"
       - "`time` field is a valid RFC3339 timestamp"
-    completed_at: null
+    completed_at: 2026-05-18T16:40:00Z
 
   - id: task-005
     title: "Run full local gates and manual smoke"
