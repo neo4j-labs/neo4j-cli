@@ -71,14 +71,14 @@ tasks:
 
       This complements the existing `bad_flag_usage_2` row by covering the
       unknown-subcommand path through the same exit-code wiring.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "`TestExitCodes` scenarios table includes the `unknown_subcommand_usage_2` entry with `wantExit: 2` and `skipServer: true`"
       - "Args slice is `[\"aura\", \"instance\", \"lis\"]` (the canonical CLI-141 repro)"
       - "`go test ./test/e2e/exitcodes/...` clean"
-    completed_at: null
+    completed_at: 2026-05-18T17:30:00Z
 
   - id: task-004
     title: "Add Patch changelog entry"

@@ -6,3 +6,7 @@ Files: ~common/clicmd/suggest.go, ~common/clicmd/suggest_test.go
 Extended TestSuggestionsForTypos with depth-2 (aura foo) + depth-4 (aura instance snapshot foo) rows; every row now asserts execErr unwraps to *clierr.CLIError with Code==2.
 Files: ~neo4j-cli/app/app_suggest_test.go
 Decisions: "Did you mean" assertion gated on len(tc.suggestions)>0 since arbitrary typos like "foo" may not produce cobra SuggestionsFor candidates.
+
+## task-003 — 2026-05-18T17:30:00Z
+Added unknown_subcommand_usage_2 e2e scenario (args ["aura","instance","lis"], wantExit 2) to TestExitCodes, locking the os.Exit wiring for unknown-subcommand typos through the real binary subprocess.
+Files: ~test/e2e/exitcodes/exitcodes_test.go
