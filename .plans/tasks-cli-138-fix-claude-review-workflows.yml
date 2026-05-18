@@ -10,13 +10,13 @@ tasks:
       Verify the working tree is clean and on `main` at the latest origin/main, then
       create branch `oskar/cli-138-fix-claude-review-workflows`. All subsequent edits
       land on this branch. No code changes in this task.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Local main is fast-forwarded to origin/main (`git status` clean, `git rev-parse HEAD` == `git rev-parse origin/main`)."
       - "Branch `oskar/cli-138-fix-claude-review-workflows` exists locally and is checked out."
       - "Branch has zero commits ahead of main at task end."
-    completed_at: null
+    completed_at: 2026-05-18T12:05:00Z
 
   - id: task-002
     title: "Add HTTPS insteadOf step to claude-review-security.yml"

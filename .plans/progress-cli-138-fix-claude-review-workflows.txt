@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-18T12:05:00Z
+Bootstrap task verified: branch oskar/cli-138-fix-claude-review-workflows checked out with PRD/tasks commit only ahead of main, working tree clean.
+Files: ~.plans/tasks-cli-138-fix-claude-review-workflows.yml
