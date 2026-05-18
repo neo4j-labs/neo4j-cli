@@ -1,0 +1,4 @@
+## TASK-001 — 2026-05-18T00:00:00Z
+Added `RegisterOrgProjectFlags` to `neo4j-cli/aura/internal/flags/` with constants `OrgIDFlag`, `ProjectIDFlag`, `TenantIDFlag`; registers `--organization-id` and `--project-id` as persistent flags plus deprecated `--tenant-id` alias.
+Files: +neo4j-cli/aura/internal/flags/orgproject.go, +neo4j-cli/aura/internal/flags/orgproject_test.go
+Decisions: Persistent flag deprecation warnings go to os.Stderr (not cobra's cmd.SetErr), so tests assert `f.Deprecated` field directly rather than capturing output.

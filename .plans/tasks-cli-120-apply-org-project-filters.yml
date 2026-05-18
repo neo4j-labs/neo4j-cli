@@ -13,7 +13,7 @@ tasks:
       deprecated persistent flag via `cmd.PersistentFlags().MarkDeprecated`. Follow the same
       pattern as `RegisterWait` in `wait.go`. Include constants for the flag names (e.g.
       `OrgIDFlag`, `ProjectIDFlag`, `TenantIDFlag`).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`RegisterOrgProjectFlags` is exported from `neo4j-cli/aura/internal/flags/`"
@@ -21,7 +21,7 @@ tasks:
       - "`--tenant-id` is registered as a deprecated persistent flag with message 'use --project-id instead'"
       - "Flag name constants are defined and used by the registration function"
       - "`make test` and `make lint` pass"
-    completed_at: null
+    completed_at: "2026-05-18T00:00:00Z"
 
   - id: task-002
     title: "Create ResolveAndValidateOrgProject helper in utils/ with unit tests"
