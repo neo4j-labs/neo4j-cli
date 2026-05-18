@@ -1,0 +1,99 @@
+feature: cli-139-trim-args0-remaining-commands
+prd: ./prd-cli-139-trim-args0-remaining-commands.md
+created_at: 2026-05-18T12:00:00Z
+updated_at: 2026-05-18T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Group A — trim args[0] in 16 URL-path / API call commands + tests"
+    description: |
+      Apply `strings.TrimSpace(args[0])` inside RunE to every file in Group A
+      (URL-path commands). Assign once to a local var (e.g. `instanceId`,
+      `snapshotId`, `graphqlId`, `sessionId`) and reuse for every reference
+      to args[0] in that RunE — do not sprinkle TrimSpace at multiple
+      callsites. Add `"strings"` to the import block of each file. Add a
+      `TestXxxWithTrailingNewline` test next to each leaf in
+      `<file>_test.go`, mirroring PR #128's shape (`instance/get_test.go`
+      at commit 7e7f0fa): build a mock handler at the URL with the CLEAN
+      ID, invoke via `helper.ExecuteCommand(fmt.Sprintf("<cmd> %s\"\n\"",
+      id))`, assert the mock was called exactly once with the trimmed
+      path. Commit as a single commit on branch
+      `oskar/cli-139-trim-args0-remaining`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Files modified: `neo4j-cli/aura/internal/subcommands/instance/{delete,pause,resume,update}.go`, `neo4j-cli/aura/internal/subcommands/instance/snapshot/get.go`, `neo4j-cli/aura/internal/subcommands/customermanagedkey/{get,delete}.go`, `neo4j-cli/aura/internal/subcommands/dataapi/graphql/{get,delete,pause,resume,update}.go`, `neo4j-cli/aura/internal/subcommands/dataapi/graphql/authprovider/{get,delete}.go`, `neo4j-cli/aura/internal/subcommands/graphanalytics/session/{get,delete}.go` — 16 files total"
+      - "Each modified file imports `strings` and assigns `strings.TrimSpace(args[0])` to a named local variable before any subsequent use; multi-use sites (customermanagedkey/delete.go, dataapi/graphql/pause.go, resume.go, update.go) reuse the variable, not re-trim"
+      - "Each fixed file has a matching `TestXxxWithTrailingNewline` test in its `_test.go` neighbour, asserting the mock handler was hit exactly once at the URL containing the clean ID (no `%0A`)"
+      - "Single commit on `oskar/cli-139-trim-args0-remaining` titled with a conventional-commit `fix:` prefix; commit body references CLI-139"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass; skill bundle diff is empty"
+
+  - id: task-002
+    title: "Group B — trim args[0] in 4 config/credential lookup commands + tests"
+    description: |
+      Apply `strings.TrimSpace(args[0])` inside RunE to the 4 plain
+      config/credential lookup commands (no `ValidArgs` pre-validation).
+      Assign to a local var named `name` (or `projectName` / `credName` —
+      match local convention) and pass to the store method. Add `"strings"`
+      to imports. Add unit tests using the same pattern as the package's
+      existing `use_test.go` / `remove_test.go`: feed a trailing-newline
+      input, assert the stored default / removed entry uses the clean
+      name. Commit as a single commit on the same branch.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Files modified: `neo4j-cli/aura/internal/subcommands/config/project/{use,remove}.go`, `neo4j-cli/aura/internal/subcommands/credential/{use,remove}.go` — 4 files total"
+      - "Each modified file imports `strings` and uses `strings.TrimSpace(args[0])` before calling the store method (`SetDefault` / `Remove`)"
+      - "Each fixed file has a new test exercising the trailing-newline case and asserting the stored default / removal target uses the clean name"
+      - "Single commit on the same branch, conventional-commit `fix:` prefix, body references CLI-139"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass; skill bundle diff is empty"
+
+  - id: task-003
+    title: "Group C — trim args[0] inside Args func for config get + config set"
+    description: |
+      For `config/get.go`: replace `Args: cobra.MatchAll(cobra.ExactArgs(1),
+      cobra.OnlyValidArgs)` with a custom function that runs
+      `cobra.ExactArgs(1)`, then `args[0] = strings.TrimSpace(args[0])`,
+      then `cobra.OnlyValidArgs(cmd, args)`. RunE is otherwise unchanged
+      (it reads the already-trimmed `args[0]`). For `config/set.go`: add
+      `args[0] = strings.TrimSpace(args[0])` at the top of the existing
+      Args func, immediately after the `ExactArgs(2)` check; existing
+      manual validation against `cfg.Aura.IsValidConfigKey` then sees the
+      trimmed key. CRITICAL: do NOT trim `args[1]` (the value) in
+      config/set.go — out of scope per REQ-F-004. Add `"strings"` to
+      imports. Add two test cases per file: (1) the trailing-newline path
+      succeeds with the trimmed key, (2) regression guard — passing
+      `default-tenant\n` does NOT surface an "invalid argument" error.
+      Commit as a single commit on the same branch.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Files modified: `neo4j-cli/aura/internal/subcommands/config/get.go`, `neo4j-cli/aura/internal/subcommands/config/set.go` — 2 files total"
+      - "`config/get.go` Args field is a custom `func(cmd, args) error` that calls ExactArgs(1), mutates args[0] in place via TrimSpace, then calls OnlyValidArgs — slice mutation is intentional (cobra passes by reference)"
+      - "`config/set.go` Args func includes `args[0] = strings.TrimSpace(args[0])` directly after the ExactArgs(2) check; `args[1]` is untouched"
+      - "Each file has two new test cases: one asserting the trimmed key works end-to-end, one asserting `<key>\\n` does NOT produce an 'invalid argument' error (regression guard for REQ-F-007)"
+      - "Single commit on the same branch, conventional-commit `fix:` prefix, body explicitly notes the in-Args-func mutation and references CLI-139"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass; skill bundle diff is empty"
+
+  - id: task-004
+    title: "Add changelog entry, run final gates, open PR"
+    description: |
+      Add a changie changelog entry, run the full local gate suite, push
+      the branch, and open a PR against `main` on `neo4j-labs/neo4j-cli`.
+      The PR must contain exactly 3 commits (Group A, B, C). Title:
+      `fix: trim args[0] in remaining aura subcommands (CLI-139)` or a
+      reviewer-preferred conventional form. PR body links the Linear
+      ticket and PR #128, and notes that PR #127 has zero file overlap so
+      no rebase dance is required. Do NOT request review until CI is
+      green.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Changelog entry added via `changie new --projects neo4j-cli --kind Patch --body \"Trim whitespace from positional ID args in remaining aura subcommands (CLI-139)\"` (or a hand-authored YAML file under `.changes/unreleased/` matching the existing naming scheme)"
+      - "Changelog commit lands as a 4th commit on the branch OR is squashed into one of the group commits — reviewer preference, but the changelog file MUST exist before merge"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass on the final tip of the branch"
+      - "Branch `oskar/cli-139-trim-args0-remaining` pushed to origin; PR opened against `main` on `neo4j-labs/neo4j-cli`"
+      - "PR body links https://linear.app/neo4j/issue/CLI-139 and https://github.com/neo4j-labs/neo4j-cli/pull/128, and notes 'no file overlap with PR #127'; CI is green across ubuntu/windows/macos before requesting review"
