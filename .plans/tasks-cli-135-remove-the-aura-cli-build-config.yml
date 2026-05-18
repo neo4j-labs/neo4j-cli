@@ -129,7 +129,7 @@ tasks:
       includes one short trailing line noting that the historical
       `CHANGELOG-aura.md` covers the now-discontinued standalone
       aura-cli. Satisfies REQ-F-007.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -137,7 +137,7 @@ tasks:
       - "`CHANGELOG.md` contains exactly one mention of `CHANGELOG-aura.md`, framed as historical"
       - "`CHANGELOG-aura.md` is byte-identical to its pre-PR contents"
       - "Markdown renders cleanly (no broken list bullets or headings)"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-008
     title: "Scrub aura-cli prose from RELEASING.md"

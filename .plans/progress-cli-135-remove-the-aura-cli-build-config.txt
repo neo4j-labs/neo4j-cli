@@ -18,3 +18,7 @@ Files: ~.github/workflows/release.yml, ~.plans/tasks-cli-135-remove-the-aura-cli
 ## TASK-006 — 2026-05-18T00:00:00Z
 Stripped `include_neo4j` consumer side from `.github/workflows/publish-npm.yml`: removed `Skip — aura-cli-only release (auto)` step, dropped `INCLUDE_NEO4J` parse/validate/echo from meta step, removed every per-step `steps.meta.outputs.include_neo4j == 'true'` `if:` guard, refreshed header + job comments. workflow_run conclusion gate preserved.
 Files: ~.github/workflows/publish-npm.yml, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
+
+## TASK-007 — 2026-05-18T00:00:00Z
+Collapsed top-level `CHANGELOG.md` to single-binary form: now points at `CHANGELOG-neo4j.md` as the released artefact with a trailing historical pointer to `CHANGELOG-aura.md`. `CHANGELOG-aura.md` untouched.
+Files: ~CHANGELOG.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
