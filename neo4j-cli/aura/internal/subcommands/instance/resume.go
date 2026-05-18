@@ -31,13 +31,13 @@ Resuming an instance is an asynchronous operation. You can poll the current stat
 
 If another operation is being performed on the instance you are trying to resume, an error will be returned that indicates that resume cannot be performed.`,
 		Example: `# Resume a paused Aura instance
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Resume and wait until the instance is ready
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Resume and emit the response as JSON for scripting
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			instanceID := args[0]

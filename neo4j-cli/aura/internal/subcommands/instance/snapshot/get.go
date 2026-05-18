@@ -22,13 +22,13 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Get details of a snapshot",
 		Long:  `This endpoint returns details about a specific snapshot.`,
 		Example: `# Get details of a snapshot by its ID
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Check whether a snapshot is exportable via jq
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.exportable'`,
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.exportable'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)

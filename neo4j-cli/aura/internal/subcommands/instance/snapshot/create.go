@@ -28,13 +28,13 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 Creating a snapshot is an asynchronous operation. You can poll the current status of this operation by periodically getting the snapshots details for the instance ID using the get subcommand.
 The time taken to complete a snapshot depends on the amount of data stored in the instance; larger quantities of data will take longer. The exact time this will take is dependent on the size of your data store.`,
 		Example: `# Take an on-demand snapshot of an instance
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Take a snapshot and wait until it is ready
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Take a snapshot and emit JSON for scripting
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {

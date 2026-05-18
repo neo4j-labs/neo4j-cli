@@ -94,13 +94,13 @@ Examples:
 
 ```
 # Delete an instance by ID
-neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Delete an instance and emit the response as JSON
-neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 
 # Delete and pipe the response status through jq
-neo4j-cli aura instance delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'
 ```
 
 ## aura-cli instance get
@@ -115,13 +115,13 @@ Examples:
 
 ```
 # Get details of an instance by ID
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Pipe details through jq to extract the connection URL
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.connection_url'
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.connection_url'
 ```
 
 ## aura-cli instance list
@@ -171,13 +171,13 @@ Examples:
 
 ```
 # Overwrite an instance with a fresh snapshot of a source instance
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --rw
 
 # Overwrite using a specific exportable snapshot and wait until ready
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --source-snapshot-id 22222222-2222-2222-2222-222222222222 --wait --rw
 
 # Overwrite and emit JSON for scripting
-neo4j-cli aura instance overwrite 00000000-0000-0000-0000-000000000000 --source-instance-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance overwrite 00000000 --source-instance-id 11111111 --rw --format json
 ```
 
 ## aura-cli instance pause
@@ -198,13 +198,13 @@ Examples:
 
 ```
 # Pause an Aura instance
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Pause an instance and emit the response as JSON
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 
 # Pause and pipe the response status through jq
-neo4j-cli aura instance pause 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'
+neo4j-cli aura instance pause 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'
 ```
 
 ## aura-cli instance resume
@@ -229,13 +229,13 @@ Examples:
 
 ```
 # Resume a paused Aura instance
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Resume and wait until the instance is ready
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Resume and emit the response as JSON for scripting
-neo4j-cli aura instance resume 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance resume 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 ```
 
 ## aura-cli instance snapshot
@@ -265,13 +265,13 @@ Examples:
 
 ```
 # Take an on-demand snapshot of an instance
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Take a snapshot and wait until it is ready
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --wait --rw
 
 # Take a snapshot and emit JSON for scripting
-neo4j-cli aura instance snapshot create --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance snapshot create --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
 ```
 
 ### aura-cli instance snapshot get
@@ -292,13 +292,13 @@ Examples:
 
 ```
 # Get details of a snapshot by its ID
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Check whether a snapshot is exportable via jq
-neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.exportable'
+neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.exportable'
 ```
 
 ### aura-cli instance snapshot list
@@ -320,13 +320,13 @@ Examples:
 
 ```
 # List today's snapshots for an instance
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # List snapshots for a specific date
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --date 2025-01-15
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --date 2025-01-15
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ## aura-cli instance update
@@ -350,12 +350,12 @@ Examples:
 
 ```
 # Rename an Aura instance
-neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --name my-renamed-instance --rw
+neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --name my-renamed-instance --rw
 
 # Resize an Aura instance to 8GB of memory
-neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --memory 8GB --rw
+neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --memory 8GB --rw
 
 # Rename and resize, emitting JSON for scripting
-neo4j-cli aura instance update 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --name my-renamed-instance --memory 8GB --rw --format json
+neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --name my-renamed-instance --memory 8GB --rw --format json
 ```
 

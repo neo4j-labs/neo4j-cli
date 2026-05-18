@@ -23,13 +23,13 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Returns a list of snapshots",
 		Long:  `This subcommand returns a list of available snapshots from the current day.`,
 		Example: `# List today's snapshots for an instance
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # List snapshots for a specific date
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --date 2025-01-15
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --date 2025-01-15
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli aura instance snapshot list --instance-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
+neo4j-cli aura instance snapshot list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {

@@ -20,13 +20,13 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "Returns instance details",
 		Long:  "This endpoint returns details about a specific Aura Instance.",
 		Example: `# Get details of an instance by ID
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 
 # Get details and emit JSON for scripting
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 
 # Pipe details through jq to extract the connection URL
-neo4j-cli aura instance get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.connection_url'`,
+neo4j-cli aura instance get 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json | jq -r '.data.connection_url'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			instanceId := strings.TrimSpace(args[0])
