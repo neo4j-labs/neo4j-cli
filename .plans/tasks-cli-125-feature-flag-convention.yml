@@ -66,7 +66,7 @@ tasks:
       Then commit both files together with a conventional-commit message
       referencing CLI-125. No `make test` / `make fmt-check` / `make lint`
       run is needed (markdown-only change, per REQ-NF-001).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -76,4 +76,4 @@ tasks:
       - "Rendered doc reads cleanly end-to-end as a standalone convention reference (no dependency on Linear ticket or source plan to make sense)"
       - "Both files committed together with a single commit message referencing CLI-125"
       - "`ls -la CLAUDE.md` post-commit still resolves the symlink to `AGENTS.md`"
-    completed_at: null
+    completed_at: 2026-05-18T12:00:00Z
