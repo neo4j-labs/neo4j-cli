@@ -288,7 +288,7 @@ tasks:
       reason as the existing scenarios — they require post-merge
       execution on a real PR). Update the AC mapping table at the
       bottom of the runbook.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -298,4 +298,4 @@ tasks:
       - "Runbook has a new scenario verifying that breaking the SHA pin (on a throwaway branch) turns the check red with a comment naming the failure"
       - "AC mapping table at the bottom of the runbook includes both new scenarios"
       - "Runbook still passes its own self-check (no broken cross-references, no allowlist mentions)"
-    completed_at: null
+    completed_at: 2026-05-18T09:51:43Z

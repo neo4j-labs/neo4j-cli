@@ -310,6 +310,163 @@ Fail criteria:
 
 ---
 
+## Scenario 8 — Plugin install succeeds + skill is invoked
+
+Goal: on a clean Go PR, the security workflow's action step installs the
+vendored `cc-skills-golang` marketplace plugin, and the prompt invokes
+the `golang-security` skill (rather than falling back to a hand-rolled
+review). Confirms REQ-F-015 (install lines visible in logs) and REQ-F-018
+(skill invoked, review mode).
+
+Setup:
+
+```
+git checkout -b oskar/smoke-138-skill-success main
+# Touch a trivial Go file so the prompt's non-Go no-op path does NOT
+# fire. A whitespace-only edit to a comment is enough; reverting it in
+# a follow-up commit keeps the smoke branch clean.
+$EDITOR neo4j-cli/aura/aura.go  # add then remove a trailing space, or
+                                # tweak a doc comment
+git commit -am "chore: smoke test skill invocation (no-op Go edit)"
+git push -u origin oskar/smoke-138-skill-success
+gh pr create --fill --base main
+PR=$(gh pr view --json number -q .number)
+```
+
+Verify:
+
+```
+# Wait for the security workflow to finish, grab the run id
+sleep 240
+RUN=$(gh run list --workflow=claude-review-security.yml \
+        --branch oskar/smoke-138-skill-success \
+        --limit 1 --json databaseId -q '.[0].databaseId')
+
+# (a) Action installer logs include the marketplace + plugin lines
+gh run view "$RUN" --log | grep -E "Adding marketplace: \./|Installing plugin: cc-skills-golang@neo4j-cli-review"
+# Expect BOTH lines to appear (one each). If either is missing the
+# vendored install is broken — treat as fail even if the check is green.
+
+# (b) Prompt actually invoked the Skill tool. Two signals; either is enough.
+#     Signal 1: top-level summary comment mentions the skill by name.
+gh pr view $PR --json comments \
+  --jq '.comments[] | select(.body | startswith("**Security review")) | .body' \
+  | grep -iE "golang-security|skill"
+# Expect a non-empty match.
+
+#     Signal 2: the run transcript / step output references a Skill tool call.
+gh run view "$RUN" --log | grep -iE "Skill\(|tool: Skill|invoking skill: golang-security"
+# Expect at least one hit.
+
+# (c) Verdict file written and check is green (clean Go change has no findings)
+gh pr checks $PR | grep "Claude Review — Security"
+# Expect "pass".
+```
+
+Pass criteria:
+- Both installer log lines present (`Adding marketplace: ./` AND
+  `Installing plugin: cc-skills-golang@neo4j-cli-review`).
+- Summary comment mentions `golang-security` (or `skill`) OR the run
+  log shows a Skill tool invocation.
+- Security check green.
+
+Fail criteria:
+- Either installer log line missing — vendored marketplace not picked
+  up; the workflow ran with no plugin (silent regression).
+- Summary mentions findings the hand-rolled prompt would have produced
+  but no Skill invocation in the transcript — falling back to hand-rolled
+  checks (violates REQ-F-019).
+- Security check red on a clean PR with no smells.
+
+Cleanup: `gh pr close $PR --delete-branch` (do NOT merge).
+
+---
+
+## Scenario 9 — Pin is broken (skill unavailable turns check red)
+
+Goal: a broken plugin pin must produce a loud red check, NOT a silent
+green. Confirms REQ-F-019 (no fallback to hand-rolled checks when the
+skill is unavailable).
+
+**Do NOT merge this scenario's branch.** It deliberately edits
+`.claude-plugin/marketplace.json` to point at a non-existent commit.
+Revert the edit before opening any other PR off the same branch.
+
+Setup:
+
+```
+git checkout -b oskar/smoke-138-pin-broken main
+
+# Edit .claude-plugin/marketplace.json — change the `sha` field to a
+# value that does not exist on samber/cc-skills-golang. All-zeros is
+# the canonical "obviously fake" SHA.
+#
+#   "sha": "e9761db859c6969b77a8fd0e8a243f4f28240211"
+# becomes
+#   "sha": "0000000000000000000000000000000000000000"
+$EDITOR .claude-plugin/marketplace.json
+
+git commit -am "test: break plugin pin SHA (smoke scenario 9, do NOT merge)"
+git push -u origin oskar/smoke-138-pin-broken
+gh pr create --fill --base main \
+  --title "DO NOT MERGE — smoke test pin breakage" \
+  --body "Smoke scenario 9 from .plans/smoke-test-cli-138.md. Close without merging."
+PR=$(gh pr view --json number -q .number)
+```
+
+Verify:
+
+```
+sleep 240
+gh pr checks $PR | grep "Claude Review — Security"
+# Expect "fail".
+
+# Top-level comment names the failure mode
+gh pr view $PR --json comments \
+  --jq '.comments[] | select(.body | startswith("**Security review") or
+                                  contains("skill unavailable") or
+                                  contains("pin may be broken")) | .body'
+# Expect at least one comment whose body contains language like
+# "golang-security skill unavailable" or "pin may be broken" or the
+# explicit ⚠️ failure-mode verdict line.
+
+# Run log should show the marketplace install step failing
+RUN=$(gh run list --workflow=claude-review-security.yml \
+        --branch oskar/smoke-138-pin-broken --limit 1 \
+        --json databaseId -q '.[0].databaseId')
+gh run view "$RUN" --log | grep -iE "failed to install|sha .* not found|0000000000000000000000000000000000000000"
+# Expect a non-empty match — the action either refused the install
+# or fetched and failed to resolve the SHA.
+```
+
+Pass criteria:
+- Security check **red** (verdict file = `fail` OR missing → enforce
+  step exits non-zero).
+- Top-level comment explicitly names the failure mode (skill
+  unavailable / pin broken). The check title alone is not enough.
+- No silent fallback: the comment must NOT read like a normal "no
+  issues found" green review.
+
+Fail criteria:
+- Security check green — the workflow fell back to hand-rolled checks
+  or the verdict file was written `pass` despite the install failure.
+  This is the regression REQ-F-019 exists to prevent.
+- Comment posted but generic (no mention of skill / pin / unavailability)
+  — operator cannot diagnose without digging into run logs.
+
+Cleanup (**important — revert before any further work**):
+
+```
+gh pr close $PR --delete-branch
+# Locally, the broken-SHA edit only lives on the throwaway branch; the
+# delete-branch flag above also removes it from origin. Verify
+# .claude-plugin/marketplace.json on main still has the real SHA:
+git show main:.claude-plugin/marketplace.json | grep sha
+# Expect: "sha": "e9761db859c6969b77a8fd0e8a243f4f28240211"
+```
+
+---
+
 ## Cleanup
 
 ```
@@ -371,7 +528,12 @@ requires a PR round-trip.
 
 ## Acceptance Criteria Mapping
 
-This runbook covers all eight task-005 acceptance criteria:
+This runbook covers task-005 + the post-extension PRD acceptance criteria
+introduced by the vendored-skill work (task-007 through task-010). Not
+every PRD AC has a runbook row — only those observable at runtime via
+`gh` / Actions logs are listed. Static AC (file exists, YAML parses,
+SHA matches) are checked at task-completion time by reading the diff,
+not in this runbook.
 
 | AC | Scenario |
 | -- | -------- |
@@ -382,4 +544,10 @@ This runbook covers all eight task-005 acceptance criteria:
 | Security-smell flips red | 5 |
 | Second push = second comment | 6 |
 | `@claude` mention still works | 7 |
+| Action logs show `Adding marketplace: ./` + `Installing plugin: cc-skills-golang@neo4j-cli-review` (REQ-F-015) | 8 |
+| Prompt invokes `golang-security` skill in review mode (REQ-F-018) | 8 |
+| `setup-go` + `govulncheck install` steps run before the action (REQ-F-016) | 8 (visible in `gh run view` step list) |
+| `--allowed-tools` includes `Skill` and `Bash(govulncheck:*)` (REQ-F-017) | 8 (visible in the action step's expanded `claude_args`) |
+| Broken pin turns security check red with named failure (REQ-F-019) | 9 |
+| `marketplace.json` correctly pinned (ref + sha) | static — checked in task-007 diff, exercised end-to-end in 8 + 9 |
 | `make test`/`fmt-check`/`lint` pass | (done locally, see progress log) |
