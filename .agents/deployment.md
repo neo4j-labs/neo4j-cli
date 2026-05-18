@@ -4,53 +4,21 @@ For the end-to-end contributor-facing release lifecycle, see [`RELEASING.md`](..
 
 ## Strategy: GitHub Releases via GoReleaser, plus npm via `publish-npm.yml`
 
-Releases are triggered automatically when a push to `main` modifies `CHANGELOG-neo4j.md` or `CHANGELOG-aura.md`. `release.yml` runs GoReleaser and publishes binaries to a GitHub Release. For neo4j-cli releases, `publish-npm.yml` then auto-fires (via `workflow_run`) and publishes `@neo4j-labs/cli` to npm.
-
-## Dual-Binary Releases
-
-Each release produces two separate binaries:
-
-| Binary | Description |
-|--------|-------------|
-| `aura-cli` | Standalone Aura CLI (entrypoint: `./neo4j-cli/aura/cmd`) |
-| `neo4j-cli` | Super-CLI that wraps `aura-cli` as `neo4j-cli aura <subcommand>` (entrypoint: `./neo4j-cli`) |
-
-Each binary gets its own archive per platform/arch combination. Both `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md` are attached as downloadable assets on the GitHub Release via `release.extra_files`.
-
-## Versioning Policy
-
-`aura-cli` and `neo4j-cli` have **separate version numbers** tracked in separate changelogs (`CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`). Changie uses a multi-project config with `aura-cli` and `neo4j-cli` as project keys.
-
-Run `make changelog` (interactive, supports multi-select) or `changie new --projects <a> --projects <b> --kind <kind> --body <body>` for non-interactive use. Because `neo4j-cli` bundles its child CLIs, changes to a child require entries for both the child and `neo4j-cli`.
+Releases are triggered automatically when a push to `main` modifies `CHANGELOG-neo4j.md`. `release.yml` runs GoReleaser and publishes the `neo4j-cli` binary to a GitHub Release. `publish-npm.yml` then auto-fires (via `workflow_run`) and publishes `@neo4j-labs/cli` to npm.
 
 ## Release Flow
 
-1. Developer creates a changelog entry with `make changelog` (or `changie new --projects ...` non-interactively)
+1. Developer creates a changelog entry with `make changelog` (or `changie new --projects neo4j-cli --kind <kind> --body <body>` non-interactively)
 2. On push to `main`, the `changie` CI workflow:
-   - Runs `changie batch auto --project aura-cli` and `changie batch auto --project neo4j-cli`
-   - Runs `changie merge` (no flags — automatically writes both `CHANGELOG-aura.md` and `CHANGELOG-neo4j.md`)
-   - Extracts both version numbers via `changie latest --project <key>` and strips the project-key prefix with `sed`
-   - Opens a single release PR titled `Release aura-cli vX.Y.Z / neo4j-cli vA.B.C`
+   - Runs `changie batch auto --project neo4j-cli`
+   - Runs `changie merge` (writes `CHANGELOG-neo4j.md`)
+   - Extracts the version via `changie latest --project neo4j-cli` and strips the `neo4j-cli` prefix with `sed`
+   - Opens a release PR titled `Release neo4j-cli vX.Y.Z`
 3. When the release PR is merged (updating `CHANGELOG-neo4j.md`), the `release` workflow fires:
-   - Extracts both versions independently via `changie latest --project`
-   - Generates `release-notes.md` with a `## Versions` section (both versions) and a `## Changes` section (neo4j-cli body)
-   - Sets `GORELEASER_CURRENT_TAG=<neo4j-version>` and `AURA_CLI_VERSION=<aura-version>` as env vars
-   - Runs GoReleaser with `--release-notes=release-notes.md` and `AURA_CLI_VERSION` passed explicitly in the env block
-
-## Dual-Version Injection
-
-Each binary receives its own version string at link time:
-
-| Binary | Env Var | Source |
-|--------|---------|--------|
-| `neo4j-cli` | `GORELEASER_CURRENT_TAG` | Set from `changie latest --project neo4j-cli` (with `neo4j-cli` prefix stripped) |
-| `aura-cli` | `AURA_CLI_VERSION` | Set from `changie latest --project aura-cli` (with `aura-cli` prefix stripped) |
-
-For local snapshot builds (both versions required):
-
-```bash
-GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev goreleaser release --snapshot --clean
-```
+   - Extracts the version via `changie latest --project neo4j-cli`
+   - Generates `release-notes.md` with a `## Changes` section (neo4j-cli body)
+   - Sets `GORELEASER_CURRENT_TAG=<version>`
+   - Runs GoReleaser with `--release-notes=release-notes.md`
 
 ## Platforms
 
@@ -64,7 +32,7 @@ GoReleaser builds default `goarch` for each `goos` (no explicit `goarch:` in `.g
 
 ## macOS Code Signing
 
-macOS binaries (both `aura-cli` and `neo4j-cli`) are signed with a `.p12` certificate and notarized via Apple's App Store Connect. Both binary IDs are listed in `notarize.macos[].ids`. Credentials are stored as GitHub secrets:
+The macOS `neo4j-cli` binary is signed with a `.p12` certificate and notarized via Apple's App Store Connect. The binary ID is listed in `notarize.macos[].ids`. Credentials are stored as GitHub secrets:
 - `MACOS_SIGN_P12`, `MACOS_SIGN_PASSWORD`
 - `MACOS_NOTARY_ISSUER_ID`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_KEY`
 
@@ -74,7 +42,7 @@ GoReleaser's auto-changelog generation is disabled (`changelog: disable: true` i
 
 ## npm Publication (`publish-npm.yml`)
 
-After `release.yml` succeeds, `.github/workflows/publish-npm.yml` fires via `workflow_run`. It downloads the `dist/` artifact + `release-meta.json` uploaded by `release.yml`, gates on `include_neo4j == 'true'` (aura-cli-only releases skip), and runs `distribution/npm/publish.sh` which publishes 8 platform packages then the `@neo4j-labs/cli` wrapper. Same workflow has a `workflow_dispatch` trigger for manual recovery — pulls binaries from the existing GitHub Release rather than re-running GoReleaser. See `distribution/npm/README.md` for npm specifics.
+After `release.yml` succeeds, `.github/workflows/publish-npm.yml` fires via `workflow_run`. It downloads the `dist/` artifact + `release-meta.json` uploaded by `release.yml` and runs `distribution/npm/publish.sh` which publishes 8 platform packages then the `@neo4j-labs/cli` wrapper. Same workflow has a `workflow_dispatch` trigger for manual recovery — pulls binaries from the existing GitHub Release rather than re-running GoReleaser. See `distribution/npm/README.md` for npm specifics.
 
 ## Release Workflow Notes
 

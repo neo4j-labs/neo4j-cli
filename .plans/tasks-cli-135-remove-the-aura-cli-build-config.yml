@@ -193,7 +193,7 @@ tasks:
       delete it entirely; remove the
       `GORELEASER_CURRENT_TAG=dev AURA_CLI_VERSION=dev` snapshot
       example. Satisfies REQ-F-010.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -201,7 +201,7 @@ tasks:
       - "'Dual-Binary Releases' and 'Dual-Version Injection' sections are removed"
       - "'Strategy' paragraph references only `CHANGELOG-neo4j.md` as the release trigger"
       - "Markdown renders cleanly"
-    completed_at: null
+    completed_at: 2026-05-18T00:00:00Z
 
   - id: task-011
     title: "Trim aura-cli bullets from .agents/repo-layout.md"

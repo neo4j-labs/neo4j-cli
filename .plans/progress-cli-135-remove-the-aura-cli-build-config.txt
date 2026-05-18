@@ -30,3 +30,7 @@ Files: ~RELEASING.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml
 ## TASK-009 — 2026-05-18T00:00:00Z
 Rewrote `.agents/build.md` as single-binary docs: removed `build-aura`/`run-aura` rows, deleted "Dual-Binary GoReleaser Setup" section, collapsed Changelog to single-project narrative, dropped the dual `AURA_CLI_VERSION=dev` snapshot example.
 Files: ~.agents/build.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
+
+## TASK-010 — 2026-05-18T00:00:00Z
+Rewrote `.agents/deployment.md` as single-binary docs: dropped "Dual-Binary Releases", "Versioning Policy", and "Dual-Version Injection" sections; rewrote Strategy/Release Flow/macOS Code Signing/npm Publication to drop aura-cli, `AURA_CLI_VERSION`, `include_neo4j`, and `CHANGELOG-aura` references.
+Files: ~.agents/deployment.md, ~.plans/tasks-cli-135-remove-the-aura-cli-build-config.yml, ~.plans/progress-cli-135-remove-the-aura-cli-build-config.txt
