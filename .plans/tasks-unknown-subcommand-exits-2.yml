@@ -121,7 +121,7 @@ tasks:
         go run ./neo4j-cli aura --help
         go run ./neo4j-cli aura instance --help
         go run ./neo4j-cli aura instance snapshot --help
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -133,4 +133,4 @@ tasks:
       - "`make test` passes"
       - "All four manual exit-2 smoke commands exit with code 2"
       - "All three manual help-smoke commands exit with code 0 and print help"
-    completed_at: null
+    completed_at: 2026-05-18T18:00:00Z

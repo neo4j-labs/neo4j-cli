@@ -14,3 +14,7 @@ Files: ~test/e2e/exitcodes/exitcodes_test.go
 ## task-004 — 2026-05-18T16:40:00Z
 Added Patch changelog entry via changie documenting the unknown-subcommand exit-2 behaviour change.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260518-163844.yaml
+
+## task-005 — 2026-05-18T18:00:00Z
+Final gates pass: make fmt-check, make lint, make test, e2e exitcodes (with build tag). Manual smoke: all 4 unknown-subcommand depths (configg, aura foo, aura instance lis, aura instance snapshot foo) exit 2; all 3 --help cases exit 0 and print help.
+Files: (verification only — no source changes)
