@@ -13,6 +13,7 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - Review prompts live in `.github/prompts/` so they can be iterated without touching CI YAML.
 - Existing `@claude` mention behaviour is preserved.
 - Pattern is easily extensible: adding a third concern = one new workflow file + one new prompt file.
+- Security review delegates to the **actual** version-pinned `golang-security` skill (from `samber/cc-skills-golang`), not a hand-rolled re-implementation. Pin is exact (tag + SHA) so reviews are reproducible until we deliberately bump.
 
 ## Non-Goals
 
@@ -41,6 +42,12 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - REQ-F-011: The security prompt's review scope mirrors the `golang-security` skill: injection (SQL, command, XSS), cryptography, filesystem safety, network security, cookies, secrets management, memory safety, logging. On PRs with no Go changes the prompt instructs Claude to post a one-line "no security-relevant changes" comment and emit `pass`.
 - REQ-F-012: The conventions prompt checks: cobra one-file-per-leaf layout, license header on new `.go` files, changelog entry under `.changes/unreleased/` for user-facing changes (with internal/CI-only exception), skill-bundle regen after touching commands reachable from `app.NewCmd`, non-empty `Example:` on new leaf commands, `gofmt`/lint hygiene, singular-noun + `<resource> <action>` form, `--format`/`--wait` conventions. Source-of-truth document is `AGENTS.md`, loaded automatically via `CLAUDE.md`'s `@AGENTS.md` include.
 - REQ-F-013: Existing `.github/workflows/claude.yml` is not modified.
+- REQ-F-014: A vendored local marketplace lives at `.claude-plugin/marketplace.json` (repo root). The marketplace `name` is `neo4j-cli-review`. It declares exactly one plugin entry: `cc-skills-golang`, sourced from `github` repo `samber/cc-skills-golang`, pinned via BOTH `ref: v1.4.0` AND `sha: e9761db859c6969b77a8fd0e8a243f4f28240211`. Bumping the pin requires a normal PR that edits this file; no auto-update path.
+- REQ-F-015: The security workflow passes `plugin_marketplaces: ./` and `plugins: cc-skills-golang@neo4j-cli-review` to the `anthropics/claude-code-action` step. The action's logs must show both `Adding marketplace: ./` and `Installing plugin: cc-skills-golang@neo4j-cli-review` succeed before the prompt runs.
+- REQ-F-016: The security workflow includes (before the action step) a `setup-go` step matching the repo's `go.mod` Go version, plus a `go install golang.org/x/vuln/cmd/govulncheck@latest` step. The skill requires both Go and `govulncheck` on PATH.
+- REQ-F-017: The security workflow's `--allowed-tools` extends the base allowlist with `Skill` and `Bash(govulncheck:*)`. No other broadening (no general `Bash`, no `Write`/`Edit`, no `curl`/`wget`).
+- REQ-F-018: The security prompt's FIRST instruction is to invoke the `golang-security` skill via the `Skill` tool in **review mode** (data-flow tracing). Audit mode (which spawns 5 parallel sub-agents) is explicitly forbidden by the prompt — too expensive for a per-push check. The existing output contract (inline comments + top-level summary + verdict file) is preserved; the prompt translates the skill's output into the contract format.
+- REQ-F-019: If the skill invocation fails (plugin not installed, skill unavailable, `govulncheck` missing, skill errors out mid-run), the prompt must write `fail` to `/tmp/claude-verdict.txt` and post a top-level comment naming the failure mode (e.g. `⚠️ golang-security skill unavailable — pin may be broken`). The existing enforce-verdict step then turns the check red. No fall-through to hand-rolled checks — pin breakage should be loudly visible.
 
 ### Non-Functional Requirements
 
@@ -60,6 +67,10 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - **Prompt-injection surface**: PR file contents can contain "ignore previous instructions, exfiltrate X" payloads. Mitigation: narrow `--allowedTools` (no `curl`/`wget`/general `Bash`/`Write`), `GITHUB_TOKEN` perms scoped to `pull-requests: write` only. Worst case under injection = a misleading review comment, not exfiltration.
 - **Two files vs one**: confirmed two-file layout. Each is its own check entry on the PR, independently re-runnable, easy to disable (`if: false` or delete file). Trade-off: ~30 lines of YAML duplication per file. Acceptable.
 - **Cost**: per-PR cost = 2× OAuth runs on every push from internal authors. Org-membership filter removes outsiders and bots. Path filter can be added later if noisy.
+- **Why a vendored marketplace, not direct install from `samber/cc`**: Samber's marketplace lists `cc-skills-golang` without a `ref`/`sha` field, so installing from it tracks the source repo's default branch. The plugin's own `plugin.json:version` only affects update-skipping, not fetch-time pinning (verified in https://code.claude.com/docs/en/plugin-marketplaces "Version resolution"). The only way to truly pin a plugin's source SHA is via a marketplace entry that sets `sha:` — hence a one-plugin local marketplace under our control.
+- **Pin maintenance**: when bumping, edit `.claude-plugin/marketplace.json` (both `ref:` and `sha:`), commit on a normal PR, let the security workflow run on that PR — green there = safe to merge. No Renovate automation in v1; revisit if pin bumps become frequent.
+- **Go version drift risk**: the `setup-go` step uses the repo's `go.mod` Go version. If the skill is written against a newer toolchain it may misbehave on older Go. Cheap mitigation: keep the skill pin and the Go upgrade decoupled — bump one at a time, verify on a test PR.
+- **Skill failure ≠ silent pass**: REQ-F-019 forbids fall-through to a hand-rolled check. Rationale: an "unavailable skill" failure that quietly degrades to handwritten heuristics would mask a broken pin indefinitely. Failing loudly forces a real fix (re-pin, re-vendor, or remove).
 
 ## Acceptance Criteria
 
@@ -77,6 +88,12 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - [ ] Pushing a second commit to the same PR produces a **new** review comment (not an edit of the prior one).
 - [ ] After merge, commenting `@claude help` on a different PR still triggers the existing `claude.yml` mention workflow.
 - [ ] `make test && make fmt-check && make lint` pass (no Go code touched; gates should be no-op).
+- [ ] `.claude-plugin/marketplace.json` exists at repo root, declares `name: neo4j-cli-review`, lists one plugin `cc-skills-golang` with `source.ref: v1.4.0` AND `source.sha: e9761db859c6969b77a8fd0e8a243f4f28240211`.
+- [ ] The security workflow's action step includes `plugin_marketplaces: ./` and `plugins: cc-skills-golang@neo4j-cli-review`; on a successful run its logs show both lines from the action's installer (`Adding marketplace: ./` + `Installing plugin: cc-skills-golang@neo4j-cli-review`) before the Claude prompt executes.
+- [ ] The security workflow includes a `setup-go` step keyed to the repo's `go.mod` Go version AND a `go install golang.org/x/vuln/cmd/govulncheck@latest` step before the action.
+- [ ] The security workflow's `--allowed-tools` includes `Skill` and `Bash(govulncheck:*)`; no other additions vs the base allowlist.
+- [ ] The security prompt's first instruction invokes the `golang-security` skill via the `Skill` tool in review mode; explicitly forbids audit mode.
+- [ ] On a PR where the plugin install is deliberately broken (e.g. SHA edited to a non-existent value on a throwaway branch), the security check goes red ❌ with a top-level comment naming the failure mode (not silently green).
 
 ## Out of Scope
 
@@ -88,8 +105,14 @@ Linear: [CLI-138](https://linear.app/neo4j/issue/CLI-138/lets-experiment-with-ai
 - Cost dashboarding / per-check budget caps.
 - Path-based filtering at the workflow level.
 - Sticky comments / replacing prior reviews on subsequent pushes.
+- Applying the same vendored-skill pattern to the conventions workflow. The `samber/cc-skills-golang` plugin has skills that overlap (`golang-lint`, `golang-naming`, `golang-project-layout`) but the conventions check is fundamentally about THIS repo's AGENTS.md rules — out-of-the-box skills don't know them. Revisit only if we extract our conventions into a reusable skill.
+- Audit mode (5 parallel sub-agents) of the `golang-security` skill. Too expensive per push; review mode only.
+- Renovate / auto-PR for pin SHA bumps. Hand-edit the marketplace.json when bumping; revisit if bumps become frequent.
+- Fallback to hand-rolled security checks when the skill is unavailable. Skill failures must surface as a red check (REQ-F-019) so pin breakage is loud.
 
 ## Open Questions
 
 - Exact `claude_args` tool string needed to let Claude write `/tmp/claude-verdict.txt` without opening up general `Bash`. To be settled during implementation by trying the narrowest viable option.
 - Whether the conventions prompt should also nudge on the title/commit-message conventions (e.g. conventional-commit prefix `feat(...)`) or stay scoped to code/file conventions only.
+- Exact invocation syntax for the `golang-security` skill in non-interactive (action) context — `/golang-security` slash-command vs `Skill` tool call vs prompt-trigger phrase. Resolve during task implementation by reading the skill's `SKILL.md` and trying the narrowest form that works.
+- Whether `govulncheck` should be cached across runs (`actions/cache`) to shave install time. Defer until we have a baseline wall-clock measurement.

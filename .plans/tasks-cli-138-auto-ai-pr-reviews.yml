@@ -1,7 +1,7 @@
 feature: cli-138-auto-ai-pr-reviews
 prd: ./prd-cli-138-auto-ai-pr-reviews.md
 created_at: 2026-05-18T00:00:00Z
-updated_at: 2026-05-18T00:00:00Z
+updated_at: 2026-05-18T01:00:00Z
 
 tasks:
   - id: task-001
@@ -182,3 +182,120 @@ tasks:
       - "Smoke-test runbook scenario 3 no longer mentions the allowlist (heading + body updated)"
       - "`make test`, `make fmt-check`, `make lint` pass"
     completed_at: 2026-05-18T00:00:00Z
+
+  - id: task-007
+    title: "Vendor pinned cc-skills-golang plugin via local .claude-plugin/marketplace.json"
+    description: |
+      Create `.claude-plugin/marketplace.json` at the repo root with a
+      single-plugin marketplace named `neo4j-cli-review`. The plugin
+      entry is `cc-skills-golang` sourced from github repo
+      `samber/cc-skills-golang`, pinned with BOTH `ref: v1.4.0` AND
+      `sha: e9761db859c6969b77a8fd0e8a243f4f28240211`. Per Claude Code
+      docs (https://code.claude.com/docs/en/plugin-marketplaces),
+      setting both makes the plugin source reproducible — `ref` is
+      human-readable, `sha` enforces exact-commit pinning. No other
+      plugins in this marketplace; this file exists solely to give us a
+      pin point for the security skill.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "File `.claude-plugin/marketplace.json` exists at repo root and parses as valid JSON"
+      - "Marketplace `name` is exactly `neo4j-cli-review`"
+      - "`owner.name` is set (e.g. `neo4j-labs`)"
+      - "`plugins` array contains exactly one entry"
+      - "Plugin entry has `name: cc-skills-golang`, `source.source: github`, `source.repo: samber/cc-skills-golang`, `source.ref: v1.4.0`, AND `source.sha: e9761db859c6969b77a8fd0e8a243f4f28240211`"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass (new file is not Go)"
+    completed_at: null
+
+  - id: task-008
+    title: "Wire security workflow to install vendored plugin + setup-go + govulncheck"
+    description: |
+      Update `.github/workflows/claude-review-security.yml`:
+      (a) Add a `setup-go` step BEFORE the action step. Use
+          `actions/setup-go@<pinned-SHA>` and `go-version-file: go.mod`
+          so the toolchain tracks repo state.
+      (b) Add a step that runs
+          `go install golang.org/x/vuln/cmd/govulncheck@latest`. The
+          `golang-security` skill requires `govulncheck` on PATH.
+      (c) Add to the `anthropics/claude-code-action` step:
+          ```
+          plugin_marketplaces: |
+            ./
+          plugins: |
+            cc-skills-golang@neo4j-cli-review
+          ```
+      (d) Extend `--allowed-tools` in `claude_args` with `Skill` and
+          `Bash(govulncheck:*)`. No other broadening — do NOT add
+          general `Bash`, `Write`, `Edit`, `curl`, or `wget`.
+      Do not touch `claude-review-conventions.yml`. Two files stay
+      symmetric except for this addition.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`.github/workflows/claude-review-security.yml` includes a `setup-go` step using `go-version-file: go.mod`"
+      - "Workflow includes a `go install golang.org/x/vuln/cmd/govulncheck@latest` step before the action step"
+      - "Action step has `plugin_marketplaces: ./` and `plugins: cc-skills-golang@neo4j-cli-review`"
+      - "`--allowed-tools` contains `Skill` and `Bash(govulncheck:*)` in addition to the existing narrow list"
+      - "`--allowed-tools` does NOT contain bare `Bash`, `Write`, `Edit`, `curl`, or `wget`"
+      - "`.github/workflows/claude-review-conventions.yml` is unchanged on this task's diff"
+      - "YAML parses; `make test`, `make fmt-check`, `make lint` pass"
+    completed_at: null
+
+  - id: task-009
+    title: "Rewrite security prompt to invoke golang-security skill in review mode"
+    description: |
+      Rewrite `.github/prompts/claude-review-security.md` so the FIRST
+      instruction is: "Invoke the `golang-security` skill via the Skill
+      tool. Use review mode (data-flow tracing), NOT audit mode (which
+      spawns 5 parallel sub-agents — too expensive per push)." Drop
+      the existing hand-rolled focus-area enumeration (injection,
+      crypto, filesystem, ...) — the skill owns that scope now. The
+      prompt's job is to (a) trigger the skill, (b) translate its
+      output into the existing inline-comment + top-level summary +
+      verdict-file contract. Keep the no-op path for non-Go PRs (still
+      `pass`). Add a failure-mode clause: if the skill fails (plugin
+      not installed, skill errors, govulncheck missing), write `fail`
+      to `/tmp/claude-verdict.txt` and post a top-level comment naming
+      the failure (e.g. `⚠️ golang-security skill unavailable — pin
+      may be broken`). Do NOT fall back to hand-rolled checks.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "First instruction in the prompt invokes the `golang-security` skill via the `Skill` tool"
+      - "Prompt explicitly pins skill to review mode and forbids audit mode (cite reason: cost)"
+      - "Hand-rolled focus-area list (injection/crypto/filesystem/...) is removed; the skill owns scope"
+      - "Output contract preserved: inline comments + top-level summary with explicit verdict line + `pass`/`fail` to `/tmp/claude-verdict.txt`"
+      - "No-op path for non-Go PRs preserved (emits `pass`)"
+      - "Failure clause: skill failure writes `fail` + posts a top-level comment naming the failure mode; no fallback to hand-rolled checks"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: null
+
+  - id: task-010
+    title: "Extend smoke-test runbook with pin-break + skill-success scenarios"
+    description: |
+      Add two scenarios to `.plans/smoke-test-cli-138.md`: (1) a
+      "skill works" scenario — clean Go PR triggers the security
+      workflow, action logs show `Adding marketplace: ./` +
+      `Installing plugin: cc-skills-golang@neo4j-cli-review`, the
+      prompt invokes the Skill tool, the top-level summary mentions
+      the skill or names a finding. (2) a "pin is broken" scenario —
+      on a throwaway branch, edit `.claude-plugin/marketplace.json`
+      to set `sha:` to a non-existent value (e.g. all zeros), push,
+      observe the check fail red with a top-level comment naming the
+      failure mode. Both scenarios are deferred to the human (same
+      reason as the existing scenarios — they require post-merge
+      execution on a real PR). Update the AC mapping table at the
+      bottom of the runbook.
+    status: pending
+    dependencies:
+      - task-007
+      - task-008
+      - task-009
+    acceptance_criteria:
+      - "`.plans/smoke-test-cli-138.md` has a new scenario verifying the marketplace + plugin install in the action logs"
+      - "Runbook has a new scenario verifying that breaking the SHA pin (on a throwaway branch) turns the check red with a comment naming the failure"
+      - "AC mapping table at the bottom of the runbook includes both new scenarios"
+      - "Runbook still passes its own self-check (no broken cross-references, no allowlist mentions)"
+    completed_at: null
