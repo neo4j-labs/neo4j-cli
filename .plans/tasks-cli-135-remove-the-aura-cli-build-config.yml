@@ -305,7 +305,7 @@ tasks:
       open a PR against `main` linking back to Linear CLI-135 and to
       `.plans/prd-cli-135-remove-the-aura-cli-build-config.md`.
       Satisfies REQ-F-014 and closes the work loop.
-    status: pending
+    status: completed
     dependencies:
       - task-014
     acceptance_criteria:
@@ -313,4 +313,4 @@ tasks:
       - "Branch `oskar/cli-135-remove-the-aura-cli-build-config` is pushed to origin with upstream tracking"
       - "PR is opened against `main`; description references CLI-135 and the PRD path"
       - "CI matrix (ubuntu, windows, macos) reports green on the PR"
-    completed_at: null
+    completed_at: 2026-05-18T09:20:00Z
