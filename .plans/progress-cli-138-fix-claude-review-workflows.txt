@@ -5,3 +5,7 @@ Files: ~.plans/tasks-cli-138-fix-claude-review-workflows.yml
 ## TASK-002 — 2026-05-18T12:15:00Z
 Added "Force HTTPS for github.com git clones" step between Install govulncheck and Load security prompt into env. Sets git insteadOf so the Claude plugin installer's git clone uses HTTPS (no SSH key on runner). YAML parses; diff scoped to the new step.
 Files: .github/workflows/claude-review-security.yml
+
+## TASK-003 — 2026-05-18T12:25:00Z
+Renamed conventions workflow job key security-review -> conventions-review and step "Run Claude Code (security review)" -> "Run Claude Code (conventions review)". Disambiguates the GitHub check name from the security workflow's check. YAML parses; diff is exactly the two rename lines.
+Files: .github/workflows/claude-review-conventions.yml

@@ -49,7 +49,7 @@ tasks:
       the one step rename below). Rename the step `Run Claude Code (security review)`
       to `Run Claude Code (conventions review)`. No other step name changes.
       Satisfies REQ-F-002 and REQ-F-003.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -57,7 +57,7 @@ tasks:
       - "The step previously named `Run Claude Code (security review)` is now `Run Claude Code (conventions review)`; no other step names changed."
       - "`if:`, `runs-on:`, `permissions:`, and step bodies (other than the renamed step's `name:`) are byte-identical to origin/main."
       - "`git diff origin/main -- .github/workflows/claude-review-conventions.yml` shows ONLY the two rename lines."
-    completed_at: null
+    completed_at: 2026-05-18T12:25:00Z
 
   - id: task-004
     title: "Push branch and open PR with defect-focused description"
