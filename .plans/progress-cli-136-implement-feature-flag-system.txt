@@ -2,3 +2,8 @@
 Built common/clicfg/flags.go: Flag struct, Registry seeded with flag.aura-beta (IntroducedIn 1.4.0), FlagSet (overrides + legacyLogOnce), Enabled/SetForTest/SetFromConfigCmd, FlagNameToEnv. Standalone; no callers yet.
 Files: +common/clicfg/flags.go, +common/clicfg/flags_test.go, ~.plans/tasks-cli-136-implement-feature-flag-system.yml
 Decisions: sjson dot-escape (`\.`) keeps flag key flat in config.json; viper.GetBool reads both flat and nested.
+
+## task-002 — 2026-05-18T15:30:00Z
+Wired FlagSet into Config: added FlagScope, Config.Flags init, Registry-driven BindEnv loop, ResolveConfigKey flag.* branch. Removed DefaultAuraBetaEnabled/betaEnabled/SetBetaEnabled/AuraBetaEnabled. Switched aura.go and api.go call sites to cfg.Flags.Enabled("flag.aura-beta"). Removed gjson bridge from auratesthelper; existing aura tests pass via legacy fallback.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/clicfg_test.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/organization_test.go, ~neo4j-cli/aura/internal/subcommands/workspace/validate_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+Decisions: deviated from task description — skipped Viper.SetDefault on both primary and legacy flag keys. viper.IsSet returns true when a default is registered (defaults checked in viper.find before flagDefault gate), which would defeat both the primary "explicitly set" detection and the legacy-fallback gate. Default lives in Registry as final layer in FlagSet.Enabled.

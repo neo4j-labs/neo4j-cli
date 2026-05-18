@@ -67,7 +67,8 @@ tasks:
       accepted; `flag.unknown-thing` rejected. Existing aura tests
       keep passing via the legacy alias path — no test renames in
       this task.
-    status: pending
+    status: completed
+    completed_at: 2026-05-18T15:30:00Z
     dependencies:
       - task-001
     acceptance_criteria:

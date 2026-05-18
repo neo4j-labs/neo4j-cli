@@ -60,11 +60,6 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 
 	cfg.Aura.SetPollingConfig(5, 0)
 
-	// Allows the aura.beta-enabled config to be used in tests. In prod this is not exposed
-	if gjson.Get(helper.cfg, "aura.beta-enabled").Bool() {
-		cfg.Aura.SetBetaEnabled(true)
-	}
-
 	cmd := aura.NewStandaloneCmd(cfg)
 	flags.RegisterOutputFlag(cmd, cfg)
 	cmd.PersistentPreRunE = flags.ComposeRootPersistentPreRunE(cfg)
