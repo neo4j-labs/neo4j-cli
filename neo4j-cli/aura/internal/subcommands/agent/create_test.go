@@ -48,16 +48,16 @@ func TestCreateAgent(t *testing.T) {
 	}`, testTools))
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "My Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": false,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": false,
+		"name": "My Agent"
+	}
+}`)
 }
 
 func TestCreateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
@@ -88,16 +88,16 @@ func TestCreateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "My Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": false,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": false,
+		"name": "My Agent"
+	}
+}`)
 }
 
 func TestCreateAgentWithPrivateFlag(t *testing.T) {
@@ -137,16 +137,16 @@ func TestCreateAgentWithPrivateFlag(t *testing.T) {
 	}`, testTools))
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "Private Agent",
-			"description": "A private agent",
-			"dbid": "a1b2c3d4",
-			"is_private": true,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "A private agent",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": true,
+		"name": "Private Agent"
+	}
+}`)
 }
 
 func TestCreateAgentWithMissingName(t *testing.T) {

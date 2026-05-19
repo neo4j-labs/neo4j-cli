@@ -40,16 +40,25 @@ func TestInvokeAgent(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"input": "What movies are in the database?"}`)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "inv-12345",
-			"type": "message",
-			"role": "assistant",
-			"content": [{"type": "text", "text": "Here are the movies in the database..."}],
-			"end_reason": "end_turn",
-			"status": "completed",
-			"usage": {"request_tokens": 150, "response_tokens": 200, "total_tokens": 350}
+	"data": {
+		"content": [
+			{
+				"text": "Here are the movies in the database...",
+				"type": "text"
+			}
+		],
+		"end_reason": "end_turn",
+		"id": "inv-12345",
+		"role": "assistant",
+		"status": "completed",
+		"type": "message",
+		"usage": {
+			"request_tokens": 150,
+			"response_tokens": 200,
+			"total_tokens": 350
 		}
-	}`)
+	}
+}`)
 }
 
 func TestInvokeAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
@@ -81,16 +90,25 @@ func TestInvokeAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "inv-12345",
-			"type": "message",
-			"role": "assistant",
-			"content": [{"type": "text", "text": "Here are the movies in the database..."}],
-			"end_reason": "end_turn",
-			"status": "completed",
-			"usage": {"request_tokens": 150, "response_tokens": 200, "total_tokens": 350}
+	"data": {
+		"content": [
+			{
+				"text": "Here are the movies in the database...",
+				"type": "text"
+			}
+		],
+		"end_reason": "end_turn",
+		"id": "inv-12345",
+		"role": "assistant",
+		"status": "completed",
+		"type": "message",
+		"usage": {
+			"request_tokens": 150,
+			"response_tokens": 200,
+			"total_tokens": 350
 		}
-	}`)
+	}
+}`)
 }
 
 func TestInvokeAgentWithMissingInput(t *testing.T) {

@@ -40,16 +40,16 @@ func TestUpdateAgentName(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"name": "Renamed Agent"}`)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "Renamed Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": false,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": false,
+		"name": "Renamed Agent"
+	}
+}`)
 }
 
 func TestUpdateAgentBooleanFields(t *testing.T) {
@@ -81,16 +81,16 @@ func TestUpdateAgentBooleanFields(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"is_mcp_enabled": true, "is_private": true}`)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "My Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": true,
-			"is_mcp_enabled": true,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": true,
+		"is_private": true,
+		"name": "My Agent"
+	}
+}`)
 }
 
 func TestUpdateAgentTools(t *testing.T) {
@@ -122,16 +122,16 @@ func TestUpdateAgentTools(t *testing.T) {
 	mockHandler.AssertCalledWithBody(fmt.Sprintf(`{"tools": %s}`, testTools))
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "My Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": false,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": false,
+		"name": "My Agent"
+	}
+}`)
 }
 
 func TestUpdateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
@@ -161,16 +161,16 @@ func TestUpdateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"name": "Renamed Agent"}`)
 
 	helper.AssertOutJson(`{
-		"data": {
-			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-			"name": "Renamed Agent",
-			"description": "An agent that queries the database",
-			"dbid": "a1b2c3d4",
-			"is_private": false,
-			"is_mcp_enabled": false,
-			"enabled": true
-		}
-	}`)
+	"data": {
+		"dbid": "a1b2c3d4",
+		"description": "An agent that queries the database",
+		"enabled": true,
+		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+		"is_mcp_enabled": false,
+		"is_private": false,
+		"name": "Renamed Agent"
+	}
+}`)
 }
 
 func TestUpdateAgentWithNoFields(t *testing.T) {

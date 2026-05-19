@@ -42,23 +42,23 @@ func TestListAgents(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOutJson(`{
-		"data": [
-			{
-				"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-				"name": "My Agent",
-				"description": "An agent that queries the database",
-				"dbid": "a1b2c3d4",
-				"enabled": true
-			},
-			{
-				"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-				"name": "Second Agent",
-				"description": "Another agent",
-				"dbid": "e5f6g7h8",
-				"enabled": false
-			}
-		]
-	}`)
+	"data": [
+		{
+			"dbid": "a1b2c3d4",
+			"description": "An agent that queries the database",
+			"enabled": true,
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent"
+		},
+		{
+			"dbid": "e5f6g7h8",
+			"description": "Another agent",
+			"enabled": false,
+			"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			"name": "Second Agent"
+		}
+	]
+}`)
 }
 
 func TestListAgentsWithOrganizationAndProjectIdFromConfig(t *testing.T) {
@@ -86,16 +86,16 @@ func TestListAgentsWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOutJson(`{
-		"data": [
-			{
-				"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-				"name": "My Agent",
-				"description": "An agent that queries the database",
-				"dbid": "a1b2c3d4",
-				"enabled": true
-			}
-		]
-	}`)
+	"data": [
+		{
+			"dbid": "a1b2c3d4",
+			"description": "An agent that queries the database",
+			"enabled": true,
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent"
+		}
+	]
+}`)
 }
 
 func TestListAgentsWithTableOutput(t *testing.T) {
