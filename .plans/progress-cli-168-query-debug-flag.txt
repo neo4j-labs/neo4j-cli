@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-05-19T00:00:00Z
 Add stderrLogger adapter (Error/Warnf/Infof/Debugf to stderr), conn.debug field, extend driverOpener seam to 5 args; migrate test stubs.
 Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/embed_test.go, ~neo4j-cli/query/run_test.go
+
+## TASK-002 — 2026-05-19T00:00:00Z
+Register --debug persistent flag on query parent; resolveDebug() wires flag-then-env precedence (strict NEO4J_DEBUG=1) into conn.debug on both credential and standard paths. Regen of skill bundle was required so make test stayed green; task-005 will be a verification step.
+Files: ~neo4j-cli/query/query.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/internal/skill/bundle/references/query.md
+Decisions: regenerated skill bundle in this task (not task-005) to keep TestGenerator_RoundTrip green per task-002 AC.

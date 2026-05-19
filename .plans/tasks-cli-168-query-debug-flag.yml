@@ -44,7 +44,7 @@ tasks:
       read). Do not plumb `--debug` through dotenv; `os.Getenv` is the only env
       surface. Persistence means `:schema` inherits the flag; `:embed` inherits
       it too but is a documented no-op (no driver opened in the leaf).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -53,7 +53,7 @@ tasks:
       - "Running `query :schema --debug ...` results in `conn.debug == true` end-to-end (inheritance works)."
       - "No dotenv lookup is added for `NEO4J_DEBUG`; only `os.Getenv` is consulted."
       - "`make build` and `make test` remain clean."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-003
     title: "Table tests for flag/env precedence, stderr routing, and stdout cleanliness"

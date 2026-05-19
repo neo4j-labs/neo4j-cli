@@ -206,6 +206,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			password:  cred.Password,
 			database:  cred.DatabaseName,
 			userAgent: "neo4j-cli/v" + version,
+			debug:     resolveDebug(cmd),
 		}, nil
 	}
 
@@ -317,7 +318,21 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		password:  password,
 		database:  database,
 		userAgent: userAgent,
+		debug:     resolveDebug(cmd),
 	}, nil
+}
+
+// resolveDebug merges the `--debug` flag with the `NEO4J_DEBUG` env var. Flag
+// precedence: when `--debug` is explicitly set on the command line, its boolean
+// value wins (so `--debug=false` overrides `NEO4J_DEBUG=1`). Otherwise debug is
+// enabled iff `NEO4J_DEBUG == "1"` (strict — any other value, including `true`
+// / `yes` / `on` / `0`, leaves debug OFF). Dotenv is intentionally not
+// consulted; only `os.Getenv` is read.
+func resolveDebug(cmd *cobra.Command) bool {
+	if f := cmd.Flag("debug"); f != nil && f.Changed {
+		return f.Value.String() == "true"
+	}
+	return os.Getenv("NEO4J_DEBUG") == "1"
 }
 
 // openDriver opens a Bolt driver using the resolved connection params and
