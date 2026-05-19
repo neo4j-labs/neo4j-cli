@@ -317,3 +317,43 @@ tasks:
       - "`go generate ./neo4j-cli/internal/skill/...` produces a clean diff that is committed alongside the source edits."
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
     completed_at: 2026-05-19T10:30:00Z
+
+  - id: task-015
+    title: "Remove flag.aura-beta gate around the agent subtree"
+    description: |
+      Promote `aura agent` from beta to default-on. Concretely:
+
+      1. `neo4j-cli/aura/aura.go` — move `cmd.AddCommand(agent.NewCmd(cfg))` OUT of the
+         `if cfg.Flags.Enabled("flag.aura-beta") { ... }` block so it mounts unconditionally
+         alongside `instance`, `workspace`, etc.
+      2. Drop `(beta)` labels and `flag.aura-beta` activation hints from the docs added in
+         task-014:
+         - `README.md` — rename "Agents (beta)" → "Agents", remove the enable-flag paragraph.
+         - `neo4j-cli/internal/skill/additions.md` — drop the `flag.aura-beta` mention from the
+           agent bullet.
+         - `neo4j-cli/internal/skill/description.txt` — drop "(beta)" from the agent clause
+           while staying ≤1024 chars / single paragraph / third person.
+      3. Agent tests — the `helper.SetConfigValue("flag.aura-beta", true)` lines in every
+         agent `*_test.go` are now no-ops but harmless; remove them in a single sweep to keep
+         the suite tidy.
+      4. Run `go generate ./neo4j-cli/internal/skill/...` — bundle WILL change this time
+         (agent subtree is now visible to the generator, so `references/agent.md` and any
+         related index entries are produced). Commit the regenerated bundle alongside the
+         source edits.
+      5. Add a `.changes/unreleased/neo4j-cli-Minor-*.yaml` entry: body
+         `Promote aura agent commands out of beta (flag.aura-beta no longer required).`
+
+      Heads-up: with the gate removed, the agent leaves will surface in every consumer that
+      walks the cobra tree — `agent-context`, the skill bundle, `aura --help`. Verify each
+      manually after build.
+    status: pending
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`aura agent --help` lists the seven leaves regardless of `flag.aura-beta` setting."
+      - "`README.md`, `additions.md`, `description.txt` no longer say `(beta)` for agents or reference the activation flag."
+      - "Regenerated skill bundle (`neo4j-cli/internal/skill/bundle/references/agent.md` + index/SKILL.md updates) is committed."
+      - "Agent tests no longer set `flag.aura-beta` (or the line is justified if kept)."
+      - "A new changelog entry exists naming the promotion."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: null
