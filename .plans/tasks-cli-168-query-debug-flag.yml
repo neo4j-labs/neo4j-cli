@@ -1,7 +1,7 @@
 feature: cli-168-query-debug-flag
 prd: ./prd-cli-168-query-debug-flag.md
 created_at: 2026-05-19T00:00:00Z
-updated_at: 2026-05-19T20:50:00Z
+updated_at: 2026-05-19T21:25:00Z
 
 tasks:
   - id: task-001
@@ -209,3 +209,44 @@ tasks:
       - "Changelog entry (Minor) documenting the new shorter retry window so users with intentionally slow / contended deployments know to expect faster failures."
       - "`make test`, `make fmt-check`, `make lint` clean."
     completed_at: 2026-05-19T21:15:00Z
+
+  - id: task-009
+    title: "Also cap MaxTransactionRetryTime so non-retryable failures fail fast"
+    description: |
+      Smoke against the original `neo4j+s://<sandbox>:443` URL after
+      task-007 + task-008 produced the correct UsageError but still took
+      ~33 seconds, not the ~10s task-008 was sized for. The error chain
+      reveals why:
+
+        TransactionExecutionLimit: timeout (exceeded max retry time: 30s)
+        after 5 attempts
+
+      `ConnectionAcquisitionTimeout` (task-008, 10s) bounds each acquire,
+      but each attempt against this URL completes in <1s (the server
+      promptly says "I'm HTTP"). What actually bounded the loop was the
+      driver's `MaxTransactionRetryTime` default of 30s — the
+      managed-transaction retry budget. Five attempts with exponential
+      backoff just happen to add up to ~30s before the budget expires.
+
+      Cap `MaxTransactionRetryTime` at 10s in `buildDriverConfigurer`
+      (`neo4j-cli/query/connect.go`) — same pattern, same file, same
+      reasoning as task-008. 10s leaves room for 1-2 retries through a
+      transient blip while still surfacing a permanent misconfiguration
+      within seconds. Document the choice with a one-line comment
+      ("interactive CLI fail-fast; default 30s feels like a hang").
+
+      The clean fix would also be to short-circuit the retry loop the
+      moment task-007's "server responded HTTP" hint surfaces, but that
+      requires wrapping the managed-transaction `work` callback and
+      reaching past the driver's retry classifier — out of scope here;
+      track separately if 10s ever proves too long.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`buildDriverConfigurer` sets `c.MaxTransactionRetryTime = 10 * time.Second`."
+      - "A one-line comment justifies the override (parallel to the existing task-008 `ConnectionAcquisitionTimeout` comment)."
+      - "Unit test in `connect_test.go` mirrors `TestBuildDriverConfigurer_ConnectionAcquisitionTimeout`: asserts `MaxTransactionRetryTime == 10 * time.Second` regardless of `debug` value."
+      - "Manual smoke against the original failing URL (`neo4j+s://cad2fee7b350fbd7844314001bcec5ae.neo4jsandbox.com:443`) now exits in <15 seconds (was 33.5s) with the task-007 UsageError."
+      - "Changelog entry covers it. Update task-008's existing `.changes/unreleased/` file to mention `MaxTransactionRetryTime` as well, OR add a new Minor entry — whichever keeps the user-facing release notes coherent. Don't ship two near-duplicate entries."
+      - "`make test`, `make fmt-check`, `make lint` clean."
+    completed_at: null
