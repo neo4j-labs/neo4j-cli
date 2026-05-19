@@ -134,7 +134,8 @@ tasks:
       Preflight FetchAndVerifySessionInProject already covers the ownership-mismatch
       path (task-005). Add 404 sub-tests to get_test.go and delete_test.go
       asserting the rewritten ResourceType, ResourceID, and Suggestion.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies:
       - task-001
       - task-005

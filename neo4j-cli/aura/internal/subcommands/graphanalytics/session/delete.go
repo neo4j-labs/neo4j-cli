@@ -49,7 +49,13 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 				Method: http.MethodDelete,
 			})
 			if err != nil {
-				return err
+				// On 404 the API layer's parseResourceFromRequest mis-segments
+				// the nested /graph-analytics/sessions/<id> path (extracts
+				// "graph-analytic"). Rewrite the context so the user gets
+				// session-specific Suggestion text. The preflight
+				// FetchAndVerifySessionInProject already covers the
+				// ownership-mismatch path.
+				return utils.WithNotFoundContext(err, "graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
 			}
 
 			if statusCode == http.StatusAccepted {

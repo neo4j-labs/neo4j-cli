@@ -4,11 +4,14 @@
 package session_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDeleteSession(t *testing.T) {
@@ -116,6 +119,36 @@ func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}
+
+// TestDeleteSessionNotFound_HasSuggestion locks the WithNotFoundContext
+// rewrite at the session-DELETE call site: when the API returns 404 for
+// the DELETE call (after the preflight succeeds), the API layer's
+// parseResourceFromRequest mis-segments the nested path; the caller
+// rewrites ResourceType to "graph-analytics-session" and attaches the
+// session-list Suggestion (REQ-F-013).
+func TestDeleteSessionNotFound_HasSuggestion(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	// Pre-flight GET succeeds (session in project), then DELETE returns 404.
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+	mockHandler.AddResponse(http.StatusNotFound, `{
+		"errors": [
+			{"message": "session not found", "reason": "not-found"}
+		]
+	}`)
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+	require.Equal(t, "graph-analytics-session", ce.ResourceType)
+	require.Equal(t, testSessionID, ce.ResourceID)
+	require.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
 }
 
 func TestDeleteSessionError(t *testing.T) {
