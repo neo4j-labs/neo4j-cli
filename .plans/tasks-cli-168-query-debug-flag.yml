@@ -1,7 +1,7 @@
 feature: cli-168-query-debug-flag
 prd: ./prd-cli-168-query-debug-flag.md
 created_at: 2026-05-19T00:00:00Z
-updated_at: 2026-05-19T00:00:00Z
+updated_at: 2026-05-19T20:50:00Z
 
 tasks:
   - id: task-001
@@ -139,3 +139,73 @@ tasks:
       - "File name follows the `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` pattern."
       - "`make test` remains clean (no test directly gates changelog entries, but file syntax must be valid YAML)."
     completed_at: 2026-05-19T20:20:00Z
+
+  - id: task-007
+    title: "Map server-speaks-HTTP driver errors to a clear UsageError with port hint"
+    description: |
+      Discovered while testing `--debug` against the user-reported hang URL
+      `neo4j+s://<sandbox>:443`: the driver reports
+      `"server responded HTTP. Make sure you are not trying to connect to the
+      http endpoint (HTTP defaults to port 7474 whereas BOLT defaults to port
+      7687)"` on attempt 1 within ~550ms. The driver treats this as a
+      retryable `ConnectivityError`, so the user waits the full
+      `ConnectionAcquisitionTimeout` (default 1 minute) before the final
+      error surfaces — and even then the existing `categorizeBoltError`
+      (`neo4j-cli/query/errors.go`) wraps it as a generic upstream error.
+
+      In `categorizeBoltError`, detect the substring `"server responded
+      HTTP"` in the driver error chain (use `strings.Contains` on
+      `err.Error()` — the message is part of the driver's stable text). When
+      matched, return a `clierr.NewUsageError` whose message names the
+      symptom and proposes the fix: switch to the Bolt port (default 7687)
+      or use an `https://` URI so `normalizeURI` rewrites it. Exit code
+      becomes the usage-error code (6), not the upstream-error code (8) —
+      this is user-input misconfiguration, not a transport blip.
+
+      Pair with task-008 so the user actually sees this message in seconds
+      rather than after the 1-minute backoff loop. Independent of task-008
+      the message still surfaces eventually, with a much more actionable
+      hint than today.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`categorizeBoltError` in `neo4j-cli/query/errors.go` detects driver errors containing `server responded HTTP` and returns a `clierr.NewUsageError`."
+      - "The user-facing message names the URI's port, hints the default Bolt port (7687), and mentions `https://` as the auto-rewritten alternative."
+      - "Unit test in `errors_test.go` constructs a fake driver error containing the substring and asserts the categorised result is a `UsageError` (exit code 6) with the expected message shape."
+      - "Existing `categorizeBoltError` test cases (ClientError, TransientError, generic) continue to pass — the new branch is additive, not a rewrite."
+      - "`make test`, `make fmt-check`, `make lint` clean."
+    completed_at: null
+
+  - id: task-008
+    title: "Tighten driver ConnectionAcquisitionTimeout for interactive CLI use"
+    description: |
+      The driver's default `ConnectionAcquisitionTimeout = 1m` is sized for
+      long-running services that benefit from retrying through transient
+      pool exhaustion. For an interactive CLI command, a full minute of
+      silent retries reads as a hang. Cap it at 10 seconds inside
+      `driverOpener` (`neo4j-cli/query/connect.go`) via the configurer
+      closure: `c.ConnectionAcquisitionTimeout = 10 * time.Second`.
+      Document the choice with a one-line comment ("interactive CLI fails
+      fast; the driver's 1m default reads as a hang"). 10s — not 5s —
+      leaves room for one or two backoff retries through a transient
+      network blip while still surfacing a permanent misconfiguration like
+      task-007's HTTP-on-Bolt-port case within seconds.
+
+      Do NOT touch `SocketConnectTimeout` (driver default 5s is fine) or
+      `MaxConnectionLifetime` (1h default, irrelevant for one-shot CLI
+      runs). Out of scope: exposing the timeout as a `--connect-timeout`
+      flag — only do that if real-world usage shows 10s is too aggressive.
+
+      Coordinate with task-007: combined, the user reporting today's hang
+      would see a UsageError pointing at the wrong port within ~2-3 seconds
+      instead of a 60-second silent hang.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`driverOpener`'s configurer closure sets `c.ConnectionAcquisitionTimeout = 10 * time.Second`."
+      - "A one-line comment justifies the override (CLI fail-fast vs. service-style 1m default)."
+      - "Unit test in `connect_test.go` (using the existing `buildDriverConfigurer` seam) asserts the resulting `*config.Config` has `ConnectionAcquisitionTimeout == 10 * time.Second` regardless of `debug` value."
+      - "Manual smoke against the original failing URL (`neo4j+s://<sandbox>:443`) exits within ~10-15 seconds, not ~60s; captured stderr shows the new task-007 UsageError when both tasks are in."
+      - "Changelog entry (Minor) documenting the new shorter retry window so users with intentionally slow / contended deployments know to expect faster failures."
+      - "`make test`, `make fmt-check`, `make lint` clean."
+    completed_at: null
