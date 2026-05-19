@@ -308,7 +308,7 @@ func TestGetInstanceNotFoundError(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
-	helper.AssertErr(fmt.Sprintf("Error: [DB not found: %s]", instanceId))
+	helper.AssertErr(fmt.Sprintf("Error: [\n\tDB not found: %s\n]", instanceId))
 }
 
 func TestGetHasCmiEndpoint(t *testing.T) {

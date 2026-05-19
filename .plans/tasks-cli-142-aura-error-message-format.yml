@@ -53,7 +53,7 @@ tasks:
       `subcommands/graphanalytics/session/{get,delete}_test.go`,
       `subcommands/deployment/{create,get}_test.go` + `deployment/token/create_test.go` (outer pair only — inner `]]` is payload),
       `subcommands/import/job/{create,get,cancel}_test.go`. Verify with `make test` per touched package.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -61,7 +61,7 @@ tasks:
       - "Each converted assertion uses a backtick raw string with `\\t` indent matching the rendered output"
       - "`deployment/token/create_test.go:116` nested `...]]` — only the outer pair is converted; inner pair stays"
       - "`make test` passes for every touched package"
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-004
     title: "Tighten instance/tenant get not-found tests with exit-code assertion"

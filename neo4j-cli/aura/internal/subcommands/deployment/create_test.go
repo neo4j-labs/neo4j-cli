@@ -138,5 +138,7 @@ func TestCreateDeploymentWithTooLongName(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
 
-	helper.AssertErr("Error: [Name must be between 1 and 30 characters]")
+	helper.AssertErr(`Error: [
+	Name must be between 1 and 30 characters
+]`)
 }

@@ -5,3 +5,8 @@ Files: ~neo4j-cli/aura/internal/api/response.go
 ## TASK-002 — 2026-05-19T00:00:00Z
 Added extractEmbeddedErrors helper in api/response.go and wired latent 2xx-with-errors-body path through NewNotFoundError in MakeRequest with resource/suggestion populated; happy path unchanged.
 Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/response.go
+
+## TASK-003 — 2026-05-19T00:00:00Z
+Converted 28 single-line `Error: [<msg>]` test assertions to multi-line backtick raw-string shape matching formatBracketedMessages output across instance/tenant/customermanagedkey/graphanalytics/deployment/import test files; also updated dataapi/graphql/get_test.go::TestGetGraphQLDataApiIncludingGraphQLServerErrors to match new task-002 behavior (2xx-with-errors body now produces Code==3 error rather than data+errors stdout — risk anticipated in PRD).
+Files: ~18 test files under neo4j-cli/aura/internal/subcommands/
+Decisions: dataapi/graphql test update is task-002 fallout but landed here to keep make test green.

@@ -102,7 +102,9 @@ func TestCreateImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job create --organization-id=%s --project-id=%s --import-model-id=%s --db-id=%s --rw", organizationId, projectId, importModelId, auraDbId),
 			expectedCalledTimes: 1,
 			statusCode:          http.StatusBadRequest,
-			expectedError:       "Error: [DataSourceId: Import model data source id is required]",
+			expectedError: `Error: [
+	DataSourceId: Import model data source id is required
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -117,7 +119,9 @@ func TestCreateImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job create --organization-id=%s --project-id=%s --import-model-id=%s --db-id=%s --rw", organizationId, projectId, importModelId, auraDbId),
 			expectedCalledTimes: 1,
 			statusCode:          http.StatusMethodNotAllowed,
-			expectedError:       "Error: [string]",
+			expectedError: `Error: [
+	string
+]`,
 			returnBody: `{
 				"errors": [
 					{

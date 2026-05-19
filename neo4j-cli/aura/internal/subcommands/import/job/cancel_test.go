@@ -164,7 +164,9 @@ func TestCancelImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --rw", organizationId, projectId, jobId),
 			statusCode:          http.StatusBadRequest,
 			expectedCalledTimes: 1,
-			expectedError:       "Error: [The job 87d485b4-73fc-4a7f-bb03-720f4672947e has requested to cancel]",
+			expectedError: `Error: [
+	The job 87d485b4-73fc-4a7f-bb03-720f4672947e has requested to cancel
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -178,7 +180,9 @@ func TestCancelImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job cancel --organization-id=%s --project-id=%s %s --rw", organizationId, projectId, jobId),
 			statusCode:          http.StatusMethodNotAllowed,
 			expectedCalledTimes: 1,
-			expectedError:       "Error: [string]",
+			expectedError: `Error: [
+	string
+]`,
 			returnBody: `{
 				"errors": [
 					{

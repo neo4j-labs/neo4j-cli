@@ -345,8 +345,10 @@ func TestCreateInstanceError(t *testing.T) {
 		returnBody    string
 	}{
 		{
-			statusCode:    http.StatusBadRequest,
-			expectedError: "Error: [You must provide billing details in the Aura Console before creating an instance]",
+			statusCode: http.StatusBadRequest,
+			expectedError: `Error: [
+	You must provide billing details in the Aura Console before creating an instance
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -357,8 +359,10 @@ func TestCreateInstanceError(t *testing.T) {
 			}`,
 		},
 		{
-			statusCode:    http.StatusMethodNotAllowed,
-			expectedError: "Error: [string]",
+			statusCode: http.StatusMethodNotAllowed,
+			expectedError: `Error: [
+	string
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -1114,5 +1118,7 @@ func TestCreateDefaultNameListAPIError(t *testing.T) {
 
 	listMock.AssertCalledTimes(1)
 	postMock.AssertCalledTimes(0)
-	helper.AssertErr("Error: [internal server error]")
+	helper.AssertErr(`Error: [
+	internal server error
+]`)
 }

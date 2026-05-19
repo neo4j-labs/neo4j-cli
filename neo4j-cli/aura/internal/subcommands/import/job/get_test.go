@@ -708,7 +708,9 @@ func TestGetImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s", organizationId, projectId, jobId),
 			statusCode:          http.StatusNotFound,
 			expectedCalledTimes: 1,
-			expectedError:       "Error: [The job 87d485b4-73fc-4a7f-bb03-720f4672947e does not exist]",
+			expectedError: `Error: [
+	The job 87d485b4-73fc-4a7f-bb03-720f4672947e does not exist
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -722,7 +724,9 @@ func TestGetImportJobError(t *testing.T) {
 			executeCommand:      fmt.Sprintf("import job get --organization-id=%s --project-id=%s %s", organizationId, projectId, jobId),
 			statusCode:          http.StatusMethodNotAllowed,
 			expectedCalledTimes: 1,
-			expectedError:       "Error: [string]",
+			expectedError: `Error: [
+	string
+]`,
 			returnBody: `{
 				"errors": [
 					{

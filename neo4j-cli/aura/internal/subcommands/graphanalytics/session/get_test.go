@@ -181,5 +181,7 @@ func TestGetSessionError(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
 	helper.AssertOut("")
-	helper.AssertErr("Error: [session with id s-f5138f3b-7956 not found]")
+	helper.AssertErr(`Error: [
+	session with id s-f5138f3b-7956 not found
+]`)
 }

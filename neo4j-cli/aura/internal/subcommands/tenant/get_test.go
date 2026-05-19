@@ -151,7 +151,9 @@ func TestGetTenantNotFoundError(t *testing.T) {
 
 	helper.AssertErrContainsStrings([]string{
 		"Warning: 'aura tenant get' is deprecated and will be removed in a future release. Use 'aura organization get' instead.",
-		"Error: [The tenant you specified could not be found]",
+		`Error: [
+	The tenant you specified could not be found
+]`,
 	})
 }
 
