@@ -307,7 +307,7 @@ tasks:
       `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle (`SKILL.md` and any
       derived files) and commit the regenerated artifacts. `make generate-check` must be clean
       and `TestGenerator_RoundTrip` must pass.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -316,4 +316,4 @@ tasks:
       - "`neo4j-cli/internal/skill/description.txt` mentions agent management while staying ≤1024 chars, single paragraph, third person."
       - "`go generate ./neo4j-cli/internal/skill/...` produces a clean diff that is committed alongside the source edits."
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
-    completed_at: null
+    completed_at: 2026-05-19T10:30:00Z

@@ -140,6 +140,30 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 
 Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
+### Agents (beta)
+
+Manage Aura Agents (LLM-backed assistants bound to a database) from the terminal. The subtree is gated behind the `flag.aura-beta` feature flag; enable it once:
+
+```bash
+neo4j-cli config set flag.aura-beta true --rw
+```
+
+Seven leaves: `list`, `get`, `create`, `update`, `replace`, `delete`, `invoke`. `--organization-id`/`--project-id` honour the default workspace from [`workspace use`](#setting-a-default-workspace).
+
+```bash
+# List agents in the current workspace
+neo4j-cli aura agent list --format json
+
+# Create an agent bound to a database, with one tool
+neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> \
+  --tools '[{"type":"cypher_template","config":{"query":"MATCH (n) RETURN n LIMIT $k","params":{"k":5}}}]' --rw
+
+# Invoke an agent — JSON output returns the full server response; default (table) prints
+# the joined text blocks followed by a stats line (Status / End reason / Tool calls / Tokens)
+neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
+neo4j-cli aura agent invoke <agent-id> --input "hello" --format json --rw
+```
+
 ## Local Neo4j (Docker)
 
 `neo4j-cli docker` runs Neo4j locally by shelling out to the host `docker` CLI. Managed containers carry the `org.neo4j.cli.managed=true` label — Docker is the source of truth, no separate state file is maintained. Requires Docker Desktop (or the `docker` CLI) on `PATH`.

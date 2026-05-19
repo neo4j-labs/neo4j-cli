@@ -42,3 +42,12 @@ neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --wait 
 neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
 neo4j-cli docker stop tmp --rw
 ```
+
+- Aura Agents (beta): `neo4j-cli aura agent` (`list` / `get` / `create` / `update` / `replace` / `delete` / `invoke`) manages Aura Agents — LLM-backed assistants bound to an Aura database. The subtree is gated behind `flag.aura-beta` (default false); enable it once with `neo4j-cli config set flag.aura-beta true --rw`. `--organization-id` / `--project-id` honour the default workspace, identical to every other aura command. `invoke` is dual-mode: `--format json` returns the full server response verbatim (content blocks, usage, end_reason, errors), while the default table output joins the text content blocks and prints a single stats line `Status: <S> | End reason: <ER> | Tool calls: <N> | Tokens: <req> req / <res> res / <total> total`. HTTP 403 on `invoke` surfaces as `agent invocation forbidden: agent may be disabled or private`; an HTTP 200 body with `type: "error"` surfaces as `agent invocation failed: <message>`.
+
+```sh
+# List, create, and invoke an agent (workspace default already set)
+neo4j-cli aura agent list --format toon
+neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> --tools '[{"type":"cypher_template","config":{"query":"MATCH (n) RETURN n LIMIT $k","params":{"k":5}}}]' --rw
+neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
+```

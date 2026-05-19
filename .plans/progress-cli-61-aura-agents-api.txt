@@ -60,3 +60,8 @@ Live smoke (against demo1 aura-client credential, organization 9f4683a0-... "Onb
 Reverted flag.aura-beta to false post-smoke; tree is clean.
 Files: ~.plans/tasks-cli-61-aura-agents-api.yml, ~.plans/progress-cli-61-aura-agents-api.txt
 Decisions: Did not modify any source — all gates green on first run, smoke passed against a live tenant with no fabricated evidence needed.
+
+## task-014 — 2026-05-19T10:30:00Z
+Promoted the aura agent subtree to user-facing docs. README.md gained a `### Agents (beta)` section under Aura with flag.aura-beta enable hint and 4 example invocations (list --format json, create --rw, invoke twice including --format json). additions.md gained a long bullet describing the seven leaves, flag.aura-beta gate, invoke's dual JSON/stats-line output, and the 403 + application-error mappings, plus a 3-line code block. description.txt extended from 980→1007 chars by slotting "manage Aura Agents (beta)" into the Use-list (single paragraph, third person, ≤1024). `go generate ./neo4j-cli/internal/skill/...` produced the matching SKILL.md diff.
+Files: ~README.md, ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/description.txt, ~neo4j-cli/internal/skill/bundle/SKILL.md
+Decisions: Used "Aura Agents (beta)" wording (not just "agents") in description.txt to keep the term unambiguous when scanned by an agent's skill router. Inserted README section after `### Create an instance` (between Aura sections and the Docker section) rather than near `### Setting a default workspace` so it flows after the resource lifecycle examples.
