@@ -70,7 +70,7 @@ tasks:
       update-website.yml. Add a post-generation guard step that fails the job if
       /tmp/release-notes-generated.md is missing or empty. Implements REQ-F-006
       through REQ-F-009.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -82,7 +82,7 @@ tasks:
       - "Streamed output is tee'd through jq for human-readable logging (same pattern as update-website.yml)"
       - "A dedicated guard step fails the job when /tmp/release-notes-generated.md is missing or zero-length"
       - "actionlint reports no errors after the change"
-    completed_at: null
+    completed_at: 2026-05-19T09:25:00Z
 
   - id: task-004
     title: "Add always-on print + Slack payload build steps"

@@ -70,3 +70,61 @@ jobs:
           PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true)
           echo "PREV_TAG=${PREV_TAG}" >> "$GITHUB_ENV"
           echo "[post-release-notes] PREV_TAG=${PREV_TAG:-<none>}"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Verify API key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          [ -n "$ANTHROPIC_API_KEY" ] || { echo "ANTHROPIC_API_KEY secret not set"; exit 1; }
+          echo "API key present (${#ANTHROPIC_API_KEY} chars)"
+
+      - name: Generate release notes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ENABLE_PROMPT_CACHING_1H: "1"
+        run: |
+          # Stream Claude Code output through jq for a human-readable log,
+          # mirroring update-website.yml. The prompt writes the final markdown
+          # to /tmp/release-notes-generated.md; we never read it from stdout.
+          cat .github/prompts/release-notes.md \
+            | claude --bare \
+              -p - \
+              --output-format stream-json \
+              --verbose \
+              --include-partial-messages \
+              --no-session-persistence \
+              --exclude-dynamic-system-prompt-sections \
+              --allowedTools "Bash,Read,Write" \
+              --max-turns 30 \
+              --max-budget-usd 1.50 \
+            | stdbuf -oL tee /tmp/release-notes-raw.jsonl \
+            | jq -r --unbuffered '
+                if .type == "assistant" then
+                  (.message.content[]? |
+                    if .type == "text" then .text
+                    elif .type == "tool_use" then
+                      "[tool] \(.name) \((.input.command // .input.url // .input.file_path // "") | .[0:120])"
+                    else empty end)
+                elif .type == "stream_event" then
+                  if .event.type == "content_block_start"
+                     and .event.content_block.type == "tool_use" then
+                    "[tool] \(.event.content_block.name)"
+                  else empty end
+                else empty
+                end
+              ' \
+            | stdbuf -oL tee /tmp/release-notes-summary.txt
+
+      - name: Guard generated notes file
+        run: |
+          # Hard-fail if Claude didn't produce the expected artifact. Anything
+          # downstream (print, Slack payload) assumes a non-empty markdown
+          # body — better to fail here with a clear message.
+          if [ ! -s /tmp/release-notes-generated.md ]; then
+            echo "ERROR: /tmp/release-notes-generated.md is missing or empty" >&2
+            exit 1
+          fi
+          echo "[post-release-notes] generated notes: $(wc -c < /tmp/release-notes-generated.md) bytes"

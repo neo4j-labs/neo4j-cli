@@ -5,3 +5,7 @@ Files: +.github/prompts/release-notes.md
 ## task-002 — 2026-05-19T09:10:00Z
 Workflow skeleton: release+workflow_dispatch triggers, contents:write perms, RELEASE_TAG/RELEASE_VERSION/PREV_TAG resolution, semver regex validation, checkout main fetch-depth:0. actionlint clean.
 Files: +.github/workflows/post-release-notes.yml
+
+## task-003 — 2026-05-19T09:25:00Z
+Added Claude Code install + API-key guard + stream-json invocation (Bash,Read,Write; max-turns 30; budget $1.50) + generated-file guard step to post-release-notes.yml. Mirrors update-website.yml jq tee pattern. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
