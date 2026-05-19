@@ -102,8 +102,8 @@ neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000
 		},
 	}
 
-	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project/tenant ID")
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Agent name")
 	cmd.Flags().StringVar(&description, descriptionFlag, "", "(required) Agent description")
 	cmd.Flags().StringVar(&dbid, dbidFlag, "", "(required) Aura database instance ID the agent connects to")

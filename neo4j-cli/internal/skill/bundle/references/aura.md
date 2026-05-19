@@ -82,8 +82,8 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 | `--system-prompt` | string | - | Optional system prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -112,8 +112,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 
 Examples:
 
@@ -140,8 +140,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 
 Examples:
 
@@ -169,8 +169,8 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--input` | string | - | (required) Input message to send to the agent |
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 
 Examples:
 
@@ -197,8 +197,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 
 Examples:
 
@@ -231,8 +231,8 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -267,8 +267,8 @@ Flags:
 | `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | Agent name |
-| `--organization-id` | string | - | (required) Organization ID |
-| `--project-id` | string | - | (required) Project/tenant ID |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | Tools configuration as a JSON array |
 
