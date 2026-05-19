@@ -221,5 +221,7 @@ func TestUpdateAgentNotFound(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPatch)
 
-	helper.AssertErr("Error: [Agent not found]")
+	helper.AssertErr(`Error: [
+	Agent not found
+]`)
 }

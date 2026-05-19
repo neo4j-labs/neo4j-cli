@@ -68,5 +68,7 @@ func TestDeleteAgentNotFound(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 
-	helper.AssertErr("Error: [Agent not found]")
+	helper.AssertErr(`Error: [
+	Agent not found
+]`)
 }

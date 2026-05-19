@@ -122,5 +122,7 @@ func TestReplaceAgentNotFound(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPut)
 
-	helper.AssertErr("Error: [Agent not found]")
+	helper.AssertErr(`Error: [
+	Agent not found
+]`)
 }

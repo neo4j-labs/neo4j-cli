@@ -174,7 +174,9 @@ func TestInvokeAgentNotFound(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 
-	helper.AssertErr("Error: [Agent not found]")
+	helper.AssertErr(`Error: [
+	Agent not found
+]`)
 }
 
 func TestInvokeAgentWithTableOutput(t *testing.T) {
