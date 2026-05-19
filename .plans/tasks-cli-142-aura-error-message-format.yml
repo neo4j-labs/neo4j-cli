@@ -106,13 +106,13 @@ tasks:
       Run `changie new --projects neo4j-cli --kind Patch --body "Aura API error messages now render in the same multi-line bracket format used for auth errors instead of Go's default []string stringification."`
       (or hand-author `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` if changie is not installed locally).
       User-facing change — required per AGENTS.md changelog policy.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "Exactly one new file under `.changes/unreleased/` matching `neo4j-cli-Patch-*.yaml`"
       - "YAML fields: `project: neo4j-cli`, `kind: Patch`, `body: ...` matches REQ-NF-003 verbatim"
-    completed_at: null
+    completed_at: 2026-05-19T13:00:04Z
 
   - id: task-007
     title: "Final gates: fmt-check, lint, test, generate-check + smoke manual run"

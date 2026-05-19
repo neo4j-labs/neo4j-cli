@@ -18,3 +18,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/instance/get_test.go, ~neo4j-cli/aur
 ## TASK-005 — 2026-05-19T00:00:00Z
 Added TestMakeRequest_2xxWithEmbeddedErrors in api/api_test.go locking the latent 2xx-with-errors-body path: mocks 200 on /v1/instances/x with embedded errors[], asserts Code==3, multi-line bracket Message, ResourceType=instance, ResourceID=x, instance-list suggestion.
 Files: ~neo4j-cli/aura/internal/api/api_test.go
+
+## TASK-006 — 2026-05-19T13:00:04Z
+Added changie Patch entry via `changie new --projects neo4j-cli --kind Patch` capturing the user-facing multi-line bracket error format change. All gates clean.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260519-130004.yaml
