@@ -21,3 +21,7 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-006 — 2026-05-19T10:10:00Z
 Verification gate: actionlint clean on post-release-notes.yml; make test / make lint / make fmt-check all pass. git diff main...HEAD limited to .github/ + .plans/ — no Go/Makefile touched. POST-MERGE manual checks remain for the human: Actions tab visibility after branch push and a live workflow_dispatch run against v1.4.0 confirming generated md + slack JSON are printed and no Slack/release mutation occurs (commented blocks stay commented).
 Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml
+
+## task-007 — 2026-05-19T11:15:00Z
+Added fail-fast "Verify Slack webhook" step between "Validate release tag" and "Checkout main" — empty SLACK_WEBHOOK_URL -> stderr + exit 1, mirrors ANTHROPIC_API_KEY guard. Aborts before ~$1.50 Claude generation when secret missing. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml

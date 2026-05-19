@@ -54,6 +54,19 @@ jobs:
           fi
           echo "[post-release-notes] tag validated: ${RELEASE_TAG}"
 
+      - name: Verify Slack webhook
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # Fail fast BEFORE we spend ~$1.50 on Claude Code generation if the
+          # webhook secret is missing. Mirrors the ANTHROPIC_API_KEY guard
+          # pattern further down — early abort with a clear error.
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
+            exit 1
+          fi
+          echo "[post-release-notes] Slack webhook present (${#SLACK_WEBHOOK_URL} chars)"
+
       - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:

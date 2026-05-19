@@ -170,7 +170,7 @@ tasks:
       SLACK_WEBHOOK_URL from env (`${{ secrets.SLACK_WEBHOOK_URL }}`), checks
       for empty, echoes a clear error to stderr, and `exit 1`. Mirrors the
       existing ANTHROPIC_API_KEY guard pattern. Implements REQ-F-017.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "New step 'Verify Slack webhook' sits between 'Validate release tag' and 'Checkout main' in the workflow YAML"
@@ -178,7 +178,7 @@ tasks:
       - "Step exits non-zero with a clear stderr message when SLACK_WEBHOOK_URL is empty"
       - "Step is unconditional (no `if:` gating) — runs on both release and workflow_dispatch"
       - "actionlint reports zero errors and zero warnings after the change"
-    completed_at: null
+    completed_at: 2026-05-19T11:15:00Z
 
   - id: task-008
     title: "Add human-readable Slack message print step"
