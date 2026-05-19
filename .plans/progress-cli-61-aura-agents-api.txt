@@ -35,3 +35,8 @@ Files: ~neo4j-cli/aura/internal/subcommands/agent/replace.go, +neo4j-cli/aura/in
 ## task-009 — 2026-05-19T11:30:00Z
 Implemented agent delete leaf: DELETE .../agents/{id} via AuraApiVersion2, Annotations write=true, Args=ExactArgs(1), success prints "Agent deleted successfully <id>". delete_test.go covers happy path, default-workspace, and 404 → "Error: [Agent not found]". All test invocations carry --rw; config keys modernized to flag.aura-beta.
 Files: ~neo4j-cli/aura/internal/subcommands/agent/delete.go, +neo4j-cli/aura/internal/subcommands/agent/delete_test.go
+
+## task-010 — 2026-05-19T11:55:00Z
+Implemented agent invoke leaf: POST .../agents/{id}/invoke via AuraApiVersion2, Annotations write=true, Args=ExactArgs(1), required --input flag. Local response types (invokeResponse/Content/Usage/Error). JSON mode → PrintRawBody verbatim; table mode → joined text blocks + stats line "Status: <S> | End reason: <ER> | Tool calls: <N> | Tokens: <req> req / <res> res / <total> total" (uppercased, underscores→spaces). Tool calls count any block whose type ends in "tool_use". HTTP 403 → "agent invocation forbidden: ..."; HTTP 200 + type=error → "agent invocation failed: <message>" (or bare "agent invocation failed" if no message). invoke_test.go covers JSON happy path, default-workspace, missing --input, 403, application error, 404, table output (with cypher_template_tool_use count).
+Files: ~neo4j-cli/aura/internal/subcommands/agent/invoke.go, +neo4j-cli/aura/internal/subcommands/agent/invoke_test.go
+Decisions: Used commonoutput.ResolveOutput instead of original PR's cfg.Aura.Output() (refactored away). Aliased common/output as commonoutput to avoid clash with the aura output shim.

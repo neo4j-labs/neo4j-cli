@@ -208,7 +208,7 @@ tasks:
       path, default-workspace variant, missing `--input` error, 403 forbidden error, application-
       level error, 404, table-output case verifying joined text + stats line (including the
       `cypher_template_tool_use` count case).
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -218,7 +218,7 @@ tasks:
       - "HTTP 200 with `type: \"error\"` surfaces as `agent invocation failed: <message>`."
       - "Tool-call count includes every block whose `type` ends in `tool_use`."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestInvoke` passes."
-    completed_at: null
+    completed_at: 2026-05-19T11:55:00Z
 
   - id: task-011
     title: "Regenerate skill bundle for agent subtree"
