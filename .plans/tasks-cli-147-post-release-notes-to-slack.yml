@@ -124,7 +124,7 @@ tasks:
       preceded by a `# CLI-147 follow-up:` lead comment. YAML must remain
       syntactically valid with these blocks commented out. Implements REQ-F-012
       and REQ-F-013.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -134,7 +134,7 @@ tasks:
       - "GH release append step references env GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} (within the comments)"
       - "The workflow YAML still parses cleanly with these blocks commented out (actionlint clean)"
       - "No live mutation of Slack or the GitHub release occurs when the workflow runs in this state"
-    completed_at: null
+    completed_at: 2026-05-19T09:55:00Z
 
   - id: task-006
     title: "Local actionlint + manual dispatch verification"

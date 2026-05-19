@@ -161,3 +161,39 @@ jobs:
           echo "----- /tmp/slack-payload.json -----"
           cat /tmp/slack-payload.json
           echo "----- end -----"
+
+      # CLI-147 follow-up: POST the assembled payload to Slack. Kept commented
+      # out until the SLACK_WEBHOOK_URL secret is provisioned and we have eyes
+      # on at least one dry run. Enable by uncommenting the block below and
+      # ensuring the secret is set on the repo.
+      # - name: Post to Slack
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   run: |
+      #     if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+      #       echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
+      #       exit 1
+      #     fi
+      #     curl -X POST \
+      #       -H 'Content-Type: application/json' \
+      #       --data @/tmp/slack-payload.json \
+      #       "${SLACK_WEBHOOK_URL}"
+
+      # CLI-147 follow-up: prepend the Claude-generated notes to the GitHub
+      # release body. Reads the existing body via `gh release view`, prepends
+      # a `## Release notes` section + a `---` separator, then writes the
+      # combined markdown back via `gh release edit --notes-file`. Kept
+      # commented out until we are happy with the generated output in
+      # production.
+      # - name: Append release notes to GitHub release
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
+      #     {
+      #       printf '## Release notes\n\n'
+      #       cat /tmp/release-notes-generated.md
+      #       printf '\n\n---\n\n'
+      #       printf '%s\n' "${CURRENT}"
+      #     } > /tmp/release-body.md
+      #     gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md

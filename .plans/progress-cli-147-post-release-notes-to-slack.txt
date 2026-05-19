@@ -13,3 +13,7 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-004 — 2026-05-19T09:40:00Z
 Appended always-on print step (cat generated md) + Slack payload build step (jq -nR --rawfile, preamble + body + URL into /tmp/slack-payload.json, also cat'd). Smoke-tested jq output: quotes/newlines/backticks JSON-safe. actionlint clean.
 Files: ~.github/workflows/post-release-notes.yml
+
+## task-005 — 2026-05-19T09:55:00Z
+Appended commented-out Slack POST step (SLACK_WEBHOOK_URL empty-guard + curl) and commented-out GH release append step (gh release view --json body, prepend `## Release notes` + `---`, gh release edit --notes-file). Each preceded by `# CLI-147 follow-up:` lead comment. YAML parses + actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
