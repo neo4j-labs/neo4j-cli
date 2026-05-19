@@ -91,7 +91,8 @@ tasks:
       strings. Extend resolve_test.go with errors.As + Code + ResourceType +
       ResourceID + Suggestion assertions for each site. Do NOT touch the
       preflight "unexpected status %d" sites at :108, :142, :176.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies:
       - task-004
     acceptance_criteria:

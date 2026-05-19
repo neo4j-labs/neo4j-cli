@@ -13,3 +13,7 @@ Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/re
 ## TASK-004 — 2026-05-19T00:00:00Z
 Converted three resolveIDs fmt.Errorf sites in utils/resolve.go to clierr.NewUsageError(...).WithSuggestion(...) preserving message strings verbatim (migration nudge :55, no-org :57, no-project :68 per REQ-F-005). Extended resolve_test.go with errors.As + Code==2 + Suggestion assertions on the three existing missing-org / migration / missing-project tests.
 Files: ~neo4j-cli/aura/internal/subcommands/utils/resolve.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve_test.go
+
+## TASK-005 — 2026-05-19T00:00:00Z
+Converted four ownership-mismatch / project-not-in-org fmt.Errorf sites in utils/resolve.go to clierr.NewNotFoundError(...).WithResource(...).WithSuggestion(...) preserving message strings verbatim (validateProjectInOrg REQ-F-006, FetchAndVerifyInstanceInProject REQ-F-007, FetchAndVerifySessionInProject REQ-F-008, FetchAndVerifyCMKInProject REQ-F-009). Preflight "unexpected status" sites left untouched per REQ-F-010. Extended ProjectNotInOrg test with errors.As + Code==3 + ResourceType + ResourceID + Suggestion assertions; added three new tests covering the three FetchAndVerify ownership-mismatch paths via httptest servers returning a body whose tenant_id differs from the project arg.
+Files: ~neo4j-cli/aura/internal/subcommands/utils/resolve.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve_test.go
