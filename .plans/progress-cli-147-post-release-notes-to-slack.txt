@@ -29,3 +29,7 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-008 — 2026-05-19T11:30:00Z
 Added "Print Slack message (rendered)" step after "Build Slack payload": jq -r '.text' rendered between delimiter lines so reviewers can read the un-clipped message body in the Actions log. actionlint clean.
 Files: ~.github/workflows/post-release-notes.yml
+
+## task-009 — 2026-05-19T11:45:00Z
+Activated "Post to Slack" step: uncommented the CLI-147 follow-up block, curl POSTs /tmp/slack-payload.json to SLACK_WEBHOOK_URL. Kept in-body empty-secret guard as defense in depth on top of the top-of-job verify step. actionlint clean; make test/lint/fmt-check pass.
+Files: ~.github/workflows/post-release-notes.yml

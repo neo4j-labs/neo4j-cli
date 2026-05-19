@@ -185,22 +185,21 @@ jobs:
           jq -r '.text' /tmp/slack-payload.json
           echo "----- end -----"
 
-      # CLI-147 follow-up: POST the assembled payload to Slack. Kept commented
-      # out until the SLACK_WEBHOOK_URL secret is provisioned and we have eyes
-      # on at least one dry run. Enable by uncommenting the block below and
-      # ensuring the secret is set on the repo.
-      # - name: Post to Slack
-      #   env:
-      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #   run: |
-      #     if [ -z "${SLACK_WEBHOOK_URL}" ]; then
-      #       echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
-      #       exit 1
-      #     fi
-      #     curl -X POST \
-      #       -H 'Content-Type: application/json' \
-      #       --data @/tmp/slack-payload.json \
-      #       "${SLACK_WEBHOOK_URL}"
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # Defense in depth: the "Verify Slack webhook" step at the top of the
+          # job already early-aborts on an empty secret, but keep the guard
+          # here too so this step is safe to copy/paste or reorder.
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
+            exit 1
+          fi
+          curl -X POST \
+            -H 'Content-Type: application/json' \
+            --data @/tmp/slack-payload.json \
+            "${SLACK_WEBHOOK_URL}"
 
       # CLI-147 follow-up: prepend the Claude-generated notes to the GitHub
       # release body. Reads the existing body via `gh release view`, prepends
