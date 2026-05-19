@@ -119,6 +119,25 @@ func TestConfigSet(t *testing.T) {
 			command: "config set --rw flag.unknown-thing true",
 			wantErr: `Error: invalid config key: "flag.unknown-thing"`,
 		},
+		// Credential-storage mode
+		{
+			name:            "set credential-storage to keyring with rw succeeds",
+			command:         "config set --rw credential-storage keyring",
+			wantConfigKey:   "credential-storage",
+			wantConfigValue: "keyring",
+		},
+		{
+			name:            "set credential-storage to insecure with rw succeeds",
+			command:         "config set --rw credential-storage insecure",
+			wantConfigKey:   "credential-storage",
+			wantConfigValue: "insecure",
+		},
+		{
+			name:         "set credential-storage to invalid value with rw returns error",
+			command:      "config set --rw credential-storage plaintext",
+			wantErr:      "Error: invalid value for 'credential-storage': plaintext (valid values: keyring, insecure)",
+			wantOutEmpty: true,
+		},
 	}
 
 	for _, tc := range tests {

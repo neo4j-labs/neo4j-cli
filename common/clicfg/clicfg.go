@@ -105,7 +105,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage"},
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-workspace"}
@@ -426,6 +426,12 @@ func (config *GlobalConfig) Set(key string, value string) error {
 		}
 	}
 
+	if key == "credential-storage" {
+		if value != "keyring" && value != "insecure" {
+			return clierr.NewUsageError("invalid value for 'credential-storage': %s (valid values: keyring, insecure)", value)
+		}
+	}
+
 	data := fileutils.ReadFileSafe(config.fs, config.configPath)
 
 	updated, err := sjson.Set(string(data), key, value)
@@ -439,6 +445,15 @@ func (config *GlobalConfig) Set(key string, value string) error {
 
 func (config *GlobalConfig) Format() string {
 	return config.viper.GetString("format")
+}
+
+// CredentialStorage returns the configured credential storage mode.
+// It defaults to "keyring" when the key is absent from config.
+func (config *GlobalConfig) CredentialStorage() string {
+	if v := config.viper.GetString("credential-storage"); v != "" {
+		return v
+	}
+	return "keyring"
 }
 
 func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {

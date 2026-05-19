@@ -185,6 +185,39 @@ func TestDefaultTenant(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigCredentialStorage(t *testing.T) {
+	tests := []struct {
+		name       string
+		configJSON string
+		want       string
+	}{
+		{
+			name:       "returns keyring when credential-storage is absent",
+			configJSON: `{}`,
+			want:       "keyring",
+		},
+		{
+			name:       "returns keyring when credential-storage is set to keyring",
+			configJSON: `{"credential-storage":"keyring"}`,
+			want:       "keyring",
+		},
+		{
+			name:       "returns insecure when credential-storage is set to insecure",
+			configJSON: `{"credential-storage":"insecure"}`,
+			want:       "insecure",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, err := testfs.GetTestFs(tc.configJSON, "{}")
+			require.NoError(t, err)
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+			assert.Equal(t, tc.want, cfg.Global.CredentialStorage())
+		})
+	}
+}
+
 func TestAuraConfigActiveCredential(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -180,6 +180,7 @@ func TestStandaloneConfigList(t *testing.T) {
 			wantOut: fmt.Sprintf(`{
 	"auth-url": "%s",
 	"base-url": "%s",
+	"credential-storage": null,
 	"default-workspace": null,
 	"format": "json",
 	"skill-auto-refresh": true,
