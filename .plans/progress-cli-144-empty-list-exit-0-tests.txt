@@ -9,3 +9,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/tenant/list_test.go
 ## task-003 — 2026-05-19T15:50:00Z
 Added TestRunQuery_EmptyResult_ExitsZero locking runQuery exit-0 + empty rows for `RETURN 1 AS n WHERE false` via seamRouter (EXPLAIN + run-time empty values). Mirrors TestRunQuery_HappyPath_JSONOutput shape.
 Files: ~neo4j-cli/query/run_test.go
+
+## task-004 — 2026-05-19T16:05:00Z
+Final gates clean: `make fmt-check` (no output), `make lint` (0 issues), `make test` (all packages pass). No bundle drift, no production source modifications across the three task commits.
+Files: ~.plans/tasks-cli-144-empty-list-exit-0-tests.yml
