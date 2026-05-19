@@ -201,21 +201,34 @@ jobs:
             --data @/tmp/slack-payload.json \
             "${SLACK_WEBHOOK_URL}"
 
-      # CLI-147 follow-up: prepend the Claude-generated notes to the GitHub
-      # release body. Reads the existing body via `gh release view`, prepends
-      # a `## Release notes` section + a `---` separator, then writes the
-      # combined markdown back via `gh release edit --notes-file`. Kept
-      # commented out until we are happy with the generated output in
-      # production.
-      # - name: Append release notes to GitHub release
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
-      #     {
-      #       printf '## Release notes\n\n'
-      #       cat /tmp/release-notes-generated.md
-      #       printf '\n\n---\n\n'
-      #       printf '%s\n' "${CURRENT}"
-      #     } > /tmp/release-body.md
-      #     gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md
+      - name: Append release notes to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Idempotent prepend (REQ-F-021): if the current body already starts
+          # with `## Release notes` AND contains a `\n---\n` separator, strip
+          # the leading Claude block up to and including the first separator
+          # before prepending the new block. Re-runs cleanly REPLACE the
+          # section rather than stacking. If the marker is present without a
+          # separator, fall back to keeping the full body so we never lose
+          # data.
+          CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
+          case "${CURRENT}" in
+            "## Release notes"*)
+              REMAINING="${CURRENT#*$'\n---\n'}"
+              # ${var#*pattern} returns the original string when the pattern
+              # is absent — fall back to the full body so we don't drop
+              # content when a malformed marker was left behind.
+              [ "${REMAINING}" = "${CURRENT}" ] && REMAINING="${CURRENT}"
+              ;;
+            *)
+              REMAINING="${CURRENT}"
+              ;;
+          esac
+          {
+            printf '## Release notes\n\n'
+            cat /tmp/release-notes-generated.md
+            printf '\n\n---\n\n'
+            printf '%s\n' "${REMAINING}"
+          } > /tmp/release-body.md
+          gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md

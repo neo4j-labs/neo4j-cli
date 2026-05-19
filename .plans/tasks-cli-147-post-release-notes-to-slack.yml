@@ -240,7 +240,7 @@ tasks:
       `gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md`.
       env: `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. Step is placed LAST (after
       the Slack POST). Runs unconditionally. Implements REQ-F-020 and REQ-F-021.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -253,7 +253,7 @@ tasks:
       - "Step is the LAST step in the job (after Slack POST)"
       - "Step runs unconditionally on both triggers"
       - "actionlint clean"
-    completed_at: null
+    completed_at: 2026-05-19T12:00:00Z
 
   - id: task-011
     title: "Local verification + push activation PR"

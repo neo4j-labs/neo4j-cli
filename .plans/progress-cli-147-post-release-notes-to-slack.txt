@@ -33,3 +33,8 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-009 — 2026-05-19T11:45:00Z
 Activated "Post to Slack" step: uncommented the CLI-147 follow-up block, curl POSTs /tmp/slack-payload.json to SLACK_WEBHOOK_URL. Kept in-body empty-secret guard as defense in depth on top of the top-of-job verify step. actionlint clean; make test/lint/fmt-check pass.
 Files: ~.github/workflows/post-release-notes.yml
+
+## task-010 — 2026-05-19T12:00:00Z
+Activated "Append release notes to GitHub release" with REQ-F-021 idempotent replace: case-match on `## Release notes` prefix, strip up to FIRST `\n---\n` via `${CURRENT#*$'\n---\n'}`, fall back to full body when marker present without separator. Step now LAST after Slack POST. Smoke-tested 4 cases (with-block, no-block, orphan-marker, multi-separator) all behave per spec; shellcheck + actionlint + make test/lint/fmt-check clean.
+Files: ~.github/workflows/post-release-notes.yml
+Decisions: kept the trailing `printf '%s\n' "${REMAINING}"` even for empty CURRENT — produces a single trailing newline, acceptable; `gh release view -q` failures propagate via pipefail.
