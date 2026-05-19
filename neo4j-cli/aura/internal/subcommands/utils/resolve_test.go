@@ -4,12 +4,14 @@
 package utils_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -136,6 +138,11 @@ func TestResolveAndValidateOrgProject_MissingOrg(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no organization specified")
 	assert.Contains(t, err.Error(), "--organization-id")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet(t *testing.T) {
@@ -149,6 +156,11 @@ func TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet(t *test
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no default workspace set")
 	assert.Contains(t, err.Error(), "aura workspace use")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_ProjectFromFlag(t *testing.T) {
@@ -198,6 +210,11 @@ func TestResolveAndValidateOrgProject_MissingProject(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no project specified")
 	assert.Contains(t, err.Error(), "--project-id")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_ProjectNotInOrg(t *testing.T) {

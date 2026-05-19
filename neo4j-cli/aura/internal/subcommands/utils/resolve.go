@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/spf13/cobra"
@@ -52,9 +53,11 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	} else {
 		// Check for legacy default-tenant before returning generic error.
 		if cfg.Aura.Get("default-tenant") != nil && cfg.Aura.Get("default-tenant") != "" {
-			return "", "", fmt.Errorf("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting")
+			return "", "", clierr.NewUsageError("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting").
+				WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.")
 		}
-		return "", "", fmt.Errorf("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+		return "", "", clierr.NewUsageError("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'").
+			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.")
 	}
 
 	// Resolve project ID.
@@ -65,7 +68,8 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	} else if defaultProject != "" {
 		projectID = defaultProject
 	} else {
-		return "", "", fmt.Errorf("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+		return "", "", clierr.NewUsageError("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'").
+			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.")
 	}
 
 	return orgID, projectID, nil

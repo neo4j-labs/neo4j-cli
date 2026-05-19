@@ -9,3 +9,7 @@ Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/re
 ## TASK-003 — 2026-05-19T00:00:00Z
 Added private suggestionForResource(resourceType) lookup in aura/internal/api/response.go (instance/project/organization/customer-managed-key/tenant per REQ-F-003; default empty so omitempty drops the field on unknown nested 404s). Wired into 404 chain: NewNotFoundError(...).WithResource(rt, id).WithSuggestion(suggestionForResource(rt)). Tenant entry is the migration nudge. Added TestSuggestionForResource locking the table + unknown/empty defaults; extended TestHandleResponseError_NotFound_TagsResource with wantSuggestion (instance/tenant/empty-path).
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+
+## TASK-004 — 2026-05-19T00:00:00Z
+Converted three resolveIDs fmt.Errorf sites in utils/resolve.go to clierr.NewUsageError(...).WithSuggestion(...) preserving message strings verbatim (migration nudge :55, no-org :57, no-project :68 per REQ-F-005). Extended resolve_test.go with errors.As + Code==2 + Suggestion assertions on the three existing missing-org / migration / missing-project tests.
+Files: ~neo4j-cli/aura/internal/subcommands/utils/resolve.go, ~neo4j-cli/aura/internal/subcommands/utils/resolve_test.go

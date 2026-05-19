@@ -71,7 +71,8 @@ tasks:
       message strings verbatim so resolve_test.go message-shape assertions
       keep passing. Extend resolve_test.go with errors.As + Code + Suggestion
       assertions for each site.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies: []
     acceptance_criteria:
       - "Legacy default-tenant migration error (:55) returns CLIError.Code == 2 with Suggestion text per REQ-F-005."
