@@ -1,0 +1,3 @@
+## task-001 — 2026-05-19T00:00:00Z
+Scaffolded configmigrate package: Migration struct, empty registry, init validator that panics on gap/duplicate/non-1-start.
+Files: +neo4j-cli/internal/configmigrate/migrations.go

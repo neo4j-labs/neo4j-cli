@@ -16,7 +16,7 @@ tasks:
       and panics with a clear message on any gap, duplicate, or non-1 start.
       No engine code in this file — that lives in task-002's
       `configmigrate.go`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`neo4j-cli/internal/configmigrate/migrations.go` exists with the Neo4j copyright header."
@@ -24,7 +24,7 @@ tasks:
       - "Package-level `migrations` slice is `[]Migration{}` (empty)."
       - "`init()` panics with a clear message when `migrations` would contain a gap (e.g. `[v1, v3]`), a duplicate (`[v1, v1]`), or starts above 1 (`[v2]`). Verified by a test or by reading the validator logic — see task-003."
       - "`go vet ./neo4j-cli/internal/configmigrate/...` and `make fmt-check` are clean."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-002
     title: "Implement Run/runWith engine in configmigrate.go"
