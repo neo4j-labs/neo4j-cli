@@ -19,3 +19,7 @@ Files: ~.agents/query.md
 ## TASK-005 — 2026-05-19T00:00:00Z
 Verified skill bundle reflects --debug (references/query.md row present); go generate produced no diff; make test/fmt-check/lint all clean. Bundle regen happened in task-002.
 Files: (none)
+
+## TASK-006 — 2026-05-19T20:20:00Z
+Added Minor changelog entry for --debug flag / NEO4J_DEBUG=1 env var, stderr routing, and BoltLogger follow-up note via changie.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260519-201954.yaml

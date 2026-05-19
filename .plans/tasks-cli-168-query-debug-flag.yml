@@ -131,11 +131,11 @@ tasks:
       to stderr (so machine-readable stdout is unaffected), and note that
       per-frame Bolt wire tracing (BoltLogger) is a deliberate follow-up
       pending credential redaction.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "One new file under `.changes/unreleased/` with `project: neo4j-cli`, `kind: Minor`, and a body covering `--debug`, `NEO4J_DEBUG=1`, stderr routing, and the BoltLogger follow-up note."
       - "File name follows the `neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` pattern."
       - "`make test` remains clean (no test directly gates changelog entries, but file syntax must be valid YAML)."
-    completed_at: null
+    completed_at: 2026-05-19T20:20:00Z
