@@ -5,3 +5,7 @@ Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/re
 ## TASK-002 — 2026-05-19T10:00:00Z
 Hardened recoverPanic to print recovered value's Error() line before the standard fallback when value implements error; non-error values keep single-line behaviour.
 Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+
+## TASK-003 — 2026-05-19T11:53:00Z
+Added Patch changelog entry via changie and ran final gates (fmt-check, lint, test) clean. generate-check shows only the harness in_progress flip in tasks YAML — no bundle drift.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260519-115210.yaml

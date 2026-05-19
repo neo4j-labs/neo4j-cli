@@ -59,7 +59,7 @@ tasks:
       unhandled API status codes are diagnosable."`. Run the full gate suite
       to confirm no regressions. No bundle drift expected (no command-tree
       changes).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -69,4 +69,4 @@ tasks:
       - "`make lint` passes."
       - "`make test` passes."
       - "`make generate-check` passes (no bundle drift)."
-    completed_at: null
+    completed_at: 2026-05-19T11:53:00Z
