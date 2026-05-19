@@ -57,6 +57,16 @@ func NewCredentials(fs afero.Fs, configPrefix string) *Credentials {
 	return &c
 }
 
+// HasAnyCredentials reports whether at least one credential exists across all
+// three credential types (Aura, Dbms, Embed). This is used by the first-run
+// default-detection logic to choose between insecure (existing user) and
+// keyring (fresh install) as the initial storage mode.
+func (c *Credentials) HasAnyCredentials() bool {
+	return len(c.Aura.Credentials) > 0 ||
+		len(c.Dbms.Credentials) > 0 ||
+		len(c.Embed.Credentials) > 0
+}
+
 // SetStorageMode sets the credential storage mode and reloads sensitive fields.
 // mode must be either StorageModeInsecure or StorageModeKeyring. This is called
 // from clicfg.NewConfig after the storage mode is resolved from config.
