@@ -5,3 +5,7 @@ Files: +neo4j-cli/aura/internal/subcommands/utils/notfound.go, +neo4j-cli/aura/i
 ## TASK-002 — 2026-05-19T00:00:00Z
 Wired .WithSuggestion onto 400/401/403/429 *CLIErrors in aura/internal/api/response.go (validation help, auth refresh-credentials, rate-limit retry-after); 401/403 share a package-local authSuggestion const covering both formatAuthorizationError returns + the 403 serverError short-circuit. Extended TestHandleResponseError_ExitCodeMapping with a wantSuggestion column.
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+
+## TASK-003 — 2026-05-19T00:00:00Z
+Added private suggestionForResource(resourceType) lookup in aura/internal/api/response.go (instance/project/organization/customer-managed-key/tenant per REQ-F-003; default empty so omitempty drops the field on unknown nested 404s). Wired into 404 chain: NewNotFoundError(...).WithResource(rt, id).WithSuggestion(suggestionForResource(rt)). Tenant entry is the migration nudge. Added TestSuggestionForResource locking the table + unknown/empty defaults; extended TestHandleResponseError_NotFound_TagsResource with wantSuggestion (instance/tenant/empty-path).
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go

@@ -94,7 +94,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		}
 
 		resourceType, resourceID := parseResourceFromRequest(res.Request)
-		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID)
+		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 	case http.StatusMethodNotAllowed:
 		var errorResponse ErrorResponse
 
@@ -163,6 +163,29 @@ func parseResourceFromRequest(req *http.Request) (string, string) {
 	// Skip the version segment (segments[0]); segments[1] is the plural
 	// resource name, segments[2] is the resource id.
 	return singularise(segments[1]), segments[2]
+}
+
+// suggestionForResource returns the per-resource next-action hint attached to
+// 404 *CLIErrors via .WithSuggestion(...). The lookup is keyed on the singular
+// resourceType produced by parseResourceFromRequest. Unknown / empty types
+// return "" so the envelope omitempty drops the field rather than emitting
+// noise (e.g. nested-path 404s where parseResourceFromRequest mis-segments —
+// those are enriched at the call site via utils.WithNotFoundContext).
+func suggestionForResource(resourceType string) string {
+	switch resourceType {
+	case "instance":
+		return "Run 'neo4j-cli aura instance list' to see available instances."
+	case "project":
+		return "Run 'neo4j-cli aura project list --organization-id <id>' to see available projects."
+	case "organization":
+		return "Run 'neo4j-cli aura organization list' to see available organizations."
+	case "customer-managed-key":
+		return "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys."
+	case "tenant":
+		return "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects)."
+	default:
+		return ""
+	}
 }
 
 // singularise turns the plural resource path segment (e.g. "instances",

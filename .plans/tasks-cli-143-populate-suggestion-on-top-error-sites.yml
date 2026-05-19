@@ -52,7 +52,8 @@ tasks:
       return value into the 404 branch via .WithSuggestion(...) after the
       existing .WithResource(resourceType, resourceID) chain. Tenant text is
       the migration nudge ("tenants are now called projects").
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies: []
     acceptance_criteria:
       - "suggestionForResource lookup returns the exact strings specified in REQ-F-003 for each of: instance, project, organization, customer-managed-key, tenant; default returns \"\"."
