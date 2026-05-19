@@ -4,12 +4,15 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/instance"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
@@ -303,10 +306,14 @@ func TestGetInstanceNotFoundError(t *testing.T) {
 		]
 	}`, instanceId))
 
-	helper.ExecuteCommand(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
+	err := helper.ExecuteCommandE(fmt.Sprintf("instance get %s --organization-id %s --project-id %s", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
 
 	helper.AssertErr(fmt.Sprintf("Error: [\n\tDB not found: %s\n]", instanceId))
 }

@@ -72,14 +72,14 @@ tasks:
       stderr text assertions (now in multi-line bracket shape after task-003). Mirror the pattern at
       `graphanalytics/session/get_test.go:148-151`. This locks the acceptance criterion "Tests: assert exit + message shape"
       from the Linear ticket.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "Both tests call `ExecuteCommandE`, capture the returned error, and use `errors.As` + `require.Equal(t, 3, ce.Code)`"
       - "Stderr-text assertions kept (multi-line bracket shape)"
       - "`go test ./neo4j-cli/aura/internal/subcommands/instance/... ./neo4j-cli/aura/internal/subcommands/tenant/...` passes"
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-005
     title: "Add TestMakeRequest_2xxWithEmbeddedErrors covering latent path"
