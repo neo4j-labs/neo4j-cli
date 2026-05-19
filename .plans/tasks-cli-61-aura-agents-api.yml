@@ -181,7 +181,7 @@ tasks:
       `Agent deleted successfully <id>` via `cmd.Println`. Port `delete_test.go` from
       `/tmp/cli-61-original-pr.diff` (lines ~582-654): happy path, default-workspace variant,
       404 → `Error: [Agent not found]`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -189,7 +189,7 @@ tasks:
       - "`delete_test.go` covers happy path, default-workspace, and 404."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestDelete` passes."
       - "`make fmt-check` and `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T11:30:00Z
 
   - id: task-010
     title: "Implement agent invoke leaf + tests"
