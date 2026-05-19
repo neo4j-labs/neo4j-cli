@@ -140,13 +140,9 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 
 Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
-### Agents (beta)
+### Agents
 
-Manage Aura Agents (LLM-backed assistants bound to a database) from the terminal. The subtree is gated behind the `flag.aura-beta` feature flag; enable it once:
-
-```bash
-neo4j-cli config set flag.aura-beta true --rw
-```
+Manage Aura Agents (LLM-backed assistants bound to a database) from the terminal.
 
 Seven leaves: `list`, `get`, `create`, `update`, `replace`, `delete`, `invoke`. `--organization-id`/`--project-id` honour the default workspace from [`workspace use`](#setting-a-default-workspace).
 

@@ -35,7 +35,6 @@ func TestListAgents(t *testing.T) {
 		}
 	]`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("agent list --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -77,7 +76,6 @@ func TestListAgentsWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		}
 	]`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand("agent list")
@@ -120,7 +118,6 @@ func TestListAgentsWithTableOutput(t *testing.T) {
 		}
 	]`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "table")
 	helper.ExecuteCommand(fmt.Sprintf("agent list --organization-id=%s --project-id=%s", organizationId, projectId))
 
@@ -143,7 +140,6 @@ func TestListAgentsWithMissingProjectId(t *testing.T) {
 
 	organizationId := "81e4ae5c-171b-4700-b243-8d1dd34f7321"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("agent list --organization-id=%s", organizationId))
 
 	helper.AssertErr("Error: required flag(s) \"project-id\" not set")
@@ -155,7 +151,6 @@ func TestListAgentsWithMissingOrganizationId(t *testing.T) {
 
 	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("agent list --project-id=%s", projectId))
 
 	helper.AssertErr("Error: required flag(s) \"organization-id\" not set")

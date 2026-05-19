@@ -346,7 +346,7 @@ tasks:
       Heads-up: with the gate removed, the agent leaves will surface in every consumer that
       walks the cobra tree — `agent-context`, the skill bundle, `aura --help`. Verify each
       manually after build.
-    status: pending
+    status: completed
     dependencies:
       - task-014
     acceptance_criteria:
@@ -356,4 +356,4 @@ tasks:
       - "Agent tests no longer set `flag.aura-beta` (or the line is justified if kept)."
       - "A new changelog entry exists naming the promotion."
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
-    completed_at: null
+    completed_at: 2026-05-19T16:09:36+02:00

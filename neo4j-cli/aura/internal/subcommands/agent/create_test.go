@@ -28,7 +28,6 @@ func TestCreateAgent(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent create --name "My Agent" --description "An agent that queries the database" --dbid a1b2c3d4 --tools '%s' --organization-id %s --project-id %s --rw`,
@@ -76,7 +75,6 @@ func TestCreateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf(
@@ -115,7 +113,6 @@ func TestCreateAgentWithPrivateFlag(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent create --name "Private Agent" --description "A private agent" --dbid a1b2c3d4 --is-private --tools '%s' --organization-id %s --project-id %s --rw`,
@@ -153,7 +150,6 @@ func TestCreateAgentWithMissingName(t *testing.T) {
 	organizationId := "81e4ae5c-171b-4700-b243-8d1dd34f7321"
 	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent create --description "An agent" --dbid a1b2c3d4 --tools '%s' --organization-id %s --project-id %s --rw`,
 		testTools, organizationId, projectId,
@@ -169,7 +165,6 @@ func TestCreateAgentWithInvalidToolsJSON(t *testing.T) {
 	organizationId := "81e4ae5c-171b-4700-b243-8d1dd34f7321"
 	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent create --name "My Agent" --description "An agent" --dbid a1b2c3d4 --tools "not-valid-json" --organization-id %s --project-id %s --rw`,
 		organizationId, projectId,
@@ -195,7 +190,6 @@ func TestCreateAgentWithTableOutput(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "table")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent create --name "My Agent" --description "An agent that queries the database" --dbid a1b2c3d4 --tools '%s' --organization-id %s --project-id %s --rw`,

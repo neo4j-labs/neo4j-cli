@@ -29,7 +29,6 @@ func TestUpdateAgentName(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent update %s --name "Renamed Agent" --organization-id %s --project-id %s --rw`,
@@ -69,7 +68,6 @@ func TestUpdateAgentBooleanFields(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent update %s --is-private --is-mcp-enabled --organization-id %s --project-id %s --rw`,
@@ -109,7 +107,6 @@ func TestUpdateAgentTools(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent update %s --tools '%s' --organization-id %s --project-id %s --rw`,
@@ -149,7 +146,6 @@ func TestUpdateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf(`agent update %s --name "Renamed Agent" --rw`, agentId))
@@ -177,7 +173,6 @@ func TestUpdateAgentWithNoFields(t *testing.T) {
 	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
 	agentId := "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("agent update %s --organization-id %s --project-id %s --rw", agentId, organizationId, projectId))
 
 	helper.AssertErr("Error: at least one of the flags in the group [name description dbid tools system-prompt is-private is-mcp-enabled enabled] is required")
@@ -191,7 +186,6 @@ func TestUpdateAgentWithInvalidToolsJSON(t *testing.T) {
 	projectId := "ef7faf53-fb7e-4994-8d0f-64ae56e91c42"
 	agentId := "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent update %s --tools "not-valid-json" --organization-id %s --project-id %s --rw`,
 		agentId, organizationId, projectId,
@@ -212,7 +206,6 @@ func TestUpdateAgentNotFound(t *testing.T) {
 		"errors": [{"message": "Agent not found"}]
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent update %s --name "New Name" --organization-id %s --project-id %s --rw`,
 		agentId, organizationId, projectId,

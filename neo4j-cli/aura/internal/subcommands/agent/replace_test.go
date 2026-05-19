@@ -29,7 +29,6 @@ func TestReplaceAgent(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent replace %s --name "My Updated Agent" --description "An updated description" --dbid a1b2c3d4 --tools '%s' --organization-id %s --project-id %s --rw`,
@@ -78,7 +77,6 @@ func TestReplaceAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf(
@@ -112,7 +110,6 @@ func TestReplaceAgentNotFound(t *testing.T) {
 		"errors": [{"message": "Agent not found"}]
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf(
 		`agent replace %s --name "My Agent" --description "desc" --dbid a1b2c3d4 --tools '%s' --organization-id %s --project-id %s --rw`,

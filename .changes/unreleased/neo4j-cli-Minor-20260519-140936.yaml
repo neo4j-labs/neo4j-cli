@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Promote aura agent commands out of beta (flag.aura-beta no longer required).
+time: 2026-05-19T16:09:36+02:00

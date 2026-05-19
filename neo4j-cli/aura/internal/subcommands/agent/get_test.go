@@ -29,7 +29,6 @@ func TestGetAgent(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("agent get %s --organization-id=%s --project-id=%s", agentId, organizationId, projectId))
 
@@ -65,7 +64,6 @@ func TestGetAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 		"enabled": true
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("agent get %s", agentId))
@@ -96,7 +94,6 @@ func TestGetAgentNotFound(t *testing.T) {
 		"errors": [{"message": "Agent not found"}]
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetConfigValue("format", "json")
 	helper.ExecuteCommand(fmt.Sprintf("agent get %s --organization-id=%s --project-id=%s", agentId, organizationId, projectId))
 

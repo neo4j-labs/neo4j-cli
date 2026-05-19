@@ -21,7 +21,6 @@ func TestDeleteAgent(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId), http.StatusAccepted, "")
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("agent delete %s --organization-id=%s --project-id=%s --rw", agentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
@@ -40,7 +39,6 @@ func TestDeleteAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v2beta1/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId), http.StatusAccepted, "")
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.SetDefaultProjectInConfig(organizationId, projectId)
 	helper.ExecuteCommand(fmt.Sprintf("agent delete %s --rw", agentId))
 
@@ -62,7 +60,6 @@ func TestDeleteAgentNotFound(t *testing.T) {
 		"errors": [{"message": "Agent not found"}]
 	}`)
 
-	helper.SetConfigValue("flag.aura-beta", true)
 	helper.ExecuteCommand(fmt.Sprintf("agent delete %s --organization-id=%s --project-id=%s --rw", agentId, organizationId, projectId))
 
 	mockHandler.AssertCalledTimes(1)
