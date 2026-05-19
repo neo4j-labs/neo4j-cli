@@ -77,7 +77,7 @@ tasks:
       paranoia check that the working tree is otherwise clean (these
       should pass trivially since no Go was touched). Implements
       REQ-NF-001 and the "no changelog / no source" non-goals.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -88,4 +88,4 @@ tasks:
       - "No file under `neo4j-cli/`, `common/`, or `distribution/` is modified"
       - "`make fmt-check` and `make lint` both pass on the working tree"
       - "actionlint (or `gh workflow view`) accepts the updated `claude.yml`"
-    completed_at: null
+    completed_at: 2026-05-19T13:00:00Z
