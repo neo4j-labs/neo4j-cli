@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-19T12:15:00Z
+Bumped claude.yml permissions: contents/pull-requests read -> write so the action's GITHUB_TOKEN can push to PR branches.
+Files: ~.github/workflows/claude.yml

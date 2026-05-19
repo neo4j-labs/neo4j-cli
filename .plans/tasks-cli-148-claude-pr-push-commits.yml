@@ -12,14 +12,14 @@ tasks:
       `issues: read`, `id-token: write`, and `actions: read` exactly as-is.
       This is the minimum change required for the action's GITHUB_TOKEN to
       push commits to the PR branch. Implements REQ-F-001 and REQ-NF-003.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`.github/workflows/claude.yml` declares `contents: write` and `pull-requests: write` under `permissions:`"
       - "`issues: read`, `id-token: write`, and `actions: read` are unchanged from the previous file"
       - "Pinned SHAs of `actions/checkout` and `anthropics/claude-code-action` are not altered"
       - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
-    completed_at: null
+    completed_at: 2026-05-19T12:15:00Z
 
   - id: task-002
     title: "Enable use_commit_signing on anthropics/claude-code-action step"
