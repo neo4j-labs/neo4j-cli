@@ -175,3 +175,32 @@ tasks:
       OK (all packages including common/configmigrate), make license-check OK.
       make generate-check shows only the harness-induced YAML status flip diff
       (no internal/skill/bundle/** drift) — expected per AGENTS.md note.
+
+  - id: task-006
+    title: "Document config-migration subsystem in .agents/ + link from AGENTS.md"
+    description: |
+      Add `.agents/config-migrations.md` describing the configmigrate
+      subsystem so the next dev who lands the first real migration doesn't
+      have to re-derive it from the package source. Cover: marker key
+      (`_schema_version` inside config.json, NOT in ValidConfigKeys);
+      registry shape and contiguous-ascending invariant enforced by
+      `validateMigrations`; how to append a migration (Apply receives raw
+      bytes, returns transformed bytes or error); the warn-and-continue
+      error policy + exact warning format; missing-file / empty-registry
+      no-op semantics; the `runWith` test seam; how it's wired from
+      `common/clicfg/clicfg.go`; and the Go internal-package gotcha
+      (package must live under `common/`, not `neo4j-cli/internal/`).
+      Link to it from AGENTS.md under a new "Config Migration Notes"
+      section (after "Feature Flag Notes" / before "Installer Script
+      Testing Notes" reads naturally). Also tighten the cross-reference
+      in `.agents/feature-flags.md` so the CLI-134 line points at the
+      new doc.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "`.agents/config-migrations.md` exists, ≤60 lines, terse style matching `.agents/feature-flags.md`."
+      - "AGENTS.md gains a `## Config Migration Notes` section linking to `.agents/config-migrations.md` (one-line description)."
+      - "`.agents/feature-flags.md` CLI-134 line(s) updated to point at the new doc."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all still clean (no .go changes — doc-only)."
+    completed_at: 2026-05-19T00:00:00Z

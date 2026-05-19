@@ -19,3 +19,7 @@ Decisions: package moved from neo4j-cli/internal/configmigrate to common/configm
 ## task-005 — 2026-05-19T00:00:00Z
 Final gates + live no-op smoke. config.json sha256 byte-identical before/after `config list` (cfd30a3e…3704). make build/fmt-check/lint/test/license-check all clean; generate-check diff is only the harness YAML status flip (no bundle drift).
 Files: ~.plans/tasks-cli-134-config-migration-support.yml
+
+## task-006 — 2026-05-19T00:00:00Z
+Added .agents/config-migrations.md (marker, registry shape, error policy, test seam, internal-package gotcha). Linked from AGENTS.md "Config Migration Notes" and tightened .agents/feature-flags.md CLI-134 cross-refs.
+Files: +.agents/config-migrations.md, ~AGENTS.md, ~.agents/feature-flags.md

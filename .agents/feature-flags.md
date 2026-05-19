@@ -33,14 +33,14 @@ Explicit: no `--flag` CLI option. CI / one-shot use is covered by the env var at
 ## Unknown / removed keys
 
 - Silent at runtime (debug-log only). Old user configs survive CLI upgrades without warnings.
-- Stripping retired keys from `config.json` is owned by CLI-134 (config migration), not the registry.
+- Stripping retired keys from `config.json` is owned by the config-migration subsystem (see [`.agents/config-migrations.md`](config-migrations.md)), not the registry.
 
 ## Migrating aura.beta-enabled
 
-- Migration completed in CLI-136: production + tests now use `flag.aura-beta` via the `common/clicfg/flags.go` `Registry`. The legacy `aura.beta-enabled` key is still read as a debug-logged fallback until CLI-134 ships physical config cleanup.
+- Migration completed in CLI-136: production + tests now use `flag.aura-beta` via the `common/clicfg/flags.go` `Registry`. The legacy `aura.beta-enabled` key is still read as a debug-logged fallback until the config-migration subsystem ships physical config cleanup.
 
 ## See also
 
 - Linear CLI-125 — this decision.
-- Linear CLI-134 — config migration (owns user-side cleanup of retired flag keys).
+- [`.agents/config-migrations.md`](config-migrations.md) — owns user-side cleanup of retired flag keys (CLI-134).
 - `AGENTS.md` "Feature Flag Notes" links here.
