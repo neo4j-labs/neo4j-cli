@@ -191,7 +191,7 @@ tasks:
       lines. Motivation: GitHub Actions UI clips the very long single-line JSON
       `text` value; the rendered print shows newlines as actual newlines so
       reviewers can read the message body inline. Implements REQ-F-018.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -201,7 +201,7 @@ tasks:
       - "Step is placed AFTER 'Build Slack payload' and BEFORE the (soon-to-be-activated) 'Post to Slack' step"
       - "Step runs unconditionally — no `if:` gating"
       - "actionlint clean"
-    completed_at: null
+    completed_at: 2026-05-19T11:30:00Z
 
   - id: task-009
     title: "Activate Slack POST step"

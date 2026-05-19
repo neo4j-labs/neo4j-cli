@@ -175,6 +175,16 @@ jobs:
           cat /tmp/slack-payload.json
           echo "----- end -----"
 
+      - name: Print Slack message (rendered)
+        run: |
+          # The Actions UI clips the very long single-line JSON `text` value
+          # above. Re-render it with jq so newlines render as actual newlines
+          # and reviewers can read the message body inline without copying the
+          # JSON elsewhere.
+          echo "----- Slack message (rendered) -----"
+          jq -r '.text' /tmp/slack-payload.json
+          echo "----- end -----"
+
       # CLI-147 follow-up: POST the assembled payload to Slack. Kept commented
       # out until the SLACK_WEBHOOK_URL secret is provisioned and we have eyes
       # on at least one dry run. Enable by uncommenting the block below and

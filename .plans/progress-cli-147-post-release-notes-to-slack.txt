@@ -25,3 +25,7 @@ Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml
 ## task-007 — 2026-05-19T11:15:00Z
 Added fail-fast "Verify Slack webhook" step between "Validate release tag" and "Checkout main" — empty SLACK_WEBHOOK_URL -> stderr + exit 1, mirrors ANTHROPIC_API_KEY guard. Aborts before ~$1.50 Claude generation when secret missing. actionlint clean.
 Files: ~.github/workflows/post-release-notes.yml
+
+## task-008 — 2026-05-19T11:30:00Z
+Added "Print Slack message (rendered)" step after "Build Slack payload": jq -r '.text' rendered between delimiter lines so reviewers can read the un-clipped message body in the Actions log. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
