@@ -256,7 +256,7 @@ tasks:
       `project: neo4j-cli`, `kind: Minor`, `body: Add aura agent commands (list, get, create, update, replace, delete, invoke) for the Aura Agents API (beta).`,
       `time: <RFC3339 with timezone>`. Format must match the most recent `neo4j-cli-Minor-*.yaml`
       entries in `.changes/unreleased/`.
-    status: pending
+    status: completed
     dependencies:
       - task-011
     acceptance_criteria:
@@ -264,7 +264,7 @@ tasks:
       - "`project: neo4j-cli` and `kind: Minor` match the repo's changie conventions."
       - "`time:` is a valid RFC3339 timestamp with timezone."
       - "`make test` and `make generate-check` still pass after the entry is added."
-    completed_at: null
+    completed_at: 2026-05-19T12:58:08+02:00
 
   - id: task-013
     title: "Final gates + manual smoke against Aura"

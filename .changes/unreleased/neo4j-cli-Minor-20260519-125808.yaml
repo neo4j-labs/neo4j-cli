@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add aura agent commands (list, get, create, update, replace, delete, invoke) for the Aura Agents API (beta).
+time: 2026-05-19T12:58:08+02:00
