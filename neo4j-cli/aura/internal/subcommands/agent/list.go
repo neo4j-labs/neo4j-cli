@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewListCmd(cfg *clicfg.Config) *cobra.Command {
+func newListCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		organizationId string
 		projectId      string

@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
+func newDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		organizationId string
 		projectId      string

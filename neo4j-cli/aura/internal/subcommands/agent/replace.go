@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewReplaceCmd(cfg *clicfg.Config) *cobra.Command {
+func newReplaceCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		organizationId string
 		projectId      string

@@ -21,13 +21,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(NewListCmd(cfg))
-	cmd.AddCommand(NewGetCmd(cfg))
-	cmd.AddCommand(NewCreateCmd(cfg))
-	cmd.AddCommand(NewUpdateCmd(cfg))
-	cmd.AddCommand(NewReplaceCmd(cfg))
-	cmd.AddCommand(NewDeleteCmd(cfg))
-	cmd.AddCommand(NewInvokeCmd(cfg))
+	cmd.AddCommand(newListCmd(cfg))
+	cmd.AddCommand(newGetCmd(cfg))
+	cmd.AddCommand(newCreateCmd(cfg))
+	cmd.AddCommand(newUpdateCmd(cfg))
+	cmd.AddCommand(newReplaceCmd(cfg))
+	cmd.AddCommand(newDeleteCmd(cfg))
+	cmd.AddCommand(newInvokeCmd(cfg))
 
 	cmd.PersistentFlags().String("auth-url", "", "")
 	cmd.PersistentFlags().String("base-url", "", "")

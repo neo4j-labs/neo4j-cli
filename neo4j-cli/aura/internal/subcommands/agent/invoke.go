@@ -46,7 +46,7 @@ type invokeError struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func NewInvokeCmd(cfg *clicfg.Config) *cobra.Command {
+func newInvokeCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		organizationId string
 		projectId      string
