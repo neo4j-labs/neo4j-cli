@@ -269,7 +269,7 @@ tasks:
       `workflow_dispatch` smoke against v1.4.0 happens AFTER the
       SLACK_WEBHOOK_URL secret is set by the human — document this as the
       post-merge check.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -279,4 +279,4 @@ tasks:
       - "Step order in the workflow matches REQ-F-022 exactly: validate tag -> verify webhook -> checkout -> prev-tag -> install Claude -> verify API key -> generate -> guard -> print -> build payload -> rendered print -> Slack POST -> GH release append"
       - "Progress file is updated with task entries for task-007 through task-011"
       - "Branch is pushed and a PR is opened describing the activation"
-    completed_at: null
+    completed_at: 2026-05-19T12:30:00Z

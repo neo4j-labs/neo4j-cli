@@ -38,3 +38,8 @@ Files: ~.github/workflows/post-release-notes.yml
 Activated "Append release notes to GitHub release" with REQ-F-021 idempotent replace: case-match on `## Release notes` prefix, strip up to FIRST `\n---\n` via `${CURRENT#*$'\n---\n'}`, fall back to full body when marker present without separator. Step now LAST after Slack POST. Smoke-tested 4 cases (with-block, no-block, orphan-marker, multi-separator) all behave per spec; shellcheck + actionlint + make test/lint/fmt-check clean.
 Files: ~.github/workflows/post-release-notes.yml
 Decisions: kept the trailing `printf '%s\n' "${REMAINING}"` even for empty CURRENT — produces a single trailing newline, acceptable; `gh release view -q` failures propagate via pipefail.
+
+## task-011 — 2026-05-19T12:30:00Z
+Activation gate: actionlint clean, make test/lint/fmt-check pass, diff main...HEAD scoped to .github/workflows/post-release-notes.yml + .plans/ only, step ordering matches REQ-F-022 (validate-tag -> verify-webhook -> checkout -> prev-tag -> install-claude -> verify-api-key -> generate -> guard -> print -> build-payload -> rendered-print -> slack-post -> gh-release-append). Branch pushed; PR #142 opened: https://github.com/neo4j-labs/neo4j-cli/pull/142.
+Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml, ~.plans/progress-cli-147-post-release-notes-to-slack.txt
+Decisions: Post-merge live workflow_dispatch against v1.4.0 documented in PR test plan; gated on the human setting SLACK_WEBHOOK_URL repo secret first (REQ-NF-008).
