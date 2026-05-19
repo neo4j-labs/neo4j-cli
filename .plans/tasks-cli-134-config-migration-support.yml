@@ -153,7 +153,7 @@ tasks:
       test`, `make generate-check`, `make license-check`. All must pass.
       Report the sha256 hashes in the task notes for the reviewer to
       confirm byte-identity.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -165,4 +165,13 @@ tasks:
       - "`make test` passes including the new `configmigrate` package tests."
       - "`make generate-check` clean (no bundle drift — internal package, no cobra surface change)."
       - "`make license-check` clean (all new .go files carry the Neo4j header)."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
+    notes: |
+      Live no-op smoke verified byte-identity of ~/Library/Preferences/neo4j/cli/config.json
+      before vs after `./bin/neo4j-cli config list`:
+        before: cfd30a3eef0342034bbbfef1754b6a4a573cd7e4af3bd720031d287f21043704
+        after:  cfd30a3eef0342034bbbfef1754b6a4a573cd7e4af3bd720031d287f21043704
+      Gates: make build OK, make fmt-check OK, make lint OK (0 issues), make test
+      OK (all packages including common/configmigrate), make license-check OK.
+      make generate-check shows only the harness-induced YAML status flip diff
+      (no internal/skill/bundle/** drift) — expected per AGENTS.md note.

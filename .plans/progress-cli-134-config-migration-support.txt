@@ -15,3 +15,7 @@ Files: +neo4j-cli/internal/configmigrate/configmigrate_test.go, ~neo4j-cli/inter
 Wired configmigrate.Run into clicfg.NewConfig (after first ReadInConfig, followed by unconditional re-read). Removed commented-out migration block. Moved package out of neo4j-cli/internal/ to common/ because Go's internal-package rule blocked common/clicfg from importing neo4j-cli/internal/configmigrate. Dropped clicfg/testfs imports from test file to avoid test-time import cycle; replaced with local seedTestFs helper using a hard-coded relative path.
 Files: ~common/clicfg/clicfg.go, >neo4j-cli/internal/configmigrate/configmigrate.go=>common/configmigrate/configmigrate.go, >neo4j-cli/internal/configmigrate/migrations.go=>common/configmigrate/migrations.go, >neo4j-cli/internal/configmigrate/configmigrate_test.go=>common/configmigrate/configmigrate_test.go
 Decisions: package moved from neo4j-cli/internal/configmigrate to common/configmigrate — internal-rule forbids common pkgs from importing neo4j-cli/internal/*; clicfg.NewConfig is the integration point so the engine had to be reachable from common.
+
+## task-005 — 2026-05-19T00:00:00Z
+Final gates + live no-op smoke. config.json sha256 byte-identical before/after `config list` (cfd30a3e…3704). make build/fmt-check/lint/test/license-check all clean; generate-check diff is only the harness YAML status flip (no bundle drift).
+Files: ~.plans/tasks-cli-134-config-migration-support.yml
