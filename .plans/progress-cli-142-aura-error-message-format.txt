@@ -22,3 +22,8 @@ Files: ~neo4j-cli/aura/internal/api/api_test.go
 ## TASK-006 — 2026-05-19T13:00:04Z
 Added changie Patch entry via `changie new --projects neo4j-cli --kind Patch` capturing the user-facing multi-line bracket error format change. All gates clean.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260519-130004.yaml
+
+## TASK-007 — 2026-05-19T13:30:00Z
+Final gates run: fmt-check clean, lint clean (0 issues), test clean (all packages pass), generate-check clean (only diff is the harness's in_progress task-file flip per AGENTS.md note — no bundle drift). No manual Aura smoke run — no creds in this environment.
+Files: ~tasks file, ~progress file
+Decisions: dataapi/graphql 2xx-with-errors test change (task-003) is the only behavioural surface change; PRD anticipated this.

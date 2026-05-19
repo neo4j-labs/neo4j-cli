@@ -122,7 +122,7 @@ tasks:
       via `--format json` envelope surfaces, update or document in the PR. Optional manual: `make build` then
       `bin/neo4j-cli aura instance get does-not-exist --organization-id <real> --project-id <real>` against real Aura —
       expect multi-line bracket stderr and `$? == 3`.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -135,4 +135,4 @@ tasks:
       - "`make test` clean across the OS matrix (locally on darwin)"
       - "`make generate-check` clean — no bundle drift expected"
       - "Manual repro (if Aura creds available) prints multi-line bracket envelope and exits 3"
-    completed_at: null
+    completed_at: 2026-05-19T13:30:00Z
