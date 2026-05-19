@@ -91,14 +91,14 @@ tasks:
       (c) `ce.ResourceType == "instance"`, `ce.ResourceID == "x"`,
       (d) `ce.Suggestion == "Run 'neo4j-cli aura instance list' to see available instances."`.
       Use existing test patterns from `TestMakeRequest_*` in the same file.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "Test exists in `api/api_test.go` and is named `TestMakeRequest_2xxWithEmbeddedErrors`"
       - "All four assertions (Code, Message shape, ResourceType/ResourceID, Suggestion) covered"
       - "`go test ./neo4j-cli/aura/internal/api/...` passes"
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-006
     title: "Add changie Patch changelog entry"

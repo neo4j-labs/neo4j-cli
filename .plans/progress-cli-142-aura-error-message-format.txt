@@ -14,3 +14,7 @@ Decisions: dataapi/graphql test update is task-002 fallout but landed here to ke
 ## TASK-004 — 2026-05-19T00:00:00Z
 Switched TestGetInstanceNotFoundError and TestGetTenantNotFoundError to ExecuteCommandE + errors.As(*clierr.CLIError) + require.Equal(3, ce.Code), mirroring graphanalytics/session/get_test.go pattern; existing stderr-text assertions preserved.
 Files: ~neo4j-cli/aura/internal/subcommands/instance/get_test.go, ~neo4j-cli/aura/internal/subcommands/tenant/get_test.go
+
+## TASK-005 — 2026-05-19T00:00:00Z
+Added TestMakeRequest_2xxWithEmbeddedErrors in api/api_test.go locking the latent 2xx-with-errors-body path: mocks 200 on /v1/instances/x with embedded errors[], asserts Code==3, multi-line bracket Message, ResourceType=instance, ResourceID=x, instance-list suggestion.
+Files: ~neo4j-cli/aura/internal/api/api_test.go
