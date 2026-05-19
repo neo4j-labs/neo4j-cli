@@ -23,6 +23,15 @@ import (
 // the four constructor sites stay in lock-step.
 const authSuggestion = "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry."
 
+// formatBracketedMessages renders a slice of upstream error messages in the
+// multi-line bracket shape used across every handleResponseError envelope
+// site (and formatAuthorizationError). Output is byte-identical to the
+// long-standing 401/403 format so all seven sites stay in lock-step rather
+// than relying on Go's default []string stringification.
+func formatBracketedMessages(messages []string) string {
+	return fmt.Sprintf("[\n\t%s\n]", strings.Join(messages, ",\n\t"))
+}
+
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }
@@ -66,7 +75,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, message)
 		}
 
-		return clierr.NewValidationError("%s", messages).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
+		return clierr.NewValidationError("%s", formatBracketedMessages(messages)).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
 	case http.StatusUnauthorized:
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusForbidden:
@@ -94,7 +103,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		}
 
 		resourceType, resourceID := parseResourceFromRequest(res.Request)
-		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
+		return clierr.NewNotFoundError("%s", formatBracketedMessages(messages)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 	case http.StatusMethodNotAllowed:
 		var errorResponse ErrorResponse
 
@@ -107,7 +116,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewUpstreamError("%s", messages)
+		return clierr.NewUpstreamError("%s", formatBracketedMessages(messages))
 	case http.StatusPaymentRequired:
 		var errorResponse ErrorResponse
 
@@ -120,7 +129,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		cliErr := clierr.NewConflictError("%s", messages)
+		cliErr := clierr.NewConflictError("%s", formatBracketedMessages(messages))
 		if s := suggestionForPaymentRequired(errorResponse); s != "" {
 			cliErr = cliErr.WithSuggestion(s)
 		}
@@ -137,7 +146,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewConflictError("%s", messages)
+		return clierr.NewConflictError("%s", formatBracketedMessages(messages))
 	case http.StatusUnsupportedMediaType:
 		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 	case http.StatusTooManyRequests:
@@ -156,7 +165,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, e.Message)
 		}
 
-		return clierr.NewUpstreamError("%s", messages)
+		return clierr.NewUpstreamError("%s", formatBracketedMessages(messages))
 	default:
 		panic(clierr.NewFatalError("unexpected status code %d and body %s running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, resBody, clievents.RedactArgs(os.Args[1:])))
 	}
@@ -437,7 +446,5 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 		messages = append(messages, "Request failed authorization - access token has been cleared and will be refreshed on next request - please retry the command")
 	}
 
-	return clierr.NewAuthError(`[
-	%s
-]`, strings.Join(messages, ",\n\t")).WithSuggestion(authSuggestion)
+	return clierr.NewAuthError("%s", formatBracketedMessages(messages)).WithSuggestion(authSuggestion)
 }

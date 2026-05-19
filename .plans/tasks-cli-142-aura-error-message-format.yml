@@ -13,7 +13,7 @@ tasks:
       with `clierr.NewXError("%s", formatBracketedMessages(messages))`, preserving each existing `.WithSuggestion(...)` and
       `.WithResource(...)` chain. Refactor `formatAuthorizationError` (line 440-442) to call the same helper so all
       seven sites stay in lock-step. Output for the 401/403 path must remain byte-identical to today.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`formatBracketedMessages` exists, package-private, returns `fmt.Sprintf(\"[\\n\\t%s\\n]\", strings.Join(messages, \",\\n\\t\"))`"
@@ -21,7 +21,7 @@ tasks:
       - "`.WithSuggestion(...)` and `.WithResource(...)` chains preserved on every touched branch"
       - "`formatAuthorizationError` uses the helper; existing `instance/get_test.go:367-370` 401 test still passes unedited"
       - "`make build` succeeds"
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-002
     title: "Wire latent 2xx-with-errors-body path through NewNotFoundError in MakeRequest"
