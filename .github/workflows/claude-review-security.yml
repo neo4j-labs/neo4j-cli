@@ -77,11 +77,13 @@ jobs:
           # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
           # (`echo pass | tee /tmp/claude-verdict.txt`). `Skill` enables invoking
           # the vendored golang-security plugin; `Bash(govulncheck:*)` lets that
-          # skill shell out to govulncheck. No general `Bash`, no `Write`/`Edit`
-          # on repo files, no `curl`/`wget`.
+          # skill shell out to govulncheck. `Bash(gh api:*)` lets the summary step
+          # look up + PATCH an existing claude[bot] comment so each push updates
+          # one comment instead of appending a new one. No general `Bash`, no
+          # `Write`/`Edit` on repo files, no `curl`/`wget`.
           claude_args: >-
             --allowed-tools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Bash(govulncheck:*),Read,Grep,Glob,Skill"
 
       - name: Enforce verdict
         # Fail-closed: missing verdict file is treated as fail so an early Claude
