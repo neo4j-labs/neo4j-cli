@@ -1,0 +1,96 @@
+feature: cli-144-empty-list-exit-0-tests
+prd: ./prd-cli-144-empty-list-exit-0-tests.md
+created_at: 2026-05-19T14:54:04Z
+updated_at: 2026-05-19T14:54:04Z
+
+tasks:
+  - id: task-001
+    title: "Add TestListInstances_EmptyData golden test"
+    description: |
+      Append a new flat TestXxx function to
+      neo4j-cli/aura/internal/subcommands/instance/list_test.go that locks
+      in the current behaviour for an empty Aura instance list. Register
+      the existing registerProjectsMock helper, mock /v1/instances with
+      HTTP 200 + body `{"data": []}`, execute `instance list` with the
+      shared testListOrgID/testListProjectID constants, and assert
+      stdout JSON equals `{"data": []}` via helper.AssertOutJson.
+      Mirrors the in-file flat-func convention (no table restructuring).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Function TestListInstances_EmptyData exists in instance/list_test.go"
+      - "Mock /v1/instances returns HTTP 200 with body `{\"data\": []}`"
+      - "mockHandler.AssertCalledTimes(1) verifies single GET"
+      - "helper.AssertOutJson(`{\"data\": []}`) passes — empty envelope on stdout"
+      - "Test passes under `go test ./neo4j-cli/aura/internal/subcommands/instance/...`"
+    completed_at: null
+
+  - id: task-002
+    title: "Add TestListTenants_EmptyData golden test"
+    description: |
+      Append a new flat TestXxx function to
+      neo4j-cli/aura/internal/subcommands/tenant/list_test.go that locks
+      in exit-0 behaviour for an empty tenant list. Mock /v1/tenants with
+      HTTP 200 + body `{"data": []}`, execute `tenant list`, assert mock
+      hit once, and assert stdout JSON equals `{"data": []}`. Do NOT
+      re-assert the deprecation warning — that is already locked by
+      TestListTenants_DeprecationWarning and duplicating couples this
+      test to unrelated copy.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Function TestListTenants_EmptyData exists in tenant/list_test.go"
+      - "Mock /v1/tenants returns HTTP 200 with body `{\"data\": []}`"
+      - "mockHandler.AssertCalledTimes(1) verifies single GET"
+      - "helper.AssertOutJson(`{\"data\": []}`) passes"
+      - "No stderr / deprecation-warning assertion in the new function"
+      - "Test passes under `go test ./neo4j-cli/aura/internal/subcommands/tenant/...`"
+    completed_at: null
+
+  - id: task-003
+    title: "Add TestRunQuery_EmptyResult_ExitsZero golden test"
+    description: |
+      Append a new flat TestXxx function to neo4j-cli/query/run_test.go
+      that locks the runQuery exit-0 path when the underlying Cypher
+      returns zero rows. Use the existing newSeamRouter to register both
+      the EXPLAIN preflight (makeQueryResponse + QueryType =
+      neo4j.QueryTypeReadOnly) and the run-time response
+      (makeQueryResponse with empty values) for a canonical statement
+      such as `RETURN 1 AS n WHERE false`. Build a runHarness with
+      output="json", execute with --uri / --password / cypher, assert
+      err == nil, decode stdout into decodedResult, and assert Columns ==
+      ["n"], empty Rows, Truncated == false. Mirrors
+      TestRunQuery_HappyPath_JSONOutput shape.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Function TestRunQuery_EmptyResult_ExitsZero exists in query/run_test.go"
+      - "seamRouter registers both EXPLAIN and runtime responses with empty values"
+      - "require.NoError(t, err) verifies exit code 0"
+      - "Decoded result has Columns == []string{\"n\"} and len(Rows) == 0"
+      - "Decoded result has Truncated == false"
+      - "Test passes under `go test ./neo4j-cli/query/...`"
+    completed_at: null
+
+  - id: task-004
+    title: "Run final gates: make fmt-check, make lint, make test"
+    description: |
+      Run the AGENTS.md final-gate trio against the branch. All three
+      must be clean — `make fmt-check` (no gofmt drift), `make lint`
+      (golangci-lint v2 with the project config), `make test` (entire
+      suite). No skill-bundle regen is expected because the changes are
+      *_test.go-only; if `make generate-check` is triggered separately,
+      it must also be clean. Investigate any failure at the root cause
+      before declaring done.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`make fmt-check` exits 0 with no output"
+      - "`make lint` exits 0 with no findings"
+      - "`make test` exits 0 with all tests passing"
+      - "No skill bundle drift (no edits under neo4j-cli/internal/skill/bundle/)"
+      - "No production source file under neo4j-cli/ has been modified"
+    completed_at: null
