@@ -93,7 +93,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		panic(err)
 	}
 
-	credentials := credentials.NewCredentials(fs, ConfigPrefix)
+	creds := credentials.NewCredentials(fs, ConfigPrefix)
 
 	logger := slog.Default()
 
@@ -106,6 +106,16 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		viper:           Viper,
 		configPath:      fullConfigPath,
 		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage"},
+	}
+
+	// Wire the storage mode only when credential-storage is explicitly set in
+	// config. When absent the credentials default to insecure mode (backwards
+	// compatible). Task-009 writes the key on first run; subsequent invocations
+	// see an explicit value and reach this branch.
+	if Viper.IsSet("credential-storage") {
+		if err := creds.SetStorageMode(globalConfig.CredentialStorage()); err != nil {
+			panic(err)
+		}
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-workspace"}
@@ -129,7 +139,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 			fs:         fs,
 			configPath: fullConfigPath,
 		},
-		Credentials: credentials,
+		Credentials: creds,
 		Events:      events,
 		scope:       scope,
 	}
