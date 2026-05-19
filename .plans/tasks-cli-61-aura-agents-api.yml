@@ -28,7 +28,7 @@ tasks:
       mirroring `PrintBody` (line 21). JSON branch: `json.Indent` then `cmd.Println`. Non-JSON
       branch: `PrintBodyMap(cmd, cfg, api.ParseRawBody(body), fields)`. Early-return when body
       is empty. Respects `cfg.Aura.Output()` like the existing `PrintBody`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -37,7 +37,7 @@ tasks:
       - "`cfg.Aura.Output() == \"json\"` prints `json.Indent`-formatted bytes."
       - "Non-JSON output delegates to `PrintBodyMap` with `api.ParseRawBody`."
       - "No existing call sites of `PrintBody` are modified; `make test` still passes."
-    completed_at: null
+    completed_at: 2026-05-19T12:30:00Z
 
   - id: task-003
     title: "Scaffold agent package parent + wire into aura.go"
