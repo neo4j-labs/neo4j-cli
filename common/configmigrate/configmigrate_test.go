@@ -6,20 +6,43 @@ package configmigrate
 import (
 	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
-// configPath is where testfs.GetTestFs seeds config.json.
+// configPath is where seedTestFs seeds config.json.
+//
+// We do NOT import common/clicfg here (would create an import cycle since
+// clicfg imports configmigrate) nor test/utils/testfs (transitively imports
+// clicfg). Hard-code the path; it only needs to be consistent within the
+// in-memory fs used by these tests.
 func configPath() string {
-	return filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json")
+	return filepath.Join("neo4j", "cli", "config.json")
+}
+
+// seedTestFs returns an in-memory fs seeded with the given config.json body.
+// An empty body means no file is created (used to exercise the missing-file
+// path). Mirrors the surface of testfs.GetTestFs(config, "{}") without the
+// clicfg import cycle.
+func seedTestFs(t *testing.T, config string) afero.Fs {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	if config == "" {
+		return fs
+	}
+	assert.Nil(t, fs.MkdirAll(filepath.Dir(configPath()), 0o755))
+	f, err := fs.OpenFile(configPath(), os.O_WRONLY|os.O_CREATE, 0o600)
+	assert.Nil(t, err)
+	_, err = f.Write([]byte(config))
+	assert.Nil(t, err)
+	assert.Nil(t, f.Close())
+	return fs
 }
 
 // readConfig reads the seeded config.json from the in-memory fs.
@@ -140,8 +163,7 @@ func TestRunWith(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fs, err := testfs.GetTestFs(c.seedConfig, "{}")
-			assert.Nil(t, err)
+			fs := seedTestFs(t, c.seedConfig)
 
 			seedBytes := []byte(c.seedConfig)
 
@@ -172,8 +194,7 @@ func TestRunWith(t *testing.T) {
 // absent. testfs seeds a config; we remove it so the read path hits
 // os.ErrNotExist.
 func TestRunWith_MissingFile(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, "{}")
-	assert.Nil(t, err)
+	fs := seedTestFs(t, `{}`)
 	assert.Nil(t, fs.Remove(configPath()))
 
 	var stderr bytes.Buffer
@@ -193,8 +214,7 @@ func TestRunWith_MissingFile(t *testing.T) {
 // TestRunWith_Idempotency: running runWith twice on the same fixture yields a
 // byte-identical file the second time.
 func TestRunWith_Idempotency(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, "{}")
-	assert.Nil(t, err)
+	fs := seedTestFs(t, `{}`)
 
 	ms := []Migration{
 		addOne(1, "v1", "a", "1"),

@@ -10,3 +10,8 @@ Decisions: stamp _schema_version via sjson.SetBytes after each Apply (not just a
 ## task-003 — 2026-05-19T00:00:00Z
 Added table-driven engine tests (fresh/partial/up-to-date/idempotency/per-migration error/empty registry/missing file) and validator tests (gap/duplicate/non-1 start). Extracted init() body into validateMigrations for direct testing without recover().
 Files: +neo4j-cli/internal/configmigrate/configmigrate_test.go, ~neo4j-cli/internal/configmigrate/migrations.go
+
+## task-004 — 2026-05-19T00:00:00Z
+Wired configmigrate.Run into clicfg.NewConfig (after first ReadInConfig, followed by unconditional re-read). Removed commented-out migration block. Moved package out of neo4j-cli/internal/ to common/ because Go's internal-package rule blocked common/clicfg from importing neo4j-cli/internal/configmigrate. Dropped clicfg/testfs imports from test file to avoid test-time import cycle; replaced with local seedTestFs helper using a hard-coded relative path.
+Files: ~common/clicfg/clicfg.go, >neo4j-cli/internal/configmigrate/configmigrate.go=>common/configmigrate/configmigrate.go, >neo4j-cli/internal/configmigrate/migrations.go=>common/configmigrate/migrations.go, >neo4j-cli/internal/configmigrate/configmigrate_test.go=>common/configmigrate/configmigrate_test.go
+Decisions: package moved from neo4j-cli/internal/configmigrate to common/configmigrate — internal-rule forbids common pkgs from importing neo4j-cli/internal/*; clicfg.NewConfig is the integration point so the engine had to be reachable from common.

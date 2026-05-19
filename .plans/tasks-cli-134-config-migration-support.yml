@@ -118,7 +118,7 @@ tasks:
       internal. No changelog entry (internal infrastructure, no user-
       visible behaviour change while registry is empty). No bundle regen
       (no cobra surface change).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -128,7 +128,17 @@ tasks:
       - "`ValidConfigKeys` in `GlobalConfig` is unchanged — `_schema_version` is NOT added."
       - "Existing tests under `common/clicfg/...` still pass; no new failures from the wiring change."
       - "`make fmt-check && make lint && make test` all clean."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
+    notes: |
+      Refactor required during wiring: the configmigrate package was originally
+      placed at `neo4j-cli/internal/configmigrate/` per PRD, but Go's
+      internal-package rule forbids `common/clicfg/` from importing it
+      (internal packages are only importable under their containing tree).
+      Moved the package to `common/configmigrate/` so clicfg can import it.
+      Test file also dropped its `common/clicfg` + `test/utils/testfs` imports
+      (would have caused a real test-time import cycle once clicfg imports
+      configmigrate); replaced with a local `seedTestFs` helper that builds
+      the in-memory fs directly with a hard-coded relative config path.
 
   - id: task-005
     title: "Final gates + live no-op smoke (byte-identical config)"
