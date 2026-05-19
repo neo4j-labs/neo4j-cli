@@ -4,11 +4,14 @@
 package session_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetSession(t *testing.T) {
@@ -121,6 +124,34 @@ func TestGetSessionWithTrailingNewline(t *testing.T) {
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
+}
+
+// TestGetSessionNotFound_HasSuggestion locks the WithNotFoundContext
+// rewrite at the session-GET call site: when the API returns 404 for a
+// session path, the API layer's parseResourceFromRequest mis-segments
+// the nested path; the caller rewrites ResourceType to
+// "graph-analytics-session" and attaches the session-list Suggestion
+// (REQ-F-013).
+func TestGetSessionNotFound_HasSuggestion(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusNotFound, `{
+		"errors": [
+			{"message": "session not found", "reason": "not-found"}
+		]
+	}`)
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session get %s --organization-id %s --project-id %s", testSessionID, testOrgID, testProjectID))
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+	require.Equal(t, "graph-analytics-session", ce.ResourceType)
+	require.Equal(t, testSessionID, ce.ResourceID)
+	require.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
 }
 
 func TestGetSessionError(t *testing.T) {

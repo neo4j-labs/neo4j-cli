@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/spf13/cobra"
@@ -52,9 +53,11 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	} else {
 		// Check for legacy default-tenant before returning generic error.
 		if cfg.Aura.Get("default-tenant") != nil && cfg.Aura.Get("default-tenant") != "" {
-			return "", "", fmt.Errorf("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting")
+			return "", "", clierr.NewUsageError("no default workspace set; run 'aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting").
+				WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.")
 		}
-		return "", "", fmt.Errorf("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'")
+		return "", "", clierr.NewUsageError("no organization specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--organization-id'").
+			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.")
 	}
 
 	// Resolve project ID.
@@ -65,7 +68,8 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	} else if defaultProject != "" {
 		projectID = defaultProject
 	} else {
-		return "", "", fmt.Errorf("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'")
+		return "", "", clierr.NewUsageError("no project specified; set a default workspace with 'aura workspace use <org-id>/<project-id>' or pass '--project-id'").
+			WithSuggestion("Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.")
 	}
 
 	return orgID, projectID, nil
@@ -85,7 +89,9 @@ func validateProjectInOrg(cfg *clicfg.Config, orgID, projectID string) error {
 		}
 	}
 
-	return fmt.Errorf("could not find project %s in organization %s", projectID, orgID)
+	return clierr.NewNotFoundError("could not find project %s in organization %s", projectID, orgID).
+		WithResource("project", projectID).
+		WithSuggestion("Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.")
 }
 
 // FetchAndVerifyInstanceInProject performs a GET /instances/{instanceID} and
@@ -116,7 +122,9 @@ func FetchAndVerifyInstanceInProject(cfg *clicfg.Config, instanceID, projectID s
 
 	tenantID, _ := instance["tenant_id"].(string)
 	if tenantID != projectID {
-		return nil, fmt.Errorf("could not find instance %s in project %s", instanceID, projectID)
+		return nil, clierr.NewNotFoundError("could not find instance %s in project %s", instanceID, projectID).
+			WithResource("instance", instanceID).
+			WithSuggestion("Run 'neo4j-cli aura instance list --project-id <id>' to see instances in this project.")
 	}
 
 	return resBody, nil
@@ -150,7 +158,9 @@ func FetchAndVerifySessionInProject(cfg *clicfg.Config, sessionID, projectID str
 
 	tenantID, _ := session["tenant_id"].(string)
 	if tenantID != projectID {
-		return nil, fmt.Errorf("could not find session %s in project %s", sessionID, projectID)
+		return nil, clierr.NewNotFoundError("could not find session %s in project %s", sessionID, projectID).
+			WithResource("graph-analytics-session", sessionID).
+			WithSuggestion("Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
 	}
 
 	return resBody, nil
@@ -184,7 +194,9 @@ func FetchAndVerifyCMKInProject(cfg *clicfg.Config, cmkID, projectID string) ([]
 
 	tenantID, _ := cmk["tenant_id"].(string)
 	if tenantID != projectID {
-		return nil, fmt.Errorf("could not find customer-managed-key %s in project %s", cmkID, projectID)
+		return nil, clierr.NewNotFoundError("could not find customer-managed-key %s in project %s", cmkID, projectID).
+			WithResource("customer-managed-key", cmkID).
+			WithSuggestion("Run 'neo4j-cli aura customer-managed-key list --project-id <id>' to see keys in this project.")
 	}
 
 	return resBody, nil

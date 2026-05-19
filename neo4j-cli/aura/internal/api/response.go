@@ -18,6 +18,11 @@ import (
 	"github.com/neo4j/cli/common/output"
 )
 
+// authSuggestion is the next-action hint attached to every 401/403 *CLIError
+// produced by handleResponseError / formatAuthorizationError. Centralised so
+// the four constructor sites stay in lock-step.
+const authSuggestion = "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry."
+
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }
@@ -61,7 +66,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, message)
 		}
 
-		return clierr.NewValidationError("%s", messages)
+		return clierr.NewValidationError("%s", messages).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
 	case http.StatusUnauthorized:
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusForbidden:
@@ -72,7 +77,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 		}
 		if serverError.Error != "" {
-			return clierr.NewAuthError("%s", serverError.Error)
+			return clierr.NewAuthError("%s", serverError.Error).WithSuggestion(authSuggestion)
 		}
 
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
@@ -89,7 +94,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		}
 
 		resourceType, resourceID := parseResourceFromRequest(res.Request)
-		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID)
+		return clierr.NewNotFoundError("%s", messages).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 	case http.StatusMethodNotAllowed:
 		var errorResponse ErrorResponse
 
@@ -120,7 +125,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
-		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter)
+		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter).WithSuggestion(fmt.Sprintf("Retry after %s seconds.", retryAfter))
 	// server error responses
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		var errorResponse ErrorResponse
@@ -158,6 +163,29 @@ func parseResourceFromRequest(req *http.Request) (string, string) {
 	// Skip the version segment (segments[0]); segments[1] is the plural
 	// resource name, segments[2] is the resource id.
 	return singularise(segments[1]), segments[2]
+}
+
+// suggestionForResource returns the per-resource next-action hint attached to
+// 404 *CLIErrors via .WithSuggestion(...). The lookup is keyed on the singular
+// resourceType produced by parseResourceFromRequest. Unknown / empty types
+// return "" so the envelope omitempty drops the field rather than emitting
+// noise (e.g. nested-path 404s where parseResourceFromRequest mis-segments —
+// those are enriched at the call site via utils.WithNotFoundContext).
+func suggestionForResource(resourceType string) string {
+	switch resourceType {
+	case "instance":
+		return "Run 'neo4j-cli aura instance list' to see available instances."
+	case "project":
+		return "Run 'neo4j-cli aura project list --organization-id <id>' to see available projects."
+	case "organization":
+		return "Run 'neo4j-cli aura organization list' to see available organizations."
+	case "customer-managed-key":
+		return "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys."
+	case "tenant":
+		return "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects)."
+	default:
+		return ""
+	}
 }
 
 // singularise turns the plural resource path segment (e.g. "instances",
@@ -362,7 +390,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
@@ -379,5 +407,5 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	return clierr.NewAuthError(`[
 	%s
-]`, strings.Join(messages, ",\n\t"))
+]`, strings.Join(messages, ",\n\t")).WithSuggestion(authSuggestion)
 }

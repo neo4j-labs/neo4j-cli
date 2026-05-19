@@ -4,12 +4,14 @@
 package utils_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -136,6 +138,11 @@ func TestResolveAndValidateOrgProject_MissingOrg(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no organization specified")
 	assert.Contains(t, err.Error(), "--organization-id")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--organization-id'.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet(t *testing.T) {
@@ -149,6 +156,11 @@ func TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet(t *test
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no default workspace set")
 	assert.Contains(t, err.Error(), "aura workspace use")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to migrate from the legacy default-tenant setting.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_ProjectFromFlag(t *testing.T) {
@@ -198,6 +210,11 @@ func TestResolveAndValidateOrgProject_MissingProject(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no project specified")
 	assert.Contains(t, err.Error(), "--project-id")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Equal(t, "Run 'neo4j-cli aura workspace use <org-id>/<project-id>' to set a default workspace, or pass '--project-id'.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_ProjectNotInOrg(t *testing.T) {
@@ -211,6 +228,13 @@ func TestResolveAndValidateOrgProject_ProjectNotInOrg(t *testing.T) {
 	assert.Contains(t, err.Error(), "could not find project")
 	assert.Contains(t, err.Error(), testProjectID)
 	assert.Contains(t, err.Error(), testOrgID)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Equal(t, "project", ce.ResourceType)
+	assert.Equal(t, testProjectID, ce.ResourceID)
+	assert.Equal(t, "Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.", ce.Suggestion)
 }
 
 func TestResolveAndValidateOrgProject_APIError(t *testing.T) {
@@ -287,4 +311,74 @@ func TestResolveAndValidateOrgProject_TableDrivenResolutionOrder(t *testing.T) {
 			assert.Equal(t, tc.wantProject, gotProject)
 		})
 	}
+}
+
+// buildResourceServer creates an httptest.Server that:
+//   - responds to /oauth/token with a dummy token
+//   - responds to resourcePath with a 200 body containing the given tenant_id
+func buildResourceServer(t *testing.T, resourcePath, tenantID string) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"access_token":"tok","expires_in":3600,"token_type":"bearer"}`)) //nolint:errcheck
+	})
+	mux.HandleFunc(resourcePath, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"data": {"id": "x", "tenant_id": "%s"}}`, tenantID) //nolint:errcheck
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
+	const instanceID = "inst-xyz"
+	srv := buildResourceServer(t, "/v1beta5/instances/"+instanceID, "other-project")
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	_, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, testProjectID)
+	require.Error(t, err)
+	assert.Equal(t, fmt.Sprintf("could not find instance %s in project %s", instanceID, testProjectID), err.Error())
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Equal(t, "instance", ce.ResourceType)
+	assert.Equal(t, instanceID, ce.ResourceID)
+	assert.Equal(t, "Run 'neo4j-cli aura instance list --project-id <id>' to see instances in this project.", ce.Suggestion)
+}
+
+func TestFetchAndVerifySessionInProject_OwnershipMismatch(t *testing.T) {
+	const sessionID = "sess-xyz"
+	srv := buildResourceServer(t, "/v1beta5/graph-analytics/sessions/"+sessionID, "other-project")
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	_, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, testProjectID)
+	require.Error(t, err)
+	assert.Equal(t, fmt.Sprintf("could not find session %s in project %s", sessionID, testProjectID), err.Error())
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Equal(t, "graph-analytics-session", ce.ResourceType)
+	assert.Equal(t, sessionID, ce.ResourceID)
+	assert.Equal(t, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.", ce.Suggestion)
+}
+
+func TestFetchAndVerifyCMKInProject_OwnershipMismatch(t *testing.T) {
+	const cmkID = "cmk-xyz"
+	srv := buildResourceServer(t, "/v1beta5/customer-managed-keys/"+cmkID, "other-project")
+	cfg := buildTestConfig(t, srv.URL, "")
+
+	_, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, testProjectID)
+	require.Error(t, err)
+	assert.Equal(t, fmt.Sprintf("could not find customer-managed-key %s in project %s", cmkID, testProjectID), err.Error())
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Equal(t, "customer-managed-key", ce.ResourceType)
+	assert.Equal(t, cmkID, ce.ResourceID)
+	assert.Equal(t, "Run 'neo4j-cli aura customer-managed-key list --project-id <id>' to see keys in this project.", ce.Suggestion)
 }

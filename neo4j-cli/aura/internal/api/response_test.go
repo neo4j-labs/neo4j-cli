@@ -136,33 +136,38 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		header         http.Header
 		wantCode       int
 		wantMsgContain string // optional substring check on the rendered message
+		wantSuggestion string // optional Suggestion field check (errors.As)
 		usesAuthCfg    bool   // 401/403-no-server-error paths call ClearAccessToken
 	}{
 		{
-			name:       "400 bad request -> validation (6)",
-			statusCode: http.StatusBadRequest,
-			body:       `{"errors":[{"message":"bad input","field":"name"}]}`,
-			wantCode:   6,
+			name:           "400 bad request -> validation (6)",
+			statusCode:     http.StatusBadRequest,
+			body:           `{"errors":[{"message":"bad input","field":"name"}]}`,
+			wantCode:       6,
+			wantSuggestion: "See 'neo4j-cli aura <cmd> --help' for valid flags and values.",
 		},
 		{
-			name:        "401 unauthorized -> auth (4)",
-			statusCode:  http.StatusUnauthorized,
-			body:        `{"errors":[{"message":"token invalid"}]}`,
-			wantCode:    4,
-			usesAuthCfg: true,
+			name:           "401 unauthorized -> auth (4)",
+			statusCode:     http.StatusUnauthorized,
+			body:           `{"errors":[{"message":"token invalid"}]}`,
+			wantCode:       4,
+			usesAuthCfg:    true,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
-			name:       "403 forbidden with serverError -> auth (4)",
-			statusCode: http.StatusForbidden,
-			body:       `{"error":"forbidden endpoint"}`,
-			wantCode:   4,
+			name:           "403 forbidden with serverError -> auth (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"error":"forbidden endpoint"}`,
+			wantCode:       4,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
-			name:        "403 forbidden without serverError -> auth (4)",
-			statusCode:  http.StatusForbidden,
-			body:        `{"errors":[{"message":"forbidden"}]}`,
-			wantCode:    4,
-			usesAuthCfg: true,
+			name:           "403 forbidden without serverError -> auth (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"errors":[{"message":"forbidden"}]}`,
+			wantCode:       4,
+			usesAuthCfg:    true,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
 			name:       "404 not found -> not_found (3)",
@@ -183,6 +188,7 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			header:         headerWithRetry("30"),
 			wantCode:       7,
 			wantMsgContain: "30",
+			wantSuggestion: "Retry after 30 seconds.",
 		},
 		{
 			name:       "500 internal server error -> upstream (8)",
@@ -244,6 +250,10 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 				assert.Contains(t, ce.Error(), tc.wantMsgContain)
 			}
 
+			if tc.wantSuggestion != "" {
+				assert.Equal(t, tc.wantSuggestion, ce.Suggestion, "Suggestion mismatch for status %d", tc.statusCode)
+			}
+
 			// 429 also asserts the Retry-After landed on the struct field.
 			if tc.statusCode == http.StatusTooManyRequests {
 				assert.Equal(t, tc.header.Get("Retry-After"), ce.RetryAfter, "RetryAfter struct field should mirror header")
@@ -297,31 +307,36 @@ func TestParseResourceFromRequest(t *testing.T) {
 // TestHandleResponseError_NotFound_TagsResource locks the 404 branch: a
 // `/v1/instances/{id}` request that returns 404 must produce a *CLIError
 // whose ResourceType="instance" and ResourceID matches the path segment so
-// the JSON envelope surfaces them under resource_type / resource_id.
+// the JSON envelope surfaces them under resource_type / resource_id. It also
+// locks the per-resource Suggestion attached via suggestionForResource(...).
 func TestHandleResponseError_NotFound_TagsResource(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		path     string
-		wantType string
-		wantID   string
+		name           string
+		path           string
+		wantType       string
+		wantID         string
+		wantSuggestion string
 	}{
 		{
-			name:     "instance 404 tagged with type+id",
-			path:     "/v1/instances/inst-404",
-			wantType: "instance",
-			wantID:   "inst-404",
+			name:           "instance 404 tagged with type+id+suggestion",
+			path:           "/v1/instances/inst-404",
+			wantType:       "instance",
+			wantID:         "inst-404",
+			wantSuggestion: "Run 'neo4j-cli aura instance list' to see available instances.",
 		},
 		{
-			name:     "tenant 404 tagged with type+id",
-			path:     "/v1/tenants/tnt-404",
-			wantType: "tenant",
-			wantID:   "tnt-404",
+			name:           "tenant 404 tagged with type+id+migration suggestion",
+			path:           "/v1/tenants/tnt-404",
+			wantType:       "tenant",
+			wantID:         "tnt-404",
+			wantSuggestion: "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects).",
 		},
 		{
-			name:     "unrecognised short path leaves resource fields empty",
-			path:     "/v1/instances",
-			wantType: "",
-			wantID:   "",
+			name:           "unrecognised short path leaves resource fields and suggestion empty",
+			path:           "/v1/instances",
+			wantType:       "",
+			wantID:         "",
+			wantSuggestion: "",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -341,6 +356,59 @@ func TestHandleResponseError_NotFound_TagsResource(t *testing.T) {
 			assert.Equal(t, 3, ce.Code, "404 must map to exit 3 (not_found)")
 			assert.Equal(t, tc.wantType, ce.ResourceType, "ResourceType mismatch")
 			assert.Equal(t, tc.wantID, ce.ResourceID, "ResourceID mismatch")
+			assert.Equal(t, tc.wantSuggestion, ce.Suggestion, "Suggestion mismatch")
+		})
+	}
+}
+
+// TestSuggestionForResource locks the per-resource 404 suggestion lookup. The
+// lookup table is keyed on the singular resourceType produced by
+// parseResourceFromRequest; unknown / empty types must return "" so the
+// envelope omitempty drops the field.
+func TestSuggestionForResource(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		resourceType string
+		want         string
+	}{
+		{
+			name:         "instance",
+			resourceType: "instance",
+			want:         "Run 'neo4j-cli aura instance list' to see available instances.",
+		},
+		{
+			name:         "project",
+			resourceType: "project",
+			want:         "Run 'neo4j-cli aura project list --organization-id <id>' to see available projects.",
+		},
+		{
+			name:         "organization",
+			resourceType: "organization",
+			want:         "Run 'neo4j-cli aura organization list' to see available organizations.",
+		},
+		{
+			name:         "customer-managed-key",
+			resourceType: "customer-managed-key",
+			want:         "Run 'neo4j-cli aura customer-managed-key list' to see customer-managed keys.",
+		},
+		{
+			name:         "tenant migration nudge",
+			resourceType: "tenant",
+			want:         "Run 'neo4j-cli aura project list' to see available projects (tenants are now called projects).",
+		},
+		{
+			name:         "unknown resource type",
+			resourceType: "graph-analytic",
+			want:         "",
+		},
+		{
+			name:         "empty resource type",
+			resourceType: "",
+			want:         "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, suggestionForResource(tc.resourceType))
 		})
 	}
 }

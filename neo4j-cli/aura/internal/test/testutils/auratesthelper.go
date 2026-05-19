@@ -44,6 +44,15 @@ func (helper *AuraTestHelper) Close() {
 }
 
 func (helper *AuraTestHelper) ExecuteCommand(command string) {
+	_ = helper.ExecuteCommandE(command)
+}
+
+// ExecuteCommandE runs the command like ExecuteCommand but returns the error
+// returned by cobra's Execute(). Use this when a test needs to inspect the
+// underlying *clierr.CLIError via errors.As (e.g. asserting Suggestion).
+// Stdout / stderr are still captured for the existing AssertOut/AssertErr
+// helpers.
+func (helper *AuraTestHelper) ExecuteCommandE(command string) error {
 	args, err := shlex.Split(command)
 	assert.Nil(helper.t, err)
 
@@ -69,7 +78,7 @@ func (helper *AuraTestHelper) ExecuteCommand(command string) {
 	cmd.SetOut(helper.out)
 	cmd.SetErr(helper.err)
 
-	cmd.Execute() //nolint:errcheck // cobra prints the error itself; test assertions check cmd output
+	return cmd.Execute()
 }
 
 func (helper *AuraTestHelper) SetConfig(cfg string) {
