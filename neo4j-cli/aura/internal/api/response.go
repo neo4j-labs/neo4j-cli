@@ -32,6 +32,27 @@ func formatBracketedMessages(messages []string) string {
 	return fmt.Sprintf("[\n\t%s\n]", strings.Join(messages, ",\n\t"))
 }
 
+// extractEmbeddedErrors decodes a 2xx response body into the shared
+// ErrorResponse shape and returns each Error.Message verbatim. Returns nil
+// when the body cannot be parsed as an ErrorResponse or when Errors is empty
+// so callers can treat the absence of embedded errors as the happy path.
+// Matches the 404 branch (no `field:` prefix) because the 2xx-with-errors
+// shape is the single-resource SingleValueResponseData get path.
+func extractEmbeddedErrors(body []byte) []string {
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(body, &errorResponse); err != nil {
+		return nil
+	}
+	if len(errorResponse.Errors) == 0 {
+		return nil
+	}
+	messages := make([]string, 0, len(errorResponse.Errors))
+	for _, e := range errorResponse.Errors {
+		messages = append(messages, e.Message)
+	}
+	return messages
+}
+
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }

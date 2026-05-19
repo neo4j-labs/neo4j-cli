@@ -33,7 +33,7 @@ tasks:
       after reading the 2xx body, call `extractEmbeddedErrors(responseBody)`; when it yields ≥1 message, return
       `clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(parseResourceFromRequest(req)).WithSuggestion(suggestionForResource(...))`
       instead of `nil`. Otherwise the happy path returns unchanged. No second read of `res.Body`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "`MakeRequest` 2xx branch detects embedded `errors[]` and returns `*clierr.CLIError{Code: 3}` with resource/suggestion populated"
       - "Happy path (2xx with no `errors[]`) returns `nil` error as before — verified by existing `MakeRequest` tests still green"
       - "No regressions in existing `api/api_test.go` tests"
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-003
     title: "Convert 28 single-line bracket test assertions to multi-line bracket shape"

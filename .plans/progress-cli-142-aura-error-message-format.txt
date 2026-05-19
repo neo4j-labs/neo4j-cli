@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-19T00:00:00Z
 Added package-private formatBracketedMessages helper in api/response.go and routed all six broken envelope sites (400/404/405/402/409/5xx) plus formatAuthorizationError through it; 401 path output stays byte-identical.
 Files: ~neo4j-cli/aura/internal/api/response.go
+
+## TASK-002 — 2026-05-19T00:00:00Z
+Added extractEmbeddedErrors helper in api/response.go and wired latent 2xx-with-errors-body path through NewNotFoundError in MakeRequest with resource/suggestion populated; happy path unchanged.
+Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/response.go
