@@ -1,0 +1,161 @@
+feature: cli-147-post-release-notes-to-slack
+prd: ./prd-cli-147-post-release-notes-to-slack.md
+created_at: 2026-05-19T08:30:00Z
+updated_at: 2026-05-19T08:30:00Z
+
+tasks:
+  - id: task-001
+    title: "Create .github/prompts/release-notes.md prompt"
+    description: |
+      Write the Claude Code prompt that generates release notes for a tagged
+      neo4j-cli release. The prompt reads `.changes/neo4j-cli/v${RELEASE_VERSION}.md`
+      (NEVER the aggregate CHANGELOG.md), runs `git log "${PREV_TAG}..${RELEASE_TAG}"
+      --oneline` (or `git log --oneline -30` when PREV_TAG is empty), digs into the
+      biggest user-facing commits via `git show <sha>`, and writes the final markdown
+      to `/tmp/release-notes-generated.md`. Tone is witty + wholesome with dry humour,
+      no corporate fluff. Output has `### Highlights` (bullets with runnable
+      `neo4j-cli` examples) and `### Other changes` (one-line bullets) — no top-level
+      h1, the workflow concatenates a `## Release notes` header. Implements REQ-F-015.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "File exists at .github/prompts/release-notes.md and is a complete, self-contained prompt"
+      - "Prompt explicitly names .changes/neo4j-cli/v${RELEASE_VERSION}.md as the canonical changelog source and forbids reading CHANGELOG.md"
+      - "Prompt handles both PREV_TAG-set and PREV_TAG-empty cases for the git log command"
+      - "Prompt instructs Claude to ground command/flag syntax in neo4j-cli/aura/internal/subcommands/**, neo4j-cli/app/app.go, and README.md and to never invent flags"
+      - "Prompt specifies tone (witty + wholesome, dry humour, no emoji unless source has it, no marketing fluff) and the exact output structure (### Highlights + ### Other changes, no top-level h1, ≤300 lines)"
+      - "Prompt instructs Claude to write the final markdown to /tmp/release-notes-generated.md and NOT to stdout"
+    completed_at: 2026-05-19T08:55:00Z
+
+  - id: task-002
+    title: "Add post-release-notes workflow skeleton (triggers, perms, version resolution)"
+    description: |
+      Create .github/workflows/post-release-notes.yml with the `on:` block
+      containing ONLY `release: { types: [published] }` and `workflow_dispatch`
+      with a `version` input (description: "neo4j-cli version (no leading v),
+      e.g. 1.4.0", required: true, type: string). Add `permissions: { contents:
+      write }`. Add a single ubuntu-latest job with steps that (1) resolve
+      RELEASE_TAG (from event.release.tag_name on auto, "v${{ inputs.version }}"
+      on dispatch) and RELEASE_VERSION (RELEASE_TAG with leading `v` stripped),
+      exporting both to $GITHUB_ENV; (2) validate RELEASE_TAG against
+      ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ (regex from publish-npm.yml);
+      (3) checkout main with fetch-depth: 0; (4) resolve PREV_TAG via `git describe
+      --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true` and export to
+      $GITHUB_ENV. Implements REQ-F-001 through REQ-F-005 and REQ-F-014.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - ".github/workflows/post-release-notes.yml exists and parses as valid YAML / GitHub Actions syntax (actionlint clean)"
+      - "`on:` block contains ONLY `release: { types: [published] }` and `workflow_dispatch.inputs.version` — no other triggers"
+      - "`permissions.contents: write` is set at workflow level"
+      - "Version resolution step exports RELEASE_TAG and RELEASE_VERSION to $GITHUB_ENV, correctly differentiated by github.event_name"
+      - "Validation step rejects RELEASE_TAG values that do not match ^v[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?$ with non-zero exit"
+      - "Checkout uses actions/checkout with fetch-depth: 0 against main"
+      - "PREV_TAG resolution does not fail the job when the previous tag cannot be found (empty string is a valid result)"
+    completed_at: 2026-05-19T09:10:00Z
+
+  - id: task-003
+    title: "Wire Claude Code generation into workflow"
+    description: |
+      Extend post-release-notes.yml with the Claude Code install + invocation
+      pattern verbatim from update-website.yml:54-100. Add steps (1) install via
+      `npm install -g @anthropic-ai/claude-code`; (2) verify ANTHROPIC_API_KEY is
+      set (same guard); (3) invoke `claude --bare -p -` reading the prompt from
+      .github/prompts/release-notes.md (`cat ... | claude ...`), with flags
+      --output-format stream-json --verbose --include-partial-messages
+      --no-session-persistence --exclude-dynamic-system-prompt-sections
+      --allowedTools "Bash,Read,Write" --max-turns 30 --max-budget-usd 1.50, env
+      ANTHROPIC_API_KEY, ENABLE_PROMPT_CACHING_1H=1, RELEASE_TAG, RELEASE_VERSION,
+      PREV_TAG; stream through the same `jq -r --unbuffered` tee pattern as
+      update-website.yml. Add a post-generation guard step that fails the job if
+      /tmp/release-notes-generated.md is missing or empty. Implements REQ-F-006
+      through REQ-F-009.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Claude Code install step is `npm install -g @anthropic-ai/claude-code` (no version pin, matching update-website.yml)"
+      - "ANTHROPIC_API_KEY guard fails fast with a clear error when the secret is empty"
+      - "Claude invocation passes RELEASE_TAG, RELEASE_VERSION, PREV_TAG, ANTHROPIC_API_KEY, and ENABLE_PROMPT_CACHING_1H=1 as env vars"
+      - "Claude invocation uses --allowedTools \"Bash,Read,Write\" (no Edit, no Agent) and --max-budget-usd 1.50"
+      - "Streamed output is tee'd through jq for human-readable logging (same pattern as update-website.yml)"
+      - "A dedicated guard step fails the job when /tmp/release-notes-generated.md is missing or zero-length"
+      - "actionlint reports no errors after the change"
+    completed_at: 2026-05-19T09:25:00Z
+
+  - id: task-004
+    title: "Add always-on print + Slack payload build steps"
+    description: |
+      Add two always-on steps to post-release-notes.yml. (1) Print step: `cat
+      /tmp/release-notes-generated.md` as its own step, separate from the Claude
+      invocation, so the generated markdown is visible in the job log. (2) Slack
+      payload build step: assemble /tmp/slack-payload.json from a fixed preamble
+      ("neo4j-labs/neo4j-cli ${RELEASE_TAG} is now out. Update with `neo4j-cli
+      update` or use your favourite package manager."), the generated body, and
+      the release URL `https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}`.
+      Use `jq -nR --rawfile body /tmp/release-notes-generated.md '...'` (or
+      equivalent) to JSON-escape newlines and quotes safely. Print the resulting
+      JSON to the log for inspection. Implements REQ-F-010 and REQ-F-011.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "A dedicated step runs `cat /tmp/release-notes-generated.md` — not folded into the Claude step"
+      - "Slack payload step assembles a JSON object with a text body matching the shape from REQ-F-011 (preamble + 'Release notes' + body + release URL)"
+      - "Payload building uses jq with --rawfile (or equivalent) so newlines, backticks, and quotes in the Claude output are JSON-safe"
+      - "Slack payload JSON is written to /tmp/slack-payload.json AND printed to the job log"
+      - "Both steps run unconditionally (no `if:` gating) so they execute on every triggered run"
+      - "actionlint reports no errors after the change"
+    completed_at: 2026-05-19T09:40:00Z
+
+  - id: task-005
+    title: "Add commented-out Slack POST + GH release append steps"
+    description: |
+      Append two commented-out steps to post-release-notes.yml. (1) Slack POST:
+      a step that hard-fails when SLACK_WEBHOOK_URL is empty, then `curl -X POST
+      -H 'Content-Type: application/json' --data @/tmp/slack-payload.json
+      "${SLACK_WEBHOOK_URL}"` with env SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}.
+      (2) GH release append: read current body via `gh release view "$RELEASE_TAG"
+      --json body -q '.body'`, prepend a `## Release notes\n\n` header + the
+      generated body + `\n\n---\n\n` separator, then `gh release edit "$RELEASE_TAG"
+      --notes-file /tmp/release-body.md`, with env GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}.
+      Both step blocks are committed entirely as YAML comments (`# ...`), each
+      preceded by a `# CLI-147 follow-up:` lead comment. YAML must remain
+      syntactically valid with these blocks commented out. Implements REQ-F-012
+      and REQ-F-013.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Both step blocks are present in the YAML as comment lines, each preceded by a `# CLI-147 follow-up:` lead comment naming what the block does"
+      - "Slack POST commented body includes a hard-fail guard: if SLACK_WEBHOOK_URL is empty, echo an error and exit 1 BEFORE the curl"
+      - "GH release append commented body uses `gh release view --json body -q '.body'`, prepends `## Release notes\\n\\n` + body + `\\n\\n---\\n\\n`, then `gh release edit --notes-file`"
+      - "GH release append step references env GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} (within the comments)"
+      - "The workflow YAML still parses cleanly with these blocks commented out (actionlint clean)"
+      - "No live mutation of Slack or the GitHub release occurs when the workflow runs in this state"
+    completed_at: 2026-05-19T09:55:00Z
+
+  - id: task-006
+    title: "Local actionlint + manual dispatch verification"
+    description: |
+      Final verification gate. Run `actionlint .github/workflows/post-release-notes.yml`
+      locally (`brew install actionlint` if needed) and ensure it is clean. Push
+      the branch and inspect the GitHub Actions tab to confirm the new workflow
+      registers without parse errors. Trigger a manual `workflow_dispatch` run
+      against `version: 1.4.0` and inspect the job log: (a) generated notes file
+      is printed via `cat`; (b) Slack JSON payload is printed; (c) no mutation
+      occurs against Slack or the GitHub release (the commented blocks remain
+      commented). Confirm `make test` / `make lint` / `make fmt-check` are NOT
+      required (no Go changes) but run them once anyway as a smoke check.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "actionlint reports zero errors and zero warnings on the new workflow file"
+      - "Workflow is visible in the GitHub Actions tab after the branch is pushed"
+      - "A manual workflow_dispatch run against `version: 1.4.0` completes successfully and the job log shows the generated markdown and the JSON payload"
+      - "The dispatch run does not post to Slack and does not edit the GitHub release body for v1.4.0"
+      - "No files outside .github/workflows/post-release-notes.yml and .github/prompts/release-notes.md are modified by this PR"
+      - "make test, make lint, and make fmt-check pass locally as a final smoke check"
+    completed_at: 2026-05-19T10:10:00Z

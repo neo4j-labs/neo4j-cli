@@ -1,0 +1,23 @@
+## task-001 — 2026-05-19T08:55:00Z
+Authored .github/prompts/release-notes.md: 6-step Claude Code prompt anchored on per-version changelog + git log range, grounded cobra-tree examples, writes /tmp/release-notes-generated.md.
+Files: +.github/prompts/release-notes.md
+
+## task-002 — 2026-05-19T09:10:00Z
+Workflow skeleton: release+workflow_dispatch triggers, contents:write perms, RELEASE_TAG/RELEASE_VERSION/PREV_TAG resolution, semver regex validation, checkout main fetch-depth:0. actionlint clean.
+Files: +.github/workflows/post-release-notes.yml
+
+## task-003 — 2026-05-19T09:25:00Z
+Added Claude Code install + API-key guard + stream-json invocation (Bash,Read,Write; max-turns 30; budget $1.50) + generated-file guard step to post-release-notes.yml. Mirrors update-website.yml jq tee pattern. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-004 — 2026-05-19T09:40:00Z
+Appended always-on print step (cat generated md) + Slack payload build step (jq -nR --rawfile, preamble + body + URL into /tmp/slack-payload.json, also cat'd). Smoke-tested jq output: quotes/newlines/backticks JSON-safe. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-005 — 2026-05-19T09:55:00Z
+Appended commented-out Slack POST step (SLACK_WEBHOOK_URL empty-guard + curl) and commented-out GH release append step (gh release view --json body, prepend `## Release notes` + `---`, gh release edit --notes-file). Each preceded by `# CLI-147 follow-up:` lead comment. YAML parses + actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-006 — 2026-05-19T10:10:00Z
+Verification gate: actionlint clean on post-release-notes.yml; make test / make lint / make fmt-check all pass. git diff main...HEAD limited to .github/ + .plans/ — no Go/Makefile touched. POST-MERGE manual checks remain for the human: Actions tab visibility after branch push and a live workflow_dispatch run against v1.4.0 confirming generated md + slack JSON are printed and no Slack/release mutation occurs (commented blocks stay commented).
+Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml
