@@ -121,13 +121,13 @@ func (l *stderrLogger) Debugf(name, id, msg string, args ...any) {
 	_, _ = fmt.Fprintf(l.w, "%s  DEBUG  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-// driverOpener is the test seam used to construct the Bolt driver. Production
-// calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
-// connection. When debug is true the configurer attaches an in-package
-// stderrLogger at DEBUG level so the driver's wire activity goes to stderr;
-// when false c.Log is left at its nil default.
-var driverOpener = func(target string, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
-	configurer := func(c *config.Config) {
+// buildDriverConfigurer returns the closure neo4j.NewDriver applies to its
+// default *config.Config. Sets UserAgent when non-empty; attaches the in-package
+// stderrLogger at DEBUG level when debug is true; otherwise leaves c.Log nil so
+// the driver stays silent. Extracted from driverOpener so tests can exercise
+// the wiring against a synthetic *config.Config without touching neo4j.NewDriver.
+func buildDriverConfigurer(userAgent string, debug bool) func(*config.Config) {
+	return func(c *config.Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
 		}
@@ -135,7 +135,15 @@ var driverOpener = func(target string, username, password, userAgent string, deb
 			c.Log = newStderrLogger(log.DEBUG)
 		}
 	}
-	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), configurer)
+}
+
+// driverOpener is the test seam used to construct the Bolt driver. Production
+// calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
+// connection. When debug is true the configurer attaches an in-package
+// stderrLogger at DEBUG level so the driver's wire activity goes to stderr;
+// when false c.Log is left at its nil default.
+var driverOpener = func(target string, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
+	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), buildDriverConfigurer(userAgent, debug))
 }
 
 // runStatementResponseFn is the test seam used by runStatementResponse. It

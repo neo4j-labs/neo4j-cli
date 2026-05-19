@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -578,4 +580,70 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			assert.Equal(t, tc.wantDatabase, c.database)
 		})
 	}
+}
+
+// TestResolveDebug_FlagAndEnvPrecedence locks the six precedence cases for the
+// --debug / NEO4J_DEBUG resolver per REQ-F-002/F-003: explicit flag wins
+// outright (so --debug=false beats NEO4J_DEBUG=1); when the flag is not set the
+// env value is consulted with strict-`1` acceptance (any other value, including
+// `true` / `yes` / `on` / `0`, leaves debug OFF).
+func TestResolveDebug_FlagAndEnvPrecedence(t *testing.T) {
+	tests := []struct {
+		name      string
+		flagArgs  []string
+		envValue  string // empty string means env unset
+		wantDebug bool
+	}{
+		{name: "flag on, env unset", flagArgs: []string{"--debug"}, envValue: "", wantDebug: true},
+		{name: "env=1, no flag", flagArgs: nil, envValue: "1", wantDebug: true},
+		{name: "flag on, env=1", flagArgs: []string{"--debug"}, envValue: "1", wantDebug: true},
+		{name: "both off", flagArgs: nil, envValue: "", wantDebug: false},
+		{name: "env=true (not '1') leaves debug off", flagArgs: nil, envValue: "true", wantDebug: false},
+		{name: "explicit --debug=false overrides env=1", flagArgs: []string{"--debug=false"}, envValue: "1", wantDebug: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_DEBUG", tc.envValue)
+
+			cmd, _ := newTestCmd(t)
+			require.NoError(t, cmd.ParseFlags(tc.flagArgs))
+
+			assert.Equal(t, tc.wantDebug, resolveDebug(cmd))
+		})
+	}
+}
+
+// TestBuildDriverConfigurer_DebugOffLeavesLogNil verifies the default-off path:
+// the configurer produced by driverOpener leaves config.Config.Log at its nil
+// default so the Bolt driver stays silent (REQ-F-001/F-007).
+func TestBuildDriverConfigurer_DebugOffLeavesLogNil(t *testing.T) {
+	cfg := &config.Config{}
+	buildDriverConfigurer("neo4j-cli/vtest", false)(cfg)
+
+	assert.Nil(t, cfg.Log, "debug=false must leave config.Config.Log nil")
+	assert.Equal(t, "neo4j-cli/vtest", cfg.UserAgent, "non-empty userAgent must still be wired")
+}
+
+// TestBuildDriverConfigurer_DebugOnAttachesStderrLogger verifies the debug-on
+// path: c.Log is the stderr adapter and Debugf actually writes when invoked.
+// The buffer substitutes for os.Stderr — the production logger writes to
+// os.Stderr but the type is identical, so we instantiate one with a buffer
+// writer to assert non-stdout routing.
+func TestBuildDriverConfigurer_DebugOnAttachesStderrLogger(t *testing.T) {
+	cfg := &config.Config{}
+	buildDriverConfigurer("neo4j-cli/vtest", true)(cfg)
+
+	require.NotNil(t, cfg.Log, "debug=true must wire config.Config.Log")
+	logger, ok := cfg.Log.(*stderrLogger)
+	require.True(t, ok, "config.Config.Log must be the in-package stderr adapter")
+	assert.Equal(t, log.Level(log.DEBUG), logger.level, "stderrLogger must be at DEBUG level")
+
+	// Replace the writer with a buffer so we can prove a Debugf call routes
+	// through the adapter (and would have gone to stderr in production, not
+	// stdout — locks the no-stdout-corruption contract).
+	var buf bytes.Buffer
+	logger.w = &buf
+	logger.Debugf("driver", "1", "hello %s", "world")
+	assert.Contains(t, buf.String(), "DEBUG")
+	assert.Contains(t, buf.String(), "hello world")
 }

@@ -69,7 +69,7 @@ tasks:
       `--debug=true` runs against the same seam-stubbed response (locks
       REQ-F-009). Use `t.Setenv` to drive env cases; use a stub `driverOpener`
       that captures the `*config.Config` produced by the configurer closure.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -78,7 +78,7 @@ tasks:
       - "Debug-on assertion: `config.Config.Log` is non-nil and a `Debugf` call writes to a stderr-substitute buffer (not stdout)."
       - "Stdout byte-identity test: `--debug=false` vs `--debug=true` produce identical stdout bytes for the same seam-stubbed response."
       - "`go test ./neo4j-cli/query/...` is clean."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-004
     title: "Update .agents/query.md driverOpener arg-count note"
