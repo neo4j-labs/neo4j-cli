@@ -54,7 +54,7 @@ tasks:
       `issues`. Use the same `contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), …)`
       shape that `claude-review-conventions.yml:13-15` uses. Implements
       REQ-F-003, REQ-F-004, REQ-F-005, REQ-NF-002.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -64,7 +64,7 @@ tasks:
       - "A comment by a CONTRIBUTOR / NONE / FIRST_TIMER / FIRST_TIME_CONTRIBUTOR / MANNEQUIN does not satisfy the gate"
       - "A comment whose sender type is `Bot` does not satisfy the gate, even if `@claude` is in the body"
       - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
-    completed_at: null
+    completed_at: 2026-05-19T12:45:00Z
 
   - id: task-004
     title: "Verify scope: only claude.yml changed, no source/changelog/bundle drift"

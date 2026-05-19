@@ -5,3 +5,7 @@ Files: ~.github/workflows/claude.yml
 ## TASK-002 — 2026-05-19T12:30:00Z
 Enabled use_commit_signing on the claude-code-action step so commits are created via GitHub contents API as claude[bot] with verified-commit badge.
 Files: ~.github/workflows/claude.yml
+
+## TASK-003 — 2026-05-19T12:45:00Z
+Gated claude.yml job on sender.type != 'Bot' AND author_association ∈ {MEMBER,OWNER,COLLABORATOR}, dispatched per-event so the correct path (comment/review/issue) is used. Preserves original @claude body/title checks.
+Files: ~.github/workflows/claude.yml
