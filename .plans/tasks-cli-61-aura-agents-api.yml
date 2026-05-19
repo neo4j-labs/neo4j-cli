@@ -227,7 +227,7 @@ tasks:
       `neo4j-cli/internal/skill/bundle/references/agent.md` (and any per-leaf references plus
       Global-Flags re-render). Commit the regenerated bundle files. Verify `make generate-check`
       reports no remaining drift and `TestGenerator_RoundTrip` is green.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -241,7 +241,13 @@ tasks:
       - "`make generate-check` exits clean (no diff)."
       - "`TestGenerator_RoundTrip` passes inside `make test`."
       - "Bundle additions for the seven leaves render their `Example` fields verbatim."
-    completed_at: null
+    completed_at: 2026-05-19T12:25:00Z
+    notes: |
+      No-op regeneration: agent commands are beta-gated behind `flag.aura-beta`, and the
+      bundle generator (neo4j-cli/internal/skill/gen/main.go) builds the cobra tree with
+      default config where the flag is disabled. Matches precedent for deployment / dataapi /
+      import which are similarly absent from the committed bundle. TestGenerator_RoundTrip
+      passes; `go generate ./neo4j-cli/internal/skill/...` produced zero file changes.
 
   - id: task-012
     title: "Add changelog entry"
