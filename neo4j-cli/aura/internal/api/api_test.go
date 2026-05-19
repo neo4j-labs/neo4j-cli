@@ -263,6 +263,48 @@ func TestMakeRequest_RejectsBlockedAuthURL(t *testing.T) {
 	assert.Contains(t, err.Error(), "aura auth-url")
 }
 
+// TestMakeRequest_2xxWithEmbeddedErrors covers the latent path where the Aura
+// API returns 200 OK with an `errors[]` array embedded in the response body
+// (e.g. `{"data":{"id":"x"},"errors":[{"message":"DB not found: x"}]}`).
+// MakeRequest must detect the embedded errors, surface them through
+// NewNotFoundError with multi-line bracket Message shape, and populate
+// ResourceType/ResourceID/Suggestion from the request path.
+func TestMakeRequest_2xxWithEmbeddedErrors(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"access_token":"tok","expires_in":3600,"token_type":"bearer"}`)) //nolint:errcheck
+	})
+	mux.HandleFunc("/v1/instances/x", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"data":{"id":"x"},"errors":[{"message":"DB not found: x","reason":"db-not-found"}]}`)) //nolint:errcheck
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	cfg := buildTestConfig(t, srv.URL, `{
+		"aura": {
+			"credentials": [{"name":"c","client-id":"id","client-secret":"s","access-token":"tok","token-expiry":9999999999}],
+			"default-credential": "c"
+		}
+	}`)
+
+	_, _, err := api.MakeRequest(cfg, "instances/x", &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersion1,
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Equal(t, "[\n\tDB not found: x\n]", ce.Message)
+	assert.Equal(t, "instance", ce.ResourceType)
+	assert.Equal(t, "x", ce.ResourceID)
+	assert.Equal(t, "Run 'neo4j-cli aura instance list' to see available instances.", ce.Suggestion)
+}
+
 // TestGetToken_401_AuthError locks the task-004 reclassification: an aura
 // token-endpoint 401 (invalid/expired/revoked client credentials) surfaces as
 // *CLIError with Code == 4 (auth), not the previous usage exit.

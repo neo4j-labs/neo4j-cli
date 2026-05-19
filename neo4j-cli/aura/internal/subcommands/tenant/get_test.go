@@ -4,10 +4,14 @@
 package tenant_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -144,14 +148,20 @@ func TestGetTenantNotFoundError(t *testing.T) {
 		]
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("tenant get %s", tenantId))
+	err := helper.ExecuteCommandE(fmt.Sprintf("tenant get %s", tenantId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	require.Equal(t, 3, ce.Code)
+
 	helper.AssertErrContainsStrings([]string{
 		"Warning: 'aura tenant get' is deprecated and will be removed in a future release. Use 'aura organization get' instead.",
-		"Error: [The tenant you specified could not be found]",
+		`Error: [
+	The tenant you specified could not be found
+]`,
 	})
 }
 

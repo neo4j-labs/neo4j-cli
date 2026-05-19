@@ -107,6 +107,11 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 			panic(err)
 		}
 
+		if msgs := extractEmbeddedErrors(responseBody); len(msgs) > 0 {
+			resourceType, resourceID := parseResourceFromRequest(req)
+			return responseBody, res.StatusCode, clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
+		}
+
 		return responseBody, res.StatusCode, nil
 	}
 

@@ -1,0 +1,138 @@
+feature: cli-142-aura-error-message-format
+prd: ./prd-cli-142-aura-error-message-format.md
+created_at: 2026-05-19T00:00:00Z
+updated_at: 2026-05-19T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add formatBracketedMessages helper and apply to all 7 envelope sites in response.go"
+    description: |
+      Introduce a package-private helper `formatBracketedMessages(messages []string) string` in
+      `neo4j-cli/aura/internal/api/response.go` returning `fmt.Sprintf("[\n\t%s\n]", strings.Join(messages, ",\n\t"))`.
+      Replace the six broken `clierr.NewXError("%s", messages)` call sites (lines 69, 97, 110, 123, 140, 159 — 400/404/405/402/409/5xx)
+      with `clierr.NewXError("%s", formatBracketedMessages(messages))`, preserving each existing `.WithSuggestion(...)` and
+      `.WithResource(...)` chain. Refactor `formatAuthorizationError` (line 440-442) to call the same helper so all
+      seven sites stay in lock-step. Output for the 401/403 path must remain byte-identical to today.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`formatBracketedMessages` exists, package-private, returns `fmt.Sprintf(\"[\\n\\t%s\\n]\", strings.Join(messages, \",\\n\\t\"))`"
+      - "All six broken branches (400, 402, 404, 405, 409, 5xx) build their envelope via the helper"
+      - "`.WithSuggestion(...)` and `.WithResource(...)` chains preserved on every touched branch"
+      - "`formatAuthorizationError` uses the helper; existing `instance/get_test.go:367-370` 401 test still passes unedited"
+      - "`make build` succeeds"
+    completed_at: 2026-05-19T00:00:00Z
+
+  - id: task-002
+    title: "Wire latent 2xx-with-errors-body path through NewNotFoundError in MakeRequest"
+    description: |
+      Add a package-private helper `extractEmbeddedErrors(body []byte) []string` in `response.go` that unmarshals
+      `body` into the existing `ErrorResponse` shape and returns each `Error.Message` verbatim (no `field:` prefix —
+      matches the 404 branch since `SingleValueResponseData` is the single-resource get shape). Unmarshal failure
+      or empty `Errors` returns `nil`. In `neo4j-cli/aura/internal/api/api.go` `MakeRequest` (lines 103-111),
+      after reading the 2xx body, call `extractEmbeddedErrors(responseBody)`; when it yields ≥1 message, return
+      `clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(parseResourceFromRequest(req)).WithSuggestion(suggestionForResource(...))`
+      instead of `nil`. Otherwise the happy path returns unchanged. No second read of `res.Body`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`extractEmbeddedErrors` exists in `response.go`, returns nil on unmarshal failure or empty errors[]"
+      - "`MakeRequest` 2xx branch detects embedded `errors[]` and returns `*clierr.CLIError{Code: 3}` with resource/suggestion populated"
+      - "Happy path (2xx with no `errors[]`) returns `nil` error as before — verified by existing `MakeRequest` tests still green"
+      - "No regressions in existing `api/api_test.go` tests"
+    completed_at: 2026-05-19T00:00:00Z
+
+  - id: task-003
+    title: "Convert 28 single-line bracket test assertions to multi-line bracket shape"
+    description: |
+      Find every `Error: [<msg>]` (single-line) stderr assertion across the aura subcommand tree using
+      `rg -n '"Error: \\[' neo4j-cli/aura/internal/subcommands/` and convert each to the multi-line backtick
+      raw-string shape (tab indent before the message). Files: `subcommands/instance/{get,create,delete,update,pause,resume}_test.go`,
+      `subcommands/tenant/get_test.go`, `subcommands/customermanagedkey/{get,delete}_test.go`,
+      `subcommands/graphanalytics/session/{get,delete}_test.go`,
+      `subcommands/deployment/{create,get}_test.go` + `deployment/token/create_test.go` (outer pair only — inner `]]` is payload),
+      `subcommands/import/job/{create,get,cancel}_test.go`. Verify with `make test` per touched package.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Pre-edit `rg` confirms ≈28 sites; post-edit `rg` returns zero `\"Error: \\[<single-line>\\]\"` matches in `neo4j-cli/aura/internal/subcommands/`"
+      - "Each converted assertion uses a backtick raw string with `\\t` indent matching the rendered output"
+      - "`deployment/token/create_test.go:116` nested `...]]` — only the outer pair is converted; inner pair stays"
+      - "`make test` passes for every touched package"
+    completed_at: 2026-05-19T00:00:00Z
+
+  - id: task-004
+    title: "Tighten instance/tenant get not-found tests with exit-code assertion"
+    description: |
+      Switch `subcommands/instance/get_test.go::TestGetInstanceNotFoundError` and
+      `subcommands/tenant/get_test.go::TestGetTenantNotFoundError` from `helper.ExecuteCommand(...)` + stderr-only assertion
+      to `helper.ExecuteCommandE(...)` + `errors.As(err, &ce)` + `require.Equal(t, 3, ce.Code)`. Keep the existing
+      stderr text assertions (now in multi-line bracket shape after task-003). Mirror the pattern at
+      `graphanalytics/session/get_test.go:148-151`. This locks the acceptance criterion "Tests: assert exit + message shape"
+      from the Linear ticket.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Both tests call `ExecuteCommandE`, capture the returned error, and use `errors.As` + `require.Equal(t, 3, ce.Code)`"
+      - "Stderr-text assertions kept (multi-line bracket shape)"
+      - "`go test ./neo4j-cli/aura/internal/subcommands/instance/... ./neo4j-cli/aura/internal/subcommands/tenant/...` passes"
+    completed_at: 2026-05-19T00:00:00Z
+
+  - id: task-005
+    title: "Add TestMakeRequest_2xxWithEmbeddedErrors covering latent path"
+    description: |
+      New test in `neo4j-cli/aura/internal/api/api_test.go` that mocks a 200 response against `/v1/instances/x`
+      returning `{"data":{"id":"x"},"errors":[{"message":"DB not found: x","reason":"db-not-found"}]}` and asserts:
+      (a) returned err matches `*clierr.CLIError` via `errors.As` with `Code == 3`,
+      (b) `ce.Message == "[\n\tDB not found: x\n]"`,
+      (c) `ce.ResourceType == "instance"`, `ce.ResourceID == "x"`,
+      (d) `ce.Suggestion == "Run 'neo4j-cli aura instance list' to see available instances."`.
+      Use existing test patterns from `TestMakeRequest_*` in the same file.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Test exists in `api/api_test.go` and is named `TestMakeRequest_2xxWithEmbeddedErrors`"
+      - "All four assertions (Code, Message shape, ResourceType/ResourceID, Suggestion) covered"
+      - "`go test ./neo4j-cli/aura/internal/api/...` passes"
+    completed_at: 2026-05-19T00:00:00Z
+
+  - id: task-006
+    title: "Add changie Patch changelog entry"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "Aura API error messages now render in the same multi-line bracket format used for auth errors instead of Go's default []string stringification."`
+      (or hand-author `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` if changie is not installed locally).
+      User-facing change — required per AGENTS.md changelog policy.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Exactly one new file under `.changes/unreleased/` matching `neo4j-cli-Patch-*.yaml`"
+      - "YAML fields: `project: neo4j-cli`, `kind: Patch`, `body: ...` matches REQ-NF-003 verbatim"
+    completed_at: 2026-05-19T13:00:04Z
+
+  - id: task-007
+    title: "Final gates: fmt-check, lint, test, generate-check + smoke manual run"
+    description: |
+      Run the four CI-equivalent gates locally and the optional manual repro:
+      `make fmt-check && make lint && make test && make generate-check`. If any test pinning the rendered byte-shape
+      via `--format json` envelope surfaces, update or document in the PR. Optional manual: `make build` then
+      `bin/neo4j-cli aura instance get does-not-exist --organization-id <real> --project-id <real>` against real Aura —
+      expect multi-line bracket stderr and `$? == 3`.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`make fmt-check` clean"
+      - "`make lint` clean"
+      - "`make test` clean across the OS matrix (locally on darwin)"
+      - "`make generate-check` clean — no bundle drift expected"
+      - "Manual repro (if Aura creds available) prints multi-line bracket envelope and exits 3"
+    completed_at: 2026-05-19T13:30:00Z

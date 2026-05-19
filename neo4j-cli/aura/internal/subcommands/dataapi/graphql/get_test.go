@@ -110,26 +110,9 @@ func TestGetGraphQLDataApiIncludingGraphQLServerErrors(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
-	helper.AssertOutJson(`{
-		"data": {
-			"features": {
-					"subgraph": false
-			},
-			"id": "afdb4e9d",
-			"name": "friendly-name",
-			"status": "ready",
-			"type_definitions": "dHlwZSBBY3RvciB7CiAgbmFtZTogU3RyaW5nCiAgbW92aWVzOiBbTW92aWUhXSEgQHJlbGF0aW9uc2hpcCh0eXBlOiAiQUNURURfSU4iLCBkaXJlY3Rpb246IE9VVCkKfQoKdHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwogIGFjdG9yczogW0FjdG9yIV0hIEByZWxhdGlvbnNoaXAodHlwZTogIkFDVEVEX0lOIiwgZGlyZWN0aW9uOiBJTikKfQ==",
-			"url": "https://afdb4e9d.28be6e4d8d3e836019.graphql.neo4j.io/graphql"
-        },
-		"errors": [
-			{
-				"message": "an error with the graphql server",
-				"reason": "server-err"
-			},
-			{
-				"message": "an error with the type defs",
-				"reason": "invalid-typedefs"
-			}
-		]
-	}`)
+	helper.AssertOut("")
+	helper.AssertErr(`Error: [
+	an error with the graphql server,
+	an error with the type defs
+]`)
 }

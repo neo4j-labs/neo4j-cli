@@ -334,7 +334,9 @@ func TestGetDeploymentWithInvalidDeploymentId(t *testing.T) {
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
 
-	helper.AssertErr("Error: [cannot parse UUID  87703862-f8b7-4712-b7eb-d0eef69cb53]")
+	helper.AssertErr(`Error: [
+	cannot parse UUID  87703862-f8b7-4712-b7eb-d0eef69cb53
+]`)
 }
 
 func TestGetDeploymentWhenDeploymentDoesNotExist(t *testing.T) {

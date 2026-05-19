@@ -193,8 +193,10 @@ func TestDeleteInstanceError(t *testing.T) {
 		returnBody    string
 	}{
 		{
-			statusCode:    http.StatusNotFound,
-			expectedError: "Error: [DB not found: 24d18db5]",
+			statusCode: http.StatusNotFound,
+			expectedError: `Error: [
+	DB not found: 24d18db5
+]`,
 			returnBody: `{
 				"errors": [
 					{
@@ -205,8 +207,10 @@ func TestDeleteInstanceError(t *testing.T) {
 			  }`,
 		},
 		{
-			statusCode:    http.StatusConflict,
-			expectedError: "Error: [The database is current undergoing an operation: resuming]",
+			statusCode: http.StatusConflict,
+			expectedError: `Error: [
+	The database is current undergoing an operation: resuming
+]`,
 			returnBody: `{
 				"errors": [
 				  {

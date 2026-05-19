@@ -165,7 +165,7 @@ func TestDeleteCustomerManagedKeyError(t *testing.T) {
 	}{
 		{
 			statusCode:    http.StatusBadRequest,
-			expectedError: fmt.Sprintf("Error: [Can not delete encryption key %s. The key is linked to an active instance.]", testCMKID),
+			expectedError: fmt.Sprintf("Error: [\n\tCan not delete encryption key %s. The key is linked to an active instance.\n]", testCMKID),
 			returnBody: fmt.Sprintf(`{
 				"errors": [
 				  {
@@ -177,7 +177,7 @@ func TestDeleteCustomerManagedKeyError(t *testing.T) {
 		},
 		{
 			statusCode:    http.StatusNotFound,
-			expectedError: fmt.Sprintf("Error: [Encryption Key not found: %s]", testCMKID),
+			expectedError: fmt.Sprintf("Error: [\n\tEncryption Key not found: %s\n]", testCMKID),
 			returnBody: fmt.Sprintf(`{
 				"errors": [
 				  {

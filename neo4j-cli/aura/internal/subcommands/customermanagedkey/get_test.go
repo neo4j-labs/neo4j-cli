@@ -160,6 +160,6 @@ func TestGetCustomerManagedKeyNotFoundError(t *testing.T) {
 		mockHandler.AssertCalledTimes(1)
 		mockHandler.AssertCalledWithMethod(http.MethodGet)
 
-		helper.AssertErr(fmt.Sprintf("Error: [Encryption Key not found: %s]", testCMKID))
+		helper.AssertErr(fmt.Sprintf("Error: [\n\tEncryption Key not found: %s\n]", testCMKID))
 	}
 }

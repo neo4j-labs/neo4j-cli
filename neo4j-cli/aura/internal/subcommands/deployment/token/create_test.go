@@ -113,5 +113,7 @@ func TestCreateDeploymentTokenWhenDeploymentAlreadyHasAToken(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
 	mockHandler.AssertCalledWithBody("{}")
 
-	helper.AssertErr("Error: [failed to create api key: failed to save new api key: no rows in result set]]")
+	helper.AssertErr(`Error: [
+	failed to create api key: failed to save new api key: no rows in result set]
+]`)
 }
