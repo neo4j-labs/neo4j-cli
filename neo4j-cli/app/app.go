@@ -9,7 +9,11 @@
 package app
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicmd"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
@@ -69,6 +73,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		if err := formatAndRw(cmd, args); err != nil {
 			return err
 		}
+		initCredentialStorageDefault(cfg, cmd.ErrOrStderr())
 		versioncheck.MaybeHint(cmd, cfg, Version)
 		versioncheck.Schedule(cmd.Context(), cfg, Version)
 		skillrefresh.MaybeRefresh(cmd.Context(), cmd, cfg, binskill.Bundle, "neo4j-cli")
@@ -91,4 +96,39 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	clicmd.ApplySuggestionsToParents(cmd)
 
 	return cmd
+}
+
+// initCredentialStorageDefault runs on every invocation before any RunE
+// executes. It is a no-op if "credential-storage" is already present in
+// config.json. When absent (first run) it chooses a default based on whether
+// any credentials already exist:
+//
+//   - Existing credentials: writes "insecure" (preserves current behaviour for
+//     upgrading users) and emits a one-time upgrade notice to stderr.
+//   - No credentials: writes "keyring" silently (secure default for new installs).
+//
+// After writing the default, the in-memory storage mode on cfg.Credentials is
+// updated so the current invocation uses the correct mode.
+//
+// Errors from GlobalConfig.Set or Credentials.SetStorageMode are swallowed
+// (the function is best-effort advisory); the command itself is not blocked.
+func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
+	if cfg.Global.CredentialStorageIsSet() {
+		return
+	}
+
+	if cfg.Credentials.HasAnyCredentials() {
+		// Existing user upgrading: default to insecure to preserve behaviour.
+		if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
+			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure)
+			_, _ = fmt.Fprintln(stderr, "Notice: your Neo4j CLI credentials are stored in plaintext.")
+			_, _ = fmt.Fprintln(stderr, "To migrate them to the OS keyring, run:")
+			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
+		}
+	} else {
+		// Fresh install: default to keyring.
+		if err := cfg.Global.Set("credential-storage", credentials.StorageModeKeyring); err == nil {
+			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring)
+		}
+	}
 }

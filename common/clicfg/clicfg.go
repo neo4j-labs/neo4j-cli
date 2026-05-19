@@ -450,6 +450,10 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	}
 
 	fileutils.WriteFile(config.fs, config.configPath, []byte(updated))
+
+	// Sync the new value into viper's in-memory store so callers that call
+	// IsSet or GetString in the same process reflect the written value immediately.
+	config.viper.Set(key, value)
 	return nil
 }
 
@@ -464,6 +468,14 @@ func (config *GlobalConfig) CredentialStorage() string {
 		return v
 	}
 	return "keyring"
+}
+
+// CredentialStorageIsSet reports whether "credential-storage" has been
+// explicitly written to config.json *or set in-memory* in this process.
+// When false, the first-run default detection logic in PersistentPreRunE
+// should write the appropriate default.
+func (config *GlobalConfig) CredentialStorageIsSet() bool {
+	return config.viper.IsSet("credential-storage")
 }
 
 func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {
