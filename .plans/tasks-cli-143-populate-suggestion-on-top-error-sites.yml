@@ -13,7 +13,8 @@ tasks:
       session callers where parseResourceFromRequest extracts the wrong path
       segment. Add a colocated test covering both the matching and the
       non-matching error path.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies: []
     acceptance_criteria:
       - "New file neo4j-cli/aura/internal/subcommands/utils/notfound.go (or extension of an existing utils file) exports WithNotFoundContext(err error, resourceType, resourceID, suggestion string) error."

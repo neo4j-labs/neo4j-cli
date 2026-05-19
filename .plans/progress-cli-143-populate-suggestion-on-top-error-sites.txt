@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-19T00:00:00Z
+Added utils.WithNotFoundContext helper that rewrites *clierr.CLIError (Code==3) ResourceType/ResourceID/Suggestion in place; non-matching errors pass through. Used downstream by snapshot/session callers where parseResourceFromRequest mis-segments nested paths.
+Files: +neo4j-cli/aura/internal/subcommands/utils/notfound.go, +neo4j-cli/aura/internal/subcommands/utils/notfound_test.go
