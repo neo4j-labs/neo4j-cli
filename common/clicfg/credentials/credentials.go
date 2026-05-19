@@ -363,6 +363,123 @@ func (c *Credentials) MigrateToKeyring() error {
 	return nil
 }
 
+// MigrateToInsecure moves all sensitive credential fields from the OS keyring
+// into credentials.json (plaintext). It iterates all three credential types
+// and calls keyring.Get() for each sensitive field.
+//
+// Required fields (ClientSecret for Aura, Password for Dbms): if ErrNotFound,
+// the migration is aborted (any in-memory fields already populated are
+// re-zeroed) and a clierr.UsageError is returned naming the credential and
+// suggesting removal.
+//
+// Optional fields (AccessToken for Aura, APIKey for Embed): if ErrNotFound,
+// the field is silently skipped (empty value written to JSON).
+//
+// Any non-ErrNotFound keyring error is a hard error for all field types and
+// aborts migration.
+//
+// On full success: save() is called to persist the secrets to JSON, then
+// keyring.Delete() is called for all non-empty entries (best-effort: errors are
+// ignored).
+//
+// The caller is responsible for persisting the "credential-storage" config key
+// and calling SetStorageMode(StorageModeInsecure) afterwards. This method
+// temporarily sets storageMode to insecure internally to flush secrets to JSON,
+// then restores it so the caller can observe the original mode and switch it
+// explicitly.
+func (c *Credentials) MigrateToInsecure() error {
+	// Phase 1: read all sensitive fields from the keyring into in-memory structs.
+	// If any required field is missing (ErrNotFound) or any Get returns a
+	// non-ErrNotFound error, abort immediately.
+
+	// Track which in-memory fields we have populated so we can zero them on
+	// failure.
+	type populated struct {
+		ptr   *string
+		field string
+	}
+	var filled []populated
+
+	zero := func() {
+		for _, p := range filled {
+			*p.ptr = ""
+		}
+	}
+
+	getRequired := func(ptr *string, credType, credName, field string) error {
+		val, err := defaultKeyring.Get(ServiceName, KeyringKey(credType, credName, field))
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				zero()
+				return clierr.NewUsageError(
+					"cannot migrate credential %q: %s %s not found in keyring; run `credential %s remove %s` and re-add it",
+					credName, credType, field, credType, credName,
+				)
+			}
+			zero()
+			return fmt.Errorf("keyring get %s/%s/%s: %w", credType, credName, field, err)
+		}
+		*ptr = val
+		filled = append(filled, populated{ptr: ptr, field: KeyringKey(credType, credName, field)})
+		return nil
+	}
+
+	getOptional := func(ptr *string, credType, credName, field string) error {
+		val, err := defaultKeyring.Get(ServiceName, KeyringKey(credType, credName, field))
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				// Silently skip — write empty value to JSON
+				return nil
+			}
+			zero()
+			return fmt.Errorf("keyring get %s/%s/%s: %w", credType, credName, field, err)
+		}
+		*ptr = val
+		filled = append(filled, populated{ptr: ptr, field: KeyringKey(credType, credName, field)})
+		return nil
+	}
+
+	// --- Aura credentials ---
+	for _, cred := range c.Aura.Credentials {
+		if err := getRequired(&cred.ClientSecret, "aura", cred.Name, "client-secret"); err != nil {
+			return err
+		}
+		if err := getOptional(&cred.AccessToken, "aura", cred.Name, "access-token"); err != nil {
+			return err
+		}
+	}
+
+	// --- Dbms credentials ---
+	for _, cred := range c.Dbms.Credentials {
+		if err := getRequired(&cred.Password, "dbms", cred.Name, "password"); err != nil {
+			return err
+		}
+	}
+
+	// --- Embed credentials ---
+	for _, cred := range c.Embed.Credentials {
+		if err := getOptional(&cred.APIKey, "embed", cred.Name, "api-key"); err != nil {
+			return err
+		}
+	}
+
+	// Phase 2: persist secrets to JSON. Temporarily switch storageMode to
+	// insecure so save() writes the full plaintext values instead of calling
+	// saveWithKeyring() again.
+	prevMode := c.storageMode
+	c.storageMode = StorageModeInsecure
+	c.save()
+	c.storageMode = prevMode
+
+	// Phase 3: delete keyring entries for all fields we successfully read
+	// (best-effort — errors are ignored).
+	for _, p := range filled {
+		_ = defaultKeyring.Delete(ServiceName, p.field)
+	}
+
+	return nil
+}
+
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the
 // OS keyring. It is called by SetStorageMode when switching to keyring mode.
 // For each sensitive field:
