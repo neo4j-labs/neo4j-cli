@@ -49,7 +49,13 @@ neo4j-cli aura instance snapshot get 22222222-2222-2222-2222-222222222222 --inst
 				Method: http.MethodGet,
 			})
 			if err != nil {
-				return err
+				// On 404 the API layer tags ResourceType="instance" (the first
+				// segment after /instances/) which is misleading when the snapshot
+				// itself is the missing resource. Rewrite the context so the user
+				// gets snapshot-specific Suggestion text. The preflight
+				// FetchAndVerifyInstanceInProject already covers the genuine
+				// instance-not-found path.
+				return utils.WithNotFoundContext(err, "snapshot", snapshotId, "Run 'neo4j-cli aura instance snapshot list --instance-id <id>' to see snapshots for this instance.")
 			}
 
 			if statusCode == http.StatusOK {

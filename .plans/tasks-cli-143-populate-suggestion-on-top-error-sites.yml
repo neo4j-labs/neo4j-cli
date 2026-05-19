@@ -113,7 +113,8 @@ tasks:
       already covers the instance-not-found case (task-005), so this enrichment
       only fires when the snapshot itself 404s. Add a 404 sub-test to
       get_test.go asserting the rewritten ResourceType, ResourceID, and Suggestion.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies:
       - task-001
       - task-005
