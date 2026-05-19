@@ -45,7 +45,6 @@ Package lives under `common/`, NOT `neo4j-cli/internal/`. Go's internal-package 
 
 ## See also
 
-- Linear CLI-134 — this subsystem.
 - `.agents/feature-flags.md` — owns the user-side cleanup motivation.
 - `common/configmigrate/configmigrate.go` — engine.
 - `common/configmigrate/migrations.go` — registry + validator.
