@@ -136,7 +136,7 @@ func TestQueryEmbed_ProviderErrorPropagates(t *testing.T) {
 
 	origOpener := driverOpener
 	t.Cleanup(func() { driverOpener = origOpener })
-	driverOpener = func(_, _, _, _ string) (neo4j.Driver, error) {
+	driverOpener = func(_, _, _, _ string, _ bool) (neo4j.Driver, error) {
 		panic("driverOpener must not be called from `:embed`")
 	}
 
@@ -162,7 +162,7 @@ func TestQueryEmbed_NoBoltConnection_NoPasswordPrompt(t *testing.T) {
 
 	origOpener := driverOpener
 	t.Cleanup(func() { driverOpener = origOpener })
-	driverOpener = func(_, _, _, _ string) (neo4j.Driver, error) {
+	driverOpener = func(_, _, _, _ string, _ bool) (neo4j.Driver, error) {
 		panic("driverOpener must not be called from `:embed`")
 	}
 

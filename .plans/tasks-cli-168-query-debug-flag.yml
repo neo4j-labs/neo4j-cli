@@ -19,7 +19,7 @@ tasks:
       (nil). Update every in-tree call site and test stub that overrides
       `driverOpener` to the new signature — grep for it before merging. No flag
       or env reading happens in this task; that comes in task-002.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`neo4j-cli/query/connect.go` defines a package-private logger type implementing `neo4j/log.Logger` with all four methods (Error, Infof, Warnf, Debugf) writing to `os.Stderr`."
@@ -27,7 +27,7 @@ tasks:
       - "Configurer closure inside `driverOpener` branches on `debug`: true → `c.Log = newStderrLogger(log.DEBUG)`; false → `c.Log` left nil."
       - "All in-tree call sites and test seam stubs (`run_test.go`, `connect_test.go`, any others) are migrated to the 5-arg signature; `go build ./...` and `make test` pass with the new signature."
       - "No flag registration and no `os.Getenv` read added yet — the `debug` value is hard-wired to `false` from `resolveConn` for now."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-002
     title: "Register --debug flag + wire flag/env precedence in resolveConn"

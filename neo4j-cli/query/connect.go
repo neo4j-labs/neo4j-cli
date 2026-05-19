@@ -10,9 +10,11 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/subosito/gotenv"
@@ -43,6 +45,7 @@ type conn struct {
 	password  string
 	database  string
 	userAgent string
+	debug     bool
 	driver    neo4j.Driver
 }
 
@@ -70,13 +73,66 @@ type queryResponse struct {
 	QueryType neo4j.QueryType
 }
 
+// stderrLogger is an in-package adapter implementing the neo4j/log.Logger
+// interface that routes ALL four levels (Error / Warnf / Infof / Debugf) to
+// stderr (default: os.Stderr). The driver-shipped log.ToConsole writes
+// DEBUG / INFO / WARN to stdout, which would corrupt the query command's
+// machine-readable output streams (--format json, --format toon); routing
+// everything to stderr keeps stdout reserved for the rendered result.
+type stderrLogger struct {
+	w     io.Writer
+	level log.Level
+}
+
+// newStderrLogger constructs a stderrLogger writing to os.Stderr filtered to
+// the supplied level (DEBUG enables all levels). Tests that need to capture
+// writes construct a stderrLogger literal pointing at a bytes.Buffer.
+func newStderrLogger(level log.Level) *stderrLogger {
+	return &stderrLogger{w: os.Stderr, level: level}
+}
+
+const stderrLoggerTimeFormat = "2006-01-02 15:04:05.000"
+
+func (l *stderrLogger) Error(name, id string, err error) {
+	if l.level < log.ERROR {
+		return
+	}
+	_, _ = fmt.Fprintf(l.w, "%s  ERROR  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, err.Error())
+}
+
+func (l *stderrLogger) Warnf(name, id, msg string, args ...any) {
+	if l.level < log.WARNING {
+		return
+	}
+	_, _ = fmt.Fprintf(l.w, "%s   WARN  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
+func (l *stderrLogger) Infof(name, id, msg string, args ...any) {
+	if l.level < log.INFO {
+		return
+	}
+	_, _ = fmt.Fprintf(l.w, "%s   INFO  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
+func (l *stderrLogger) Debugf(name, id, msg string, args ...any) {
+	if l.level < log.DEBUG {
+		return
+	}
+	_, _ = fmt.Fprintf(l.w, "%s  DEBUG  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
 // driverOpener is the test seam used to construct the Bolt driver. Production
 // calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
-// connection.
-var driverOpener = func(target string, username, password, userAgent string) (neo4j.Driver, error) {
+// connection. When debug is true the configurer attaches an in-package
+// stderrLogger at DEBUG level so the driver's wire activity goes to stderr;
+// when false c.Log is left at its nil default.
+var driverOpener = func(target string, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
 	configurer := func(c *config.Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
+		}
+		if debug {
+			c.Log = newStderrLogger(log.DEBUG)
 		}
 	}
 	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), configurer)
@@ -279,7 +335,7 @@ func (c *conn) openDriver() error {
 	if c.driver != nil {
 		return nil
 	}
-	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent)
+	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent, c.debug)
 	if err != nil {
 		return categorizeBoltError(fmt.Errorf("query: open driver: %w", err))
 	}

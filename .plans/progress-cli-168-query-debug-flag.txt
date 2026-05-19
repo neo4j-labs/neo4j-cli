@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-19T00:00:00Z
+Add stderrLogger adapter (Error/Warnf/Infof/Debugf to stderr), conn.debug field, extend driverOpener seam to 5 args; migrate test stubs.
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/embed_test.go, ~neo4j-cli/query/run_test.go

@@ -1150,7 +1150,7 @@ func TestRunQuery_EmbedParam_ProviderErrorAbortsBeforeExplain(t *testing.T) {
 	// Swap driverOpener to panic so we prove no Bolt driver is ever opened.
 	origOpener := driverOpener
 	t.Cleanup(func() { driverOpener = origOpener })
-	driverOpener = func(_, _, _, _ string) (neo4j.Driver, error) {
+	driverOpener = func(_, _, _, _ string, _ bool) (neo4j.Driver, error) {
 		panic("driverOpener must not be called when embed errors before driver-open")
 	}
 

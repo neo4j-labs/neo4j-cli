@@ -237,7 +237,7 @@ func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, st
 		driverOpener = origOpener
 	})
 	runStatementResponseFn = fn
-	driverOpener = func(target, username, password, userAgent string) (neo4j.Driver, error) {
+	driverOpener = func(target, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
 		return &noopDriver{}, nil
 	}
 }
