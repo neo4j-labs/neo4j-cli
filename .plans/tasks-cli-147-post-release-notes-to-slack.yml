@@ -97,7 +97,7 @@ tasks:
       Use `jq -nR --rawfile body /tmp/release-notes-generated.md '...'` (or
       equivalent) to JSON-escape newlines and quotes safely. Print the resulting
       JSON to the log for inspection. Implements REQ-F-010 and REQ-F-011.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -107,7 +107,7 @@ tasks:
       - "Slack payload JSON is written to /tmp/slack-payload.json AND printed to the job log"
       - "Both steps run unconditionally (no `if:` gating) so they execute on every triggered run"
       - "actionlint reports no errors after the change"
-    completed_at: null
+    completed_at: 2026-05-19T09:40:00Z
 
   - id: task-005
     title: "Add commented-out Slack POST + GH release append steps"
