@@ -189,6 +189,37 @@ func TestRunQuery_HappyPath_JSONOutput(t *testing.T) {
 	assert.Equal(t, float64(42), got.Rows[0]["n"])
 }
 
+// TestRunQuery_EmptyResult_ExitsZero locks the exit-0 contract for runQuery
+// when the underlying Cypher returns zero rows. Mirrors
+// TestRunQuery_HappyPath_JSONOutput shape: EXPLAIN classifies the statement
+// as read-only, the run-time response carries the column list with no values,
+// and the JSON envelope decodes with the column header, an empty rows slice,
+// and truncated=false.
+func TestRunQuery_EmptyResult_ExitsZero(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS n WHERE false"] = func() *queryResponse {
+		resp := makeQueryResponse([]string{"n"}, [][]any{})
+		resp.QueryType = neo4j.QueryTypeReadOnly
+		return resp
+	}()
+	r.resp["RETURN 1 AS n WHERE false"] = makeQueryResponse([]string{"n"}, [][]any{})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"RETURN 1 AS n WHERE false",
+	)
+	require.NoError(t, err)
+
+	var got decodedResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
+	assert.Equal(t, []string{"n"}, got.Columns)
+	assert.Empty(t, got.Rows)
+	assert.False(t, got.Truncated)
+}
+
 func TestRunQuery_ServerErrorSurfacesError(t *testing.T) {
 	r := newSeamRouter()
 	r.respErr["EXPLAIN BAD CYPHER"] = errors.New("Neo.ClientError.Statement.SyntaxError: Invalid input")

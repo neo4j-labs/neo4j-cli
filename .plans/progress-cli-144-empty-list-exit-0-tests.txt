@@ -5,3 +5,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/instance/list_test.go
 ## task-002 — 2026-05-19T15:35:00Z
 Added TestListTenants_EmptyData locking in exit-0 behaviour for empty tenant list. No deprecation assertion (already covered by TestListTenants_DeprecationWarning).
 Files: ~neo4j-cli/aura/internal/subcommands/tenant/list_test.go
+
+## task-003 — 2026-05-19T15:50:00Z
+Added TestRunQuery_EmptyResult_ExitsZero locking runQuery exit-0 + empty rows for `RETURN 1 AS n WHERE false` via seamRouter (EXPLAIN + run-time empty values). Mirrors TestRunQuery_HappyPath_JSONOutput shape.
+Files: ~neo4j-cli/query/run_test.go

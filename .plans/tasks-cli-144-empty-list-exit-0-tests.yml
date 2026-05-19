@@ -61,7 +61,7 @@ tasks:
       err == nil, decode stdout into decodedResult, and assert Columns ==
       ["n"], empty Rows, Truncated == false. Mirrors
       TestRunQuery_HappyPath_JSONOutput shape.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Function TestRunQuery_EmptyResult_ExitsZero exists in query/run_test.go"
@@ -70,7 +70,7 @@ tasks:
       - "Decoded result has Columns == []string{\"n\"} and len(Rows) == 0"
       - "Decoded result has Truncated == false"
       - "Test passes under `go test ./neo4j-cli/query/...`"
-    completed_at: null
+    completed_at: 2026-05-19T15:50:00Z
 
   - id: task-004
     title: "Run final gates: make fmt-check, make lint, make test"
