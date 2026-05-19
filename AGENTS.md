@@ -91,8 +91,11 @@ neo4j-cli/
 common/
   clicfg/                  # Config, credentials, project state (OS-specific paths)
   clierr/                  # Shared error types
+  configmigrate/           # Forward-only config.json migration engine (callable from clicfg.NewConfig)
   skill/                   # Shared agent-skill logic (catalog, render, installer, cobra wrapper)
 ```
+
+Go internal-package rule reminder: `common/*` packages CANNOT import anything under `neo4j-cli/internal/*` (the internal restriction). Any helper that needs to be reachable from `common/clicfg.NewConfig` (or other shared common code) must live under `common/`, not `neo4j-cli/internal/`. Test files in such helpers also can't import `common/clicfg` or `test/utils/testfs` (which transitively imports clicfg) once clicfg depends on the helper — that creates a test-time import cycle; seed in-memory fs directly with a hard-coded relative path.
 
 Agent-skill subsystem: `common/skill/` holds the binary-agnostic logic (agent catalog, path expansion, bundle render, install/remove/list/check, cobra wrapper). The neo4j-cli binary has its own `neo4j-cli/internal/skill/` template (`embed.go` + `description.txt` + `additions.md` + `gen/main.go` + committed `bundle/`). Adding a new standalone CLI in the future = copy the template, edit `description.txt`/`additions.md`/`gen/main.go` import, mount `skill.NewCmd(cfg, binskill.Bundle, "<newcli>")`, run `go generate`. No edits to `common/skill/`. See `CONTRIBUTING.md` "Generated content" for the full workflow.
 
@@ -179,6 +182,10 @@ See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling
 ## Feature Flag Notes
 
 See [`.agents/feature-flags.md`](.agents/feature-flags.md) — naming (`flag.<area>-<feature>`), default-false lifecycle, override surface (config + env), registry shape, and the `aura.beta-enabled` → `flag.aura-beta` migration.
+
+## Config Migration Notes
+
+See [`.agents/config-migrations.md`](.agents/config-migrations.md) — `common/configmigrate/` engine, `_schema_version` marker, registry shape, warn-and-continue error policy, `runWith` test seam, and the internal-package gotcha that put the package under `common/`.
 
 ## Installer Script Testing Notes
 

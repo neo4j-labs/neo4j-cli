@@ -17,6 +17,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/configmigrate"
 	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -83,47 +84,14 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		panic(err)
 	}
 
-	// NOTE: The migration block below is intentionally commented out.
-	// This experimental release has never shipped to users, so the migration
-	// has never run in the field. Users may switch between the stable CLI
-	// (which still uses "aura.output" or "output") and this experimental version;
-	// running the migration would corrupt stable-version config files.
-	// This code is preserved as reference for a future stable-release upgrade path.
-	// When re-enabled, it migrates both "aura.output" → "format" and "output" → "format".
-	//
-	// {
-	// 	data := fileutils.ReadFileSafe(fs, fullConfigPath)
-	// 	migrated := false
-	// 	if gjson.GetBytes(data, "aura.output").Exists() && !gjson.GetBytes(data, "format").Exists() {
-	// 		oldValue := gjson.GetBytes(data, "aura.output").String()
-	// 		updated, err := sjson.Set(string(data), "format", oldValue)
-	// 		if err == nil {
-	// 			updated, err = sjson.Delete(updated, "aura.output")
-	// 			if err == nil {
-	// 				data = []byte(updated)
-	// 				migrated = true
-	// 			}
-	// 		}
-	// 	}
-	// 	if gjson.GetBytes(data, "output").Exists() && !gjson.GetBytes(data, "format").Exists() {
-	// 		oldValue := gjson.GetBytes(data, "output").String()
-	// 		updated, err := sjson.Set(string(data), "format", oldValue)
-	// 		if err == nil {
-	// 			updated, err = sjson.Delete(updated, "output")
-	// 			if err == nil {
-	// 				data = []byte(updated)
-	// 				migrated = true
-	// 			}
-	// 		}
-	// 	}
-	// 	if migrated {
-	// 		fileutils.WriteFile(fs, fullConfigPath, data)
-	// 		if err := Viper.ReadInConfig(); err != nil {
-	// 			fmt.Println("Cannot re-read config file after migration.")
-	// 			panic(err)
-	// 		}
-	// 	}
-	// }
+	// Apply any pending forward-only config migrations, then re-read so Viper
+	// sees migrated values. Run never returns a non-nil error in this design,
+	// but we always re-read because Run may have rewritten the file on disk.
+	_, _ = configmigrate.Run(fs, fullConfigPath, os.Stderr)
+	if err := Viper.ReadInConfig(); err != nil {
+		fmt.Println("Cannot re-read config file after migration.")
+		panic(err)
+	}
 
 	credentials := credentials.NewCredentials(fs, ConfigPrefix)
 
