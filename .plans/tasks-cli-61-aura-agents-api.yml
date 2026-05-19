@@ -162,7 +162,7 @@ tasks:
       `Annotations: write=true`. Required flags identical to create; full body always sent.
       Port `replace_test.go` from `/tmp/cli-61-original-pr.diff` (lines ~1591-1717): happy path
       with full body assertion (uses `testTools`), default-workspace variant, 404.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -171,7 +171,7 @@ tasks:
       - "`replace_test.go` covers happy path with body assertion, default-workspace variant, and 404."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestReplace` passes."
       - "`make fmt-check` and `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T11:05:00Z
 
   - id: task-009
     title: "Implement agent delete leaf + tests"

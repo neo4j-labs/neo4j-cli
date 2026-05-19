@@ -27,3 +27,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/agent/create.go, +neo4j-cli/aura/int
 ## task-007 — 2026-05-19T10:44:23Z
 Implemented agent update leaf: PATCH .../agents/{id} via AuraApiVersion2, Annotations write=true, partial body (string fields included when non-empty; bool fields gated by cmd.Flags().Changed so explicit false ships). MarkFlagsOneRequired group covers all eight content flags. update_test.go covers single-field rename, boolean fields, tools variant, default-workspace, no-fields group error, invalid-tools-JSON, and 404. All test invocations carry --rw; config keys modernized to flag.aura-beta + format.
 Files: ~neo4j-cli/aura/internal/subcommands/agent/update.go, +neo4j-cli/aura/internal/subcommands/agent/update_test.go
+
+## task-008 — 2026-05-19T11:05:00Z
+Implemented agent replace leaf: PUT .../agents/{id} via AuraApiVersion2, Annotations write=true, full eight-field body always sent, Args=ExactArgs(1), required flags name/description/dbid/tools (inline JSON), optional is-private/system-prompt/is-mcp-enabled/enabled. PrintRawBody fields match create. replace_test.go covers happy path + body assertion, default-workspace variant, and 404 → "Error: [Agent not found]". All test invocations carry --rw; config keys modernized to flag.aura-beta + format.
+Files: ~neo4j-cli/aura/internal/subcommands/agent/replace.go, +neo4j-cli/aura/internal/subcommands/agent/replace_test.go
