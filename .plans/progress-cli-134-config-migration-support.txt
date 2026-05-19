@@ -1,3 +1,8 @@
 ## task-001 — 2026-05-19T00:00:00Z
 Scaffolded configmigrate package: Migration struct, empty registry, init validator that panics on gap/duplicate/non-1-start.
 Files: +neo4j-cli/internal/configmigrate/migrations.go
+
+## task-002 — 2026-05-19T00:00:00Z
+Implemented Run/runWith engine: empty-registry/missing-file no-op, gjson-read _schema_version, per-migration Apply + sjson stamp, single fileutils.WriteFile, stderr warning on read/apply errors.
+Files: +neo4j-cli/internal/configmigrate/configmigrate.go
+Decisions: stamp _schema_version via sjson.SetBytes after each Apply (not just at loop end) so a downstream Apply failure leaves the file untouched but the in-memory chain stays valid; matches "write once at end" acceptance.

@@ -48,7 +48,7 @@ tasks:
       succeed, write once via `fileutils.WriteFile` and return `(true,
       nil)`. Use only the existing vendored deps `github.com/tidwall/gjson`
       and `github.com/tidwall/sjson`; no new third-party deps.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -59,7 +59,7 @@ tasks:
       - "Happy path: with `_schema_version: 3` and registry `[v1..v5]`, only v4 and v5 are applied, in order; `_schema_version` ends at 5; file is written exactly once via `fileutils.WriteFile`."
       - "Per-migration error path: when an `Apply` returns error, the exact warning format `\"Warning: config migration v%d (%s) failed: %v; continuing with un-migrated config\\n\"` is written to the supplied stderr, the loop stops, no file write happens, and `runWith` returns `(false, nil)`."
       - "`make fmt-check && make lint` clean for the new file."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-003
     title: "Add table-driven tests for configmigrate engine"
