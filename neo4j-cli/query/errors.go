@@ -19,6 +19,12 @@ import (
 // upstream errors (exit 8). The original error is preserved on CLIError.Err so
 // errors.As / errors.Is continue to find inner sentinels.
 //
+// One transport-shaped failure is reclassified as a usage error: when the
+// driver reports `server responded HTTP` (the user pointed Bolt at the HTTP
+// port, e.g. 7474 or a `:443` ingress), the error is user-input
+// misconfiguration, not a transient blip. Surface it as a UsageError with a
+// hint pointing at the Bolt port (7687) and the `https://` rewrite path.
+//
 // The function inspects the error in two passes: first via errors.As on the
 // concrete *neo4j.Neo4jError type (real driver path), then by string-prefix
 // match on the error message (tests inject plain `errors.New("Neo.ClientError…")`
@@ -33,6 +39,19 @@ func categorizeBoltError(err error) error {
 	var ce *clierr.CLIError
 	if errors.As(err, &ce) {
 		return err
+	}
+
+	// Wrong-port-family detection: the driver emits a stable
+	// `server responded HTTP` message when it talks Bolt at an HTTP endpoint
+	// (port 7474, 443, or any other HTTP listener). This is user-input
+	// misconfiguration, so reclassify as a UsageError with an actionable hint
+	// before the generic Neo4jError / transport branches below run.
+	if strings.Contains(err.Error(), "server responded HTTP") {
+		return clierr.NewUsageError(
+			"server responded HTTP at the Bolt endpoint: the URI points at an HTTP listener, "+
+				"not a Bolt one. Use the Bolt port (default 7687) on the same host, or pass an "+
+				"https://... URI so it is rewritten to neo4j+s://<host>:7687 automatically. "+
+				"(driver: %w)", err)
 	}
 
 	// Real driver error path. Neo4jError.Classification() returns

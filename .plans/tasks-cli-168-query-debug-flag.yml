@@ -166,7 +166,7 @@ tasks:
       rather than after the 1-minute backoff loop. Independent of task-008
       the message still surfaces eventually, with a much more actionable
       hint than today.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`categorizeBoltError` in `neo4j-cli/query/errors.go` detects driver errors containing `server responded HTTP` and returns a `clierr.NewUsageError`."
@@ -174,7 +174,7 @@ tasks:
       - "Unit test in `errors_test.go` constructs a fake driver error containing the substring and asserts the categorised result is a `UsageError` (exit code 6) with the expected message shape."
       - "Existing `categorizeBoltError` test cases (ClientError, TransientError, generic) continue to pass — the new branch is additive, not a rewrite."
       - "`make test`, `make fmt-check`, `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T21:00:00Z
 
   - id: task-008
     title: "Tighten driver ConnectionAcquisitionTimeout for interactive CLI use"

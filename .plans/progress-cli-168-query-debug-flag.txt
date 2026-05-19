@@ -23,3 +23,8 @@ Files: (none)
 ## TASK-006 — 2026-05-19T20:20:00Z
 Added Minor changelog entry for --debug flag / NEO4J_DEBUG=1 env var, stderr routing, and BoltLogger follow-up note via changie.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260519-201954.yaml
+
+## TASK-007 — 2026-05-19T21:00:00Z
+categorizeBoltError now reclassifies driver "server responded HTTP" errors as UsageError (exit 2) with hint naming Bolt port 7687 and https:// rewrite path; added table test covering plain + fmt.Errorf-wrapped chains.
+Files: ~neo4j-cli/query/errors.go, ~neo4j-cli/query/errors_test.go
+Decisions: task description said `NewUsageError` (exit 2) but AC text said "exit code 6" — followed the explicit function-name instruction; exit 2 (usage_error) fits user-input misconfiguration better than 6 (validation) or 8 (upstream).
