@@ -199,7 +199,7 @@ tasks:
       Coordinate with task-007: combined, the user reporting today's hang
       would see a UsageError pointing at the wrong port within ~2-3 seconds
       instead of a 60-second silent hang.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`driverOpener`'s configurer closure sets `c.ConnectionAcquisitionTimeout = 10 * time.Second`."
@@ -208,4 +208,4 @@ tasks:
       - "Manual smoke against the original failing URL (`neo4j+s://<sandbox>:443`) exits within ~10-15 seconds, not ~60s; captured stderr shows the new task-007 UsageError when both tasks are in."
       - "Changelog entry (Minor) documenting the new shorter retry window so users with intentionally slow / contended deployments know to expect faster failures."
       - "`make test`, `make fmt-check`, `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T21:15:00Z

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
@@ -646,4 +647,20 @@ func TestBuildDriverConfigurer_DebugOnAttachesStderrLogger(t *testing.T) {
 	logger.Debugf("driver", "1", "hello %s", "world")
 	assert.Contains(t, buf.String(), "DEBUG")
 	assert.Contains(t, buf.String(), "hello world")
+}
+
+// TestBuildDriverConfigurer_ConnectionAcquisitionTimeout asserts the configurer
+// caps the driver's ConnectionAcquisitionTimeout at 10s for interactive CLI use
+// regardless of the debug flag. The driver default of 1m reads as a hang in a
+// terminal session; 10s leaves headroom for one or two retries through a
+// transient blip while surfacing permanent misconfigurations (e.g. HTTP on the
+// Bolt port — see task-007) within seconds.
+func TestBuildDriverConfigurer_ConnectionAcquisitionTimeout(t *testing.T) {
+	for _, debug := range []bool{false, true} {
+		t.Run(map[bool]string{false: "debug=false", true: "debug=true"}[debug], func(t *testing.T) {
+			cfg := &config.Config{}
+			buildDriverConfigurer("neo4j-cli/vtest", debug)(cfg)
+			assert.Equal(t, 10*time.Second, cfg.ConnectionAcquisitionTimeout)
+		})
+	}
 }

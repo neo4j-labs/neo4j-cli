@@ -134,6 +134,8 @@ func buildDriverConfigurer(userAgent string, debug bool) func(*config.Config) {
 		if debug {
 			c.Log = newStderrLogger(log.DEBUG)
 		}
+		// interactive CLI fails fast; the driver's 1m default reads as a hang
+		c.ConnectionAcquisitionTimeout = 10 * time.Second
 	}
 }
 
