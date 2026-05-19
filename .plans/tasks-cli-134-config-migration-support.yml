@@ -87,7 +87,7 @@ tasks:
       without process-level panics, then have `init()` call
       `if err := validateMigrations(migrations); err != nil { panic(err) }`).
       Tests are table-driven where possible.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -97,7 +97,7 @@ tasks:
       - "Validator extracted to `validateMigrations([]Migration) error`; `init()` calls it; tests call it directly and assert on returned error messages (no `recover()` gymnastics)."
       - "`go test ./neo4j-cli/internal/configmigrate/...` passes; race detector clean (`go test -race`)."
       - "`make fmt-check && make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-004
     title: "Wire configmigrate.Run into clicfg.NewConfig, removing commented block"

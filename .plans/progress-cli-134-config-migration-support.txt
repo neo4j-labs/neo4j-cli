@@ -6,3 +6,7 @@ Files: +neo4j-cli/internal/configmigrate/migrations.go
 Implemented Run/runWith engine: empty-registry/missing-file no-op, gjson-read _schema_version, per-migration Apply + sjson stamp, single fileutils.WriteFile, stderr warning on read/apply errors.
 Files: +neo4j-cli/internal/configmigrate/configmigrate.go
 Decisions: stamp _schema_version via sjson.SetBytes after each Apply (not just at loop end) so a downstream Apply failure leaves the file untouched but the in-memory chain stays valid; matches "write once at end" acceptance.
+
+## task-003 — 2026-05-19T00:00:00Z
+Added table-driven engine tests (fresh/partial/up-to-date/idempotency/per-migration error/empty registry/missing file) and validator tests (gap/duplicate/non-1 start). Extracted init() body into validateMigrations for direct testing without recover().
+Files: +neo4j-cli/internal/configmigrate/configmigrate_test.go, ~neo4j-cli/internal/configmigrate/migrations.go

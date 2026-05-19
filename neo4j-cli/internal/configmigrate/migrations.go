@@ -26,13 +26,25 @@ type Migration struct {
 var migrations = []Migration{}
 
 func init() {
-	for i, m := range migrations {
+	if err := validateMigrations(migrations); err != nil {
+		panic(err)
+	}
+}
+
+// validateMigrations enforces that the slice is contiguous and ascending
+// starting at Version=1 (so index i holds Version=i+1). Returns a descriptive
+// error on any gap, duplicate, or non-1 start; nil for an empty slice or a
+// valid one. Extracted from init() so tests can drive it directly without
+// process-level panics.
+func validateMigrations(ms []Migration) error {
+	for i, m := range ms {
 		want := i + 1
 		if m.Version != want {
-			panic(fmt.Sprintf(
+			return fmt.Errorf(
 				"configmigrate: migrations slice must be contiguous and ascending starting at 1; index %d has Version=%d, want %d",
 				i, m.Version, want,
-			))
+			)
 		}
 	}
+	return nil
 }
