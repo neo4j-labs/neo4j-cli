@@ -151,6 +151,22 @@ jobs:
           cat /tmp/release-notes-generated.md
           echo "----- end -----"
 
+      - name: Convert release notes to Slack mrkdwn
+        run: |
+          # Slack's `mrkdwn` flavour does not understand GitHub headings
+          # (`##`, `###`) or `**bold**` — they render as literal characters.
+          # Translate the GitHub-flavoured body produced by Claude into Slack
+          # mrkdwn so headings and bold weights render. Bullets (`- `) and
+          # triple-backtick fenced code blocks pass through unchanged because
+          # Slack already handles those. The GitHub-flavoured original stays
+          # on disk for the GH release append step further down.
+          perl -pe '
+            s{^### (.*)}{*$1*};
+            s{^## (.*)}{*$1*};
+            s{\*\*([^*]+)\*\*}{*$1*}g;
+            s{\[([^\]]+)\]\(([^)]+)\)}{<$2|$1>}g;
+          ' /tmp/release-notes-generated.md > /tmp/release-notes-slack.md
+
       - name: Build Slack payload
         run: |
           # Assemble the Slack message body as:
@@ -162,13 +178,14 @@ jobs:
           #   <release-url>
           # `jq -nR --rawfile body ...` slurps the markdown verbatim, so newlines,
           # backticks, and quotes are JSON-escaped safely without our own
-          # sed/printf gymnastics.
+          # sed/printf gymnastics. The body comes from the Slack-flavoured copy
+          # so `##` headings and `**bold**` actually render.
           PREAMBLE="neo4j-labs/neo4j-cli ${RELEASE_TAG} is now out. Update with \`neo4j-cli update\` or use your favourite package manager."
           RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
           jq -nR \
             --arg preamble "${PREAMBLE}" \
             --arg url "${RELEASE_URL}" \
-            --rawfile body /tmp/release-notes-generated.md \
+            --rawfile body /tmp/release-notes-slack.md \
             '{text: ($preamble + "\n\nRelease notes\n" + $body + "\n\n" + $url)}' \
             > /tmp/slack-payload.json
           echo "----- /tmp/slack-payload.json -----"
