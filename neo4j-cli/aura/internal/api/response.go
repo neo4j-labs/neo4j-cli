@@ -18,6 +18,11 @@ import (
 	"github.com/neo4j/cli/common/output"
 )
 
+// authSuggestion is the next-action hint attached to every 401/403 *CLIError
+// produced by handleResponseError / formatAuthorizationError. Centralised so
+// the four constructor sites stay in lock-step.
+const authSuggestion = "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry."
+
 type ErrorResponse struct {
 	Errors []Error `json:"errors"`
 }
@@ -61,7 +66,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			messages = append(messages, message)
 		}
 
-		return clierr.NewValidationError("%s", messages)
+		return clierr.NewValidationError("%s", messages).WithSuggestion("See 'neo4j-cli aura <cmd> --help' for valid flags and values.")
 	case http.StatusUnauthorized:
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
 	case http.StatusForbidden:
@@ -72,7 +77,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 			panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 		}
 		if serverError.Error != "" {
-			return clierr.NewAuthError("%s", serverError.Error)
+			return clierr.NewAuthError("%s", serverError.Error).WithSuggestion(authSuggestion)
 		}
 
 		return formatAuthorizationError(resBody, statusCode, credential, cfg)
@@ -120,7 +125,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
-		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter)
+		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter).WithSuggestion(fmt.Sprintf("Retry after %s seconds.", retryAfter))
 	// server error responses
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		var errorResponse ErrorResponse
@@ -362,7 +367,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
@@ -379,5 +384,5 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	return clierr.NewAuthError(`[
 	%s
-]`, strings.Join(messages, ",\n\t"))
+]`, strings.Join(messages, ",\n\t")).WithSuggestion(authSuggestion)
 }

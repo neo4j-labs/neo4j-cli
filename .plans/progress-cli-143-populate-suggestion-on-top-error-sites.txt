@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-19T00:00:00Z
 Added utils.WithNotFoundContext helper that rewrites *clierr.CLIError (Code==3) ResourceType/ResourceID/Suggestion in place; non-matching errors pass through. Used downstream by snapshot/session callers where parseResourceFromRequest mis-segments nested paths.
 Files: +neo4j-cli/aura/internal/subcommands/utils/notfound.go, +neo4j-cli/aura/internal/subcommands/utils/notfound_test.go
+
+## TASK-002 — 2026-05-19T00:00:00Z
+Wired .WithSuggestion onto 400/401/403/429 *CLIErrors in aura/internal/api/response.go (validation help, auth refresh-credentials, rate-limit retry-after); 401/403 share a package-local authSuggestion const covering both formatAuthorizationError returns + the 403 serverError short-circuit. Extended TestHandleResponseError_ExitCodeMapping with a wantSuggestion column.
+Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go

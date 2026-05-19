@@ -33,7 +33,8 @@ tasks:
       short-circuit at response.go:67-78 (serverError.Error != "") also gets
       the same suggestion inline. The 429 suggestion uses the Retry-After header
       value via fmt.Sprintf.
-    status: pending
+    status: completed
+    completed_at: 2026-05-19T00:00:00Z
     dependencies: []
     acceptance_criteria:
       - "400 branch returns CLIError.Suggestion == \"See 'neo4j-cli aura <cmd> --help' for valid flags and values.\"."

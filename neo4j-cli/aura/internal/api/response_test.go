@@ -136,33 +136,38 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		header         http.Header
 		wantCode       int
 		wantMsgContain string // optional substring check on the rendered message
+		wantSuggestion string // optional Suggestion field check (errors.As)
 		usesAuthCfg    bool   // 401/403-no-server-error paths call ClearAccessToken
 	}{
 		{
-			name:       "400 bad request -> validation (6)",
-			statusCode: http.StatusBadRequest,
-			body:       `{"errors":[{"message":"bad input","field":"name"}]}`,
-			wantCode:   6,
+			name:           "400 bad request -> validation (6)",
+			statusCode:     http.StatusBadRequest,
+			body:           `{"errors":[{"message":"bad input","field":"name"}]}`,
+			wantCode:       6,
+			wantSuggestion: "See 'neo4j-cli aura <cmd> --help' for valid flags and values.",
 		},
 		{
-			name:        "401 unauthorized -> auth (4)",
-			statusCode:  http.StatusUnauthorized,
-			body:        `{"errors":[{"message":"token invalid"}]}`,
-			wantCode:    4,
-			usesAuthCfg: true,
+			name:           "401 unauthorized -> auth (4)",
+			statusCode:     http.StatusUnauthorized,
+			body:           `{"errors":[{"message":"token invalid"}]}`,
+			wantCode:       4,
+			usesAuthCfg:    true,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
-			name:       "403 forbidden with serverError -> auth (4)",
-			statusCode: http.StatusForbidden,
-			body:       `{"error":"forbidden endpoint"}`,
-			wantCode:   4,
+			name:           "403 forbidden with serverError -> auth (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"error":"forbidden endpoint"}`,
+			wantCode:       4,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
-			name:        "403 forbidden without serverError -> auth (4)",
-			statusCode:  http.StatusForbidden,
-			body:        `{"errors":[{"message":"forbidden"}]}`,
-			wantCode:    4,
-			usesAuthCfg: true,
+			name:           "403 forbidden without serverError -> auth (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"errors":[{"message":"forbidden"}]}`,
+			wantCode:       4,
+			usesAuthCfg:    true,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
 			name:       "404 not found -> not_found (3)",
@@ -183,6 +188,7 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			header:         headerWithRetry("30"),
 			wantCode:       7,
 			wantMsgContain: "30",
+			wantSuggestion: "Retry after 30 seconds.",
 		},
 		{
 			name:       "500 internal server error -> upstream (8)",
@@ -242,6 +248,10 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 
 			if tc.wantMsgContain != "" {
 				assert.Contains(t, ce.Error(), tc.wantMsgContain)
+			}
+
+			if tc.wantSuggestion != "" {
+				assert.Equal(t, tc.wantSuggestion, ce.Suggestion, "Suggestion mismatch for status %d", tc.statusCode)
 			}
 
 			// 429 also asserts the Retry-After landed on the struct field.
