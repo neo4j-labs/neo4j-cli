@@ -96,7 +96,7 @@ tasks:
       enabled]`. Port `get_test.go` from `/tmp/cli-61-original-pr.diff` (lines ~726-838):
       JSON happy path, default-workspace variant, 404 → `Error: [Agent not found]`. Apply same
       config-key renames as task-004.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -105,7 +105,7 @@ tasks:
       - "`get_test.go` covers JSON happy path, default-workspace resolution, and 404 error."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestGet` passes."
       - "`make fmt-check` and `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T14:30:00Z
 
   - id: task-006
     title: "Implement agent create leaf + testdata_test.go + tests"

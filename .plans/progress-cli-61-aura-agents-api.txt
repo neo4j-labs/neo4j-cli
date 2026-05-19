@@ -15,3 +15,7 @@ Decisions: Skipped the original PR's PersistentPreRunE output binding (uses remo
 ## task-004 — 2026-05-19T14:00:00Z
 Implemented agent list leaf: GET /organizations/{org}/projects/{proj}/agents via AuraApiVersion2, PrintRawBody with fields [id,name,description,dbid,enabled], --organization-id/--project-id flags, SetProjectFlagsAsRequired PreRunE. list_test.go covers JSON, table, default-workspace, and missing-flag errors. Renamed aura.beta-enabled→flag.aura-beta and aura.output→format per modern config keys.
 Files: ~neo4j-cli/aura/internal/subcommands/agent/list.go, +neo4j-cli/aura/internal/subcommands/agent/list_test.go
+
+## task-005 — 2026-05-19T14:30:00Z
+Implemented agent get leaf: GET /organizations/{org}/projects/{proj}/agents/{id} via AuraApiVersion2, Args=ExactArgs(1), PrintRawBody with fields [id,name,description,dbid,is_private,is_mcp_enabled,enabled]. get_test.go covers JSON happy path, default-workspace, and 404 → "Error: [Agent not found]". Same config-key renames as task-004.
+Files: ~neo4j-cli/aura/internal/subcommands/agent/get.go, +neo4j-cli/aura/internal/subcommands/agent/get_test.go
