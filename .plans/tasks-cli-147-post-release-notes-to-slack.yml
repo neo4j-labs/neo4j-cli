@@ -16,7 +16,7 @@ tasks:
       no corporate fluff. Output has `### Highlights` (bullets with runnable
       `neo4j-cli` examples) and `### Other changes` (one-line bullets) — no top-level
       h1, the workflow concatenates a `## Release notes` header. Implements REQ-F-015.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "File exists at .github/prompts/release-notes.md and is a complete, self-contained prompt"
@@ -25,7 +25,7 @@ tasks:
       - "Prompt instructs Claude to ground command/flag syntax in neo4j-cli/aura/internal/subcommands/**, neo4j-cli/app/app.go, and README.md and to never invent flags"
       - "Prompt specifies tone (witty + wholesome, dry humour, no emoji unless source has it, no marketing fluff) and the exact output structure (### Highlights + ### Other changes, no top-level h1, ≤300 lines)"
       - "Prompt instructs Claude to write the final markdown to /tmp/release-notes-generated.md and NOT to stdout"
-    completed_at: null
+    completed_at: 2026-05-19T08:55:00Z
 
   - id: task-002
     title: "Add post-release-notes workflow skeleton (triggers, perms, version resolution)"

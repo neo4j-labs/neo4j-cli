@@ -1,0 +1,3 @@
+## task-001 — 2026-05-19T08:55:00Z
+Authored .github/prompts/release-notes.md: 6-step Claude Code prompt anchored on per-version changelog + git log range, grounded cobra-tree examples, writes /tmp/release-notes-generated.md.
+Files: +.github/prompts/release-notes.md
