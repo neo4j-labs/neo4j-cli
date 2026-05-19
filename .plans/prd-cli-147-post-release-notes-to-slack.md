@@ -10,6 +10,8 @@ This feature adds a new GitHub Actions workflow that, on every release (and on d
 
 **First PR scope:** generate + print to the job log only. The Slack POST and GitHub-release-edit steps are written, syntactically correct, and committed *commented out* so a follow-up PR (or simply uncommenting once the `SLACK_WEBHOOK_URL` secret is set) can ship them without rework.
 
+**Extension (2026-05-19):** activation PR. The two commented blocks are now turned on, plus a fail-fast check for the webhook secret, plus a human-readable Slack print step to work around GitHub's log UI truncating one giant single-line JSON. See REQ-F-017 onwards.
+
 ## Goals
 
 - A new workflow `.github/workflows/post-release-notes.yml` triggers on `release: published` (auto) and `workflow_dispatch` with a `version` input (manual recovery).
@@ -93,6 +95,37 @@ This feature adds a new GitHub Actions workflow that, on every release (and on d
   8. Write the final markdown to `/tmp/release-notes-generated.md`. Do not print to stdout — the workflow logs the file.
 - **REQ-F-016:** No code is added to the Go module; no Go file changes; no Makefile, no skill bundle regeneration.
 
+#### Activation extension (added 2026-05-19)
+
+- **REQ-F-017:** Add an early-fail guard step for `SLACK_WEBHOOK_URL`, placed AFTER the tag-validation step and BEFORE checkout / Claude install. The step `exit 1`s with a clear error if the secret is empty. Goal: avoid spending ~$1.50 of Claude generation when posting will fail anyway. Env: `SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}`.
+- **REQ-F-018:** Insert a human-readable Slack print step using `jq -r '.text' /tmp/slack-payload.json`, with a `----- Slack message (rendered) -----` header line and a matching `----- end -----` footer. Placed BETWEEN the existing "Build Slack payload" step (which still prints the JSON) and the new "Post to Slack" step. Motivation: GitHub's log UI clips the single-line JSON visually; the rendered text shows actual newlines.
+- **REQ-F-019:** Activate the previously commented Slack POST step (originally specified by REQ-F-012). Uncomment the block; keep the hard-fail-on-empty `SLACK_WEBHOOK_URL` guard inside the step body (defense in depth on top of REQ-F-017). The step runs on BOTH `release: published` AND `workflow_dispatch` triggers — no `if:` gating.
+- **REQ-F-020:** Activate the previously commented GH release append step (originally specified by REQ-F-013). Uncomment the block; runs on BOTH triggers.
+- **REQ-F-021:** The GH release append step (REQ-F-020) MUST be idempotent on re-runs. Detection rule: if the current release body starts with `## Release notes\n` AND contains a `\n---\n` separator, the leading `## Release notes ... ---\n` block is removed BEFORE prepending the new Claude block. The split point is the FIRST `\n---\n` occurrence. If the marker is absent, the new block is prepended as-is. Concretely:
+  ```bash
+  CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
+  case "${CURRENT}" in
+    "## Release notes"*)
+      # strip the leading Claude block up to and including the first `---` separator
+      REMAINING="${CURRENT#*$'\n---\n'}"
+      # If no separator was present, ${CURRENT#*...} returns the original string unchanged
+      [ "${REMAINING}" = "${CURRENT}" ] && REMAINING="${CURRENT}"
+      ;;
+    *)
+      REMAINING="${CURRENT}"
+      ;;
+  esac
+  {
+    printf '## Release notes\n\n'
+    cat /tmp/release-notes-generated.md
+    printf '\n\n---\n\n'
+    printf '%s\n' "${REMAINING}"
+  } > /tmp/release-body.md
+  gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md
+  ```
+  This means re-running `workflow_dispatch` for v1.4.0 cleanly replaces the prior Claude block rather than stacking another one on top.
+- **REQ-F-022:** Step ordering for the activation MUST be (top-to-bottom in the YAML): tag-validation → REQ-F-017 webhook fail-fast → checkout → prev-tag resolve → Claude install → API-key guard → Claude generate → guard generated file → print generated → build Slack payload → REQ-F-018 rendered print → Slack POST (REQ-F-019) → GH release append (REQ-F-020). The Slack POST runs BEFORE the GH release edit so a transient GH API failure doesn't prevent the Slack message from going out; the idempotent replace from REQ-F-021 means a `workflow_dispatch` re-run cleanly recovers the GH side.
+
 ### Non-Functional Requirements
 
 - **REQ-NF-001:** The workflow YAML must parse on GitHub Actions (no syntax errors, all commented blocks valid as comments). Verify by pushing a draft and checking the Actions tab.
@@ -102,6 +135,12 @@ This feature adds a new GitHub Actions workflow that, on every release (and on d
 - **REQ-NF-005:** Secrets used: `ANTHROPIC_API_KEY` (existing). `SLACK_WEBHOOK_URL` will be referenced only inside the commented step; the workflow MUST still pass YAML validation when that secret is absent. When uncommented in the follow-up, a missing `SLACK_WEBHOOK_URL` MUST hard-fail the job (no graceful skip).
 - **REQ-NF-006:** No changelog entry under `.changes/unreleased/` — this is CI infrastructure with no user-visible CLI behaviour change (per AGENTS.md: "Internal changes (CI/CD workflow fixes, build scripts, code refactors with no visible effect) do not need changelog entries").
 - **REQ-NF-007:** No license header is required for `.yml` or `.md` files under `.github/` (consistent with existing `update-website.yml` and `claude.yml`).
+
+#### Activation extension (added 2026-05-19)
+
+- **REQ-NF-008:** Pre-merge prerequisite — the `SLACK_WEBHOOK_URL` repo secret MUST be set BEFORE the activation PR merges. The fail-fast guard from REQ-F-017 makes a missing secret immediately visible; merging without it would break every subsequent release. The webhook points at `#feature-labs-neo4j-cli` per the original ticket.
+- **REQ-NF-009:** Re-running `workflow_dispatch` against the same version is supported and SHOULD leave the GH release body in a clean state (Claude block replaced, not stacked). Slack is fundamentally non-idempotent — re-running posts the message again. Maintainers know this.
+- **REQ-NF-010:** The activation must not regress actionlint cleanliness — the modified workflow file must still pass `actionlint .github/workflows/post-release-notes.yml` with zero errors and zero warnings.
 
 ## Technical Considerations
 
@@ -153,6 +192,18 @@ This feature adds a new GitHub Actions workflow that, on every release (and on d
 - [ ] After the next real release, the auto path fires on `release: published` and produces the same shape of output.
 - [ ] No edits to `release.yml`, `publish-npm.yml`, `update-website.yml`, any Go file, the Makefile, or the skill bundle.
 
+### Activation extension (added 2026-05-19)
+
+- [ ] Early-fail guard (REQ-F-017) exits non-zero before checkout when `SLACK_WEBHOOK_URL` is empty.
+- [ ] A `jq -r '.text'` rendered-print step (REQ-F-018) sits between the JSON-payload print and the Slack POST, with `----- Slack message (rendered) -----` header.
+- [ ] Slack POST step (REQ-F-019) runs unconditionally on both triggers and the `# CLI-147 follow-up:` comments are gone.
+- [ ] GH release append step (REQ-F-020) runs unconditionally on both triggers and the `# CLI-147 follow-up:` comments are gone.
+- [ ] Idempotent replace (REQ-F-021): a `workflow_dispatch` re-run for `version: 1.4.0` REPLACES the existing `## Release notes` block on the v1.4.0 release rather than stacking a new one.
+- [ ] Step ordering (REQ-F-022) is exactly as specified — Slack POST precedes GH release edit.
+- [ ] `actionlint .github/workflows/post-release-notes.yml` is clean.
+- [ ] `SLACK_WEBHOOK_URL` is provisioned in the repo BEFORE this PR merges (REQ-NF-008).
+- [ ] End-to-end verification: trigger `workflow_dispatch` for `version: 1.4.0`. A single message appears in `#feature-labs-neo4j-cli`; the v1.4.0 GH release body now leads with `## Release notes`; re-triggering does not stack the section.
+
 ## Out of Scope
 
 - Slack live posting and `SLACK_WEBHOOK_URL` secret creation (follow-up).
@@ -168,7 +219,11 @@ This feature adds a new GitHub Actions workflow that, on every release (and on d
 - **Workflow filename**: `.github/workflows/post-release-notes.yml`.
 - **Changelog source**: `.changes/neo4j-cli/v${RELEASE_VERSION}.md` (the per-version file already used by `release.yml`). The prompt MUST NOT parse the aggregate `CHANGELOG.md`.
 - **Triggers**: ONLY `release: { types: [published] }` and `workflow_dispatch`. No other trigger types.
-- **Missing `SLACK_WEBHOOK_URL` once uncommented**: hard-fail the job. No graceful skip.
+- **Missing `SLACK_WEBHOOK_URL`**: hard-fail the job (both at the early-fail guard and inside the Slack POST step).
+- **Re-run idempotency (GH release body)**: detect-and-replace the existing `## Release notes ... ---` block before prepending. Stacking is prevented.
+- **Re-run idempotency (Slack)**: not provided — Slack posts again. Maintainers accept this.
+- **Step ordering**: Slack POST runs BEFORE GH release edit. A transient GH API failure does not block the Slack message.
+- **Webhook check timing**: fail fast at the top of the job (before Claude runs).
 
 ## Open Questions
 
