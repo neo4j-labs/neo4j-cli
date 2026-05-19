@@ -53,7 +53,7 @@ tasks:
       `if cfg.Flags.Enabled("flag.aura-beta") { ... }` block. Every new file carries the Neo4j
       copyright header. Leaves will be filled in by subsequent tasks; the goal here is a
       compiling, addressable command tree.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -62,7 +62,7 @@ tasks:
       - "`neo4j-cli/aura/aura.go` imports `.../subcommands/agent` and calls `cmd.AddCommand(agent.NewCmd(cfg))` inside the `flag.aura-beta` block."
       - "With `flag.aura-beta=true`, `./bin/neo4j-cli aura agent --help` lists all seven subcommands."
       - "`make test` and `make fmt-check` pass; `TestAllLeafCommands_HaveExamples` is green."
-    completed_at: null
+    completed_at: 2026-05-19T13:15:00Z
 
   - id: task-004
     title: "Implement agent list leaf + tests"

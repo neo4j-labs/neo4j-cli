@@ -6,3 +6,8 @@ Files: ~neo4j-cli/aura/internal/api/response.go
 Added output.PrintRawBody helper. JSON mode re-indents raw bytes via json.Indent for verbatim fidelity; non-JSON delegates to PrintBodyMap(api.ParseRawBody(body)). Uses output.ResolveOutput (not the original PR's cfg.Aura.Output() — that API was refactored away).
 Files: ~neo4j-cli/aura/internal/output/output.go
 Decisions: ResolveOutput chosen over cfg.Global.Format() so explicit --format and TTY-fallback both work, matching PrintBodyMap behaviour.
+
+## task-003 — 2026-05-19T13:15:00Z
+Scaffolded agent package: parent agent.go mirrors deployment.go (BindBaseUrl/BindAuthUrl + RegisterAuraCredentialFlag), seven placeholder leaves (list/get/create/update/replace/delete/invoke) each with flush-left Example, copyright header, RunE returning nil; write leaves annotated write=true. Wired into aura.go inside flag.aura-beta block.
+Files: +neo4j-cli/aura/internal/subcommands/agent/{agent,list,get,create,update,replace,delete,invoke}.go, ~neo4j-cli/aura/aura.go
+Decisions: Skipped the original PR's PersistentPreRunE output binding (uses removed cfg.Aura.BindOutput) — leaves will call output.ResolveOutput directly in subsequent tasks. Added RegisterAuraCredentialFlag to match deployment.go parent shape.

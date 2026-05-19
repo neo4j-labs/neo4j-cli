@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/agent"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/dataapi"
@@ -42,6 +43,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		cmd.AddCommand(dataapi.NewCmd(cfg))
 		cmd.AddCommand(_import.NewCmd(cfg))
 		cmd.AddCommand(deployment.NewCmd(cfg))
+		cmd.AddCommand(agent.NewCmd(cfg))
 	}
 
 	return cmd
