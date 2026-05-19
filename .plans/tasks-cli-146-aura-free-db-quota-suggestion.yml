@@ -19,7 +19,7 @@ tasks:
       the 402 case only when the helper returns non-empty. Extend
       `response_test.go` with two new 402 rows in the existing mapping table
       plus a new `TestSuggestionForPaymentRequired` table-driven test.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "402 with body `{\"errors\":[{\"message\":\"User is not permitted to create any more instances of this type.\",\"reason\":\"quota-exceeded\"}]}` returns CLIError.Code==5 and Suggestion==\"You've reached your quota for this instance type. Delete an existing instance with 'neo4j-cli aura instance list' then 'neo4j-cli aura instance delete <id>', or pick a different --type.\""
@@ -27,7 +27,7 @@ tasks:
       - "402 with body that fails to unmarshal returns CLIError.Code==1 (fatal) with the standard \"unexpected error [status %d] running CLI with args %s\" message."
       - "`TestSuggestionForPaymentRequired` covers: positive `quota-exceeded`; negative unknown reason; empty errors[]; multi-error body where one entry is `quota-exceeded` (positive)."
       - "`make fmt-check && make lint && go test ./neo4j-cli/aura/internal/api/...` all clean."
-    completed_at: null
+    completed_at: 2026-05-19T09:48:21Z
 
   - id: task-002
     title: "Harden recoverPanic in neo4j-cli/main.go to surface panic value"
