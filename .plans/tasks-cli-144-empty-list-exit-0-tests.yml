@@ -36,7 +36,7 @@ tasks:
       re-assert the deprecation warning — that is already locked by
       TestListTenants_DeprecationWarning and duplicating couples this
       test to unrelated copy.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Function TestListTenants_EmptyData exists in tenant/list_test.go"
@@ -45,7 +45,7 @@ tasks:
       - "helper.AssertOutJson(`{\"data\": []}`) passes"
       - "No stderr / deprecation-warning assertion in the new function"
       - "Test passes under `go test ./neo4j-cli/aura/internal/subcommands/tenant/...`"
-    completed_at: null
+    completed_at: 2026-05-19T15:35:00Z
 
   - id: task-003
     title: "Add TestRunQuery_EmptyResult_ExitsZero golden test"

@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-19T15:20:13Z
 Added TestListInstances_EmptyData locking in exit-0 behaviour for empty Aura instance list.
 Files: ~neo4j-cli/aura/internal/subcommands/instance/list_test.go
+
+## task-002 — 2026-05-19T15:35:00Z
+Added TestListTenants_EmptyData locking in exit-0 behaviour for empty tenant list. No deprecation assertion (already covered by TestListTenants_DeprecationWarning).
+Files: ~neo4j-cli/aura/internal/subcommands/tenant/list_test.go

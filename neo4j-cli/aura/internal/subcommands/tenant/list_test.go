@@ -109,3 +109,17 @@ func TestListTenants_DeprecationWarning(t *testing.T) {
 
 	helper.AssertErrContainsStrings([]string{"Warning: 'aura tenant list' is deprecated and will be removed in a future release. Use 'aura project list' instead."})
 }
+
+func TestListTenants_EmptyData(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/tenants", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand("tenant list")
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AssertOutJson(`{"data": []}`)
+}
