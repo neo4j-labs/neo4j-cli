@@ -1,0 +1,3 @@
+## task-001 — 2026-05-19T10:22:53Z
+Added api.ParseRawBody helper for bare-JSON responses (no {"data":...} envelope), mirroring ParseBody. Tries []map[string]any first then map[string]any, panics with "could not parse raw response body" if neither matches.
+Files: ~neo4j-cli/aura/internal/api/response.go

@@ -11,7 +11,7 @@ tasks:
       mirroring the existing `ParseBody` (line 403) shape: try `[]map[string]any` first, then
       `map[string]any`, panic if neither matches. This isolates the agent API's bare-JSON
       response handling (no `{"data":...}` envelope) without touching existing call sites.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`ParseRawBody` is exported from `neo4j-cli/aura/internal/api/response.go` and returns `ResponseData`."
@@ -19,7 +19,7 @@ tasks:
       - "Failure to parse panics with `\"could not parse raw response body\"` (matches existing `ParseBody` shape)."
       - "No existing call sites of `ParseBody` are modified; `make test` still passes."
       - "Copyright header preserved on the file."
-    completed_at: null
+    completed_at: 2026-05-19T10:22:53Z
 
   - id: task-002
     title: "Add output.PrintRawBody helper for bare-JSON responses"
