@@ -40,13 +40,15 @@ func TestUpdateAgentName(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"name": "Renamed Agent"}`)
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "Renamed Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "Renamed Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -79,13 +81,15 @@ func TestUpdateAgentBooleanFields(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"is_mcp_enabled": true, "is_private": true}`)
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": true,
-		"is_mcp_enabled": true,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": true,
+			"is_mcp_enabled": true,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -118,13 +122,15 @@ func TestUpdateAgentTools(t *testing.T) {
 	mockHandler.AssertCalledWithBody(fmt.Sprintf(`{"tools": %s}`, testTools))
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -155,13 +161,15 @@ func TestUpdateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithBody(`{"name": "Renamed Agent"}`)
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "Renamed Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "Renamed Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 

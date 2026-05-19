@@ -48,13 +48,15 @@ func TestCreateAgent(t *testing.T) {
 	}`, testTools))
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -86,13 +88,15 @@ func TestCreateAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Agent",
-		"description": "An agent that queries the database",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Agent",
+			"description": "An agent that queries the database",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -133,13 +137,15 @@ func TestCreateAgentWithPrivateFlag(t *testing.T) {
 	}`, testTools))
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "Private Agent",
-		"description": "A private agent",
-		"dbid": "a1b2c3d4",
-		"is_private": true,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "Private Agent",
+			"description": "A private agent",
+			"dbid": "a1b2c3d4",
+			"is_private": true,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 

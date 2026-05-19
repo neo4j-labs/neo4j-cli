@@ -4,9 +4,6 @@
 package output
 
 import (
-	"bytes"
-	"encoding/json"
-
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -32,19 +29,10 @@ func PrintBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []str
 
 // PrintRawBody prints a bare-JSON response body (no `{"data": ...}` envelope).
 // Used for endpoints (e.g. the Aura Agents API) whose response shape is a bare
-// array or a bare object at the top level. In JSON output mode the raw body is
-// re-indented and printed verbatim, preserving fidelity. In any other mode the
-// body is parsed via `api.ParseRawBody` and rendered through `PrintBodyMap`.
+// array or a bare object at the top level. The response is wrapped in a
+// `{"data": ...}` envelope via PrintBodyMap for consistency with other Aura commands.
 func PrintRawBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []string) {
 	if len(body) == 0 {
-		return
-	}
-	if output.ResolveOutput(cmd, cfg) == "json" {
-		var buf bytes.Buffer
-		if err := json.Indent(&buf, body, "", "\t"); err != nil {
-			panic(err)
-		}
-		cmd.Println(buf.String())
 		return
 	}
 	PrintBodyMap(cmd, cfg, api.ParseRawBody(body), fields)

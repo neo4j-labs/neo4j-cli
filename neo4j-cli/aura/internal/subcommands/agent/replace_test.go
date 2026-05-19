@@ -49,13 +49,15 @@ func TestReplaceAgent(t *testing.T) {
 	}`, testTools))
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Updated Agent",
-		"description": "An updated description",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Updated Agent",
+			"description": "An updated description",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
@@ -88,13 +90,15 @@ func TestReplaceAgentWithOrganizationAndProjectIdFromConfig(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodPut)
 
 	helper.AssertOutJson(`{
-		"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-		"name": "My Updated Agent",
-		"description": "An updated description",
-		"dbid": "a1b2c3d4",
-		"is_private": false,
-		"is_mcp_enabled": false,
-		"enabled": true
+		"data": {
+			"id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"name": "My Updated Agent",
+			"description": "An updated description",
+			"dbid": "a1b2c3d4",
+			"is_private": false,
+			"is_mcp_enabled": false,
+			"enabled": true
+		}
 	}`)
 }
 
