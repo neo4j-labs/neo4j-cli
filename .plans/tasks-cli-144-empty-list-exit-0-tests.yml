@@ -15,7 +15,7 @@ tasks:
       shared testListOrgID/testListProjectID constants, and assert
       stdout JSON equals `{"data": []}` via helper.AssertOutJson.
       Mirrors the in-file flat-func convention (no table restructuring).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Function TestListInstances_EmptyData exists in instance/list_test.go"
@@ -23,7 +23,7 @@ tasks:
       - "mockHandler.AssertCalledTimes(1) verifies single GET"
       - "helper.AssertOutJson(`{\"data\": []}`) passes — empty envelope on stdout"
       - "Test passes under `go test ./neo4j-cli/aura/internal/subcommands/instance/...`"
-    completed_at: null
+    completed_at: 2026-05-19T15:20:13Z
 
   - id: task-002
     title: "Add TestListTenants_EmptyData golden test"

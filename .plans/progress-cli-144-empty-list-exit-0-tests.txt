@@ -1,0 +1,3 @@
+## task-001 — 2026-05-19T15:20:13Z
+Added TestListInstances_EmptyData locking in exit-0 behaviour for empty Aura instance list.
+Files: ~neo4j-cli/aura/internal/subcommands/instance/list_test.go

@@ -96,6 +96,22 @@ func TestListInstances(t *testing.T) {
 	}`)
 }
 
+func TestListInstances_EmptyData(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+
+	mockHandler := helper.NewRequestHandlerMock("/v1/instances", http.StatusOK, `{"data": []}`)
+
+	helper.ExecuteCommand("instance list --organization-id " + testListOrgID + " --project-id " + testListProjectID)
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AssertOutJson(`{"data": []}`)
+}
+
 func TestListInstancesWithProjectIdFlag(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
