@@ -48,14 +48,14 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "create",
 		Short:       "Creates a new agent",
 		Long:        "Creates a new agent for the specified project.",
-		Example: `# Create an agent in the default project
-neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --rw
+		Example: `# Create an agent with a text2cypher tool
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
 
 # Create an agent with a system prompt
-neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --system-prompt "you are helpful" --rw
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --system-prompt "you are helpful" --rw
 
 # Create an agent and emit the response as JSON
-neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --rw --format json`,
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw --format json`,
 		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)

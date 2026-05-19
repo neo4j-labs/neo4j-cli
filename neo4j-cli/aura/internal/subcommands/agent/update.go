@@ -53,6 +53,9 @@ neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --name my-renam
 # Disable an agent
 neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --enabled=false --rw
 
+# Update an agent's tools with a text2cypher tool
+neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
+
 # Update an agent and emit the response as JSON
 neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "updated" --rw --format json`,
 		Args: cobra.ExactArgs(1),

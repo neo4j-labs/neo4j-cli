@@ -48,14 +48,14 @@ func NewReplaceCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:         "replace <id>",
 		Short:       "Fully replaces an existing agent",
 		Long:        "Fully replaces an existing agent's configuration. All fields are required (PUT semantics).",
-		Example: `# Replace an agent's full definition
-neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --rw
+		Example: `# Replace an agent's full definition with a text2cypher tool
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
 
 # Replace an agent with a system prompt
-neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --system-prompt "you are helpful" --rw
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --system-prompt "you are helpful" --rw
 
 # Replace an agent and emit the response as JSON
-neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools "[]" --rw --format json`,
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw --format json`,
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
