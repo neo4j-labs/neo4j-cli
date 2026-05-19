@@ -110,7 +110,7 @@ tasks:
       `make generate-check` afterwards to confirm the working tree is clean
       relative to a fresh `go generate`. `TestGenerator_RoundTrip` is the CI
       gate that catches stale bundles.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -118,7 +118,7 @@ tasks:
       - "`references/query.md` (or the equivalent bundle file) lists the new `--debug` flag with help text matching the source."
       - "`make generate-check` is clean."
       - "`TestGenerator_RoundTrip` passes inside `make test`."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-006
     title: "Add changelog entry for --debug flag"

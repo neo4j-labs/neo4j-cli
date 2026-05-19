@@ -15,3 +15,7 @@ Decisions: extracted configurer into a named helper so tests can run it against 
 ## TASK-004 — 2026-05-19T00:00:00Z
 Bump .agents/query.md driverOpener note from 4 args to 5; add one line on debug bool param setting c.Log=stderrLogger(log.DEBUG).
 Files: ~.agents/query.md
+
+## TASK-005 — 2026-05-19T00:00:00Z
+Verified skill bundle reflects --debug (references/query.md row present); go generate produced no diff; make test/fmt-check/lint all clean. Bundle regen happened in task-002.
+Files: (none)
