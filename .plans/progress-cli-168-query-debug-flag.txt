@@ -32,3 +32,7 @@ Decisions: task description said `NewUsageError` (exit 2) but AC text said "exit
 ## TASK-008 — 2026-05-19T21:15:00Z
 buildDriverConfigurer now caps ConnectionAcquisitionTimeout at 10s regardless of debug; added debug=false/true table test + Minor changelog entry.
 Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, +.changes/unreleased/neo4j-cli-Minor-20260519-211252.yaml
+
+## TASK-009 — 2026-05-19T21:30:00Z
+buildDriverConfigurer also caps MaxTransactionRetryTime at 10s; added mirror table test; updated task-008's changelog entry in place to cover both timeouts (avoids duplicate near-identical release notes).
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~.changes/unreleased/neo4j-cli-Minor-20260519-211252.yaml

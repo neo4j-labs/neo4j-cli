@@ -136,6 +136,8 @@ func buildDriverConfigurer(userAgent string, debug bool) func(*config.Config) {
 		}
 		// interactive CLI fails fast; the driver's 1m default reads as a hang
 		c.ConnectionAcquisitionTimeout = 10 * time.Second
+		// interactive CLI fail-fast; default 30s feels like a hang
+		c.MaxTransactionRetryTime = 10 * time.Second
 	}
 }
 

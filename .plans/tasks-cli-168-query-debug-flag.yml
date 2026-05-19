@@ -240,7 +240,7 @@ tasks:
       requires wrapping the managed-transaction `work` callback and
       reaching past the driver's retry classifier — out of scope here;
       track separately if 10s ever proves too long.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`buildDriverConfigurer` sets `c.MaxTransactionRetryTime = 10 * time.Second`."
@@ -249,4 +249,4 @@ tasks:
       - "Manual smoke against the original failing URL (`neo4j+s://cad2fee7b350fbd7844314001bcec5ae.neo4jsandbox.com:443`) now exits in <15 seconds (was 33.5s) with the task-007 UsageError."
       - "Changelog entry covers it. Update task-008's existing `.changes/unreleased/` file to mention `MaxTransactionRetryTime` as well, OR add a new Minor entry — whichever keeps the user-facing release notes coherent. Don't ship two near-duplicate entries."
       - "`make test`, `make fmt-check`, `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T21:30:00Z

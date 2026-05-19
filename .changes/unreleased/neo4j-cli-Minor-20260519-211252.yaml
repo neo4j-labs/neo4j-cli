@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: Cap Neo4j driver ConnectionAcquisitionTimeout at 10s on query commands so interactive failures (e.g. wrong URI scheme/port) surface within seconds instead of the driver's 1m default that reads as a hang.
+body: Cap Neo4j driver ConnectionAcquisitionTimeout and MaxTransactionRetryTime at 10s on query commands so interactive failures (e.g. wrong URI scheme/port) surface within seconds instead of the driver's 1m / 30s defaults that read as a hang.
 time: 2026-05-19T21:12:52.05169+02:00

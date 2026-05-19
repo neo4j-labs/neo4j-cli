@@ -664,3 +664,19 @@ func TestBuildDriverConfigurer_ConnectionAcquisitionTimeout(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildDriverConfigurer_MaxTransactionRetryTime asserts the configurer caps
+// the driver's managed-transaction retry budget at 10s regardless of debug. The
+// driver default of 30s otherwise lets the retry loop bound the wall-clock
+// failure window when ConnectionAcquisitionTimeout itself fires quickly (e.g.
+// HTTP-on-Bolt-port surfaces in <1s per attempt, so the loop just keeps
+// retrying for ~30s total).
+func TestBuildDriverConfigurer_MaxTransactionRetryTime(t *testing.T) {
+	for _, debug := range []bool{false, true} {
+		t.Run(map[bool]string{false: "debug=false", true: "debug=true"}[debug], func(t *testing.T) {
+			cfg := &config.Config{}
+			buildDriverConfigurer("neo4j-cli/vtest", debug)(cfg)
+			assert.Equal(t, 10*time.Second, cfg.MaxTransactionRetryTime)
+		})
+	}
+}
