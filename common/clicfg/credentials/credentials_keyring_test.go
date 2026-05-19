@@ -5,6 +5,7 @@ package credentials_test
 
 import (
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// errProviderFail is a sentinel returned by failAfterNProvider to simulate
+// a keyring.Set failure.
+var errProviderFail = errors.New("simulated keyring provider failure")
 
 // newKeyringTestCredentials creates a Credentials instance in keyring mode
 // backed by a mock keyring provider. The caller can pre-populate the mock
@@ -270,4 +275,188 @@ func TestSetStorageMode_KeyringMode_DbmsMissingPassword_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "local")
 	assert.Contains(t, err.Error(), "dbms password")
+}
+
+// --- MigrateToKeyring tests ---
+
+// newInsecureTestCredentials creates a Credentials instance in insecure mode
+// (the default) backed by a mock keyring provider. The credentialsJSON is
+// loaded into an in-memory FS.
+func newInsecureTestCredentials(t *testing.T, mock *mockKeyringProvider, credentialsJSON string) (*credentials.Credentials, afero.Fs) {
+	t.Helper()
+	credentials.SetKeyringProviderForTest(t, mock)
+	fs, err := testfs.GetTestFs("{}", credentialsJSON)
+	require.NoError(t, err)
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	// default mode is insecure — no SetStorageMode call needed
+	return creds, fs
+}
+
+// TestMigrateToKeyring_Success verifies the happy path: all secrets are written
+// to the keyring, zeroed in in-memory structs, and saved (scrubbed) to JSON.
+func TestMigrateToKeyring_Success(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds, fs := newInsecureTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"tok","token-expiry":0}]},`+
+			`"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"p4ss","database-name":"neo4j","uri":"bolt://localhost:7687"}]},`+
+			`"embed":{"credentials":[{"name":"openai","provider":"openai","model":"ada","base-url":"","dimensions":1536,"api-key":"sk-key"}]}}`)
+
+	require.NoError(t, creds.MigrateToKeyring())
+
+	// Keyring must hold all secrets
+	val, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
+	require.NoError(t, err)
+	assert.Equal(t, "s3cr3t", val)
+
+	val, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"))
+	require.NoError(t, err)
+	assert.Equal(t, "tok", val)
+
+	val, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("dbms", "local", "password"))
+	require.NoError(t, err)
+	assert.Equal(t, "p4ss", val)
+
+	val, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("embed", "openai", "api-key"))
+	require.NoError(t, err)
+	assert.Equal(t, "sk-key", val)
+
+	// In-memory sensitive fields must be zeroed
+	assert.Equal(t, "", creds.Aura.Credentials[0].ClientSecret, "in-memory ClientSecret must be zeroed")
+	assert.Equal(t, "", creds.Aura.Credentials[0].AccessToken, "in-memory AccessToken must be zeroed")
+	assert.Equal(t, "", creds.Dbms.Credentials[0].Password, "in-memory Password must be zeroed")
+	assert.Equal(t, "", creds.Embed.Credentials[0].APIKey, "in-memory APIKey must be zeroed")
+
+	// credentials.json must not contain any sensitive values
+	data := readCredentialsJSON(t, fs)
+	var jsonFile struct {
+		Aura struct {
+			Credentials []struct {
+				ClientSecret string `json:"client-secret"`
+				AccessToken  string `json:"access-token"`
+			} `json:"credentials"`
+		} `json:"aura"`
+		Dbms struct {
+			Credentials []struct {
+				Password string `json:"password"`
+			} `json:"credentials"`
+		} `json:"dbms"`
+		Embed struct {
+			Credentials []struct {
+				APIKey string `json:"api-key"`
+			} `json:"credentials"`
+		} `json:"embed"`
+	}
+	require.NoError(t, json.Unmarshal(data, &jsonFile))
+	assert.Equal(t, "", jsonFile.Aura.Credentials[0].ClientSecret, "client-secret must be scrubbed from JSON")
+	assert.Equal(t, "", jsonFile.Aura.Credentials[0].AccessToken, "access-token must be scrubbed from JSON")
+	assert.Equal(t, "", jsonFile.Dbms.Credentials[0].Password, "password must be scrubbed from JSON")
+	assert.Equal(t, "", jsonFile.Embed.Credentials[0].APIKey, "api-key must be scrubbed from JSON")
+}
+
+// TestMigrateToKeyring_EmptyRequiredAuraClientSecret aborts with a named error
+// when an Aura credential has an empty ClientSecret.
+func TestMigrateToKeyring_EmptyRequiredAuraClientSecret(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds, _ := newInsecureTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`)
+
+	err := creds.MigrateToKeyring()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prod", "error must name the credential")
+	assert.Contains(t, err.Error(), "aura", "error must identify the credential type")
+}
+
+// TestMigrateToKeyring_EmptyRequiredDbmsPassword aborts with a named error
+// when a Dbms credential has an empty Password.
+func TestMigrateToKeyring_EmptyRequiredDbmsPassword(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds, _ := newInsecureTestCredentials(t, mock,
+		`{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+
+	err := creds.MigrateToKeyring()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "local", "error must name the credential")
+	assert.Contains(t, err.Error(), "dbms", "error must identify the credential type")
+}
+
+// TestMigrateToKeyring_EmptyOptionalFieldsSkipped verifies that optional empty
+// fields (AccessToken, APIKey) are silently skipped and no keyring entry is
+// written for them.
+func TestMigrateToKeyring_EmptyOptionalFieldsSkipped(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds, _ := newInsecureTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"","token-expiry":0}]},`+
+			`"embed":{"credentials":[{"name":"openai","provider":"openai","model":"ada","base-url":"","dimensions":1536,"api-key":""}]}}`)
+
+	require.NoError(t, creds.MigrateToKeyring())
+
+	// access-token and api-key must NOT be in keyring
+	_, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "empty AccessToken must not be written to keyring")
+
+	_, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("embed", "openai", "api-key"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "empty APIKey must not be written to keyring")
+}
+
+// TestMigrateToKeyring_PartialFailureRollback verifies that when a keyring.Set
+// fails mid-migration, all previously written keyring entries are deleted.
+func TestMigrateToKeyring_PartialFailureRollback(t *testing.T) {
+	mock := newMockKeyringProvider()
+	// Make the mock fail on the second Set call (dbms password) to simulate
+	// a partial failure. We use a wrapper that errors after N writes.
+	failing := &failAfterNProvider{inner: mock, failAfter: 1}
+	credentials.SetKeyringProviderForTest(t, failing)
+
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"","token-expiry":0}]},`+
+		`"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"p4ss","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+	require.NoError(t, err)
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+
+	err = creds.MigrateToKeyring()
+	require.Error(t, err, "should fail on second Set")
+
+	// The first entry (aura/prod/client-secret) must have been rolled back
+	_, getErr := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
+	assert.ErrorIs(t, getErr, credentials.ErrNotFound, "rolled-back aura/prod/client-secret must not remain in keyring")
+}
+
+// failAfterNProvider wraps a mock provider and returns an error on Set after N
+// successful writes, then delegates to the inner mock for Get/Delete.
+type failAfterNProvider struct {
+	inner     *mockKeyringProvider
+	failAfter int
+	setCount  int
+}
+
+func (f *failAfterNProvider) Get(service, user string) (string, error) {
+	return f.inner.Get(service, user)
+}
+
+func (f *failAfterNProvider) Set(service, user, password string) error {
+	if f.setCount >= f.failAfter {
+		return errProviderFail
+	}
+	f.setCount++
+	return f.inner.Set(service, user, password)
+}
+
+func (f *failAfterNProvider) Delete(service, user string) error {
+	return f.inner.Delete(service, user)
+}
+
+// TestMigrateToKeyring_EmptyRequiredField_RollsBackPreviousEntries verifies
+// that when a required field is empty (hard error path), entries written for
+// earlier credentials are deleted (rolled back).
+func TestMigrateToKeyring_EmptyRequiredField_RollsBackPreviousEntries(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds, _ := newInsecureTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"","token-expiry":0}]},`+
+			`"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+
+	err := creds.MigrateToKeyring()
+	require.Error(t, err, "must fail on empty dbms password")
+
+	// The previously-written aura/prod/client-secret must be rolled back
+	_, getErr := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
+	assert.ErrorIs(t, getErr, credentials.ErrNotFound, "rolled-back aura/prod/client-secret must not remain in keyring")
 }

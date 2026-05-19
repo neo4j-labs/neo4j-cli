@@ -258,6 +258,111 @@ func (c *Credentials) saveWithKeyring() {
 	fileutils.WriteFile(c.fs, c.filePath, data)
 }
 
+// MigrateToKeyring moves all sensitive credential fields from in-memory (and
+// JSON) to the OS keyring. It iterates all three credential types.
+//
+// Required fields (ClientSecret for Aura, Password for Dbms): if empty, the
+// migration is aborted, all keyring entries written so far are rolled back via
+// keyring.Delete(), and a clierr.UsageError is returned naming the credential
+// and suggesting removal.
+//
+// Optional fields (AccessToken for Aura, APIKey for Embed): silently skipped
+// when empty.
+//
+// Any keyring.Set() failure triggers a full rollback.
+//
+// On full success: sensitive fields are zeroed in the in-memory structs and
+// save() is called to scrub them from credentials.json.
+//
+// The caller is responsible for persisting the "credential-storage" config key.
+// This method must be called while storageMode is still StorageModeInsecure so
+// that the final save() writes the scrubbed (zeroed) values to JSON rather than
+// dispatching to saveWithKeyring(). The caller should call SetStorageMode after
+// persisting the config key.
+func (c *Credentials) MigrateToKeyring() error {
+	// written tracks every (user-key) pair written so far so we can roll back
+	// on partial failure.
+	type entry struct{ user string }
+	var written []entry
+
+	rollback := func() {
+		for _, e := range written {
+			// best-effort; ignore errors on rollback
+			_ = defaultKeyring.Delete(ServiceName, e.user)
+		}
+	}
+
+	setKey := func(user, value string) error {
+		if err := defaultKeyring.Set(ServiceName, user, value); err != nil {
+			rollback()
+			return fmt.Errorf("keyring set %s: %w", user, err)
+		}
+		written = append(written, entry{user: user})
+		return nil
+	}
+
+	// --- Aura credentials ---
+	for _, cred := range c.Aura.Credentials {
+		// ClientSecret is required
+		if cred.ClientSecret == "" {
+			rollback()
+			return clierr.NewUsageError(
+				"cannot migrate credential %q: aura client-secret is empty; run `credential aura-client remove %s` and re-add it",
+				cred.Name, cred.Name,
+			)
+		}
+		if err := setKey(KeyringKey("aura", cred.Name, "client-secret"), cred.ClientSecret); err != nil {
+			return err
+		}
+		// AccessToken is optional
+		if cred.AccessToken != "" {
+			if err := setKey(KeyringKey("aura", cred.Name, "access-token"), cred.AccessToken); err != nil {
+				return err
+			}
+		}
+	}
+
+	// --- Dbms credentials ---
+	for _, cred := range c.Dbms.Credentials {
+		// Password is required
+		if cred.Password == "" {
+			rollback()
+			return clierr.NewUsageError(
+				"cannot migrate credential %q: dbms password is empty; run `credential dbms remove %s` and re-add it",
+				cred.Name, cred.Name,
+			)
+		}
+		if err := setKey(KeyringKey("dbms", cred.Name, "password"), cred.Password); err != nil {
+			return err
+		}
+	}
+
+	// --- Embed credentials ---
+	for _, cred := range c.Embed.Credentials {
+		// APIKey is optional
+		if cred.APIKey != "" {
+			if err := setKey(KeyringKey("embed", cred.Name, "api-key"), cred.APIKey); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Zero sensitive in-memory fields and persist scrubbed JSON.
+	for _, cred := range c.Aura.Credentials {
+		cred.ClientSecret = ""
+		cred.AccessToken = ""
+	}
+	for _, cred := range c.Dbms.Credentials {
+		cred.Password = ""
+	}
+	for _, cred := range c.Embed.Credentials {
+		cred.APIKey = ""
+	}
+	c.save()
+
+	return nil
+}
+
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the
 // OS keyring. It is called by SetStorageMode when switching to keyring mode.
 // For each sensitive field:
