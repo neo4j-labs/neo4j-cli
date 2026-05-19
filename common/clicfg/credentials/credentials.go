@@ -480,6 +480,42 @@ func (c *Credentials) MigrateToInsecure() error {
 	return nil
 }
 
+// DeleteKeyringEntries removes all keyring entries associated with a credential
+// identified by credType ("aura", "dbms", or "embed") and name. It is called
+// by the credential remove commands after the credential has been removed from
+// the JSON file. Deletions are best-effort: ErrNotFound is silently ignored
+// (the entry may already be absent). Any other error is returned as a warning
+// but does not block the caller.
+//
+// Sensitive field mapping:
+//
+//	aura:  client-secret (required), access-token (optional)
+//	dbms:  password (required)
+//	embed: api-key (optional)
+func (c *Credentials) DeleteKeyringEntries(credType, name string) error {
+	deleteOne := func(field string) error {
+		err := defaultKeyring.Delete(ServiceName, KeyringKey(credType, name, field))
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("keyring delete %s/%s/%s: %w", credType, name, field, err)
+		}
+		return nil
+	}
+
+	switch credType {
+	case "aura":
+		if err := deleteOne("client-secret"); err != nil {
+			return err
+		}
+		return deleteOne("access-token")
+	case "dbms":
+		return deleteOne("password")
+	case "embed":
+		return deleteOne("api-key")
+	default:
+		return fmt.Errorf("unknown credential type %q", credType)
+	}
+}
+
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the
 // OS keyring. It is called by SetStorageMode when switching to keyring mode.
 // For each sensitive field:

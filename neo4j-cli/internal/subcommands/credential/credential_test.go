@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	gokeyring "github.com/zalando/go-keyring"
 )
 
 // credentialTestHelper wires NewCredentialCmd with an in-memory filesystem,
@@ -56,10 +57,14 @@ func (h *credentialTestHelper) setCredentialsValue(key string, value interface{}
 }
 
 func (h *credentialTestHelper) executeCommand(command string) {
+	h.executeCommandWithConfig(command, "{}")
+}
+
+func (h *credentialTestHelper) executeCommandWithConfig(command string, configJSON string) {
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
-	fs, err := testfs.GetTestFs("{}", h.credentials)
+	fs, err := testfs.GetTestFs(configJSON, h.credentials)
 	assert.Nil(h.t, err)
 	h.fs = fs
 
@@ -296,6 +301,69 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 			h.assertCredentialsValue("aura.credentials", tc.wantCredentials)
 		})
 	}
+}
+
+// --- remove aura-client keyring tests ---
+
+// TestCredentialRemoveAuraClient_KeyringMode verifies that in keyring mode,
+// removing a credential also deletes its keyring entries. ErrNotFound on
+// delete is silently ignored and does not block the credential removal.
+func TestCredentialRemoveAuraClient_KeyringMode(t *testing.T) {
+	const keyringConfig = `{"credential-storage":"keyring"}`
+
+	t.Run("removes credential and deletes keyring entries", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newCredentialTestHelper(t)
+		h.setCredentialsValue("aura.credentials", []map[string]interface{}{
+			{"name": "prod", "client-id": "id1", "client-secret": "s3cr3t", "access-token": "tok", "token-expiry": 0},
+		})
+		// Seed keyring entries that should be deleted after remove
+		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/client-secret", "s3cr3t"))
+		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/access-token", "tok"))
+
+		h.executeCommandWithConfig("aura-client remove --rw prod", keyringConfig)
+
+		h.assertErr("")
+		h.assertCredentialsValue("aura.credentials", "[]")
+
+		// Keyring entries must be absent after remove
+		_, err := gokeyring.Get("neo4j-cli", "aura/prod/client-secret")
+		assert.ErrorIs(t, err, gokeyring.ErrNotFound, "keyring client-secret must be deleted on remove")
+		_, err = gokeyring.Get("neo4j-cli", "aura/prod/access-token")
+		assert.ErrorIs(t, err, gokeyring.ErrNotFound, "keyring access-token must be deleted on remove")
+	})
+
+	t.Run("remove succeeds even when keyring entries are already absent", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newCredentialTestHelper(t)
+		h.setCredentialsValue("aura.credentials", []map[string]interface{}{
+			{"name": "prod", "client-id": "id1", "client-secret": "s3cr3t", "access-token": "", "token-expiry": 0},
+		})
+		// No keyring entries seeded — ErrNotFound on delete must not block removal
+
+		h.executeCommandWithConfig("aura-client remove --rw prod", keyringConfig)
+
+		h.assertErr("")
+		h.assertCredentialsValue("aura.credentials", "[]")
+	})
+
+	t.Run("remove in insecure mode does not touch keyring", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newCredentialTestHelper(t)
+		h.setCredentialsValue("aura.credentials", []map[string]interface{}{
+			{"name": "prod", "client-id": "id1", "client-secret": "s3cr3t", "access-token": "", "token-expiry": 0},
+		})
+		// Seed a keyring entry that must NOT be deleted in insecure mode
+		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/client-secret", "s3cr3t"))
+
+		h.executeCommand("aura-client remove --rw prod")
+
+		h.assertErr("")
+		// Keyring entry must still be present (insecure mode does not clean up)
+		val, err := gokeyring.Get("neo4j-cli", "aura/prod/client-secret")
+		assert.NoError(t, err)
+		assert.Equal(t, "s3cr3t", val)
+	})
 }
 
 // --- use aura-client tests ---

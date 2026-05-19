@@ -4,9 +4,11 @@
 package credential
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +28,15 @@ neo4j-cli aura credential remove my-creds --rw && neo4j-cli aura credential list
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			credName := strings.TrimSpace(args[0])
-			return cfg.Credentials.Aura.Remove(credName)
+			if err := cfg.Credentials.Aura.Remove(credName); err != nil {
+				return err
+			}
+			if cfg.Credentials.StorageMode() == credentials.StorageModeKeyring {
+				if err := cfg.Credentials.DeleteKeyringEntries("aura", credName); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err) //nolint:errcheck // warning write to stderr; original removal already succeeded
+				}
+			}
+			return nil
 		},
 	}
 }

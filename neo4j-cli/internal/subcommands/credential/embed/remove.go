@@ -4,7 +4,10 @@
 package embed
 
 import (
+	"fmt"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +29,16 @@ neo4j-cli credential embed remove hf-bge --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Embed.Remove(args[0])
+			name := args[0]
+			if err := cfg.Credentials.Embed.Remove(name); err != nil {
+				return err
+			}
+			if cfg.Credentials.StorageMode() == credentials.StorageModeKeyring {
+				if err := cfg.Credentials.DeleteKeyringEntries("embed", name); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err) //nolint:errcheck // warning write to stderr; original removal already succeeded
+				}
+			}
+			return nil
 		},
 	}
 }

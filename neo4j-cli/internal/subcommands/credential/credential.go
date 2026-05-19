@@ -4,7 +4,10 @@
 package credential
 
 import (
+	"fmt"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/output"
@@ -210,7 +213,16 @@ neo4j-cli credential aura-client remove old-tenant --rw`,
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cfg.Credentials.Aura.Remove(args[0])
+			name := args[0]
+			if err := cfg.Credentials.Aura.Remove(name); err != nil {
+				return err
+			}
+			if cfg.Credentials.StorageMode() == credentials.StorageModeKeyring {
+				if err := cfg.Credentials.DeleteKeyringEntries("aura", name); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err) //nolint:errcheck // warning write to stderr; original removal already succeeded
+				}
+			}
+			return nil
 		},
 	}
 }

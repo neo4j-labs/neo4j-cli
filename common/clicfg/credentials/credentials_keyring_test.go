@@ -647,6 +647,100 @@ func TestMigrateToInsecure_RequiredFieldMissing_ZerosInMemoryFieldsAlreadySet(t 
 	assert.Equal(t, "", creds.Aura.Credentials[0].AccessToken, "in-memory AccessToken must be zeroed after failure")
 }
 
+// --- DeleteKeyringEntries tests ---
+
+// newInsecureTestCredentialsWithMock creates a Credentials instance in insecure
+// mode backed by the given mock provider. Used for DeleteKeyringEntries tests
+// that only need the mock active and don't require keyring mode.
+func newInsecureTestCredentialsWithMock(t *testing.T, mock *mockKeyringProvider, credentialsJSON string) *credentials.Credentials {
+	t.Helper()
+	credentials.SetKeyringProviderForTest(t, mock)
+	fs, err := testfs.GetTestFs("{}", credentialsJSON)
+	require.NoError(t, err)
+	return credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+}
+
+// TestDeleteKeyringEntries_Aura verifies that both aura keyring entries are
+// deleted, and that ErrNotFound on delete is silently ignored.
+func TestDeleteKeyringEntries_Aura(t *testing.T) {
+	mock := newMockKeyringProvider()
+	// Populate aura keyring entries
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"), "s3cr3t"))
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"), "tok"))
+
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"tok","token-expiry":0}]}}`)
+
+	require.NoError(t, creds.DeleteKeyringEntries("aura", "prod"))
+
+	_, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "client-secret must be deleted")
+
+	_, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "access-token must be deleted")
+}
+
+// TestDeleteKeyringEntries_Aura_ErrNotFoundIsIgnored verifies that deleting a
+// non-existent keyring entry does not return an error.
+func TestDeleteKeyringEntries_Aura_ErrNotFoundIsIgnored(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"","token-expiry":0}]}}`)
+
+	// No keyring entries seeded — delete must succeed (ErrNotFound silently ignored)
+	require.NoError(t, creds.DeleteKeyringEntries("aura", "prod"))
+}
+
+// TestDeleteKeyringEntries_Dbms verifies that the dbms password keyring entry
+// is deleted, and that ErrNotFound on delete is silently ignored.
+func TestDeleteKeyringEntries_Dbms(t *testing.T) {
+	mock := newMockKeyringProvider()
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("dbms", "local", "password"), "p4ss"))
+
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"p4ss","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+
+	require.NoError(t, creds.DeleteKeyringEntries("dbms", "local"))
+
+	_, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("dbms", "local", "password"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "password must be deleted")
+}
+
+// TestDeleteKeyringEntries_Dbms_ErrNotFoundIsIgnored verifies that deleting an
+// absent dbms password does not error.
+func TestDeleteKeyringEntries_Dbms_ErrNotFoundIsIgnored(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"p4ss","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+
+	require.NoError(t, creds.DeleteKeyringEntries("dbms", "local"))
+}
+
+// TestDeleteKeyringEntries_Embed verifies that the embed api-key keyring entry
+// is deleted, and that ErrNotFound on delete is silently ignored.
+func TestDeleteKeyringEntries_Embed(t *testing.T) {
+	mock := newMockKeyringProvider()
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("embed", "openai", "api-key"), "sk-key"))
+
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"embed":{"credentials":[{"name":"openai","provider":"openai","model":"ada","base-url":"","dimensions":1536,"api-key":"sk-key"}]}}`)
+
+	require.NoError(t, creds.DeleteKeyringEntries("embed", "openai"))
+
+	_, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("embed", "openai", "api-key"))
+	assert.ErrorIs(t, err, credentials.ErrNotFound, "api-key must be deleted")
+}
+
+// TestDeleteKeyringEntries_Embed_ErrNotFoundIsIgnored verifies that deleting
+// an absent embed api-key does not error.
+func TestDeleteKeyringEntries_Embed_ErrNotFoundIsIgnored(t *testing.T) {
+	mock := newMockKeyringProvider()
+	creds := newInsecureTestCredentialsWithMock(t, mock,
+		`{"embed":{"credentials":[{"name":"openai","provider":"openai","model":"ada","base-url":"","dimensions":1536,"api-key":"sk-key"}]}}`)
+
+	require.NoError(t, creds.DeleteKeyringEntries("embed", "openai"))
+}
+
 // errorOnGetProvider is a KeyringProvider that fails with a specific non-ErrNotFound
 // error when getting a specific key. All other operations delegate to inner.
 type errorOnGetProvider struct {
