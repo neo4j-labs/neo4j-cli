@@ -39,14 +39,14 @@ tasks:
       defence-in-depth surfaces any future unhandled API status code from CLI
       output alone without requiring a rebuild. Extend the existing
       `recoverPanic` test in `main_test.go` to cover both branches.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "When `r` implements `error` (e.g. `*clierr.CLIError`), `recoverPanic` writes the panic's `Error()` text on one line followed by the existing \"Unexpected error running CLI with args ..., please report an issue ...\" line."
       - "When `r` is a non-error value (e.g. a plain string), `recoverPanic` writes only the existing fallback line — unchanged behaviour."
       - "Extended `recoverPanic` test in `neo4j-cli/main_test.go` asserts both branches."
       - "`make fmt-check && make lint && go test ./neo4j-cli/...` all clean."
-    completed_at: null
+    completed_at: 2026-05-19T10:00:00Z
 
   - id: task-003
     title: "Add changelog entry and verify final gates"

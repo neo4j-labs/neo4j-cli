@@ -70,6 +70,43 @@ func TestRecoverPanic_RedactsSecretArgs(t *testing.T) {
 	}
 }
 
+// TestRecoverPanic_SurfacesPanicValue verifies the defence-in-depth hardening
+// added in CLI-146: when the recovered value implements `error`, the panic's
+// own message is printed on its own line BEFORE the existing fallback line,
+// so unhandled status-code panics from `aura/internal/api/response.go` are
+// diagnosable from CLI output alone. Non-error panic values keep the
+// single-line behaviour.
+func TestRecoverPanic_SurfacesPanicValue(t *testing.T) {
+	const fallback = "Unexpected error running CLI with args"
+
+	t.Run("error panic value writes diagnostic line BEFORE fallback line", func(t *testing.T) {
+		var out bytes.Buffer
+		args := []string{"aura", "instance", "create", "--rw"}
+		panicErr := clierr.NewFatalError("unexpected error [status 402] running CLI with args [aura instance create --rw]")
+
+		recoverPanic(&out, args, panicErr)
+
+		got := out.String()
+		diagIdx := strings.Index(got, panicErr.Error())
+		fallbackIdx := strings.Index(got, fallback)
+		require.GreaterOrEqual(t, diagIdx, 0, "diagnostic line must be present")
+		require.GreaterOrEqual(t, fallbackIdx, 0, "fallback line must be present")
+		assert.Less(t, diagIdx, fallbackIdx, "diagnostic line must precede fallback line")
+		assert.Contains(t, got, panicErr.Error()+"\n", "diagnostic line must be terminated with a newline")
+	})
+
+	t.Run("non-error panic value writes only the fallback line", func(t *testing.T) {
+		var out bytes.Buffer
+		args := []string{"aura", "instance", "list"}
+
+		recoverPanic(&out, args, "boom")
+
+		got := out.String()
+		assert.True(t, strings.HasPrefix(got, fallback), "non-error panic must NOT add a diagnostic line; got %q", got)
+		assert.NotContains(t, got, "boom\n", "non-error panic value must not be written verbatim as a diagnostic line")
+	})
+}
+
 // TestExitCodeFor verifies the helper used in main() to convert a returned
 // error from cmd.Execute into a process exit code.
 func TestExitCodeFor(t *testing.T) {

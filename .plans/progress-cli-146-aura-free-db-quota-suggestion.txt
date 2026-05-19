@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-19T09:48:21Z
 Added 402 PaymentRequired handler returning conflict CLIError (exit 5) with quota-exceeded suggestion; mirrors 404/405/409/5xx unmarshal-fallback pattern.
 Files: ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/response_test.go
+
+## TASK-002 — 2026-05-19T10:00:00Z
+Hardened recoverPanic to print recovered value's Error() line before the standard fallback when value implements error; non-error values keep single-line behaviour.
+Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go

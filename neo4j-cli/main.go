@@ -19,7 +19,16 @@ import (
 
 // recoverPanic prints a redacted "unexpected error" line to w.
 // Extracted so the redaction format is unit-testable without invoking main().
+//
+// When the recovered value implements `error`, its `Error()` text is written
+// on its own line BEFORE the fallback line. This surfaces panic diagnostics
+// (e.g. unhandled API status codes that reach `response.go`'s default panic)
+// without requiring a rebuild. Non-error panic values keep the single-line
+// behaviour.
 func recoverPanic(w io.Writer, args []string, r any) {
+	if err, ok := r.(error); ok {
+		fmt.Fprintf(w, "%s\n", err.Error()) //nolint:errcheck // best-effort write before re-panic
+	}
 	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
 }
 
