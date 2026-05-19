@@ -19,3 +19,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/agent/list.go, +neo4j-cli/aura/inter
 ## task-005 — 2026-05-19T14:30:00Z
 Implemented agent get leaf: GET /organizations/{org}/projects/{proj}/agents/{id} via AuraApiVersion2, Args=ExactArgs(1), PrintRawBody with fields [id,name,description,dbid,is_private,is_mcp_enabled,enabled]. get_test.go covers JSON happy path, default-workspace, and 404 → "Error: [Agent not found]". Same config-key renames as task-004.
 Files: ~neo4j-cli/aura/internal/subcommands/agent/get.go, +neo4j-cli/aura/internal/subcommands/agent/get_test.go
+
+## task-006 — 2026-05-19T15:00:00Z
+Implemented agent create leaf: POST .../agents via AuraApiVersion2, Annotations write=true, required flags name/description/dbid/tools (inline JSON), optional is-private/system-prompt/is-mcp-enabled/enabled. Body matches PRD REQ-F-005. PrintRawBody fields [id,name,description,dbid,is_private,is_mcp_enabled,enabled]. Added testdata_test.go with shared testTools constant. create_test.go covers happy path + body assertion, default-workspace, --is-private variant, missing-name error, invalid-tools-JSON error, table output. All invocations carry --rw.
+Files: ~neo4j-cli/aura/internal/subcommands/agent/create.go, +neo4j-cli/aura/internal/subcommands/agent/testdata_test.go, +neo4j-cli/aura/internal/subcommands/agent/create_test.go

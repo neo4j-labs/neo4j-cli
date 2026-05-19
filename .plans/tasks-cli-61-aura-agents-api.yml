@@ -120,7 +120,7 @@ tasks:
       `/tmp/cli-61-original-pr.diff:1729`. Port `create_test.go` (lines ~289-505): happy-path
       body assertion via `AssertCalledWithBody`, default-workspace variant, missing-required-flag
       errors. Apply config-key renames.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -129,7 +129,7 @@ tasks:
       - "`testdata_test.go` exports `const testTools` for reuse across create/update/replace tests."
       - "`create_test.go` covers happy path with body assertion, default-workspace variant, and required-flag-missing errors."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestCreate` passes."
-    completed_at: null
+    completed_at: 2026-05-19T15:00:00Z
 
   - id: task-007
     title: "Implement agent update leaf + tests"
