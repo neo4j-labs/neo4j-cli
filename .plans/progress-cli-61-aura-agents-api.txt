@@ -11,3 +11,7 @@ Decisions: ResolveOutput chosen over cfg.Global.Format() so explicit --format an
 Scaffolded agent package: parent agent.go mirrors deployment.go (BindBaseUrl/BindAuthUrl + RegisterAuraCredentialFlag), seven placeholder leaves (list/get/create/update/replace/delete/invoke) each with flush-left Example, copyright header, RunE returning nil; write leaves annotated write=true. Wired into aura.go inside flag.aura-beta block.
 Files: +neo4j-cli/aura/internal/subcommands/agent/{agent,list,get,create,update,replace,delete,invoke}.go, ~neo4j-cli/aura/aura.go
 Decisions: Skipped the original PR's PersistentPreRunE output binding (uses removed cfg.Aura.BindOutput) — leaves will call output.ResolveOutput directly in subsequent tasks. Added RegisterAuraCredentialFlag to match deployment.go parent shape.
+
+## task-004 — 2026-05-19T14:00:00Z
+Implemented agent list leaf: GET /organizations/{org}/projects/{proj}/agents via AuraApiVersion2, PrintRawBody with fields [id,name,description,dbid,enabled], --organization-id/--project-id flags, SetProjectFlagsAsRequired PreRunE. list_test.go covers JSON, table, default-workspace, and missing-flag errors. Renamed aura.beta-enabled→flag.aura-beta and aura.output→format per modern config keys.
+Files: ~neo4j-cli/aura/internal/subcommands/agent/list.go, +neo4j-cli/aura/internal/subcommands/agent/list_test.go

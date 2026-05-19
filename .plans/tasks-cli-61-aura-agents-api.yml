@@ -76,7 +76,7 @@ tasks:
       `/tmp/cli-61-original-pr.diff` (lines ~1300-1465): table + JSON output, default-workspace
       via `SetDefaultProjectInConfig`, missing-flag errors. Replace `aura.beta-enabled` →
       `flag.aura-beta` and `aura.output` → `format` in test config calls.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -85,7 +85,7 @@ tasks:
       - "All test mocks use path `/v2beta1/organizations/...` (v2beta1 routing automatic)."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestList` passes."
       - "`make fmt-check` and `make lint` clean."
-    completed_at: null
+    completed_at: 2026-05-19T14:00:00Z
 
   - id: task-005
     title: "Implement agent get leaf + tests"
