@@ -23,3 +23,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/agent/get.go, +neo4j-cli/aura/intern
 ## task-006 — 2026-05-19T15:00:00Z
 Implemented agent create leaf: POST .../agents via AuraApiVersion2, Annotations write=true, required flags name/description/dbid/tools (inline JSON), optional is-private/system-prompt/is-mcp-enabled/enabled. Body matches PRD REQ-F-005. PrintRawBody fields [id,name,description,dbid,is_private,is_mcp_enabled,enabled]. Added testdata_test.go with shared testTools constant. create_test.go covers happy path + body assertion, default-workspace, --is-private variant, missing-name error, invalid-tools-JSON error, table output. All invocations carry --rw.
 Files: ~neo4j-cli/aura/internal/subcommands/agent/create.go, +neo4j-cli/aura/internal/subcommands/agent/testdata_test.go, +neo4j-cli/aura/internal/subcommands/agent/create_test.go
+
+## task-007 — 2026-05-19T10:44:23Z
+Implemented agent update leaf: PATCH .../agents/{id} via AuraApiVersion2, Annotations write=true, partial body (string fields included when non-empty; bool fields gated by cmd.Flags().Changed so explicit false ships). MarkFlagsOneRequired group covers all eight content flags. update_test.go covers single-field rename, boolean fields, tools variant, default-workspace, no-fields group error, invalid-tools-JSON, and 404. All test invocations carry --rw; config keys modernized to flag.aura-beta + format.
+Files: ~neo4j-cli/aura/internal/subcommands/agent/update.go, +neo4j-cli/aura/internal/subcommands/agent/update_test.go

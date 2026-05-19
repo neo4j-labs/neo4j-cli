@@ -144,7 +144,7 @@ tasks:
       `{"is_mcp_enabled": true, "is_private": true}`), tools variant, default-workspace variant,
       `TestUpdateAgentWithNoFields` asserts the `MarkFlagsOneRequired` group error string,
       invalid-tools-JSON error, 404 error.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -153,7 +153,7 @@ tasks:
       - "Calling `agent update <id>` with no fields prints the `MarkFlagsOneRequired` group error."
       - "`update_test.go` covers all six scenarios from the original PR diff."
       - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestUpdate` passes."
-    completed_at: null
+    completed_at: 2026-05-19T10:44:23Z
 
   - id: task-008
     title: "Implement agent replace leaf + tests"
