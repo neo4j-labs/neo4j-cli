@@ -1,0 +1,91 @@
+feature: cli-148-claude-pr-push-commits
+prd: ./prd-cli-148-claude-pr-push-commits.md
+created_at: 2026-05-19T12:00:00Z
+updated_at: 2026-05-19T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Bump claude.yml permissions to write for contents + pull-requests"
+    description: |
+      In `.github/workflows/claude.yml`, change the `permissions:` block so
+      `contents` and `pull-requests` are `write` instead of `read`. Leave
+      `issues: read`, `id-token: write`, and `actions: read` exactly as-is.
+      This is the minimum change required for the action's GITHUB_TOKEN to
+      push commits to the PR branch. Implements REQ-F-001 and REQ-NF-003.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`.github/workflows/claude.yml` declares `contents: write` and `pull-requests: write` under `permissions:`"
+      - "`issues: read`, `id-token: write`, and `actions: read` are unchanged from the previous file"
+      - "Pinned SHAs of `actions/checkout` and `anthropics/claude-code-action` are not altered"
+      - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
+    completed_at: null
+
+  - id: task-002
+    title: "Enable use_commit_signing on anthropics/claude-code-action step"
+    description: |
+      In `.github/workflows/claude.yml`, add `use_commit_signing: true` to the
+      `with:` block of the `anthropics/claude-code-action@v1` step. This makes
+      the action create commits via the GitHub contents API as `claude[bot]`
+      with a verified-commit badge instead of running `git commit` on the
+      runner. No SSH key or extra secret is required. Implements REQ-F-002.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The `Run Claude Code` step in `.github/workflows/claude.yml` passes `use_commit_signing: true` in its `with:` block"
+      - "Existing `with:` keys (`claude_code_oauth_token`, `additional_permissions`) remain in place"
+      - "No new secrets are referenced by the workflow"
+      - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
+    completed_at: null
+
+  - id: task-003
+    title: "Gate claude.yml workflow on MEMBER/OWNER/COLLABORATOR + non-Bot sender"
+    description: |
+      Rewrite the `if:` block of the `claude` job in
+      `.github/workflows/claude.yml` so it (a) preserves the existing
+      per-event-type `@claude` body/title checks and (b) additionally
+      requires `github.event.sender.type != 'Bot'` AND an
+      `author_association` of `MEMBER`, `OWNER`, or `COLLABORATOR` —
+      dispatched per event because the field path differs:
+      `github.event.comment.author_association` for `issue_comment` and
+      `pull_request_review_comment`, `github.event.review.author_association`
+      for `pull_request_review`, `github.event.issue.author_association` for
+      `issues`. Use the same `contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), …)`
+      shape that `claude-review-conventions.yml:13-15` uses. Implements
+      REQ-F-003, REQ-F-004, REQ-F-005, REQ-NF-002.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "The `if:` block requires `github.event.sender.type != 'Bot'`"
+      - "The `if:` block requires `author_association` ∈ {MEMBER, OWNER, COLLABORATOR} for each of the four supported events, using the correct field path per event type"
+      - "Original per-event-name `@claude` body/title `contains(...)` checks are preserved"
+      - "A comment by a CONTRIBUTOR / NONE / FIRST_TIMER / FIRST_TIME_CONTRIBUTOR / MANNEQUIN does not satisfy the gate"
+      - "A comment whose sender type is `Bot` does not satisfy the gate, even if `@claude` is in the body"
+      - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
+    completed_at: null
+
+  - id: task-004
+    title: "Verify scope: only claude.yml changed, no source/changelog/bundle drift"
+    description: |
+      Confirm the change is CI-only. Run `git status` and ensure the diff
+      touches only `.github/workflows/claude.yml`. Do NOT add a changelog
+      entry under `.changes/unreleased/`, do NOT modify any file under
+      `neo4j-cli/`, `common/`, or `distribution/`, and do NOT regenerate
+      the skill bundle. Run `make fmt-check` and `make lint` as a
+      paranoia check that the working tree is otherwise clean (these
+      should pass trivially since no Go was touched). Implements
+      REQ-NF-001 and the "no changelog / no source" non-goals.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`git status --porcelain` lists only `.github/workflows/claude.yml` as modified"
+      - "No new file under `.changes/unreleased/` is staged or untracked as part of this work"
+      - "No file under `neo4j-cli/`, `common/`, or `distribution/` is modified"
+      - "`make fmt-check` and `make lint` both pass on the working tree"
+      - "actionlint (or `gh workflow view`) accepts the updated `claude.yml`"
+    completed_at: null
