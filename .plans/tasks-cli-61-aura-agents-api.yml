@@ -285,3 +285,35 @@ tasks:
       - "Manual smoke for `list`, `get`, and `invoke` against a live Aura tenant succeeds, or is explicitly skipped with a note."
       - "Branch is ready for PR: clean tree, all gates green, smoke evidence captured if available."
     completed_at: 2026-05-19T11:01:35Z
+
+  - id: task-014
+    title: "Document agent surface in README + skill description + additions"
+    description: |
+      Promote the new `aura agent` subtree to user-facing docs even though it is gated behind
+      `flag.aura-beta`. Three surfaces to edit:
+
+      1. `README.md` — add a `### Agents (beta)` section near the existing `### Setting a default
+         workspace` / instance sections. Note the `flag.aura-beta` requirement, list the seven
+         leaves (`list, get, create, update, replace, delete, invoke`), show 2-3 invocation
+         examples (one read with `--format json`, one create with `--rw`, one invoke).
+      2. `neo4j-cli/internal/skill/additions.md` — append a short bullet describing the
+         `aura agent` surface and how to enable it (`neo4j-cli config set flag.aura-beta true`).
+         Mention `invoke` outputs both JSON (full body) and a human stats line.
+      3. `neo4j-cli/internal/skill/description.txt` — extend the frontmatter description to
+         name agent management explicitly. Stay within the ≤1024-char single-paragraph
+         third-person constraint documented in AGENTS.md.
+
+      After editing `additions.md` and `description.txt`, run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle (`SKILL.md` and any
+      derived files) and commit the regenerated artifacts. `make generate-check` must be clean
+      and `TestGenerator_RoundTrip` must pass.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "`README.md` has a new agents (beta) section with at least three example invocations covering reads, writes (`--rw`), and `invoke`."
+      - "`neo4j-cli/internal/skill/additions.md` has a new bullet for the agent subtree noting the `flag.aura-beta` requirement."
+      - "`neo4j-cli/internal/skill/description.txt` mentions agent management while staying ≤1024 chars, single paragraph, third person."
+      - "`go generate ./neo4j-cli/internal/skill/...` produces a clean diff that is committed alongside the source edits."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: null
