@@ -49,3 +49,14 @@ Decisions: Followed AGENTS.md guidance — only `internal/skill/bundle/**` paths
 ## task-012 — 2026-05-19T12:58:08+02:00
 Added changelog entry for the aura agent commands feature. Hand-authored YAML matches the shape of the most recent `neo4j-cli-Minor-*.yaml` (four fields: project, kind, body, time). Body matches PRD REQ-F-017 wording verbatim.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260519-125808.yaml
+
+## task-013 — 2026-05-19T11:01:35Z
+Final gates + manual smoke. All gates pass: make fmt-check (clean), make lint (0 issues), make test (all packages ok), make license-check (clean), make generate-check (only harness-induced tasks.yml in_progress flip — no bundle drift, as expected per task-011 notes). make build produced bin/neo4j-cli.
+Help visibility verified: with flag.aura-beta=false the agent subtree is hidden from `aura --help`; with flag.aura-beta=true `aura agent --help` lists all seven leaves (create, delete, get, invoke, list, replace, update).
+Live smoke (against demo1 aura-client credential, organization 9f4683a0-... "Onboarding Assistant", project 9f4683a0-... "Dev", agent ac0ba77e-... "Neo4j Aura Documentation Assistant"):
+  - `aura agent list --format json` → returned non-empty array with id/name/description/dbid/tools fields, shape matches PRD.
+  - `aura agent get <id> --format json` → returned full agent including system_prompt, tools array with nested config, all PRD fields present.
+  - `aura agent invoke <id> --input "hello" --rw` → JSON mode rendered the full server response verbatim; with --format table the response rendered as joined text ("Hello! I'm your Neo4j Aura support assistant...") followed by the stats line "Status: SUCCESS | End reason: FINAL ANSWER PROVIDED | Tool calls: 0 | Tokens: 3448 req / 21 res / 3469 total" — exact format matched the leaf's RunE.
+Reverted flag.aura-beta to false post-smoke; tree is clean.
+Files: ~.plans/tasks-cli-61-aura-agents-api.yml, ~.plans/progress-cli-61-aura-agents-api.txt
+Decisions: Did not modify any source — all gates green on first run, smoke passed against a live tenant with no fabricated evidence needed.

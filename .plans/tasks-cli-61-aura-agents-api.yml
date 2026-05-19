@@ -276,7 +276,7 @@ tasks:
       and `aura agent invoke <id> --input "hello" --rw`. Confirm output shapes match the PRD
       expectations. Skip the smoke step if no live tenant is available and call that out in
       the task completion notes.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -284,4 +284,4 @@ tasks:
       - "`./bin/neo4j-cli aura agent --help` shows the seven leaves when `flag.aura-beta=true` and hides them when false."
       - "Manual smoke for `list`, `get`, and `invoke` against a live Aura tenant succeeds, or is explicitly skipped with a note."
       - "Branch is ready for PR: clean tree, all gates green, smoke evidence captured if available."
-    completed_at: null
+    completed_at: 2026-05-19T11:01:35Z
