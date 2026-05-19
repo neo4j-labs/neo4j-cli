@@ -21,3 +21,25 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-006 — 2026-05-19T10:10:00Z
 Verification gate: actionlint clean on post-release-notes.yml; make test / make lint / make fmt-check all pass. git diff main...HEAD limited to .github/ + .plans/ — no Go/Makefile touched. POST-MERGE manual checks remain for the human: Actions tab visibility after branch push and a live workflow_dispatch run against v1.4.0 confirming generated md + slack JSON are printed and no Slack/release mutation occurs (commented blocks stay commented).
 Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml
+
+## task-007 — 2026-05-19T11:15:00Z
+Added fail-fast "Verify Slack webhook" step between "Validate release tag" and "Checkout main" — empty SLACK_WEBHOOK_URL -> stderr + exit 1, mirrors ANTHROPIC_API_KEY guard. Aborts before ~$1.50 Claude generation when secret missing. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-008 — 2026-05-19T11:30:00Z
+Added "Print Slack message (rendered)" step after "Build Slack payload": jq -r '.text' rendered between delimiter lines so reviewers can read the un-clipped message body in the Actions log. actionlint clean.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-009 — 2026-05-19T11:45:00Z
+Activated "Post to Slack" step: uncommented the CLI-147 follow-up block, curl POSTs /tmp/slack-payload.json to SLACK_WEBHOOK_URL. Kept in-body empty-secret guard as defense in depth on top of the top-of-job verify step. actionlint clean; make test/lint/fmt-check pass.
+Files: ~.github/workflows/post-release-notes.yml
+
+## task-010 — 2026-05-19T12:00:00Z
+Activated "Append release notes to GitHub release" with REQ-F-021 idempotent replace: case-match on `## Release notes` prefix, strip up to FIRST `\n---\n` via `${CURRENT#*$'\n---\n'}`, fall back to full body when marker present without separator. Step now LAST after Slack POST. Smoke-tested 4 cases (with-block, no-block, orphan-marker, multi-separator) all behave per spec; shellcheck + actionlint + make test/lint/fmt-check clean.
+Files: ~.github/workflows/post-release-notes.yml
+Decisions: kept the trailing `printf '%s\n' "${REMAINING}"` even for empty CURRENT — produces a single trailing newline, acceptable; `gh release view -q` failures propagate via pipefail.
+
+## task-011 — 2026-05-19T12:30:00Z
+Activation gate: actionlint clean, make test/lint/fmt-check pass, diff main...HEAD scoped to .github/workflows/post-release-notes.yml + .plans/ only, step ordering matches REQ-F-022 (validate-tag -> verify-webhook -> checkout -> prev-tag -> install-claude -> verify-api-key -> generate -> guard -> print -> build-payload -> rendered-print -> slack-post -> gh-release-append). Branch pushed; PR #142 opened: https://github.com/neo4j-labs/neo4j-cli/pull/142.
+Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml, ~.plans/progress-cli-147-post-release-notes-to-slack.txt
+Decisions: Post-merge live workflow_dispatch against v1.4.0 documented in PR test plan; gated on the human setting SLACK_WEBHOOK_URL repo secret first (REQ-NF-008).

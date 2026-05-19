@@ -54,6 +54,19 @@ jobs:
           fi
           echo "[post-release-notes] tag validated: ${RELEASE_TAG}"
 
+      - name: Verify Slack webhook
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # Fail fast BEFORE we spend ~$1.50 on Claude Code generation if the
+          # webhook secret is missing. Mirrors the ANTHROPIC_API_KEY guard
+          # pattern further down — early abort with a clear error.
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
+            exit 1
+          fi
+          echo "[post-release-notes] Slack webhook present (${#SLACK_WEBHOOK_URL} chars)"
+
       - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -162,38 +175,60 @@ jobs:
           cat /tmp/slack-payload.json
           echo "----- end -----"
 
-      # CLI-147 follow-up: POST the assembled payload to Slack. Kept commented
-      # out until the SLACK_WEBHOOK_URL secret is provisioned and we have eyes
-      # on at least one dry run. Enable by uncommenting the block below and
-      # ensuring the secret is set on the repo.
-      # - name: Post to Slack
-      #   env:
-      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      #   run: |
-      #     if [ -z "${SLACK_WEBHOOK_URL}" ]; then
-      #       echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
-      #       exit 1
-      #     fi
-      #     curl -X POST \
-      #       -H 'Content-Type: application/json' \
-      #       --data @/tmp/slack-payload.json \
-      #       "${SLACK_WEBHOOK_URL}"
+      - name: Print Slack message (rendered)
+        run: |
+          # The Actions UI clips the very long single-line JSON `text` value
+          # above. Re-render it with jq so newlines render as actual newlines
+          # and reviewers can read the message body inline without copying the
+          # JSON elsewhere.
+          echo "----- Slack message (rendered) -----"
+          jq -r '.text' /tmp/slack-payload.json
+          echo "----- end -----"
 
-      # CLI-147 follow-up: prepend the Claude-generated notes to the GitHub
-      # release body. Reads the existing body via `gh release view`, prepends
-      # a `## Release notes` section + a `---` separator, then writes the
-      # combined markdown back via `gh release edit --notes-file`. Kept
-      # commented out until we are happy with the generated output in
-      # production.
-      # - name: Append release notes to GitHub release
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
-      #     {
-      #       printf '## Release notes\n\n'
-      #       cat /tmp/release-notes-generated.md
-      #       printf '\n\n---\n\n'
-      #       printf '%s\n' "${CURRENT}"
-      #     } > /tmp/release-body.md
-      #     gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          # Defense in depth: the "Verify Slack webhook" step at the top of the
+          # job already early-aborts on an empty secret, but keep the guard
+          # here too so this step is safe to copy/paste or reorder.
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "ERROR: SLACK_WEBHOOK_URL secret not set" >&2
+            exit 1
+          fi
+          curl -X POST \
+            -H 'Content-Type: application/json' \
+            --data @/tmp/slack-payload.json \
+            "${SLACK_WEBHOOK_URL}"
+
+      - name: Append release notes to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Idempotent prepend (REQ-F-021): if the current body already starts
+          # with `## Release notes` AND contains a `\n---\n` separator, strip
+          # the leading Claude block up to and including the first separator
+          # before prepending the new block. Re-runs cleanly REPLACE the
+          # section rather than stacking. If the marker is present without a
+          # separator, fall back to keeping the full body so we never lose
+          # data.
+          CURRENT=$(gh release view "${RELEASE_TAG}" --json body -q '.body')
+          case "${CURRENT}" in
+            "## Release notes"*)
+              REMAINING="${CURRENT#*$'\n---\n'}"
+              # ${var#*pattern} returns the original string when the pattern
+              # is absent — fall back to the full body so we don't drop
+              # content when a malformed marker was left behind.
+              [ "${REMAINING}" = "${CURRENT}" ] && REMAINING="${CURRENT}"
+              ;;
+            *)
+              REMAINING="${CURRENT}"
+              ;;
+          esac
+          {
+            printf '## Release notes\n\n'
+            cat /tmp/release-notes-generated.md
+            printf '\n\n---\n\n'
+            printf '%s\n' "${REMAINING}"
+          } > /tmp/release-body.md
+          gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md

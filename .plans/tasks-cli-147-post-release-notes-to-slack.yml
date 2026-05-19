@@ -1,7 +1,7 @@
 feature: cli-147-post-release-notes-to-slack
 prd: ./prd-cli-147-post-release-notes-to-slack.md
 created_at: 2026-05-19T08:30:00Z
-updated_at: 2026-05-19T08:30:00Z
+updated_at: 2026-05-19T11:00:00Z
 
 tasks:
   - id: task-001
@@ -159,3 +159,124 @@ tasks:
       - "No files outside .github/workflows/post-release-notes.yml and .github/prompts/release-notes.md are modified by this PR"
       - "make test, make lint, and make fmt-check pass locally as a final smoke check"
     completed_at: 2026-05-19T10:10:00Z
+
+  - id: task-007
+    title: "Add fail-fast SLACK_WEBHOOK_URL guard at top of workflow"
+    description: |
+      Add a new step "Verify Slack webhook" in
+      .github/workflows/post-release-notes.yml. Place it AFTER "Validate release
+      tag" and BEFORE "Checkout main" so we abort before paying for the
+      ~$1.50 Claude generation when the secret is missing. The step reads
+      SLACK_WEBHOOK_URL from env (`${{ secrets.SLACK_WEBHOOK_URL }}`), checks
+      for empty, echoes a clear error to stderr, and `exit 1`. Mirrors the
+      existing ANTHROPIC_API_KEY guard pattern. Implements REQ-F-017.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "New step 'Verify Slack webhook' sits between 'Validate release tag' and 'Checkout main' in the workflow YAML"
+      - "Step env exposes SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}"
+      - "Step exits non-zero with a clear stderr message when SLACK_WEBHOOK_URL is empty"
+      - "Step is unconditional (no `if:` gating) — runs on both release and workflow_dispatch"
+      - "actionlint reports zero errors and zero warnings after the change"
+    completed_at: 2026-05-19T11:15:00Z
+
+  - id: task-008
+    title: "Add human-readable Slack message print step"
+    description: |
+      In post-release-notes.yml, add a new step "Print Slack message (rendered)"
+      placed AFTER the existing "Build Slack payload" step and BEFORE the
+      (still-commented) Slack POST step. The step runs:
+      `jq -r '.text' /tmp/slack-payload.json` between
+      `----- Slack message (rendered) -----` and `----- end -----` header/footer
+      lines. Motivation: GitHub Actions UI clips the very long single-line JSON
+      `text` value; the rendered print shows newlines as actual newlines so
+      reviewers can read the message body inline. Implements REQ-F-018.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "New step 'Print Slack message (rendered)' exists in the workflow"
+      - "Step uses `jq -r '.text' /tmp/slack-payload.json` to render the message body"
+      - "Step prints `----- Slack message (rendered) -----` and `----- end -----` delimiter lines bracketing the rendered text"
+      - "Step is placed AFTER 'Build Slack payload' and BEFORE the (soon-to-be-activated) 'Post to Slack' step"
+      - "Step runs unconditionally — no `if:` gating"
+      - "actionlint clean"
+    completed_at: 2026-05-19T11:30:00Z
+
+  - id: task-009
+    title: "Activate Slack POST step"
+    description: |
+      Uncomment the existing `# CLI-147 follow-up:` "Post to Slack" block in
+      post-release-notes.yml. Remove the leading `# CLI-147 follow-up:` lead
+      comment lines and the `# ` step-line prefixes. Keep the hard-fail guard
+      inside the step body (defense in depth on top of the REQ-F-017 early-fail
+      guard). The step env references `SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}`
+      and POSTs `/tmp/slack-payload.json` to that webhook via `curl`. Step runs
+      unconditionally on both triggers. Implements REQ-F-019.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "The 'Post to Slack' step is no longer commented out; it is a live step in the workflow"
+      - "The `# CLI-147 follow-up:` lead comment for this block is removed"
+      - "Hard-fail guard remains inside the step body: empty SLACK_WEBHOOK_URL -> echo to stderr -> exit 1"
+      - "Step uses `curl -X POST -H 'Content-Type: application/json' --data @/tmp/slack-payload.json \"${SLACK_WEBHOOK_URL}\"`"
+      - "Step is placed AFTER the rendered-print step from task-008 and BEFORE the GH release append step from task-010"
+      - "Step runs unconditionally on both triggers (no `if:` gating)"
+      - "actionlint clean"
+    completed_at: 2026-05-19T11:45:00Z
+
+  - id: task-010
+    title: "Activate GH release append with idempotent replace"
+    description: |
+      Uncomment the existing `# CLI-147 follow-up:` "Append release notes to
+      GitHub release" block in post-release-notes.yml, and rewrite its body to
+      implement idempotent replace per REQ-F-021. New flow: read current body
+      via `gh release view --json body -q '.body'`; if it starts with
+      `## Release notes` then strip the leading block up to and including the
+      first `\n---\n` separator; otherwise keep the body verbatim. Then write
+      `/tmp/release-body.md` as: `## Release notes\n\n` + cat of generated
+      markdown + `\n\n---\n\n` + remaining body. Apply with
+      `gh release edit "${RELEASE_TAG}" --notes-file /tmp/release-body.md`.
+      env: `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. Step is placed LAST (after
+      the Slack POST). Runs unconditionally. Implements REQ-F-020 and REQ-F-021.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The 'Append release notes to GitHub release' step is no longer commented; it is a live step in the workflow"
+      - "The `# CLI-147 follow-up:` lead comment for this block is removed"
+      - "Step env exposes GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}"
+      - "Step strips an existing `## Release notes ... \\n---\\n` leading block before prepending, so re-runs cleanly replace rather than stack"
+      - "When no existing `## Release notes` block is present, the new block is prepended cleanly"
+      - "Step calls `gh release edit \"${RELEASE_TAG}\" --notes-file /tmp/release-body.md`"
+      - "Step is the LAST step in the job (after Slack POST)"
+      - "Step runs unconditionally on both triggers"
+      - "actionlint clean"
+    completed_at: 2026-05-19T12:00:00Z
+
+  - id: task-011
+    title: "Local verification + push activation PR"
+    description: |
+      Final gate for the activation. Run `actionlint .github/workflows/post-release-notes.yml`
+      locally — must be clean. Run `make test`, `make lint`, `make fmt-check`
+      as a smoke check. Confirm `git diff --name-only main...HEAD` is limited
+      to `.github/workflows/post-release-notes.yml`, `.plans/...`, and any
+      progress/AGENTS updates — NO Go file changes. Verify the step ordering
+      from REQ-F-022 by reading the file end-to-end. Push the branch and open
+      a PR titled something like "ci: activate Slack post + GH release append
+      (CLI-147)" referencing the parent PR (#139) for context. NOTE: the live
+      `workflow_dispatch` smoke against v1.4.0 happens AFTER the
+      SLACK_WEBHOOK_URL secret is set by the human — document this as the
+      post-merge check.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "actionlint reports zero errors and zero warnings"
+      - "make test, make lint, make fmt-check all pass"
+      - "git diff --name-only main...HEAD lists only .github/workflows/post-release-notes.yml + .plans/ artefacts (no Go, no Makefile, no skill bundle)"
+      - "Step order in the workflow matches REQ-F-022 exactly: validate tag -> verify webhook -> checkout -> prev-tag -> install Claude -> verify API key -> generate -> guard -> print -> build payload -> rendered print -> Slack POST -> GH release append"
+      - "Progress file is updated with task entries for task-007 through task-011"
+      - "Branch is pushed and a PR is opened describing the activation"
+    completed_at: 2026-05-19T12:30:00Z
