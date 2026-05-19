@@ -108,6 +108,23 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		}
 
 		return clierr.NewUpstreamError("%s", messages)
+	case http.StatusPaymentRequired:
+		var errorResponse ErrorResponse
+
+		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
+			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+		}
+
+		messages := []string{}
+		for _, e := range errorResponse.Errors {
+			messages = append(messages, e.Message)
+		}
+
+		cliErr := clierr.NewConflictError("%s", messages)
+		if s := suggestionForPaymentRequired(errorResponse); s != "" {
+			cliErr = cliErr.WithSuggestion(s)
+		}
+		return cliErr
 	case http.StatusConflict:
 		var errorResponse ErrorResponse
 
@@ -186,6 +203,21 @@ func suggestionForResource(resourceType string) string {
 	default:
 		return ""
 	}
+}
+
+// suggestionForPaymentRequired returns the next-action hint attached to 402
+// *CLIErrors via .WithSuggestion(...). The 402 body's errors[].reason field is
+// inspected; when any entry signals `quota-exceeded` (the stable Aura v2beta1
+// enum value), a type-agnostic instance-quota suggestion is returned. Any
+// other reason (or an empty errors[]) returns "" so the envelope omitempty
+// drops the field and the API's own message remains the primary signal.
+func suggestionForPaymentRequired(resp ErrorResponse) string {
+	for _, e := range resp.Errors {
+		if e.Reason == "quota-exceeded" {
+			return "You've reached your quota for this instance type. Delete an existing instance with 'neo4j-cli aura instance list' then 'neo4j-cli aura instance delete <id>', or pick a different --type."
+		}
+	}
+	return ""
 }
 
 // singularise turns the plural resource path segment (e.g. "instances",

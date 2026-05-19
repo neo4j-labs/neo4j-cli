@@ -130,14 +130,15 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name           string
-		statusCode     int
-		body           string
-		header         http.Header
-		wantCode       int
-		wantMsgContain string // optional substring check on the rendered message
-		wantSuggestion string // optional Suggestion field check (errors.As)
-		usesAuthCfg    bool   // 401/403-no-server-error paths call ClearAccessToken
+		name               string
+		statusCode         int
+		body               string
+		header             http.Header
+		wantCode           int
+		wantMsgContain     string // optional substring check on the rendered message
+		wantSuggestion     string // optional Suggestion field check (errors.As)
+		assertNoSuggestion bool   // when set, assert Suggestion == "" even though wantSuggestion is empty
+		usesAuthCfg        bool   // 401/403-no-server-error paths call ClearAccessToken
 	}{
 		{
 			name:           "400 bad request -> validation (6)",
@@ -180,6 +181,29 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			statusCode: http.StatusConflict,
 			body:       `{"errors":[{"message":"already exists"}]}`,
 			wantCode:   5,
+		},
+		{
+			name:           "402 payment required quota-exceeded -> conflict (5) with quota suggestion",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `{"errors":[{"message":"User is not permitted to create any more instances of this type.","reason":"quota-exceeded"}]}`,
+			wantCode:       5,
+			wantMsgContain: "User is not permitted to create any more instances of this type.",
+			wantSuggestion: "You've reached your quota for this instance type. Delete an existing instance with 'neo4j-cli aura instance list' then 'neo4j-cli aura instance delete <id>', or pick a different --type.",
+		},
+		{
+			name:               "402 payment required other reason -> conflict (5) no suggestion",
+			statusCode:         http.StatusPaymentRequired,
+			body:               `{"errors":[{"message":"payment declined","reason":"something-else"}]}`,
+			wantCode:           5,
+			wantMsgContain:     "payment declined",
+			assertNoSuggestion: true,
+		},
+		{
+			name:           "402 with malformed body -> fatal (1) with report-issue message",
+			statusCode:     http.StatusPaymentRequired,
+			body:           `<<<not-json>>>`,
+			wantCode:       1,
+			wantMsgContain: "unexpected error [status 402]",
 		},
 		{
 			name:           "429 too many requests -> rate_limited (7) with Retry-After",
@@ -252,6 +276,10 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 
 			if tc.wantSuggestion != "" {
 				assert.Equal(t, tc.wantSuggestion, ce.Suggestion, "Suggestion mismatch for status %d", tc.statusCode)
+			}
+
+			if tc.assertNoSuggestion {
+				assert.Equal(t, "", ce.Suggestion, "Suggestion should be empty for status %d", tc.statusCode)
 			}
 
 			// 429 also asserts the Retry-After landed on the struct field.
@@ -409,6 +437,49 @@ func TestSuggestionForResource(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, suggestionForResource(tc.resourceType))
+		})
+	}
+}
+
+// TestSuggestionForPaymentRequired locks the 402 quota-exceeded suggestion
+// lookup. Any error entry with Reason == "quota-exceeded" triggers the quota
+// suggestion; everything else (unknown reason / empty errors[]) returns "" so
+// the envelope omitempty drops the field. Multi-error bodies still trigger as
+// long as one entry matches.
+func TestSuggestionForPaymentRequired(t *testing.T) {
+	const quotaSuggestion = "You've reached your quota for this instance type. Delete an existing instance with 'neo4j-cli aura instance list' then 'neo4j-cli aura instance delete <id>', or pick a different --type."
+
+	for _, tc := range []struct {
+		name string
+		resp ErrorResponse
+		want string
+	}{
+		{
+			name: "positive quota-exceeded",
+			resp: ErrorResponse{Errors: []Error{{Message: "User is not permitted to create any more instances of this type.", Reason: "quota-exceeded"}}},
+			want: quotaSuggestion,
+		},
+		{
+			name: "negative unknown reason",
+			resp: ErrorResponse{Errors: []Error{{Message: "payment declined", Reason: "card-declined"}}},
+			want: "",
+		},
+		{
+			name: "empty errors slice",
+			resp: ErrorResponse{Errors: nil},
+			want: "",
+		},
+		{
+			name: "multi-error body with one quota-exceeded entry",
+			resp: ErrorResponse{Errors: []Error{
+				{Message: "other failure", Reason: "something-else"},
+				{Message: "User is not permitted to create any more instances of this type.", Reason: "quota-exceeded"},
+			}},
+			want: quotaSuggestion,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, suggestionForPaymentRequired(tc.resp))
 		})
 	}
 }

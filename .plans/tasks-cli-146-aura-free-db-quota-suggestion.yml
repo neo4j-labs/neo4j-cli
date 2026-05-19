@@ -1,0 +1,72 @@
+feature: cli-146-aura-free-db-quota-suggestion
+prd: ./prd-cli-146-aura-free-db-quota-suggestion.md
+created_at: 2026-05-19T00:00:00Z
+updated_at: 2026-05-19T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add 402 handler + suggestionForPaymentRequired in aura/internal/api/response.go"
+    description: |
+      Add `case http.StatusPaymentRequired:` to `handleResponseError` in
+      `neo4j-cli/aura/internal/api/response.go`. Parse `resBody` as
+      `ErrorResponse`, build the messages slice, return
+      `clierr.NewConflictError("%s", messages)` (exit code 5). On unmarshal
+      failure, return `clierr.NewFatalError(...)` mirroring the existing
+      404/405/409/5xx pattern. Add a private helper
+      `suggestionForPaymentRequired(resp ErrorResponse) string` near
+      `suggestionForResource` that returns the quota-suggestion text when any
+      `e.Reason == "quota-exceeded"`, else `""`. Chain `.WithSuggestion(s)` on
+      the 402 case only when the helper returns non-empty. Extend
+      `response_test.go` with two new 402 rows in the existing mapping table
+      plus a new `TestSuggestionForPaymentRequired` table-driven test.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "402 with body `{\"errors\":[{\"message\":\"User is not permitted to create any more instances of this type.\",\"reason\":\"quota-exceeded\"}]}` returns CLIError.Code==5 and Suggestion==\"You've reached your quota for this instance type. Delete an existing instance with 'neo4j-cli aura instance list' then 'neo4j-cli aura instance delete <id>', or pick a different --type.\""
+      - "402 with body where errors[].reason is anything other than `quota-exceeded` returns CLIError.Code==5 and Suggestion==\"\"."
+      - "402 with body that fails to unmarshal returns CLIError.Code==1 (fatal) with the standard \"unexpected error [status %d] running CLI with args %s\" message."
+      - "`TestSuggestionForPaymentRequired` covers: positive `quota-exceeded`; negative unknown reason; empty errors[]; multi-error body where one entry is `quota-exceeded` (positive)."
+      - "`make fmt-check && make lint && go test ./neo4j-cli/aura/internal/api/...` all clean."
+    completed_at: 2026-05-19T09:48:21Z
+
+  - id: task-002
+    title: "Harden recoverPanic in neo4j-cli/main.go to surface panic value"
+    description: |
+      Replace the `recoverPanic` body in `neo4j-cli/main.go` so it prints the
+      panic value's `Error()` line BEFORE the existing fixed "report an issue"
+      fallback line when `r` implements `error`. Non-error panic values
+      (e.g. plain strings) keep the existing single-line behaviour. This
+      defence-in-depth surfaces any future unhandled API status code from CLI
+      output alone without requiring a rebuild. Extend the existing
+      `recoverPanic` test in `main_test.go` to cover both branches.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "When `r` implements `error` (e.g. `*clierr.CLIError`), `recoverPanic` writes the panic's `Error()` text on one line followed by the existing \"Unexpected error running CLI with args ..., please report an issue ...\" line."
+      - "When `r` is a non-error value (e.g. a plain string), `recoverPanic` writes only the existing fallback line — unchanged behaviour."
+      - "Extended `recoverPanic` test in `neo4j-cli/main_test.go` asserts both branches."
+      - "`make fmt-check && make lint && go test ./neo4j-cli/...` all clean."
+    completed_at: 2026-05-19T10:00:00Z
+
+  - id: task-003
+    title: "Add changelog entry and verify final gates"
+    description: |
+      Add a Patch changelog entry under `.changes/unreleased/` via
+      `changie new --projects neo4j-cli --kind Patch --body "Surface an
+      actionable suggestion when an Aura instance-type quota is exceeded
+      (e.g. attempting to create a free-db when one already exists), and
+      surface any panic diagnostic in the CLI's panic-recovery line so
+      unhandled API status codes are diagnosable."`. Run the full gate suite
+      to confirm no regressions. No bundle drift expected (no command-tree
+      changes).
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`.changes/unreleased/neo4j-cli-Patch-<timestamp>.yaml` exists with project: neo4j-cli, kind: Patch, body matching the user-facing description."
+      - "`make fmt-check` passes."
+      - "`make lint` passes."
+      - "`make test` passes."
+      - "`make generate-check` passes (no bundle drift)."
+    completed_at: 2026-05-19T11:53:00Z
