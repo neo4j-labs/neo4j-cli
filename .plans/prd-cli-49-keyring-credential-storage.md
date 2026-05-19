@@ -107,6 +107,15 @@ The `config set credential-storage` RunE in `neo4j-cli/internal/subcommands/conf
 
 Add `credential-storage` to `GlobalConfig.ValidConfigKeys` in `common/clicfg/clicfg.go`. The existing `Set()` validation pattern applies; add an additional value check (only `keyring` / `insecure` accepted).
 
+### Why Not the Config Migration Engine
+
+`common/configmigrate` (CLI-134) was considered and rejected for both migration concerns in this feature:
+
+- **REQ-F-011 (first-run detection)**: the engine's `Apply` function receives only raw `config.json` bytes — it has no access to `credentials.json` or the keyring. The `credential-storage` default depends on whether credentials already exist, so the engine cannot make this decision.
+- **REQ-F-004/005 (explicit migration)**: the engine uses a warn-and-continue error policy and runs automatically on startup. Our explicit migrations must be user-triggered, must hard-error on failure, must roll back partial state, and must gate the config write on success — the opposite of the engine's posture.
+
+The engine is the right tool for config key renames and graduated-flag cleanup. It is the wrong tool here.
+
 ### First-Run Default Detection
 
 A `initCredentialStorageDefault(cfg *Config, creds *Credentials)` function (or equivalent) is called from `PersistentPreRunE` on the root cobra command in `neo4j-cli/app/app.go`. It:
@@ -130,7 +139,7 @@ On Linux without a running Secret Service daemon, `keyring.Get()` / `keyring.Set
 
 ## Acceptance Criteria
 
-- [ ] `neo4j-cli config set credential-storage keyring` succeeds; any other value fails with a clear validation error.
+- [ ] `neo4j-cli config set credential-storage keyring` and `neo4j-cli config set credential-storage insecure` both succeed; any other value fails with a clear validation error listing the valid options.
 - [ ] After `credential aura-client add` in keyring mode, `credentials.json` contains no `client_secret` or `access_token` values (fields absent or empty string).
 - [ ] After `credential aura-client add` in insecure mode, `credentials.json` contains the secrets as today.
 - [ ] `neo4j-cli config set credential-storage keyring` migrates existing secrets to the keyring and only persists the config change on success.
