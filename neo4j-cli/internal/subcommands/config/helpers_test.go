@@ -51,13 +51,17 @@ func (h *neo4jTestHelper) setConfigValue(key string, value interface{}) {
 }
 
 func (h *neo4jTestHelper) executeCommand(command string) {
+	h.executeCommandWithCredentials(command, `{}`)
+}
+
+func (h *neo4jTestHelper) executeCommandWithCredentials(command string, credentialsJSON string) {
 	h.out = bytes.NewBufferString("")
 	h.err = bytes.NewBufferString("")
 
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
-	fs, err := testfs.GetTestFs(h.cfg, `{}`)
+	fs, err := testfs.GetTestFs(h.cfg, credentialsJSON)
 	assert.Nil(h.t, err)
 	h.fs = fs
 

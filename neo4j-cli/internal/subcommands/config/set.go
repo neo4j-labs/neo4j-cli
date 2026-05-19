@@ -5,6 +5,7 @@ package config
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/spf13/cobra"
 )
 
@@ -52,10 +53,44 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				}
 				return nil
 			default:
+				// When changing credential-storage, migrate secrets before
+				// persisting the new config value. Migration must succeed before
+				// the config key is written; on failure the config is unchanged.
+				credentialStorageModeChanged := false
+				if bareKey == "credential-storage" {
+					currentMode := cfg.Credentials.StorageMode()
+					if currentMode != value {
+						credentialStorageModeChanged = true
+						var migrateErr error
+						switch value {
+						case credentials.StorageModeKeyring:
+							migrateErr = cfg.Credentials.MigrateToKeyring()
+						case credentials.StorageModeInsecure:
+							migrateErr = cfg.Credentials.MigrateToInsecure()
+						}
+						if migrateErr != nil {
+							cmd.SilenceUsage = true
+							return migrateErr
+						}
+					}
+				}
+
 				if err := cfg.Global.Set(bareKey, value); err != nil {
 					cmd.SilenceUsage = true
 					return err
 				}
+
+				// Update in-memory storage mode after successfully persisting the
+				// config key so subsequent operations in this process use the new mode.
+				// Only update when the mode actually changed to avoid a redundant
+				// keyring reload.
+				if credentialStorageModeChanged {
+					if err := cfg.Credentials.SetStorageMode(value); err != nil {
+						cmd.SilenceUsage = true
+						return err
+					}
+				}
+
 				return nil
 			}
 		},
