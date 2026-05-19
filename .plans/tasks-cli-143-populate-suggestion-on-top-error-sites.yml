@@ -153,7 +153,6 @@ tasks:
       (400/401/403/404/429) and workspace/ownership errors."). Run the full
       gate suite: make fmt-check, make lint, make test, make generate-check.
       No bundle drift expected since no command-tree changes were made.
-    status: pending
     dependencies:
       - task-002
       - task-003
@@ -167,3 +166,5 @@ tasks:
       - "make lint passes (golangci-lint v2 clean)."
       - "make test passes on the full Go test suite."
       - "make generate-check passes (no bundle drift; no command-tree changes were made)."
+    status: completed
+    completed_at: 2026-05-19T09:30:36Z

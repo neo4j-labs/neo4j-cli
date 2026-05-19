@@ -26,3 +26,7 @@ Decisions: Added testutils.AuraTestHelper.ExecuteCommandE returning the cobra er
 ## TASK-007 — 2026-05-19T00:00:00Z
 Wrapped session-GET and session-DELETE direct-call errors in graphanalytics/session/{get,delete}.go with utils.WithNotFoundContext("graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' ...") so 404 envelopes carry session-specific ResourceType/ResourceID/Suggestion instead of the API-layer's "graph-analytic" mis-segmentation (preflight covers ownership-mismatch per REQ-F-008). Added TestGetSessionNotFound_HasSuggestion + TestDeleteSessionNotFound_HasSuggestion locking Code/ResourceType/ResourceID/Suggestion via errors.As.
 Files: ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/get.go, ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/get_test.go, ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/delete.go, ~neo4j-cli/aura/internal/subcommands/graphanalytics/session/delete_test.go
+
+## TASK-008 — 2026-05-19T09:30:36Z
+Added Minor changelog entry via `changie new --projects neo4j-cli` describing the suggestion-enrichment user-facing change. fmt-check, lint, test all green; generate-check shows only the harness YAML status-flip diff (no bundle drift, per AGENTS.md "Makefile Notes").
+Files: +.changes/unreleased/neo4j-cli-Minor-20260519-093036.yaml
