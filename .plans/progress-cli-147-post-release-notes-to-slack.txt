@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-19T08:55:00Z
 Authored .github/prompts/release-notes.md: 6-step Claude Code prompt anchored on per-version changelog + git log range, grounded cobra-tree examples, writes /tmp/release-notes-generated.md.
 Files: +.github/prompts/release-notes.md
+
+## task-002 — 2026-05-19T09:10:00Z
+Workflow skeleton: release+workflow_dispatch triggers, contents:write perms, RELEASE_TAG/RELEASE_VERSION/PREV_TAG resolution, semver regex validation, checkout main fetch-depth:0. actionlint clean.
+Files: +.github/workflows/post-release-notes.yml

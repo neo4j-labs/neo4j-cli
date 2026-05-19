@@ -1,0 +1,72 @@
+name: Post release notes
+
+# Generates richer release notes via Claude Code after a neo4j-cli release.
+# First-PR scope (CLI-147): generate + print to the job log only. The Slack
+# POST and `gh release edit` steps land in a follow-up PR; this file is the
+# skeleton that resolves the tag, version, and previous-tag inputs.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "neo4j-cli version (no leading v), e.g. 1.4.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve release tag and version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          # On `release` the tag already carries the leading `v` (GoReleaser
+          # publishes `vX.Y.Z`); on `workflow_dispatch` the input is the bare
+          # version, so prepend `v` ourselves. Either way RELEASE_TAG ends up
+          # `vX.Y.Z` and RELEASE_VERSION ends up `X.Y.Z`.
+          if [ "${EVENT_NAME}" = "release" ]; then
+            TAG="${RELEASE_EVENT_TAG}"
+          else
+            TAG="v${INPUT_VERSION}"
+          fi
+          VERSION="${TAG#v}"
+          echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "[post-release-notes] RELEASE_TAG=${TAG} RELEASE_VERSION=${VERSION}"
+
+      - name: Validate release tag
+        run: |
+          # Same regex as publish-npm.yml — semver with optional pre-release /
+          # build metadata. Reject anything that doesn't look like a release tag
+          # before we run anything expensive.
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "ERROR: RELEASE_TAG '${RELEASE_TAG}' does not match ^v[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?\$" >&2
+            exit 1
+          fi
+          echo "[post-release-notes] tag validated: ${RELEASE_TAG}"
+
+      - name: Checkout main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve previous release tag
+        run: |
+          # `git describe --tags --abbrev=0 <tag>^` returns the nearest tag
+          # reachable from the parent of <tag>. The `|| true` keeps the job
+          # alive when there is no prior tag (very first release) — PREV_TAG
+          # is then exported as an empty string and the prompt handles that
+          # branch via `git log --oneline -30`.
+          PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true)
+          echo "PREV_TAG=${PREV_TAG}" >> "$GITHUB_ENV"
+          echo "[post-release-notes] PREV_TAG=${PREV_TAG:-<none>}"

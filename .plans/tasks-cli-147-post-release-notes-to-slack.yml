@@ -42,7 +42,7 @@ tasks:
       (3) checkout main with fetch-depth: 0; (4) resolve PREV_TAG via `git describe
       --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || true` and export to
       $GITHUB_ENV. Implements REQ-F-001 through REQ-F-005 and REQ-F-014.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - ".github/workflows/post-release-notes.yml exists and parses as valid YAML / GitHub Actions syntax (actionlint clean)"
@@ -52,7 +52,7 @@ tasks:
       - "Validation step rejects RELEASE_TAG values that do not match ^v[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?$ with non-zero exit"
       - "Checkout uses actions/checkout with fetch-depth: 0 against main"
       - "PREV_TAG resolution does not fail the job when the previous tag cannot be found (empty string is a valid result)"
-    completed_at: null
+    completed_at: 2026-05-19T09:10:00Z
 
   - id: task-003
     title: "Wire Claude Code generation into workflow"
