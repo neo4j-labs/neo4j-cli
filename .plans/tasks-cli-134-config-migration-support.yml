@@ -1,0 +1,158 @@
+feature: cli-134-config-migration-support
+prd: ./prd-cli-134-config-migration-support.md
+created_at: 2026-05-19T00:00:00Z
+updated_at: 2026-05-19T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold configmigrate package: Migration type, empty registry, init validator"
+    description: |
+      Create `neo4j-cli/internal/configmigrate/migrations.go` with the Neo4j
+      copyright header. Define `type Migration struct { Version int;
+      Description string; Apply func([]byte) ([]byte, error) }`. Declare
+      `var migrations = []Migration{}` (empty — first real entry lands later
+      when a flag graduates). Add an `init()` that validates the slice is
+      contiguous and ascending starting at 1 (`migrations[i].Version == i+1`)
+      and panics with a clear message on any gap, duplicate, or non-1 start.
+      No engine code in this file — that lives in task-002's
+      `configmigrate.go`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli/internal/configmigrate/migrations.go` exists with the Neo4j copyright header."
+      - "`Migration` struct defined with exactly the three fields `Version int`, `Description string`, `Apply func([]byte) ([]byte, error)`."
+      - "Package-level `migrations` slice is `[]Migration{}` (empty)."
+      - "`init()` panics with a clear message when `migrations` would contain a gap (e.g. `[v1, v3]`), a duplicate (`[v1, v1]`), or starts above 1 (`[v2]`). Verified by a test or by reading the validator logic — see task-003."
+      - "`go vet ./neo4j-cli/internal/configmigrate/...` and `make fmt-check` are clean."
+    completed_at: null
+
+  - id: task-002
+    title: "Implement Run/runWith engine in configmigrate.go"
+    description: |
+      Create `neo4j-cli/internal/configmigrate/configmigrate.go` with the
+      Neo4j copyright header. Implement `Run(fs afero.Fs, configPath string,
+      stderr io.Writer) (mutated bool, err error)` as a thin wrapper that
+      calls the unexported test seam `runWith(fs, configPath, stderr,
+      migrations)`. `runWith` does the work: read the file via
+      `afero.ReadFile`; on `os.ErrNotExist` return `(false, nil)` no-op; on
+      other read errors write a single-line stderr warning and return
+      `(false, nil)`. If `ms` is empty, return `(false, nil)` without
+      reading or writing. Otherwise parse `_schema_version` via gjson
+      (default 0 when absent or non-integer), iterate `ms` in order, for
+      each `m` where `m.Version > current` call `m.Apply(data)` and on
+      success `sjson.SetBytes(data, "_schema_version", m.Version)`. If
+      `m.Apply` returns a non-nil error, write the warning
+      `"Warning: config migration v%d (%s) failed: %v; continuing with
+      un-migrated config\n"` to `stderr`, stop the loop, do NOT write the
+      file, and return `(false, nil)`. After all applicable migrations
+      succeed, write once via `fileutils.WriteFile` and return `(true,
+      nil)`. Use only the existing vendored deps `github.com/tidwall/gjson`
+      and `github.com/tidwall/sjson`; no new third-party deps.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`Run` is the only exported symbol; `runWith` is unexported."
+      - "Empty registry path: `runWith` with `ms=[]Migration{}` returns `(false, nil)` and performs NO file I/O (no read, no write)."
+      - "Missing-file path: `afero.ReadFile` returning `os.ErrNotExist` causes `runWith` to return `(false, nil)` silently."
+      - "Other read-error path: a non-ErrNotExist read error causes a single-line stderr warning and returns `(false, nil)`."
+      - "Happy path: with `_schema_version: 3` and registry `[v1..v5]`, only v4 and v5 are applied, in order; `_schema_version` ends at 5; file is written exactly once via `fileutils.WriteFile`."
+      - "Per-migration error path: when an `Apply` returns error, the exact warning format `\"Warning: config migration v%d (%s) failed: %v; continuing with un-migrated config\\n\"` is written to the supplied stderr, the loop stops, no file write happens, and `runWith` returns `(false, nil)`."
+      - "`make fmt-check && make lint` clean for the new file."
+    completed_at: null
+
+  - id: task-003
+    title: "Add table-driven tests for configmigrate engine"
+    description: |
+      Create `neo4j-cli/internal/configmigrate/configmigrate_test.go`.
+      Use `testutils.GetTestFs("{}", "{}")` (NOT `afero.NewOsFs` — see
+      AGENTS.md's credentials-contamination warning) and a
+      `bytes.Buffer` as the stderr sink. Inject fixture migrations via the
+      `runWith` seam so the package-level `migrations` var is not touched.
+      Cover: (a) fresh install with no `_schema_version` and registry
+      `[v1, v2]` applies both, ends at v2; (b) partial — `_schema_version:3`
+      with registry `[v1..v5]` applies only v4+v5, ends at v5; (c)
+      up-to-date — `_schema_version` equals max applies nothing, no file
+      mutation; (d) idempotency — running `runWith` twice with the same
+      fixture produces a byte-identical file the second time; (e) per-
+      migration error — fixture migration returns error, verify exact
+      warning line on stderr, no file write, returns `(false, nil)`; (f)
+      empty registry — no read, no write, returns `(false, nil)`; (g)
+      missing-file path — pre-clean fs, `runWith` returns `(false, nil)`
+      with no stderr output; (h) init validator — three sub-tests with
+      `[v1, v3]` (gap), `[v1, v1]` (duplicate), `[v2]` (non-1 start) each
+      verify the panic message via the existing validator function called
+      directly (extract the body of `init()` into a package-private
+      `validateMigrations([]Migration) error` so it can be unit-tested
+      without process-level panics, then have `init()` call
+      `if err := validateMigrations(migrations); err != nil { panic(err) }`).
+      Tests are table-driven where possible.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Test file exists with Neo4j copyright header and lives at `neo4j-cli/internal/configmigrate/configmigrate_test.go`."
+      - "All eight scenarios (a)–(h) listed in the description are covered, each as a discrete test or table row."
+      - "Tests use `testutils.GetTestFs(...)` not `afero.NewOsFs()`."
+      - "Validator extracted to `validateMigrations([]Migration) error`; `init()` calls it; tests call it directly and assert on returned error messages (no `recover()` gymnastics)."
+      - "`go test ./neo4j-cli/internal/configmigrate/...` passes; race detector clean (`go test -race`)."
+      - "`make fmt-check && make lint` clean."
+    completed_at: null
+
+  - id: task-004
+    title: "Wire configmigrate.Run into clicfg.NewConfig, removing commented block"
+    description: |
+      Edit `common/clicfg/clicfg.go`. Delete the entire commented-out
+      migration block at lines 86–126 (including the explanatory NOTE
+      comment). In its place, immediately after the first
+      `Viper.ReadInConfig()` call (line 81), add:
+      `if _, err := configmigrate.Run(fs, fullConfigPath, os.Stderr); err
+      == nil { _ = Viper.ReadInConfig() }` — actually use the same
+      panic-on-error posture as the existing call above; specifically
+      always call `Viper.ReadInConfig()` after `configmigrate.Run`
+      regardless of `Run`'s return value (Run never returns a non-nil
+      error in this design, but a subsequent re-read is required so Viper
+      sees any migrated values). Add the import
+      `"github.com/neo4j/cli/neo4j-cli/internal/configmigrate"`. Do NOT
+      add `_schema_version` to `ValidConfigKeys` — it must remain
+      internal. No changelog entry (internal infrastructure, no user-
+      visible behaviour change while registry is empty). No bundle regen
+      (no cobra surface change).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`common/clicfg/clicfg.go` no longer contains lines 86–126 of the original commented-out migration block (verify by grep — `gjson.GetBytes` and `sjson.Set` no longer appear in this file)."
+      - "Import for `github.com/neo4j/cli/neo4j-cli/internal/configmigrate` is added."
+      - "`configmigrate.Run(fs, fullConfigPath, os.Stderr)` is called after the first `Viper.ReadInConfig()` and is followed by an unconditional second `Viper.ReadInConfig()` so migrated values are visible."
+      - "`ValidConfigKeys` in `GlobalConfig` is unchanged — `_schema_version` is NOT added."
+      - "Existing tests under `common/clicfg/...` still pass; no new failures from the wiring change."
+      - "`make fmt-check && make lint && make test` all clean."
+    completed_at: null
+
+  - id: task-005
+    title: "Final gates + live no-op smoke (byte-identical config)"
+    description: |
+      Run the full gate suite and a live smoke check confirming the
+      empty-registry ship is a true no-op. Build the binary with `make
+      build`. Take a sha256 of an existing `config.json` (or seed one in
+      `$HOME/.config/neo4j/cli/` or `~/Library/Preferences/neo4j/cli/`
+      depending on platform). Run `./bin/neo4j-cli config list`. Take
+      sha256 again — MUST be identical, since `migrations` is empty.
+      Then run the full gate suite: `make fmt-check`, `make lint`, `make
+      test`, `make generate-check`, `make license-check`. All must pass.
+      Report the sha256 hashes in the task notes for the reviewer to
+      confirm byte-identity.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make build` produces `bin/neo4j-cli` without error."
+      - "`./bin/neo4j-cli config list` against an existing config.json leaves the file byte-identical (sha256 unchanged before vs after) — hashes recorded in the task notes."
+      - "`make fmt-check` clean (no gofmt diffs)."
+      - "`make lint` clean."
+      - "`make test` passes including the new `configmigrate` package tests."
+      - "`make generate-check` clean (no bundle drift — internal package, no cobra surface change)."
+      - "`make license-check` clean (all new .go files carry the Neo4j header)."
+    completed_at: null
