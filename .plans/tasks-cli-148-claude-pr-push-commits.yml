@@ -29,7 +29,7 @@ tasks:
       the action create commits via the GitHub contents API as `claude[bot]`
       with a verified-commit badge instead of running `git commit` on the
       runner. No SSH key or extra secret is required. Implements REQ-F-002.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -37,7 +37,7 @@ tasks:
       - "Existing `with:` keys (`claude_code_oauth_token`, `additional_permissions`) remain in place"
       - "No new secrets are referenced by the workflow"
       - "File parses as valid YAML / GitHub Actions syntax (actionlint clean)"
-    completed_at: null
+    completed_at: 2026-05-19T12:30:00Z
 
   - id: task-003
     title: "Gate claude.yml workflow on MEMBER/OWNER/COLLABORATOR + non-Bot sender"

@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-19T12:15:00Z
 Bumped claude.yml permissions: contents/pull-requests read -> write so the action's GITHUB_TOKEN can push to PR branches.
 Files: ~.github/workflows/claude.yml
+
+## TASK-002 — 2026-05-19T12:30:00Z
+Enabled use_commit_signing on the claude-code-action step so commits are created via GitHub contents API as claude[bot] with verified-commit badge.
+Files: ~.github/workflows/claude.yml
