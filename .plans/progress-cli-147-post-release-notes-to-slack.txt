@@ -17,3 +17,7 @@ Files: ~.github/workflows/post-release-notes.yml
 ## task-005 — 2026-05-19T09:55:00Z
 Appended commented-out Slack POST step (SLACK_WEBHOOK_URL empty-guard + curl) and commented-out GH release append step (gh release view --json body, prepend `## Release notes` + `---`, gh release edit --notes-file). Each preceded by `# CLI-147 follow-up:` lead comment. YAML parses + actionlint clean.
 Files: ~.github/workflows/post-release-notes.yml
+
+## task-006 — 2026-05-19T10:10:00Z
+Verification gate: actionlint clean on post-release-notes.yml; make test / make lint / make fmt-check all pass. git diff main...HEAD limited to .github/ + .plans/ — no Go/Makefile touched. POST-MERGE manual checks remain for the human: Actions tab visibility after branch push and a live workflow_dispatch run against v1.4.0 confirming generated md + slack JSON are printed and no Slack/release mutation occurs (commented blocks stay commented).
+Files: ~.plans/tasks-cli-147-post-release-notes-to-slack.yml

@@ -148,7 +148,7 @@ tasks:
       occurs against Slack or the GitHub release (the commented blocks remain
       commented). Confirm `make test` / `make lint` / `make fmt-check` are NOT
       required (no Go changes) but run them once anyway as a smoke check.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -158,4 +158,4 @@ tasks:
       - "The dispatch run does not post to Slack and does not edit the GitHub release body for v1.4.0"
       - "No files outside .github/workflows/post-release-notes.yml and .github/prompts/release-notes.md are modified by this PR"
       - "make test, make lint, and make fmt-check pass locally as a final smoke check"
-    completed_at: null
+    completed_at: 2026-05-19T10:10:00Z
