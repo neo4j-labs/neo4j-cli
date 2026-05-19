@@ -11,3 +11,7 @@ Decisions: regenerated skill bundle in this task (not task-005) to keep TestGene
 Extract driverOpener configurer into buildDriverConfigurer helper; add tests covering six flag/env precedence cases, default-off c.Log==nil, debug-on stderrLogger wiring (Debugf routes to buffer), and stdout byte-identity between --debug=false/true.
 Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/run_test.go
 Decisions: extracted configurer into a named helper so tests can run it against a synthetic *config.Config without going through neo4j.NewDriver; log.DEBUG is an untyped int constant so compared via log.Level(log.DEBUG).
+
+## TASK-004 — 2026-05-19T00:00:00Z
+Bump .agents/query.md driverOpener note from 4 args to 5; add one line on debug bool param setting c.Log=stderrLogger(log.DEBUG).
+Files: ~.agents/query.md

@@ -90,14 +90,14 @@ tasks:
       `config.Config.Log = stderrLogger(log.DEBUG)` branch. Keep the rest of
       that section untouched — minimal-diff edit, do not rewrite surrounding
       paragraphs.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "`.agents/query.md` reflects the 5-arg seam signature."
       - "One-line note describes the new `debug bool` parameter's effect (sets `c.Log`)."
       - "No unrelated edits to other sections of `.agents/query.md`."
-    completed_at: null
+    completed_at: 2026-05-19T00:00:00Z
 
   - id: task-005
     title: "Regenerate skill bundle and commit drift"
