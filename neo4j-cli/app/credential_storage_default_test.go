@@ -26,77 +26,86 @@ const credentialsJSONWithAura = `{
 	"embed": {"credentials": []}
 }`
 
-// TestInitCredentialStorageDefault_NoCredentials_WritesKeyring verifies that on a
-// fresh install (no credentials), the function silently writes "keyring" and
-// emits no notice to stderr.
-func TestInitCredentialStorageDefault_NoCredentials_WritesKeyring(t *testing.T) {
-	gokeyring.MockInit()
+// TestInitCredentialStorageDefault covers the primary behaviours of
+// initCredentialStorageDefault: fresh install (no credentials), first run with
+// existing credentials (upgrade notice), and no-op when the setting is already
+// present in config.
+func TestInitCredentialStorageDefault(t *testing.T) {
+	const migrationCmd = "neo4j-cli config set credential-storage keyring --rw"
 
-	fs, err := testfs.GetTestFs("{}", "{}")
-	require.NoError(t, err)
+	tests := []struct {
+		name               string
+		configJSON         string
+		credentialsJSON    string
+		wantEmptyStderr    bool
+		wantStderrContains []string
+		wantStderrLine     string // if non-empty, must appear on a complete stderr line
+		wantStorageMode    string
+		wantCredStorage    string
+	}{
+		{
+			name:            "no credentials: silently writes keyring",
+			configJSON:      "{}",
+			credentialsJSON: "{}",
+			wantEmptyStderr: true,
+			wantStorageMode: credentials.StorageModeKeyring,
+			wantCredStorage: credentials.StorageModeKeyring,
+		},
+		{
+			name:               "existing credentials: writes insecure and emits upgrade notice",
+			configJSON:         "{}",
+			credentialsJSON:    credentialsJSONWithAura,
+			wantEmptyStderr:    false,
+			wantStderrContains: []string{"plaintext", migrationCmd},
+			wantStderrLine:     migrationCmd,
+			wantStorageMode:    credentials.StorageModeInsecure,
+			wantCredStorage:    credentials.StorageModeInsecure,
+		},
+		{
+			name:            "already set: is a complete no-op",
+			configJSON:      `{"credential-storage":"keyring"}`,
+			credentialsJSON: credentialsJSONWithAura,
+			wantEmptyStderr: true,
+			wantStorageMode: credentials.StorageModeKeyring,
+			wantCredStorage: credentials.StorageModeKeyring,
+		},
+	}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gokeyring.MockInit()
 
-	var stderr bytes.Buffer
-	initCredentialStorageDefault(cfg, &stderr)
+			fs, err := testfs.GetTestFs(tc.configJSON, tc.credentialsJSON)
+			require.NoError(t, err)
 
-	// No notice emitted
-	assert.Empty(t, stderr.String())
-	// Storage mode set to keyring in-memory
-	assert.Equal(t, credentials.StorageModeKeyring, cfg.Credentials.StorageMode())
-	// Key written to config
-	assert.True(t, cfg.Global.CredentialStorageIsSet())
-	assert.Equal(t, credentials.StorageModeKeyring, cfg.Global.CredentialStorage())
-}
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-// TestInitCredentialStorageDefault_WithCredentials_WritesInsecureAndNotice verifies
-// that when existing credentials are present, "insecure" is written and the
-// one-time upgrade notice is printed to stderr.
-func TestInitCredentialStorageDefault_WithCredentials_WritesInsecureAndNotice(t *testing.T) {
-	// Use an insecure mock so the credentials can load without touching the real keyring.
-	gokeyring.MockInit()
+			var stderr bytes.Buffer
+			initCredentialStorageDefault(cfg, &stderr)
 
-	fs, err := testfs.GetTestFs("{}", credentialsJSONWithAura)
-	require.NoError(t, err)
+			if tc.wantEmptyStderr {
+				assert.Empty(t, stderr.String())
+			}
+			for _, s := range tc.wantStderrContains {
+				assert.Contains(t, stderr.String(), s)
+			}
+			if tc.wantStderrLine != "" {
+				lines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
+				found := false
+				for _, line := range lines {
+					if strings.Contains(line, tc.wantStderrLine) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "stderr must contain %q on a complete line; got:\n%s", tc.wantStderrLine, stderr.String())
+			}
 
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	var stderr bytes.Buffer
-	initCredentialStorageDefault(cfg, &stderr)
-
-	// Notice must be emitted
-	notice := stderr.String()
-	assert.Contains(t, notice, "plaintext")
-	assert.Contains(t, notice, "neo4j-cli config set credential-storage keyring --rw")
-
-	// Storage mode set to insecure in-memory
-	assert.Equal(t, credentials.StorageModeInsecure, cfg.Credentials.StorageMode())
-	// Key written to config
-	assert.True(t, cfg.Global.CredentialStorageIsSet())
-	assert.Equal(t, credentials.StorageModeInsecure, cfg.Global.CredentialStorage())
-}
-
-// TestInitCredentialStorageDefault_AlreadySet_IsNoop verifies that when
-// "credential-storage" is already present in config.json, the function is a
-// complete no-op (no notice, no mode change).
-func TestInitCredentialStorageDefault_AlreadySet_IsNoop(t *testing.T) {
-	gokeyring.MockInit()
-
-	// Pre-seed the config with credential-storage already set to keyring.
-	fs, err := testfs.GetTestFs(`{"credential-storage":"keyring"}`, credentialsJSONWithAura)
-	require.NoError(t, err)
-
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	// In keyring mode with existing credentials the loader tries the keyring;
-	// but the test credential JSON has client-secret present as JSON fallback.
-
-	var stderr bytes.Buffer
-	initCredentialStorageDefault(cfg, &stderr)
-
-	// No notice, no change
-	assert.Empty(t, stderr.String())
-	// Mode unchanged
-	assert.Equal(t, credentials.StorageModeKeyring, cfg.Credentials.StorageMode())
+			assert.Equal(t, tc.wantStorageMode, cfg.Credentials.StorageMode())
+			assert.True(t, cfg.Global.CredentialStorageIsSet())
+			assert.Equal(t, tc.wantCredStorage, cfg.Global.CredentialStorage())
+		})
+	}
 }
 
 // TestInitCredentialStorageDefault_SubsequentRuns_NoNotice verifies that a
@@ -119,29 +128,4 @@ func TestInitCredentialStorageDefault_SubsequentRuns_NoNotice(t *testing.T) {
 	var stderr2 bytes.Buffer
 	initCredentialStorageDefault(cfg, &stderr2)
 	assert.Empty(t, stderr2.String())
-}
-
-// TestInitCredentialStorageDefault_UpgradeNoticeContainsMigrationCommand checks the
-// exact migration command appears in the upgrade notice.
-func TestInitCredentialStorageDefault_UpgradeNoticeContainsMigrationCommand(t *testing.T) {
-	gokeyring.MockInit()
-
-	fs, err := testfs.GetTestFs("{}", credentialsJSONWithAura)
-	require.NoError(t, err)
-
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	var stderr bytes.Buffer
-	initCredentialStorageDefault(cfg, &stderr)
-
-	lines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
-	// Must contain the exact migration command on one of the lines
-	found := false
-	for _, line := range lines {
-		if strings.Contains(line, "neo4j-cli config set credential-storage keyring --rw") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "upgrade notice must name the migration command exactly; got:\n%s", stderr.String())
 }
