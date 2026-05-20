@@ -23,7 +23,7 @@ neo4j-cli query --credential dev 'RETURN 1 AS n'
 neo4j-cli docker delete dev --force --rw
 ```
 
-- The generated password appears in `docker create`'s rendered output; redirects and pipes capture it — pass `--password <s>` to pick your own, or `--no-store-credential` to suppress storage and rendering.
+- The generated password appears in `docker create`'s rendered output; redirects and pipes capture it — pass `--password <s>` to pick your own, `--no-print-password` to keep the stored credential but omit the password from stdout (recover via `neo4j-cli credential dbms get <name>`), or `--no-store-credential` to suppress storage and rendering.
 
 - Persistent volume mounts: `--data-dir <host>` bind-mounts at `/data` (persist DB across `docker delete`), `--logs-dir <host>` at `/logs`, `--import-dir <host>` at `/import` (for `LOAD CSV`). Paths support `~` and `$VAR` expansion; missing dirs are created at mode 0o755. All three are incompatible with `--ephemeral`. Neo4j adjusts ownership of the mounted dirs at container startup, so they appear under the container's neo4j UID on the host after first start.
 
