@@ -238,9 +238,10 @@ func TestSwap_HappyPath_LinuxTarGz(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "NEW-BINARY-BODY", string(got))
 
-	// .new temp file is gone
-	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
-	assert.True(t, os.IsNotExist(statErr), "expected neo4j-cli.new in %s to be removed", tmpDir)
+	// .new temp file is gone (random-suffix shape: neo4j-cli.new.<16-hex>)
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "neo4j-cli.new.*"))
+	require.NoError(t, err)
+	assert.Empty(t, matches, "expected no neo4j-cli.new.* leftovers in %s", tmpDir)
 
 	// Mode is 0755 (Unix only — Windows will report 0666 from chmod due to
 	// the platform's lack of execute bits)
@@ -303,10 +304,11 @@ func TestSwap_TamperedChecksum_AbortsBeforeSwap(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, string(original), string(got))
 
-	// No .new lingering, no .old lingering
-	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
-	assert.True(t, os.IsNotExist(statErr))
-	_, statErr = os.Stat(currentBinary + ".old")
+	// No .new lingering (random-suffix shape), no .old lingering
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "neo4j-cli.new.*"))
+	require.NoError(t, err)
+	assert.Empty(t, matches, "expected no neo4j-cli.new.* leftovers in %s", tmpDir)
+	_, statErr := os.Stat(currentBinary + ".old")
 	assert.True(t, os.IsNotExist(statErr))
 }
 
@@ -442,9 +444,10 @@ func TestSwap_WindowsRenameDance(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ORIGINAL", string(oldBytes))
 
-	// `neo4j-cli.new` (the temp file) is gone (consumed by the rename)
-	_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
-	assert.True(t, os.IsNotExist(statErr))
+	// `neo4j-cli.new.<rand>` (the temp file) is gone (consumed by the rename)
+	matches, err := filepath.Glob(filepath.Join(tmpDir, "neo4j-cli.new.*"))
+	require.NoError(t, err)
+	assert.Empty(t, matches, "expected no neo4j-cli.new.* leftovers in %s", tmpDir)
 }
 
 func TestSwap_WindowsRestoreOnError(t *testing.T) {
@@ -1133,12 +1136,13 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 				assert.Equal(t, 0, counters.runCalls, "writable branch must NOT invoke runCommandFn")
 				assert.Equal(t, 2, counters.httpCalls, "writable branch downloads archive + checksum")
 
-				// New binary is in place, no leftover .new.
+				// New binary is in place, no leftover .new.<rand>.
 				got, err := os.ReadFile(currentBinary)
 				require.NoError(t, err)
 				assert.Equal(t, "MATRIX-PAYLOAD", string(got))
-				_, statErr := os.Stat(filepath.Join(tmpDir, "neo4j-cli.new"))
-				assert.True(t, os.IsNotExist(statErr), "tmpNew must be removed by rename")
+				matches, err := filepath.Glob(filepath.Join(tmpDir, "neo4j-cli.new.*"))
+				require.NoError(t, err)
+				assert.Empty(t, matches, "tmpNew must be removed by rename")
 			},
 		},
 		{
@@ -1191,12 +1195,23 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 				err := Swap(context.Background(), urls, currentBinary, &stderr)
 				require.NoError(t, err)
 
-				// Exact argv shape.
+				// Exact argv shape — Args[4] (src) has the random-suffix prefix
+				// `<elevTmpDir>/neo4j-cli.new.` plus 16 lowercase hex chars; all
+				// other positions are unchanged.
 				require.NotNil(t, counters.capturedCmd)
-				expectedTmpNew := filepath.Join(elevTmpDir, "neo4j-cli.new")
-				assert.Equal(t, []string{
-					"/usr/bin/sudo", "/usr/bin/install", "-m", "0755", expectedTmpNew, currentBinary,
-				}, counters.capturedCmd.Args)
+				require.Len(t, counters.capturedCmd.Args, 6)
+				assert.Equal(t, "/usr/bin/sudo", counters.capturedCmd.Args[0])
+				assert.Equal(t, "/usr/bin/install", counters.capturedCmd.Args[1])
+				assert.Equal(t, "-m", counters.capturedCmd.Args[2])
+				assert.Equal(t, "0755", counters.capturedCmd.Args[3])
+				assert.Equal(t, currentBinary, counters.capturedCmd.Args[5])
+				srcPrefix := filepath.Join(elevTmpDir, "neo4j-cli.new.")
+				gotSrc := counters.capturedCmd.Args[4]
+				require.True(t, strings.HasPrefix(gotSrc, srcPrefix),
+					"src arg %q must have prefix %q", gotSrc, srcPrefix)
+				suffix := strings.TrimPrefix(gotSrc, srcPrefix)
+				assert.Len(t, suffix, 16, "random suffix must be 16 hex chars")
+				assert.Regexp(t, `^[0-9a-f]{16}$`, suffix, "suffix must be lowercase hex")
 
 				assert.Equal(t, 1, counters.runCalls, "elevated branch must call runCommandFn exactly once")
 				assert.Equal(t, 0, counters.renameCalls, "elevated branch must NOT call os.Rename")
@@ -1207,8 +1222,9 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 				assert.Contains(t, stderr.String(), "Elevating via sudo")
 
 				// tmpNew cleanup runs regardless of stub outcome.
-				_, statErr := os.Stat(expectedTmpNew)
-				assert.True(t, os.IsNotExist(statErr), "tmpNew under tempDirFn() must be removed after elevation")
+				matches, err := filepath.Glob(filepath.Join(elevTmpDir, "neo4j-cli.new.*"))
+				require.NoError(t, err)
+				assert.Empty(t, matches, "tmpNew under tempDirFn() must be removed after elevation")
 			},
 		},
 		{
@@ -1381,7 +1397,6 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 				require.NoError(t, os.WriteFile(currentBinary, []byte("OLD"), 0o755))
 
 				elevTmpDir := t.TempDir()
-				expectedTmpNew := filepath.Join(elevTmpDir, "neo4j-cli.new")
 
 				var counters elevationCounters
 				innerErr := fmt.Errorf("simulated sudo decline")
@@ -1414,9 +1429,26 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 				assert.Equal(t, 1, counters.runCalls, "runCommandFn fires exactly once even when it returns non-zero")
 				assert.Equal(t, 2, counters.httpCalls, "archive + checksum still downloaded before elevation")
 
+				// Captured argv: Args[4] (src) carries the random-suffix prefix.
+				require.NotNil(t, counters.capturedCmd)
+				require.Len(t, counters.capturedCmd.Args, 6)
+				assert.Equal(t, "/usr/bin/sudo", counters.capturedCmd.Args[0])
+				assert.Equal(t, "/usr/bin/install", counters.capturedCmd.Args[1])
+				assert.Equal(t, "-m", counters.capturedCmd.Args[2])
+				assert.Equal(t, "0755", counters.capturedCmd.Args[3])
+				assert.Equal(t, currentBinary, counters.capturedCmd.Args[5])
+				srcPrefix := filepath.Join(elevTmpDir, "neo4j-cli.new.")
+				gotSrc := counters.capturedCmd.Args[4]
+				require.True(t, strings.HasPrefix(gotSrc, srcPrefix),
+					"src arg %q must have prefix %q", gotSrc, srcPrefix)
+				suffix := strings.TrimPrefix(gotSrc, srcPrefix)
+				assert.Len(t, suffix, 16, "random suffix must be 16 hex chars")
+				assert.Regexp(t, `^[0-9a-f]{16}$`, suffix, "suffix must be lowercase hex")
+
 				// Cleanup runs regardless of outcome.
-				_, statErr := os.Stat(expectedTmpNew)
-				assert.True(t, os.IsNotExist(statErr), "tmpNew must be removed even on elevation failure")
+				matches, err := filepath.Glob(filepath.Join(elevTmpDir, "neo4j-cli.new.*"))
+				require.NoError(t, err)
+				assert.Empty(t, matches, "tmpNew must be removed even on elevation failure")
 
 				// Original binary untouched on disk.
 				got, err := os.ReadFile(currentBinary)
@@ -1429,4 +1461,83 @@ func TestSwap_ElevationMatrix(t *testing.T) {
 	for _, sc := range scenarios {
 		t.Run(sc.name, sc.run)
 	}
+}
+
+// TestSwap_TmpName_RandomSuffixPerInvocation drives two back-to-back Swap
+// invocations sharing one tempDirFn / installDir / archive stubs and asserts
+// the two captured `sudo install` src args differ. The random suffix is
+// drawn from crypto/rand per call, so a collision is effectively impossible —
+// sequential calls are sufficient to prove the suffix is not fixed.
+func TestSwap_TmpName_RandomSuffixPerInvocation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("elevation branch is unix-only; same random-suffix code is exercised on linux/darwin")
+	}
+	withSwapGoos(t, "linux")
+
+	installDir := t.TempDir()
+	currentBinary := filepath.Join(installDir, "neo4j-cli")
+	require.NoError(t, os.WriteFile(currentBinary, []byte("OLD"), 0o755))
+
+	elevTmpDir := t.TempDir()
+
+	archive := makeTarGz(t, []tarEntry{
+		{name: "neo4j-cli", typeflag: tar.TypeReg, mode: 0o755, body: []byte("PAYLOAD")},
+	})
+	archiveName := "neo4j-cli_0.1.0_Linux_x86_64.tar.gz"
+	archiveURL := "https://swap-test.local/" + archiveName
+	checksumURL := "https://swap-test.local/neo4j-cli_0.1.0_checksums.txt"
+	urls := AssetURLs{Archive: archiveURL, Checksum: checksumURL}
+
+	withDirWritable(t, func(string) (bool, error) { return false, nil })
+	withGeteuid(t, func() int { return 1000 })
+	withLookPath(t, func(file string) (string, error) {
+		switch file {
+		case "sudo":
+			return "/usr/bin/sudo", nil
+		case "install":
+			return "/usr/bin/install", nil
+		}
+		return "", exec.ErrNotFound
+	})
+	withStdinIsTTY(t, true)
+	withTempDir(t, func() string { return elevTmpDir })
+	withAllowedHost(t, "swap-test.local")
+	withHttpDo(t, func(req *http.Request) (*http.Response, error) {
+		body := archive
+		if strings.HasSuffix(req.URL.Path, "_checksums.txt") {
+			sum := sha256.Sum256(archive)
+			body = []byte(fmt.Sprintf("%s  %s\n", hex.EncodeToString(sum[:]), archiveName))
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	var capturedSrcs []string
+	withRunCommand(t, func(cmd *exec.Cmd) error {
+		require.Len(t, cmd.Args, 6)
+		capturedSrcs = append(capturedSrcs, cmd.Args[4])
+		return nil
+	})
+
+	// Two back-to-back invocations sharing one tempDirFn.
+	for i := 0; i < 2; i++ {
+		err := Swap(context.Background(), urls, currentBinary, io.Discard)
+		require.NoError(t, err, "call %d", i)
+	}
+
+	require.Len(t, capturedSrcs, 2)
+	srcPrefix := filepath.Join(elevTmpDir, "neo4j-cli.new.")
+	for i, src := range capturedSrcs {
+		require.True(t, strings.HasPrefix(src, srcPrefix),
+			"call %d src %q must have prefix %q", i, src, srcPrefix)
+		suffix := strings.TrimPrefix(src, srcPrefix)
+		assert.Len(t, suffix, 16, "call %d random suffix must be 16 hex chars", i)
+		assert.Regexp(t, `^[0-9a-f]{16}$`, suffix, "call %d suffix must be lowercase hex", i)
+	}
+	assert.NotEqual(t, capturedSrcs[0], capturedSrcs[1],
+		"two back-to-back Swap calls must produce distinct random tmpNew names; got both %q", capturedSrcs[0])
 }

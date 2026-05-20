@@ -1,0 +1,13 @@
+## task-001 — 2026-05-20T09:57:46Z
+Randomised tmpNew filename in Swap() with 16-hex crypto/rand suffix; closes multi-user /tmp pre-plant DoS. Generated right after planSwap, before any HTTP I/O. Removed stale pre-extract os.Remove(tmpNew). Updated file-level + inline docstrings.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go
+Decisions: Test failures from fixed-name assertions are expected; task-002 owns the test updates.
+
+## task-002 — 2026-05-20T10:02:19Z
+Swap tests adapted to randomised tmpNew: post-Swap cleanup assertions now use filepath.Glob("neo4j-cli.new.*") len-zero; elevated-branch argv splits Args[4] into prefix `<elevTmpDir>/neo4j-cli.new.` plus 16-char lowercase hex, Args[0..3]+Args[5] unchanged. Added TestSwap_TmpName_RandomSuffixPerInvocation (two sequential Swap calls, captures Args[4], asserts both have prefix+hex shape and differ).
+Files: ~neo4j-cli/internal/subcommands/update/swap_test.go
+Decisions: Self-reviewed against acceptance criteria — sub-agent reviewer unavailable.
+
+## TASK-003 — 2026-05-20T10:08:00Z
+Ran final gates: fmt-check clean, lint 0 issues, full test suite green, generate-check bundle-clean (only harness tasks-yml status flip in diff, per AGENTS.md). golang-security skill reviewed swap.go change in review/ultrathink mode — no new findings on crypto/rand usage, fail-closed rand.Read path, [0-9a-f]{16} suffix injection/traversal surface, or preserved cleanup sites. No .changes/unreleased/ entry added (internal hardening).
+Files: ~tasks-cli-156-update-randomise-temp-filename.yml, ~progress-cli-156-update-randomise-temp-filename.txt
