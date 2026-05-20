@@ -1,0 +1,138 @@
+feature: cli-158-security-md-supply-chain-trust-root
+prd: ./prd-cli-158-security-md-supply-chain-trust-root.md
+created_at: 2026-05-20T09:04:56Z
+updated_at: 2026-05-20T09:04:56Z
+
+tasks:
+  - id: task-001
+    title: "Create SECURITY.md at repo root with five-section trust-root doc"
+    description: |
+      Create a new flush-left Markdown file `SECURITY.md` at the repo
+      root (NOT under `.github/`). Five H2 sections in this exact order:
+      `## Reporting a vulnerability` (advertises security@neo4j.com and
+      tells reporters not to file public GitHub issues for security
+      reports); `## Supply-chain trust root for \`neo4j-cli update\``
+      enumerating four trust links (Go TLS vs. host root store; TLS
+      certs for the five-host allowlist github.com / api.github.com /
+      codeload.github.com / objects.githubusercontent.com /
+      release-assets.githubusercontent.com; integrity of GitHub
+      release-assets storage for neo4j-labs/neo4j-cli; SHA256
+      `…_checksums.txt` manifest verified BEFORE archive extraction);
+      `## Accepted residual risks` (three bullets: GitHub Actions
+      release-workflow compromise, release-assets storage compromise,
+      single-channel substitution; close with one sentence noting the
+      next-step mitigations are not yet implemented);
+      `## Mitigation roadmap (not committed)` (three bullets:
+      sigstore/cosign signed releases with verification in `update`,
+      reproducible builds, out-of-band publication of release public
+      keys — the `(not committed)` qualifier MUST be in the heading);
+      `## Review cadence` (one short paragraph, deliberately vague — no
+      calendar binding, no retrospective binding). No Oplane references,
+      no internal threat-model IDs, no file:line anchors into the source
+      tree. Target ≤120 lines total.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "SECURITY.md exists at repo root (NOT under .github/) and is flush-left"
+      - "Five H2 sections appear in the order specified above"
+      - "Reporting section names security@neo4j.com and instructs reporters not to file public GitHub issues"
+      - "Trust-root section enumerates all five pinned GitHub hosts explicitly (not as a wildcard)"
+      - "File contains no `swap.go`, no `release.go`, no `Oplane`, no `REQ-` references"
+      - "`wc -l SECURITY.md` < 120"
+    completed_at: null
+
+  - id: task-002
+    title: "Link to SECURITY.md from README.md Installation section"
+    description: |
+      In `README.md`, append a single trailing line to the
+      `## Installation` section AFTER the existing `#### Alternatives`
+      bullet list (current location ~line 30). Do NOT introduce a new
+      top-level heading and do NOT modify any existing install command,
+      bullet, or paragraph. Suggested line:
+      `**Security:** how \`neo4j-cli update\` validates downloads and our vulnerability reporting channel are documented in [SECURITY.md](./SECURITY.md).`
+      The link target MUST be the relative path `./SECURITY.md`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "README.md contains a single new line linking to ./SECURITY.md inside the Installation section"
+      - "The new line is placed AFTER the existing `#### Alternatives` bullet list"
+      - "No new top-level heading is introduced"
+      - "No existing install command, bullet, or paragraph in Installation is altered"
+      - "`grep -c 'SECURITY.md' README.md` returns ≥ 1"
+    completed_at: null
+
+  - id: task-003
+    title: "Extend update.go Long with SECURITY.md pointer + regen skill bundle"
+    description: |
+      In `neo4j-cli/internal/subcommands/update/update.go`, append one
+      trailing sentence to the existing `Long:` string at lines 96-101.
+      Suggested addition (append to the existing final segment ending
+      `"…are refreshed automatically."`):
+      `" See SECURITY.md in the repo for the supply-chain trust root and accepted residual risks."`
+      No other text in `Long` may change. After the source edit, run
+      `go generate ./neo4j-cli/internal/skill/...` and commit the
+      regenerated `neo4j-cli/internal/skill/bundle/references/update.md`
+      (and any other bundle files that legitimately changed) in the
+      SAME commit as the source edit. If `make generate-check` flags
+      changes to files OTHER than `bundle/references/update.md` (e.g.
+      `SKILL.md`), STOP and investigate — that would indicate the change
+      has accidentally touched a global help surface.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "update.go Long field gains exactly one trailing sentence referencing SECURITY.md"
+      - "No other text in update.go Long changes"
+      - "`go generate ./neo4j-cli/internal/skill/...` has been run and the resulting bundle changes are staged"
+      - "Bundle diff is limited to neo4j-cli/internal/skill/bundle/references/update.md (any other change → investigate before continuing)"
+      - "`go build ./...` is clean"
+    completed_at: null
+
+  - id: task-004
+    title: "Add Patch changelog entry for CLI-158"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "docs: add SECURITY.md documenting update trust root (CLI-158)"`.
+      If changie is not installed locally, hand-author a YAML file under
+      `.changes/unreleased/` named `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`
+      per the AGENTS.md Changie Notes (single-quoted body, RFC3339 time,
+      project field set to `neo4j-cli`). Do NOT alter `.changes/neo4j-cli/v*.md`
+      release files. Rationale: the `update --help` Long-text change is
+      user-visible, so a Patch entry is appropriate (interactive decision
+      recorded in PRD Technical Considerations).
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "A new YAML file exists under .changes/unreleased/ matching neo4j-cli-Patch-<date>-<time>.yaml"
+      - "Body references CLI-158 and the SECURITY.md addition"
+      - "kind is Patch and project is neo4j-cli"
+      - "No edits under .changes/neo4j-cli/"
+    completed_at: null
+
+  - id: task-005
+    title: "Run final gates: fmt-check, lint, test, generate-check, license-check"
+    description: |
+      Run the AGENTS.md final-gate set against the branch. All five
+      MUST be clean: `make fmt-check` (no gofmt drift), `make lint`
+      (golangci-lint v2), `make test` (entire suite — `TestGenerator_RoundTrip`
+      is the load-bearing gate that proves the bundle regen in task-003
+      was actually done), `make generate-check` (no further bundle
+      drift), and `make license-check` (confirms no missing copyright
+      header is required for SECURITY.md). Manual sanity:
+      `./bin/neo4j-cli update --help | grep -i security` prints the new
+      sentence; `wc -l SECURITY.md` is under 120; `grep -c SECURITY.md README.md`
+      returns ≥ 1.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make fmt-check` exits 0 with no output"
+      - "`make lint` exits 0 with no findings"
+      - "`make test` exits 0 with all tests passing including TestGenerator_RoundTrip"
+      - "`make generate-check` exits 0 — no further bundle drift after task-003"
+      - "`make license-check` exits 0"
+      - "Manual: `./bin/neo4j-cli update --help` mentions SECURITY.md in the Long text"
+    completed_at: null
