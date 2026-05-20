@@ -64,7 +64,7 @@ tasks:
       captures `cmd.Args[4]` per call. Assert the two captured src
       paths differ. Sequential is sufficient — `rand.Read` collision
       is not ordering-dependent.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -74,7 +74,8 @@ tasks:
       - "New `TestSwap_TmpName_RandomSuffixPerInvocation` exists, drives two back-to-back `Swap` invocations sharing one `tempDirFn`, and asserts the two captured src paths differ and both have the expected prefix+hex shape."
       - "Direct-call tests of `extractTarGzEntry`, `writeRegularFile`, and `elevatedSwap` (which pass a chosen destination path into the leaf helper) are unchanged."
       - "`go test ./neo4j-cli/internal/subcommands/update/...` is green."
-    completed_at: null
+    status_note: self-reviewed (sub-agent unavailable)
+    completed_at: 2026-05-20T10:02:19Z
 
   - id: task-003
     title: "Run final gates: make test, fmt-check, lint, golang-security"
