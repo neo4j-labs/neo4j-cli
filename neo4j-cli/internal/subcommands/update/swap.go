@@ -27,12 +27,16 @@
 //     before any extraction so a tampered archive never touches disk under
 //     the target directory.
 //  4. Extract the binary entry from the archive into a temp file at
-//     `<plan.tmpDir>/neo4j-cli.new` — same directory as the running binary
-//     for the direct branch (so `os.Rename` stays on one filesystem), or
-//     `os.TempDir()` for the elevated branch (`sudo install` copies, so
-//     cross-filesystem is fine). Reject any entry whose cleaned path
-//     escapes the destination (zip-slip / tar-slip per REQ-F-014). Reject
-//     symlinks, hardlinks, and devices — only regular files allowed.
+//     `<plan.tmpDir>/neo4j-cli.new.<rand>` — same directory as the running
+//     binary for the direct branch (so `os.Rename` stays on one filesystem),
+//     or `os.TempDir()` for the elevated branch (`sudo install` copies, so
+//     cross-filesystem is fine). The 16-hex-char per-invocation random
+//     suffix closes a multi-user /tmp pre-plant DoS — without it, any local
+//     user can create `<tmpDir>/neo4j-cli.new` ahead of time and the
+//     `O_EXCL` open in `writeRegularFile` would fail every update. Reject
+//     any entry whose cleaned path escapes the destination (zip-slip /
+//     tar-slip per REQ-F-014). Reject symlinks, hardlinks, and devices —
+//     only regular files allowed.
 //  5. Swap into place:
 //     - Direct branch on linux/darwin: `os.Rename(tmpNew, <current>)`.
 //     - Direct branch on Windows: best-effort `os.Remove(<current>.old)`,
@@ -397,6 +401,22 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr 
 		return fmt.Errorf("swap: %w", err)
 	}
 
+	// tmpNew lives under plan.tmpDir: same directory as the running binary
+	// for the direct-rename branch (so os.Rename stays on one filesystem),
+	// or os.TempDir() for the elevated branch (sudo install copies, so
+	// cross-filesystem is fine). The 16-hex-char per-invocation random
+	// suffix closes a multi-user /tmp pre-plant DoS — any local user could
+	// otherwise create `<tmpDir>/neo4j-cli.new` ahead of time and the
+	// O_EXCL open in writeRegularFile would fail every update. crypto/rand
+	// makes pre-creation effectively impossible, so the prior best-effort
+	// `os.Remove(tmpNew)` here is unnecessary. Generated before any network
+	// I/O so a rand.Read failure aborts before a single byte is fetched.
+	var randBytes [8]byte
+	if _, err := rand.Read(randBytes[:]); err != nil {
+		return fmt.Errorf("swap: generate tmp suffix: %w", err)
+	}
+	tmpNew := filepath.Join(plan.tmpDir, "neo4j-cli.new."+hex.EncodeToString(randBytes[:]))
+
 	archiveBytes, err := downloadCapped(ctx, urls.Archive, maxArchiveBytes)
 	if err != nil {
 		return fmt.Errorf("swap: download archive: %w", err)
@@ -427,16 +447,6 @@ func Swap(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr 
 	if swapGoosFn() == "windows" {
 		binaryEntry = "neo4j-cli.exe"
 	}
-
-	// tmpNew lives under plan.tmpDir: same directory as the running binary
-	// for the direct-rename branch (so os.Rename stays on one filesystem),
-	// or os.TempDir() for the elevated branch (sudo install copies, so
-	// cross-filesystem is fine).
-	tmpNew := filepath.Join(plan.tmpDir, "neo4j-cli.new")
-	// Best-effort remove a stale .new from a previous failed run before we
-	// extract — extractToFile uses O_EXCL so a stale path would block the
-	// fresh write.
-	_ = os.Remove(tmpNew)
 
 	// Extract straight into tmpNew with mode 0600 during write; we chmod
 	// 0755 once the body has fully landed and verified.

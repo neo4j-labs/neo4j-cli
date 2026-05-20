@@ -1,0 +1,4 @@
+## task-001 — 2026-05-20T09:57:46Z
+Randomised tmpNew filename in Swap() with 16-hex crypto/rand suffix; closes multi-user /tmp pre-plant DoS. Generated right after planSwap, before any HTTP I/O. Removed stale pre-extract os.Remove(tmpNew). Updated file-level + inline docstrings.
+Files: ~neo4j-cli/internal/subcommands/update/swap.go
+Decisions: Test failures from fixed-name assertions are expected; task-002 owns the test updates.

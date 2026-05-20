@@ -29,7 +29,7 @@ tasks:
       existing cleanup `os.Remove(tmpNew)` calls keep targeting the
       same `tmpNew` variable — no logic change beyond the name
       construction.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`Swap()` constructs `tmpNew` with a 16-hex-char per-invocation random suffix using `crypto/rand` once per call."
@@ -38,7 +38,7 @@ tasks:
       - "Stale `_ = os.Remove(tmpNew)` pre-extract call removed; all subsequent `os.Remove(tmpNew)` cleanup calls still target the same `tmpNew` variable."
       - "File-level docstring (lines 29-35) and inline comment block (lines 431-435) updated to reflect the random suffix and reference the pre-plant DoS rationale."
       - "No new imports added (`crypto/rand` and `encoding/hex` already present)."
-    completed_at: null
+    completed_at: 2026-05-20T09:57:46Z
 
   - id: task-002
     title: "Update swap tests for new tmpNew shape and add collision test"
