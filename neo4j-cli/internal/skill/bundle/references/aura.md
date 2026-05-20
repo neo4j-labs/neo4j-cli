@@ -2,6 +2,14 @@
 
 ## Contents
 
+- [neo4j-cli aura agent](#neo4j-cli-aura-agent)
+- [neo4j-cli aura agent create](#neo4j-cli-aura-agent-create)
+- [neo4j-cli aura agent delete](#neo4j-cli-aura-agent-delete)
+- [neo4j-cli aura agent get](#neo4j-cli-aura-agent-get)
+- [neo4j-cli aura agent invoke](#neo4j-cli-aura-agent-invoke)
+- [neo4j-cli aura agent list](#neo4j-cli-aura-agent-list)
+- [neo4j-cli aura agent replace](#neo4j-cli-aura-agent-replace)
+- [neo4j-cli aura agent update](#neo4j-cli-aura-agent-update)
 - [neo4j-cli aura customer-managed-key](#neo4j-cli-aura-customer-managed-key)
 - [neo4j-cli aura customer-managed-key create](#neo4j-cli-aura-customer-managed-key-create)
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
@@ -41,6 +49,244 @@ Allows you to programmatically provision and manage your Aura resources
 Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.
 
 Usage: `neo4j-cli aura`
+
+## neo4j-cli aura agent
+
+Relates to Aura Agents
+
+Usage: `neo4j-cli aura agent`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura agent create
+
+Creates a new agent
+
+Creates a new agent for the specified project.
+
+Usage: `neo4j-cli aura agent create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--dbid` | string | - | (required) Aura database instance ID the agent connects to |
+| `--description` | string | - | (required) Agent description |
+| `--enabled` | bool | true | Whether the agent is enabled |
+| `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
+| `--is-private` | bool | false | Whether the agent is private |
+| `--name` | string | - | (required) Agent name |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+| `--system-prompt` | string | - | Optional system prompt for the agent |
+| `--tools` | string | - | (required) Tools configuration as a JSON array |
+
+Examples:
+
+```
+# Create an agent with a text2cypher tool
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
+
+# Create an agent with a system prompt
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --system-prompt "you are helpful" --rw
+
+# Create an agent and emit the response as JSON
+neo4j-cli aura agent create --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw --format json
+```
+
+### neo4j-cli aura agent delete
+
+Deletes an agent
+
+Deletes an agent by its ID.
+
+Usage: `neo4j-cli aura agent delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+
+Examples:
+
+```
+# Delete an agent by ID
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete an agent in a specific organization and project
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Delete an agent and emit the response as JSON
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --format json
+```
+
+### neo4j-cli aura agent get
+
+Returns agent details
+
+Returns the details of a specific agent.
+
+Usage: `neo4j-cli aura agent get <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+
+Examples:
+
+```
+# Get details for an agent
+neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000
+
+# Get an agent in a specific organization and project
+neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# Get agent details as JSON for scripting
+neo4j-cli aura agent get 00000000-0000-0000-0000-000000000000 --format json
+```
+
+### neo4j-cli aura agent invoke
+
+Invoke an agent with an input prompt
+
+Invokes an agent with the provided input string. Use --format json for the full response including content blocks.
+
+Usage: `neo4j-cli aura agent invoke <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--input` | string | - | (required) Input message to send to the agent |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+
+Examples:
+
+```
+# Invoke an agent with a prompt
+neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello" --rw
+
+# Invoke an agent in a specific organization and project
+neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello" --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+
+# Invoke an agent and emit the response as JSON
+neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello" --rw --format json
+```
+
+### neo4j-cli aura agent list
+
+Returns a list of agents
+
+Returns a list of agents for the specified project.
+
+Usage: `neo4j-cli aura agent list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+
+Examples:
+
+```
+# List all agents in the default project
+neo4j-cli aura agent list
+
+# List agents in a specific organization and project
+neo4j-cli aura agent list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000
+
+# List agents as JSON for scripting
+neo4j-cli aura agent list --format json
+```
+
+### neo4j-cli aura agent replace
+
+Fully replaces an existing agent
+
+Fully replaces an existing agent's configuration. All fields are required (PUT semantics).
+
+Usage: `neo4j-cli aura agent replace <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--dbid` | string | - | (required) Aura database instance ID the agent connects to |
+| `--description` | string | - | (required) Agent description |
+| `--enabled` | bool | true | Whether the agent is enabled |
+| `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
+| `--is-private` | bool | false | Whether the agent is private |
+| `--name` | string | - | (required) Agent name |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+| `--system-prompt` | string | - | System prompt for the agent |
+| `--tools` | string | - | (required) Tools configuration as a JSON array |
+
+Examples:
+
+```
+# Replace an agent's full definition with a text2cypher tool
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
+
+# Replace an agent with a system prompt
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --system-prompt "you are helpful" --rw
+
+# Replace an agent and emit the response as JSON
+neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agent --description "demo" --dbid 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw --format json
+```
+
+### neo4j-cli aura agent update
+
+Partially updates an existing agent
+
+Partially updates an existing agent's configuration. Only provided fields are updated (PATCH semantics).
+
+Usage: `neo4j-cli aura agent update <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--dbid` | string | - | Aura database instance ID the agent connects to |
+| `--description` | string | - | Agent description |
+| `--enabled` | bool | true | Whether the agent is enabled |
+| `--is-mcp-enabled` | bool | false | Whether MCP is enabled for the agent |
+| `--is-private` | bool | false | Whether the agent is private |
+| `--name` | string | - | Agent name |
+| `--organization-id` | string | - | Organization ID |
+| `--project-id` | string | - | Project/tenant ID |
+| `--system-prompt` | string | - | System prompt for the agent |
+| `--tools` | string | - | Tools configuration as a JSON array |
+
+Examples:
+
+```
+# Rename an agent
+neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --name my-renamed-agent --rw
+
+# Disable an agent
+neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --enabled=false --rw
+
+# Update an agent's tools with a text2cypher tool
+neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --tools '[{"name":"query-tool","type":"text2cypher","description":"Converts natural language to Cypher queries","enabled":true}]' --rw
+
+# Update an agent and emit the response as JSON
+neo4j-cli aura agent update 00000000-0000-0000-0000-000000000000 --description "updated" --rw --format json
+```
 
 ## neo4j-cli aura customer-managed-key
 

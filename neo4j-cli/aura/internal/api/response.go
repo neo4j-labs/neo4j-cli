@@ -447,6 +447,24 @@ func ParseBody(body []byte) ResponseData {
 	}
 }
 
+// ParseRawBody parses a bare-JSON response body (no `{"data": ...}` envelope)
+// into a ResponseData. It tries `[]map[string]any` first then `map[string]any`,
+// panicking if neither matches. Used by endpoints (e.g. the Aura Agents API)
+// whose response shape is a bare array or a bare object at the top level.
+func ParseRawBody(body []byte) ResponseData {
+	var listData []map[string]any
+	if err := json.Unmarshal(body, &listData); err == nil {
+		return NewListResponseData(listData)
+	}
+
+	var singleData map[string]any
+	if err := json.Unmarshal(body, &singleData); err == nil {
+		return NewSingleValueResponseData(singleData)
+	}
+
+	panic("could not parse raw response body")
+}
+
 func formatAuthorizationError(resBody []byte, statusCode int, credential *credentials.AuraCredential, cfg *clicfg.Config) error {
 	var errorResponse ErrorResponse
 

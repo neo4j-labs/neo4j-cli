@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Runs Cypher, inspects the database schema / data model via `neo4j-cli query :schema`, manages Neo4j Aura, Neo4j connection (dbms) credentials, and embedding-provider credentials, and manages local Neo4j Docker containers (create / list / get / start / stop / delete, including ephemeral runs that emit a .env file consumable by `query --env`) from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, inspect/view/introspect the schema or generate a data model from the schema (labels, relationship types, properties) via `:schema`, embed text inline as a Cypher parameter, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura/dbms/embed credentials, run / start / stop a local Neo4j Docker container, install/remove the neo4j-cli skill in an agent, or self-update the neo4j-cli binary via `neo4j-cli update`. Skip for Cypher syntax questions, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
+description: Runs Cypher, inspects the database schema / data model via `neo4j-cli query :schema`, manages Neo4j Aura, Neo4j connection (dbms) credentials, and embedding-provider credentials, and manages local Neo4j Docker containers (create / list / get / start / stop / delete, including ephemeral runs that emit a .env file consumable by `query --env`) from the terminal via the neo4j-cli CLI. Use when the user wants to execute or pipe Cypher against Neo4j, inspect/view/introspect the schema or generate a data model from the schema (labels, relationship types, properties) via `:schema`, embed text inline as a Cypher parameter, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura Agents, manage Aura/dbms/embed credentials, run / start / stop a local Neo4j Docker container, install/remove the neo4j-cli skill in an agent, or self-update the neo4j-cli binary via `neo4j-cli update`. Skip for Cypher syntax questions, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
@@ -76,3 +76,35 @@ neo4j-cli docker create --name tmp --ephemeral --env-out-file /tmp/n.env --wait 
 neo4j-cli query --env /tmp/n.env 'RETURN 1 AS n'
 neo4j-cli docker stop tmp --rw
 ```
+
+- Aura Agents: `neo4j-cli aura agent` (`list` / `get` / `create` / `update` / `replace` / `delete` / `invoke`) manages Aura Agents — LLM-backed assistants bound to an Aura database. `--organization-id` / `--project-id` honour the default workspace, identical to every other aura command. `invoke` is dual-mode: `--format json` returns the full server response verbatim (content blocks, usage, end_reason, errors), while the default table output joins the text content blocks and prints a single stats line `Status: <S> | End reason: <ER> | Tool calls: <N> | Tokens: <req> req / <res> res / <total> total`. HTTP 403 on `invoke` surfaces as `agent invocation forbidden: agent may be disabled or private`; an HTTP 200 body with `type: "error"` surfaces as `agent invocation failed: <message>`.
+
+```sh
+# List, create, and invoke an agent (workspace default already set)
+neo4j-cli aura agent list --format toon
+neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> --tools '[{"type":"text2cypher","name":"ask","description":"Answer questions about the graph"}]' --rw
+neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
+```
+
+- `--tools` is a JSON array of tool objects. Every tool shares the envelope `{type, name, description, config}` (plus optional `enabled`) — `name` ≤64 chars, `description` ≤2000 chars. The `type` discriminator is **camelCase** (NOT snake_case): `text2cypher`, `cypherTemplate`, `similaritySearch`. The `config` object is type-specific; the four canonical shapes are:
+
+```json
+[{"type":"text2cypher","name":"ask-graph","description":"Convert natural-language questions into Cypher and run them against the database."}]
+```
+
+```json
+[{"type":"cypherTemplate","name":"top-customers","description":"Return the top N customers by total order value.","config":{"template":"MATCH (c:Customer)-[:PLACED]->(o:Order) RETURN c.name AS name, sum(o.total) AS spent ORDER BY spent DESC LIMIT $limit","parameters":[{"name":"limit","data_type":"integer","description":"Maximum number of customers to return."}]}}]
+```
+
+```json
+[{"type":"similaritySearch","name":"doc-search","description":"Find docs most similar to the user question.","config":{"provider":"openai","model":"text-embedding-3-small","index":"docs_embedding_index","top_k":5}}]
+```
+
+```json
+[{"type":"similaritySearch","name":"doc-search-enriched","description":"Vector-search docs, then enrich each hit with its parent page.","config":{"provider":"openai","model":"text-embedding-3-small","index":"docs_embedding_index","top_k":5,"post_processing_cypher":"MATCH (node)<-[:HAS_CHUNK]-(page:Page) RETURN page.title AS title, page.url AS url, node.text AS chunk, score ORDER BY score DESC"}}]
+```
+
+Tool-config field reference (v2beta1):
+  - `text2cypher` — no `config` fields required.
+  - `cypherTemplate.config` — required `template` (Cypher string); optional `parameters[]` of `{name, data_type, description}` with `data_type ∈ {string, number, boolean, integer}`.
+  - `similaritySearch.config` — required `provider` (`openai` | `vertexai`), `model` (provider-compatible embedding model), `index` (vector-index name, ≤100 chars), `top_k` (1–100); optional `dimensions` (integer, when the provider/index needs an explicit size); optional `post_processing_cypher` — read-only Cypher appended to the vector search and run as a single query, with `node` and `score` exposed to the post-processing block (write queries are rejected server-side).

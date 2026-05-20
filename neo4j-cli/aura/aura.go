@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/agent"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/customermanagedkey"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/dataapi"
@@ -38,6 +39,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(project.NewCmd(cfg))
 	cmd.AddCommand(tenant.NewCmd(cfg))
 	cmd.AddCommand(graphanalytics.NewCmd(cfg))
+	cmd.AddCommand(agent.NewCmd(cfg))
 	if cfg.Flags.Enabled("flag.aura-beta") {
 		cmd.AddCommand(dataapi.NewCmd(cfg))
 		cmd.AddCommand(_import.NewCmd(cfg))

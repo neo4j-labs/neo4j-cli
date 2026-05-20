@@ -142,6 +142,28 @@ neo4j-cli aura instance create --name my-pro-db --type professional-db --cloud-p
 
 Initial DB credentials returned by `instance create` are auto-stored as a `dbms` credential (named `<instance-id>-default`), so `neo4j-cli query` can connect immediately. Use `--no-credential-storage` to skip that.
 
+### Aura Agent
+
+Aura Agent — LLM-backed assistants bound to a database. Manage them from the terminal.
+
+Seven leaves: `list`, `get`, `create`, `update`, `replace`, `delete`, `invoke`. `--organization-id`/`--project-id` honour the default workspace from [`workspace use`](#setting-a-default-workspace).
+
+`--tools` accepts a JSON array of tool objects shaped `{type, name, description, config}` — the `type` discriminator is **camelCase**: `text2cypher`, `cypherTemplate`, `similaritySearch`. Full per-type JSON shapes (including `post_processing_cypher` for `similaritySearch`) live in [`neo4j-cli/internal/skill/additions.md`](neo4j-cli/internal/skill/additions.md) and the [Aura v2beta1 spec](https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents).
+
+```bash
+# List agents in the current workspace
+neo4j-cli aura agent list --format json
+
+# Create an agent bound to a database, with one tool
+neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> \
+  --tools '[{"type":"text2cypher","name":"ask","description":"Answer questions about the graph"}]' --rw
+
+# Invoke an agent — JSON output returns the full server response; default (table) prints
+# the joined text blocks followed by a stats line (Status / End reason / Tool calls / Tokens)
+neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
+neo4j-cli aura agent invoke <agent-id> --input "hello" --format json --rw
+```
+
 ## Local Neo4j (Docker)
 
 `neo4j-cli docker` runs Neo4j locally by shelling out to the host `docker` CLI. Managed containers carry the `org.neo4j.cli.managed=true` label — Docker is the source of truth, no separate state file is maintained. Requires Docker Desktop (or the `docker` CLI) on `PATH`.

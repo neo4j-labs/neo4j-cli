@@ -1,0 +1,416 @@
+feature: cli-61-aura-agents-api
+prd: ./prd-cli-61-aura-agents-api.md
+created_at: 2026-05-19T10:18:56Z
+updated_at: 2026-05-19T10:18:56Z
+
+tasks:
+  - id: task-001
+    title: "Add api.ParseRawBody helper for bare-JSON responses"
+    description: |
+      Add `ParseRawBody(body []byte) ResponseData` to `neo4j-cli/aura/internal/api/response.go`,
+      mirroring the existing `ParseBody` (line 403) shape: try `[]map[string]any` first, then
+      `map[string]any`, panic if neither matches. This isolates the agent API's bare-JSON
+      response handling (no `{"data":...}` envelope) without touching existing call sites.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ParseRawBody` is exported from `neo4j-cli/aura/internal/api/response.go` and returns `ResponseData`."
+      - "Array body returns via `NewListResponseData`; object body returns via `NewSingleValueResponseData`."
+      - "Failure to parse panics with `\"could not parse raw response body\"` (matches existing `ParseBody` shape)."
+      - "No existing call sites of `ParseBody` are modified; `make test` still passes."
+      - "Copyright header preserved on the file."
+    completed_at: 2026-05-19T10:22:53Z
+
+  - id: task-002
+    title: "Add output.PrintRawBody helper for bare-JSON responses"
+    description: |
+      Add `PrintRawBody(cmd, cfg, body, fields)` to `neo4j-cli/aura/internal/output/output.go`,
+      mirroring `PrintBody` (line 21). JSON branch: `json.Indent` then `cmd.Println`. Non-JSON
+      branch: `PrintBodyMap(cmd, cfg, api.ParseRawBody(body), fields)`. Early-return when body
+      is empty. Respects `cfg.Aura.Output()` like the existing `PrintBody`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`PrintRawBody` is exported from `neo4j-cli/aura/internal/output/output.go`."
+      - "Empty body is a no-op."
+      - "`cfg.Aura.Output() == \"json\"` prints `json.Indent`-formatted bytes."
+      - "Non-JSON output delegates to `PrintBodyMap` with `api.ParseRawBody`."
+      - "No existing call sites of `PrintBody` are modified; `make test` still passes."
+    completed_at: 2026-05-19T12:30:00Z
+
+  - id: task-003
+    title: "Scaffold agent package parent + wire into aura.go"
+    description: |
+      Create `neo4j-cli/aura/internal/subcommands/agent/agent.go` exporting
+      `NewCmd(cfg *clicfg.Config) *cobra.Command` with `Use: "agent"`,
+      `Short: "Relates to Aura Agents"`, mounting placeholder constructors for all seven leaves
+      (`NewListCmd`, `NewGetCmd`, `NewCreateCmd`, `NewUpdateCmd`, `NewReplaceCmd`, `NewDeleteCmd`,
+      `NewInvokeCmd`). Add minimal placeholder leaf files (each exporting its `NewXxxCmd`
+      returning a cobra.Command with `Use`, `Short`, flush-left `Example`, and a `RunE` that
+      returns `nil` — enough to satisfy `TestAllLeafCommands_HaveExamples` and let the parent
+      compile). Wire `agent.NewCmd(cfg)` into `neo4j-cli/aura/aura.go` inside the existing
+      `if cfg.Flags.Enabled("flag.aura-beta") { ... }` block. Every new file carries the Neo4j
+      copyright header. Leaves will be filled in by subsequent tasks; the goal here is a
+      compiling, addressable command tree.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`neo4j-cli/aura/internal/subcommands/agent/agent.go` exists with `NewCmd(cfg)` mounting all seven leaves."
+      - "Seven placeholder leaf files exist (`list.go`, `get.go`, `create.go`, `update.go`, `replace.go`, `delete.go`, `invoke.go`), each with a flush-left non-empty `Example` field."
+      - "`neo4j-cli/aura/aura.go` imports `.../subcommands/agent` and calls `cmd.AddCommand(agent.NewCmd(cfg))` inside the `flag.aura-beta` block."
+      - "With `flag.aura-beta=true`, `./bin/neo4j-cli aura agent --help` lists all seven subcommands."
+      - "`make test` and `make fmt-check` pass; `TestAllLeafCommands_HaveExamples` is green."
+    completed_at: 2026-05-19T13:15:00Z
+
+  - id: task-004
+    title: "Implement agent list leaf + tests"
+    description: |
+      Replace the `list.go` placeholder with the full GET `/organizations/{org}/projects/{proj}/agents`
+      implementation: `PreRunE = utils.SetProjectFlagsAsRequired`, `RunE` calls
+      `utils.SetProjetDefaults` then `api.MakeRequest` with `Version: api.AuraApiVersion2`,
+      success path calls `output.PrintRawBody(cmd, cfg, resBody, []string{"id","name","description","dbid","enabled"})`.
+      `--organization-id` and `--project-id` flags as in `deployment/list.go`. Multi-invocation
+      flush-left `Example:` including `--format json`. Port `list_test.go` from
+      `/tmp/cli-61-original-pr.diff` (lines ~1300-1465): table + JSON output, default-workspace
+      via `SetDefaultProjectInConfig`, missing-flag errors. Replace `aura.beta-enabled` →
+      `flag.aura-beta` and `aura.output` → `format` in test config calls.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`list.go` calls GET `/organizations/{org}/projects/{proj}/agents` via `AuraApiVersion2` and prints via `PrintRawBody`."
+      - "`list_test.go` covers JSON output, table output, default-workspace, and missing-org/project flag errors."
+      - "All test mocks use path `/v2beta1/organizations/...` (v2beta1 routing automatic)."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestList` passes."
+      - "`make fmt-check` and `make lint` clean."
+    completed_at: 2026-05-19T14:00:00Z
+
+  - id: task-005
+    title: "Implement agent get leaf + tests"
+    description: |
+      Replace `get.go` placeholder with the full GET `.../agents/{id}` implementation
+      (`Args: cobra.ExactArgs(1)`). Same org/project plumbing as list. Print via
+      `output.PrintRawBody` with fields `[id, name, description, dbid, is_private, is_mcp_enabled,
+      enabled]`. Port `get_test.go` from `/tmp/cli-61-original-pr.diff` (lines ~726-838):
+      JSON happy path, default-workspace variant, 404 → `Error: [Agent not found]`. Apply same
+      config-key renames as task-004.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`get.go` calls GET `.../agents/{id}` and prints via `PrintRawBody` with the documented fields."
+      - "404 response surfaces as `Error: [Agent not found]` on stderr."
+      - "`get_test.go` covers JSON happy path, default-workspace resolution, and 404 error."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestGet` passes."
+      - "`make fmt-check` and `make lint` clean."
+    completed_at: 2026-05-19T14:30:00Z
+
+  - id: task-006
+    title: "Implement agent create leaf + testdata_test.go + tests"
+    description: |
+      Replace `create.go` placeholder with the full POST `.../agents` implementation:
+      `Annotations: map[string]string{"write": "true"}`, required flags `--name`, `--description`,
+      `--dbid`, `--tools` (inline JSON, `json.Unmarshal` to `[]any`, invalid → `fmt.Errorf("invalid tools JSON: %w", err)`);
+      optional `--is-private` (default false), `--system-prompt`, `--is-mcp-enabled` (default false),
+      `--enabled` (default true). Body fields exactly as documented in PRD REQ-F-005. Multi-invocation
+      `Example:` includes `--rw` on every invocation and one `--format json` variant.
+      Add `testdata_test.go` (package `agent_test`) with the shared `testTools` constant from
+      `/tmp/cli-61-original-pr.diff:1729`. Port `create_test.go` (lines ~289-505): happy-path
+      body assertion via `AssertCalledWithBody`, default-workspace variant, missing-required-flag
+      errors. Apply config-key renames.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`create.go` POSTs `.../agents` with the eight-field body and is annotated `write=true`."
+      - "Invalid `--tools` JSON returns `Error: invalid tools JSON: <parse error>`."
+      - "`testdata_test.go` exports `const testTools` for reuse across create/update/replace tests."
+      - "`create_test.go` covers happy path with body assertion, default-workspace variant, and required-flag-missing errors."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestCreate` passes."
+    completed_at: 2026-05-19T15:00:00Z
+
+  - id: task-007
+    title: "Implement agent update leaf + tests"
+    description: |
+      Replace `update.go` placeholder with the full PATCH `.../agents/{id}` implementation:
+      `Annotations: write=true`. Partial body — string fields included when non-empty; bool fields
+      (`is_private`, `is_mcp_enabled`, `enabled`) included only when `cmd.Flags().Changed(flag)`
+      so users can explicitly send `false`. `--tools` parsed inline (same error wrapper as
+      create). `MarkFlagsOneRequired(name, description, dbid, tools, system-prompt, is-private,
+      is-mcp-enabled, enabled)`. Port `update_test.go` from `/tmp/cli-61-original-pr.diff`
+      (lines ~1862-2091): single-field PATCH body assertion, boolean fields case (body
+      `{"is_mcp_enabled": true, "is_private": true}`), tools variant, default-workspace variant,
+      `TestUpdateAgentWithNoFields` asserts the `MarkFlagsOneRequired` group error string,
+      invalid-tools-JSON error, 404 error.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "`update.go` PATCHes `.../agents/{id}` with only the fields the user set."
+      - "Boolean flags participate only when explicitly set via `cmd.Flags().Changed(...)`."
+      - "Calling `agent update <id>` with no fields prints the `MarkFlagsOneRequired` group error."
+      - "`update_test.go` covers all six scenarios from the original PR diff."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestUpdate` passes."
+    completed_at: 2026-05-19T10:44:23Z
+
+  - id: task-008
+    title: "Implement agent replace leaf + tests"
+    description: |
+      Replace `replace.go` placeholder with the full PUT `.../agents/{id}` implementation:
+      `Annotations: write=true`. Required flags identical to create; full body always sent.
+      Port `replace_test.go` from `/tmp/cli-61-original-pr.diff` (lines ~1591-1717): happy path
+      with full body assertion (uses `testTools`), default-workspace variant, 404.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "`replace.go` PUTs `.../agents/{id}` with the full eight-field body."
+      - "Required flags `--name`, `--description`, `--dbid`, `--tools` are enforced."
+      - "`replace_test.go` covers happy path with body assertion, default-workspace variant, and 404."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestReplace` passes."
+      - "`make fmt-check` and `make lint` clean."
+    completed_at: 2026-05-19T11:05:00Z
+
+  - id: task-009
+    title: "Implement agent delete leaf + tests"
+    description: |
+      Replace `delete.go` placeholder with the full DELETE `.../agents/{id}` implementation:
+      `Annotations: write=true`, `Args: cobra.ExactArgs(1)`. Success prints
+      `Agent deleted successfully <id>` via `cmd.Println`. Port `delete_test.go` from
+      `/tmp/cli-61-original-pr.diff` (lines ~582-654): happy path, default-workspace variant,
+      404 → `Error: [Agent not found]`.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`delete.go` DELETEs `.../agents/{id}` and prints the success line on the happy path."
+      - "`delete_test.go` covers happy path, default-workspace, and 404."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestDelete` passes."
+      - "`make fmt-check` and `make lint` clean."
+    completed_at: 2026-05-19T11:30:00Z
+
+  - id: task-010
+    title: "Implement agent invoke leaf + tests"
+    description: |
+      Replace `invoke.go` placeholder with the full POST `.../agents/{id}/invoke`
+      implementation: `Annotations: write=true`, required `--input` flag. Define the local
+      response types (`invokeResponse`, `invokeContent`, `invokeUsage`, `invokeError`).
+      JSON output mode: `output.PrintRawBody(cmd, cfg, resBody, nil)`. Default (table) output:
+      join `result.Content[*].text` blocks with `"\n"`, then print the stats line
+      `Status: <S> | End reason: <ER> | Tool calls: <N> | Tokens: <req> req / <res> res / <total> total`
+      (status/end-reason uppercased, end-reason underscores → spaces). Tool-call count sums any
+      content block whose `Type` ends in `tool_use`. Error mapping: HTTP 403 →
+      `agent invocation forbidden: agent may be disabled or private`; HTTP 200 with `type:"error"`
+      → `agent invocation failed: <message>` (or bare `agent invocation failed` if no message).
+      Port `invoke_test.go` from `/tmp/cli-61-original-pr.diff` (lines ~1012-1225): JSON happy
+      path, default-workspace variant, missing `--input` error, 403 forbidden error, application-
+      level error, 404, table-output case verifying joined text + stats line (including the
+      `cypher_template_tool_use` count case).
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`invoke.go` POSTs `.../agents/{id}/invoke` with `{\"input\": <input>}` and is annotated `write=true`."
+      - "JSON output prints the full server response; table output prints joined text and the stats line."
+      - "HTTP 403 surfaces as `agent invocation forbidden: agent may be disabled or private`."
+      - "HTTP 200 with `type: \"error\"` surfaces as `agent invocation failed: <message>`."
+      - "Tool-call count includes every block whose `type` ends in `tool_use`."
+      - "`go test ./neo4j-cli/aura/internal/subcommands/agent/... -run TestInvoke` passes."
+    completed_at: 2026-05-19T11:55:00Z
+
+  - id: task-011
+    title: "Regenerate skill bundle for agent subtree"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to regenerate
+      `neo4j-cli/internal/skill/bundle/references/agent.md` (and any per-leaf references plus
+      Global-Flags re-render). Commit the regenerated bundle files. Verify `make generate-check`
+      reports no remaining drift and `TestGenerator_RoundTrip` is green.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+    acceptance_criteria:
+      - "`neo4j-cli/internal/skill/bundle/references/agent.md` (and any companion files) are committed."
+      - "`make generate-check` exits clean (no diff)."
+      - "`TestGenerator_RoundTrip` passes inside `make test`."
+      - "Bundle additions for the seven leaves render their `Example` fields verbatim."
+    completed_at: 2026-05-19T12:25:00Z
+    notes: |
+      No-op regeneration: agent commands are beta-gated behind `flag.aura-beta`, and the
+      bundle generator (neo4j-cli/internal/skill/gen/main.go) builds the cobra tree with
+      default config where the flag is disabled. Matches precedent for deployment / dataapi /
+      import which are similarly absent from the committed bundle. TestGenerator_RoundTrip
+      passes; `go generate ./neo4j-cli/internal/skill/...` produced zero file changes.
+
+  - id: task-012
+    title: "Add changelog entry"
+    description: |
+      Add `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` with fields
+      `project: neo4j-cli`, `kind: Minor`, `body: Add aura agent commands (list, get, create, update, replace, delete, invoke) for the Aura Agents API (beta).`,
+      `time: <RFC3339 with timezone>`. Format must match the most recent `neo4j-cli-Minor-*.yaml`
+      entries in `.changes/unreleased/`.
+    status: completed
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "A new file `.changes/unreleased/neo4j-cli-Minor-<datetime>.yaml` exists with the four required fields."
+      - "`project: neo4j-cli` and `kind: Minor` match the repo's changie conventions."
+      - "`time:` is a valid RFC3339 timestamp with timezone."
+      - "`make test` and `make generate-check` still pass after the entry is added."
+    completed_at: 2026-05-19T12:58:08+02:00
+
+  - id: task-013
+    title: "Final gates + manual smoke against Aura"
+    description: |
+      Run the full local gate set: `make fmt-check`, `make lint`, `make test`,
+      `make generate-check`, `make license-check`. Then build (`make build`) and run a manual
+      smoke against a real Aura tenant with `flag.aura-beta=true`:
+      `./bin/neo4j-cli aura agent list --format json`, `aura agent get <id> --format json`,
+      and `aura agent invoke <id> --input "hello" --rw`. Confirm output shapes match the PRD
+      expectations. Skip the smoke step if no live tenant is available and call that out in
+      the task completion notes.
+    status: completed
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`make fmt-check`, `make lint`, `make test`, `make generate-check`, `make license-check` all pass."
+      - "`./bin/neo4j-cli aura agent --help` shows the seven leaves when `flag.aura-beta=true` and hides them when false."
+      - "Manual smoke for `list`, `get`, and `invoke` against a live Aura tenant succeeds, or is explicitly skipped with a note."
+      - "Branch is ready for PR: clean tree, all gates green, smoke evidence captured if available."
+    completed_at: 2026-05-19T11:01:35Z
+
+  - id: task-014
+    title: "Document agent surface in README + skill description + additions"
+    description: |
+      Promote the new `aura agent` subtree to user-facing docs even though it is gated behind
+      `flag.aura-beta`. Three surfaces to edit:
+
+      1. `README.md` — add a `### Agents (beta)` section near the existing `### Setting a default
+         workspace` / instance sections. Note the `flag.aura-beta` requirement, list the seven
+         leaves (`list, get, create, update, replace, delete, invoke`), show 2-3 invocation
+         examples (one read with `--format json`, one create with `--rw`, one invoke).
+      2. `neo4j-cli/internal/skill/additions.md` — append a short bullet describing the
+         `aura agent` surface and how to enable it (`neo4j-cli config set flag.aura-beta true`).
+         Mention `invoke` outputs both JSON (full body) and a human stats line.
+      3. `neo4j-cli/internal/skill/description.txt` — extend the frontmatter description to
+         name agent management explicitly. Stay within the ≤1024-char single-paragraph
+         third-person constraint documented in AGENTS.md.
+
+      After editing `additions.md` and `description.txt`, run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle (`SKILL.md` and any
+      derived files) and commit the regenerated artifacts. `make generate-check` must be clean
+      and `TestGenerator_RoundTrip` must pass.
+    status: completed
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "`README.md` has a new agents (beta) section with at least three example invocations covering reads, writes (`--rw`), and `invoke`."
+      - "`neo4j-cli/internal/skill/additions.md` has a new bullet for the agent subtree noting the `flag.aura-beta` requirement."
+      - "`neo4j-cli/internal/skill/description.txt` mentions agent management while staying ≤1024 chars, single paragraph, third person."
+      - "`go generate ./neo4j-cli/internal/skill/...` produces a clean diff that is committed alongside the source edits."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: 2026-05-19T10:30:00Z
+
+  - id: task-015
+    title: "Remove flag.aura-beta gate around the agent subtree"
+    description: |
+      Promote `aura agent` from beta to default-on. Concretely:
+
+      1. `neo4j-cli/aura/aura.go` — move `cmd.AddCommand(agent.NewCmd(cfg))` OUT of the
+         `if cfg.Flags.Enabled("flag.aura-beta") { ... }` block so it mounts unconditionally
+         alongside `instance`, `workspace`, etc.
+      2. Drop `(beta)` labels and `flag.aura-beta` activation hints from the docs added in
+         task-014:
+         - `README.md` — rename "Agents (beta)" → "Agents", remove the enable-flag paragraph.
+         - `neo4j-cli/internal/skill/additions.md` — drop the `flag.aura-beta` mention from the
+           agent bullet.
+         - `neo4j-cli/internal/skill/description.txt` — drop "(beta)" from the agent clause
+           while staying ≤1024 chars / single paragraph / third person.
+      3. Agent tests — the `helper.SetConfigValue("flag.aura-beta", true)` lines in every
+         agent `*_test.go` are now no-ops but harmless; remove them in a single sweep to keep
+         the suite tidy.
+      4. Run `go generate ./neo4j-cli/internal/skill/...` — bundle WILL change this time
+         (agent subtree is now visible to the generator, so `references/agent.md` and any
+         related index entries are produced). Commit the regenerated bundle alongside the
+         source edits.
+      5. Add a `.changes/unreleased/neo4j-cli-Minor-*.yaml` entry: body
+         `Promote aura agent commands out of beta (flag.aura-beta no longer required).`
+
+      Heads-up: with the gate removed, the agent leaves will surface in every consumer that
+      walks the cobra tree — `agent-context`, the skill bundle, `aura --help`. Verify each
+      manually after build.
+    status: completed
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`aura agent --help` lists the seven leaves regardless of `flag.aura-beta` setting."
+      - "`README.md`, `additions.md`, `description.txt` no longer say `(beta)` for agents or reference the activation flag."
+      - "Regenerated skill bundle (`neo4j-cli/internal/skill/bundle/references/agent.md` + index/SKILL.md updates) is committed."
+      - "Agent tests no longer set `flag.aura-beta` (or the line is justified if kept)."
+      - "A new changelog entry exists naming the promotion."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: 2026-05-19T16:09:36+02:00
+
+  - id: task-016
+    title: "Document agent tool specs in the aura skill"
+    description: |
+      Today the skill bundle and README only show one tool example (cypher_template inline).
+      Agents creating tools have to read the Aura API spec to discover the JSON shape for
+      every other supported tool type, which is friction the skill is meant to remove.
+
+      Source of truth (fetch and read):
+      https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents/update-agent
+
+      Specifically the request schema for `update-agent` / `create-agent` — the `tools[]`
+      member is a polymorphic array; each variant is documented under its `type` discriminator.
+
+      Tool types to cover with a concrete, copy-pastable JSON example:
+        1. `text2cypher` — natural-language → Cypher translation.
+        2. `cypher_template` — parameterised query with `params`.
+        3. `vector_similarity_search` — pure vector retrieval (no follow-up Cypher).
+        4. `vector_similarity_search` with **post-processing Cypher** — the spec exposes
+           a post-processing query field; show the same tool with that field populated.
+
+      Where to put them:
+        - `neo4j-cli/internal/skill/additions.md` — add a fenced JSON block per tool type
+          under the existing "Aura Agents:" bullet. Each example must be a single-element
+          array `[{ ... }]` that pastes directly into `--tools '...'`.
+        - Optional: short pointer in `README.md`'s `### Aura Agent` section listing the
+          four supported tool types and linking back to the additions.md block for the
+          full JSON. Skip if it bloats the README.
+
+      Verify against the live spec:
+        - Field names match the v2beta1 schema verbatim (snake_case, no inventions).
+        - Required vs optional fields are reflected — examples should only set fields that
+          have meaningful values; omit optional ones unless they materially help the example.
+        - Run `neo4j-cli aura agent create --tools '<each example>' --dry-run` if the CLI has
+          a dry-run flag; otherwise hand-validate by JSON-parsing each block.
+
+      After editing additions.md, run `go generate ./neo4j-cli/internal/skill/...` to refresh
+      the bundle. `TestGenerator_RoundTrip` is the gate.
+    status: completed
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "additions.md has four fenced JSON tool examples: text2cypher, cypher_template, vector_similarity_search (no post-processing), vector_similarity_search with post-processing Cypher."
+      - "Each example is a single-element array shaped to paste into `--tools '...'` and parses as valid JSON."
+      - "Field names match the v2beta1 update-agent / create-agent spec verbatim — no invented keys."
+      - "Skill bundle regenerated (`bundle/SKILL.md`, any `bundle/references/*.md` derived from additions) and committed."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: 2026-05-20T00:00:00Z
+    notes: |
+      Spec discriminators are camelCase (`text2cypher`, `cypherTemplate`, `similaritySearch`),
+      NOT snake_case as the task description assumed. Verified against the live v2beta1 spec
+      at neo4j.com/.../aura_api_spec_v2beta1.yaml (schemas Tool / CypherTemplateTool /
+      SimilaritySearchTool / Text2CypherTool). Fixed the pre-existing wrong example in
+      additions.md AND README.md which used `cypher_template` + fictional `query`/`params`
+      fields — replaced with a minimal `text2cypher` example. Added four canonical fenced
+      JSON blocks + a per-type field reference covering required/optional fields and the
+      `post_processing_cypher` semantics (`node` + `score` exposed, write queries rejected).
