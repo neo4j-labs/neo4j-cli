@@ -1,158 +1,137 @@
 {
-  "name": "neo4j-cli",
+  "name": "neo4j",
   "displayName": "Neo4j",
-  "description": "Spin up Neo4j instances, run Cypher queries, and explore your graph schema — without leaving VS Code",
-  "version": "0.0.1",
+  "description": "Manage Neo4j credentials, Aura infrastructure, local instances, and AI developer skills from VS Code.",
+  "version": "0.1.0",
   "publisher": "neo4j",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/neo4j/cli"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
+  "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
-  "keywords": ["neo4j", "cypher", "aura", "graph", "database"],
+  "keywords": ["neo4j", "graph", "database", "cypher", "aura"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
+
+  "cliVersion": "1.0.0",
+
   "contributes": {
-    "commands": [
-      {
-        "command": "neo4j-cli.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "neo4j-cli.connect",
-        "title": "Connect",
-        "icon": "$(plug)"
-      },
-      {
-        "command": "neo4j-cli.disconnect",
-        "title": "Disconnect"
-      },
-      {
-        "command": "neo4j-cli.runQuery",
-        "title": "Neo4j: Run Cypher Query",
-        "icon": "$(play)"
-      },
-      {
-        "command": "neo4j-cli.createDocker",
-        "title": "Neo4j: Create Local Instance",
-        "icon": "$(add)"
-      },
-      {
-        "command": "neo4j-cli.deleteInstance",
-        "title": "Delete",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "neo4j-cli.writeEnv",
-        "title": "Neo4j: Write .env"
-      },
-      {
-        "command": "neo4j-cli.showConnections",
-        "title": "Neo4j: Show Connections"
-      },
-      {
-        "command": "neo4j-cli.selectWorkspace",
-        "title": "Neo4j: Select Aura Workspace"
-      }
-    ],
-    "views": {
-      "neo4j-sidebar": [
-        {
-          "id": "neo4j.connections",
-          "name": "Connections"
-        },
-        {
-          "id": "neo4j.schema",
-          "name": "Schema"
-        }
-      ]
-    },
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "neo4j-sidebar",
+          "id": "neo4jExplorer",
           "title": "Neo4j",
-          "icon": "$(database)"
+          "icon": "resources/neo4j.svg"
         }
       ]
     },
+    "views": {
+      "neo4jExplorer": [
+        { "id": "neo4j.credentials", "name": "Credentials" },
+        { "id": "neo4j.local",       "name": "Local"        },
+        { "id": "neo4j.aura",        "name": "Aura"         },
+        { "id": "neo4j.aiSkills",    "name": "AI Skills"    }
+      ]
+    },
+    "commands": [
+      { "command": "neo4j.refreshAll",           "title": "Refresh All",           "icon": "$(refresh)",        "category": "Neo4j" },
+      { "command": "neo4j.openManager",           "title": "Manage Credentials",    "icon": "$(settings-gear)",  "category": "Neo4j" },
+      { "command": "neo4j.query.new",             "title": "New Query Window",      "icon": "$(terminal)",       "category": "Neo4j" },
+      { "command": "neo4j.cli.update",            "title": "Update CLI Binary",     "icon": "$(cloud-download)", "category": "Neo4j" },
+
+      { "command": "neo4j.credential.add",        "title": "Add Credential",        "icon": "$(add)",            "category": "Neo4j" },
+      { "command": "neo4j.credential.refresh",    "title": "Refresh Credentials",   "icon": "$(refresh)",        "category": "Neo4j" },
+      { "command": "neo4j.credential.use",        "title": "Set Active",            "icon": "$(check)",          "category": "Neo4j" },
+      { "command": "neo4j.credential.test",       "title": "Test Connection",       "icon": "$(plug)",           "category": "Neo4j" },
+      { "command": "neo4j.credential.remove",     "title": "Remove Credential",     "icon": "$(trash)",          "category": "Neo4j" },
+
+      { "command": "neo4j.local.new",             "title": "New Local Instance",    "icon": "$(add)",            "category": "Neo4j" },
+      { "command": "neo4j.local.refresh",         "title": "Refresh Local",         "icon": "$(refresh)",        "category": "Neo4j" },
+      { "command": "neo4j.local.start",           "title": "Start",                 "icon": "$(play)",           "category": "Neo4j" },
+      { "command": "neo4j.local.stop",            "title": "Stop",                  "icon": "$(stop)",           "category": "Neo4j" },
+      { "command": "neo4j.local.openBrowser",     "title": "Open Neo4j Browser",    "icon": "$(browser)",        "category": "Neo4j" },
+      { "command": "neo4j.local.remove",          "title": "Remove Instance",       "icon": "$(trash)",          "category": "Neo4j" },
+
+      { "command": "neo4j.aura.new",              "title": "New Aura Instance",     "icon": "$(add)",            "category": "Neo4j" },
+      { "command": "neo4j.aura.refresh",          "title": "Refresh Aura",          "icon": "$(refresh)",        "category": "Neo4j" },
+      { "command": "neo4j.aura.connect",          "title": "Connect",               "icon": "$(plug)",           "category": "Neo4j" },
+      { "command": "neo4j.aura.pause",            "title": "Pause",                 "icon": "$(debug-pause)",    "category": "Neo4j" },
+      { "command": "neo4j.aura.resume",           "title": "Resume",                "icon": "$(play)",           "category": "Neo4j" },
+      { "command": "neo4j.aura.openConsole",      "title": "Open Aura Console",     "icon": "$(external-link)",  "category": "Neo4j" },
+      { "command": "neo4j.aura.remove",           "title": "Delete Instance",       "icon": "$(trash)",          "category": "Neo4j" },
+
+      { "command": "neo4j.skills.refresh",        "title": "Refresh AI Skills",     "icon": "$(refresh)",        "category": "Neo4j" },
+      { "command": "neo4j.skills.install",        "title": "Install Skills",        "icon": "$(cloud-download)", "category": "Neo4j" },
+      { "command": "neo4j.skills.update",         "title": "Update Skills",         "icon": "$(arrow-up)",       "category": "Neo4j" }
+    ],
     "menus": {
       "view/title": [
-        {
-          "command": "neo4j-cli.refresh",
-          "when": "view == neo4j.connections",
-          "group": "navigation"
-        },
-        {
-          "command": "neo4j-cli.createDocker",
-          "when": "view == neo4j.connections",
-          "group": "navigation"
-        }
+        { "command": "neo4j.credential.refresh", "when": "view == neo4j.credentials", "group": "navigation@1" },
+        { "command": "neo4j.credential.add",     "when": "view == neo4j.credentials", "group": "navigation@2" },
+        { "command": "neo4j.local.refresh",      "when": "view == neo4j.local",       "group": "navigation@1" },
+        { "command": "neo4j.local.new",          "when": "view == neo4j.local",       "group": "navigation@2" },
+        { "command": "neo4j.aura.refresh",       "when": "view == neo4j.aura",        "group": "navigation@1" },
+        { "command": "neo4j.aura.new",           "when": "view == neo4j.aura",        "group": "navigation@2" },
+        { "command": "neo4j.skills.refresh",     "when": "view == neo4j.aiSkills",    "group": "navigation@1" }
       ],
       "view/item/context": [
-        {
-          "command": "neo4j-cli.connect",
-          "when": "view == neo4j.connections && viewItem =~ /^connection/",
-          "group": "inline@1"
-        },
-        {
-          "command": "neo4j-cli.disconnect",
-          "when": "view == neo4j.connections && viewItem == connectionActive",
-          "group": "1_actions"
-        },
-        {
-          "command": "neo4j-cli.writeEnv",
-          "when": "view == neo4j.connections && viewItem == connectionActive",
-          "group": "1_actions"
-        },
-        {
-          "command": "neo4j-cli.deleteInstance",
-          "when": "view == neo4j.connections && viewItem =~ /^connection/",
-          "group": "2_danger"
-        }
+        { "command": "neo4j.credential.use",    "when": "view == neo4j.credentials && viewItem =~ /^neo4j\\.credential\\.[^.]+$/", "group": "1_main@1" },
+        { "command": "neo4j.credential.test",   "when": "view == neo4j.credentials && viewItem =~ /neo4j\\.credential\\.neo4j-db/", "group": "1_main@2" },
+        { "command": "neo4j.credential.remove", "when": "view == neo4j.credentials && viewItem =~ /^neo4j\\.credential/",          "group": "2_danger@1" },
+
+        { "command": "neo4j.local.start",       "when": "view == neo4j.local && viewItem == neo4j.local.stopped", "group": "inline"   },
+        { "command": "neo4j.local.start",       "when": "view == neo4j.local && viewItem == neo4j.local.stopped", "group": "1_main@1" },
+        { "command": "neo4j.local.stop",        "when": "view == neo4j.local && viewItem == neo4j.local.running", "group": "inline"   },
+        { "command": "neo4j.local.stop",        "when": "view == neo4j.local && viewItem == neo4j.local.running", "group": "1_main@1" },
+        { "command": "neo4j.local.openBrowser", "when": "view == neo4j.local && viewItem == neo4j.local.running", "group": "inline"   },
+        { "command": "neo4j.local.openBrowser", "when": "view == neo4j.local && viewItem == neo4j.local.running", "group": "1_main@2" },
+        { "command": "neo4j.local.remove",      "when": "view == neo4j.local && viewItem =~ /^neo4j\\.local/",    "group": "2_danger@1" },
+
+        { "command": "neo4j.aura.connect",      "when": "view == neo4j.aura && viewItem == neo4j.aura.running",  "group": "inline"   },
+        { "command": "neo4j.aura.connect",      "when": "view == neo4j.aura && viewItem == neo4j.aura.running",  "group": "1_main@1" },
+        { "command": "neo4j.aura.pause",        "when": "view == neo4j.aura && viewItem == neo4j.aura.running",  "group": "inline"   },
+        { "command": "neo4j.aura.pause",        "when": "view == neo4j.aura && viewItem == neo4j.aura.running",  "group": "1_main@2" },
+        { "command": "neo4j.aura.resume",       "when": "view == neo4j.aura && viewItem == neo4j.aura.paused",   "group": "inline"   },
+        { "command": "neo4j.aura.resume",       "when": "view == neo4j.aura && viewItem == neo4j.aura.paused",   "group": "1_main@1" },
+        { "command": "neo4j.aura.openConsole",  "when": "view == neo4j.aura && viewItem =~ /^neo4j\\.aura/",     "group": "1_main@3" },
+        { "command": "neo4j.aura.remove",       "when": "view == neo4j.aura && viewItem =~ /^neo4j\\.aura/",     "group": "2_danger@1" },
+
+        { "command": "neo4j.skills.update",     "when": "view == neo4j.aiSkills && viewItem == neo4j.skill.outdated",     "group": "inline"   },
+        { "command": "neo4j.skills.update",     "when": "view == neo4j.aiSkills && viewItem == neo4j.skill.outdated",     "group": "1_main@1" },
+        { "command": "neo4j.skills.install",    "when": "view == neo4j.aiSkills && viewItem == neo4j.skill.notInstalled", "group": "inline"   },
+        { "command": "neo4j.skills.install",    "when": "view == neo4j.aiSkills && viewItem == neo4j.skill.notInstalled", "group": "1_main@1" }
       ],
-      "editor/title": [
-        {
-          "command": "neo4j-cli.runQuery",
-          "when": "resourceLangId == cypher",
-          "group": "navigation"
-        }
-      ],
-      "editor/context": [
-        {
-          "command": "neo4j-cli.runQuery",
-          "when": "editorLangId == cypher",
-          "group": "neo4j@1"
-        }
+      "commandPalette": [
+        { "command": "neo4j.credential.use",    "when": "false" },
+        { "command": "neo4j.credential.test",   "when": "false" },
+        { "command": "neo4j.credential.remove", "when": "false" },
+        { "command": "neo4j.local.start",       "when": "false" },
+        { "command": "neo4j.local.stop",        "when": "false" },
+        { "command": "neo4j.local.openBrowser", "when": "false" },
+        { "command": "neo4j.local.remove",      "when": "false" },
+        { "command": "neo4j.aura.connect",      "when": "false" },
+        { "command": "neo4j.aura.pause",        "when": "false" },
+        { "command": "neo4j.aura.resume",       "when": "false" },
+        { "command": "neo4j.aura.openConsole",  "when": "false" },
+        { "command": "neo4j.aura.remove",       "when": "false" },
+        { "command": "neo4j.skills.update",     "when": "false" },
+        { "command": "neo4j.skills.install",    "when": "false" }
       ]
     },
-    "languages": [
-      {
-        "id": "cypher",
-        "aliases": ["Cypher", "cypher"],
-        "extensions": [".cypher", ".cql"]
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "neo4j-cli.runQuery",
-        "key": "ctrl+shift+enter",
-        "mac": "cmd+shift+enter",
-        "when": "editorTextFocus && editorLangId == cypher"
-      }
-    ],
     "configuration": {
       "title": "Neo4j",
       "properties": {
-        "neo4j-cli.binaryPath": {
+        "neo4j.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the neo4j-cli binary. Leave empty to use the bundled binary or system PATH."
+          "markdownDescription": "Override path to the `neo4j-cli` binary. **Leave empty** (the default) to use the extension-managed binary, which is downloaded automatically from GitHub Releases and kept in VS Code's global storage. Set this only if you need to test against a specific local build."
+        },
+        "neo4j.autoRefreshInterval": {
+          "type": "number",
+          "default": 30,
+          "description": "Seconds between automatic status refreshes. Set to 0 to disable."
+        },
+        "neo4j.showLatencyInStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show connection latency next to the connection name in the status bar."
         }
       }
     }
@@ -161,13 +140,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile"
+    "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "20.x",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.22.0",
-    "ovsx": "^0.9.0",
     "typescript": "^5.3.0"
   }
 }

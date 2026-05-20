@@ -66,6 +66,10 @@ neo4j-cli aura project get 00000000-0000-0000-0000-000000000000 --format json`,
 				return err
 			}
 
+			// debug stuff
+			resp := string(resBody)
+			fmt.Printf("resp body: %s \n", resp)
+
 			if statusCode == http.StatusOK {
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name"})
 			}

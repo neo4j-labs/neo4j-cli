@@ -1,0 +1,12 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+  <!-- Central node -->
+  <circle cx="12" cy="12" r="3"/>
+  <!-- Satellite nodes -->
+  <circle cx="12" cy="2.5" r="2"/>
+  <circle cx="21.5" cy="17.5" r="2"/>
+  <circle cx="2.5" cy="17.5" r="2"/>
+  <!-- Edges -->
+  <line x1="12" y1="9" x2="12" y2="4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="14.5" y1="13.5" x2="19.7" y2="16.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="9.5" y1="13.5" x2="4.3" y2="16.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
