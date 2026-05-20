@@ -1,0 +1,145 @@
+feature: cli-157-update-force-pkg-mgr-warning
+prd: ./prd-cli-157-update-force-pkg-mgr-warning.md
+created_at: 2026-05-20T09:05:49Z
+updated_at: 2026-05-20T09:05:49Z
+
+tasks:
+  - id: task-001
+    title: "Extract channelLabel/uninstallCmd/selfManagedBlock helpers in install_method.go"
+    description: |
+      Refactor `neo4j-cli/internal/subcommands/update/install_method.go` so the
+      channel label, the channel-correct uninstall command, and the
+      "To switch to a self-managed install..." remediation block each have a
+      single source of truth. Add three package-private helpers — `channelLabel(method) string`,
+      `uninstallCmd(method) string`, `selfManagedBlock(method) string` — and rewrite
+      `Hint` / `formatHint` / `formatHintMulti` to call them.
+
+      Two intentional behaviour changes ripple through `Hint` output:
+      (1) the uninstall line loses its `# optional — only needed if PATH still
+      resolves the package-manager binary` annotation (per user direction —
+      uninstall is required so PATH resolves the new self-managed binary);
+      (2) the npm preamble shortens from
+      `Installed via npm-compatible package manager (global).` to
+      `Installed via npm/pnpm/yarn.` so the label matches `channelLabel(InstallMethodNpm)`.
+
+      Update `install_method_test.go` Hint goldens accordingly and add unit
+      tests for the three new helpers covering every `InstallMethod`
+      (including `InstallMethodBinary` → empty string).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "channelLabel returns 'Homebrew', 'npm/pnpm/yarn', 'pipx', 'uv tool' for the four non-binary methods and '' for InstallMethodBinary"
+      - "uninstallCmd returns the four channel-correct uninstall commands and '' for InstallMethodBinary"
+      - "selfManagedBlock returns the two-line block (uninstallCmd + curl install script) with NO 'optional' annotation, and '' for InstallMethodBinary"
+      - "Hint output for homebrew/pipx/uv is bit-identical to today except the dropped 'optional' annotation on the uninstall line; npm Hint preamble shortens to 'Installed via npm/pnpm/yarn.'"
+      - "Existing Hint goldens in install_method_test.go are updated to match; new helper unit tests cover all five InstallMethod values"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: null
+
+  - id: task-002
+    title: "Add ForceOverrideWarning(method, path) helper + unit tests"
+    description: |
+      Add `ForceOverrideWarning(method InstallMethod, path string) string` to
+      `neo4j-cli/internal/subcommands/update/install_method.go`, next to `Hint`.
+      Return `""` when `method == InstallMethodBinary`. Otherwise compose the
+      canonical multi-line block defined in the PRD:
+
+          Warning: --force overriding detected <channelLabel> install at <path>.
+          The package manager may revert this change on next upgrade.
+
+          To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):
+            <uninstallCmd>
+            curl -sSfL https://neo4j.sh/install.sh | bash
+
+      The returned string MUST end in a single newline so the call site uses
+      `fmt.Fprint` (not `Fprintln`) without producing a double blank line. Reuse
+      the helpers from task-001 (`channelLabel`, `uninstallCmd`,
+      `selfManagedBlock`) — do not duplicate strings.
+
+      Add unit tests in `install_method_test.go` covering all five `InstallMethod`
+      values: each non-binary method asserts the exact rendered block (label,
+      path, revert sentence, uninstall command, curl line); the binary method
+      asserts an empty return. Use a representative resolved path per method.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "ForceOverrideWarning(InstallMethodBinary, ...) returns the empty string"
+      - "ForceOverrideWarning returns the exact PRD-spec block for each of homebrew/npm/pipx/uv, including the channel label, the resolved path, the revert sentence, the channel-correct uninstall command, and the curl install line"
+      - "Returned string ends with exactly one trailing newline (no double blank line when emitted via fmt.Fprint)"
+      - "Implementation reuses channelLabel, uninstallCmd, selfManagedBlock — no duplicated wording"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: null
+
+  - id: task-003
+    title: "Emit warning in runUpdate when --force overrides pkg-mgr detection"
+    description: |
+      In `neo4j-cli/internal/subcommands/update/update.go`, inside `runUpdate`,
+      add the warning emit at the post-detect site (after the
+      `result.installMethod = string(method)` assignment, before the plain-text
+      "Current version" narrative and before `swapFn(...)`):
+
+          if opts.force && method != InstallMethodBinary {
+              fmt.Fprint(cmd.ErrOrStderr(), ForceOverrideWarning(method, currentBinaryPath)) //nolint:errcheck
+          }
+
+      Placement is critical: the warning MUST run regardless of `--format` mode
+      (warning is for humans; JSON scripts can redirect stderr) AND MUST run
+      before the swap so a swap failure does not swallow it.
+
+      Add three tests to `update_test.go`:
+
+      1. New helper `runWithOptsSplit(t, current, opts, format) (stdout, stderr string, err error)`
+         that mirrors `runWithOptsFormat` but uses two separate buffers
+         (`cmd.SetOut(stdoutBuf); cmd.SetErr(stderrBuf)`). Existing helpers
+         and existing tests stay untouched.
+      2. Table-driven `TestRunUpdate_Force_NonBinaryMethod_WarnsOnStderr` covering
+         all four non-binary methods. Each row swaps `detectFn` for the method
+         and asserts stderr contains the warning header, the resolved path,
+         the revert sentence, the channel-correct uninstall command, and the
+         curl install line; stdout contains `Successfully updated from v0.1.0 to v0.2.0`.
+      3. `TestRunUpdate_Force_BinaryMethod_NoWarning` — detect returns
+         `InstallMethodBinary`, asserts stderr does NOT contain the warning header
+         (`--force overriding detected`).
+      4. `TestRunUpdate_Force_JSONOutput_WarningOnStderrOnly` — force + homebrew
+         + `--format json`. Asserts stdout parses as valid JSON via
+         `parseJSONOutput` with `install_method: "homebrew"`, `updated: true`,
+         and that stdout contains no warning text; stderr contains the
+         warning block.
+
+      Confirm existing `TestRunUpdate_ForceBypassesPkgMgrCheck` and
+      `TestJSONOutput_PkgMgrPassthrough` continue to pass.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "runUpdate emits ForceOverrideWarning(method, currentBinaryPath) to cmd.ErrOrStderr() when opts.force && method != InstallMethodBinary, regardless of --format value, before swapFn is called"
+      - "New runWithOptsSplit helper added; uses separate stdout/stderr buffers"
+      - "TestRunUpdate_Force_NonBinaryMethod_WarnsOnStderr covers homebrew, npm, pipx, uv — asserts warning block fragments on stderr and 'Successfully updated' on stdout for each"
+      - "TestRunUpdate_Force_BinaryMethod_NoWarning asserts no warning text on stderr"
+      - "TestRunUpdate_Force_JSONOutput_WarningOnStderrOnly asserts stdout is valid JSON with no warning bleed and stderr contains the warning"
+      - "Existing TestRunUpdate_ForceBypassesPkgMgrCheck and TestJSONOutput_PkgMgrPassthrough pass unchanged"
+      - "make test, make fmt-check, make lint, make license-check all pass"
+    completed_at: null
+
+  - id: task-004
+    title: "Add changelog entry via changie"
+    description: |
+      Add an unreleased changelog entry covering the user-facing behaviour
+      change (new stderr warning + remediation block on --force; dropped
+      'optional' annotation on Hint uninstall lines). Run:
+
+          changie new --projects neo4j-cli --kind Patch --body 'update: warn on stderr and suggest switching to a self-managed install when --force overrides package-manager detection (CLI-157)'
+
+      If `changie` is unavailable locally, hand-author the YAML under
+      `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with
+      `project: neo4j-cli`, `kind: Patch`, the same body string, and an
+      RFC3339 `time:` value.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "A new .changes/unreleased/neo4j-cli-Patch-*.yaml file exists with project: neo4j-cli, kind: Patch"
+      - "Body references CLI-157 and describes both the warning and the self-managed-install suggestion"
+      - "File parses as valid changie YAML (matches format of sibling entries in .changes/unreleased/)"
+    completed_at: null
