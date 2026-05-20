@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'docker: redact NEO4J_AUTH/PASSWORD values in error messages from docker stderr (CLI-162)'
+time: 2026-05-20T09:38:26.547589+02:00
