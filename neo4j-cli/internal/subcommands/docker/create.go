@@ -180,6 +180,17 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				return clierr.NewUsageError(`invalid argument %q for "--%s" flag: must be one of "community" or "enterprise"`, edition, editionFlag)
 			}
 
+			// Validate --version against the package-level allowlist BEFORE
+			// any other pre-flight or docker side effect (REQ-F-001..005).
+			// The canonical form is reassigned to the outer `version` so the
+			// image-construction block, LabelVersion label, and output row
+			// all see the trimmed / -enterprise-stripped value.
+			canonicalVersion, err := validateVersion(version)
+			if err != nil {
+				return err
+			}
+			version = canonicalVersion
+
 			// --env-out-file / --ephemeral compatibility (REQ-F-017). --env-out-file
 			// is a child of --ephemeral (it only changes WHERE the env blob
 			// goes); rejecting it standalone keeps the contract honest.

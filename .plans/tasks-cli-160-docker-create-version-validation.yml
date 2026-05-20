@@ -40,7 +40,7 @@ tasks:
       image-construction block (create.go:260-267), LabelVersion label
       (create.go:309), and output row (create.go:378) all consume the
       trimmed/stripped form. Do NOT touch any other lines.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -49,7 +49,7 @@ tasks:
       - "No changes to the image-construction block, label append block, or output row"
       - "On validation failure RunE returns the error before any docker side effect"
       - "`go build ./...` is clean"
-    completed_at: null
+    completed_at: 2026-05-20T07:02:00Z
 
   - id: task-003
     title: "Add TestCreate_VersionValidation table-driven test"
