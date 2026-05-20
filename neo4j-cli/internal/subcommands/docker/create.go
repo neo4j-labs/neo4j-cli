@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +79,15 @@ var waitTimeout = 60 * time.Second
 // in a deterministic fake so the wait path can be exercised without standing
 // up a real Bolt endpoint.
 var waitForBoltFn = WaitForBolt
+
+// versionPattern is the package-level allowlist for `--version` values flowing
+// into the docker image tag (REQ-F-002). Compiled once via regexp.MustCompile
+// per the in-repo precompiled-regex idiom (see common/skill/installer.go:32).
+// Accepts digit-dot sequences with an optional `-enterprise` suffix
+// (covers semver `5`, `5.20`, `5.20.0`, calver `2026.04`, and the redundant
+// `-enterprise` suffix that the edition branch in create.go strips before
+// re-applying) plus the bare literal `latest`.
+var versionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*(-enterprise)?$|^latest$`)
 
 // newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
 // the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
@@ -630,6 +640,30 @@ func expandHostPath(s string) (string, error) {
 		return "", fmt.Errorf("resolve absolute path: %w", err)
 	}
 	return abs, nil
+}
+
+// validateVersion enforces the `--version` allowlist (REQ-F-001..005) before
+// the value flows into the docker image tag at create.go's image-construction
+// block. The contract:
+//   - TrimSpace the input before matching so `--version " 5.20 "` is accepted
+//     and the trimmed value flows downstream unchanged.
+//   - Regex-match against versionPattern. On miss return a clierr.UsageError
+//     that names BOTH the expected format and the ORIGINAL (untrimmed) input
+//     so the operator sees exactly what they passed.
+//   - On hit, strip any trailing `-enterprise` suffix. The image-construction
+//     block re-appends `-enterprise` when --edition enterprise, so leaving
+//     the suffix in place would yield e.g. `neo4j:5.20-enterprise-enterprise`
+//     (unpublished tag, broken pull). Stripping makes the suffix harmless in
+//     both editions: enterprise re-adds it, community drops it.
+func validateVersion(version string) (string, error) {
+	trimmed := strings.TrimSpace(version)
+	if !versionPattern.MatchString(trimmed) {
+		return "", clierr.NewUsageError(
+			"invalid argument %q for \"--version\" flag: must match digits/dots with optional -enterprise suffix (e.g. 5.20, 5.20.0, 5.20-enterprise, latest)",
+			version,
+		)
+	}
+	return strings.TrimSuffix(trimmed, "-enterprise"), nil
 }
 
 // resolveHostDir expands a `--data-dir` / `--logs-dir` / `--import-dir` flag

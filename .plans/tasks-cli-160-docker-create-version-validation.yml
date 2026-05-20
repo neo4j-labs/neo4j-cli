@@ -18,7 +18,7 @@ tasks:
       ORIGINAL untrimmed input), and TrimSuffixes any trailing
       `-enterprise` on hit so the edition-driven suffix at create.go:265
       never double-appends. Add `regexp` to the import block.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "versionPattern is a package-level var declared once via regexp.MustCompile"
@@ -27,7 +27,7 @@ tasks:
       - "Error message names the expected format AND the original (untrimmed) bad input"
       - "On hit, return value has whitespace trimmed AND any trailing `-enterprise` stripped"
       - "`regexp` import added; no other imports change"
-    completed_at: null
+    completed_at: 2026-05-20T06:55:23Z
 
   - id: task-002
     title: "Wire validateVersion into create RunE before pre-flights"

@@ -1,0 +1,4 @@
+## task-001 — 2026-05-20T06:55:23Z
+Added package-level `versionPattern` regex and private `validateVersion` helper to docker/create.go for --version allowlist enforcement. Helper TrimSpaces, regex-matches, strips trailing -enterprise on hit, returns clierr.NewUsageError naming format + original input on miss.
+Files: ~neo4j-cli/internal/subcommands/docker/create.go
+Decisions: helper is intentionally unused until task-002 wires it into RunE; `make lint` warns `unused` until then — gate enforced at task-005.
