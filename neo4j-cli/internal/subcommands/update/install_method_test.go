@@ -215,10 +215,12 @@ func TestHint_HomebrewIncludesAllThreeBlocks(t *testing.T) {
 	// Block 2: install-script command.
 	assert.Contains(t, h, installScriptCmd)
 	assert.Contains(t, h, "https://neo4j.sh/install.sh")
-	// Block 3: optional uninstall + PATH-order rationale.
+	// Block 3: uninstall command (now required, no "optional" annotation).
 	assert.Contains(t, h, "brew uninstall neo4j-cli")
-	assert.Contains(t, h, "optional")
-	assert.Contains(t, h, "PATH")
+	// Uninstall line no longer carries the "optional —" annotation per
+	// REQ-F-004; assert the annotation is gone so a regression re-adds it
+	// to test, not to ship.
+	assert.NotContains(t, h, "optional")
 }
 
 func TestHint_AllChannelsHaveExpectedCommands(t *testing.T) {
@@ -263,7 +265,7 @@ func TestHint_AllChannelsHaveExpectedCommands(t *testing.T) {
 			}
 			assert.Contains(t, h, tc.wantUninst)
 			assert.Contains(t, h, installScriptCmd)
-			assert.Contains(t, h, "optional")
+			assert.NotContains(t, h, "optional")
 		})
 	}
 }
@@ -279,9 +281,97 @@ func TestHint_GoldenHomebrew(t *testing.T) {
 		"  brew upgrade neo4j-cli\n" +
 		"\n" +
 		"To switch to a self-managed install (so 'neo4j-cli update' works directly):\n" +
-		"  brew uninstall neo4j-cli   # optional — only needed if PATH still resolves the package-manager binary\n" +
+		"  brew uninstall neo4j-cli\n" +
 		"  curl -sSfL https://neo4j.sh/install.sh | bash\n"
 	assert.Equal(t, want, Hint(InstallMethodHomebrew))
+}
+
+func TestHint_GoldenNpm(t *testing.T) {
+	// Golden for npm so the preamble change (shortened to "Installed via
+	// npm/pnpm/yarn.") is locked in.
+	want := "Installed via npm/pnpm/yarn. To upgrade in place, run one of:\n" +
+		"  npm i -g @neo4j-labs/cli@latest\n" +
+		"  pnpm add -g @neo4j-labs/cli@latest\n" +
+		"  yarn global add @neo4j-labs/cli@latest\n" +
+		"\n" +
+		"To switch to a self-managed install (so 'neo4j-cli update' works directly):\n" +
+		"  npm uninstall -g @neo4j-labs/cli\n" +
+		"  curl -sSfL https://neo4j.sh/install.sh | bash\n"
+	assert.Equal(t, want, Hint(InstallMethodNpm))
+}
+
+func TestChannelLabel_AllMethods(t *testing.T) {
+	cases := []struct {
+		method InstallMethod
+		want   string
+	}{
+		{InstallMethodHomebrew, "Homebrew"},
+		{InstallMethodNpm, "npm/pnpm/yarn"},
+		{InstallMethodPipx, "pipx"},
+		{InstallMethodUv, "uv tool"},
+		{InstallMethodBinary, ""},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.method), func(t *testing.T) {
+			assert.Equal(t, tc.want, channelLabel(tc.method))
+		})
+	}
+}
+
+func TestUninstallCmd_AllMethods(t *testing.T) {
+	cases := []struct {
+		method InstallMethod
+		want   string
+	}{
+		{InstallMethodHomebrew, "brew uninstall neo4j-cli"},
+		{InstallMethodNpm, "npm uninstall -g @neo4j-labs/cli"},
+		{InstallMethodPipx, "pipx uninstall neo4j-cli"},
+		{InstallMethodUv, "uv tool uninstall neo4j-cli"},
+		{InstallMethodBinary, ""},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.method), func(t *testing.T) {
+			assert.Equal(t, tc.want, uninstallCmd(tc.method))
+		})
+	}
+}
+
+func TestSelfManagedBlock_AllMethods(t *testing.T) {
+	cases := []struct {
+		method InstallMethod
+		want   string
+	}{
+		{
+			method: InstallMethodHomebrew,
+			want: "  brew uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodNpm,
+			want: "  npm uninstall -g @neo4j-labs/cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodPipx,
+			want: "  pipx uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodUv,
+			want: "  uv tool uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{InstallMethodBinary, ""},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.method), func(t *testing.T) {
+			got := selfManagedBlock(tc.method)
+			assert.Equal(t, tc.want, got)
+			if tc.method != InstallMethodBinary {
+				assert.NotContains(t, got, "optional")
+			}
+		})
+	}
 }
 
 // TestSeams_InstallMethod_Smoke makes sure the new seams compile and behave

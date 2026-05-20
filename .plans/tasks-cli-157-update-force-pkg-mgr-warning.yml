@@ -25,7 +25,7 @@ tasks:
       Update `install_method_test.go` Hint goldens accordingly and add unit
       tests for the three new helpers covering every `InstallMethod`
       (including `InstallMethodBinary` → empty string).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "channelLabel returns 'Homebrew', 'npm/pnpm/yarn', 'pipx', 'uv tool' for the four non-binary methods and '' for InstallMethodBinary"
@@ -34,7 +34,7 @@ tasks:
       - "Hint output for homebrew/pipx/uv is bit-identical to today except the dropped 'optional' annotation on the uninstall line; npm Hint preamble shortens to 'Installed via npm/pnpm/yarn.'"
       - "Existing Hint goldens in install_method_test.go are updated to match; new helper unit tests cover all five InstallMethod values"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-05-20T09:30:00Z
 
   - id: task-002
     title: "Add ForceOverrideWarning(method, path) helper + unit tests"

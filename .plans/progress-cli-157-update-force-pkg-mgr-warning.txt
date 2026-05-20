@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-20T09:30:00Z
+Extracted channelLabel/uninstallCmd/selfManagedBlock helpers; Hint/formatHint/formatHintMulti now route through them. Dropped "optional" annotation on uninstall line; shortened npm preamble to "Installed via npm/pnpm/yarn.". Goldens updated; added per-method unit tests for the three helpers.
+Files: ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/internal/subcommands/update/install_method_test.go
