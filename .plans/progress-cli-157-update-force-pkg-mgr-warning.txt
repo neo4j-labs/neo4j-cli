@@ -5,3 +5,7 @@ Files: ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/inte
 ## TASK-002 — 2026-05-20T10:00:00Z
 Added ForceOverrideWarning(method, path) helper composing channelLabel + revert sentence + selfManagedBlock; returns "" for InstallMethodBinary, ends in single newline for fmt.Fprint. Added table-driven unit test covering all 5 methods with exact expected blocks.
 Files: ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/internal/subcommands/update/install_method_test.go
+
+## TASK-003 — 2026-05-20T10:30:00Z
+Emit ForceOverrideWarning on stderr in runUpdate when --force overrides non-binary method, placed after result.installMethod assignment and before swapFn so it survives swap failures and is --format-independent. Added runWithOptsSplit (split stdout/stderr) helper + three tests: non-binary table-driven (4 methods), binary no-warning, JSON warning-on-stderr-only.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go

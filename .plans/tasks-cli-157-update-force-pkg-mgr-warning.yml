@@ -109,7 +109,7 @@ tasks:
 
       Confirm existing `TestRunUpdate_ForceBypassesPkgMgrCheck` and
       `TestJSONOutput_PkgMgrPassthrough` continue to pass.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -120,7 +120,7 @@ tasks:
       - "TestRunUpdate_Force_JSONOutput_WarningOnStderrOnly asserts stdout is valid JSON with no warning bleed and stderr contains the warning"
       - "Existing TestRunUpdate_ForceBypassesPkgMgrCheck and TestJSONOutput_PkgMgrPassthrough pass unchanged"
       - "make test, make fmt-check, make lint, make license-check all pass"
-    completed_at: null
+    completed_at: 2026-05-20T10:30:00Z
 
   - id: task-004
     title: "Add changelog entry via changie"

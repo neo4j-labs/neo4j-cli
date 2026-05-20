@@ -437,6 +437,15 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	// update on top of a homebrew binary"). Plain-text path is unaffected.
 	result.installMethod = string(method)
 
+	// REQ-F-004: when --force has overridden a package-manager-managed binary,
+	// emit the channel-correct warning to stderr BEFORE the plain-text narrative
+	// and BEFORE swapFn — the warning must surface regardless of --format mode
+	// (it's for humans; JSON scripts can redirect stderr) and must not be lost
+	// to a swap failure.
+	if opts.force && method != InstallMethodBinary {
+		fmt.Fprint(cmd.ErrOrStderr(), ForceOverrideWarning(method, currentBinaryPath)) //nolint:errcheck // warning to stderr; write errors are not actionable
+	}
+
 	// Plain-text path emits the running narrative ("Current version", "Checking
 	// for updates...") inline so the user sees progress before swap completes.
 	// Any structured-output mode (json/table/toon) stays silent until success
