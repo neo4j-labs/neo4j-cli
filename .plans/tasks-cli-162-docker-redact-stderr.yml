@@ -22,7 +22,7 @@ tasks:
       regex-driven, case-insensitive delegation. Add an inline
       comment on `redactString` describing the regex shape and the
       multi-match property used for stderr blobs.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Package-level `sensitiveAssignmentRe` regex exists with the exact RE2 pattern from REQ-F-001."
@@ -31,7 +31,7 @@ tasks:
       - "`client.go:151` call site interpolates `redactString(msg)` in place of bare `msg`; argv echo branch (`strings.Join(redactArgs(args), \" \")`) shape is unchanged."
       - "Argv passed to `exec.CommandContext` is unchanged — redaction is only applied to the user-facing error string."
       - "Comment on `redactArgs` notes regex-driven delegation; comment on `redactString` documents the pattern shape and multi-match property."
-    completed_at: null
+    completed_at: 2026-05-20T07:35:00Z
 
   - id: task-002
     title: "Add TestRedactString table tests; confirm TestRedactArgs unchanged"
