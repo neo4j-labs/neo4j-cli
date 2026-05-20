@@ -99,7 +99,7 @@ tasks:
       release files. Rationale: the `update --help` Long-text change is
       user-visible, so a Patch entry is appropriate (interactive decision
       recorded in PRD Technical Considerations).
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -107,7 +107,7 @@ tasks:
       - "Body references CLI-158 and the SECURITY.md addition"
       - "kind is Patch and project is neo4j-cli"
       - "No edits under .changes/neo4j-cli/"
-    completed_at: null
+    completed_at: 2026-05-20T11:16:30Z
 
   - id: task-005
     title: "Run final gates: fmt-check, lint, test, generate-check, license-check"

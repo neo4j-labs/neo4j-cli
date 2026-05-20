@@ -9,3 +9,7 @@ Files: ~README.md
 ## task-003 — 2026-05-20T10:00:00Z
 Append SECURITY.md pointer sentence to `update` cobra Long; regen skill bundle. Bundle diff limited to references/update.md as expected.
 Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/skill/bundle/references/update.md
+
+## TASK-004 — 2026-05-20T11:16:30Z
+Generated Patch changelog entry via `changie new --projects neo4j-cli --kind Patch` referencing CLI-158 SECURITY.md docs addition. fmt-check + test gates clean.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260520-111604.yaml
