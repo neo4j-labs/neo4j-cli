@@ -1,9 +1,10 @@
 name: Post release notes
 
 # Generates richer release notes via Claude Code after a neo4j-cli release.
-# First-PR scope (CLI-147): generate + print to the job log only. The Slack
-# POST and `gh release edit` steps land in a follow-up PR; this file is the
-# skeleton that resolves the tag, version, and previous-tag inputs.
+# Claude writes two artifacts: /tmp/release-notes-generated.md (markdown for
+# the GitHub release body) and /tmp/slack-payload.json (Block Kit JSON for
+# the Slack webhook). The workflow validates, prints, posts to Slack, and
+# prepends to the GitHub release body.
 
 on:
   release:
@@ -156,14 +157,29 @@ jobs:
 
       - name: Guard generated notes file
         run: |
-          # Hard-fail if Claude didn't produce the expected artifact. Anything
-          # downstream (print, Slack payload) assumes a non-empty markdown
-          # body — better to fail here with a clear message.
+          # Hard-fail if Claude didn't produce the expected artifact. The
+          # `gh release edit` step below assumes a non-empty markdown body —
+          # better to fail here with a clear message.
           if [ ! -s /tmp/release-notes-generated.md ]; then
             echo "ERROR: /tmp/release-notes-generated.md is missing or empty" >&2
             exit 1
           fi
           echo "[post-release-notes] generated notes: $(wc -c < /tmp/release-notes-generated.md) bytes"
+
+      - name: Guard Slack payload file
+        run: |
+          # Hard-fail if Claude didn't produce a valid Block Kit JSON. The
+          # `curl` POST below would otherwise fail opaquely against Slack's
+          # webhook endpoint.
+          if [ ! -s /tmp/slack-payload.json ]; then
+            echo "ERROR: /tmp/slack-payload.json is missing or empty" >&2
+            exit 1
+          fi
+          if ! jq -e . /tmp/slack-payload.json > /dev/null; then
+            echo "ERROR: /tmp/slack-payload.json is not valid JSON" >&2
+            exit 1
+          fi
+          echo "[post-release-notes] slack payload: $(wc -c < /tmp/slack-payload.json) bytes, $(jq '.blocks | length' /tmp/slack-payload.json) blocks"
 
       - name: Print generated release notes
         run: |
@@ -174,54 +190,14 @@ jobs:
           cat /tmp/release-notes-generated.md
           echo "----- end -----"
 
-      - name: Convert release notes to Slack mrkdwn
+      - name: Print Slack payload
         run: |
-          # Slack's `mrkdwn` flavour does not understand GitHub headings
-          # (`##`, `###`) or `**bold**` — they render as literal characters.
-          # Translate the GitHub-flavoured body produced by Claude into Slack
-          # mrkdwn so headings and bold weights render. Bullets (`- `) and
-          # triple-backtick fenced code blocks pass through unchanged because
-          # Slack already handles those. The GitHub-flavoured original stays
-          # on disk for the GH release append step further down.
-          perl -pe '
-            s{^### (.*)}{*$1*};
-            s{^## (.*)}{*$1*};
-            s{\*\*([^*]+)\*\*}{*$1*}g;
-            s{\[([^\]]+)\]\(([^)]+)\)}{<$2|$1>}g;
-          ' /tmp/release-notes-generated.md > /tmp/release-notes-slack.md
-
-      - name: Build Slack payload
-        run: |
-          # Assemble the Slack message body as:
-          #   <preamble>
-          #
-          #   Release notes
-          #   <body>
-          #
-          #   <release-url>
-          # `jq -nR --rawfile body ...` slurps the markdown verbatim, so newlines,
-          # backticks, and quotes are JSON-escaped safely without our own
-          # sed/printf gymnastics. The body comes from the Slack-flavoured copy
-          # so `##` headings and `**bold**` actually render.
-          PREAMBLE="neo4j-labs/neo4j-cli ${RELEASE_TAG} is now out. Update with \`neo4j-cli update\` or use your favourite package manager."
-          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
-          jq -nR \
-            --arg preamble "${PREAMBLE}" \
-            --arg url "${RELEASE_URL}" \
-            --rawfile body /tmp/release-notes-slack.md \
-            '{text: ($preamble + "\n\nRelease notes\n" + $body + "\n\n" + $url)}' \
-            > /tmp/slack-payload.json
+          # Pretty-print the Block Kit JSON so reviewers can read the structure
+          # without copying the file elsewhere. Also surface the notification
+          # `text` field on its own — that's what users see in their sidebar.
           echo "----- /tmp/slack-payload.json -----"
-          cat /tmp/slack-payload.json
-          echo "----- end -----"
-
-      - name: Print Slack message (rendered)
-        run: |
-          # The Actions UI clips the very long single-line JSON `text` value
-          # above. Re-render it with jq so newlines render as actual newlines
-          # and reviewers can read the message body inline without copying the
-          # JSON elsewhere.
-          echo "----- Slack message (rendered) -----"
+          jq . /tmp/slack-payload.json
+          echo "----- notification text -----"
           jq -r '.text' /tmp/slack-payload.json
           echo "----- end -----"
 
