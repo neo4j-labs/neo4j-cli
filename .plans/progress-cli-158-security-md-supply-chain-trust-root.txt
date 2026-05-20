@@ -1,0 +1,3 @@
+## task-001 — 2026-05-20T09:30:00Z
+Add repo-root SECURITY.md with five H2 sections: reporting (security@neo4j.com), supply-chain trust root for `neo4j-cli update`, accepted residual risks, mitigation roadmap (not committed), review cadence. 109 lines, flush-left, no Oplane/REQ-/file:line refs.
+Files: +SECURITY.md

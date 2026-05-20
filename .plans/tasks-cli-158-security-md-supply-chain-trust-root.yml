@@ -30,7 +30,7 @@ tasks:
       calendar binding, no retrospective binding). No Oplane references,
       no internal threat-model IDs, no file:line anchors into the source
       tree. Target ≤120 lines total.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "SECURITY.md exists at repo root (NOT under .github/) and is flush-left"
@@ -39,7 +39,7 @@ tasks:
       - "Trust-root section enumerates all five pinned GitHub hosts explicitly (not as a wildcard)"
       - "File contains no `swap.go`, no `release.go`, no `Oplane`, no `REQ-` references"
       - "`wc -l SECURITY.md` < 120"
-    completed_at: null
+    completed_at: 2026-05-20T09:30:00Z
 
   - id: task-002
     title: "Link to SECURITY.md from README.md Installation section"
