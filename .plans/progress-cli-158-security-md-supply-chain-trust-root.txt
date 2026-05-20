@@ -5,3 +5,7 @@ Files: +SECURITY.md
 ## task-002 — 2026-05-20T09:45:00Z
 Append single trailing line to README.md Installation section linking to ./SECURITY.md; placed between Self-update content and `## Agent skills` heading. No existing content altered.
 Files: ~README.md
+
+## task-003 — 2026-05-20T10:00:00Z
+Append SECURITY.md pointer sentence to `update` cobra Long; regen skill bundle. Bundle diff limited to references/update.md as expected.
+Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/skill/bundle/references/update.md

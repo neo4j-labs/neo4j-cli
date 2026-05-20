@@ -78,7 +78,7 @@ tasks:
       changes to files OTHER than `bundle/references/update.md` (e.g.
       `SKILL.md`), STOP and investigate — that would indicate the change
       has accidentally touched a global help surface.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "update.go Long field gains exactly one trailing sentence referencing SECURITY.md"
@@ -86,7 +86,7 @@ tasks:
       - "`go generate ./neo4j-cli/internal/skill/...` has been run and the resulting bundle changes are staged"
       - "Bundle diff is limited to neo4j-cli/internal/skill/bundle/references/update.md (any other change → investigate before continuing)"
       - "`go build ./...` is clean"
-    completed_at: null
+    completed_at: 2026-05-20T10:00:00Z
 
   - id: task-004
     title: "Add Patch changelog entry for CLI-158"
