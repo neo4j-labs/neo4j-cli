@@ -21,9 +21,13 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli credential aura-client add` — store Aura Console API credentials (client ID + secret)
 - `neo4j-cli credential dbms add` — store Neo4j Bolt connection profiles for reuse via `--credential`
 - `neo4j-cli credential embed add` — store embedding-provider credentials (openai, ollama, huggingface)
-- `neo4j-cli aura instance list` — list Aura instances (table or JSON)
+- `neo4j-cli aura organization list` / `aura project list --organization-id <org-id>` — discover the org/project IDs that scope every other Aura command
+- `neo4j-cli aura workspace use <org-id>/<project-id> --rw` — pin a default org+project pair so `--organization-id` / `--project-id` can be omitted
+- `neo4j-cli aura instance list` — list Aura instances (table or JSON; needs an explicit `--organization-id` + `--project-id` unless a workspace is pinned)
 - `neo4j-cli aura instance create` — provision a new Aura instance (`--name` optional; auto-generates `InstanceNN` if omitted)
 - `neo4j-cli aura instance get <id>` — get instance details
+- `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
+- `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`
 - `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
 - `neo4j-cli query :embed [text]` — compute an embedding vector standalone (no Bolt connection)
