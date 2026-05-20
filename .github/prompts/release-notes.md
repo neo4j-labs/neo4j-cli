@@ -66,15 +66,14 @@ Write a single markdown document to `/tmp/release-notes-generated.md` with this 
 ```
 ### Highlights
 
-- **<headline>** — <why it matters in one sentence>. Example:
+- **<single-topic headline>** — <why it matters in one sentence>. Example:
   ```
   neo4j-cli <invocation>
   ```
 
-- **<headline>** — <why it matters in one sentence>. Example:
-  ```
-  neo4j-cli <invocation>
-  ```
+- **<themed bundle headline>** — <one-sentence theme>:
+  - <entry one>
+  - <entry two>
 
 ### Other changes
 
@@ -85,11 +84,13 @@ Write a single markdown document to `/tmp/release-notes-generated.md` with this 
 Constraints — these are firm:
 
 - NO top-level `# h1`. The workflow concatenates a `## Release notes` header upstream of your output. Your first heading must be `### Highlights`.
-- Maximum 300 lines total.
-- Pick 2–5 highlights. If the release genuinely has only one user-facing change, one highlight is fine. If it has none (e.g. a pure-internal release), say so in a single sentence under `### Highlights` and skip the `### Other changes` section.
-- Every highlight must include a runnable `neo4j-cli` invocation in a fenced code block. Use the exact `neo4j-cli` binary name (not `aura` or any other variant). Examples that depend on credentials are fine — the reader will fill in their own values.
-- Group every other changelog entry under `### Other changes` as a single bullet per entry. One line each. No example blocks.
-- Tone: a little witty, a little wholesome, dry humour, no corporate fluff, no marketing language, no superlatives. Aim for the voice of a maintainer who is quietly pleased that the thing shipped. Avoid emoji unless the source changelog entry has one — never add an emoji that is not in the source.
+- Keep the whole document tight — aim short, hard cap 150 lines.
+- **Maximum 3 highlights.** Pick only genuinely important or exciting changes: new commands, breaking changes, notable new capability. Skip minor tweaks. If only one thing is exciting, ship one highlight. If nothing is, say so in a single sentence under `### Highlights` and skip `### Other changes`.
+- Default highlight shape is single-topic with a runnable example. Use that whenever the change stands on its own.
+- Optionally, a highlight may bundle several related entries under one themed headline (e.g. "Security hardening", "Better error handling", "Docker UX polish") when grouping genuinely saves space — list the entries as sub-bullets and skip the example block. Only use the bundle form when the entries share a real theme; otherwise stick with separate single-topic highlights.
+- Single-topic highlights must include one runnable `neo4j-cli` invocation in a fenced code block. Use the exact `neo4j-cli` binary name. One sentence of "why it matters" — no recap of the implementation.
+- Group every other changelog entry under `### Other changes` as a single bullet per entry. One line each. No example blocks. Terse.
+- Tone: a little witty, a little wholesome, dry humour, no corporate fluff, no marketing language, no superlatives. Maintainer quietly pleased the thing shipped. Avoid emoji unless the source changelog entry has one — never add one that isn't in the source.
 - Do not mention the SHA, PR number, or Linear ticket ID unless the changelog entry itself includes it.
 - Do not include a section about how to install or update — the workflow's Slack preamble already says that.
 
