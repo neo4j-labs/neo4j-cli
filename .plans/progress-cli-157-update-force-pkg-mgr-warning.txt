@@ -9,3 +9,7 @@ Files: ~neo4j-cli/internal/subcommands/update/install_method.go, ~neo4j-cli/inte
 ## TASK-003 — 2026-05-20T10:30:00Z
 Emit ForceOverrideWarning on stderr in runUpdate when --force overrides non-binary method, placed after result.installMethod assignment and before swapFn so it survives swap failures and is --format-independent. Added runWithOptsSplit (split stdout/stderr) helper + three tests: non-binary table-driven (4 methods), binary no-warning, JSON warning-on-stderr-only.
 Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/subcommands/update/update_test.go
+
+## TASK-004 — 2026-05-20T11:19:08Z
+Added Patch changelog entry via changie for CLI-157 (stderr warning + self-managed-install suggestion on --force pkg-mgr override).
+Files: +.changes/unreleased/neo4j-cli-Patch-20260520-111908.yaml

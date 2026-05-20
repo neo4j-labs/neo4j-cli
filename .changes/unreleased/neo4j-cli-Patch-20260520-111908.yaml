@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'update: warn on stderr and suggest switching to a self-managed install when --force overrides package-manager detection (CLI-157)'
+time: 2026-05-20T11:19:08.380858+02:00

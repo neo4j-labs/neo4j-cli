@@ -135,11 +135,11 @@ tasks:
       `.changes/unreleased/neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with
       `project: neo4j-cli`, `kind: Patch`, the same body string, and an
       RFC3339 `time:` value.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "A new .changes/unreleased/neo4j-cli-Patch-*.yaml file exists with project: neo4j-cli, kind: Patch"
       - "Body references CLI-157 and describes both the warning and the self-managed-install suggestion"
       - "File parses as valid changie YAML (matches format of sibling entries in .changes/unreleased/)"
-    completed_at: null
+    completed_at: 2026-05-20T11:19:08Z
