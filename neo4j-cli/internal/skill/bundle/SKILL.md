@@ -82,6 +82,29 @@ neo4j-cli docker stop tmp --rw
 ```sh
 # List, create, and invoke an agent (workspace default already set)
 neo4j-cli aura agent list --format toon
-neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> --tools '[{"type":"cypher_template","config":{"query":"MATCH (n) RETURN n LIMIT $k","params":{"k":5}}}]' --rw
+neo4j-cli aura agent create --name docs-bot --description "Docs assistant" --dbid <dbid> --tools '[{"type":"text2cypher","name":"ask","description":"Answer questions about the graph"}]' --rw
 neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
 ```
+
+- `--tools` is a JSON array of tool objects. Every tool shares the envelope `{type, name, description, config}` (plus optional `enabled`) — `name` ≤64 chars, `description` ≤2000 chars. The `type` discriminator is **camelCase** (NOT snake_case): `text2cypher`, `cypherTemplate`, `similaritySearch`. The `config` object is type-specific; the four canonical shapes are:
+
+```json
+[{"type":"text2cypher","name":"ask-graph","description":"Convert natural-language questions into Cypher and run them against the database."}]
+```
+
+```json
+[{"type":"cypherTemplate","name":"top-customers","description":"Return the top N customers by total order value.","config":{"template":"MATCH (c:Customer)-[:PLACED]->(o:Order) RETURN c.name AS name, sum(o.total) AS spent ORDER BY spent DESC LIMIT $limit","parameters":[{"name":"limit","data_type":"integer","description":"Maximum number of customers to return."}]}}]
+```
+
+```json
+[{"type":"similaritySearch","name":"doc-search","description":"Find docs most similar to the user question.","config":{"provider":"openai","model":"text-embedding-3-small","index":"docs_embedding_index","top_k":5}}]
+```
+
+```json
+[{"type":"similaritySearch","name":"doc-search-enriched","description":"Vector-search docs, then enrich each hit with its parent page.","config":{"provider":"openai","model":"text-embedding-3-small","index":"docs_embedding_index","top_k":5,"post_processing_cypher":"MATCH (node)<-[:HAS_CHUNK]-(page:Page) RETURN page.title AS title, page.url AS url, node.text AS chunk, score ORDER BY score DESC"}}]
+```
+
+Tool-config field reference (v2beta1):
+  - `text2cypher` — no `config` fields required.
+  - `cypherTemplate.config` — required `template` (Cypher string); optional `parameters[]` of `{name, data_type, description}` with `data_type ∈ {string, number, boolean, integer}`.
+  - `similaritySearch.config` — required `provider` (`openai` | `vertexai`), `model` (provider-compatible embedding model), `index` (vector-index name, ≤100 chars), `top_k` (1–100); optional `dimensions` (integer, when the provider/index needs an explicit size); optional `post_processing_cypher` — read-only Cypher appended to the vector search and run as a single query, with `node` and `score` exposed to the post-processing block (write queries are rejected server-side).

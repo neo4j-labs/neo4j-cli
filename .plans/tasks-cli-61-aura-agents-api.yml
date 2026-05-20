@@ -395,7 +395,7 @@ tasks:
 
       After editing additions.md, run `go generate ./neo4j-cli/internal/skill/...` to refresh
       the bundle. `TestGenerator_RoundTrip` is the gate.
-    status: pending
+    status: completed
     dependencies:
       - task-015
     acceptance_criteria:
@@ -404,4 +404,13 @@ tasks:
       - "Field names match the v2beta1 update-agent / create-agent spec verbatim — no invented keys."
       - "Skill bundle regenerated (`bundle/SKILL.md`, any `bundle/references/*.md` derived from additions) and committed."
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
-    completed_at: null
+    completed_at: 2026-05-20T00:00:00Z
+    notes: |
+      Spec discriminators are camelCase (`text2cypher`, `cypherTemplate`, `similaritySearch`),
+      NOT snake_case as the task description assumed. Verified against the live v2beta1 spec
+      at neo4j.com/.../aura_api_spec_v2beta1.yaml (schemas Tool / CypherTemplateTool /
+      SimilaritySearchTool / Text2CypherTool). Fixed the pre-existing wrong example in
+      additions.md AND README.md which used `cypher_template` + fictional `query`/`params`
+      fields — replaced with a minimal `text2cypher` example. Added four canonical fenced
+      JSON blocks + a per-type field reference covering required/optional fields and the
+      `post_processing_cypher` semantics (`node` + `score` exposed, write queries rejected).
