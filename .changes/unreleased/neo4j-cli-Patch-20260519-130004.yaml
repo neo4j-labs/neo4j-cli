@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Aura API error messages now render in the same multi-line bracket format used for auth errors instead of Go's default []string stringification.
-time: 2026-05-19T13:00:04.437876+02:00
