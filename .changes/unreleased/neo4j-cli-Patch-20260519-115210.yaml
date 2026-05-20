@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Surface an actionable suggestion when an Aura instance-type quota is exceeded (e.g. attempting to create a free-db when one already exists), and surface any panic diagnostic in the CLI's panic-recovery line so unhandled API status codes are diagnosable.
-time: 2026-05-19T11:52:10.558496+02:00

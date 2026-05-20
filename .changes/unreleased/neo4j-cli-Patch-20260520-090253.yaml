@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: 'docker create: validate --version against allowlist (CLI-160)'
-time: 2026-05-20T09:02:53.831179+02:00

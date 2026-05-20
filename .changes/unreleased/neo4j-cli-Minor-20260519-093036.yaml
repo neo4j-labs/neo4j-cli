@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Populate next-action suggestions on Aura API errors (400/401/403/404/429) and workspace/ownership errors.
-time: 2026-05-19T09:30:36.837642+02:00
