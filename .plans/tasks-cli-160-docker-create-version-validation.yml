@@ -82,7 +82,7 @@ tasks:
         - `5.20-enterprise` + `--edition community` → image `neo4j:5.20`
         - `2026.04` + `--edition community` → image `neo4j:2026.04`
         - `  5.1.2  ` + `--edition community` → image `neo4j:5.1.2` and label `org.neo4j.cli.version=5.1.2`
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -92,7 +92,7 @@ tasks:
       - "The `  5.1.2  ` accept case asserts the LabelVersion argv contains `=5.1.2` (canonical, no whitespace)"
       - "The two `5.20-enterprise` accept cases confirm no double `-enterprise-enterprise` suffix"
       - "Test passes under `go test ./neo4j-cli/internal/subcommands/docker/...`"
-    completed_at: null
+    completed_at: 2026-05-20T07:15:00Z
 
   - id: task-004
     title: "Add Patch changelog entry for CLI-160"

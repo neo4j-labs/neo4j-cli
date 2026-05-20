@@ -6,3 +6,8 @@ Decisions: helper is intentionally unused until task-002 wires it into RunE; `ma
 ## task-002 — 2026-05-20T07:02:00Z
 Wired validateVersion into docker create RunE after --edition guard and before all other pre-flights. Canonical (trimmed, -enterprise-stripped) value reassigned to outer `version` so image build, LabelVersion, and output row all see the canonical form.
 Files: ~neo4j-cli/internal/subcommands/docker/create.go
+
+## task-003 — 2026-05-20T07:15:00Z
+Added TestCreate_VersionValidation to create_test.go: 8 reject + 7 accept table cases covering registry prefixes, digests, shell metachars, empty/double-dot inputs, latest+enterprise bare tag, double-suffix guard, calver, and whitespace trim. Asserts err+empty RunCalls on reject, canonical image tag + LabelVersion on accept.
+Files: ~neo4j-cli/internal/subcommands/docker/create_test.go
+Decisions: wrap each version arg in shlexQuote so empty string + shell metachars survive shlex.Split.
