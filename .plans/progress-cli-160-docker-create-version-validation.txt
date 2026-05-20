@@ -11,3 +11,7 @@ Files: ~neo4j-cli/internal/subcommands/docker/create.go
 Added TestCreate_VersionValidation to create_test.go: 8 reject + 7 accept table cases covering registry prefixes, digests, shell metachars, empty/double-dot inputs, latest+enterprise bare tag, double-suffix guard, calver, and whitespace trim. Asserts err+empty RunCalls on reject, canonical image tag + LabelVersion on accept.
 Files: ~neo4j-cli/internal/subcommands/docker/create_test.go
 Decisions: wrap each version arg in shlexQuote so empty string + shell metachars survive shlex.Split.
+
+## task-004 — 2026-05-20T09:03:30Z
+Added Patch changelog entry for CLI-160 via `changie new`.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260520-090253.yaml

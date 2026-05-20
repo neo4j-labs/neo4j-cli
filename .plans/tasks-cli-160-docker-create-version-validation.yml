@@ -104,7 +104,7 @@ tasks:
       Changie Notes (single-quoted body, RFC3339 time, project field
       set to `neo4j-cli`). Do NOT alter `.changes/neo4j-cli/v*.md`
       release files.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -112,7 +112,7 @@ tasks:
       - "Body references CLI-160 and the validate-allowlist behaviour"
       - "kind is Patch and project is neo4j-cli"
       - "No edits under .changes/neo4j-cli/"
-    completed_at: null
+    completed_at: 2026-05-20T09:03:30Z
 
   - id: task-005
     title: "Run final gates: fmt-check, lint, test, generate-check"
