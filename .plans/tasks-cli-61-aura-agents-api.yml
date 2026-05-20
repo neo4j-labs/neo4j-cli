@@ -357,3 +357,51 @@ tasks:
       - "A new changelog entry exists naming the promotion."
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
     completed_at: 2026-05-19T16:09:36+02:00
+
+  - id: task-016
+    title: "Document agent tool specs in the aura skill"
+    description: |
+      Today the skill bundle and README only show one tool example (cypher_template inline).
+      Agents creating tools have to read the Aura API spec to discover the JSON shape for
+      every other supported tool type, which is friction the skill is meant to remove.
+
+      Source of truth (fetch and read):
+      https://neo4j.com/docs/aura/platform/api/specification/?urls.primaryName=Aura%20v2beta1#/agents/update-agent
+
+      Specifically the request schema for `update-agent` / `create-agent` — the `tools[]`
+      member is a polymorphic array; each variant is documented under its `type` discriminator.
+
+      Tool types to cover with a concrete, copy-pastable JSON example:
+        1. `text2cypher` — natural-language → Cypher translation.
+        2. `cypher_template` — parameterised query with `params`.
+        3. `vector_similarity_search` — pure vector retrieval (no follow-up Cypher).
+        4. `vector_similarity_search` with **post-processing Cypher** — the spec exposes
+           a post-processing query field; show the same tool with that field populated.
+
+      Where to put them:
+        - `neo4j-cli/internal/skill/additions.md` — add a fenced JSON block per tool type
+          under the existing "Aura Agents:" bullet. Each example must be a single-element
+          array `[{ ... }]` that pastes directly into `--tools '...'`.
+        - Optional: short pointer in `README.md`'s `### Aura Agent` section listing the
+          four supported tool types and linking back to the additions.md block for the
+          full JSON. Skip if it bloats the README.
+
+      Verify against the live spec:
+        - Field names match the v2beta1 schema verbatim (snake_case, no inventions).
+        - Required vs optional fields are reflected — examples should only set fields that
+          have meaningful values; omit optional ones unless they materially help the example.
+        - Run `neo4j-cli aura agent create --tools '<each example>' --dry-run` if the CLI has
+          a dry-run flag; otherwise hand-validate by JSON-parsing each block.
+
+      After editing additions.md, run `go generate ./neo4j-cli/internal/skill/...` to refresh
+      the bundle. `TestGenerator_RoundTrip` is the gate.
+    status: pending
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "additions.md has four fenced JSON tool examples: text2cypher, cypher_template, vector_similarity_search (no post-processing), vector_similarity_search with post-processing Cypher."
+      - "Each example is a single-element array shaped to paste into `--tools '...'` and parses as valid JSON."
+      - "Field names match the v2beta1 update-agent / create-agent spec verbatim — no invented keys."
+      - "Skill bundle regenerated (`bundle/SKILL.md`, any `bundle/references/*.md` derived from additions) and committed."
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass."
+    completed_at: null
