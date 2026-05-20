@@ -32,6 +32,8 @@ If the binary was installed via Homebrew / npm / pipx / uv, `update` prints the 
 
 Installed agent skill bundles are refreshed automatically after a successful swap; if none are installed, `update` suggests running `neo4j-cli skill install`.
 
+**Security:** how `neo4j-cli update` validates downloads and our vulnerability reporting channel are documented in [SECURITY.md](./SECURITY.md).
+
 ## Agent skills
 
 `neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops it into each detected agent's skill directory; pass an agent name to target one.
