@@ -60,7 +60,7 @@ tasks:
       values: each non-binary method asserts the exact rendered block (label,
       path, revert sentence, uninstall command, curl line); the binary method
       asserts an empty return. Use a representative resolved path per method.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -69,7 +69,7 @@ tasks:
       - "Returned string ends with exactly one trailing newline (no double blank line when emitted via fmt.Fprint)"
       - "Implementation reuses channelLabel, uninstallCmd, selfManagedBlock — no duplicated wording"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-05-20T10:00:00Z
 
   - id: task-003
     title: "Emit warning in runUpdate when --force overrides pkg-mgr detection"

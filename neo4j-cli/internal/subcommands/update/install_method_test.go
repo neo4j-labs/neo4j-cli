@@ -374,6 +374,73 @@ func TestSelfManagedBlock_AllMethods(t *testing.T) {
 	}
 }
 
+func TestForceOverrideWarning_AllMethods(t *testing.T) {
+	cases := []struct {
+		method InstallMethod
+		path   string
+		want   string
+	}{
+		{
+			method: InstallMethodHomebrew,
+			path:   "/opt/homebrew/bin/neo4j-cli",
+			want: "Warning: --force overriding detected Homebrew install at /opt/homebrew/bin/neo4j-cli.\n" +
+				"The package manager may revert this change on next upgrade.\n" +
+				"\n" +
+				"To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n" +
+				"  brew uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodNpm,
+			path:   "/usr/lib/node_modules/@neo4j-labs/cli/bin/neo4j-cli",
+			want: "Warning: --force overriding detected npm/pnpm/yarn install at /usr/lib/node_modules/@neo4j-labs/cli/bin/neo4j-cli.\n" +
+				"The package manager may revert this change on next upgrade.\n" +
+				"\n" +
+				"To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n" +
+				"  npm uninstall -g @neo4j-labs/cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodPipx,
+			path:   "/home/user/.local/pipx/venvs/neo4j-cli/bin/neo4j-cli",
+			want: "Warning: --force overriding detected pipx install at /home/user/.local/pipx/venvs/neo4j-cli/bin/neo4j-cli.\n" +
+				"The package manager may revert this change on next upgrade.\n" +
+				"\n" +
+				"To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n" +
+				"  pipx uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodUv,
+			path:   "/home/user/.local/share/uv/tools/neo4j-cli/bin/neo4j-cli",
+			want: "Warning: --force overriding detected uv tool install at /home/user/.local/share/uv/tools/neo4j-cli/bin/neo4j-cli.\n" +
+				"The package manager may revert this change on next upgrade.\n" +
+				"\n" +
+				"To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n" +
+				"  uv tool uninstall neo4j-cli\n" +
+				"  curl -sSfL https://neo4j.sh/install.sh | bash\n",
+		},
+		{
+			method: InstallMethodBinary,
+			path:   "/usr/local/bin/neo4j-cli",
+			want:   "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.method), func(t *testing.T) {
+			got := ForceOverrideWarning(tc.method, tc.path)
+			assert.Equal(t, tc.want, got)
+			if tc.method != InstallMethodBinary {
+				// Exactly one trailing newline so the call site can use
+				// fmt.Fprint without producing a double blank line.
+				assert.True(t, strings.HasSuffix(got, "\n"))
+				assert.False(t, strings.HasSuffix(got, "\n\n"),
+					"warning must end in exactly one newline, not two")
+			}
+		})
+	}
+}
+
 // TestSeams_InstallMethod_Smoke makes sure the new seams compile and behave
 // when not swapped — production fills with the real impls.
 func TestSeams_InstallMethod_Smoke(t *testing.T) {

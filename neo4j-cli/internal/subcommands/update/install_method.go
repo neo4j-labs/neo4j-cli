@@ -208,6 +208,31 @@ func selfManagedBlock(method InstallMethod) string {
 	return b.String()
 }
 
+// ForceOverrideWarning returns the multi-line stderr warning emitted when
+// `update --force` overrides a detected package-manager install. The block
+// names the detected channel and the resolved binary path, flags the revert
+// risk, then offers the channel-correct self-managed remediation via
+// selfManagedBlock (so wording stays in lockstep with Hint).
+//
+// Returns the empty string for InstallMethodBinary — there's nothing to warn
+// about when the binary is self-managed.
+//
+// The returned string ends in a single trailing newline so the call site uses
+// fmt.Fprint (NOT Fprintln) without producing a double blank line.
+func ForceOverrideWarning(method InstallMethod, path string) string {
+	label := channelLabel(method)
+	if label == "" {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Warning: --force overriding detected %s install at %s.\n", label, path)
+	b.WriteString("The package manager may revert this change on next upgrade.\n")
+	b.WriteString("\n")
+	b.WriteString("To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n")
+	b.WriteString(selfManagedBlock(method))
+	return b.String()
+}
+
 // Hint returns the user-facing passthrough message for a given install method.
 // The shape follows REQ-F-010a: a top-line preamble, the channel-correct
 // upgrade command, then a "switch to a self-managed install" block carrying
