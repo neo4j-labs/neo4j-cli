@@ -103,6 +103,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPort          int
 		password          string
 		noStoreCredential bool
+		noPrintPassword   bool
 		wait              bool
 		ephemeral         bool
 		envOutFile        string
@@ -120,6 +121,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPortFlag          = "http-port"
 		passwordFlag          = "password"
 		noStoreCredentialFlag = "no-store-credential"
+		noPrintPasswordFlag   = "no-print-password"
 		ephemeralFlag         = "ephemeral"
 		envOutFileFlag        = "env-out-file"
 		dataDirFlag           = "data-dir"
@@ -151,7 +153,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"Use --data-dir / --logs-dir / --import-dir to bind-mount host directories at /data, /logs, /import " +
 			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
 			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
-			"--ephemeral.",
+			"--ephemeral. " +
+			"Pass --no-print-password to omit the generated password from stdout output; retrieve it later via " +
+			"`neo4j-cli credential dbms get <name>`.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -201,6 +205,23 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 			if ephemeral && noStoreCredential {
 				return clierr.NewUsageError("--%s is incompatible with --%s (ephemeral already skips credential persistence)", noStoreCredentialFlag, ephemeralFlag)
+			}
+			// --no-print-password incompatibilities. The flag is meaningful only
+			// when the password remains recoverable through some other channel
+			// (stored dbms credential, operator-supplied --password, or the
+			// ephemeral .env blob via --env-out-file). Reject combos that would
+			// leave NO recovery path.
+			if noPrintPassword && ephemeral {
+				return clierr.NewUsageError(
+					"--%s is incompatible with --%s (ephemeral emits a .env blob; use --%s to write it to a file)",
+					noPrintPasswordFlag, ephemeralFlag, envOutFileFlag,
+				)
+			}
+			if noPrintPassword && noStoreCredential && password == "" {
+				return clierr.NewUsageError(
+					"--%s with --%s would discard the generated password unrecoverably; supply --%s explicitly or drop one of the flags",
+					noPrintPasswordFlag, noStoreCredentialFlag, passwordFlag,
+				)
 			}
 
 			// Volume-mount flags (--data-dir / --logs-dir / --import-dir) are
@@ -393,6 +414,9 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			// Render the result. Field order mirrors what an operator wants
 			// at a glance: identity, image identity, ports, connection details.
+			// When --no-print-password is set, the password is omitted from
+			// both the map and the fields slice so every format (JSON, table,
+			// TOON) suppresses it at a single point.
 			row := map[string]any{
 				"name":      chosenName,
 				"edition":   edition,
@@ -401,9 +425,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				"http-port": httpPort,
 				"uri":       uri,
 				"username":  "neo4j",
-				"password":  resolvedPassword,
 			}
-			fields := []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username", "password"}
+			fields := []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username"}
+			if !noPrintPassword {
+				row["password"] = resolvedPassword
+				fields = append(fields, "password")
+			}
 			commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 
 			return nil
@@ -419,6 +446,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474). Auto-incremented along with --bolt-port if taken.")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
+	cmd.Flags().BoolVar(&noPrintPassword, noPrintPasswordFlag, false, "Don't include the generated password in stdout output. Retrieve later via `neo4j-cli credential dbms get <name>`.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
 	cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
 	cmd.Flags().StringVar(&dataDir, dataDirFlag, "", "Host directory to bind-mount at /data inside the container. Empty = no mount (data lives in the container layer and is lost on delete). Path supports `~` and environment-variable expansion; resolved to an absolute path; created at mode 0o755 if missing. Incompatible with --ephemeral.")
