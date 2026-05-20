@@ -1,0 +1,90 @@
+feature: cli-162-docker-redact-stderr
+prd: ./prd-cli-162-docker-redact-stderr.md
+created_at: 2026-05-20T07:27:33Z
+updated_at: 2026-05-20T07:27:33Z
+
+tasks:
+  - id: task-001
+    title: "Add redactString helper, refactor redactArgs, redact stderr at call site"
+    description: |
+      Edit neo4j-cli/internal/subcommands/docker/client.go. Add the
+      "regexp" import. Add a package-level precompiled regex
+      `sensitiveAssignmentRe = regexp.MustCompile(`(?i)(\w*(?:AUTH|PASSWORD)\w*\s*=\s*)(\S+)`)`
+      near the existing `lookPathFn` / `ErrNotFound` seams. Add a
+      package-private helper
+      `redactString(s string) string` that calls
+      `sensitiveAssignmentRe.ReplaceAllString(s, "${1}<redacted>")`.
+      Rewrite `redactArgs` to delegate per-element to `redactString`
+      while preserving the nil/empty short-circuit and the
+      non-mutation contract. At the existing call site (client.go:151)
+      change the `msg` argument from `msg` to `redactString(msg)`.
+      Update the comment block on `redactArgs` to note the
+      regex-driven, case-insensitive delegation. Add an inline
+      comment on `redactString` describing the regex shape and the
+      multi-match property used for stderr blobs.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Package-level `sensitiveAssignmentRe` regex exists with the exact RE2 pattern from REQ-F-001."
+      - "`redactString(s string) string` exists and is implemented via `sensitiveAssignmentRe.ReplaceAllString` with the `${1}<redacted>` replacement template."
+      - "`redactArgs` body delegates to `redactString` per element; nil input returns nil; empty input returns an empty slice; the input slice is not mutated."
+      - "`client.go:151` call site interpolates `redactString(msg)` in place of bare `msg`; argv echo branch (`strings.Join(redactArgs(args), \" \")`) shape is unchanged."
+      - "Argv passed to `exec.CommandContext` is unchanged — redaction is only applied to the user-facing error string."
+      - "Comment on `redactArgs` notes regex-driven delegation; comment on `redactString` documents the pattern shape and multi-match property."
+    completed_at: null
+
+  - id: task-002
+    title: "Add TestRedactString table tests; confirm TestRedactArgs unchanged"
+    description: |
+      Extend neo4j-cli/internal/subcommands/docker/client_test.go with
+      a new table-driven `TestRedactString` covering the Oplane
+      verification subset: single-line stderr with
+      `NEO4J_AUTH=neo4j/hunter2`; multi-line blob with two
+      `PASSWORD=` mentions on separate lines (both replaced via
+      `ReplaceAllString` walking all matches); Unicode value
+      (`NEO4J_AUTH=neo4j/密码1234`); mixed-case LHS with whitespace
+      around `=` (`Neo4j_Auth = secret xyz`); operational-error
+      string with no sensitive assignment (e.g. the daemon-down
+      sentence) — returned verbatim; empty string returns empty
+      string. Do NOT modify any existing `TestRedactArgs` case — the
+      regex-backed implementation must remain behaviour-compatible.
+      Do NOT add new test seams or a fake `exec.Cmd` — the existing
+      file is helper-level table tests and the call-site composition
+      is trivially correct by construction.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`TestRedactString` exists in `neo4j-cli/internal/subcommands/docker/client_test.go` as a table-driven test."
+      - "Cases cover: single-line AUTH, multi-line two-PASSWORD blob, Unicode value, mixed-case + spaces around `=`, no-match operational sentence (returned verbatim), empty string."
+      - "Each redacted case asserts both that the secret is gone AND that surrounding non-sensitive text is intact (no over-redaction)."
+      - "Existing `TestRedactArgs` table cases pass without modification."
+      - "Existing `TestClassifyInspectError`, `TestAltRuntimeHint_*`, and `TestResolve_DockerMissing_*` tests remain unchanged."
+      - "`go test ./neo4j-cli/internal/subcommands/docker/...` is green."
+
+    completed_at: null
+
+  - id: task-003
+    title: "Add changelog entry and run final gates"
+    description: |
+      Add a changie entry via
+      `changie new --projects neo4j-cli --kind Patch --body "docker: redact NEO4J_AUTH/PASSWORD values in error messages from docker stderr (CLI-162)"`,
+      or hand-author the YAML under
+      `.changes/unreleased/neo4j-cli-Patch-YYYYMMDD-HHMMSS.yaml`
+      per AGENTS.md Changie Notes when changie is not installed.
+      Then run the AGENTS.md final-gate suite: `make fmt-check`,
+      `make lint`, `make test`, `make generate-check`. The
+      generate-check should be a no-op (no flag-Long change); if
+      it flags drift, investigate before committing — the change
+      should not touch any cobra-tree help text.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "A new file exists under `.changes/unreleased/` with `kind: Patch`, `project: neo4j-cli`, and a body that references CLI-162 and names AUTH/PASSWORD redaction in docker stderr."
+      - "`make fmt-check` is clean."
+      - "`make lint` is clean."
+      - "`make test` is green."
+      - "`make generate-check` is clean (no skill-bundle drift)."
+    completed_at: null
