@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add --debug flag (and NEO4J_DEBUG=1 env var) on query commands to route Neo4j driver diagnostics to stderr, keeping --format json/toon stdout unaffected. Per-frame Bolt wire tracing (BoltLogger) is a deliberate follow-up pending credential redaction.
+time: 2026-05-19T20:19:54.594791+02:00

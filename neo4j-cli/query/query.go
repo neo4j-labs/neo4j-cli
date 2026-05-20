@@ -69,6 +69,8 @@ neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format jso
 	cmd.PersistentFlags().String("embed-base-url", "", "Embedding provider base URL [env: NEO4J_EMBED_BASE_URL]")
 	cmd.PersistentFlags().Int("embed-dimensions", 0, "Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS]")
 
+	cmd.PersistentFlags().Bool("debug", false, "Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	cmd.AddCommand(newSchemaCmd(cfg))

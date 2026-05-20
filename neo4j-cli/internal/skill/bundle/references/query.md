@@ -12,6 +12,7 @@ Flags:
 |------|------|---------|-------------|
 | `-c, --credential` | string | - | Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
+| `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
 | `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
 | `--embed-credential` | string | - | Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list') |
 | `--embed-dimensions` | int | 0 | Embedding output dimensions (provider-dependent; ignored by Ollama) [env: NEO4J_EMBED_DIMENSIONS] |
