@@ -120,6 +120,28 @@ func runWithOptsFormat(t *testing.T, current string, opts runOpts, format string
 	return out.String(), err
 }
 
+// runWithOptsSplit mirrors runWithOptsFormat but routes stdout and stderr to
+// SEPARATE buffers so callers can assert which stream carries which payload
+// (e.g. the --force pkg-mgr override warning must land on stderr only while
+// JSON / plain-text update output lands on stdout). Used by the
+// TestRunUpdate_Force_* tests below.
+func runWithOptsSplit(t *testing.T, current string, opts runOpts, format string) (stdout, stderr string, err error) {
+	t.Helper()
+	cfgJSON := `{"format":"` + format + `"}`
+	tfs, terr := testfs.GetTestFs(cfgJSON, "{}")
+	require.NoError(t, terr)
+	cfg := clicfg.NewConfig(tfs, current, clicfg.GlobalScope)
+
+	cmd := NewCmd(cfg, nil, "")
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+	cmd.SetOut(stdoutBuf)
+	cmd.SetErr(stderrBuf)
+
+	err = runUpdate(context.Background(), cmd, cfg, opts)
+	return stdoutBuf.String(), stderrBuf.String(), err
+}
+
 func TestRunUpdate_DevBuild_ShortCircuits(t *testing.T) {
 	// REQ-F-002 / acceptance criterion 1: dev build exits 0 with no HTTP call.
 	httpCalled := false
@@ -313,6 +335,129 @@ func TestRunUpdate_ForceBypassesPkgMgrCheck(t *testing.T) {
 	// for swap) but the Hint passthrough is bypassed.
 	assert.True(t, detectCalled)
 	assert.Contains(t, out, "Successfully updated from v0.1.0 to v0.2.0")
+}
+
+// TestRunUpdate_Force_NonBinaryMethod_WarnsOnStderr pins REQ-F-004: when
+// `update --force` overrides a detected package-manager-managed binary, the
+// channel-correct ForceOverrideWarning lands on stderr (header + path + revert
+// sentence + uninstall command + curl install line) while the success
+// narrative ("Successfully updated from ...") lands on stdout. Covers all four
+// non-binary InstallMethods.
+func TestRunUpdate_Force_NonBinaryMethod_WarnsOnStderr(t *testing.T) {
+	cases := []struct {
+		method        InstallMethod
+		path          string
+		wantLabel     string
+		wantUninstall string
+	}{
+		{
+			method:        InstallMethodHomebrew,
+			path:          "/opt/homebrew/bin/neo4j-cli",
+			wantLabel:     "Homebrew",
+			wantUninstall: "brew uninstall neo4j-cli",
+		},
+		{
+			method:        InstallMethodNpm,
+			path:          "/usr/lib/node_modules/@neo4j-labs/cli/bin/neo4j-cli",
+			wantLabel:     "npm/pnpm/yarn",
+			wantUninstall: "npm uninstall -g @neo4j-labs/cli",
+		},
+		{
+			method:        InstallMethodPipx,
+			path:          "/home/user/.local/pipx/venvs/neo4j-cli/bin/neo4j-cli",
+			wantLabel:     "pipx",
+			wantUninstall: "pipx uninstall neo4j-cli",
+		},
+		{
+			method:        InstallMethodUv,
+			path:          "/home/user/.local/share/uv/tools/neo4j-cli/bin/neo4j-cli",
+			wantLabel:     "uv tool",
+			wantUninstall: "uv tool uninstall neo4j-cli",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.method), func(t *testing.T) {
+			withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+				return &Release{TagName: "v0.2.0"}, nil
+			})
+			withDetect(t, func() (InstallMethod, string, error) {
+				return tc.method, tc.path, nil
+			})
+			withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+				return nil
+			})
+
+			stdout, stderr, err := runWithOptsSplit(t, "v0.1.0", runOpts{force: true}, "default")
+			require.NoError(t, err)
+
+			// Stderr carries the warning block.
+			assert.Contains(t, stderr, "Warning: --force overriding detected "+tc.wantLabel+" install at "+tc.path+".")
+			assert.Contains(t, stderr, "The package manager may revert this change on next upgrade.")
+			assert.Contains(t, stderr, tc.wantUninstall)
+			assert.Contains(t, stderr, "curl -sSfL https://neo4j.sh/install.sh | bash")
+
+			// Stdout carries the success line.
+			assert.Contains(t, stdout, "Successfully updated from v0.1.0 to v0.2.0")
+			// Success line must NOT bleed to stderr (it's progress-on-stderr
+			// for "Current version" / "Checking for updates" but the final
+			// "Successfully updated" line goes via cmd.Println → stdout).
+			assert.NotContains(t, stdout, "Warning: --force overriding detected",
+				"warning must not bleed onto stdout")
+		})
+	}
+}
+
+// TestRunUpdate_Force_BinaryMethod_NoWarning pins REQ-F-004's binary-channel
+// short-circuit: `update --force` on a self-managed binary must NOT emit the
+// warning header (there's nothing to override).
+func TestRunUpdate_Force_BinaryMethod_NoWarning(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodBinary, "/usr/local/bin/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+
+	stdout, stderrOut, err := runWithOptsSplit(t, "v0.1.0", runOpts{force: true}, "default")
+	require.NoError(t, err)
+	assert.NotContains(t, stderrOut, "--force overriding detected",
+		"binary-channel --force must not emit the pkg-mgr override warning")
+	assert.Contains(t, stdout, "Successfully updated from v0.1.0 to v0.2.0")
+}
+
+// TestRunUpdate_Force_JSONOutput_WarningOnStderrOnly pins REQ-F-004 for the
+// JSON-output branch: the warning is for humans and must land on stderr, while
+// stdout stays a clean parseable JSON document (no warning bleed). Scripts that
+// pipe `update --force --format json` to jq continue to work.
+func TestRunUpdate_Force_JSONOutput_WarningOnStderrOnly(t *testing.T) {
+	withLatest(t, func(ctx context.Context, preReleases bool) (*Release, error) {
+		return &Release{TagName: "v0.2.0"}, nil
+	})
+	withDetect(t, func() (InstallMethod, string, error) {
+		return InstallMethodHomebrew, "/opt/homebrew/bin/neo4j-cli", nil
+	})
+	withSwap(t, func(ctx context.Context, urls AssetURLs, currentBinaryPath string, stderr io.Writer) error {
+		return nil
+	})
+
+	stdout, stderrOut, err := runWithOptsSplit(t, "v0.1.0", runOpts{force: true}, "json")
+	require.NoError(t, err)
+
+	// stdout: valid JSON, install_method=homebrew, updated=true.
+	doc := parseJSONOutput(t, stdout)
+	assert.Equal(t, "homebrew", doc.InstallMethod)
+	assert.True(t, doc.Updated)
+	assert.NotContains(t, stdout, "Warning:", "warning text must not bleed into JSON stdout")
+	assert.NotContains(t, stdout, "--force overriding detected")
+
+	// stderr: full warning block.
+	assert.Contains(t, stderrOut, "Warning: --force overriding detected Homebrew install at /opt/homebrew/bin/neo4j-cli.")
+	assert.Contains(t, stderrOut, "The package manager may revert this change on next upgrade.")
+	assert.Contains(t, stderrOut, "brew uninstall neo4j-cli")
+	assert.Contains(t, stderrOut, "curl -sSfL https://neo4j.sh/install.sh | bash")
 }
 
 func TestRunUpdate_HappyPath_BinaryChannel(t *testing.T) {
