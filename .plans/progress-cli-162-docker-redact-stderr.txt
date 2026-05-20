@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-20T07:35:00Z
 Added sensitiveAssignmentRe regex + redactString helper in docker/client.go; refactored redactArgs to delegate per-element; applied redactString to stderr msg at the run() error wrap site. Existing TestRedactArgs cases pass unchanged.
 Files: ~neo4j-cli/internal/subcommands/docker/client.go
+
+## task-002 — 2026-05-20T07:50:00Z
+Added table-driven TestRedactString covering single-line AUTH, multi-line two-PASSWORD blob, Unicode value, mixed-case+spaces LHS, operational-sentence verbatim, and empty-string cases. Existing TestRedactArgs / TestClassifyInspectError / TestAltRuntimeHint_* / TestResolve_DockerMissing_* untouched.
+Files: ~neo4j-cli/internal/subcommands/docker/client_test.go

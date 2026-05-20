@@ -51,7 +51,7 @@ tasks:
       Do NOT add new test seams or a fake `exec.Cmd` — the existing
       file is helper-level table tests and the call-site composition
       is trivially correct by construction.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -62,7 +62,7 @@ tasks:
       - "Existing `TestClassifyInspectError`, `TestAltRuntimeHint_*`, and `TestResolve_DockerMissing_*` tests remain unchanged."
       - "`go test ./neo4j-cli/internal/subcommands/docker/...` is green."
 
-    completed_at: null
+    completed_at: 2026-05-20T07:50:00Z
 
   - id: task-003
     title: "Add changelog entry and run final gates"
