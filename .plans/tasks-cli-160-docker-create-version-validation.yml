@@ -1,0 +1,135 @@
+feature: cli-160-docker-create-version-validation
+prd: ./prd-cli-160-docker-create-version-validation.md
+created_at: 2026-05-20T06:50:35Z
+updated_at: 2026-05-20T06:50:35Z
+
+tasks:
+  - id: task-001
+    title: "Add validateVersion helper + versionPattern regex to create.go"
+    description: |
+      In neo4j-cli/internal/subcommands/docker/create.go add a package-level
+      precompiled regex `versionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*(-enterprise)?$|^latest$`)`
+      near the other package-level seams (homeDirFn, clientFactory,
+      randSource, listenerFactory, waitForBoltFn). Add a private helper
+      `validateVersion(version string) (string, error)` near the other
+      resolve*/expand* helpers at the bottom of the file. The helper
+      TrimSpaces the input, regex-matches the trimmed value, returns a
+      clierr.NewUsageError on miss (naming the expected format and the
+      ORIGINAL untrimmed input), and TrimSuffixes any trailing
+      `-enterprise` on hit so the edition-driven suffix at create.go:265
+      never double-appends. Add `regexp` to the import block.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "versionPattern is a package-level var declared once via regexp.MustCompile"
+      - "validateVersion lives in create.go (not a new file) and is package-private"
+      - "On regex miss, returns a *clierr.CLIError from clierr.NewUsageError"
+      - "Error message names the expected format AND the original (untrimmed) bad input"
+      - "On hit, return value has whitespace trimmed AND any trailing `-enterprise` stripped"
+      - "`regexp` import added; no other imports change"
+    completed_at: null
+
+  - id: task-002
+    title: "Wire validateVersion into create RunE before pre-flights"
+    description: |
+      In the create cobra RunE in neo4j-cli/internal/subcommands/docker/create.go,
+      call validateVersion immediately after the --edition enum guard
+      (around create.go:171) and BEFORE the --env-out-file / --ephemeral /
+      volume / port / name pre-flights. Assign the returned canonical
+      value back into the outer `version` variable so the existing
+      image-construction block (create.go:260-267), LabelVersion label
+      (create.go:309), and output row (create.go:378) all consume the
+      trimmed/stripped form. Do NOT touch any other lines.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "validateVersion is called inside RunE after the --edition check and before any other pre-flight"
+      - "Outer `version` variable is reassigned from validateVersion's return"
+      - "No changes to the image-construction block, label append block, or output row"
+      - "On validation failure RunE returns the error before any docker side effect"
+      - "`go build ./...` is clean"
+    completed_at: null
+
+  - id: task-003
+    title: "Add TestCreate_VersionValidation table-driven test"
+    description: |
+      Append a new table-driven function TestCreate_VersionValidation to
+      neo4j-cli/internal/subcommands/docker/create_test.go using the
+      existing runCreate helper. Cover both reject and accept paths in a
+      single table. Reject cases assert that err != nil, the error
+      message contains "--version" and the bad input, and
+      fake.RunCalls is empty (mirrors TestCreate_InvalidEdition_ReturnsUsageError
+      at create_test.go:341). Accept cases assert err == nil and the
+      last token of fake.RunCalls[0].Args is the expected image string.
+
+      Reject cases:
+        - `evilregistry.com/neo4j:latest`
+        - `4.4:malicious`
+        - `4.4@sha256:deadbeef`
+        - `evil.com/neo4j@sha256:deadbeef`
+        - `5.1.2$enterprise`
+        - empty string `""`
+        - `5..20`
+        - `5.20-community`
+
+      Accept cases (verify image string AND that the label payload uses
+      the canonical version):
+        - `latest` + `--edition enterprise` → image `neo4j:enterprise`
+        - `5` + `--edition community` → image `neo4j:5`
+        - `5.1.2` + `--edition community` → image `neo4j:5.1.2`
+        - `5.20-enterprise` + `--edition enterprise` → image `neo4j:5.20-enterprise` (NOT `neo4j:5.20-enterprise-enterprise`)
+        - `5.20-enterprise` + `--edition community` → image `neo4j:5.20`
+        - `2026.04` + `--edition community` → image `neo4j:2026.04`
+        - `  5.1.2  ` + `--edition community` → image `neo4j:5.1.2` and label `org.neo4j.cli.version=5.1.2`
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Function TestCreate_VersionValidation exists in create_test.go and is table-driven"
+      - "All eight reject cases assert err != nil, fake.RunCalls is empty, and the error names --version"
+      - "All seven accept cases assert err == nil and the docker run argv ends with the expected image"
+      - "The `  5.1.2  ` accept case asserts the LabelVersion argv contains `=5.1.2` (canonical, no whitespace)"
+      - "The two `5.20-enterprise` accept cases confirm no double `-enterprise-enterprise` suffix"
+      - "Test passes under `go test ./neo4j-cli/internal/subcommands/docker/...`"
+    completed_at: null
+
+  - id: task-004
+    title: "Add Patch changelog entry for CLI-160"
+    description: |
+      Run `changie new --projects neo4j-cli --kind Patch --body "docker create: validate --version against allowlist (CLI-160)"`.
+      If changie is not installed locally, hand-author a YAML file under
+      `.changes/unreleased/` named
+      `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` per the AGENTS.md
+      Changie Notes (single-quoted body, RFC3339 time, project field
+      set to `neo4j-cli`). Do NOT alter `.changes/neo4j-cli/v*.md`
+      release files.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "A new YAML file exists under .changes/unreleased/ matching neo4j-cli-Patch-<date>-<time>.yaml"
+      - "Body references CLI-160 and the validate-allowlist behaviour"
+      - "kind is Patch and project is neo4j-cli"
+      - "No edits under .changes/neo4j-cli/"
+    completed_at: null
+
+  - id: task-005
+    title: "Run final gates: fmt-check, lint, test, generate-check"
+    description: |
+      Run the AGENTS.md final-gate quartet against the branch. All four
+      must be clean: `make fmt-check` (no gofmt drift), `make lint`
+      (golangci-lint v2), `make test` (entire suite including the new
+      TestCreate_VersionValidation), and `make generate-check` (no
+      skill bundle drift — the --version flag Long is unchanged, so
+      drift here would mean an unintended widening of scope).
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`make fmt-check` exits 0 with no output"
+      - "`make lint` exits 0 with no findings"
+      - "`make test` exits 0 with all tests passing including TestCreate_VersionValidation"
+      - "`make generate-check` exits 0 — no edits under neo4j-cli/internal/skill/bundle/"
+      - "Manual smoke: `./bin/neo4j-cli docker create --name dev --version 'evil.com/neo4j' --rw` exits 2 with usage error naming the bad input; no docker side effect"
+    completed_at: null
