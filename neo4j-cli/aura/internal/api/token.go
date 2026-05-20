@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -73,6 +74,8 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
 	}
 
-	cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn)
+	if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to persist access token to keyring: %v\n", saveErr)
+	}
 	return grant.AccessToken, err
 }

@@ -228,6 +228,32 @@ func TestSave_InsecureMode_WritesAllFields(t *testing.T) {
 	assert.Contains(t, string(data), "s3cr3t", "insecure mode must write sensitive field to JSON")
 }
 
+// TestSave_KeyringMode_KeyringSetError_ReturnsError verifies that a keyring.Set
+// failure surfaces as an error from the mutating method (e.g. Add) rather than
+// crashing the process with a panic.
+func TestSave_KeyringMode_KeyringSetError_ReturnsError(t *testing.T) {
+	// failAfter: 0 → every Set call fails immediately.
+	alwaysFail := &failAfterNProvider{inner: newMockKeyringProvider(), failAfter: 0}
+	credentials.SetKeyringProviderForTest(t, alwaysFail)
+
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[]}}`)
+	require.NoError(t, err)
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	// SetStorageMode loads from keyring (Get only, no Set); zero credentials → no
+	// keyring reads, so the failing Set provider doesn't matter here.
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+
+	before := readCredentialsJSON(t, fs)
+
+	addErr := creds.Dbms.Add("local", "neo4j", "p4ss", "neo4j", "bolt://localhost:7687")
+	require.Error(t, addErr, "keyring.Set failure must propagate as an error, not a panic")
+	assert.Contains(t, addErr.Error(), "keyring set")
+
+	// credentials.json must remain unchanged (no partial scrub)
+	after := readCredentialsJSON(t, fs)
+	assert.Equal(t, string(before), string(after), "credentials.json must not be modified when keyring write fails")
+}
+
 // TestKeyringMode_LoadReload verifies that credentials saved in keyring mode
 // are correctly loaded in a new Credentials instance using the same mock.
 func TestKeyringMode_LoadReload(t *testing.T) {
@@ -447,6 +473,29 @@ func (f *failAfterNProvider) Set(service, user, password string) error {
 }
 
 func (f *failAfterNProvider) Delete(service, user string) error {
+	return f.inner.Delete(service, user)
+}
+
+// failDeleteForKeyProvider wraps a mock provider and returns errProviderFail
+// when Delete is called for a specific keyring user key, delegating all other
+// calls to the inner mock.
+type failDeleteForKeyProvider struct {
+	inner   *mockKeyringProvider
+	failKey string
+}
+
+func (f *failDeleteForKeyProvider) Get(service, user string) (string, error) {
+	return f.inner.Get(service, user)
+}
+
+func (f *failDeleteForKeyProvider) Set(service, user, password string) error {
+	return f.inner.Set(service, user, password)
+}
+
+func (f *failDeleteForKeyProvider) Delete(service, user string) error {
+	if user == f.failKey {
+		return errProviderFail
+	}
 	return f.inner.Delete(service, user)
 }
 
@@ -762,6 +811,33 @@ func TestDeleteKeyringEntries(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDeleteKeyringEntries_AuraPartialFailure verifies that when client-secret
+// deletion fails with a non-ErrNotFound error, access-token deletion is still
+// attempted (rather than returning early). This ensures orphaned keyring entries
+// are minimised even under partial failures.
+func TestDeleteKeyringEntries_AuraPartialFailure(t *testing.T) {
+	inner := newMockKeyringProvider()
+	accessTokenKey := credentials.KeyringKey("aura", "prod", "access-token")
+	require.NoError(t, inner.Set(credentials.ServiceName, accessTokenKey, "tok"))
+
+	failing := &failDeleteForKeyProvider{
+		inner:   inner,
+		failKey: credentials.KeyringKey("aura", "prod", "client-secret"),
+	}
+	credentials.SetKeyringProviderForTest(t, failing)
+
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"tok","token-expiry":0}]}}`)
+	require.NoError(t, err)
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+
+	deleteErr := creds.DeleteKeyringEntries("aura", "prod")
+	require.Error(t, deleteErr, "client-secret deletion failure must be reported")
+
+	// access-token must have been deleted despite the client-secret failure
+	_, getErr := inner.Get(credentials.ServiceName, accessTokenKey)
+	assert.ErrorIs(t, getErr, credentials.ErrNotFound, "access-token must be deleted even when client-secret deletion fails")
 }
 
 // errorOnGetProvider is a KeyringProvider that fails with a specific non-ErrNotFound

@@ -12,7 +12,7 @@ import (
 type DbmsCredentials struct {
 	DefaultCredential string            `json:"default-credential"`
 	Credentials       []*DbmsCredential `json:"credentials"`
-	onUpdate          func()
+	onUpdate          func() error
 }
 
 func (c *DbmsCredentials) Printable() PrintableDbmsCredentials {
@@ -37,10 +37,9 @@ func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string
 		URI:          uri,
 	})
 	if len(c.Credentials) == 1 {
-		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
+		c.SetDefault(name) //nolint:errcheck // not-found error impossible here; any keyring error surfaces in the c.onUpdate() call below
 	}
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *DbmsCredentials) Remove(name string) error {
@@ -62,8 +61,7 @@ func (c *DbmsCredentials) Remove(name string) error {
 	}
 
 	c.Credentials = append(c.Credentials[:indexToRemove], c.Credentials[indexToRemove+1:]...)
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 // SetEmbed links a named dbms credential to an embed credential. Passing an
@@ -73,8 +71,7 @@ func (c *DbmsCredentials) SetEmbed(dbmsName, embedName string) error {
 	for _, credential := range c.Credentials {
 		if credential.Name == dbmsName {
 			credential.EmbedCredential = embedName
-			c.onUpdate()
-			return nil
+			return c.onUpdate()
 		}
 	}
 	return clierr.NewUsageError("could not find credential with name %s", dbmsName)
@@ -86,8 +83,7 @@ func (c *DbmsCredentials) SetDefault(name string) error {
 	}
 
 	c.DefaultCredential = name
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *DbmsCredentials) GetDefault() (*DbmsCredential, error) {

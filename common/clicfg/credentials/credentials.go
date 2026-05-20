@@ -118,7 +118,7 @@ func (c *Credentials) load() error {
 			// Reset to empty credentials regardless of backup outcome so
 			// the next invocation does not re-trip the same parse error.
 			c.resetToEmpty()
-			c.save()
+			_ = c.save() //nolint:errcheck // storageMode is insecure during load(); keyring path never reached
 			if backupErr != nil {
 				return clierr.NewFatalError("credentials file %s is corrupt and could not be parsed (%v); additionally failed to back it up: %v. The file has been reset to empty credentials.", c.filePath, err, backupErr)
 			}
@@ -145,7 +145,7 @@ func (c *Credentials) load() error {
 	c.Embed.onUpdate = c.save
 
 	if !fileHasData {
-		c.save()
+		_ = c.save() //nolint:errcheck // storageMode is insecure during load(); keyring path never reached
 	}
 	return nil
 }
@@ -176,10 +176,9 @@ func (c *Credentials) backupCorruptFile(data []byte) (string, error) {
 	return backupPath, nil
 }
 
-func (c *Credentials) save() {
+func (c *Credentials) save() error {
 	if c.storageMode == StorageModeKeyring {
-		c.saveWithKeyring()
-		return
+		return c.saveWithKeyring()
 	}
 
 	data, err := json.Marshal(CredentialsFile{
@@ -192,36 +191,39 @@ func (c *Credentials) save() {
 	}
 
 	fileutils.WriteFile(c.fs, c.filePath, data)
+	return nil
 }
 
 // saveWithKeyring writes sensitive fields to the OS keyring and zeroes them
 // in the JSON file. In-memory values remain populated so the current process
-// can continue using them.
-func (c *Credentials) saveWithKeyring() {
+// can continue using them. Returns an error if a keyring.Set call fails (e.g.
+// the OS keyring daemon is unavailable); file I/O and JSON marshal errors
+// still panic, consistent with the insecure-mode save() path.
+func (c *Credentials) saveWithKeyring() error {
 	// Write sensitive fields to keyring before zeroing them in the JSON snapshot.
 	for _, cred := range c.Aura.Credentials {
 		if cred.ClientSecret != "" {
 			if err := defaultKeyring.Set(ServiceName, KeyringKey("aura", cred.Name, "client-secret"), cred.ClientSecret); err != nil {
-				panic(fmt.Errorf("keyring set aura/%s/client-secret: %w", cred.Name, err))
+				return fmt.Errorf("keyring set aura/%s/client-secret: %w", cred.Name, err)
 			}
 		}
 		if cred.AccessToken != "" {
 			if err := defaultKeyring.Set(ServiceName, KeyringKey("aura", cred.Name, "access-token"), cred.AccessToken); err != nil {
-				panic(fmt.Errorf("keyring set aura/%s/access-token: %w", cred.Name, err))
+				return fmt.Errorf("keyring set aura/%s/access-token: %w", cred.Name, err)
 			}
 		}
 	}
 	for _, cred := range c.Dbms.Credentials {
 		if cred.Password != "" {
 			if err := defaultKeyring.Set(ServiceName, KeyringKey("dbms", cred.Name, "password"), cred.Password); err != nil {
-				panic(fmt.Errorf("keyring set dbms/%s/password: %w", cred.Name, err))
+				return fmt.Errorf("keyring set dbms/%s/password: %w", cred.Name, err)
 			}
 		}
 	}
 	for _, cred := range c.Embed.Credentials {
 		if cred.APIKey != "" {
 			if err := defaultKeyring.Set(ServiceName, KeyringKey("embed", cred.Name, "api-key"), cred.APIKey); err != nil {
-				panic(fmt.Errorf("keyring set embed/%s/api-key: %w", cred.Name, err))
+				return fmt.Errorf("keyring set embed/%s/api-key: %w", cred.Name, err)
 			}
 		}
 	}
@@ -267,6 +269,7 @@ func (c *Credentials) saveWithKeyring() {
 		panic(err)
 	}
 	fileutils.WriteFile(c.fs, c.filePath, data)
+	return nil
 }
 
 // MigrateToKeyring moves all sensitive credential fields from in-memory (and
@@ -369,7 +372,9 @@ func (c *Credentials) MigrateToKeyring() error {
 	for _, cred := range c.Embed.Credentials {
 		cred.APIKey = ""
 	}
-	c.save()
+	if err := c.save(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -479,7 +484,7 @@ func (c *Credentials) MigrateToInsecure() error {
 	// saveWithKeyring() again.
 	prevMode := c.storageMode
 	c.storageMode = StorageModeInsecure
-	c.save()
+	_ = c.save() //nolint:errcheck // temporarily insecure; keyring path never reached
 	c.storageMode = prevMode
 
 	// Phase 3: delete keyring entries for all fields we successfully read
@@ -514,10 +519,14 @@ func (c *Credentials) DeleteKeyringEntries(credType, name string) error {
 
 	switch credType {
 	case "aura":
+		var errs []error
 		if err := deleteOne("client-secret"); err != nil {
-			return err
+			errs = append(errs, err)
 		}
-		return deleteOne("access-token")
+		if err := deleteOne("access-token"); err != nil {
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
 	case "dbms":
 		return deleteOne("password")
 	case "embed":

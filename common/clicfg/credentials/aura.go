@@ -13,7 +13,7 @@ import (
 type AuraCredentials struct {
 	DefaultCredential string            `json:"default-credential"`
 	Credentials       []*AuraCredential `json:"credentials"`
-	onUpdate          func()
+	onUpdate          func() error
 }
 
 func (c *AuraCredentials) Printable() PrintableAuraCredentials {
@@ -33,10 +33,9 @@ func (c *AuraCredentials) Add(name string, clientId string, clientSecret string)
 
 	c.Credentials = append(c.Credentials, &AuraCredential{Name: name, ClientId: clientId, ClientSecret: clientSecret})
 	if len(c.Credentials) == 1 {
-		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
+		c.SetDefault(name) //nolint:errcheck // not-found error impossible here; any keyring error surfaces in the c.onUpdate() call below
 	}
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) Remove(name string) error {
@@ -58,8 +57,7 @@ func (c *AuraCredentials) Remove(name string) error {
 	}
 
 	c.Credentials = append(c.Credentials[:indexToRemove], c.Credentials[indexToRemove+1:]...)
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) SetDefault(name string) error {
@@ -68,8 +66,7 @@ func (c *AuraCredentials) SetDefault(name string) error {
 	}
 
 	c.DefaultCredential = name
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) GetDefault() (*AuraCredential, error) {
@@ -88,7 +85,7 @@ func (c *AuraCredentials) Get(name string) (*AuraCredential, error) {
 	return nil, clierr.NewUsageError("could not find credential with name %s", name)
 }
 
-func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken string, expiresInSeconds int64) *AuraCredential {
+func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken string, expiresInSeconds int64) (*AuraCredential, error) {
 	credential, err := c.Get(cred.Name)
 	if err != nil {
 		panic(err)
@@ -99,8 +96,7 @@ func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken st
 
 	credential.TokenExpiry = now + (expiresInSeconds-expireToleranceSeconds)*1000
 	credential.AccessToken = accessToken
-	c.onUpdate()
-	return credential
+	return credential, c.onUpdate()
 }
 
 func (c *AuraCredentials) ClearAccessToken(cred *AuraCredential) (*AuraCredential, error) {
@@ -111,7 +107,9 @@ func (c *AuraCredentials) ClearAccessToken(cred *AuraCredential) (*AuraCredentia
 
 	credential.TokenExpiry = 0
 	credential.AccessToken = ""
-	c.onUpdate()
+	if err := c.onUpdate(); err != nil {
+		return nil, err
+	}
 	return credential, nil
 }
 
