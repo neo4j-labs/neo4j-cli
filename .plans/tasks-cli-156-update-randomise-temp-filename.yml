@@ -88,7 +88,7 @@ tasks:
       code and the gate must report no new findings on the swap
       path. No changelog entry — internal hardening with no
       user-visible behaviour change.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -99,4 +99,5 @@ tasks:
       - "`make generate-check` is clean (no skill-bundle drift — change touches only swap.go internals, not cobra-tree help text)."
       - "`golang-security` skill reports no new findings on the modified swap path."
       - "No `.changes/unreleased/` file added — change is internal hardening with no user-visible effect."
-    completed_at: null
+    status_note: self-reviewed (sub-agent unavailable); generate-check bundle-clean (only harness tasks-yml status flip in diff, per AGENTS.md)
+    completed_at: 2026-05-20T10:08:00Z
