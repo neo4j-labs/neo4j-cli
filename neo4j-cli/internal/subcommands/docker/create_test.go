@@ -1636,6 +1636,7 @@ func TestCreate_VersionValidation(t *testing.T) {
 		})
 	}
 }
+
 // TestCreate_NoPrintPassword_OmitsPasswordFromOutput — CLI-161. When the
 // flag is set, every output format (JSON, default table, TOON) must omit
 // the `password` field from rendered stdout. The generated password still
