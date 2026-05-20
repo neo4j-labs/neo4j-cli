@@ -98,7 +98,8 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 			"to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager " +
 			"prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the " +
 			"channel-correct upgrade command instead — pass `--force` to override. " +
-			"After a successful swap, any installed agent skill bundles are refreshed automatically.",
+			"After a successful swap, any installed agent skill bundles are refreshed automatically. " +
+			"See SECURITY.md in the repo for the supply-chain trust root and accepted residual risks.",
 		Example: `# Self-update to the latest stable release
 neo4j-cli update
 

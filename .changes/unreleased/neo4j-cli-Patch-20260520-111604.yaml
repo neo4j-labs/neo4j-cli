@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: 'docs: add SECURITY.md documenting update trust root (CLI-158)'
+time: 2026-05-20T11:16:04.831067+02:00
