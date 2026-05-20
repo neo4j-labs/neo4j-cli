@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"time"
 
@@ -524,6 +525,51 @@ func (c *Credentials) DeleteKeyringEntries(credType, name string) error {
 	default:
 		return fmt.Errorf("unknown credential type %q", credType)
 	}
+}
+
+// RemoveAura removes an Aura credential by name and, in keyring mode, deletes
+// its keyring entries. Keyring cleanup failures are written as warnings to
+// warnW and do not fail the removal.
+func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
+	if err := c.Aura.Remove(name); err != nil {
+		return err
+	}
+	if c.storageMode == StorageModeKeyring {
+		if err := c.DeleteKeyringEntries("aura", name); err != nil {
+			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
+		}
+	}
+	return nil
+}
+
+// RemoveDbms removes a Dbms credential by name and, in keyring mode, deletes
+// its keyring entries. Keyring cleanup failures are written as warnings to
+// warnW and do not fail the removal.
+func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
+	if err := c.Dbms.Remove(name); err != nil {
+		return err
+	}
+	if c.storageMode == StorageModeKeyring {
+		if err := c.DeleteKeyringEntries("dbms", name); err != nil {
+			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
+		}
+	}
+	return nil
+}
+
+// RemoveEmbed removes an Embed credential by name and, in keyring mode, deletes
+// its keyring entries. Keyring cleanup failures are written as warnings to
+// warnW and do not fail the removal.
+func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
+	if err := c.Embed.Remove(name); err != nil {
+		return err
+	}
+	if c.storageMode == StorageModeKeyring {
+		if err := c.DeleteKeyringEntries("embed", name); err != nil {
+			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
+		}
+	}
+	return nil
 }
 
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the

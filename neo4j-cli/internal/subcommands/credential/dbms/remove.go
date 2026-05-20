@@ -4,10 +4,7 @@
 package dbms
 
 import (
-	"fmt"
-
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/spf13/cobra"
 )
 
@@ -28,15 +25,7 @@ neo4j-cli credential dbms remove prod --rw`,
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			if err := cfg.Credentials.Dbms.Remove(name); err != nil {
-				return err
-			}
-			if cfg.Credentials.StorageMode() == credentials.StorageModeKeyring {
-				if err := cfg.Credentials.DeleteKeyringEntries("dbms", name); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err) //nolint:errcheck // warning write to stderr; original removal already succeeded
-				}
-			}
-			return nil
+			return cfg.Credentials.RemoveDbms(name, cmd.ErrOrStderr())
 		},
 	}
 }
