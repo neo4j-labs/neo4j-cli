@@ -1570,3 +1570,68 @@ func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) 
 	assert.True(t, os.IsNotExist(statErr) || statErr != nil,
 		"final env-file path must not exist after a rename failure; got stat err %v", statErr)
 }
+
+// TestCreate_VersionValidation pins the --version allowlist (REQ-F-001..005).
+// Reject cases assert the value is refused with a usage error naming --version
+// AND the original bad input, and no docker run is recorded. Accept cases
+// assert the canonical (trimmed, -enterprise-stripped) value is what flows
+// into both the image tag (last argv token) and the LabelVersion label —
+// mirrors the TestCreate_InvalidEdition_ReturnsUsageError shape.
+func TestCreate_VersionValidation(t *testing.T) {
+	rejects := []struct {
+		name    string
+		version string
+	}{
+		{"registry prefix", "evilregistry.com/neo4j:latest"},
+		{"trailing tag colon", "4.4:malicious"},
+		{"digest suffix", "4.4@sha256:deadbeef"},
+		{"registry plus digest", "evil.com/neo4j@sha256:deadbeef"},
+		{"shell metachar", "5.1.2$enterprise"},
+		{"empty string", ""},
+		{"double dot", "5..20"},
+		{"non-enterprise suffix", "5.20-community"},
+	}
+
+	for _, tc := range rejects {
+		t.Run("reject/"+tc.name, func(t *testing.T) {
+			args := fmt.Sprintf("--name dev --version %s --no-store-credential", shlexQuote(tc.version))
+			fake, _, _, err := runCreate(t, args)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--version",
+				"error must name the offending flag; got %q", err.Error())
+			assert.Contains(t, err.Error(), tc.version,
+				"error must echo the original bad input %q; got %q", tc.version, err.Error())
+			assert.Empty(t, fake.RunCalls,
+				"docker run must not be invoked on invalid --version: %v", fake.RunCalls)
+		})
+	}
+
+	accepts := []struct {
+		name        string
+		version     string
+		edition     string
+		wantImage   string
+		wantVersion string
+	}{
+		{"latest + enterprise → bare enterprise tag", "latest", "enterprise", "neo4j:enterprise", "latest"},
+		{"single digit + community", "5", "community", "neo4j:5", "5"},
+		{"dotted + community", "5.1.2", "community", "neo4j:5.1.2", "5.1.2"},
+		{"suffixed + enterprise no double", "5.20-enterprise", "enterprise", "neo4j:5.20-enterprise", "5.20"},
+		{"suffixed + community strips suffix", "5.20-enterprise", "community", "neo4j:5.20", "5.20"},
+		{"calver + community", "2026.04", "community", "neo4j:2026.04", "2026.04"},
+		{"whitespace trimmed + community", "  5.1.2  ", "community", "neo4j:5.1.2", "5.1.2"},
+	}
+
+	for _, tc := range accepts {
+		t.Run("accept/"+tc.name, func(t *testing.T) {
+			args := fmt.Sprintf("--name dev --version %s --edition %s --no-store-credential", shlexQuote(tc.version), tc.edition)
+			fake, _, _, err := runCreate(t, args)
+			require.NoError(t, err)
+			argv := runArgv(t, fake)
+			assert.Equal(t, tc.wantImage, argv[len(argv)-1],
+				"image tag (last argv token) must be canonical; got argv=%v", argv)
+			assert.True(t, containsPair(argv, "--label", LabelVersion+"="+tc.wantVersion),
+				"LabelVersion must carry canonical version %q; argv=%v", tc.wantVersion, argv)
+		})
+	}
+}
