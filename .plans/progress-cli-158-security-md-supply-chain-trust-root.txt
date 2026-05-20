@@ -13,3 +13,7 @@ Files: ~neo4j-cli/internal/subcommands/update/update.go, ~neo4j-cli/internal/ski
 ## TASK-004 — 2026-05-20T11:16:30Z
 Generated Patch changelog entry via `changie new --projects neo4j-cli --kind Patch` referencing CLI-158 SECURITY.md docs addition. fmt-check + test gates clean.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260520-111604.yaml
+
+## TASK-005 — 2026-05-20T11:30:00Z
+All AGENTS.md final gates clean; SECURITY.md surfaces in `update --help`.
+Files: ~tasks-cli-158-...yml, ~progress-cli-158-...txt

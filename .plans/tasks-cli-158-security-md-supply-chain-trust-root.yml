@@ -122,7 +122,7 @@ tasks:
       `./bin/neo4j-cli update --help | grep -i security` prints the new
       sentence; `wc -l SECURITY.md` is under 120; `grep -c SECURITY.md README.md`
       returns ≥ 1.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -135,4 +135,4 @@ tasks:
       - "`make generate-check` exits 0 — no further bundle drift after task-003"
       - "`make license-check` exits 0"
       - "Manual: `./bin/neo4j-cli update --help` mentions SECURITY.md in the Long text"
-    completed_at: null
+    completed_at: 2026-05-20T11:30:00Z
