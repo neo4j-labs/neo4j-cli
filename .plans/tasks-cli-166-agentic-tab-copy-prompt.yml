@@ -48,7 +48,7 @@ tasks:
       browser (Chrome + Safari) because clipboard API behaviour
       differs. Record any discrepancy and re-iterate task-001 if a
       paste does not match.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -58,7 +58,7 @@ tasks:
       - "CLI mode steps 1-6 each paste the `data-copy` CLI command byte-identically to pre-fix behaviour."
       - "At least one `.copy-mini` button verified in each mode and still works (regression check)."
       - "Verified in both Chrome and Safari (clipboard API behaviour differs)."
-    completed_at: null
+    completed_at: 2026-05-21T06:50:00Z
 
   - id: task-003
     title: "Commit and push gh-pages, then remove the worktree"
