@@ -46,6 +46,10 @@ import (
 func setupDarwinHome(t *testing.T) (homeDir string, env []string) {
 	t.Helper()
 
+	if os.Getenv("CI") != "true" {
+		t.Skip("macOS Keychain e2e tests only run in CI (CI=true) to avoid writing to the local Keychain")
+	}
+
 	home := t.TempDir()
 
 	// Create the neo4j-cli config directory.
@@ -283,6 +287,10 @@ func TestKeyring_Darwin_RemoveCleansKeyring(t *testing.T) {
 // cleanup.
 func withLockedKeychain(t *testing.T) {
 	t.Helper()
+
+	if os.Getenv("CI") != "true" {
+		t.Skip("macOS Keychain e2e tests only run in CI (CI=true) to avoid modifying the local Keychain")
+	}
 
 	// Record the current default keychain so we can restore it afterwards.
 	origOut, err := exec.Command("/usr/bin/security", "default-keychain").Output()
