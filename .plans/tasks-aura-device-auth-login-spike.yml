@@ -90,7 +90,7 @@ tasks:
       expired_token error, access_denied error, context timeout, and each missing
       env var. Use the testutils helpers from neo4j-cli/aura/internal/test/testutils/
       where applicable.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -101,7 +101,7 @@ tasks:
       - "expired_token and access_denied: command returns non-nil error with descriptive message"
       - "Missing env var: each of the four vars tested individually; error names the missing var"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-05-21T04:00:00Z"
 
   - id: task-006
     title: "Regenerate skill bundle and run all final gates"

@@ -15,3 +15,7 @@ Decisions: `httpClient` as a package-level var (not injected) matches the `execC
 Added `pollForToken()` with RFC 8628 error handling: `authorization_pending` (continue), `slow_down` (+5s interval), `expired_token`/`access_denied` (clierr.UsageError), context timeout (pre/post-sleep guards + httpClient.Do check). Added `sleepFn` package-level var as test seam. `RunE` now calls `pollForToken` and prints `access_token` to stdout.
 Files: ~neo4j-cli/aura/internal/subcommands/login/login.go
 Decisions: `resp.Body.Close()` called inline (not deferred) inside the poll loop to avoid accumulating unclosed bodies across iterations.
+
+## TASK-005 — 2026-05-21T04:00:00Z
+Expanded `login_test.go` with full-flow httptest.NewServer-based tests covering: happy path (with and without `verification_uri_complete`), `authorization_pending`→success (N pending then success), `slow_down` interval recording, `expired_token`/`access_denied` error cases, context timeout via `ExecuteContext`, device endpoint 500 error, and all four missing-env-var cases. Uses `httpClient` and `sleepFn` package-level test seams; `writeJSON` helper centralises nolint annotation.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login_test.go
