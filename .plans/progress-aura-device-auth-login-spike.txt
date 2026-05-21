@@ -35,3 +35,7 @@ Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/inte
 ## TASK-009 — 2026-05-21T08:00:00Z
 Added empty-`ClientSecret` guard in `getToken` before the client-credentials HTTP call; surfaces a `clierr.AuthError` with a re-login hint instead of a cryptic 401. Updated `NewAuraTestHelper` fixture to include non-empty `client-id`/`client-secret`, fixing downstream test assertions in `get_test.go`.
 Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go, ~neo4j-cli/aura/internal/subcommands/instance/get_test.go
+
+## TASK-010 — 2026-05-21T09:00:00Z
+Ran `go generate ./neo4j-cli/internal/skill/...`; bundle was already up to date (regenerated in task-008). Verified all final CI gates pass: make test, make fmt-check, make lint (0 issues), make license-check.
+Files: ~.plans/tasks-aura-device-auth-login-spike.yml

@@ -188,7 +188,7 @@ tasks:
       Regenerate the skill bundle with go generate ./neo4j-cli/internal/skill/... after
       the login command output changed (no longer prints a token; confirmation message
       updated). Run all CI gates to confirm the integration is clean.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -198,4 +198,4 @@ tasks:
       - "make fmt-check passes"
       - "make lint passes"
       - "make license-check passes"
-    completed_at: null
+    completed_at: "2026-05-21T09:00:00Z"
