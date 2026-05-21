@@ -4,9 +4,41 @@
 package login
 
 import (
+	"os"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 )
+
+const (
+	envDeviceEndpoint = "NEO4J_AURA_LOGIN_DEVICE_ENDPOINT"
+	envTokenEndpoint  = "NEO4J_AURA_LOGIN_TOKEN_ENDPOINT"
+	envClientID       = "NEO4J_AURA_LOGIN_CLIENT_ID"
+	envAudience       = "NEO4J_AURA_LOGIN_AUDIENCE"
+)
+
+type loginConfig struct {
+	DeviceEndpoint string
+	TokenEndpoint  string
+	ClientID       string
+	Audience       string
+}
+
+func readLoginConfig() (*loginConfig, error) {
+	vars := []string{envDeviceEndpoint, envTokenEndpoint, envClientID, envAudience}
+	for _, v := range vars {
+		if os.Getenv(v) == "" {
+			return nil, clierr.NewUsageError("environment variable %s is not set", v)
+		}
+	}
+	return &loginConfig{
+		DeviceEndpoint: os.Getenv(envDeviceEndpoint),
+		TokenEndpoint:  os.Getenv(envTokenEndpoint),
+		ClientID:       os.Getenv(envClientID),
+		Audience:       os.Getenv(envAudience),
+	}, nil
+}
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
@@ -28,6 +60,10 @@ source .env.aura-login-spike && neo4j-cli aura login
 # Capture the access token into a shell variable for use in subsequent calls
 TOKEN=$(neo4j-cli aura login)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := readLoginConfig()
+			if err != nil {
+				return err
+			}
 			return nil
 		},
 	}

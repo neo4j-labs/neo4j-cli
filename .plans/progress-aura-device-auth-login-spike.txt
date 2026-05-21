@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-21T00:00:00Z
 Scaffolded the `neo4j-cli aura login` leaf command with copyright header, flush-left Example (≥3 invocations), and `RunE returning nil`; mounted in `aura.NewCmd`; regenerated skill bundle.
 Files: +neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
+## TASK-002 — 2026-05-21T01:00:00Z
+Added `loginConfig` struct, four `envXxx` constants, and `readLoginConfig()` helper that returns a `clierr.NewUsageError` naming the first unset env var; wired into `RunE`. Table-driven unit test covers happy path and each of the four missing-var cases.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, +neo4j-cli/aura/internal/subcommands/login/login_test.go

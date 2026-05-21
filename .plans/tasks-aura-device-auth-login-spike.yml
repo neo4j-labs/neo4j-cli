@@ -30,7 +30,7 @@ tasks:
       NEO4J_AURA_LOGIN_CLIENT_ID, and NEO4J_AURA_LOGIN_AUDIENCE via os.Getenv.
       Return a clierr.UsageError naming the first missing or empty variable.
       Call readLoginConfig() at the top of RunE.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "readLoginConfig returns a populated struct when all four vars are set"
       - "RunE surfaces the error from readLoginConfig without panicking"
       - "Table-driven test in login_test.go covers: all vars set (ok), each var individually missing (error names the var)"
-    completed_at: null
+    completed_at: "2026-05-21T01:00:00Z"
 
   - id: task-003
     title: "Implement device code request and print verification prompt"
