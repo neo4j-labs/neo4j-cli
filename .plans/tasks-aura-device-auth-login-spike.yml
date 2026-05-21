@@ -69,7 +69,7 @@ tasks:
       Handle authorization_pending (continue), slow_down (interval += 5, continue),
       expired_token (return error), access_denied (return error). On success parse
       the access_token and print it to stdout.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -79,7 +79,7 @@ tasks:
       - "access_denied returns a clear clierr.UsageError"
       - "Context timeout (expires_in elapsed) returns a clear error"
       - "Successful token response prints access_token to stdout"
-    completed_at: null
+    completed_at: "2026-05-21T03:00:00Z"
 
   - id: task-005
     title: "Write table-driven tests for the login command"

@@ -4,6 +4,7 @@
 package login
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -104,6 +105,99 @@ func printVerificationPrompt(w io.Writer, dcResp *deviceCodeResponse) {
 	}
 }
 
+// tokenResponse holds the token endpoint response fields we care about.
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
+// tokenErrorResponse holds the RFC 8628 error response shape.
+type tokenErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// sleepFn is the package-level sleep function; swapped in tests to avoid real waits.
+var sleepFn = time.Sleep
+
+// pollForToken polls the token endpoint until a token is obtained, a terminal
+// RFC 8628 error is returned, or the context deadline expires.
+func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeResponse) (string, error) {
+	interval := time.Duration(dcResp.Interval) * time.Second
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+		default:
+		}
+
+		sleepFn(interval)
+
+		// Re-check context after sleeping.
+		select {
+		case <-ctx.Done():
+			return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+		default:
+		}
+
+		form := url.Values{}
+		form.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+		form.Set("client_id", cfg.ClientID)
+		form.Set("device_code", dcResp.DeviceCode)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.TokenEndpoint, strings.NewReader(form.Encode()))
+		if err != nil {
+			return "", clierr.NewFatalError("failed to build token request: %s", err.Error())
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			// Context cancellation surfaces as an error here too.
+			if ctx.Err() != nil {
+				return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+			}
+			return "", clierr.NewUpstreamError("token request failed: %s", err.Error())
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close() //nolint:errcheck // response body close; errors are not actionable here
+
+		if err != nil {
+			return "", clierr.NewFatalError("failed to read token endpoint response: %s", err.Error())
+		}
+
+		if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+			var tr tokenResponse
+			if err := json.Unmarshal(body, &tr); err != nil {
+				return "", clierr.NewFatalError("failed to parse token response: %s", err.Error())
+			}
+			return tr.AccessToken, nil
+		}
+
+		// Non-2xx — parse the RFC 8628 error field.
+		var errResp tokenErrorResponse
+		if err := json.Unmarshal(body, &errResp); err != nil {
+			return "", clierr.NewUpstreamError("token endpoint returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		}
+
+		switch errResp.Error {
+		case "authorization_pending":
+			// Normal: user hasn't authorized yet; keep polling.
+			continue
+		case "slow_down":
+			// Server requested slower polling; add 5 seconds per RFC 8628 §3.5.
+			interval += 5 * time.Second
+			continue
+		case "expired_token":
+			return "", clierr.NewUsageError("device code has expired: please run login again to start a new device authorization flow")
+		case "access_denied":
+			return "", clierr.NewUsageError("access denied: the user rejected the authorization request")
+		default:
+			return "", clierr.NewUpstreamError("token endpoint returned error %q: %s", errResp.Error, strings.TrimSpace(string(body)))
+		}
+	}
+}
+
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -136,6 +230,15 @@ TOKEN=$(neo4j-cli aura login)`,
 
 			printVerificationPrompt(cmd.ErrOrStderr(), dcResp)
 
+			ctx, cancel := context.WithTimeout(cmd.Context(), time.Duration(dcResp.ExpiresIn)*time.Second)
+			defer cancel()
+
+			token, err := pollForToken(ctx, loginCfg, dcResp)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), token) //nolint:errcheck // writing the token to stdout; write errors are not actionable
 			return nil
 		},
 	}

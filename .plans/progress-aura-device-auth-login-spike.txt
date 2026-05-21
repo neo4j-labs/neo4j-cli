@@ -10,3 +10,8 @@ Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, +neo4j-cli/aura/inte
 Added `deviceCodeResponse` struct, package-level `httpClient` var (test seam), `requestDeviceCode()` helper that POSTs form-encoded `client_id`+`audience` and parses the JSON response, and `printVerificationPrompt()` that writes to stderr using `verification_uri_complete` when present or falls back to `verification_uri`+`user_code`. Wired both into `RunE`.
 Files: ~neo4j-cli/aura/internal/subcommands/login/login.go
 Decisions: `httpClient` as a package-level var (not injected) matches the `execClient` / `clientFactory` pattern used in the docker subsystem for test seam without altering the public API.
+
+## TASK-004 — 2026-05-21T03:00:00Z
+Added `pollForToken()` with RFC 8628 error handling: `authorization_pending` (continue), `slow_down` (+5s interval), `expired_token`/`access_denied` (clierr.UsageError), context timeout (pre/post-sleep guards + httpClient.Do check). Added `sleepFn` package-level var as test seam. `RunE` now calls `pollForToken` and prints `access_token` to stdout.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go
+Decisions: `resp.Body.Close()` called inline (not deferred) inside the poll loop to avoid accumulating unclosed bodies across iterations.
