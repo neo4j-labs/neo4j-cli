@@ -14,10 +14,10 @@ import (
 )
 
 func TestAGENTSCatalog(t *testing.T) {
-	// Catalog must match the Rust reference (10 agents, in this order).
-	// Locking order means stable `skill list` output across releases.
+	// Catalog must match the Rust reference (plus Antigravity), in this
+	// order. Locking order means stable `skill list` output across releases.
 	expected := []string{
-		"claude-code", "cursor", "windsurf", "copilot", "gemini-cli",
+		"claude-code", "cursor", "windsurf", "copilot", "antigravity", "gemini-cli",
 		"cline", "codex", "pi", "opencode", "junie",
 	}
 	require.Len(t, AGENTS, len(expected))
