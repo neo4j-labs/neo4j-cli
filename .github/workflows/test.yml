@@ -67,7 +67,8 @@ jobs:
             # guarded by DBUS_SESSION_BUS_ADDRESS; it skips locally when no bus
             # is present and fatals in CI when the env var is missing (to catch
             # a broken dbus-run-session setup). Only ubuntu-latest because the
-            # Windows and macOS keyring steps are handled by task-015/task-016.
+            # macOS keyring step is handled by task-016; Windows uses its own
+            # step below (Credential Manager always available, no daemon needed).
             - name: Keyring smoke (no daemon)
               if: matrix.os == 'ubuntu-latest'
               run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
@@ -83,6 +84,13 @@ jobs:
                     'echo "" | gnome-keyring-daemon --unlock --components=secrets --daemonize && \
                      sleep 1 && \
                      go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...'
+
+            # Keyring smoke tests — Windows Credential Manager is always available
+            # on windows-latest runners, so no daemon setup is required. The build
+            # step in the matrix already produced bin/neo4j-cli.exe via `make build`.
+            - name: Keyring smoke (Windows)
+              if: matrix.os == 'windows-latest'
+              run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
 
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
