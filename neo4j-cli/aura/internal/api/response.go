@@ -487,6 +487,12 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 		messages = append(messages, e.Message)
 	}
 
+	// Device-auth credentials have no client secret — there is nothing to refresh
+	// with, so skip the "clear and retry" cycle and tell the user to re-login now.
+	if credential.ClientSecret == "" {
+		return clierr.NewAuthError("your session has expired; run 'neo4j-cli aura login' to authenticate")
+	}
+
 	_, err = cfg.Credentials.Aura.ClearAccessToken(credential)
 	if err != nil {
 		messages = append(messages, fmt.Sprintf("Request failed authorization - attempted to clear the access token but encountered an error, please report an issue in %s", clierr.IssuesURL))
