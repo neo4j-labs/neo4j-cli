@@ -39,8 +39,8 @@ func TestListCmd_JSON(t *testing.T) {
 	require.NoError(t, f.exec(t, "list"))
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
-	// Catalog length — should include all 10 agents.
-	assert.Len(t, rows, 10)
+	// Catalog length — should include all 11 agents.
+	assert.Len(t, rows, 11)
 
 	// claude-code entry should have detected/installed = true and version.
 	var cc map[string]any

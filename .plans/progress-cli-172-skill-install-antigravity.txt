@@ -1,0 +1,4 @@
+## task-001 — 2026-05-21T06:35:00Z
+Added antigravity to AGENTS catalog before gemini-cli; updated TestAGENTSCatalog and TestListCmd_JSON length (10→11); regenerated skill bundle (install/remove Long includes agentNames()).
+Files: ~common/skill/agents.go, ~common/skill/agents_test.go, ~common/skill/list_test.go, ~neo4j-cli/internal/skill/bundle/references/skill.md
+Decisions: PRD claimed no bundle regen needed but install/remove Long embeds agentNames() — regen required.
