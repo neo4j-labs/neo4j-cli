@@ -2,7 +2,7 @@
 
 > A super CLI for Neo4j. Team up with your agents to build graph apps from your terminal.
 
-neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the Bolt protocol, and integrating with AI agent frameworks (Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie).
+neo4j-cli is an open-source command-line tool for managing Neo4j resources, executing Cypher queries via the Bolt protocol, and integrating with AI agent frameworks (Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie).
 
 ## Installation
 
