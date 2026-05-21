@@ -130,7 +130,7 @@ tasks:
       name is new, append a new AuraCredential (ClientSecret left empty) and set it as
       the default if no default is currently set. Compute TokenExpiry using the same
       60-second tolerance as UpdateAccessToken.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -140,7 +140,7 @@ tasks:
       - "TokenExpiry is computed as now + (expiresIn - 60) * 1000 milliseconds"
       - "Table-driven unit tests in common/clicfg/credentials/ cover add-new, update-existing, and default-setting cases"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-05-21T06:00:00Z"
 
   - id: task-008
     title: "Persist token in login command and print confirmation"

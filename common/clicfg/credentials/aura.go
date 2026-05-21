@@ -87,6 +87,37 @@ func (c *AuraCredentials) Get(name string) (*AuraCredential, error) {
 	return nil, clierr.NewUsageError("could not find credential with name %s", name)
 }
 
+// AddOrUpdateFromToken stores a device-auth-issued access token.
+// If a credential with the given name already exists, its AccessToken and
+// TokenExpiry are updated in-place. If the name is new, a new AuraCredential
+// is appended (ClientSecret is left empty — re-login is used to refresh). The
+// new credential is set as the default when no default is currently configured.
+// TokenExpiry is computed with the same 60-second tolerance as UpdateAccessToken.
+func (c *AuraCredentials) AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error {
+	const expireToleranceSeconds = int64(60)
+	now := time.Now().UnixMilli()
+	expiry := now + (expiresIn-expireToleranceSeconds)*1000
+
+	for _, cred := range c.Credentials {
+		if cred.Name == name {
+			cred.AccessToken = accessToken
+			cred.TokenExpiry = expiry
+			return c.onUpdate()
+		}
+	}
+
+	c.Credentials = append(c.Credentials, &AuraCredential{
+		Name:        name,
+		ClientId:    clientId,
+		AccessToken: accessToken,
+		TokenExpiry: expiry,
+	})
+	if c.DefaultCredential == "" {
+		c.DefaultCredential = name
+	}
+	return c.onUpdate()
+}
+
 func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken string, expiresInSeconds int64) (*AuraCredential, error) {
 	credential, err := c.Get(cred.Name)
 	if err != nil {
