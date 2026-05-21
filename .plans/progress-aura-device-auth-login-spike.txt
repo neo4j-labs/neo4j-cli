@@ -27,3 +27,7 @@ Files: ~.plans/tasks-aura-device-auth-login-spike.yml
 ## TASK-007 — 2026-05-21T06:00:00Z
 Added `AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error` to `AuraCredentials`; upserts token credential with 60s expiry tolerance, sets default only when none is configured. Table-driven tests cover add-new, update-existing, and both default-setting scenarios.
 Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/aura_test.go
+
+## TASK-008 — 2026-05-21T07:00:00Z
+Changed `pollForToken` return type from `(string, error)` to `(*tokenResponse, error)`; added `ExpiresIn int` to `tokenResponse`; `RunE` now calls `cfg.Credentials.Aura.AddOrUpdateFromToken` and prints confirmation to stderr instead of token to stdout. Tests updated: `newTestConfig`+`buildAndRunWithCfg` helpers use in-memory FS credentials; happy-path and pending-then-success tests assert credential persisted and no token on stdout; skill bundle regenerated.
+Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/internal/subcommands/login/login_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md

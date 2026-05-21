@@ -1487,7 +1487,8 @@ neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-000
 Authenticate with Aura using the device authorization flow
 
 Authenticate with Aura using the OAuth 2.0 Device Authorization Grant (RFC 8628).
-On success, the access token is printed to stdout.
+On success, the credential is stored under the name "login" and set as the default
+when no other default is configured.
 
 The following environment variables must be set before running:
   NEO4J_AURA_LOGIN_DEVICE_ENDPOINT  Device authorization endpoint URL
@@ -1506,8 +1507,8 @@ neo4j-cli aura login
 # Source the example env file first, then log in
 source .env.aura-login-spike && neo4j-cli aura login
 
-# Capture the access token into a shell variable for use in subsequent calls
-TOKEN=$(neo4j-cli aura login)
+# Log in after setting required environment variables in the current shell
+export NEO4J_AURA_LOGIN_CLIENT_ID=my-client && neo4j-cli aura login
 ```
 
 ## neo4j-cli aura organization

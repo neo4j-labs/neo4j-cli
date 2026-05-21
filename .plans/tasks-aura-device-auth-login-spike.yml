@@ -151,7 +151,7 @@ tasks:
       token.ExpiresIn) to persist the credential. Replace the stdout token print with a
       confirmation message on stderr. Update login_test.go to assert the credential is stored
       and the confirmation message is printed.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -161,7 +161,7 @@ tasks:
       - "Raw token is no longer printed to stdout"
       - "login_test.go updated: asserts credential persisted and confirmation message emitted"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-05-21T07:00:00Z"
 
   - id: task-009
     title: "Graceful re-login error in getToken for empty-ClientSecret credentials"

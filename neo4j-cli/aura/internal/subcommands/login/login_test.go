@@ -17,14 +17,32 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// newTestConfig creates a clicfg.Config backed by an in-memory filesystem with
+// empty Aura credentials, suitable for login command tests.
+func newTestConfig(t *testing.T) *clicfg.Config {
+	t.Helper()
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, `{"aura":{"credentials":[]}}`)
+	require.NoError(t, err)
+	return clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+}
+
 // buildAndRun wires up the login command with the given env vars and runs it,
 // returning captured stdout, stderr, and the error returned by cobra.
 func buildAndRun(t *testing.T, envVars map[string]string, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	cfg := newTestConfig(t)
+	return buildAndRunWithCfg(t, cfg, envVars, args...)
+}
+
+// buildAndRunWithCfg is like buildAndRun but uses the provided cfg so the
+// caller can inspect persisted credentials after the command runs.
+func buildAndRunWithCfg(t *testing.T, cfg *clicfg.Config, envVars map[string]string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
 	for k, v := range envVars {
@@ -34,7 +52,6 @@ func buildAndRun(t *testing.T, envVars map[string]string, args ...string) (stdou
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 
-	cfg := &clicfg.Config{}
 	cmd := NewCmd(cfg)
 
 	// Wrap in a root command so cmd.Context() is non-nil.
@@ -74,11 +91,6 @@ func deviceCodeJSON(deviceCode, userCode, verificationURI, verificationURIComple
 	}
 	b, _ := json.Marshal(m) //nolint:errcheck // test helper; marshal of known types never fails
 	return string(b)
-}
-
-// tokenSuccessJSON returns a successful token response.
-func tokenSuccessJSON(token string) string {
-	return fmt.Sprintf(`{"access_token":%q}`, token)
 }
 
 // tokenErrorJSON returns an RFC 8628 error response.
@@ -211,14 +223,28 @@ func TestLoginCommand_HappyPath(t *testing.T) {
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		writeJSON(w, tokenSuccessJSON(accessToken))
+		writeJSON(w, fmt.Sprintf(`{"access_token":%q,"expires_in":3600}`, accessToken))
 	}))
 	defer tokenServer.Close()
 
-	stdout, stderr, err := buildAndRun(t, allEnvVars(deviceServer.URL, tokenServer.URL))
+	cfg := newTestConfig(t)
+	stdout, stderr, err := buildAndRunWithCfg(t, cfg, allEnvVars(deviceServer.URL, tokenServer.URL))
 	require.NoError(t, err)
-	assert.Contains(t, stdout, accessToken)
+
+	// Token must NOT be printed to stdout.
+	assert.NotContains(t, stdout, accessToken)
+	// Confirmation and verification URL should appear on stderr.
 	assert.Contains(t, stderr, "https://verify.example.com?code=ABCD-1234")
+	assert.Contains(t, stderr, "Login successful")
+
+	// Credential must be persisted.
+	require.Len(t, cfg.Credentials.Aura.Credentials, 1)
+	cred := cfg.Credentials.Aura.Credentials[0]
+	assert.Equal(t, "login", cred.Name)
+	assert.Equal(t, "test-client-id", cred.ClientId)
+	assert.Equal(t, accessToken, cred.AccessToken)
+	assert.Equal(t, "", cred.ClientSecret, "ClientSecret must remain empty for device-auth credentials")
+	assert.Equal(t, "login", cfg.Credentials.Aura.DefaultCredential, "new credential should be the default")
 }
 
 func TestLoginCommand_HappyPath_FallbackVerificationURI(t *testing.T) {
@@ -234,7 +260,7 @@ func TestLoginCommand_HappyPath_FallbackVerificationURI(t *testing.T) {
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		writeJSON(w, tokenSuccessJSON("tok"))
+		writeJSON(w, `{"access_token":"tok","expires_in":3600}`)
 	}))
 	defer tokenServer.Close()
 
@@ -242,6 +268,7 @@ func TestLoginCommand_HappyPath_FallbackVerificationURI(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "https://verify.example.com/activate")
 	assert.Contains(t, stderr, "WXYZ-5678")
+	assert.Contains(t, stderr, "Login successful")
 }
 
 func TestLoginCommand_AuthorizationPendingThenSuccess(t *testing.T) {
@@ -266,14 +293,20 @@ func TestLoginCommand_AuthorizationPendingThenSuccess(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		writeJSON(w, tokenSuccessJSON(accessToken))
+		writeJSON(w, fmt.Sprintf(`{"access_token":%q,"expires_in":3600}`, accessToken))
 	}))
 	defer tokenServer.Close()
 
-	stdout, _, err := buildAndRun(t, allEnvVars(deviceServer.URL, tokenServer.URL))
+	cfg := newTestConfig(t)
+	stdout, stderr, err := buildAndRunWithCfg(t, cfg, allEnvVars(deviceServer.URL, tokenServer.URL))
 	require.NoError(t, err)
-	assert.Contains(t, stdout, accessToken)
+	assert.NotContains(t, stdout, accessToken, "token must not be printed to stdout")
+	assert.Contains(t, stderr, "Login successful")
 	assert.Equal(t, int32(3), atomic.LoadInt32(&callCount), "expected exactly 3 token requests")
+
+	// Credential must be persisted.
+	require.Len(t, cfg.Credentials.Aura.Credentials, 1)
+	assert.Equal(t, accessToken, cfg.Credentials.Aura.Credentials[0].AccessToken)
 }
 
 func TestLoginCommand_SlowDownIncreasesInterval(t *testing.T) {
@@ -297,7 +330,7 @@ func TestLoginCommand_SlowDownIncreasesInterval(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		writeJSON(w, tokenSuccessJSON("tok"))
+		writeJSON(w, `{"access_token":"tok","expires_in":3600}`)
 	}))
 	defer tokenServer.Close()
 
@@ -388,7 +421,7 @@ func TestLoginCommand_ContextTimeout(t *testing.T) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 
-	cfg := &clicfg.Config{}
+	cfg := newTestConfig(t)
 	cmd := NewCmd(cfg)
 
 	root := &cobra.Command{Use: "root"}

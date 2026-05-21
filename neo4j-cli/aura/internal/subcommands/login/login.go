@@ -108,6 +108,7 @@ func printVerificationPrompt(w io.Writer, dcResp *deviceCodeResponse) {
 // tokenResponse holds the token endpoint response fields we care about.
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
 }
 
 // tokenErrorResponse holds the RFC 8628 error response shape.
@@ -120,13 +121,13 @@ var sleepFn = time.Sleep
 
 // pollForToken polls the token endpoint until a token is obtained, a terminal
 // RFC 8628 error is returned, or the context deadline expires.
-func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeResponse) (string, error) {
+func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeResponse) (*tokenResponse, error) {
 	interval := time.Duration(dcResp.Interval) * time.Second
 
 	for {
 		select {
 		case <-ctx.Done():
-			return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+			return nil, clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
 		default:
 		}
 
@@ -135,7 +136,7 @@ func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeRespo
 		// Re-check context after sleeping.
 		select {
 		case <-ctx.Done():
-			return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+			return nil, clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
 		default:
 		}
 
@@ -146,7 +147,7 @@ func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeRespo
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.TokenEndpoint, strings.NewReader(form.Encode()))
 		if err != nil {
-			return "", clierr.NewFatalError("failed to build token request: %s", err.Error())
+			return nil, clierr.NewFatalError("failed to build token request: %s", err.Error())
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -154,30 +155,30 @@ func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeRespo
 		if err != nil {
 			// Context cancellation surfaces as an error here too.
 			if ctx.Err() != nil {
-				return "", clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
+				return nil, clierr.NewUsageError("device authorization timed out: the code expired before you completed authentication")
 			}
-			return "", clierr.NewUpstreamError("token request failed: %s", err.Error())
+			return nil, clierr.NewUpstreamError("token request failed: %s", err.Error())
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close() //nolint:errcheck // response body close; errors are not actionable here
 
 		if err != nil {
-			return "", clierr.NewFatalError("failed to read token endpoint response: %s", err.Error())
+			return nil, clierr.NewFatalError("failed to read token endpoint response: %s", err.Error())
 		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 			var tr tokenResponse
 			if err := json.Unmarshal(body, &tr); err != nil {
-				return "", clierr.NewFatalError("failed to parse token response: %s", err.Error())
+				return nil, clierr.NewFatalError("failed to parse token response: %s", err.Error())
 			}
-			return tr.AccessToken, nil
+			return &tr, nil
 		}
 
 		// Non-2xx — parse the RFC 8628 error field.
 		var errResp tokenErrorResponse
 		if err := json.Unmarshal(body, &errResp); err != nil {
-			return "", clierr.NewUpstreamError("token endpoint returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			return nil, clierr.NewUpstreamError("token endpoint returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 
 		switch errResp.Error {
@@ -189,11 +190,11 @@ func pollForToken(ctx context.Context, cfg *loginConfig, dcResp *deviceCodeRespo
 			interval += 5 * time.Second
 			continue
 		case "expired_token":
-			return "", clierr.NewUsageError("device code has expired: please run login again to start a new device authorization flow")
+			return nil, clierr.NewUsageError("device code has expired: please run login again to start a new device authorization flow")
 		case "access_denied":
-			return "", clierr.NewUsageError("access denied: the user rejected the authorization request")
+			return nil, clierr.NewUsageError("access denied: the user rejected the authorization request")
 		default:
-			return "", clierr.NewUpstreamError("token endpoint returned error %q: %s", errResp.Error, strings.TrimSpace(string(body)))
+			return nil, clierr.NewUpstreamError("token endpoint returned error %q: %s", errResp.Error, strings.TrimSpace(string(body)))
 		}
 	}
 }
@@ -203,7 +204,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "login",
 		Short: "Authenticate with Aura using the device authorization flow",
 		Long: "Authenticate with Aura using the OAuth 2.0 Device Authorization Grant (RFC 8628).\n" +
-			"On success, the access token is printed to stdout.\n\n" +
+			"On success, the credential is stored under the name \"login\" and set as the default\n" +
+			"when no other default is configured.\n\n" +
 			"The following environment variables must be set before running:\n" +
 			"  NEO4J_AURA_LOGIN_DEVICE_ENDPOINT  Device authorization endpoint URL\n" +
 			"  NEO4J_AURA_LOGIN_TOKEN_ENDPOINT    Token endpoint URL\n" +
@@ -215,8 +217,8 @@ neo4j-cli aura login
 # Source the example env file first, then log in
 source .env.aura-login-spike && neo4j-cli aura login
 
-# Capture the access token into a shell variable for use in subsequent calls
-TOKEN=$(neo4j-cli aura login)`,
+# Log in after setting required environment variables in the current shell
+export NEO4J_AURA_LOGIN_CLIENT_ID=my-client && neo4j-cli aura login`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loginCfg, err := readLoginConfig()
 			if err != nil {
@@ -238,7 +240,11 @@ TOKEN=$(neo4j-cli aura login)`,
 				return err
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), token) //nolint:errcheck // writing the token to stdout; write errors are not actionable
+			if err := cfg.Credentials.Aura.AddOrUpdateFromToken("login", loginCfg.ClientID, token.AccessToken, int64(token.ExpiresIn)); err != nil {
+				return err
+			}
+
+			fmt.Fprintln(cmd.ErrOrStderr(), "Login successful. Credential stored as \"login\".") //nolint:errcheck // confirmation to stderr; write errors are not actionable
 			return nil
 		},
 	}
