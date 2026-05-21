@@ -31,14 +31,14 @@ tasks:
       Edit the "Supported agents:" sentence on line 41 of `README.md` to insert
       `Antigravity, ` immediately before `Gemini CLI`, so the README order
       matches catalog order after the new entry lands.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "README.md `## Agent skills` section lists `Antigravity` immediately before `Gemini CLI` in the comma-separated supported-agents sentence."
       - "No other content in README.md is modified."
       - "Doc order matches the order of entries in `common/skill/agents.go` `AGENTS`."
-    completed_at: null
+    completed_at: 2026-05-21T06:45:00Z
 
   - id: task-003
     title: "Add changie patch entry for Antigravity support"
