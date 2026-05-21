@@ -236,6 +236,7 @@ func TestLoginCommand_HappyPath(t *testing.T) {
 	// Confirmation and verification URL should appear on stderr.
 	assert.Contains(t, stderr, "https://verify.example.com?code=ABCD-1234")
 	assert.Contains(t, stderr, "Login successful")
+	assert.Contains(t, stderr, "set as default")
 
 	// Credential must be persisted.
 	require.Len(t, cfg.Credentials.Aura.Credentials, 1)
@@ -245,6 +246,38 @@ func TestLoginCommand_HappyPath(t *testing.T) {
 	assert.Equal(t, accessToken, cred.AccessToken)
 	assert.Equal(t, "", cred.ClientSecret, "ClientSecret must remain empty for device-auth credentials")
 	assert.Equal(t, "login", cfg.Credentials.Aura.DefaultCredential, "new credential should be the default")
+}
+
+func TestLoginCommand_HappyPath_OverwritesExistingDefault(t *testing.T) {
+	pointHTTPClientAt(t)
+	withNoSleep(t)
+
+	const accessToken = "overwrite-default-token"
+
+	deviceServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, deviceCodeJSON("dc-code", "ABCD-1234", "https://verify.example.com", "https://verify.example.com?code=ABCD-1234", 60, 5))
+	}))
+	defer deviceServer.Close()
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, fmt.Sprintf(`{"access_token":%q,"expires_in":3600}`, accessToken))
+	}))
+	defer tokenServer.Close()
+
+	cfg := newTestConfig(t)
+	// Seed a pre-existing credential and make it the default.
+	require.NoError(t, cfg.Credentials.Aura.Add("pre-existing", "cid-old", "secret-old"))
+	require.Equal(t, "pre-existing", cfg.Credentials.Aura.DefaultCredential)
+
+	_, stderr, err := buildAndRunWithCfg(t, cfg, allEnvVars(deviceServer.URL, tokenServer.URL))
+	require.NoError(t, err)
+
+	assert.Contains(t, stderr, "set as default")
+
+	// "login" must now be the default, overwriting "pre-existing".
+	assert.Equal(t, "login", cfg.Credentials.Aura.DefaultCredential, "login must overwrite the pre-existing default")
 }
 
 func TestLoginCommand_HappyPath_FallbackVerificationURI(t *testing.T) {

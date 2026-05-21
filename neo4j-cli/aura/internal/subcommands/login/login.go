@@ -204,8 +204,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "login",
 		Short: "Authenticate with Aura using the device authorization flow",
 		Long: "Authenticate with Aura using the OAuth 2.0 Device Authorization Grant (RFC 8628).\n" +
-			"On success, the credential is stored under the name \"login\" and set as the default\n" +
-			"when no other default is configured.\n\n" +
+			"On success, the credential is stored under the name \"login\" and always set as the\n" +
+			"default, overwriting any previously configured default.\n\n" +
 			"The following environment variables must be set before running:\n" +
 			"  NEO4J_AURA_LOGIN_DEVICE_ENDPOINT  Device authorization endpoint URL\n" +
 			"  NEO4J_AURA_LOGIN_TOKEN_ENDPOINT    Token endpoint URL\n" +
@@ -244,7 +244,7 @@ export NEO4J_AURA_LOGIN_CLIENT_ID=my-client && neo4j-cli aura login`,
 				return err
 			}
 
-			fmt.Fprintln(cmd.ErrOrStderr(), "Login successful. Credential stored as \"login\".") //nolint:errcheck // confirmation to stderr; write errors are not actionable
+			fmt.Fprintln(cmd.ErrOrStderr(), "Login successful. Credential stored as \"login\" and set as default.") //nolint:errcheck // confirmation to stderr; write errors are not actionable
 			return nil
 		},
 	}

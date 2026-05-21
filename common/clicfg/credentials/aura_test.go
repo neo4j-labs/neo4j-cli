@@ -83,7 +83,7 @@ func TestAuraCredentials_AddOrUpdateFromToken(t *testing.T) {
 		assert.Equal(t, "login", cfg.Aura.DefaultCredential)
 	})
 
-	t.Run("add new credential — does not overwrite existing default", func(t *testing.T) {
+	t.Run("add new credential — always overwrites existing default", func(t *testing.T) {
 		cfg, err := newCreds()
 		require.NoError(t, err)
 
@@ -93,8 +93,23 @@ func TestAuraCredentials_AddOrUpdateFromToken(t *testing.T) {
 
 		require.NoError(t, cfg.Aura.AddOrUpdateFromToken("login", "cid-1", "tok-abc", expiresIn))
 
-		assert.Equal(t, "existing", cfg.Aura.DefaultCredential, "existing default must not be overwritten")
+		assert.Equal(t, "login", cfg.Aura.DefaultCredential, "login credential must always become the default")
 		require.Len(t, cfg.Aura.Credentials, 2)
+	})
+
+	t.Run("update existing credential — default is set to the updated credential", func(t *testing.T) {
+		cfg, err := newCreds()
+		require.NoError(t, err)
+
+		// Seed two credentials; make "other" the current default.
+		require.NoError(t, cfg.Aura.Add("other", "cid-x", "secret-x"))
+		require.NoError(t, cfg.Aura.Add("login", "cid-1", "secret-1"))
+		require.NoError(t, cfg.Aura.SetDefault("other"))
+		require.Equal(t, "other", cfg.Aura.DefaultCredential)
+
+		require.NoError(t, cfg.Aura.AddOrUpdateFromToken("login", "cid-1", "tok-new", expiresIn))
+
+		assert.Equal(t, "login", cfg.Aura.DefaultCredential, "updating 'login' must make it the default")
 	})
 
 	t.Run("update existing credential — AccessToken and TokenExpiry updated in-place", func(t *testing.T) {

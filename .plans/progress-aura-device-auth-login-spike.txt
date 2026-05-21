@@ -39,3 +39,7 @@ Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_t
 ## TASK-010 — 2026-05-21T09:00:00Z
 Ran `go generate ./neo4j-cli/internal/skill/...`; bundle was already up to date (regenerated in task-008). Verified all final CI gates pass: make test, make fmt-check, make lint (0 issues), make license-check.
 Files: ~.plans/tasks-aura-device-auth-login-spike.yml
+
+## TASK-011 — 2026-05-21T10:00:00Z
+`AddOrUpdateFromToken` now unconditionally sets `DefaultCredential` in both code paths (update-existing and append-new); confirmation message updated to "set as default"; `Long` and skill bundle refreshed.
+Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/aura_test.go, ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/internal/subcommands/login/login_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md

@@ -90,8 +90,9 @@ func (c *AuraCredentials) Get(name string) (*AuraCredential, error) {
 // AddOrUpdateFromToken stores a device-auth-issued access token.
 // If a credential with the given name already exists, its AccessToken and
 // TokenExpiry are updated in-place. If the name is new, a new AuraCredential
-// is appended (ClientSecret is left empty — re-login is used to refresh). The
-// new credential is set as the default when no default is currently configured.
+// is appended (ClientSecret is left empty — re-login is used to refresh).
+// In both cases the named credential is unconditionally set as the default so
+// that subsequent aura commands use the freshly obtained token.
 // TokenExpiry is computed with the same 60-second tolerance as UpdateAccessToken.
 func (c *AuraCredentials) AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error {
 	const expireToleranceSeconds = int64(60)
@@ -102,6 +103,7 @@ func (c *AuraCredentials) AddOrUpdateFromToken(name, clientId, accessToken strin
 		if cred.Name == name {
 			cred.AccessToken = accessToken
 			cred.TokenExpiry = expiry
+			c.DefaultCredential = name
 			return c.onUpdate()
 		}
 	}
@@ -112,9 +114,7 @@ func (c *AuraCredentials) AddOrUpdateFromToken(name, clientId, accessToken strin
 		AccessToken: accessToken,
 		TokenExpiry: expiry,
 	})
-	if c.DefaultCredential == "" {
-		c.DefaultCredential = name
-	}
+	c.DefaultCredential = name
 	return c.onUpdate()
 }
 

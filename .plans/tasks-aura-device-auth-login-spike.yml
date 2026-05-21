@@ -209,7 +209,7 @@ tasks:
       Change AddOrUpdateFromToken to always set the named credential as the default
       (unconditionally). Update the confirmation message in login RunE to say the
       credential has been set as default. Update affected tests.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -220,4 +220,4 @@ tasks:
       - "login_test.go updated to match new confirmation message"
       - "make test passes"
       - "make fmt-check and make lint pass"
-    completed_at: null
+    completed_at: "2026-05-21T10:00:00Z"
