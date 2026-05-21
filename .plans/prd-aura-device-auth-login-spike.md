@@ -8,10 +8,12 @@ Spike that implements OAuth 2.0 Device Authorization Grant (RFC 8628) as a new `
 
 - Validate device auth flow works against the Aura Auth0 tenant.
 - Establish the HTTP polling pattern and user-facing UX (display URL + code, poll, print token) for a future full implementation.
+- Persist the obtained token into the credential store so all existing `aura` subcommands authenticate automatically without requiring a client ID / secret.
 
 ## Non-Goals
 
-- Credential storage or any integration with the existing `AuraCredential` / `getToken` workflow.
+- Refresh token support (re-login required on expiry).
+- `--name` flag for the stored credential name (fixed as `"login"` for this spike).
 - `--format json` output support.
 - Configuration of auth server URL, client ID, or audience via CLI flags or persistent config.
 - Production hardening (retries, error-message polish, telemetry).
@@ -30,7 +32,10 @@ Spike that implements OAuth 2.0 Device Authorization Grant (RFC 8628) as a new `
   - `expired_token` — return a clear error.
   - `access_denied` — return a clear error.
 - **REQ-F-005**: Respect the `expires_in` from the device code response; if polling times out before authorization, return a clear error.
-- **REQ-F-006**: On success, print the access token to stdout.
+- **REQ-F-006**: On success, print a confirmation message to stderr (e.g. `Logged in successfully. Run 'neo4j-cli aura instance list' to verify.`). Do not print the raw token to stdout.
+- **REQ-F-008**: After a successful token exchange, persist the token into the credential store under the fixed name `"login"` via a new `AuraCredentials.AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64)` method. If a credential named `"login"` already exists, update its `AccessToken` and `TokenExpiry` in-place. Set `"login"` as the default credential if no default is currently set.
+- **REQ-F-009**: Update `pollForToken` (or its caller) to return the full token response including `expires_in` so `AddOrUpdateFromToken` can compute the correct expiry.
+- **REQ-F-010**: In `neo4j-cli/aura/internal/api/token.go`, when the resolved credential has an empty `ClientSecret` and no valid access token, return a `clierr.AuthError` telling the user to re-run `neo4j-cli aura login` rather than attempting a client-credentials grant that would fail.
 - **REQ-F-007**: Read all auth configuration from environment variables at runtime (via `os.Getenv`). Required variables:
   - `NEO4J_AURA_LOGIN_DEVICE_ENDPOINT` — device authorization endpoint URL
   - `NEO4J_AURA_LOGIN_TOKEN_ENDPOINT` — token endpoint URL
@@ -45,6 +50,7 @@ Spike that implements OAuth 2.0 Device Authorization Grant (RFC 8628) as a new `
 - **REQ-NF-003**: All new `.go` files must carry the Neo4j copyright header (enforced by `make license-check`).
 - **REQ-NF-004**: Skill bundle must be regenerated after adding the command (`go generate ./neo4j-cli/internal/skill/...`), otherwise `TestGenerator_RoundTrip` fails.
 - **REQ-NF-005**: A committed `.env.aura-login-spike.example` file at the repo root documents the required env var names (no values). Add `.env.aura-login-spike` to `.gitignore` so real values are never committed.
+- **REQ-NF-006**: `AddOrUpdateFromToken` lives in `common/clicfg/credentials/aura.go` (not under `neo4j-cli/internal/`) so it is reachable from both the login command and future callers in `common/`. Token expiry is computed with the same 60-second tolerance already used by `UpdateAccessToken`.
 
 ## Technical Considerations
 
@@ -83,11 +89,20 @@ neo4j-cli config set aura.auth-url <dev-token-endpoint>
 
 **`--rw` not required** — this command does not mutate credential store state, so the write-guard should not apply.
 
-**Do not** use `cfg.Aura.AuthUrl()` or `api.MakeRequest` — the spike is intentionally standalone to avoid tangling with the existing credential lookup path.
+**Do not** use `cfg.Aura.AuthUrl()` or `api.MakeRequest` for the device auth HTTP calls — the login command is intentionally standalone for those. However, after storing the credential, the existing `api.MakeRequest` / `getToken` path is used by all other aura commands as normal.
+
+**Token integration path:**
+1. `pollForToken` returns `tokenResponse` (struct with `AccessToken` + `ExpiresIn`) instead of just a `string`.
+2. `login` `RunE` calls `cfg.Credentials.Aura.AddOrUpdateFromToken("login", cfg.ClientId, token.AccessToken, token.ExpiresIn)`.
+3. Existing `getToken` in `api/token.go` already checks `HasValidAccessToken()` first — the stored token is returned without a client-credentials round-trip while it is valid.
+4. On expiry, add a guard: `if credential.ClientSecret == "" { return "", clierr.NewAuthError(...) }`.
 
 ## Acceptance Criteria
 
-- [ ] `neo4j-cli aura login` initiates device auth, prints a verification URL + code, polls, and on success prints the access token.
+- [ ] `neo4j-cli aura login` initiates device auth, prints a verification URL + code, polls, and on success prints a confirmation message (not the raw token).
+- [ ] After login, `neo4j-cli aura instance list` (or any other aura read command) succeeds without specifying a credential.
+- [ ] Re-running `neo4j-cli aura login` updates the stored token in-place (no duplicate credential created).
+- [ ] When the stored token is expired and `ClientSecret` is empty, the error message directs the user to re-run `neo4j-cli aura login`.
 - [ ] `authorization_pending` is silently swallowed and polling continues.
 - [ ] `slow_down` increases the poll interval by 5 s and polling continues.
 - [ ] `expired_token` produces a clear user-facing error.
@@ -103,7 +118,7 @@ neo4j-cli config set aura.auth-url <dev-token-endpoint>
 
 ## Out of Scope
 
-- Storing the token in the credential store or wiring it into subsequent API calls.
+- Refresh token support.
 - Config-driven auth server URL / client ID / audience.
 - Production Auth0 client registration and production audience / scope determination.
 - Changelog entry.

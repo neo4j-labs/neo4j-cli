@@ -1,7 +1,7 @@
 feature: aura-device-auth-login-spike
 prd: ./prd-aura-device-auth-login-spike.md
 created_at: 2026-05-21T00:00:00Z
-updated_at: 2026-05-21T00:00:00Z
+updated_at: 2026-05-21T12:00:00Z
 
 tasks:
   - id: task-001
@@ -120,3 +120,82 @@ tasks:
       - "make lint passes"
       - "make license-check passes"
     completed_at: "2026-05-21T05:00:00Z"
+
+  - id: task-007
+    title: "Add AddOrUpdateFromToken to AuraCredentials"
+    description: |
+      Add AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64) error
+      to common/clicfg/credentials/aura.go. If a credential with the given name already
+      exists, update its AccessToken and TokenExpiry in-place and call onUpdate. If the
+      name is new, append a new AuraCredential (ClientSecret left empty) and set it as
+      the default if no default is currently set. Compute TokenExpiry using the same
+      60-second tolerance as UpdateAccessToken.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "AddOrUpdateFromToken adds a new credential when the name does not exist"
+      - "AddOrUpdateFromToken updates AccessToken and TokenExpiry in-place when the name already exists"
+      - "New credential is set as default if DefaultCredential was empty; existing default is not overwritten"
+      - "TokenExpiry is computed as now + (expiresIn - 60) * 1000 milliseconds"
+      - "Table-driven unit tests in common/clicfg/credentials/ cover add-new, update-existing, and default-setting cases"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-008
+    title: "Persist token in login command and print confirmation"
+    description: |
+      Update pollForToken to return the full tokenResponse struct (not just the access_token
+      string) so the caller has access to expires_in. In RunE, after a successful poll call
+      cfg.Credentials.Aura.AddOrUpdateFromToken("login", cfg.ClientId, token.AccessToken,
+      token.ExpiresIn) to persist the credential. Replace the stdout token print with a
+      confirmation message on stderr. Update login_test.go to assert the credential is stored
+      and the confirmation message is printed.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "pollForToken returns tokenResponse (struct) instead of string"
+      - "RunE calls AddOrUpdateFromToken with the correct arguments after a successful poll"
+      - "Confirmation message is printed to stderr, not stdout"
+      - "Raw token is no longer printed to stdout"
+      - "login_test.go updated: asserts credential persisted and confirmation message emitted"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-009
+    title: "Graceful re-login error in getToken for empty-ClientSecret credentials"
+    description: |
+      In neo4j-cli/aura/internal/api/token.go, after the HasValidAccessToken() check fails,
+      add a guard: if credential.ClientSecret == "", return a clierr.AuthError telling the
+      user their session has expired and to re-run 'neo4j-cli aura login'. This prevents
+      the existing client-credentials grant from firing with an empty secret and producing
+      a cryptic 401 from the auth server.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "getToken returns a clierr.AuthError (not a panic or HTTP 401) when ClientSecret is empty and token is absent or expired"
+      - "Error message names the re-login command: 'neo4j-cli aura login'"
+      - "Existing client-credentials path is unaffected when ClientSecret is non-empty"
+      - "Unit test in api/token_test.go (or api_test.go) covers the empty-secret branch"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-010
+    title: "Regenerate skill bundle and run all final gates"
+    description: |
+      Regenerate the skill bundle with go generate ./neo4j-cli/internal/skill/... after
+      the login command output changed (no longer prints a token; confirmation message
+      updated). Run all CI gates to confirm the integration is clean.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make license-check passes"
+    completed_at: null
