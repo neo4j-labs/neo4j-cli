@@ -21,7 +21,7 @@ tasks:
       `.copy-mini` handler (lines 1856-1869), the HTML markup, the CSS,
       or the `> ` prefix that lives in `.agentic-comment` (Invariant 1
       of `website-update.md` requires it on screen).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`gh-pages` worktree exists at repo-root `gh-pages/` checked out at the `gh-pages` branch."
@@ -30,7 +30,7 @@ tasks:
       - "Toast message uses whichever string was copied (`'Copied: ' + cmd.slice(0, 40) + …`)."
       - "Diff is confined to the `.step-cmd` handler block; no edits to markup, CSS, the `.copy-mini` handler, or the `.alt-install` handler."
       - "`grep -n 'data-copy=\"neo4j-cli credential aura-client add' gh-pages/index.html` still finds the original `data-copy` attribute (the agent prompt is sourced from the DOM, not duplicated as a new attribute)."
-    completed_at: null
+    completed_at: 2026-05-21T06:34:37Z
 
   - id: task-002
     title: "Manually verify mode-aware copy in Chrome and Safari"

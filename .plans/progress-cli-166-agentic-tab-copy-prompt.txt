@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-21T06:34:37Z
+Mode-aware .step-cmd copy handler in gh-pages/index.html (agent prompt minus `> ` when viewMode=agentic, data-copy fallback otherwise).
+Files: ~gh-pages/index.html
