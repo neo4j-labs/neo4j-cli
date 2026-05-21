@@ -247,6 +247,11 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## macOS Subprocess Test Isolation Notes
+
+- `common/clicfg/darwin.go` uses `$HOME` env var (not `user.Current().HomeDir`) for the config prefix so that subprocess tests can override HOME to isolate config files. If you add subprocess tests that need config isolation on macOS, pass `HOME=<tempdir>` in the subprocess env and symlink `<real-home>/Library/Keychains/login.keychain-db` into `<tempdir>/Library/Keychains/` — go-keyring resolves keychains relative to `$HOME` but still needs the real login keychain in the search list.
+- go-keyring on macOS hardcodes `/usr/bin/security` (not resolved via PATH), so PATH-stub approaches for simulating a missing `security` binary do not work. Use `gokeyring.MockInitWithError` in unit tests instead.
+
 ## PowerShell Installer Test Notes
 
 - **Use `.cmd` stubs, not `.ps1`**: When testing PowerShell installer scripts that call `& neo4j-cli`, put the stub in a `.cmd` file (not `.ps1`). Windows resolves bare `& neo4j-cli` to `.cmd`/`.bat` before `.ps1` when scanning PATH — a `.ps1` stub is often silently skipped.

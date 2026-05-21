@@ -41,9 +41,10 @@ func TestKeyring_NoDaemon_FirstRun_WritesInsecureAndWarns(t *testing.T) {
 
 	env := stripDBUS(baseChildEnv(configEnvForDir(home)...))
 
-	// Run any command that triggers PersistentPreRunE. "version" is cheapest.
-	exitCode, _, stderr := runCLI(t, bin, []string{"version"}, env)
-	require.Equal(t, 0, exitCode, "version must exit 0; stderr=%s", stderr)
+	// Run any command that triggers PersistentPreRunE. "config list" is the
+	// simplest leaf command that reliably runs PersistentPreRunE and exits 0.
+	exitCode, _, stderr := runCLI(t, bin, []string{"config", "list"}, env)
+	require.Equal(t, 0, exitCode, "config list must exit 0; stderr=%s", stderr)
 
 	// credential-storage: insecure must be written to config.json
 	cfg := readConfigJSON(t, home)

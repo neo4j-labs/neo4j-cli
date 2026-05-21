@@ -92,6 +92,18 @@ jobs:
               if: matrix.os == 'windows-latest'
               run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
 
+            # Keyring smoke tests — macOS Keychain is always available on
+            # macos-latest runners; no daemon setup is required. Happy-path tests
+            # run unconditionally. Locked-Keychain tests create and lock a
+            # temporary Keychain to exercise the graceful degradation path.
+            # The missing-security PATH-stub tests are skipped because go-keyring
+            # hardcodes /usr/bin/security; that degradation path is covered by
+            # MockInitWithError unit tests instead. The build step in the matrix
+            # already produced bin/neo4j-cli via `make build`.
+            - name: Keyring smoke (macOS)
+              if: matrix.os == 'macos-latest'
+              run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
+
             - name: HTTPS smoke test (--insecure against real Neo4j)
               if: matrix.os == 'ubuntu-latest'
               run: NEO4J_HTTPS_TEST=1 go test -run TestHTTPS_Smoke -v ./neo4j-cli/query/...
