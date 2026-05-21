@@ -61,26 +61,28 @@ tasks:
     completed_at: 2026-05-21T06:50:00Z
 
   - id: task-003
-    title: "Commit and push gh-pages, then remove the worktree"
+    title: "Open a PR against gh-pages with the JS fix"
     description: |
-      Inside the `gh-pages` worktree commit the `index.html` change with
-      message `fix(site): agentic-tab copy uses prompt not CLI (CLI-166)`
-      (or similar concise conventional-commit form). Push the
-      `gh-pages` branch to `origin`; GitHub Pages will serve it
-      automatically — there is no PR for `gh-pages`. After push, remove
-      the worktree via `git worktree remove gh-pages` from the repo
-      root. Confirm the live site picks up the change by visiting
-      https://neo4j.sh in a fresh browser session and re-running the
-      step-3 paste check against production.
-    status: pending
+      Per user override of the original "push gh-pages directly" plan,
+      route the JS fix through a PR for review safety. From the
+      `gh-pages` worktree, branch off `gh-pages` to
+      `oskar/cli-166-gh-pages-copy-fix`, carry the uncommitted
+      `index.html` edit forward, commit with message
+      `fix(site): agentic-tab copy uses prompt not CLI (CLI-166)`,
+      push the branch, and open a PR via `gh pr create --base gh-pages
+      --head oskar/cli-166-gh-pages-copy-fix` referencing `(CLI-166)`
+      in the title. Do NOT push to `gh-pages` directly. Leave the
+      worktree in place until the PR merges so the user can revisit.
+      Record the PR URL in the progress file.
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
-      - "Commit lands on the `gh-pages` branch with a concise message naming `CLI-166` and touches only `index.html`."
-      - "`git push origin gh-pages` succeeds; remote `gh-pages` is updated."
-      - "`git worktree remove gh-pages` cleans up; `git worktree list` no longer shows it."
-      - "Production paste check passes: clicking agentic-mode step 3 on https://neo4j.sh copies `Add my Aura credentials — grab client ID and secret from console.neo4j.io`."
-    completed_at: null
+      - "Branch `oskar/cli-166-gh-pages-copy-fix` created in the `gh-pages` worktree, branched off `gh-pages`, holding the `index.html` edit."
+      - "Single commit on that branch with concise message referencing `(CLI-166)`, touches only `index.html`."
+      - "Branch pushed to `origin`; PR opened via `gh pr create --base gh-pages --head <branch>` with `(CLI-166)` in the title and a short body summarising the fix."
+      - "Worktree may stay in place until the PR merges; PR URL recorded in the progress file. Worktree removal deferred until post-merge."
+    completed_at: 2026-05-21T06:41:42Z
 
   - id: task-004
     title: "Encode the copy-UX invariant in website-update.md on main"
