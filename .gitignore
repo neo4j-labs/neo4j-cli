@@ -23,6 +23,7 @@ go.work.sum
 
 # env file
 .env
+.env.aura-login-spike
 
 bin/
 !distribution/**/bin/

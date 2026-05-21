@@ -1,0 +1,122 @@
+feature: aura-device-auth-login-spike
+prd: ./prd-aura-device-auth-login-spike.md
+created_at: 2026-05-21T00:00:00Z
+updated_at: 2026-05-21T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold login command and mount in aura tree"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/login/login.go with a stub
+      cobra.Command (Use: "login", Short description, flush-left Example field
+      with ≥3 invocations, RunE returning nil). Add the Neo4j copyright header.
+      Mount with cmd.AddCommand(login.NewCmd(cfg)) in neo4j-cli/aura/aura.go NewCmd.
+      The .env.aura-login-spike.example and .gitignore entry are already in place.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/subcommands/login/login.go exists with copyright header"
+      - "login.NewCmd(cfg) is added to aura.NewCmd in aura.go"
+      - "neo4j-cli aura login --help runs without error"
+      - "Example field is non-empty and flush-left (TestAllLeafCommands_HaveExamples passes)"
+      - "make fmt-check and make build pass"
+    completed_at: null
+
+  - id: task-002
+    title: "Implement env var reading and validation"
+    description: |
+      Add a loginConfig struct and a readLoginConfig() helper inside login.go that
+      reads NEO4J_AURA_LOGIN_DEVICE_ENDPOINT, NEO4J_AURA_LOGIN_TOKEN_ENDPOINT,
+      NEO4J_AURA_LOGIN_CLIENT_ID, and NEO4J_AURA_LOGIN_AUDIENCE via os.Getenv.
+      Return a clierr.UsageError naming the first missing or empty variable.
+      Call readLoginConfig() at the top of RunE.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "readLoginConfig returns an error naming the unset variable when any of the four env vars is missing or empty"
+      - "readLoginConfig returns a populated struct when all four vars are set"
+      - "RunE surfaces the error from readLoginConfig without panicking"
+      - "Table-driven test in login_test.go covers: all vars set (ok), each var individually missing (error names the var)"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement device code request and print verification prompt"
+    description: |
+      In RunE, POST to loginConfig.DeviceEndpoint with form fields client_id and
+      audience, parse the JSON response into a deviceCodeResponse struct (device_code,
+      user_code, verification_uri, verification_uri_complete, expires_in, interval).
+      Print a message to stderr directing the user to open verification_uri_complete
+      (falling back to verification_uri + user_code if complete is absent).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "POST body contains client_id and audience from env config"
+      - "deviceCodeResponse struct covers all required fields"
+      - "verification_uri_complete is used when present; falls back to verification_uri + user_code"
+      - "User-facing prompt is printed to stderr (not stdout, which is reserved for the token)"
+      - "HTTP error from device endpoint surfaces a clear error message"
+    completed_at: null
+
+  - id: task-004
+    title: "Implement token polling loop with all RFC 8628 error handling"
+    description: |
+      Add a poll loop that fires a POST to loginConfig.TokenEndpoint with grant_type
+      urn:ietf:params:oauth:grant-type:device_code, client_id, and device_code.
+      Use context.WithTimeout from deviceCodeResponse.ExpiresIn. Sleep for the
+      current interval (starting from deviceCodeResponse.Interval) between polls.
+      Handle authorization_pending (continue), slow_down (interval += 5, continue),
+      expired_token (return error), access_denied (return error). On success parse
+      the access_token and print it to stdout.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "authorization_pending is silently swallowed and polling continues"
+      - "slow_down increases the sleep interval by 5 seconds before next poll"
+      - "expired_token returns a clear clierr.UsageError"
+      - "access_denied returns a clear clierr.UsageError"
+      - "Context timeout (expires_in elapsed) returns a clear error"
+      - "Successful token response prints access_token to stdout"
+    completed_at: null
+
+  - id: task-005
+    title: "Write table-driven tests for the login command"
+    description: |
+      Create neo4j-cli/aura/internal/subcommands/login/login_test.go with a
+      httptest.NewServer-based mock covering the full flow. Use table-driven tests
+      for: successful login, authorization_pending then success, slow_down backoff,
+      expired_token error, access_denied error, context timeout, and each missing
+      env var. Use the testutils helpers from neo4j-cli/aura/internal/test/testutils/
+      where applicable.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "login_test.go exists with copyright header"
+      - "Happy-path test: mock returns device code then access token; command prints token to stdout"
+      - "authorization_pending then success: mock returns pending N times then success"
+      - "slow_down: test verifies interval increases (via elapsed time or injected sleep seam)"
+      - "expired_token and access_denied: command returns non-nil error with descriptive message"
+      - "Missing env var: each of the four vars tested individually; error names the missing var"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-006
+    title: "Regenerate skill bundle and run all final gates"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to regenerate the skill bundle
+      after the new login command was added to the tree. Commit the regenerated bundle
+      alongside the source changes. Verify all CI gates pass locally.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... runs without error"
+      - "TestGenerator_RoundTrip passes (no bundle drift)"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make license-check passes"
+    completed_at: null
