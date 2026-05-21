@@ -1,0 +1,113 @@
+feature: cli-166-agentic-tab-copy-prompt
+prd: ./prd-cli-166-agentic-tab-copy-prompt.md
+created_at: 2026-05-21T00:00:00Z
+updated_at: 2026-05-21T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Make Quickstart .step-cmd copy handler mode-aware in gh-pages/index.html"
+    description: |
+      Set up a gh-pages worktree at the repo root via
+      `git worktree add gh-pages gh-pages` and edit
+      `gh-pages/index.html`. Replace the `.step-cmd` click handler block
+      at lines 1871-1879 so it consults the existing `viewMode` global
+      and, in agentic mode, copies the `.agentic-comment` text inside
+      the clicked element (with the leading `> ` and following whitespace
+      stripped) instead of `el.dataset.copy`. When `.agentic-comment` is
+      absent (Quickstart steps 1 and 2 — the install commands), fall
+      back to `data-copy` unconditionally so behaviour is unchanged
+      there. Keep the toast-rendering call shape identical so it
+      reflects the actually-copied string. Do NOT touch the
+      `.copy-mini` handler (lines 1856-1869), the HTML markup, the CSS,
+      or the `> ` prefix that lives in `.agentic-comment` (Invariant 1
+      of `website-update.md` requires it on screen).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`gh-pages` worktree exists at repo-root `gh-pages/` checked out at the `gh-pages` branch."
+      - "`gh-pages/index.html` `.step-cmd` handler reads `viewMode` at click time and, when `viewMode === 'agentic'` AND the clicked element has a `.agentic-comment` descendant, copies `agentic-comment.textContent.trim().replace(/^>\\s*/, '')`."
+      - "When `viewMode === 'cli'` OR the element has no `.agentic-comment`, the handler copies `el.dataset.copy` unchanged."
+      - "Toast message uses whichever string was copied (`'Copied: ' + cmd.slice(0, 40) + …`)."
+      - "Diff is confined to the `.step-cmd` handler block; no edits to markup, CSS, the `.copy-mini` handler, or the `.alt-install` handler."
+      - "`grep -n 'data-copy=\"neo4j-cli credential aura-client add' gh-pages/index.html` still finds the original `data-copy` attribute (the agent prompt is sourced from the DOM, not duplicated as a new attribute)."
+    completed_at: 2026-05-21T06:34:37Z
+
+  - id: task-002
+    title: "Manually verify mode-aware copy in Chrome and Safari"
+    description: |
+      Open `gh-pages/index.html` directly in a browser (file://) from
+      the worktree and exercise every Quickstart step in both modes,
+      pasting into a scratch buffer to confirm the actual clipboard
+      content. Cover: agentic mode steps 3-6 (each pastes the
+      `.agentic-comment` text minus the `> ` prefix and matches the
+      ticket-expected strings); agentic mode steps 1-2 (still paste the
+      install / skill-install commands as today); cli mode steps 1-6
+      (byte-identical paste to pre-fix behaviour — regression check).
+      Spot-check at least one Examples-section `.copy-mini` button in
+      each mode to confirm no collateral damage. Repeat on a second
+      browser (Chrome + Safari) because clipboard API behaviour
+      differs. Record any discrepancy and re-iterate task-001 if a
+      paste does not match.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Agentic mode step 3 pastes exactly `Add my Aura credentials — grab client ID and secret from console.neo4j.io` (no `> `, no CLI text)."
+      - "Agentic mode steps 4, 5, 6 each paste their respective `.agentic-comment` text with the `> ` prefix stripped."
+      - "Agentic mode steps 1 and 2 still paste the install / skill-install commands from `data-copy`."
+      - "CLI mode steps 1-6 each paste the `data-copy` CLI command byte-identically to pre-fix behaviour."
+      - "At least one `.copy-mini` button verified in each mode and still works (regression check)."
+      - "Verified in both Chrome and Safari (clipboard API behaviour differs)."
+    completed_at: 2026-05-21T06:50:00Z
+
+  - id: task-003
+    title: "Open a PR against gh-pages with the JS fix"
+    description: |
+      Per user override of the original "push gh-pages directly" plan,
+      route the JS fix through a PR for review safety. From the
+      `gh-pages` worktree, branch off `gh-pages` to
+      `oskar/cli-166-gh-pages-copy-fix`, carry the uncommitted
+      `index.html` edit forward, commit with message
+      `fix(site): agentic-tab copy uses prompt not CLI (CLI-166)`,
+      push the branch, and open a PR via `gh pr create --base gh-pages
+      --head oskar/cli-166-gh-pages-copy-fix` referencing `(CLI-166)`
+      in the title. Do NOT push to `gh-pages` directly. Leave the
+      worktree in place until the PR merges so the user can revisit.
+      Record the PR URL in the progress file.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Branch `oskar/cli-166-gh-pages-copy-fix` created in the `gh-pages` worktree, branched off `gh-pages`, holding the `index.html` edit."
+      - "Single commit on that branch with concise message referencing `(CLI-166)`, touches only `index.html`."
+      - "Branch pushed to `origin`; PR opened via `gh pr create --base gh-pages --head <branch>` with `(CLI-166)` in the title and a short body summarising the fix."
+      - "Worktree may stay in place until the PR merges; PR URL recorded in the progress file. Worktree removal deferred until post-merge."
+    completed_at: 2026-05-21T06:41:42Z
+
+  - id: task-004
+    title: "Encode the copy-UX invariant in website-update.md on main"
+    description: |
+      Stay on the existing feature branch
+      `oskar/cli-166-agentic-tab-copy` (which already holds the PRD,
+      tasks, and progress commits) and add a new invariant block to
+      `.github/prompts/website-update.md` slotted alongside the
+      existing rendering invariants (~line 75). The block must state
+      that any copy target whose visible content differs between cli
+      and agentic modes (`.step-cmd` and `.copy-mini`) MUST copy
+      `data-copy` / `paneCommands` in cli mode and the agent prompt in
+      agentic mode; for `.step-cmd` the agent prompt is sourced from
+      the `.agentic-comment` text with the leading `> ` stripped;
+      `.step-cmd` elements without an `.agentic-line` fall back to
+      `data-copy` in both modes. Open a single bundled PR against
+      `main` from this feature branch with a title referencing
+      `(CLI-166)`. No changelog entry is needed (prompt-doc only). Do
+      not edit any Go code, regenerate the skill bundle, or touch
+      `gh-pages/index.html` from this branch.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`.github/prompts/website-update.md` gains a copy-UX invariant block describing the mode-aware contract for `.step-cmd` and `.copy-mini`, the `> ` strip rule, and the no-`.agentic-line` fallback."
+      - "Diff is confined to `.github/prompts/website-update.md`; no Go files, no skill bundle, no `gh-pages` files, no changelog entries touched."
+      - "Single feature-branch PR (`oskar/cli-166-agentic-tab-copy` → `main`) bundles PRD, tasks, progress, and this invariant; PR title references `(CLI-166)`."
+    completed_at: 2026-05-21T06:44:18Z
