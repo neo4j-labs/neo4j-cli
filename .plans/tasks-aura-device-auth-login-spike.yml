@@ -171,7 +171,7 @@ tasks:
       user their session has expired and to re-run 'neo4j-cli aura login'. This prevents
       the existing client-credentials grant from firing with an empty secret and producing
       a cryptic 401 from the auth server.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -180,7 +180,7 @@ tasks:
       - "Existing client-credentials path is unaffected when ClientSecret is non-empty"
       - "Unit test in api/token_test.go (or api_test.go) covers the empty-secret branch"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-05-21T08:00:00Z"
 
   - id: task-010
     title: "Regenerate skill bundle and run all final gates"

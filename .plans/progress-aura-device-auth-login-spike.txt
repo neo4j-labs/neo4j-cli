@@ -31,3 +31,7 @@ Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/aura_test.
 ## TASK-008 — 2026-05-21T07:00:00Z
 Changed `pollForToken` return type from `(string, error)` to `(*tokenResponse, error)`; added `ExpiresIn int` to `tokenResponse`; `RunE` now calls `cfg.Credentials.Aura.AddOrUpdateFromToken` and prints confirmation to stderr instead of token to stdout. Tests updated: `newTestConfig`+`buildAndRunWithCfg` helpers use in-memory FS credentials; happy-path and pending-then-success tests assert credential persisted and no token on stdout; skill bundle regenerated.
 Files: ~neo4j-cli/aura/internal/subcommands/login/login.go, ~neo4j-cli/aura/internal/subcommands/login/login_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
+## TASK-009 — 2026-05-21T08:00:00Z
+Added empty-`ClientSecret` guard in `getToken` before the client-credentials HTTP call; surfaces a `clierr.AuthError` with a re-login hint instead of a cryptic 401. Updated `NewAuraTestHelper` fixture to include non-empty `client-id`/`client-secret`, fixing downstream test assertions in `get_test.go`.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/api_test.go, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go, ~neo4j-cli/aura/internal/subcommands/instance/get_test.go

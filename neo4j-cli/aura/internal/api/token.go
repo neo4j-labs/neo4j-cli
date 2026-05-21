@@ -31,6 +31,10 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 		return credential.AccessToken, nil
 	}
 
+	if credential.ClientSecret == "" {
+		return "", clierr.NewAuthError("your session has expired; run 'neo4j-cli aura login' to authenticate")
+	}
+
 	authURL := cfg.Aura.AuthUrl()
 	if err := urlcheck.ValidateRemoteURL(authURL); err != nil {
 		return "", clierr.NewUsageError("aura auth-url rejected: %s", err.Error())
