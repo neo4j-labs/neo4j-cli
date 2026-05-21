@@ -6,3 +6,7 @@ Decisions: PRD claimed no bundle regen needed but install/remove Long embeds age
 ## task-002 — 2026-05-21T06:45:00Z
 Inserted Antigravity before Gemini CLI in README supported-agents sentence to match catalog order.
 Files: ~README.md
+
+## task-003 — 2026-05-21T08:36:00Z
+Added changie Patch entry for Antigravity skill install support via `changie new`.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260521-083544.yaml

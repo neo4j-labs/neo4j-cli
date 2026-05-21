@@ -50,11 +50,11 @@ tasks:
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` with fields `project: neo4j-cli`,
       `kind: Patch`, `body: 'Add skill install support for Antigravity CLI.'`,
       and an RFC3339 `time:` (per `.agents/` notes).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "One new YAML file exists under `.changes/unreleased/` with `project: neo4j-cli`, `kind: Patch`, body matching the task description, and a valid RFC3339 `time:` field."
       - "No other unreleased changelog entries are added or modified."
       - "`make test` still passes (changelog dir is not gated by tests, but sanity-check there is no regression)."
-    completed_at: null
+    completed_at: 2026-05-21T08:36:00Z
