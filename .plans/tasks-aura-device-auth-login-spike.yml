@@ -109,7 +109,7 @@ tasks:
       Run go generate ./neo4j-cli/internal/skill/... to regenerate the skill bundle
       after the new login command was added to the tree. Commit the regenerated bundle
       alongside the source changes. Verify all CI gates pass locally.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -119,4 +119,4 @@ tasks:
       - "make fmt-check passes"
       - "make lint passes"
       - "make license-check passes"
-    completed_at: null
+    completed_at: "2026-05-21T05:00:00Z"
