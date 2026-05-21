@@ -87,26 +87,27 @@ tasks:
   - id: task-004
     title: "Encode the copy-UX invariant in website-update.md on main"
     description: |
-      On a fresh branch off `main` (e.g. `oskar/cli-166-copy-invariant`)
-      add a new invariant block to `.github/prompts/website-update.md`
-      slotted alongside the existing rendering invariants (~line 75)
-      and reflected in the document's invariants list. The block must
-      state that any copy target whose visible content differs between
-      cli and agentic modes (`.step-cmd` and `.copy-mini`) MUST copy
+      Stay on the existing feature branch
+      `oskar/cli-166-agentic-tab-copy` (which already holds the PRD,
+      tasks, and progress commits) and add a new invariant block to
+      `.github/prompts/website-update.md` slotted alongside the
+      existing rendering invariants (~line 75). The block must state
+      that any copy target whose visible content differs between cli
+      and agentic modes (`.step-cmd` and `.copy-mini`) MUST copy
       `data-copy` / `paneCommands` in cli mode and the agent prompt in
       agentic mode; for `.step-cmd` the agent prompt is sourced from
       the `.agentic-comment` text with the leading `> ` stripped;
       `.step-cmd` elements without an `.agentic-line` fall back to
-      `data-copy` in both modes. Open a PR with title referencing
+      `data-copy` in both modes. Open a single bundled PR against
+      `main` from this feature branch with a title referencing
       `(CLI-166)`. No changelog entry is needed (prompt-doc only). Do
       not edit any Go code, regenerate the skill bundle, or touch
       `gh-pages/index.html` from this branch.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
-      - "Branch `oskar/cli-166-copy-invariant` (or similar `oskar/`-prefixed name) created off `main`."
       - "`.github/prompts/website-update.md` gains a copy-UX invariant block describing the mode-aware contract for `.step-cmd` and `.copy-mini`, the `> ` strip rule, and the no-`.agentic-line` fallback."
       - "Diff is confined to `.github/prompts/website-update.md`; no Go files, no skill bundle, no `gh-pages` files, no changelog entries touched."
-      - "PR opened against `main` via `gh pr create` with a title referencing `(CLI-166)`."
-    completed_at: null
+      - "Single feature-branch PR (`oskar/cli-166-agentic-tab-copy` → `main`) bundles PRD, tasks, progress, and this invariant; PR title references `(CLI-166)`."
+    completed_at: 2026-05-21T06:44:18Z

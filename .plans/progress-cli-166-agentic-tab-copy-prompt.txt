@@ -39,3 +39,8 @@ Gates: make fmt-check OK, make lint 0 issues, make test all packages OK.
 Pushed gh-pages-side branch `oskar/cli-166-gh-pages-copy-fix` and opened PR https://github.com/neo4j-labs/neo4j-cli/pull/164 against `gh-pages` (no direct push to gh-pages per user override).
 Files: ~gh-pages/index.html, ~.plans/tasks-cli-166-agentic-tab-copy-prompt.yml
 Decisions: PR flow chosen over direct push for site-change review safety; worktree kept until PR merges.
+
+## TASK-004 — 2026-05-21T06:44:18Z
+Added mode-aware copy-UX invariant (Invariant 4) to .github/prompts/website-update.md; bundled into the feature-branch PR against main.
+Files: ~.github/prompts/website-update.md, ~.plans/tasks-cli-166-agentic-tab-copy-prompt.yml
+Decisions: kept on existing feature branch (oskar/cli-166-agentic-tab-copy) for one bundled PR rather than spawning a new branch.
