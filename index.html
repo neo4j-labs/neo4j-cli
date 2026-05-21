@@ -1868,10 +1868,14 @@
     });
   });
 
-  // ---------- Step copy ----------
+  // ---------- Step copy (mode-aware) ----------
   document.querySelectorAll('.step-cmd').forEach(el => {
     el.addEventListener('click', async () => {
-      const cmd = el.dataset.copy;
+      let cmd = el.dataset.copy;
+      if (viewMode === 'agentic') {
+        const agentText = el.querySelector('.agentic-comment')?.textContent.trim();
+        if (agentText) cmd = agentText.replace(/^>\s*/, '');
+      }
       if (!cmd) return;
       const ok = await copyText(cmd);
       if (ok) showToast('Copied: ' + cmd.slice(0, 40) + (cmd.length > 40 ? '…' : ''));
