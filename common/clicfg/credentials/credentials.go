@@ -275,6 +275,10 @@ func (c *Credentials) saveWithKeyring() error {
 // MigrateToKeyring moves all sensitive credential fields from in-memory (and
 // JSON) to the OS keyring. It iterates all three credential types.
 //
+// The keyring is probed for availability before any credentials are touched.
+// If the keyring daemon is unreachable, a clierr.UsageError is returned
+// immediately, before any keyring writes, with a hint to use insecure mode.
+//
 // Required fields (ClientSecret for Aura, Password for Dbms): if empty, the
 // migration is aborted, all keyring entries written so far are rolled back via
 // keyring.Delete(), and a clierr.UsageError is returned naming the credential
@@ -294,6 +298,14 @@ func (c *Credentials) saveWithKeyring() error {
 // dispatching to saveWithKeyring(). The caller should call SetStorageMode after
 // persisting the config key.
 func (c *Credentials) MigrateToKeyring() error {
+	// Probe keyring availability before writing any entries.
+	if err := ProbeKeyringAvailability(); err != nil {
+		return clierr.NewUsageError(
+			"keyring is unavailable (%v); run `neo4j-cli config set credential-storage insecure --rw` to use plaintext storage instead",
+			err,
+		)
+	}
+
 	// written tracks every (user-key) pair written so far so we can roll back
 	// on partial failure.
 	type entry struct{ user string }

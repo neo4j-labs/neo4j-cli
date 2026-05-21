@@ -105,7 +105,10 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 //
 //   - Existing credentials: writes "insecure" (preserves current behaviour for
 //     upgrading users) and emits a one-time upgrade notice to stderr.
-//   - No credentials: writes "keyring" silently (secure default for new installs).
+//   - No credentials + keyring available: writes "keyring" silently (secure
+//     default for new installs).
+//   - No credentials + keyring unavailable: emits a warning and writes
+//     "insecure" as a graceful fallback (e.g. headless Linux without D-Bus).
 //
 // After writing the default, the in-memory storage mode on cfg.Credentials is
 // updated so the current invocation uses the correct mode.
@@ -126,9 +129,19 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
 		}
 	} else {
-		// Fresh install: default to keyring.
-		if err := cfg.Global.Set("credential-storage", credentials.StorageModeKeyring); err == nil {
-			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring)
+		// Fresh install: prefer keyring, but fall back to insecure if the
+		// OS keyring daemon is unavailable (e.g. headless Linux without D-Bus).
+		if probeErr := credentials.ProbeKeyringAvailability(); probeErr != nil {
+			_, _ = fmt.Fprintf(stderr, "Warning: OS keyring is unavailable (%v); defaulting to plaintext credential storage.\n", probeErr)
+			_, _ = fmt.Fprintln(stderr, "To retry with keyring storage once the daemon is available, run:")
+			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
+			if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
+				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure)
+			}
+		} else {
+			if err := cfg.Global.Set("credential-storage", credentials.StorageModeKeyring); err == nil {
+				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring)
+			}
 		}
 	}
 }

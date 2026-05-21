@@ -4,6 +4,7 @@
 package credentials
 
 import (
+	"errors"
 	"fmt"
 
 	gokeyring "github.com/zalando/go-keyring"
@@ -52,4 +53,21 @@ var ErrNotFound = gokeyring.ErrNotFound
 // across credential types and names.
 func KeyringKey(credType, name, field string) string {
 	return fmt.Sprintf("%s/%s/%s", credType, name, field)
+}
+
+// probeKey is the sentinel user-key used by ProbeKeyringAvailability to test
+// whether the OS keyring daemon is reachable without touching real credentials.
+const probeKey = "__neo4j-cli-probe__"
+
+// ProbeKeyringAvailability tests whether the OS keyring is reachable. It calls
+// Get with a well-known probe key and considers the keyring available if the
+// result is nil or ErrNotFound (daemon is running but entry is absent). Any
+// other error indicates that the keyring daemon is unavailable (e.g. no D-Bus
+// session on headless Linux, locked Keychain on macOS) and is returned as-is.
+func ProbeKeyringAvailability() error {
+	_, err := defaultKeyring.Get(ServiceName, probeKey)
+	if err == nil || errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	return err
 }

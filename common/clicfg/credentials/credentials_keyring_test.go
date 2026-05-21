@@ -516,6 +516,47 @@ func TestMigrateToKeyring_EmptyRequiredField_RollsBackPreviousEntries(t *testing
 	assert.ErrorIs(t, getErr, credentials.ErrNotFound, "rolled-back aura/prod/client-secret must not remain in keyring")
 }
 
+// TestMigrateToKeyring_KeyringUnavailable verifies that MigrateToKeyring returns
+// a UsageError immediately when the keyring daemon is unreachable, before
+// writing any keyring entries. The probe check runs even when no credentials
+// exist, so both sub-cases are covered.
+func TestMigrateToKeyring_KeyringUnavailable(t *testing.T) {
+	tests := []struct {
+		name     string
+		credJSON string
+	}{
+		{
+			name:     "keyring unavailable with credentials present",
+			credJSON: `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"s3cr3t","access-token":"","token-expiry":0}]}}`,
+		},
+		{
+			name:     "keyring unavailable with no credentials",
+			credJSON: `{"aura":{"credentials":[]}}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// probeStubProvider (defined in keyring_test.go, same test package)
+			// returns a non-ErrNotFound error for every Get, simulating an
+			// unavailable keyring daemon.
+			stub := &probeStubProvider{getErr: errors.New("keyring daemon unavailable")}
+			credentials.SetKeyringProviderForTest(t, stub)
+
+			fs, err := testfs.GetTestFs("{}", tc.credJSON)
+			require.NoError(t, err)
+			creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+			// Stay in insecure mode (default) so NewCredentials / load() does
+			// not touch the keyring before MigrateToKeyring is called.
+
+			migrateErr := creds.MigrateToKeyring()
+			require.Error(t, migrateErr)
+			assert.Contains(t, migrateErr.Error(), "keyring is unavailable")
+			assert.Contains(t, migrateErr.Error(), "insecure")
+		})
+	}
+}
+
 // --- MigrateToInsecure tests ---
 
 // TestMigrateToInsecure_Success verifies the happy path: all secrets are read

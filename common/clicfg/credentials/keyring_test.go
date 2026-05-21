@@ -4,6 +4,7 @@
 package credentials_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg/credentials"
@@ -117,6 +118,63 @@ func TestSetKeyringProviderForTest_SwapsAndRestores(t *testing.T) {
 
 	// After the test (via t.Cleanup) the real provider is restored — we cannot
 	// observe that here but the seam is at least verified not to panic.
+}
+
+// errProbe is a non-ErrNotFound sentinel used in probe tests.
+var errProbe = errors.New("keyring daemon unavailable")
+
+// TestProbeKeyringAvailability verifies that the function treats ErrNotFound as
+// success (daemon is reachable, probe key simply absent) and any other error as
+// a failure (daemon unavailable).
+func TestProbeKeyringAvailability(t *testing.T) {
+	tests := []struct {
+		name    string
+		getErr  error
+		wantErr bool
+	}{
+		{
+			name:    "ErrNotFound: probe succeeds",
+			getErr:  credentials.ErrNotFound,
+			wantErr: false,
+		},
+		{
+			name:    "non-ErrNotFound: probe fails",
+			getErr:  errProbe,
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := &probeStubProvider{getErr: tc.getErr}
+			credentials.SetKeyringProviderForTest(t, stub)
+
+			err := credentials.ProbeKeyringAvailability()
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tc.getErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// probeStubProvider is a KeyringProvider whose Get always returns getErr.
+type probeStubProvider struct {
+	getErr error
+}
+
+func (p *probeStubProvider) Get(_, _ string) (string, error) {
+	return "", p.getErr
+}
+
+func (p *probeStubProvider) Set(_, _, _ string) error {
+	return nil
+}
+
+func (p *probeStubProvider) Delete(_, _ string) error {
+	return nil
 }
 
 func TestMockKeyringProvider_GetSetDelete(t *testing.T) {

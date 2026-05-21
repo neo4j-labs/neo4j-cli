@@ -5,6 +5,7 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -106,6 +107,32 @@ func TestInitCredentialStorageDefault(t *testing.T) {
 			assert.Equal(t, tc.wantCredStorage, cfg.Global.CredentialStorage())
 		})
 	}
+}
+
+// TestInitCredentialStorageDefault_NoCreds_KeyringUnavailable verifies that
+// when no credentials exist but the OS keyring daemon is unavailable, the
+// function falls back to insecure mode and emits a warning to stderr.
+func TestInitCredentialStorageDefault_NoCreds_KeyringUnavailable(t *testing.T) {
+	someErr := errors.New("dbus connection refused")
+	gokeyring.MockInitWithError(someErr)
+
+	fs, err := testfs.GetTestFs("{}", "{}")
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	var stderr bytes.Buffer
+	initCredentialStorageDefault(cfg, &stderr)
+
+	// Must have written insecure (not keyring) because the probe failed.
+	assert.Equal(t, credentials.StorageModeInsecure, cfg.Credentials.StorageMode())
+	assert.True(t, cfg.Global.CredentialStorageIsSet())
+	assert.Equal(t, credentials.StorageModeInsecure, cfg.Global.CredentialStorage())
+
+	// Must have emitted a warning mentioning keyring unavailability.
+	stderrOut := stderr.String()
+	assert.Contains(t, stderrOut, "keyring")
+	assert.Contains(t, stderrOut, "unavailable")
 }
 
 // TestInitCredentialStorageDefault_SubsequentRuns_NoNotice verifies that a
