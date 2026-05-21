@@ -53,6 +53,7 @@
 - [neo4j-cli aura instance snapshot get](#neo4j-cli-aura-instance-snapshot-get)
 - [neo4j-cli aura instance snapshot list](#neo4j-cli-aura-instance-snapshot-list)
 - [neo4j-cli aura instance update](#neo4j-cli-aura-instance-update)
+- [neo4j-cli aura login](#neo4j-cli-aura-login)
 - [neo4j-cli aura organization](#neo4j-cli-aura-organization)
 - [neo4j-cli aura organization get](#neo4j-cli-aura-organization-get)
 - [neo4j-cli aura organization list](#neo4j-cli-aura-organization-list)
@@ -1479,6 +1480,34 @@ neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-000
 
 # Rename and resize, emitting JSON for scripting
 neo4j-cli aura instance update 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --name my-renamed-instance --memory 8GB --rw --format json
+```
+
+## neo4j-cli aura login
+
+Authenticate with Aura using the device authorization flow
+
+Authenticate with Aura using the OAuth 2.0 Device Authorization Grant (RFC 8628).
+On success, the access token is printed to stdout.
+
+The following environment variables must be set before running:
+  NEO4J_AURA_LOGIN_DEVICE_ENDPOINT  Device authorization endpoint URL
+  NEO4J_AURA_LOGIN_TOKEN_ENDPOINT    Token endpoint URL
+  NEO4J_AURA_LOGIN_CLIENT_ID         Public OAuth client ID
+  NEO4J_AURA_LOGIN_AUDIENCE          OAuth audience
+
+Usage: `neo4j-cli aura login`
+
+Examples:
+
+```
+# Log in interactively; the command prints a URL to open in your browser
+neo4j-cli aura login
+
+# Source the example env file first, then log in
+source .env.aura-login-spike && neo4j-cli aura login
+
+# Capture the access token into a shell variable for use in subsequent calls
+TOKEN=$(neo4j-cli aura login)
 ```
 
 ## neo4j-cli aura organization

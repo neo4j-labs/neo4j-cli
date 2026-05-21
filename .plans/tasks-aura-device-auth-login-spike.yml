@@ -12,7 +12,7 @@ tasks:
       with ≥3 invocations, RunE returning nil). Add the Neo4j copyright header.
       Mount with cmd.AddCommand(login.NewCmd(cfg)) in neo4j-cli/aura/aura.go NewCmd.
       The .env.aura-login-spike.example and .gitignore entry are already in place.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/aura/internal/subcommands/login/login.go exists with copyright header"
@@ -20,7 +20,7 @@ tasks:
       - "neo4j-cli aura login --help runs without error"
       - "Example field is non-empty and flush-left (TestAllLeafCommands_HaveExamples passes)"
       - "make fmt-check and make build pass"
-    completed_at: null
+    completed_at: "2026-05-21T00:00:00Z"
 
   - id: task-002
     title: "Implement env var reading and validation"
