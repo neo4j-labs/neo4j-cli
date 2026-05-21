@@ -36,6 +36,8 @@ Spike that implements OAuth 2.0 Device Authorization Grant (RFC 8628) as a new `
 - **REQ-F-008**: After a successful token exchange, persist the token into the credential store under the fixed name `"login"` via a new `AuraCredentials.AddOrUpdateFromToken(name, clientId, accessToken string, expiresIn int64)` method. If a credential named `"login"` already exists, update its `AccessToken` and `TokenExpiry` in-place. Set `"login"` as the default credential if no default is currently set.
 - **REQ-F-009**: Update `pollForToken` (or its caller) to return the full token response including `expires_in` so `AddOrUpdateFromToken` can compute the correct expiry.
 - **REQ-F-010**: In `neo4j-cli/aura/internal/api/token.go`, when the resolved credential has an empty `ClientSecret` and no valid access token, return a `clierr.AuthError` telling the user to re-run `neo4j-cli aura login` rather than attempting a client-credentials grant that would fail.
+- **REQ-F-011**: `AddOrUpdateFromToken` must **always** set the named credential as the default (not only when `DefaultCredential == ""`), so that running `neo4j-cli aura login` makes subsequent commands use the new device-auth token regardless of any previously stored default credential.
+- **REQ-F-012**: Update the login confirmation message to indicate the credential has been set as the active default (e.g. `Login successful. Credential "login" stored and set as default.`).
 - **REQ-F-007**: Read all auth configuration from environment variables at runtime (via `os.Getenv`). Required variables:
   - `NEO4J_AURA_LOGIN_DEVICE_ENDPOINT` — device authorization endpoint URL
   - `NEO4J_AURA_LOGIN_TOKEN_ENDPOINT` — token endpoint URL
@@ -100,7 +102,7 @@ neo4j-cli config set aura.auth-url <dev-token-endpoint>
 ## Acceptance Criteria
 
 - [ ] `neo4j-cli aura login` initiates device auth, prints a verification URL + code, polls, and on success prints a confirmation message (not the raw token).
-- [ ] After login, `neo4j-cli aura instance list` (or any other aura read command) succeeds without specifying a credential.
+- [ ] After login, `neo4j-cli aura instance list` (or any other aura read command) succeeds without specifying a credential, **even if another credential was previously the default**.
 - [ ] Re-running `neo4j-cli aura login` updates the stored token in-place (no duplicate credential created).
 - [ ] When the stored token is expired and `ClientSecret` is empty, the error message directs the user to re-run `neo4j-cli aura login`.
 - [ ] `authorization_pending` is silently swallowed and polling continues.
