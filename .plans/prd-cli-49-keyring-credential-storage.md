@@ -45,6 +45,8 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 - REQ-F-013: **Missing-secret behaviour during migration** — applied symmetrically in both directions (forward: empty value in JSON; reverse: `ErrNotFound` from keyring):
   - **Aura `ClientSecret`** and **Dbms `Password`**: treated as required — a missing value is a hard error. Migration aborts, rolls back, config unchanged. Error message names the credential and suggests removing it with `neo4j-cli credential <type> remove <name>` before retrying.
   - **Aura `AccessToken`** and **Embed `APIKey`**: treated as optional/cacheable — a missing value is silently skipped (no keyring entry written for forward; empty value written to JSON for reverse). A keyring error *other than* `ErrNotFound` (e.g., daemon unavailable, permission denied) is still a hard error for all field types.
+- REQ-F-014: **First-run keyring availability probe** — when first-run default detection (REQ-F-011) would write `credential-storage: keyring` (i.e., no existing credentials), the keyring is first probed for availability. If the probe fails (e.g., `dbus-launch` not found on Linux), a warning is emitted to stderr and `credential-storage: insecure` is written instead. The warning names the failure and provides the command to retry once the keyring daemon is available.
+- REQ-F-015: **Explicit keyring probe on `config set credential-storage keyring`** — before accepting `keyring` as the new mode (regardless of whether credentials exist), the keyring is probed. If unavailable, the command returns a `UsageError` identifying the keyring failure and instructing the user to either fix the keyring daemon or run `neo4j-cli config set credential-storage insecure --rw`. The config key is not written.
 
 ### Non-Functional Requirements
 
@@ -52,6 +54,17 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 - REQ-NF-002: Unit tests must use the library's mock/in-memory provider so that tests run without a real keyring daemon on any platform.
 - REQ-NF-003: Migration during `config set credential-storage` must complete within a few seconds for users with fewer than 20 credentials.
 - REQ-NF-004: If a credential's keyring entry is missing during a `keyring`-mode read (e.g., the OS keyring was cleared externally), the CLI must return a clear error naming the missing credential rather than silently returning an empty secret.
+- REQ-NF-005: Keyring availability is probed by issuing a `Get()` for a sentinel key (`__neo4j-cli-probe__`). `ErrNotFound` indicates the keyring daemon is reachable (the key simply does not exist). Any other error indicates the keyring is unavailable. The probe uses the same `KeyringProvider` test seam so tests can inject errors without a real daemon.
+- REQ-NF-006: Linux keyring behaviour must be covered by subprocess-driven e2e smoke tests (build tag `keyring_smoke && linux`) in `test/e2e/keyring/keyring_linux_test.go`. Tests drive the real `bin/neo4j-cli` binary with a temp `HOME` for credential isolation. Two groups:
+  - **No-daemon tests** (always run on Linux CI): subprocess env strips `DBUS_SESSION_BUS_ADDRESS`; verifies graceful degradation (REQ-F-014, REQ-F-015) — warning + insecure fallback on first run, hard error on explicit `config set keyring`.
+  - **With-daemon tests** (must always run in CI; skip gracefully only in local dev): verifies full credential lifecycle in keyring mode — add, migration forward/reverse, remove. Skip guard: if `DBUS_SESSION_BUS_ADDRESS` is absent AND `CI` env var is not `"true"`, call `t.Skip`. If `DBUS_SESSION_BUS_ADDRESS` is absent AND `CI=true`, call `t.Fatal` — a missing session bus in CI means the `dbus-run-session` + `gnome-keyring` setup step has failed, and the test suite must not silently pass.
+- REQ-NF-007: Windows keyring behaviour must be covered by subprocess-driven e2e smoke tests (build tag `keyring_smoke && windows`) in `test/e2e/keyring/keyring_windows_test.go`. Tests drive the real `bin/neo4j-cli.exe` binary with an isolated temp `USERPROFILE`/`APPDATA`. Tests always run on `windows-latest` CI (Windows Credential Manager is a built-in Win32 service with no daemon; `ErrUnsupportedPlatform` is not raised on Windows). Test groups:
+  - **Happy-path tests** (always run — Credential Manager is always available on standard Windows): verifies the full credential lifecycle in keyring mode — add, migration forward/reverse, remove. Mirrors the Linux with-daemon group.
+  - **Graceful degradation tests**: Credential Manager unavailability on Windows (containers, service accounts) cannot be reliably simulated in standard CI. This path is validated by the platform-agnostic unit tests in REQ-NF-005 using `MockInitWithError()`; no separate Windows e2e group is needed.
+- REQ-NF-008: macOS Keychain behaviour must be covered by subprocess-driven e2e smoke tests (build tag `keyring_smoke && darwin`) in `test/e2e/keyring/keyring_darwin_test.go`. Tests drive the real `bin/neo4j-cli` binary with a temp `HOME` for credential isolation. Three groups:
+  - **Happy-path tests** (always run on macos-latest — Keychain is always available on standard macOS): verifies the full credential lifecycle in keyring mode — add, migration forward/reverse, remove. Mirrors the Windows happy-path group.
+  - **Locked-Keychain tests** (graceful degradation via custom Keychain): create a temporary Keychain (`security create-keychain`), make it the default, lock it (`security lock-keychain`), run neo4j-cli, verify the probe triggers the expected graceful-degradation behavior (REQ-F-014 warning+insecure fallback on first run; REQ-F-015 hard error on `config set keyring`). Restore the original default Keychain in `t.Cleanup`.
+  - **Missing-security tests** (graceful degradation via PATH override): set subprocess PATH to a temp dir containing a stub `security` executable that always exits non-zero, prepended before `/usr/bin/`. Verifies graceful degradation when the `security` binary is absent or broken. Note: this group only works if go-keyring invokes `security` via PATH lookup; if it hardcodes `/usr/bin/security`, this group falls back to unit-test coverage and the test must be skipped or adapted during implementation.
 
 ## Technical Considerations
 
@@ -129,7 +142,96 @@ This runs on every invocation but exits immediately after the key-presence check
 
 ### Linux / Headless CI
 
-On Linux without a running Secret Service daemon, `keyring.Get()` / `keyring.Set()` return an error. This surfaces REQ-F-006 — a clear error with instructions to switch to `insecure` mode. CI users should set `credential-storage: insecure` in their config file or equivalent. A follow-up issue will address env-var-based injection as the idiomatic CI pattern.
+On Linux without a running Secret Service daemon (e.g., `dbus-launch` not found in `$PATH`), `keyring.Get()` / `keyring.Set()` return an error such as `exec: "dbus-launch": executable file not found in $PATH`.
+
+**Probe function** — `ProbeKeyringAvailability() error` in `common/clicfg/credentials/keyring.go` calls `defaultKeyring.Get(ServiceName, "__neo4j-cli-probe__")`. `ErrNotFound` → nil (keyring reachable); any other error → that error (keyring unavailable). Uses the same `defaultKeyring` test seam as the rest of the package.
+
+**First-run path** (REQ-F-014) — `initCredentialStorageDefault` in `neo4j-cli/app/app.go` calls `ProbeKeyringAvailability()` before writing `credential-storage: keyring` when no credentials exist. On failure it warns to stderr and writes `insecure` instead.
+
+**Explicit migration path** (REQ-F-015) — `MigrateToKeyring()` in `common/clicfg/credentials/credentials.go` calls `ProbeKeyringAvailability()` at the top, before iterating any credentials. On failure it returns a `clierr.UsageError` immediately. This covers both the has-creds case (where the existing error surfacing was already correct but message is improved) and the no-creds case (where no `keyring.Set()` calls would otherwise have been made).
+
+CI users should set `credential-storage: insecure` in their config file. A follow-up issue will address env-var-based injection as the idiomatic CI pattern.
+
+### macOS Keychain
+
+go-keyring on macOS spawns `/usr/bin/security` as a subprocess (no CGo, no daemon). The `security` binary is part of every standard macOS install and is protected by SIP, so it cannot be deleted. It is always present on `macos-latest` CI runners.
+
+**Failure modes:**
+- **Locked Keychain**: if the default Keychain is locked and `security` cannot prompt the user (headless CI), the command exits non-zero. go-keyring surfaces this as a generic `exec.ExitError`, which `ProbeKeyringAvailability()` classifies as unavailable.
+- **Missing/broken `security` binary**: if the binary is replaced by a failing stub (PATH override), `exec.Command` returns an `*exec.ExitError` (or `exec.ErrNotFound` if PATH lookup fails). Same classification path.
+- **Data too large**: `ErrSetDataTooBig` if the combined command string exceeds ~4096 bytes. Not a graceful-degradation scenario; surface as a regular credential error.
+
+**GitHub Actions macOS runners**: start with an unlocked login Keychain. Happy-path tests should work without any setup. The locked-Keychain test creates and manages its own temporary Keychain to avoid mutating the runner's login Keychain.
+
+**Probe coverage**: `ProbeKeyringAvailability()` (REQ-NF-005) catches all non-ErrNotFound errors from the `security` binary, including locked Keychain and broken-binary failures, triggering the same graceful degradation as Linux.
+
+**Home directory isolation on macOS**: subprocess env sets `HOME` (neo4j-cli uses `os.UserHomeDir()` to locate config on macOS).
+
+**Locked-Keychain test setup**:
+```
+security create-keychain -p "" /tmp/neo4j-cli-smoke-<pid>.keychain-db
+security list-keychains -d user -s /tmp/neo4j-cli-smoke-<pid>.keychain-db <original-keychains...>
+security default-keychain -s /tmp/neo4j-cli-smoke-<pid>.keychain-db
+security lock-keychain /tmp/neo4j-cli-smoke-<pid>.keychain-db
+```
+Cleanup (in `t.Cleanup`): restore original default Keychain, restore search list, `security delete-keychain /tmp/neo4j-cli-smoke-<pid>.keychain-db`.
+
+**PATH-override test**: create a temp dir with a `security` shell script that `exit 1`; prepend to PATH in subprocess env. Effective only if go-keyring uses `exec.Command("security", ...)` (PATH-resolved). If it uses the full path `/usr/bin/security`, this test must be skipped (document via `t.Skip` with an explanation) — the unit tests with `MockInitWithError()` cover this path instead.
+
+### Windows Credential Manager
+
+`advapi32.dll` (always present on standard Windows — part of LSASS, no external daemon). Unlike Linux, there is no external process dependency; `ErrUnsupportedPlatform` from go-keyring only fires on truly unsupported platforms (not Windows, macOS, or Linux).
+
+**Known size limit**: `wincred` caps the credential blob at 2560 bytes. All current sensitive fields (client secrets, OAuth tokens, passwords, API keys) are well under this limit; future fields should be checked.
+
+**Edge cases where Credential Manager can fail** (analogous to Linux's missing dbus-launch, but rarer):
+- **Windows containers** (process isolation mode): Credential Manager may be unavailable under the container service account.
+- **Service account without user profile**: DPAPI encryption of credentials requires a loaded user profile; running as SYSTEM or a headless service account without `LoadUserProfile` can fail.
+
+**Probe coverage**: The platform-agnostic `ProbeKeyringAvailability()` (REQ-NF-005) catches these failures and triggers the same graceful degradation as Linux (REQ-F-014, REQ-F-015). No Windows-specific probe code is needed.
+
+**E2E simulation gap**: Credential Manager unavailability cannot be reliably simulated on `windows-latest` CI without running inside a Windows container or service account context. The graceful degradation path is therefore validated solely by unit tests using `MockInitWithError()`. Happy-path e2e tests cover the standard case (REQ-NF-007).
+
+**Home directory isolation on Windows**: Tests use `t.TempDir()` and set both `USERPROFILE` and `APPDATA` env vars in the subprocess (neo4j-cli constructs the config path from `APPDATA` on Windows via `os.UserConfigDir()`).
+
+### Linux Keyring E2E Smoke Tests
+
+Subprocess-driven smoke tests in `test/e2e/keyring/` using a split-file layout:
+- `helpers_test.go` (`//go:build keyring_smoke`): shared helpers — repo-root walk-up, binary path resolution, HOME/USERPROFILE isolation, credentials.json reader.
+- `keyring_linux_test.go` (`//go:build keyring_smoke && linux`): Linux-specific tests.
+- `keyring_windows_test.go` (`//go:build keyring_smoke && windows`): Windows-specific tests (see REQ-NF-007).
+
+Linux tests: `test/e2e/keyring/keyring_linux_test.go` Each test creates a temp dir and sets `HOME` to it so credential files are isolated. The repo-root helper (`runtime.Caller(0)` walk-up) locates `bin/neo4j-cli` (built by `make build`).
+
+**No-daemon group** (always run on Linux CI, no dbus-run-session needed):
+- Strip `DBUS_SESSION_BUS_ADDRESS` and `DBUS_LAUNCHD_SESSION_BUS_SOCKET` from subprocess env.
+- `TestKeyring_NoDaemon_FirstRun_WritesInsecureAndWarns`: run any neo4j-cli command on a fresh install; verify `credential-storage: insecure` written to config.json, warning on stderr.
+- `TestKeyring_NoDaemon_ConfigSet_FailsWithNoCreds`: run `config set credential-storage keyring --rw` with no credentials; assert non-zero exit and keyring error in stderr.
+- `TestKeyring_NoDaemon_ConfigSet_FailsWithExistingCreds`: pre-seed an insecure credential, then run `config set credential-storage keyring --rw`; assert non-zero exit and keyring error in stderr.
+
+**With-daemon group** (mandatory in CI; graceful skip in local dev without a session bus):
+- Inherit parent env (which has the session bus address from `dbus-run-session`).
+- Guard at top of each with-daemon test:
+  ```go
+  if os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "" {
+      if os.Getenv("CI") == "true" {
+          t.Fatal("DBUS_SESSION_BUS_ADDRESS not set in CI — dbus-run-session/gnome-keyring setup failed")
+      }
+      t.Skip("DBUS_SESSION_BUS_ADDRESS not set; run inside dbus-run-session for with-daemon tests")
+  }
+  ```
+- `TestKeyring_WithDaemon_CredentialAddDoesNotStoreSecretInJSON`: add a dbms credential in keyring mode; assert password absent from credentials.json.
+- `TestKeyring_WithDaemon_ForwardMigration`: start in insecure mode with a seeded dbms credential; run `config set credential-storage keyring --rw`; assert password absent from credentials.json afterwards.
+- `TestKeyring_WithDaemon_ReverseMigration`: start in keyring mode with a seeded keyring entry; run `config set credential-storage insecure --rw`; assert password present in credentials.json afterwards.
+- `TestKeyring_WithDaemon_RemoveCleansKeyring`: add a credential in keyring mode; remove it; assert the keyring entry is gone (probe via `secret-tool lookup`).
+
+**CI steps** added to `.github/workflows/test.yml` under `ubuntu-latest`:
+1. Build: `make build` (provides `bin/neo4j-cli`).
+2. No-daemon step: `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` (no dbus-run-session; with-daemon tests self-skip).
+3. Install gnome-keyring: `sudo apt-get install -y gnome-keyring libsecret-tools`.
+4. With-daemon step: `dbus-run-session -- go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` (gnome-keyring auto-activates via D-Bus when first keyring call is made; both groups run).
+
+The exact `dbus-run-session` + gnome-keyring unlock incantation (empty passphrase via `echo "" | gnome-keyring-daemon --unlock --components=secrets`) should be validated during implementation — CI headless environments may require explicit daemon unlock before auto-activation works reliably.
 
 ### AccessToken Storage
 
@@ -157,6 +259,14 @@ On Linux without a running Secret Service daemon, `keyring.Get()` / `keyring.Set
 - [ ] On all subsequent runs, the first-run detection is a no-op (key already present).
 - [ ] All credential unit tests pass using the mock keyring provider.
 - [ ] `make test`, `make lint`, and `make fmt-check` all pass clean.
+- [ ] On first run with no existing credentials and keyring unavailable (e.g., Linux without dbus-launch), a warning is emitted to stderr and `credential-storage: insecure` is written instead of `keyring`.
+- [ ] `neo4j-cli config set credential-storage keyring` on a machine with unavailable keyring (with or without existing credentials) returns a UsageError naming the keyring failure and leaves `credential-storage` unchanged.
+- [ ] Both keyring-unavailable behaviours are covered by unit tests using mock keyring errors.
+- [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on ubuntu-latest (no-daemon group runs; with-daemon group self-skips).
+- [ ] `dbus-run-session -- go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on ubuntu-latest with `gnome-keyring` installed (both groups run).
+- [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on windows-latest (happy-path group runs against real Windows Credential Manager).
+- [ ] Keyring_smoke CI steps present in `.github/workflows/test.yml` for `ubuntu-latest`, `windows-latest`, and `macos-latest`.
+- [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on macos-latest (happy-path, locked-Keychain, and missing-security groups all run or are appropriately skipped).
 
 ## Out of Scope
 
