@@ -137,6 +137,122 @@ func TestSetStorageMode_KeyringMode_PreMigrationFallback(t *testing.T) {
 		"JSON value must be used when keyring has no entry")
 }
 
+// TestSetStorageMode_KeyringMode_AutoMigration_Success verifies REQ-F-019: when
+// keyring mode is active and a field has ErrNotFound in keyring but the JSON
+// value is non-empty, SetStorageMode succeeds (REQ-F-016) AND attempts
+// auto-migration: the value is written to the keyring and credentials.json is
+// scrubbed (sensitive field absent from JSON after SetStorageMode returns).
+func TestSetStorageMode_KeyringMode_AutoMigration_Success(t *testing.T) {
+	mock := newMockKeyringProvider()
+	credentials.SetKeyringProviderForTest(t, mock)
+
+	// JSON holds the password; keyring is empty → auto-migration path
+	fs, err := testfs.GetTestFs("{}", `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"json-pass","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+	require.NoError(t, err)
+
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+
+	// In-memory value must still be populated
+	assert.Equal(t, "json-pass", creds.Dbms.Credentials[0].Password,
+		"in-memory password must remain available after auto-migration")
+
+	// Keyring must now hold the value (auto-migration fired)
+	val, getErr := mock.Get(credentials.ServiceName, credentials.KeyringKey("dbms", "local", "password"))
+	require.NoError(t, getErr, "keyring must hold the auto-migrated password")
+	assert.Equal(t, "json-pass", val)
+
+	// credentials.json must no longer contain the plaintext password
+	data := readCredentialsJSON(t, fs)
+	assert.NotContains(t, string(data), "json-pass",
+		"credentials.json must be scrubbed after successful auto-migration")
+}
+
+// TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails verifies REQ-F-019:
+// when the keyring.Set call during auto-migration fails, SetStorageMode still
+// succeeds (in-memory value available), the JSON is NOT scrubbed, and no error
+// is returned. Retry happens on the next command invocation.
+func TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails(t *testing.T) {
+	// failAfterNProvider with failAfter=0 fails every Set call immediately.
+	// Get still succeeds (returns ErrNotFound for unknown keys), so the
+	// pre-migration fallback check passes and we reach the Set path.
+	alwaysFailSet := &failAfterNProvider{inner: newMockKeyringProvider(), failAfter: 0}
+	credentials.SetKeyringProviderForTest(t, alwaysFailSet)
+
+	// JSON holds the secret; keyring is empty → auto-migration attempted but Set fails
+	fs, err := testfs.GetTestFs("{}", `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"json-pass","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+	require.NoError(t, err)
+
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	// SetStorageMode must succeed despite the keyring.Set failure
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring),
+		"SetStorageMode must succeed even when auto-migration keyring.Set fails")
+
+	// In-memory value must still be populated (JSON fallback used)
+	assert.Equal(t, "json-pass", creds.Dbms.Credentials[0].Password,
+		"in-memory password must be available via JSON fallback when auto-migration fails")
+
+	// credentials.json must still contain the password (no scrub on failed migration)
+	data := readCredentialsJSON(t, fs)
+	assert.Contains(t, string(data), "json-pass",
+		"credentials.json must not be modified when auto-migration keyring.Set fails")
+}
+
+// TestMigrateToInsecure_JSONFallbackValue_SucceedsWithoutKeyringEntry verifies
+// REQ-F-018: during reverse migration, if keyring.Get returns ErrNotFound for
+// a required field but the in-memory value is non-empty (populated via the
+// REQ-F-016 JSON fallback during load), the migration succeeds — the field is
+// treated as "already in JSON". The save() at the end persists all in-memory
+// values to JSON.
+func TestMigrateToInsecure_JSONFallbackValue_SucceedsWithoutKeyringEntry(t *testing.T) {
+	mock := newMockKeyringProvider()
+	// Seed only the optional access-token; leave the required client-secret absent
+	// from the keyring to simulate a credential whose secret was never migrated
+	// to the keyring (REQ-F-016 JSON-fallback state).
+	// But first we need SetStorageMode to succeed — for that we need either the
+	// keyring entry OR the JSON value present. We keep the client-secret in JSON.
+	credentials.SetKeyringProviderForTest(t, mock)
+
+	// JSON has the client-secret; keyring is empty → SetStorageMode uses JSON fallback
+	creds, fs := newKeyringTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"json-secret","access-token":"","token-expiry":0}]}}`)
+
+	// The in-memory client-secret is now "json-secret" (from JSON fallback).
+	// Keyring has no entry for it (mock is empty for client-secret).
+	assert.Equal(t, "json-secret", creds.Aura.Credentials[0].ClientSecret,
+		"pre-condition: in-memory must hold the JSON-fallback value")
+
+	// MigrateToInsecure should succeed: ErrNotFound for client-secret + in-memory non-empty
+	require.NoError(t, creds.MigrateToInsecure(),
+		"MigrateToInsecure must succeed when required field is only in JSON (REQ-F-018)")
+
+	// The secret must be present in credentials.json after migration
+	data := readCredentialsJSON(t, fs)
+	assert.Contains(t, string(data), "json-secret",
+		"credentials.json must contain the client-secret after reverse migration")
+}
+
+// TestMigrateToInsecure_JSONFallbackEmpty_StillErrors verifies that REQ-F-018
+// does NOT change the hard-error behavior when both the keyring entry AND the
+// in-memory value are absent/empty for a required field.
+func TestMigrateToInsecure_JSONFallbackEmpty_StillErrors(t *testing.T) {
+	mock := newMockKeyringProvider()
+	// Seed the required client-secret in keyring so SetStorageMode succeeds
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"), "s3cr3t"))
+	creds, _ := newKeyringTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`)
+
+	// After SetStorageMode the in-memory value is "s3cr3t" (from keyring). Now
+	// delete the keyring entry and zero the in-memory field to simulate a state
+	// where both are absent before calling MigrateToInsecure.
+	require.NoError(t, mock.Delete(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret")))
+	creds.Aura.Credentials[0].ClientSecret = ""
+
+	err := creds.MigrateToInsecure()
+	require.Error(t, err, "must error when both keyring and in-memory value are absent")
+	assert.Contains(t, err.Error(), "prod", "error must name the credential")
+}
+
 // TestSave_KeyringMode_SensitiveFieldsRoutedToKeyring verifies that in keyring
 // mode, save() writes empty strings for sensitive fields in credentials.json and
 // stores the real values in the keyring. Covers aura client-secret, dbms
@@ -602,46 +718,97 @@ func TestMigrateToInsecure_Success(t *testing.T) {
 	assert.ErrorIs(t, err, credentials.ErrNotFound, "keyring entry for embed/openai/api-key must be deleted")
 }
 
-// TestMigrateToInsecure_RequiredFieldNotFound_Error verifies that ErrNotFound
-// for a required field aborts migration with a named error. The keyring entry is
-// deleted after SetStorageMode to simulate an externally-deleted keyring entry.
-// Covers aura client-secret and dbms password.
-func TestMigrateToInsecure_RequiredFieldNotFound_Error(t *testing.T) {
+// TestMigrateToInsecure_RequiredFieldNotFound_ExternallyDeleted_SucceedsViaMemory
+// verifies REQ-F-018: if the keyring entry for a required field is deleted
+// externally AFTER SetStorageMode loaded it into memory, MigrateToInsecure
+// still succeeds because the in-memory value is non-empty. The value is
+// persisted to JSON by the final save() call.
+func TestMigrateToInsecure_RequiredFieldNotFound_ExternallyDeleted_SucceedsViaMemory(t *testing.T) {
 	tests := []struct {
 		name       string
 		keyringKey string
 		seedValue  string
 		credJSON   string
-		wantInErr  []string
+		wantInJSON string
 	}{
 		{
-			name:       "aura missing client-secret",
+			name:       "aura externally-deleted client-secret uses in-memory value",
 			keyringKey: credentials.KeyringKey("aura", "prod", "client-secret"),
 			seedValue:  "s3cr3t",
 			credJSON:   `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`,
-			wantInErr:  []string{"prod", "client-secret"},
+			wantInJSON: "s3cr3t",
 		},
 		{
-			name:       "dbms missing password",
+			name:       "dbms externally-deleted password uses in-memory value",
 			keyringKey: credentials.KeyringKey("dbms", "local", "password"),
 			seedValue:  "p4ss",
 			credJSON:   `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
-			wantInErr:  []string{"local", "password"},
+			wantInJSON: "p4ss",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := newMockKeyringProvider()
-			// Seed so SetStorageMode succeeds, then delete to simulate external removal
+			// Seed so SetStorageMode loads the value into memory
 			require.NoError(t, mock.Set(credentials.ServiceName, tc.keyringKey, tc.seedValue))
-			creds, _ := newKeyringTestCredentials(t, mock, tc.credJSON)
+			creds, fs := newKeyringTestCredentials(t, mock, tc.credJSON)
+			// Simulate external deletion after the process started
 			require.NoError(t, mock.Delete(credentials.ServiceName, tc.keyringKey))
 
-			err := creds.MigrateToInsecure()
-			require.Error(t, err)
+			// REQ-F-018: should succeed since in-memory value is non-empty
+			require.NoError(t, creds.MigrateToInsecure(),
+				"must succeed when in-memory value is available (REQ-F-018)")
+
+			// Value must be persisted to JSON
+			data := readCredentialsJSON(t, fs)
+			assert.Contains(t, string(data), tc.wantInJSON,
+				"credentials.json must contain the value after reverse migration")
+		})
+	}
+}
+
+// TestMigrateToInsecure_BothKeyringAndMemoryEmpty_Errors verifies that
+// MigrateToInsecure returns a named error when both the keyring entry AND the
+// in-memory value are absent for a required field — the hard error path that
+// REQ-F-018 does NOT change.
+func TestMigrateToInsecure_BothKeyringAndMemoryEmpty_Errors(t *testing.T) {
+	tests := []struct {
+		name      string
+		credJSON  string
+		wantInErr []string
+	}{
+		{
+			name:      "aura missing client-secret both keyring and memory",
+			credJSON:  `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`,
+			wantInErr: []string{"prod", "client-secret"},
+		},
+		{
+			name:      "dbms missing password both keyring and memory",
+			credJSON:  `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
+			wantInErr: []string{"local", "password"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mock := newMockKeyringProvider()
+			// No entries seeded — both keyring and in-memory are empty.
+			// Use insecure mode so that load() populates in-memory fields from
+			// JSON (which has empty sensitive fields), then call MigrateToInsecure
+			// directly. MigrateToInsecure always calls keyring.Get regardless of
+			// storageMode; with empty keyring and empty in-memory it must error.
+			credentials.SetKeyringProviderForTest(t, mock)
+			fs, err := testfs.GetTestFs("{}", tc.credJSON)
+			require.NoError(t, err)
+			// Stay in insecure mode (default) — the in-memory sensitive fields
+			// are empty (loaded from JSON which has empty values).
+			creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+
+			migrateErr := creds.MigrateToInsecure()
+			require.Error(t, migrateErr, "must error when both keyring and in-memory are absent")
 			for _, s := range tc.wantInErr {
-				assert.Contains(t, err.Error(), s)
+				assert.Contains(t, migrateErr.Error(), s)
 			}
 		})
 	}

@@ -438,6 +438,12 @@ func (c *Credentials) MigrateToInsecure() error {
 		val, err := defaultKeyring.Get(ServiceName, KeyringKey(credType, credName, field))
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
+				// REQ-F-018: if the in-memory value is already non-empty (populated
+				// via the REQ-F-016 JSON fallback during load), the secret is already
+				// in JSON — treat as a no-op (no keyring entry to delete either).
+				if *ptr != "" {
+					return nil
+				}
 				zero()
 				return clierr.NewUsageError(
 					"cannot migrate credential %q: %s %s not found in keyring; run `credential %s remove %s` and re-add it",
@@ -597,13 +603,39 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 // OS keyring. It is called by SetStorageMode when switching to keyring mode.
 // For each sensitive field:
 //   - If found in keyring, the in-memory value is overwritten.
-//   - If ErrNotFound but the JSON still holds a value (pre-migration state),
-//     the JSON value is used silently.
+//   - If ErrNotFound but the JSON still holds a value (REQ-F-016, pre-migration
+//     state): the JSON value is used silently and an auto-migration is attempted
+//     (REQ-F-019): keyring.Set() is called with the JSON value. On success the
+//     field is zeroed in the JSON struct (to be persisted by save() after all
+//     fields are processed). On failure the scrub is silently skipped for this
+//     invocation; retry happens automatically on the next command.
 //   - If ErrNotFound and JSON value is also absent, a clierr.UsageError is
 //     returned (REQ-NF-004).
 //
 // Non-ErrNotFound errors are returned as-is.
+// save() is called at the end only when at least one field was auto-migrated.
 func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
+	// anyMigrated tracks whether at least one JSON-resident secret was
+	// successfully pushed to the keyring so we only call save() when needed.
+	// save() (→ saveWithKeyring) will write in-memory values to keyring
+	// (idempotent) and produce a scrubbed JSON snapshot.
+	anyMigrated := false
+
+	// tryAutoMigrate attempts to push a JSON-resident value into the keyring.
+	// On success it sets anyMigrated so save() is called at the end to scrub
+	// the JSON. The in-memory field is intentionally kept populated so the
+	// current command can use the secret. Failures are silently ignored
+	// (retry on next command); the JSON value continues to serve as fallback.
+	tryAutoMigrate := func(val, credType, credName, field string) {
+		if val == "" {
+			return
+		}
+		if setErr := defaultKeyring.Set(ServiceName, KeyringKey(credType, credName, field), val); setErr == nil {
+			anyMigrated = true
+		}
+		// keyring.Set failure → skip scrub this run; JSON fallback remains active
+	}
+
 	for _, cred := range c.Aura.Credentials {
 		secret, err := defaultKeyring.Get(ServiceName, KeyringKey("aura", cred.Name, "client-secret"))
 		if err != nil {
@@ -614,7 +646,8 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 			if cred.ClientSecret == "" {
 				return clierr.NewUsageError("keyring entry missing for credential %q (aura client-secret); run `credential aura-client remove %s` and re-add it", cred.Name, cred.Name)
 			}
-			// JSON fallback (pre-migration state) — use silently
+			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
+			tryAutoMigrate(cred.ClientSecret, "aura", cred.Name, "client-secret")
 		} else {
 			cred.ClientSecret = secret
 		}
@@ -625,6 +658,8 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 				return fmt.Errorf("keyring get aura/%s/access-token: %w", cred.Name, err)
 			}
 			// AccessToken is optional — ErrNotFound is fine; keep JSON value if any
+			// Still attempt auto-migration if the JSON value is present (REQ-F-019)
+			tryAutoMigrate(cred.AccessToken, "aura", cred.Name, "access-token")
 		} else {
 			cred.AccessToken = token
 		}
@@ -639,6 +674,8 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 			if cred.Password == "" {
 				return clierr.NewUsageError("keyring entry missing for credential %q (dbms password); run `credential dbms remove %s` and re-add it", cred.Name, cred.Name)
 			}
+			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
+			tryAutoMigrate(cred.Password, "dbms", cred.Name, "password")
 		} else {
 			cred.Password = pwd
 		}
@@ -651,9 +688,19 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 				return fmt.Errorf("keyring get embed/%s/api-key: %w", cred.Name, err)
 			}
 			// APIKey is optional — ErrNotFound is fine; keep JSON value if any
+			// Still attempt auto-migration if the JSON value is present (REQ-F-019)
+			tryAutoMigrate(cred.APIKey, "embed", cred.Name, "api-key")
 		} else {
 			cred.APIKey = key
 		}
+	}
+
+	// Persist the scrubbed JSON only if at least one field was auto-migrated.
+	// saveWithKeyring() writes in-memory values to keyring (idempotent since
+	// they were already set by tryAutoMigrate) and produces a scrubbed JSON
+	// snapshot, removing the plaintext secrets from credentials.json.
+	if anyMigrated {
+		_ = c.save() //nolint:errcheck // best-effort JSON scrub; error is non-fatal here
 	}
 
 	return nil
