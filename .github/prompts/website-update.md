@@ -26,9 +26,17 @@ git log --oneline -20
 
 For each commit that looks user-visible (new commands, removed commands, changed flags, changed defaults, new agent support, version bumps), look at the diff:
 ```
-git show <sha> -- README.md AGENTS.md neo4j-cli/app/app.go 'neo4j-cli/aura/internal/subcommands/**' 'common/skill/**'
+git show <sha> -- README.md AGENTS.md neo4j-cli/app/app.go neo4j-cli/internal/subcommands/ 'neo4j-cli/aura/internal/subcommands/**' 'common/skill/**'
 ```
 Focus on changes that affect what a developer reading the page would need to know.
+
+### 2b. Check for coverage gaps
+
+List every top-level command tree that ships in the binary. The authoritative source is `neo4j-cli/app/app.go` (`cmd.AddCommand(…)` calls) and README.md's command surface. Then compare against:
+- the `data-tab` values in `gh-pages/index.html` (example tabs)
+- the `<!-- BEGIN:docs:<name> -->` markers in the reference accordion
+
+For each command tree that has no example tab **and** no reference section, decide whether it warrants coverage (see step 5c threshold below). Record the gap so you act on it in step 5c.
 
 ### 3. Copy the install scripts
 
@@ -52,10 +60,85 @@ Edit only what is factually wrong or out of date. Specifically:
 - The `--rw` requirement for write operations
 
 Do **not**:
-- Add new sections or features not yet shipped
+- Add new sections or features **not yet shipped** (unreleased, on open PRs, or behind a flag)
 - Change design, layout, or copy style
 - Add marketing language or speculation
 - Remove working examples unless the command was deleted
+
+New tabs and reference sections for **shipped** features belong in step 5c, not here.
+
+### 5c. Add coverage for newly shipped command trees
+
+For each gap recorded in step 2b, apply the following threshold and templates.
+
+**Threshold for a new example tab** — add a tab when the command tree:
+- Has 4 or more distinct leaf commands, **or** represents a self-contained workflow (create → use → delete), **and**
+- The workflow is meaningfully different from existing tabs (not just an alias or thin wrapper)
+
+If only the reference section is warranted (fewer commands, or the workflow is too credential-heavy to demo), skip the tab and add the reference section only.
+
+**Naming convention**
+- Cloud-hosted services: lowercase product name (`aura`)
+- Local runtimes: `<Name> (local)` in the reference section title; tab label-tag `local` and tab `data-tab` matches the command name (e.g. `data-tab="docker"` for `neo4j-cli docker …`)
+- Follow the same pattern for any future local runtime: Desktop → `data-tab="desktop"`, reference title `Desktop (local)`
+
+**Insertion points**
+- New tab `<button>` elements: insert before the `reference` tab button (the last tab in the row)
+- New `<div class="example-pane">` elements: insert before the `reference` pane
+- New `paneCommands` key: add alongside the existing keys in the JS object
+- New `panePrompts` key: add alongside the existing keys in the JS object
+- New reference accordion section: insert before the `<!-- BEGIN:docs:write-gate -->` section
+
+**Tab button template**
+```html
+<button class="example-tab" data-tab="TABNAME" role="tab">
+  <span>TABNAME</span>
+  <span class="label-tag">LABEL</span>  <!-- e.g. "local" or "cloud" -->
+</button>
+```
+
+**Example pane template**
+```html
+<div class="example-pane" data-tab="TABNAME">
+  <div class="pane-header">
+    <span class="pane-title">TITLE</span>
+    <button class="copy-mini" data-tab="TABNAME" title="Copy">⎘</button>
+  </div>
+  <pre><span class="agentic-line"><span class="agentic-comment">&gt; AGENT_PROMPT_TEXT</span>
+<span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="ps">$</span> <span class="cmd">COMMAND_1</span> <span class="flag">--flag</span> <span class="str">"value"</span>
+<span class="out">EXAMPLE_OUTPUT</span>
+<span class="ps">$</span> <span class="cmd">COMMAND_2</span>
+<span class="out">EXAMPLE_OUTPUT_2</span>
+<span class="agentic-line"><span class="agentic-result">One-sentence summary of what the agent accomplished.</span></span></pre>
+</div>
+```
+
+Replace `AGENT_PROMPT_TEXT` with a natural-language task description. Follow invariant 1 (no `> ` in the HTML — it is rendered as the literal `>` character via `&gt;` only in the attribute/text; the CSS adds the visual `> ` via the span). Use the real CLI commands with `--rw` on write operations. Wrap multi-line result output in `<span class="out">…</span>`.
+
+**JS entries** — add inside `paneCommands` and `panePrompts`:
+```js
+TABNAME: 'neo4j-cli COMMAND --flag …',          // cli copy payload
+TABNAME: 'AGENT_PROMPT_TEXT',                   // agentic copy payload
+```
+
+**Reference section template**
+```html
+<!-- BEGIN:docs:TABNAME -->
+<div class="accordion-item">
+  <button class="accordion-header" onclick="toggleAccordion(this)">
+    SECTION_TITLE <span class="accordion-arrow">▶</span>
+  </button>
+  <div class="accordion-body">
+    <pre>REFERENCE_CONTENT</pre>
+  </div>
+</div>
+<!-- END:docs:TABNAME -->
+```
+
+`REFERENCE_CONTENT` should mirror the style of existing reference sections: a `# comment` line introducing the command group, then a block of `$ neo4j-cli …` invocations with brief inline comments. Show the most important flags; do not exhaustively list every option.
+
+**After adding** any new tab or reference section, verify step 5b invariants still hold for the new pane.
 
 ### 5b. Enforce agentic-mode rendering invariants
 
