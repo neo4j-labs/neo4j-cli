@@ -72,6 +72,22 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 
 ## Technical Considerations
 
+### CI Failures — Ubuntu Smoke Tests (No-Daemon Fatal + Missing DBUS Propagation)
+
+Two bugs in the Linux smoke test infrastructure cause both Ubuntu smoke CI steps to fail:
+
+**Ubuntu — no-daemon step fatals due to `requireDaemon` using `CI` env var** (`test/e2e/keyring/keyring_linux_test.go`)
+
+`requireDaemon` calls `t.Fatal("DBUS_SESSION_BUS_ADDRESS not set in CI — ...")` whenever `DBUS_SESSION_BUS_ADDRESS == ""` AND `os.Getenv("CI") == "true"`. The intention was to catch a broken `dbus-run-session` setup in the with-daemon step. But GitHub Actions always sets `CI=true`, so the no-daemon CI step (which intentionally has no D-Bus session) also fatals — causing all four with-daemon tests to fail with a fatal rather than skip.
+
+Fix: add a dedicated `KEYRING_WITH_DAEMON=true` env var to the with-daemon CI step. Update `requireDaemon` to check `os.Getenv("KEYRING_WITH_DAEMON") == "true"` instead of `CI`. When `DBUS_SESSION_BUS_ADDRESS` is absent and `KEYRING_WITH_DAEMON` is not set, the test calls `t.Skip` (correct for the no-daemon step and for local dev). When `DBUS_SESSION_BUS_ADDRESS` is absent and `KEYRING_WITH_DAEMON=true`, it calls `t.Fatal` (correct for the with-daemon step when `dbus-run-session` failed).
+
+**Ubuntu — with-daemon tests can't use the keyring because `DBUS_SESSION_BUS_ADDRESS` is not propagated to subprocesses** (`test/e2e/keyring/helpers_test.go`)
+
+`baseChildEnv` builds a minimal subprocess environment from scratch that omits `DBUS_SESSION_BUS_ADDRESS`. The `go test` process (launched inside `dbus-run-session`) has `DBUS_SESSION_BUS_ADDRESS` set, but the neo4j-cli subprocess it spawns does not. go-keyring on Linux uses D-Bus to communicate with the Secret Service daemon; without `DBUS_SESSION_BUS_ADDRESS`, all `keyring.Get()` / `keyring.Set()` calls in the subprocess fail. This causes every with-daemon test to fail: `credential dbms add` exits non-zero because `saveWithKeyring()` returns a D-Bus error, `MigrateToKeyring()` fails at `ProbeKeyringAvailability()`, etc.
+
+Fix: propagate `DBUS_SESSION_BUS_ADDRESS` from the parent test process to subprocesses in `baseChildEnv` when the env var is set. The `stripDBUS` function in the no-daemon tests already removes it for those tests, so no-daemon test isolation is preserved.
+
 ### CI Failures — Ubuntu Unit Test and Windows Smoke Binary
 
 Two pre-existing CI failures need repair before the branch can merge:
@@ -313,6 +329,8 @@ The exact `dbus-run-session` + gnome-keyring unlock incantation (empty passphras
 - [ ] All new load-fallback, auto-migration, and repair-migration scenarios are covered by unit tests using the mock keyring provider.
 - [ ] `make test` passes on ubuntu-latest without a D-Bus session (`TestConfigSet/set_credential-storage_to_keyring_with_rw_succeeds` no longer hits the real Secret Service).
 - [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` on windows-latest finds `bin/neo4j-cli.exe` and all four smoke tests run (no "binary not found" failure).
+- [ ] The Ubuntu no-daemon CI step (`Keyring smoke (no daemon)`) passes: no-daemon tests run and with-daemon tests skip (not fatal) because `DBUS_SESSION_BUS_ADDRESS` is absent and `KEYRING_WITH_DAEMON` is not set.
+- [ ] The Ubuntu with-daemon CI step (`Keyring smoke (with daemon)`) passes: `DBUS_SESSION_BUS_ADDRESS` is propagated to neo4j-cli subprocesses via `baseChildEnv`, allowing go-keyring to connect to gnome-keyring; `KEYRING_WITH_DAEMON=true` is set so a broken `dbus-run-session` setup causes `t.Fatal` rather than silent skip.
 
 ## Out of Scope
 
