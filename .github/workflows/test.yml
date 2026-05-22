@@ -363,3 +363,28 @@ jobs:
                   fi
 
                   echo "tier-2 e2e: OK"
+
+            # Desktop e2e: drive `neo4j-cli desktop ...` and `query -c
+            # desktop[-connection:<uuid>]` against a relate-shaped fixture
+            # HTTP server. The fixture (test/e2e/desktop_fixture) mimics
+            # Neo4j Desktop 2's `/fastify/api/*` surface including HS256
+            # JWT auth, so the suite covers transport (REQ-F-008 / 010 /
+            # 024), credential resolution (REQ-F-101..103), connection
+            # CRUD, and the DBMS status filter end-to-end without any
+            # real Desktop install or real Neo4j process.
+            #
+            # The test harness (test/e2e/desktop/desktop_test.go) builds
+            # both the seam-tagged CLI binary (-tags e2e_desktop_seams)
+            # and the fixture binary itself in TestMain, then spawns the
+            # fixture per-subtest for port + scenario-state isolation.
+            # No workflow-side binary staging is needed; this step just
+            # invokes `go test` with the `e2e_desktop` build tag.
+            #
+            # On failure the harness's dumpOnFail helper attaches the
+            # fixture request trace, fixture stderr, and CLI stdout/stderr
+            # to the test log so CI logs are debuggable. Total wall time
+            # is ~6s on Linux; we set -timeout=180s to leave headroom for
+            # the Windows runner's slower go-build path.
+            - name: Desktop e2e (CLI + relate-shaped fixture, e2e_desktop)
+              shell: bash
+              run: go test -tags=e2e_desktop -count=1 -timeout=180s ./test/e2e/desktop/...

@@ -21,7 +21,7 @@
 
 Manage and view credential values
 
-Manage stored credentials. Three subtrees are available: `aura-client` for Aura Console API client credentials, `dbms` for Neo4j Bolt connection profiles consumed by `query`, and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.
+Manage stored credentials. Three subtrees are available: `aura-client` for Aura Console API client credentials, `dbms` for Neo4j Bolt connection profiles consumed by `query`, and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`. Note: `query --credential desktop` and `query --credential desktop-connection:<uuid>` are runtime-resolved against the running Neo4j Desktop 2 instance and are NOT stored here — Desktop owns those credential lifecycles. See `neo4j-cli desktop list` to discover saved Desktop connections.
 
 Usage: `neo4j-cli credential`
 
@@ -138,7 +138,7 @@ Usage: `neo4j-cli credential dbms`
 
 Adds a dbms credential
 
-Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.
+Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values. The name `desktop` and any name starting with `desktop-connection:` are reserved by `query --credential` runtime dispatch and cannot be used.
 
 Usage: `neo4j-cli credential dbms add [flags]`
 

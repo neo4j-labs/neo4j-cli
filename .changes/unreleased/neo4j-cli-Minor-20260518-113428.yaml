@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add ''neo4j-cli desktop'' subtree for local Neo4j Desktop 2: ''desktop install'' installs the app; ''desktop dbms'' lifecycles local DBMSes (--wait on async leaves); ''desktop dbms plugin'' manages plugins; ''desktop connection'' manages saved remote connections; ''desktop list'' shows both; ''desktop doctor'' runs a structured health check. ''query --credential desktop'' or ''desktop-connection:<uuid>'' reads Desktop credentials on demand without writing them to the local store.'
+time: 2026-05-21T17:40:58.257383+02:00

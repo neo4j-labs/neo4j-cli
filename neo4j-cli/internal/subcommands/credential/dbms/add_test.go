@@ -145,6 +145,18 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			wantErr:        "already have credential with name mydb",
 		},
 		{
+			name:         "reserved name 'desktop' is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name desktop --username neo4j --password secret --uri bolt://localhost:7687",
+			wantErr:      `credential name "desktop" is reserved`,
+		},
+		{
+			name:         "reserved 'desktop-connection:' prefix is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name desktop-connection:abc123 --username neo4j --password secret --uri bolt://localhost:7687",
+			wantErr:      `credential name "desktop-connection:abc123" is reserved`,
+		},
+		{
 			name:            "custom database-name is stored",
 			initialCreds:    []map[string]interface{}{},
 			initialDefault:  "",

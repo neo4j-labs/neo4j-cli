@@ -531,7 +531,7 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			name:            "unknown credential errors with helpful message",
 			credsJSON:       "{}",
 			flags:           []string{"--credential=unknown"},
-			wantErrContains: []string{"unknown", "credential dbms list"},
+			wantErrContains: []string{"unknown", "credential dbms add", "Neo4j Desktop 2"},
 		},
 		{
 			name:         "no --credential flag uses stored default (existing behaviour unchanged)",

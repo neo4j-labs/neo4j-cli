@@ -5,8 +5,15 @@ package credentials
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/neo4j/cli/common/clierr"
+)
+
+// Reserved: `query --credential` prefix dispatch intercepts these before persisted-store lookup, so a stored credential of either form would be unreachable.
+const (
+	reservedNameDesktop      = "desktop"
+	reservedConnectionPrefix = "desktop-connection:"
 )
 
 type DbmsCredentials struct {
@@ -23,6 +30,11 @@ func (c *DbmsCredentials) Printable() PrintableDbmsCredentials {
 }
 
 func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string) error {
+	if name == reservedNameDesktop || strings.HasPrefix(name, reservedConnectionPrefix) {
+		return clierr.NewUsageError(
+			"credential name %q is reserved — 'query --credential desktop' and 'query --credential desktop-connection:<uuid>' resolve against the running Neo4j Desktop 2 instance, not the persisted store. Pick a different name.",
+			name)
+	}
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)
@@ -66,9 +78,7 @@ func (c *DbmsCredentials) Remove(name string) error {
 	return nil
 }
 
-// SetEmbed links a named dbms credential to an embed credential. Passing an
-// empty embedName clears the link. Returns a usage error when dbmsName does
-// not exist.
+// SetEmbed links a dbms credential to an embed credential; empty embedName clears the link.
 func (c *DbmsCredentials) SetEmbed(dbmsName, embedName string) error {
 	for _, credential := range c.Credentials {
 		if credential.Name == dbmsName {
@@ -119,17 +129,13 @@ func (c *DbmsCredentials) credentialExists(name string) bool {
 	return false
 }
 
-// PrintableDbmsCredentials wraps a slice of DbmsCredential and satisfies the
-// common/output.ResponseData interface (AsArray) via structural typing, so PrintBodyMap
-// can render it as a table or JSON.
+// PrintableDbmsCredentials renders DbmsCredentials as a table or JSON via common/output.
 type PrintableDbmsCredentials struct {
 	credentials       []*DbmsCredential
 	defaultCredential string
 }
 
-// AsArray returns each credential as a map for table rendering.
-// Password is intentionally omitted. The `embed-credential` key is always
-// emitted (empty string when unset) so the column is stable across rows.
+// AsArray emits each credential as a map; Password is omitted, `embed-credential` is always present (empty when unset) so the column stays stable.
 func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
@@ -145,8 +151,7 @@ func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 	return result
 }
 
-// MarshalJSON renders PrintableDbmsCredentials as a JSON array of objects,
-// matching what the table renders. Password is intentionally omitted.
+// MarshalJSON emits the same shape as AsArray; Password is omitted.
 func (d PrintableDbmsCredentials) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.AsArray())
 }

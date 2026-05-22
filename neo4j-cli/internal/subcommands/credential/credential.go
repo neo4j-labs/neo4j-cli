@@ -20,7 +20,9 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Manage stored credentials. Three subtrees are available: " +
 			"`aura-client` for Aura Console API client credentials, " +
 			"`dbms` for Neo4j Bolt connection profiles consumed by `query`, " +
-			"and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.",
+			"and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`. " +
+			"Note: `query --credential desktop` and `query --credential desktop-connection:<uuid>` are runtime-resolved against the running Neo4j Desktop 2 instance and are NOT stored here — Desktop owns those credential lifecycles. " +
+			"See `neo4j-cli desktop list` to discover saved Desktop connections.",
 	}
 
 	cmd.AddCommand(NewAuraClientCredentialCmd(cfg))
@@ -84,9 +86,7 @@ neo4j-cli credential aura-client add --name work --env ~/Downloads/aura-client-c
 neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse the optional --env first so we can distinguish
-			// "file had the key but with empty value" (error) from
-			// "file didn't have the key" (fall through to flag).
+			// Distinguish file-had-empty-value (error) from file-missing-key (fall through to flag).
 			var (
 				fileVals    = map[string]string{}
 				filePresent = map[string]bool{}
@@ -153,9 +153,6 @@ neo4j-cli credential aura-client use personal --rw`,
 	return cmd
 }
 
-// filterAuraClientEnvKeys narrows envfile.Parse's domain-neutral maps to the
-// keys the aura-client add command recognises. Unrecognised keys are silently
-// discarded.
 func filterAuraClientEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
 	recognised := map[string]bool{
 		"CLIENT_ID":     true,
