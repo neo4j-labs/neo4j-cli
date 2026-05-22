@@ -28,6 +28,11 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli aura instance get <id>` — get instance details
 - `neo4j-cli aura agent list|get|create|update|replace|delete|invoke` — manage Aura Agents (LLM assistants bound to a database); `--tools` accepts a JSON array of `{type, name, description, config}` with camelCase types (`text2cypher`, `cypherTemplate`, `similaritySearch`)
 - `neo4j-cli docker create|list|get|start|stop|delete` — run a local Neo4j container by shelling out to `docker` (or `podman` aliased to `docker`); persistent flow stores a `dbms` credential, ephemeral flow emits an env-file consumable by `query --env`
+- `neo4j-cli desktop install|list|doctor` — manage a local Neo4j Desktop 2 install: install the app, list managed DBMSes + saved connections, run a structured health check
+- `neo4j-cli desktop dbms list|create|start|stop|delete` — lifecycle local DBMSes under Neo4j Desktop 2 (enterprise-only; one DBMS runs at a time on port 7687); `--wait` blocks until `status=started`
+- `neo4j-cli desktop dbms plugin available|list|install|uninstall` — manage plugins on a Desktop DBMS
+- `neo4j-cli desktop connection list|create|update|delete` — register saved remote DB connection profiles with Desktop; consume via `query --credential desktop-connection:<uuid>`
+- `neo4j-cli query --credential desktop` — query the currently-running Desktop DBMS without restating URI / username / password (credential is read from Desktop's safeStorage on demand and never written to `~/.neo4j/cli/credentials.json`)
 - `neo4j-cli query <cypher>` — run Cypher against any Neo4j via the Bolt protocol
 - `neo4j-cli query :schema` — introspect node labels, rel types, properties
 - `neo4j-cli query :embed [text]` — compute an embedding vector standalone (no Bolt connection)

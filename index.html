@@ -1256,6 +1256,10 @@
           <span>embed</span>
           <span class="label-tag">vectors</span>
         </button>
+        <button class="example-tab" data-tab="desktop" role="tab">
+          <span>desktop</span>
+          <span class="label-tag">local</span>
+        </button>
         <button class="example-tab" data-tab="reference" role="tab">
           <span>reference</span>
           <span class="label-tag">full docs</span>
@@ -1523,6 +1527,60 @@
 </pre>
       </div>
 
+      <!-- desktop -->
+      <div class="example-pane" data-pane="desktop">
+        <div class="example-header">
+          <span class="desc">Manage a local Neo4j Desktop 2 install — DBMSes, plugins, and saved remote connections</span>
+          <button class="copy-mini" data-copy-pane="desktop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="comment"># install the Desktop 2 app (no-op if already present)</span>
+<span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--rw</span>
+
+<span class="ok">✓</span> Neo4j Desktop 2 installed · <span class="info">/Applications/Neo4j Desktop.app</span>
+
+<span class="comment"># create + start a DBMS (Desktop must be running). --wait blocks until status=started</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--wait</span> <span class="flag">--rw</span>
+
+<span class="info">▸</span> picked version <span class="num">2026.04.0</span> (latest stable enterprise)
+<span class="ok">✓</span> dev (<span class="string">a1b2c3d4</span>) · <span class="keyword">enterprise</span> · <span class="info">neo4j://localhost:7687</span> · <span class="ok">started</span>
+
+<span class="comment"># query the running DBMS — Desktop owns the credential, no flags needed</span>
+<span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n) AS n'</span>
+
+<span class="out">┌───┐
+│ n │
+├───┤
+│ <span class="num">0</span> │
+└───┘</span>
+
+<span class="comment"># composed view: local DBMSes + saved remote connections</span>
+<span class="prompt">$</span> neo4j-cli desktop list <span class="flag">--format</span> table
+
+<span class="out"><span class="info">▸</span> <span class="keyword">Local DBMSes</span>
+┌──────────┬──────┬────────────┬─────────┬────────────────────────┐
+│ id       │ name │ version    │ status  │ connectionUri          │
+├──────────┼──────┼────────────┼─────────┼────────────────────────┤
+│ <span class="string">a1b2c3d4</span> │ <span class="string">dev</span>  │ <span class="num">2026.04.0</span>  │ <span class="ok">started</span> │ neo4j://localhost:7687 │
+└──────────┴──────┴────────────┴─────────┴────────────────────────┘
+
+<span class="info">▸</span> <span class="keyword">Remote connections</span>
+┌──────────┬───────────┬──────────────────────────────────────────┐
+│ id       │ name      │ connectionUri                            │
+├──────────┼───────────┼──────────────────────────────────────────┤
+│ <span class="string">9f8e7d6c</span> │ <span class="string">aura-prod</span> │ neo4j+s://abc123.databases.neo4j.io      │
+└──────────┴───────────┴──────────────────────────────────────────┘</span>
+
+<span class="comment"># stop / start / delete</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms stop dev <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms delete dev <span class="flag">--rw</span>
+<span class="agentic-line"><span class="agentic-result">Desktop 2 installed, DBMS "dev" running at localhost:7687, listed 1 local DBMS and 1 saved remote connection.</span></span></pre>
+      </div>
+
       <!-- reference -->
       <div class="example-pane ref-pane" data-pane="reference">
         <div class="example-header">
@@ -1651,6 +1709,40 @@
             </div>
           </details>
           <!-- END:docs:docker -->
+
+          <!-- BEGIN:docs:desktop -->
+          <details class="ref-section">
+            <summary class="ref-title">Desktop (local)</summary>
+            <div class="ref-body">
+              <p>Manage a local Neo4j Desktop 2 install — install the app, lifecycle local DBMSes, install plugins, and register saved remote connections. All commands except <code>install</code> talk to Desktop's local relate API on <code>http://localhost:&lt;port&gt;/fastify/api</code>, so Desktop must be running. <code>--port</code> pins the API port instead of probing <code>44222..44232</code>.</p>
+              <pre><span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--rw</span>                       <span class="comment"># install Desktop 2 (DMG / AppImage / NSIS .exe)</span>
+<span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--dry-run</span> <span class="flag">--rw</span>             <span class="comment"># resolve manifest + URL only, no download</span>
+<span class="prompt">$</span> neo4j-cli desktop list <span class="flag">--format</span> table                <span class="comment"># composed view: DBMSes + saved connections</span>
+<span class="prompt">$</span> neo4j-cli desktop doctor                              <span class="comment"># structured health check</span></pre>
+              <p class="ref-sub"><span class="keyword">dbms</span> — local DBMS lifecycle. Desktop 2 ships enterprise-only; no <code>--edition</code> flag. Only one DBMS may run at a time on port 7687; pass <code>--force</code> on <code>create</code>/<code>start</code> to stop the conflicting one first. <code>--wait</code> polls every 1s for up to 30s for <code>status=started</code>.</p>
+              <pre><span class="prompt">$</span> neo4j-cli desktop dbms list <span class="flag">--format</span> table
+<span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--wait</span> <span class="flag">--rw</span>     <span class="comment"># latest stable version auto-picked</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--version</span> 2026.04.0 <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms start &lt;id&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms stop &lt;id&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms delete &lt;id&gt; <span class="flag">--rw</span></pre>
+              <p class="ref-sub"><span class="keyword">dbms plugin</span> — manage plugins on a Desktop DBMS.</p>
+              <pre><span class="prompt">$</span> neo4j-cli desktop dbms plugin available &lt;dbms-id&gt;        <span class="comment"># catalog of installable plugins</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms plugin list &lt;dbms-id&gt;             <span class="comment"># currently installed</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms plugin install &lt;dbms-id&gt; apoc <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms plugin uninstall &lt;dbms-id&gt; apoc <span class="flag">--rw</span></pre>
+              <p class="ref-sub"><span class="keyword">connection</span> — saved remote DB connection profiles (Aura, self-hosted, …). Desktop owns the credential — passwords go to safeStorage, not <code>credentials.json</code>.</p>
+              <pre><span class="prompt">$</span> neo4j-cli desktop connection list
+<span class="prompt">$</span> neo4j-cli desktop connection create <span class="flag">--name</span> aura-prod \
+    <span class="flag">--uri</span> neo4j+s://abc123.databases.neo4j.io <span class="flag">--username</span> neo4j <span class="flag">--rw</span>      <span class="comment"># prompts for password on TTY</span>
+<span class="prompt">$</span> neo4j-cli desktop connection update &lt;id&gt; <span class="flag">--description</span> <span class="string">"dev tier"</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--rw</span></pre>
+              <p>Query against the currently-running Desktop DBMS or a saved connection without restating credentials:</p>
+              <pre><span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n)'</span>
+<span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop-connection:&lt;uuid&gt; <span class="string">'MATCH (n) RETURN count(n)'</span></pre>
+            </div>
+          </details>
+          <!-- END:docs:desktop -->
 
           <!-- BEGIN:docs:write-gate -->
           <details class="ref-section">
@@ -1966,6 +2058,7 @@
     pipe: 'echo \'MATCH (n) RETURN count(n) AS n\' | neo4j-cli query',
     skill: 'neo4j-cli skill install --rw',
     embed: 'neo4j-cli query --param \'q:embed=sci-fi movies\' --param k=5 "CALL db.index.vector.queryNodes(\'plot_idx\', $k, $q) YIELD node, score RETURN node.title, score"',
+    desktop: 'neo4j-cli desktop dbms create --name dev --wait --rw',
     reference: 'neo4j-cli --help',
   };
   const panePrompts = {
@@ -1976,6 +2069,7 @@
     pipe: 'Seed the database from seeds/people.cypher, then show me the 3 youngest people as JSON',
     skill: 'Install the neo4j skill for all my agents, then verify it\'s up to date everywhere',
     embed: 'Add an OpenAI embedding credential, link it to my dbms profile, then find the 5 most similar movies to "sci-fi movies"',
+    desktop: 'Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages',
     reference: 'Set up neo4j-cli from scratch — install, add credentials for Aura and a Bolt connection, then run a query',
   };
   document.querySelectorAll('.copy-mini').forEach(btn => {
