@@ -86,8 +86,13 @@ jobs:
                      go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...'
 
             # Keyring smoke tests — Windows Credential Manager is always available
-            # on windows-latest runners, so no daemon setup is required. The build
-            # step in the matrix already produced bin/neo4j-cli.exe via `make build`.
+            # on windows-latest runners, so no daemon setup is required.
+            # go build on Windows requires an explicit .exe suffix; `make build`
+            # produces bin/neo4j-cli (without .exe) so we add a dedicated step.
+            - name: Build neo4j-cli.exe (Windows keyring smoke)
+              if: matrix.os == 'windows-latest'
+              run: go build -o bin/neo4j-cli.exe ./neo4j-cli
+
             - name: Keyring smoke (Windows)
               if: matrix.os == 'windows-latest'
               run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
