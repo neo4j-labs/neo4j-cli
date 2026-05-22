@@ -248,6 +248,10 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## `internal/quip/` Notes
+
+`neo4j-cli/internal/quip/` is an intentional cosmetic terminal-message helper. Keep as-is unless explicitly instructed to change or remove it. Do not document the trigger values, simplify the lookup, or "tidy up" the obfuscation — the package is the way it is on purpose.
+
 ## PowerShell Installer Test Notes
 
 - **Use `.cmd` stubs, not `.ps1`**: When testing PowerShell installer scripts that call `& neo4j-cli`, put the stub in a `.cmd` file (not `.ps1`). Windows resolves bare `& neo4j-cli` to `.cmd`/`.bat` before `.ps1` when scanning PATH — a `.ps1` stub is often silently skipped.

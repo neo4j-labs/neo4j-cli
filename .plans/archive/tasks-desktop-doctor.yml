@@ -1,0 +1,131 @@
+feature: desktop-doctor
+prd: ./prd-desktop-doctor.md
+created_at: 2026-05-22T11:22:14Z
+updated_at: 2026-05-22T11:22:14Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold the `desktop doctor` cobra leaf"
+    description: |
+      Create `neo4j-cli/internal/subcommands/desktop/doctor.go` containing
+      `newDoctorCmd(cfg *clicfg.Config) *cobra.Command` with a non-empty
+      `Long`, ≥3 flush-left `Example:` invocations, and a stub `RunE` that
+      prints `(not implemented)` so the leaf is wired end-to-end before any
+      business logic lands. Register the leaf in `desktop.go` next to
+      `newListCmd`. Add `doctor_test.go` with a smoke test asserting the
+      help text builds. Run `go generate ./neo4j-cli/internal/skill/...`
+      so the bundle catches the new leaf.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli desktop --help` lists `doctor` under Available Commands"
+      - "`neo4j-cli desktop doctor --help` renders the Long + ≥3 examples (`TestAllLeafCommands_HaveExamples` passes)"
+      - "Skill bundle regen leaves `make generate-check` clean (`TestGenerator_RoundTrip` passes)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` are all clean"
+    completed_at: 2026-05-22T11:35:00Z
+
+  - id: task-002
+    title: "Implement the five health-check functions"
+    description: |
+      Add `checkResult`, `doctorReport`, `doctorSummary` types in
+      `doctor.go`. Implement five functions returning `checkResult` for:
+      install present (reuse `detectInstalled` from `install_detect.go:134`),
+      data directory (`ResolveDataDir` from `desktopclient/discovery.go`),
+      auth data readable (`LoadSalt` — user-facing label is generic, no
+      "secret"/"key" wording per REQ-F-008), standard port probe
+      (`ProbePort`), authenticated probe (`NewClient` + a minimal authed
+      call where 2xx OR an expected 404 both PASS). Cover Mac/Linux/Windows
+      install branches via `SetGOOSFnForTest`; cover error paths via the
+      existing `Set*FnForTest` seams.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Each of the five checks has a dedicated unit test covering its happy path + at least one error path"
+      - "Install-present test covers macOS, Linux, and Windows branches via `SetGOOSFnForTest`"
+      - "`auth_data_readable` row label has no mention of `secret`, `key`, `JWT`, or `salt`"
+      - "Authenticated probe accepts both 2xx and expected-404 responses as PASS"
+    completed_at: 2026-05-22T12:15:00Z
+
+  - id: task-003
+    title: "Orchestrator with skip-on-dependency-fail semantics"
+    description: |
+      Implement `runChecks(ctx, cfg, pinnedPort) doctorReport` that runs
+      the five checks in order, marks dependent checks as `skip` with a
+      `(depends on …)` detail when a prerequisite fails, and builds the
+      `doctorSummary` (reachable, port, standard_port_range, next_step).
+      Always returns nil error so the leaf exits 0 regardless of which
+      checks fail (REQ-F-009). Cover the dependency-skip scenarios in
+      unit tests.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "When the standard probe FAILs, the authenticated probe row has `Status: \"skip\"` and detail mentions the dependency"
+      - "`summary.reachable` is true iff probe + auth-probe both PASSed"
+      - "`summary.standard_port_range` is false when the user supplied `--port` with a value outside 44222..44232"
+      - "Leaf RunE returns nil (exit 0) for every check-status combination, verified by unit tests"
+    completed_at: 2026-05-22T13:05:00Z
+
+  - id: task-004
+    title: "Output rendering: JSON, toon, and table"
+    description: |
+      Wire the orchestrator's `doctorReport` to the format-resolved
+      renderer. JSON / toon via `json.MarshalIndent` and `toon.Marshal`;
+      table via direct `fmt.Fprintf` on `cmd.OutOrStdout()` with aligned
+      columns and `PASS` / `FAIL` / `SKIP` / `INFO` status prefixes.
+      Resolve mode using `output.StdoutIsTerminal` + `cfg.Global.Format()`
+      mirroring `output.ResolveOutput`. JSON shape must match REQ-F-006:
+      `{checks: [...], summary: {reachable, port?, standard_port_range, next_step?}}`.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`--format json` emits a parseable JSON document; tests unmarshal and assert all required fields"
+      - "`--format toon` emits a valid toon document with the same logical shape"
+      - "Default-TTY table format renders aligned name/status/detail columns and a trailing summary line when applicable"
+      - "Stdout is byte-identical between TTY and non-TTY when `--format` is explicit (no auto-table sneaking in on a pipe)"
+    completed_at: 2026-05-22T13:50:00Z
+
+  - id: task-005
+    title: "Append doctor hint to canonicalUnreachable + final gate sweep"
+    description: |
+      Append `" or run 'neo4j-cli desktop doctor' to scan."` to the
+      `canonicalUnreachable` const in
+      `neo4j-cli/internal/desktopclient/client.go`. Update
+      `TestUnreachableError_MatchesCanonicalMessage` (and any other tests
+      asserting on the full message) to include the new substring while
+      keeping existing `doesn't appear to be running` / `--port`
+      assertions intact. Run the full gate sweep: `make test`,
+      `make fmt-check`, `make lint`, `make license-check`,
+      `make generate-check`.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`canonicalUnreachable` ends with `or run 'neo4j-cli desktop doctor' to scan.`"
+      - "All five gates (`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check`) pass on macOS"
+      - "Existing assertions on `doesn't appear to be running` and `--port` continue to pass"
+      - "A new unit test asserts the doctor hint substring is present in `UnreachableError().Error()`"
+    completed_at: 2026-05-22T14:30:00Z
+
+  - id: task-006
+    title: "Manual smoke test against live Desktop + binary size sanity"
+    description: |
+      Build `bin/neo4j-cli` and run the three live scenarios from the PRD
+      acceptance criteria: (1) Desktop running on 44222 — all checks PASS;
+      (2) Desktop stopped — install/data-dir/auth-data PASS, probe FAILs,
+      auth-probe SKIPs, summary `reachable=false`; (3)
+      `--port 12345` against a port nothing listens on — probe FAILs with
+      the user-supplied port mentioned in the detail. Capture JSON output
+      and verify the schema. Compare binary size against the pre-change
+      baseline; flag a delta beyond ±0.5 MiB.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "Scenario 1 emits all PASS rows and `summary.reachable=true`"
+      - "Scenario 2 emits SKIP for auth-probe and `summary.next_step` points to starting Desktop"
+      - "Scenario 3 emits FAIL for probe with detail naming 12345 and `summary.standard_port_range=false`"
+      - "Final `bin/neo4j-cli` size is within ±0.5 MiB of the baseline measured before task-001"
+    completed_at: 2026-05-22T15:30:00Z
