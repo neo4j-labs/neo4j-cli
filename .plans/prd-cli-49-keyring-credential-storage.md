@@ -47,13 +47,17 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
   - **Aura `AccessToken`** and **Embed `APIKey`**: treated as optional/cacheable — a missing value is silently skipped (no keyring entry written for forward; empty value written to JSON for reverse). A keyring error *other than* `ErrNotFound` (e.g., daemon unavailable, permission denied) is still a hard error for all field types.
 - REQ-F-014: **First-run keyring availability probe** — when first-run default detection (REQ-F-011) would write `credential-storage: keyring` (i.e., no existing credentials), the keyring is first probed for availability. If the probe fails (e.g., `dbus-launch` not found on Linux), a warning is emitted to stderr and `credential-storage: insecure` is written instead. The warning names the failure and provides the command to retry once the keyring daemon is available.
 - REQ-F-015: **Explicit keyring probe on `config set credential-storage keyring`** — before accepting `keyring` as the new mode (regardless of whether credentials exist), the keyring is probed. If unavailable, the command returns a `UsageError` identifying the keyring failure and instructing the user to either fix the keyring daemon or run `neo4j-cli config set credential-storage insecure --rw`. The config key is not written.
+- REQ-F-016: **Silent JSON fallback for missing keyring entries during credential load** — when `credential-storage: keyring` is configured and `keyring.Get()` returns `ErrNotFound` for a sensitive field during `load()`, if the JSON value for that field is non-empty, silently use the JSON value without warning or error. Hard-error only when both the keyring entry and the JSON value are absent/empty for a required field (`ClientSecret`, `Password`). Optional fields (`AccessToken`, `APIKey`) remain silently skipped when both are absent. This makes the CLI resilient to out-of-sync states where a credential was written to JSON while keyring mode was already configured (e.g., a new credential added via direct JSON edit, or an incomplete migration).
+- REQ-F-017: **Repair migration — `config set credential-storage keyring` is idempotent** — `config set credential-storage keyring --rw` runs `MigrateToKeyring()` even when `credential-storage` is already `keyring`. Since `load()` now populates in-memory credential fields from JSON fallback (REQ-F-016), the repair pass has access to the JSON-resident secrets and writes them into the keyring, scrubbing them from `credentials.json`. Credentials already correctly stored in the keyring are unaffected (their in-memory values, loaded from the keyring, are written back — effectively a no-op). This allows users to explicitly repair an out-of-sync state by re-running the same command.
+- REQ-F-018: **Reverse migration handles JSON-only credentials** — during `MigrateToInsecure()`, if `keyring.Get()` returns `ErrNotFound` for a sensitive field but the in-memory credential struct already has a non-empty value for that field (populated via the REQ-F-016 JSON fallback during `load()`), the field is already present in JSON — treat it as a no-op (no keyring read needed, no error). This allows `config set credential-storage insecure --rw` to succeed when transitioning away from a partially-migrated or out-of-sync keyring state.
+- REQ-F-019: **Auto-migration on load** — when `load()` uses the REQ-F-016 JSON fallback for any sensitive field (keyring `ErrNotFound` but JSON value present), immediately attempt to write that value to the keyring and scrub it from `credentials.json`. This auto-migration fires on every command that loads credentials, without requiring `--rw`. If the keyring write fails (e.g., the daemon is temporarily unavailable), the attempt is silently abandoned for this invocation and the JSON value continues to be used — the next command will retry automatically. Auto-migration is per-field and per-credential: a failure on one does not block others. A successful auto-migration leaves the credential fully in keyring mode with no trace in `credentials.json`, without any user action.
 
 ### Non-Functional Requirements
 
 - REQ-NF-001: A pure-Go keyring library (e.g., `github.com/zalando/go-keyring`) must be used — no CGo dependencies.
 - REQ-NF-002: Unit tests must use the library's mock/in-memory provider so that tests run without a real keyring daemon on any platform.
 - REQ-NF-003: Migration during `config set credential-storage` must complete within a few seconds for users with fewer than 20 credentials.
-- REQ-NF-004: If a credential's keyring entry is missing during a `keyring`-mode read (e.g., the OS keyring was cleared externally), the CLI must return a clear error naming the missing credential rather than silently returning an empty secret.
+- REQ-NF-004: If a credential's keyring entry is missing during a `keyring`-mode read (e.g., the OS keyring was cleared externally), the CLI must return a clear error naming the missing credential rather than silently returning an empty secret. Exception: if the JSON value for that field is non-empty (out-of-sync state), REQ-F-016 applies — the JSON value is used silently and no error is raised. Hard errors fire only when both keyring and JSON are absent/empty for a required field.
 - REQ-NF-005: Keyring availability is probed by issuing a `Get()` for a sentinel key (`__neo4j-cli-probe__`). `ErrNotFound` indicates the keyring daemon is reachable (the key simply does not exist). Any other error indicates the keyring is unavailable. The probe uses the same `KeyringProvider` test seam so tests can inject errors without a real daemon.
 - REQ-NF-006: Linux keyring behaviour must be covered by subprocess-driven e2e smoke tests (build tag `keyring_smoke && linux`) in `test/e2e/keyring/keyring_linux_test.go`. Tests drive the real `bin/neo4j-cli` binary with a temp `HOME` for credential isolation. Two groups:
   - **No-daemon tests** (always run on Linux CI): subprocess env strips `DBUS_SESSION_BUS_ADDRESS`; verifies graceful degradation (REQ-F-014, REQ-F-015) — warning + insecure fallback on first run, hard error on explicit `config set keyring`.
@@ -78,14 +82,27 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 
 ### Credentials Load/Save Seam
 
-`load()` in `common/clicfg/credentials/credentials.go` handles the normal read path only — no migration logic:
+`load()` in `common/clicfg/credentials/credentials.go` — updated for REQ-F-016 and REQ-F-019:
 1. Unmarshal JSON as today.
-2. If `credential-storage: keyring`: for each credential call `keyring.Get()` to populate sensitive fields.
+2. If `credential-storage: keyring`: for each credential and sensitive field:
+   a. Call `keyring.Get()`.
+   b. If the value is returned: use it (normal path).
+   c. If `ErrNotFound` and the JSON value is non-empty (REQ-F-016 fallback): use the JSON value, then immediately call `keyring.Set()` + scrub from the in-memory JSON struct to trigger auto-migration (REQ-F-019). If `keyring.Set()` fails, leave `credentials.json` unchanged for this invocation — do not abort.
+   d. If `ErrNotFound` and the JSON value is also empty/absent: hard error for required fields (`ClientSecret`, `Password`); silent skip for optional fields (`AccessToken`, `APIKey`).
 3. Wire `onUpdate` callbacks as today.
 
-`save()` in keyring mode:
+The auto-migration in step 2c must call `save()` (or the equivalent partial-write path) to persist the scrub to `credentials.json`. This write does not require `--rw`; it is treated as internal housekeeping, not a user-initiated write.
+
+`save()` in keyring mode (unchanged):
 1. Before writing JSON: zero out sensitive fields in the struct copies written to disk.
 2. Call `keyring.Set()` for each sensitive field.
+
+### Auto-Migration Design Notes
+
+- **Best-effort and silent**: auto-migration (REQ-F-019) never fails a command. If `keyring.Set()` returns an error, the migration attempt is dropped for that invocation. The credential remains readable from JSON on the next run, which will retry the migration.
+- **Per-field atomicity**: each sensitive field is migrated independently. A `keyring.Set()` failure for one field does not roll back fields that already succeeded.
+- **No `--rw` required**: auto-migration bypasses the `--rw` flag because it is transparent housekeeping, not a user-visible write. The user's intent is preserved; the credential value is unchanged, only its storage location moves.
+- **`save()` is the JSON scrub path**: after a successful `keyring.Set()` for a field, the corresponding JSON field is zeroed and `credentials.json` is rewritten. This reuses the existing `save()` call at the end of `load()` rather than introducing a second write path.
 
 ### Migration Methods on Credentials
 
@@ -267,6 +284,12 @@ The exact `dbus-run-session` + gnome-keyring unlock incantation (empty passphras
 - [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on windows-latest (happy-path group runs against real Windows Credential Manager).
 - [ ] Keyring_smoke CI steps present in `.github/workflows/test.yml` for `ubuntu-latest`, `windows-latest`, and `macos-latest`.
 - [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` passes on macos-latest (happy-path, locked-Keychain, and missing-security groups all run or are appropriately skipped).
+- [ ] In keyring mode, a command run against a credential whose keyring entry is missing but whose secret is present in `credentials.json` completes successfully without error or warning, and the secret is automatically moved to the keyring and scrubbed from `credentials.json` by the time the command finishes.
+- [ ] In keyring mode, if the keyring write fails during auto-migration (e.g., daemon temporarily unavailable), the command still succeeds using the JSON value and `credentials.json` is left unchanged — the auto-migration will be retried on the next invocation.
+- [ ] In keyring mode, a command run against a credential whose keyring entry is missing AND whose JSON value is also absent/empty returns a clear hard error naming the credential (REQ-NF-004 unchanged for fully-missing case).
+- [ ] `neo4j-cli config set credential-storage keyring --rw` when `credential-storage` is already `keyring` moves any remaining JSON-resident secrets into the keyring and scrubs them from `credentials.json` (explicit repair pass, complements auto-migration).
+- [ ] `neo4j-cli config set credential-storage insecure --rw` succeeds when credentials are in JSON only (no keyring entries) — JSON values are retained and no `ErrNotFound` error is raised.
+- [ ] All new load-fallback, auto-migration, and repair-migration scenarios are covered by unit tests using the mock keyring provider.
 
 ## Out of Scope
 
