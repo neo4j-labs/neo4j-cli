@@ -757,18 +757,14 @@
      override this and restore full syntax highlighting.
      Scoped with :has(.agentic-line) so blocks WITHOUT an agent prompt
      (e.g. install commands in Quickstart steps 1–2) keep full color. */
-  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line),
-  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
-    color: var(--fg-faint) !important;
-  }
+  /* Quickstart step-cmds stay full contrast in both modes — this is a
+     copy-these-commands guide, not an agentic showcase. Dim sweep is
+     intentionally kept only on #examplesSection below. */
 
   /* #examplesSection IS the .examples element (id+class on same div), so the
      :not(.cli-mode) check goes on the id selector directly — not a descendant
      match. Earlier `#examplesSection .examples` looked for a child and never fired. */
-  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line),
-  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
-    color: var(--fg-faint) !important;
-  }
+  /* Dim sweep removed — full contrast in both modes for readability. */
 
   /* ---------- Quickstart ---------- */
   .steps {
@@ -1166,6 +1162,7 @@
           <div class="db-toggle">
             <button class="mode-btn db-btn active" data-db="aura">aura</button>
             <button class="mode-btn db-btn" data-db="docker">docker</button>
+            <button class="mode-btn db-btn" data-db="desktop">desktop</button>
           </div>
         </div>
 
@@ -1185,6 +1182,12 @@
         <div class="db-panel db-panel-hidden" data-db-panel="docker">
           <p>Spin up a managed local Neo4j container. Docker must be installed. <a href="#examples" data-activate-tab="docker" class="step-link">↓</a></p>
           <div class="step-cmd" data-copy="neo4j-cli docker create --name dev --wait --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Spin up a local Neo4j container named dev and wait until it is ready</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli docker create --name <span style="color:var(--code-string)">dev</span> <span style="color:var(--code-keyword)">--wait</span> <span style="color:var(--code-keyword)">--rw</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        </div>
+
+        <!-- Local panel: desktop create -->
+        <div class="db-panel db-panel-hidden" data-db-panel="desktop">
+          <p>Create a DBMS inside a running Neo4j Desktop 2 install. <a href="#examples" data-activate-tab="desktop" class="step-link">↓</a></p>
+          <div class="step-cmd" data-copy="neo4j-cli desktop dbms create --name dev --wait --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Create a local Neo4j Desktop DBMS named dev and wait until it is started</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli desktop dbms create --name <span style="color:var(--code-string)">dev</span> <span style="color:var(--code-keyword)">--wait</span> <span style="color:var(--code-keyword)">--rw</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
         </div>
       </div>
 
@@ -1236,6 +1239,10 @@
           <span>docker</span>
           <span class="label-tag">local</span>
         </button>
+        <button class="example-tab" data-tab="desktop" role="tab">
+          <span>desktop</span>
+          <span class="label-tag">local</span>
+        </button>
         <button class="example-tab" data-tab="query" role="tab">
           <span>query</span>
           <span class="label-tag">cypher</span>
@@ -1255,10 +1262,6 @@
         <button class="example-tab" data-tab="embed" role="tab">
           <span>embed</span>
           <span class="label-tag">vectors</span>
-        </button>
-        <button class="example-tab" data-tab="desktop" role="tab">
-          <span>desktop</span>
-          <span class="label-tag">local</span>
         </button>
         <button class="example-tab" data-tab="reference" role="tab">
           <span>reference</span>
@@ -1350,6 +1353,59 @@
 <span class="prompt">$</span> neo4j-cli query <span class="flag">--env</span> /tmp/n.env <span class="string">'RETURN 1 AS ok'</span>
 <span class="prompt">$</span> neo4j-cli docker stop tmp <span class="flag">--rw</span>   <span class="comment"># container auto-removed by Docker</span>
 <span class="agentic-line"><span class="agentic-result">Container "dev" is running at localhost:7687, dbms credential stored. Listed 1 managed container.</span></span></pre>
+      </div>
+
+      <div class="example-pane" data-pane="desktop">
+        <div class="example-header">
+          <span class="desc">Manage a local Neo4j Desktop 2 install — DBMSes, plugins, and saved remote connections</span>
+          <button class="copy-mini" data-copy-pane="desktop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            copy
+          </button>
+        </div>
+<pre><span class="agentic-line"><span class="agentic-comment">&gt; Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="comment"># install the Desktop 2 app (no-op if already present)</span>
+<span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--rw</span>
+
+<span class="out">✓ Neo4j Desktop 2 installed · <span class="info">/Applications/Neo4j Desktop.app</span></span>
+
+<span class="comment"># create + start a DBMS (Desktop must be running). --wait blocks until status=started</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--wait</span> <span class="flag">--rw</span>
+
+<span class="out"><span class="info">▸</span> picked version <span class="num">2026.04.0</span> (latest stable enterprise)
+✓ dev (<span class="string">a1b2c3d4</span>) · <span class="keyword">enterprise</span> · <span class="info">neo4j://localhost:7687</span> · <span class="ok">started</span></span>
+
+<span class="comment"># query the running DBMS — Desktop owns the credential, no flags needed</span>
+<span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n) AS n'</span>
+
+<span class="out">┌───┐
+│ n │
+├───┤
+│ <span class="num">0</span> │
+└───┘</span>
+
+<span class="comment"># composed view: local DBMSes + saved remote connections</span>
+<span class="prompt">$</span> neo4j-cli desktop list <span class="flag">--format</span> table
+
+<span class="out"><span class="info">▸</span> <span class="keyword">Local DBMSes</span>
+┌──────────┬──────┬────────────┬─────────┬────────────────────────┐
+│ id       │ name │ version    │ status  │ connectionUri          │
+├──────────┼──────┼────────────┼─────────┼────────────────────────┤
+│ <span class="string">a1b2c3d4</span> │ <span class="string">dev</span>  │ <span class="num">2026.04.0</span>  │ <span class="ok">started</span> │ neo4j://localhost:7687 │
+└──────────┴──────┴────────────┴─────────┴────────────────────────┘
+
+<span class="info">▸</span> <span class="keyword">Remote connections</span>
+┌──────────┬───────────┬──────────────────────────────────────────┐
+│ id       │ name      │ connectionUri                            │
+├──────────┼───────────┼──────────────────────────────────────────┤
+│ <span class="string">9f8e7d6c</span> │ <span class="string">aura-prod</span> │ neo4j+s://abc123.databases.neo4j.io      │
+└──────────┴───────────┴──────────────────────────────────────────┘</span>
+
+<span class="comment"># stop / start / delete</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms stop dev <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms delete dev <span class="flag">--rw</span>
+<span class="agentic-line"><span class="agentic-result">Desktop 2 installed, DBMS "dev" running at localhost:7687, listed 1 local DBMS and 1 saved remote connection.</span></span></pre>
       </div>
 
       <!-- query -->
@@ -1528,59 +1584,6 @@
       </div>
 
       <!-- desktop -->
-      <div class="example-pane" data-pane="desktop">
-        <div class="example-header">
-          <span class="desc">Manage a local Neo4j Desktop 2 install — DBMSes, plugins, and saved remote connections</span>
-          <button class="copy-mini" data-copy-pane="desktop">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            copy
-          </button>
-        </div>
-<pre><span class="agentic-line"><span class="agentic-comment">&gt; Set up Neo4j Desktop 2, spin up a local DBMS called dev, run a query against it, then list everything Desktop manages</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
-<span class="comment"># install the Desktop 2 app (no-op if already present)</span>
-<span class="prompt">$</span> neo4j-cli desktop install <span class="flag">--rw</span>
-
-<span class="ok">✓</span> Neo4j Desktop 2 installed · <span class="info">/Applications/Neo4j Desktop.app</span>
-
-<span class="comment"># create + start a DBMS (Desktop must be running). --wait blocks until status=started</span>
-<span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--wait</span> <span class="flag">--rw</span>
-
-<span class="info">▸</span> picked version <span class="num">2026.04.0</span> (latest stable enterprise)
-<span class="ok">✓</span> dev (<span class="string">a1b2c3d4</span>) · <span class="keyword">enterprise</span> · <span class="info">neo4j://localhost:7687</span> · <span class="ok">started</span>
-
-<span class="comment"># query the running DBMS — Desktop owns the credential, no flags needed</span>
-<span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n) AS n'</span>
-
-<span class="out">┌───┐
-│ n │
-├───┤
-│ <span class="num">0</span> │
-└───┘</span>
-
-<span class="comment"># composed view: local DBMSes + saved remote connections</span>
-<span class="prompt">$</span> neo4j-cli desktop list <span class="flag">--format</span> table
-
-<span class="out"><span class="info">▸</span> <span class="keyword">Local DBMSes</span>
-┌──────────┬──────┬────────────┬─────────┬────────────────────────┐
-│ id       │ name │ version    │ status  │ connectionUri          │
-├──────────┼──────┼────────────┼─────────┼────────────────────────┤
-│ <span class="string">a1b2c3d4</span> │ <span class="string">dev</span>  │ <span class="num">2026.04.0</span>  │ <span class="ok">started</span> │ neo4j://localhost:7687 │
-└──────────┴──────┴────────────┴─────────┴────────────────────────┘
-
-<span class="info">▸</span> <span class="keyword">Remote connections</span>
-┌──────────┬───────────┬──────────────────────────────────────────┐
-│ id       │ name      │ connectionUri                            │
-├──────────┼───────────┼──────────────────────────────────────────┤
-│ <span class="string">9f8e7d6c</span> │ <span class="string">aura-prod</span> │ neo4j+s://abc123.databases.neo4j.io      │
-└──────────┴───────────┴──────────────────────────────────────────┘</span>
-
-<span class="comment"># stop / start / delete</span>
-<span class="prompt">$</span> neo4j-cli desktop dbms stop dev <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli desktop dbms start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli desktop dbms delete dev <span class="flag">--rw</span>
-<span class="agentic-line"><span class="agentic-result">Desktop 2 installed, DBMS "dev" running at localhost:7687, listed 1 local DBMS and 1 saved remote connection.</span></span></pre>
-      </div>
-
       <!-- reference -->
       <div class="example-pane ref-pane" data-pane="reference">
         <div class="example-header">
