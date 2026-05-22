@@ -852,6 +852,33 @@
   }
   .step .step-cmd:hover .copy-icon { opacity: 1; }
   .step .step-cmd .copy-icon svg { width: 12px; height: 12px; display: block; }
+  /* Step 3 full-width "Get a database" card */
+  .step-full { grid-column: 1 / -1; }
+  .step-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .step-top h3 { margin-bottom: 0; }
+  .db-panel { display: flex; flex-direction: column; gap: 10px; }
+  .db-panel-hidden { display: none !important; }
+  @media (min-width: 720px) {
+    .step-full .db-panel[data-db-panel="aura"] {
+      flex-direction: row;
+      align-items: stretch;
+      gap: 16px;
+    }
+    .step-full .db-panel[data-db-panel="aura"] > div {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .step-full .db-panel[data-db-panel="aura"] > div p { margin-top: 0; }
+  }
 
   /* ---------- Footer ---------- */
   footer {
@@ -1131,33 +1158,47 @@
         <div class="step-cmd" data-copy="neo4j-cli skill install --rw"><span class="prompt">$</span><span> neo4j-cli skill install <span class="flag">--rw</span></span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
-      <!-- Step 3 -->
-      <div class="step">
+      <!-- Step 3: Get a database (cloud/local toggle) -->
+      <div class="step step-full">
         <div class="step-num">3</div>
-        <h3>Add Aura credentials</h3>
-        <p>Grab a client ID + secret from your <a href="https://console.neo4j.io/account" claude="claude leave this URL alone" target="_blank" rel="noopener" class="step-link">Aura account</a> and register them. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli credential aura-client add --name &quot;default&quot; --client-id &lt;id&gt; --client-secret &lt;secret&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Add my Aura credentials — grab client ID and secret from console.neo4j.io</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli credential aura-client add --name <span style="color:var(--code-string)">"default"</span> --rw ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        <div class="step-top">
+          <h3>Get a database</h3>
+          <div class="db-toggle">
+            <button class="mode-btn db-btn active" data-db="aura">aura</button>
+            <button class="mode-btn db-btn" data-db="docker">docker</button>
+          </div>
+        </div>
+
+        <!-- Cloud panel: credential add + instance create side by side -->
+        <div class="db-panel" data-db-panel="aura">
+          <div>
+            <p>Grab a client ID + secret from your <a href="https://console.neo4j.io/account" claude="claude leave this URL alone" target="_blank" rel="noopener" class="step-link">Aura account</a> and register them. Free tier, no credit card. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
+            <div class="step-cmd" data-copy="neo4j-cli credential aura-client add --name &quot;default&quot; --client-id &lt;id&gt; --client-secret &lt;secret&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Add my Aura credentials — grab client ID and secret from console.neo4j.io</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli credential aura-client add --name <span style="color:var(--code-string)">"default"</span> --rw ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+          </div>
+          <div>
+            <p>Provision a new Aura instance.</p>
+            <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --type free-db --organization-id &lt;org-id&gt; --project-id &lt;project-id&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Create a free Aura instance called movies-dev</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --type <span style="color:var(--code-keyword)">free-db</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+          </div>
+        </div>
+
+        <!-- Local panel: docker create -->
+        <div class="db-panel db-panel-hidden" data-db-panel="docker">
+          <p>Spin up a managed local Neo4j container. Docker must be installed. <a href="#examples" data-activate-tab="docker" class="step-link">↓</a></p>
+          <div class="step-cmd" data-copy="neo4j-cli docker create --name dev --wait --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Spin up a local Neo4j container named dev and wait until it is ready</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli docker create --name <span style="color:var(--code-string)">dev</span> <span style="color:var(--code-keyword)">--wait</span> <span style="color:var(--code-keyword)">--rw</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        </div>
       </div>
 
-      <!-- Step 4 -->
+      <!-- Step 4 (was 5) -->
       <div class="step">
         <div class="step-num">4</div>
-        <h3>Create an instance</h3>
-        <p>Provision a new Aura instance. Free tier needs no credit card. <a href="#examples" data-activate-tab="aura" class="step-link">↓</a></p>
-        <div class="step-cmd" data-copy="neo4j-cli aura instance create --name &quot;movies-dev&quot; --type free-db --organization-id &lt;org-id&gt; --project-id &lt;project-id&gt; --rw"><span class="agentic-line"><span class="agentic-comment">&gt; Create a free Aura instance called movies-dev</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli aura instance create --name <span style="color:var(--code-string)">"movies-dev"</span> --type <span style="color:var(--code-keyword)">free-db</span> ...<span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
-      </div>
-
-      <!-- Step 5 -->
-      <div class="step">
-        <div class="step-num">5</div>
         <h3>Insert data</h3>
         <p>Pass typed params inline with <code style="font-size:12px">--param</code>, or pipe a Cypher file. <a href="#examples" data-activate-tab="pipe" class="step-link">↓</a></p>
         <div class="step-cmd" data-copy="neo4j-cli query --rw 'UNWIND $p AS r CREATE (:Person {name:r.name,born:r.born})' --param 'p=[{&quot;name&quot;:&quot;Alice&quot;,&quot;born&quot;:1990},{&quot;name&quot;:&quot;Bob&quot;,&quot;born&quot;:1985},{&quot;name&quot;:&quot;Carol&quot;,&quot;born&quot;:1992}]'"><span class="agentic-line"><span class="agentic-comment">&gt; Insert 3 Person nodes: Alice born 1990, Bob 1985, Carol 1992</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli query <span style="color:var(--code-keyword)">--rw</span> <span style="color:var(--code-string)">'UNWIND $p AS r CREATE (:Person …)'</span> <span style="color:var(--code-keyword)">--param</span> <span style="color:var(--code-string)">'p=[…]'</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
-      <!-- Step 6 -->
+      <!-- Step 5 (was 6) -->
       <div class="step">
-        <div class="step-num">6</div>
+        <div class="step-num">5</div>
         <h3>Query your database</h3>
         <p>Run Cypher against any Neo4j. Pretty table by default; JSON when piped. <a href="#examples" data-activate-tab="query" class="step-link">↓</a></p>
         <div class="step-cmd" data-copy="neo4j-cli query 'MATCH (p:Person) WHERE p.born < 1990 RETURN p.name, p.born ORDER BY p.born'"><span class="agentic-line"><span class="agentic-comment">&gt; Find all people born before 1990 and return their names</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span><span class="prompt">$</span> neo4j-cli query <span style="color:var(--code-string)">'MATCH (p:Person) WHERE p.born &lt; 1990 RETURN p.name, p.born'</span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
@@ -1189,7 +1230,7 @@
       <div class="example-tabs" role="tablist">
         <button class="example-tab active" data-tab="aura" role="tab">
           <span>aura</span>
-          <span class="label-tag">instances</span>
+          <span class="label-tag">cloud</span>
         </button>
         <button class="example-tab" data-tab="docker" role="tab">
           <span>docker</span>
@@ -1949,6 +1990,17 @@
         showToast('Copied');
         setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1600);
       }
+    });
+  });
+
+  // ---------- DB toggle (cloud / local) in step 3 ----------
+  document.querySelectorAll('.db-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.db;
+      document.querySelectorAll('.db-btn').forEach(b => b.classList.toggle('active', b.dataset.db === mode));
+      document.querySelectorAll('.db-panel').forEach(p => {
+        p.classList.toggle('db-panel-hidden', p.dataset.dbPanel !== mode);
+      });
     });
   });
 
