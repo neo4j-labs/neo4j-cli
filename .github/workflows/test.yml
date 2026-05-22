@@ -65,10 +65,11 @@ jobs:
             # bus, exercising the graceful degradation path (keyring unavailable
             # → writes insecure default and warns). The with-daemon group is
             # guarded by DBUS_SESSION_BUS_ADDRESS; it skips locally when no bus
-            # is present and fatals in CI when the env var is missing (to catch
-            # a broken dbus-run-session setup). Only ubuntu-latest because the
-            # macOS keyring step is handled by task-016; Windows uses its own
-            # step below (Credential Manager always available, no daemon needed).
+            # is present and fatals when KEYRING_WITH_DAEMON=true (set only by
+            # the with-daemon CI step, not the no-daemon step) to catch a broken
+            # dbus-run-session setup. Only ubuntu-latest because the macOS keyring
+            # step is handled separately; Windows uses its own step below
+            # (Credential Manager always available, no daemon needed).
             - name: Keyring smoke (no daemon)
               if: matrix.os == 'ubuntu-latest'
               run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
@@ -83,7 +84,7 @@ jobs:
                   dbus-run-session -- sh -c \
                     'echo "" | gnome-keyring-daemon --unlock --components=secrets --daemonize && \
                      sleep 1 && \
-                     go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...'
+                     KEYRING_WITH_DAEMON=true go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...'
 
             # Keyring smoke tests — Windows Credential Manager is always available
             # on windows-latest runners, so no daemon setup is required.

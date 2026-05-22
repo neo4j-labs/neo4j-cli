@@ -109,6 +109,10 @@ func configDirForHome(dir string) string {
 // the binary. It includes PATH and optionally SystemRoot (Windows DLL loading),
 // and suppresses telemetry / version-check noise. Callers append platform-specific
 // config-home overrides and any additional env vars via extra.
+//
+// DBUS_SESSION_BUS_ADDRESS is forwarded when set in the parent process so that
+// the neo4j-cli subprocess can connect to the gnome-keyring daemon on Linux.
+// No-daemon tests call stripDBUS(baseChildEnv(...)) to remove it explicitly.
 func baseChildEnv(extra ...string) []string {
 	env := []string{
 		"PATH=" + os.Getenv("PATH"),
@@ -117,6 +121,9 @@ func baseChildEnv(extra ...string) []string {
 	}
 	if sr := os.Getenv("SystemRoot"); sr != "" {
 		env = append(env, "SystemRoot="+sr)
+	}
+	if v := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); v != "" {
+		env = append(env, "DBUS_SESSION_BUS_ADDRESS="+v)
 	}
 	env = append(env, extra...)
 	return env

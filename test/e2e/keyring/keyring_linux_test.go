@@ -122,11 +122,15 @@ func TestKeyring_NoDaemon_ConfigSet_FailsWithExistingCreds(t *testing.T) {
 // ===========================================================================
 
 // requireDaemon skips the test if DBUS_SESSION_BUS_ADDRESS is not set,
-// unless CI=true in which case it fatals (CI must set up the daemon correctly).
+// unless KEYRING_WITH_DAEMON=true in which case it fatals (the with-daemon CI
+// step sets this variable, so a missing bus means the dbus-run-session setup
+// failed). Using a dedicated variable (not CI=true) ensures the no-daemon CI
+// step — which intentionally has no daemon and always runs under CI=true —
+// does not fatal on these tests.
 func requireDaemon(t *testing.T) {
 	t.Helper()
 	if os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "" {
-		if os.Getenv("CI") == "true" {
+		if os.Getenv("KEYRING_WITH_DAEMON") == "true" {
 			t.Fatal("DBUS_SESSION_BUS_ADDRESS not set in CI — dbus-run-session/gnome-keyring setup failed")
 		}
 		t.Skip("DBUS_SESSION_BUS_ADDRESS not set; run inside dbus-run-session for with-daemon tests")
