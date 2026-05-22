@@ -123,6 +123,13 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		return cfg, cred
 	}
 
+	// Device-auth credential: no ClientSecret, has an access token.
+	// The 401/403 device-auth paths in formatAuthorizationError return before
+	// touching cfg, so cfg can be nil for these cases.
+	newDeviceAuthCred := func() *credentials.AuraCredential {
+		return &credentials.AuraCredential{Name: "login", ClientId: "device-client-id"}
+	}
+
 	headerWithRetry := func(v string) http.Header {
 		h := http.Header{}
 		h.Set("Retry-After", v)
@@ -139,6 +146,7 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 		wantSuggestion     string // optional Suggestion field check (errors.As)
 		assertNoSuggestion bool   // when set, assert Suggestion == "" even though wantSuggestion is empty
 		usesAuthCfg        bool   // 401/403-no-server-error paths call ClearAccessToken
+		useDeviceAuth      bool   // device-auth credential (empty ClientSecret); cfg is nil
 	}{
 		{
 			name:           "400 bad request -> validation (6)",
@@ -168,6 +176,33 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 			body:           `{"errors":[{"message":"forbidden"}]}`,
 			wantCode:       4,
 			usesAuthCfg:    true,
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
+		},
+		{
+			name:               "401 device-auth (no secret, expired token) -> session expired (4)",
+			statusCode:         http.StatusUnauthorized,
+			body:               `{"errors":[{"message":"token invalid"}]}`,
+			wantCode:           4,
+			useDeviceAuth:      true,
+			wantMsgContain:     "neo4j-cli aura login",
+			assertNoSuggestion: true,
+		},
+		{
+			name:           "403 device-auth (no secret) with standard error body -> shows API errors (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"errors":[{"message":"Insufficient permissions for performing this action"}]}`,
+			wantCode:       4,
+			useDeviceAuth:  true,
+			wantMsgContain: "Insufficient permissions",
+			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
+		},
+		{
+			name:           "403 device-auth (no secret) with non-standard error body -> fallback message (4)",
+			statusCode:     http.StatusForbidden,
+			body:           `{"Message":"Insufficient permissions","Reason":"unauthorized"}`,
+			wantCode:       4,
+			useDeviceAuth:  true,
+			wantMsgContain: "access forbidden",
 			wantSuggestion: "Run 'neo4j-cli credential aura-client add' to refresh credentials, then retry.",
 		},
 		{
@@ -259,8 +294,11 @@ func TestHandleResponseError_ExitCodeMapping(t *testing.T) {
 
 			var cfg *clicfg.Config
 			var cred *credentials.AuraCredential
-			if tc.usesAuthCfg {
+			switch {
+			case tc.usesAuthCfg:
 				cfg, cred = newAuthFixture(t)
+			case tc.useDeviceAuth:
+				cred = newDeviceAuthCred()
 			}
 
 			err := handleResponseError(res, cred, cfg)
