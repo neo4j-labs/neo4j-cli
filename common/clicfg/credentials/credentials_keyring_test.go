@@ -81,23 +81,28 @@ func TestSetStorageMode_KeyringMode_LoadsFromKeyring(t *testing.T) {
 
 // TestSetStorageMode_KeyringMode_MissingRequired_Error verifies that when
 // keyring mode is active and a required field is missing from both keyring and
-// JSON, SetStorageMode returns an error naming the credential and field
-// (REQ-NF-004). Covers aura client-secret and dbms password.
-func TestSetStorageMode_KeyringMode_MissingRequired_Error(t *testing.T) {
+// JSON, SetStorageMode succeeds (no error) but leaves the field empty so that
+// the command can still run. The missing-credential warning is written to
+// stderr. Covers aura client-secret and dbms password.
+func TestSetStorageMode_KeyringMode_MissingRequired_Warn(t *testing.T) {
 	tests := []struct {
-		name      string
-		credJSON  string
-		wantInErr []string
+		name         string
+		credJSON     string
+		checkEmptyFn func(creds *credentials.Credentials) string
 	}{
 		{
-			name:      "aura missing client-secret",
-			credJSON:  `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`,
-			wantInErr: []string{"prod", "aura client-secret"},
+			name:     "aura missing client-secret",
+			credJSON: `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`,
+			checkEmptyFn: func(creds *credentials.Credentials) string {
+				return creds.Aura.Credentials[0].ClientSecret
+			},
 		},
 		{
-			name:      "dbms missing password",
-			credJSON:  `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
-			wantInErr: []string{"local", "dbms password"},
+			name:     "dbms missing password",
+			credJSON: `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`,
+			checkEmptyFn: func(creds *credentials.Credentials) string {
+				return creds.Dbms.Credentials[0].Password
+			},
 		},
 	}
 
@@ -111,10 +116,8 @@ func TestSetStorageMode_KeyringMode_MissingRequired_Error(t *testing.T) {
 
 			creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
 			err = creds.SetStorageMode(credentials.StorageModeKeyring)
-			require.Error(t, err)
-			for _, s := range tc.wantInErr {
-				assert.Contains(t, err.Error(), s)
-			}
+			require.NoError(t, err, "missing required field must warn but not error")
+			assert.Equal(t, "", tc.checkEmptyFn(creds), "field must remain empty when missing from both keyring and JSON")
 		})
 	}
 }

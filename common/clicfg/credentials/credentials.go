@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -609,8 +610,9 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 //     field is zeroed in the JSON struct (to be persisted by save() after all
 //     fields are processed). On failure the scrub is silently skipped for this
 //     invocation; retry happens automatically on the next command.
-//   - If ErrNotFound and JSON value is also absent, a clierr.UsageError is
-//     returned (REQ-NF-004).
+//   - If ErrNotFound and JSON value is also absent, a warning is written to
+//     stderr and the field is left empty; the command continues (error only
+//     surfaces if the credential is actually used).
 //
 // Non-ErrNotFound errors are returned as-is.
 // save() is called at the end only when at least one field was auto-migrated.
@@ -642,11 +644,12 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 			if !errors.Is(err, ErrNotFound) {
 				return fmt.Errorf("keyring get aura/%s/client-secret: %w", cred.Name, err)
 			}
-			// ErrNotFound: fall back to JSON value if present, error if not
+			// ErrNotFound: fall back to JSON value if present, warn if not
 			if cred.ClientSecret == "" {
-				return clierr.NewUsageError("keyring entry missing for credential %q (aura client-secret); run `credential aura-client remove %s` and re-add it", cred.Name, cred.Name)
+				fmt.Fprintf(os.Stderr, "Warning: keyring entry missing for credential %q (aura client-secret); run `credential aura-client remove %s` and re-add it\n", cred.Name, cred.Name)
 			}
 			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
+			// tryAutoMigrate is a no-op when val is "".
 			tryAutoMigrate(cred.ClientSecret, "aura", cred.Name, "client-secret")
 		} else {
 			cred.ClientSecret = secret
@@ -672,9 +675,10 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 				return fmt.Errorf("keyring get dbms/%s/password: %w", cred.Name, err)
 			}
 			if cred.Password == "" {
-				return clierr.NewUsageError("keyring entry missing for credential %q (dbms password); run `credential dbms remove %s` and re-add it", cred.Name, cred.Name)
+				fmt.Fprintf(os.Stderr, "Warning: keyring entry missing for credential %q (dbms password); run `credential dbms remove %s` and re-add it\n", cred.Name, cred.Name)
 			}
 			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
+			// tryAutoMigrate is a no-op when val is "".
 			tryAutoMigrate(cred.Password, "dbms", cred.Name, "password")
 		} else {
 			cred.Password = pwd
