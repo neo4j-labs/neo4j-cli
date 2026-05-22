@@ -12,6 +12,14 @@ import (
 )
 
 func TestConfigSet(t *testing.T) {
+	// Initialise the mock keyring so that ProbeKeyringAvailability() (called
+	// by MigrateToKeyring() when testing credential-storage keyring cases)
+	// does not reach the real OS keyring daemon. The cleanup restores the mock
+	// so that subtests in TestConfigSet_CredentialStorageMigration that call
+	// MockInitWithError are not affected by ordering.
+	gokeyring.MockInit()
+	t.Cleanup(gokeyring.MockInit)
+
 	tests := []struct {
 		name             string
 		command          string
@@ -206,14 +214,38 @@ func TestConfigSet_CredentialStorageMigration(t *testing.T) {
 		assert.Contains(t, string(errOut), "Error")
 	})
 
-	t.Run("setting same credential-storage value is a no-op", func(t *testing.T) {
+	t.Run("credential-storage keyring to keyring (repair pass): runs MigrateToKeyring", func(t *testing.T) {
 		gokeyring.MockInit()
+		// Pre-seed the mock keyring with the secret so that loadSensitiveFieldsFromKeyring
+		// (called from NewConfig) finds it and loads it into memory without triggering
+		// auto-migration. This isolates the repair-pass behaviour: the credential is
+		// already in the keyring but credentials.json still carries the plaintext secret
+		// (simulating an out-of-sync state after a partial migration).
+		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/client-secret", "s3cr3t"))
 		h := newNeo4jTestHelper(t)
-		// Pre-seed config with credential-storage already set to keyring.
 		h.setConfigValue("credential-storage", "keyring")
-		// Setting keyring again should succeed without triggering migration.
+		// credentials.json deliberately carries the plaintext secret even though the
+		// keyring already has it. The repair pass must scrub the JSON copy.
 		h.executeCommandWithCredentials("config set --rw credential-storage keyring", credentialsWithAura)
 		h.assertErr("")
 		h.assertConfigValue("credential-storage", "keyring")
+		// Repair pass must leave the secret in the keyring and have scrubbed it from JSON.
+		secret, err := gokeyring.Get("neo4j-cli", "aura/prod/client-secret")
+		assert.Nil(t, err)
+		assert.Equal(t, "s3cr3t", secret)
+		h.assertCredentialsValue("aura.credentials.0.client-secret", "")
+	})
+
+	t.Run("setting credential-storage insecure to insecure is a no-op", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newNeo4jTestHelper(t)
+		// Pre-seed config with credential-storage already set to insecure.
+		h.setConfigValue("credential-storage", "insecure")
+		// Setting insecure again should succeed without triggering migration.
+		h.executeCommandWithCredentials("config set --rw credential-storage insecure", credentialsWithAura)
+		h.assertErr("")
+		h.assertConfigValue("credential-storage", "insecure")
+		// Secret must remain in credentials.json (no migration triggered).
+		h.assertCredentialsValue("aura.credentials.0.client-secret", "s3cr3t")
 	})
 }

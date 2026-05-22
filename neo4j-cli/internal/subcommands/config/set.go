@@ -56,22 +56,33 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				// When changing credential-storage, migrate secrets before
 				// persisting the new config value. Migration must succeed before
 				// the config key is written; on failure the config is unchanged.
+				//
+				// For the keyring target we always run MigrateToKeyring()
+				// regardless of the current mode (REQ-F-017 repair pass): if any
+				// secrets are still resident in credentials.json (e.g. from a
+				// partial previous migration), they will be moved to the keyring
+				// and scrubbed. This is idempotent — credentials already in the
+				// keyring are read back by load() and written back unchanged.
+				//
+				// For the insecure target we only run MigrateToInsecure() when
+				// the mode actually changes to avoid spurious keyring reads.
 				credentialStorageModeChanged := false
 				if bareKey == "credential-storage" {
 					currentMode := cfg.Credentials.StorageMode()
-					if currentMode != value {
-						credentialStorageModeChanged = true
-						var migrateErr error
-						switch value {
-						case credentials.StorageModeKeyring:
-							migrateErr = cfg.Credentials.MigrateToKeyring()
-						case credentials.StorageModeInsecure:
-							migrateErr = cfg.Credentials.MigrateToInsecure()
-						}
-						if migrateErr != nil {
+					if value == credentials.StorageModeKeyring {
+						// Always run the repair/migration pass for keyring target.
+						if migrateErr := cfg.Credentials.MigrateToKeyring(); migrateErr != nil {
 							cmd.SilenceUsage = true
 							return migrateErr
 						}
+						credentialStorageModeChanged = (currentMode != value)
+					} else if value == credentials.StorageModeInsecure && currentMode != value {
+						// Only migrate to insecure when actually switching modes.
+						if migrateErr := cfg.Credentials.MigrateToInsecure(); migrateErr != nil {
+							cmd.SilenceUsage = true
+							return migrateErr
+						}
+						credentialStorageModeChanged = true
 					}
 				}
 
