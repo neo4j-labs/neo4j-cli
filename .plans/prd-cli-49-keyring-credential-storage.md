@@ -72,6 +72,27 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 
 ## Technical Considerations
 
+### CI Failures — Ubuntu Unit Test and Windows Smoke Binary
+
+Two pre-existing CI failures need repair before the branch can merge:
+
+**Ubuntu — `TestConfigSet/set_credential-storage_to_keyring_with_rw_succeeds`** (`neo4j-cli/internal/subcommands/config/set_test.go`)
+
+The table-driven `TestConfigSet` includes a case that runs `config set --rw credential-storage keyring` without initialising the mock keyring. When executed under plain `make test` on ubuntu-latest (no D-Bus session), `ProbeKeyringAvailability()` (REQ-F-015) hits the real Secret Service and returns `"The name org.freedesktop.secrets was not provided by any .service files"`, making the command fail rather than succeed.
+
+Fix: call `gokeyring.MockInit()` at the top of `TestConfigSet` (before the range loop) and register a `t.Cleanup(gokeyring.MockInit)` to reset state after all subtests. The mock makes `ProbeKeyringAvailability()` return `ErrNotFound` (→ keyring available) instead of the real D-Bus error. Other subtests in the table that don't touch credentials are unaffected.
+
+**Windows — Smoke test binary not found** (`test/e2e/keyring/keyring_windows_test.go`)
+
+The Windows keyring smoke CI step assumes the matrix `make build` step already produced `bin/neo4j-cli.exe`. Empirically, `go build -o bin/neo4j-cli ./neo4j-cli` on the windows-latest runner does not create `bin/neo4j-cli.exe` at the path the test helper expects (confirmed by CI log: all four smoke tests fail immediately with `GetFileAttributesEx ... neo4j-cli.exe: The system cannot find the file specified`).
+
+Fix: add a Windows-specific CI step immediately before "Keyring smoke (Windows)" that explicitly produces the binary with the correct name:
+```yaml
+- name: Build neo4j-cli.exe (Windows keyring smoke)
+  if: matrix.os == 'windows-latest'
+  run: go build -o bin/neo4j-cli.exe ./neo4j-cli
+```
+
 ### Library Choice
 
 `github.com/zalando/go-keyring` is the recommended library. It is pure Go, uses OS-native backends (`/usr/bin/security` on macOS, Win32 Credential Manager on Windows, dbus Secret Service on Linux), has a minimal three-function API (`Get` / `Set` / `Delete`), and provides `MockInit()` for hermetic testing. No CGo required.
@@ -290,6 +311,8 @@ The exact `dbus-run-session` + gnome-keyring unlock incantation (empty passphras
 - [ ] `neo4j-cli config set credential-storage keyring --rw` when `credential-storage` is already `keyring` moves any remaining JSON-resident secrets into the keyring and scrubs them from `credentials.json` (explicit repair pass, complements auto-migration).
 - [ ] `neo4j-cli config set credential-storage insecure --rw` succeeds when credentials are in JSON only (no keyring entries) — JSON values are retained and no `ErrNotFound` error is raised.
 - [ ] All new load-fallback, auto-migration, and repair-migration scenarios are covered by unit tests using the mock keyring provider.
+- [ ] `make test` passes on ubuntu-latest without a D-Bus session (`TestConfigSet/set_credential-storage_to_keyring_with_rw_succeeds` no longer hits the real Secret Service).
+- [ ] `go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...` on windows-latest finds `bin/neo4j-cli.exe` and all four smoke tests run (no "binary not found" failure).
 
 ## Out of Scope
 
