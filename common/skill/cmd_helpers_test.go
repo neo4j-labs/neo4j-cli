@@ -65,6 +65,7 @@ func newStandaloneSkillCmd(cfg *clicfg.Config) *cobra.Command {
 // value ("default", "json", or "table"). The test HOME is set to homeDir.
 func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fixture {
 	t.Helper()
+	clearConductorEnv(t)
 	t.Setenv("HOME", homeDir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, "xdg"))
 
@@ -93,6 +94,7 @@ func newFixture(t *testing.T, homeDir, output string, agentNames ...string) *fix
 
 func newRootFixture(t *testing.T, homeDir, output string, agentNames ...string) *fixture {
 	t.Helper()
+	clearConductorEnv(t)
 	origTraverse := cobra.EnableTraverseRunHooks
 	cobra.EnableTraverseRunHooks = true
 	t.Cleanup(func() { cobra.EnableTraverseRunHooks = origTraverse })
@@ -140,4 +142,16 @@ func (f *fixture) execSkill(t *testing.T, args ...string) error {
 func (f *fixture) resetBuffers() {
 	f.stdout.Reset()
 	f.stderr.Reset()
+}
+
+func clearConductorEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{
+		"CONDUCTOR_AGENT_BINARIES_DIR",
+		"CONDUCTOR_INTERNAL_BIN_DIR",
+		"CONDUCTOR_ROOT_PATH",
+		"CONDUCTOR_WORKSPACE_PATH",
+	} {
+		t.Setenv(name, "")
+	}
 }

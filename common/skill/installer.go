@@ -41,6 +41,16 @@ type AgentInstall struct {
 	Detected         bool   // DetectDir exists on disk
 	Installed        bool   // SKILL.md present in this agent's skills dir
 	InstalledVersion string // value of the `version:` frontmatter line, "" if not installed or unparseable
+	Details          []AgentInstallDetail
+}
+
+// AgentInstallDetail describes a concrete backing install used by meta-agents.
+type AgentInstallDetail struct {
+	Agent            string
+	DisplayName      string
+	SkillsPath       string
+	Installed        bool
+	InstalledVersion string
 }
 
 // CheckRow is a per-agent row produced by Check. Status is "ok", "drift",
@@ -79,18 +89,20 @@ func Install(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter 
 	}
 
 	for _, a := range targets {
-		skillsRoot, ok := a.SkillsPath()
+		skillTargets, ok := a.SkillTargets()
 		if !ok {
 			return nil, fmt.Errorf("skill: cannot resolve skills path for %s", a.Name)
 		}
-		dst := filepath.Join(skillsRoot, skillName)
+		for _, target := range skillTargets {
+			dst := filepath.Join(target.SkillsRoot, skillName)
 
-		// Clean any prior install so removed reference files don't linger.
-		if rerr := RemoveDir(filesystem, dst); rerr != nil {
-			return nil, fmt.Errorf("skill: cleaning %s: %w", dst, rerr)
-		}
-		if cerr := copyBundleWithVersion(filesystem, dst, bundle, version); cerr != nil {
-			return nil, fmt.Errorf("skill: writing %s: %w", dst, cerr)
+			// Clean any prior install so removed reference files don't linger.
+			if rerr := RemoveDir(filesystem, dst); rerr != nil {
+				return nil, fmt.Errorf("skill: cleaning %s: %w", dst, rerr)
+			}
+			if cerr := copyBundleWithVersion(filesystem, dst, bundle, version); cerr != nil {
+				return nil, fmt.Errorf("skill: writing %s: %w", dst, cerr)
+			}
 		}
 	}
 	return targets, nil
@@ -122,13 +134,15 @@ func Remove(filesystem afero.Fs, skillName, agentFilter string) ([]*Agent, error
 	}
 
 	for _, a := range targets {
-		skillsRoot, ok := a.SkillsPath()
+		skillTargets, ok := a.SkillTargets()
 		if !ok {
 			continue
 		}
-		dst := filepath.Join(skillsRoot, skillName)
-		if rerr := RemoveDir(filesystem, dst); rerr != nil {
-			return nil, fmt.Errorf("skill: removing %s: %w", dst, rerr)
+		for _, target := range skillTargets {
+			dst := filepath.Join(target.SkillsRoot, skillName)
+			if rerr := RemoveDir(filesystem, dst); rerr != nil {
+				return nil, fmt.Errorf("skill: removing %s: %w", dst, rerr)
+			}
 		}
 	}
 	return targets, nil
@@ -147,19 +161,35 @@ func List(filesystem afero.Fs, skillName string) ([]AgentInstall, error) {
 	for i := range AGENTS {
 		row := AgentInstall{Agent: &AGENTS[i]}
 
-		dp, ok := AGENTS[i].DetectPath()
-		if ok {
-			exists, _ := afero.DirExists(filesystem, dp)
-			row.Detected = exists
-		}
+		row.Detected = agentDetected(filesystem, &AGENTS[i])
 
-		sp, ok := AGENTS[i].SkillsPath()
+		targets, ok := AGENTS[i].SkillTargets()
 		if ok {
-			skillFile := filepath.Join(sp, skillName, "SKILL.md")
-			if exists, _ := afero.Exists(filesystem, skillFile); exists {
-				row.Installed = true
-				if data, err := afero.ReadFile(filesystem, skillFile); err == nil {
-					row.InstalledVersion = parseVersion(data)
+			for _, target := range targets {
+				skillFile := filepath.Join(target.SkillsRoot, skillName, "SKILL.md")
+				detail := AgentInstallDetail{
+					Agent:       target.AgentName,
+					DisplayName: target.DisplayName,
+					SkillsPath:  filepath.Join(target.SkillsRoot, skillName),
+				}
+				if exists, _ := afero.Exists(filesystem, skillFile); exists {
+					row.Installed = true
+					detail.Installed = true
+					if data, err := afero.ReadFile(filesystem, skillFile); err == nil {
+						detail.InstalledVersion = parseVersion(data)
+					}
+				}
+				row.Details = append(row.Details, detail)
+			}
+			if len(row.Details) > 1 && !row.Detected {
+				row.Installed = false
+				row.InstalledVersion = ""
+			} else if len(row.Details) == 1 {
+				row.InstalledVersion = row.Details[0].InstalledVersion
+			} else if len(row.Details) > 1 {
+				row.InstalledVersion = summarizeInstallDetails(row.Details)
+				if !row.Installed {
+					row.InstalledVersion = ""
 				}
 			}
 		}
@@ -187,15 +217,8 @@ func Check(filesystem afero.Fs, skillName, currentVersion string) ([]CheckRow, b
 		if !r.Installed {
 			continue
 		}
-		status := "ok"
-		switch {
-		case r.InstalledVersion == "":
-			status = "unknown-version"
-			drift = true
-		case r.InstalledVersion != currentVersion:
-			status = "drift"
-			drift = true
-		}
+		status, rowDrift := checkStatus(r, currentVersion)
+		drift = drift || rowDrift
 		out = append(out, CheckRow{
 			Agent:            r.Agent,
 			InstalledVersion: r.InstalledVersion,
@@ -221,15 +244,64 @@ func resolveTargets(filesystem afero.Fs, agentFilter string) ([]*Agent, error) {
 	if a == nil {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownAgent, agentFilter)
 	}
-	dp, ok := a.DetectPath()
-	if !ok {
-		return nil, fmt.Errorf("%w: %s (cannot resolve HOME)", ErrAgentNotDetected, a.Name)
-	}
-	exists, _ := afero.DirExists(filesystem, dp)
-	if !exists {
+	if !agentDetected(filesystem, a) {
 		return nil, fmt.Errorf("%w: %s", ErrAgentNotDetected, a.Name)
 	}
 	return []*Agent{a}, nil
+}
+
+func summarizeInstallDetails(details []AgentInstallDetail) string {
+	parts := make([]string, 0, len(details))
+	for _, detail := range details {
+		version := "missing"
+		if detail.Installed {
+			version = detail.InstalledVersion
+			if version == "" {
+				version = "unknown-version"
+			}
+		}
+		parts = append(parts, detail.Agent+":"+version)
+	}
+	return strings.Join(parts, ",")
+}
+
+func checkStatus(row AgentInstall, currentVersion string) (string, bool) {
+	if len(row.Details) > 1 {
+		partial := false
+		unknown := false
+		drift := false
+		for _, detail := range row.Details {
+			if !detail.Installed {
+				partial = true
+				continue
+			}
+			switch {
+			case detail.InstalledVersion == "":
+				unknown = true
+			case detail.InstalledVersion != currentVersion:
+				drift = true
+			}
+		}
+		switch {
+		case partial:
+			return "partial", true
+		case unknown:
+			return "unknown-version", true
+		case drift:
+			return "drift", true
+		default:
+			return "ok", false
+		}
+	}
+
+	switch {
+	case row.InstalledVersion == "":
+		return "unknown-version", true
+	case row.InstalledVersion != currentVersion:
+		return "drift", true
+	default:
+		return "ok", false
+	}
 }
 
 // copyBundleWithVersion is CopyBundle plus a single-file substitution: the

@@ -20,10 +20,20 @@ import (
 // DetectDir / SkillsDir are stored in their unexpanded form (with `~` and
 // `$XDG_CONFIG_HOME`); call DetectPath / SkillsPath to resolve.
 type Agent struct {
-	Name        string // canonical lowercase id, e.g. "claude-code"
-	DisplayName string // human-readable, e.g. "Claude Code"
-	DetectDir   string // unexpanded path used to detect agent presence
-	SkillsDir   string // unexpanded path where skill bundles are placed
+	Name          string   // canonical lowercase id, e.g. "claude-code"
+	DisplayName   string   // human-readable, e.g. "Claude Code"
+	DetectDir     string   // unexpanded path used to detect agent presence
+	SkillsDir     string   // unexpanded path where skill bundles are placed
+	BackingAgents []string // optional child agents for meta-targets
+	DetectEnvVars []string // optional env vars that also mark the agent detected
+}
+
+// AgentSkillTarget is a concrete skill destination for an agent. Most agents
+// have one destination; meta-agents can expand to multiple backing agents.
+type AgentSkillTarget struct {
+	AgentName   string
+	DisplayName string
+	SkillsRoot  string
 }
 
 // AGENTS is the supported agent catalog. Order is preserved for stable
@@ -37,6 +47,7 @@ var AGENTS = []Agent{
 	{Name: "gemini-cli", DisplayName: "Gemini CLI", DetectDir: "~/.gemini", SkillsDir: "~/.gemini/skills"},
 	{Name: "cline", DisplayName: "Cline", DetectDir: "~/.cline", SkillsDir: "~/.agents/skills"},
 	{Name: "codex", DisplayName: "Codex", DetectDir: "~/.codex", SkillsDir: "~/.codex/skills"},
+	{Name: "conductor", DisplayName: "Conductor", DetectDir: "~/.conductor", BackingAgents: []string{"codex", "claude-code"}, DetectEnvVars: []string{"CONDUCTOR_AGENT_BINARIES_DIR", "CONDUCTOR_INTERNAL_BIN_DIR", "CONDUCTOR_ROOT_PATH", "CONDUCTOR_WORKSPACE_PATH"}},
 	{Name: "pi", DisplayName: "Pi", DetectDir: "~/.pi/agent", SkillsDir: "~/.pi/agent/skills"},
 	{Name: "opencode", DisplayName: "OpenCode", DetectDir: "$XDG_CONFIG_HOME/opencode", SkillsDir: "$XDG_CONFIG_HOME/opencode/skills"},
 	{Name: "junie", DisplayName: "Junie", DetectDir: "~/.junie", SkillsDir: "~/.junie/skills"},
@@ -52,7 +63,44 @@ func (a Agent) DetectPath() (string, bool) {
 // SkillsPath returns the expanded SkillsDir. See DetectPath for the ok
 // semantics.
 func (a Agent) SkillsPath() (string, bool) {
+	if a.SkillsDir == "" {
+		return "", false
+	}
 	return expandPath(a.SkillsDir)
+}
+
+// SkillTargets returns every concrete skill destination for this agent.
+// Meta-agents expand to their backing agents' user-level skills directories.
+func (a Agent) SkillTargets() ([]AgentSkillTarget, bool) {
+	if len(a.BackingAgents) == 0 {
+		p, ok := a.SkillsPath()
+		if !ok {
+			return nil, false
+		}
+		return []AgentSkillTarget{{
+			AgentName:   a.Name,
+			DisplayName: a.DisplayName,
+			SkillsRoot:  p,
+		}}, true
+	}
+
+	targets := make([]AgentSkillTarget, 0, len(a.BackingAgents))
+	for _, name := range a.BackingAgents {
+		backing := FindAgent(name)
+		if backing == nil {
+			continue
+		}
+		p, ok := backing.SkillsPath()
+		if !ok {
+			continue
+		}
+		targets = append(targets, AgentSkillTarget{
+			AgentName:   backing.Name,
+			DisplayName: backing.DisplayName,
+			SkillsRoot:  p,
+		})
+	}
+	return targets, len(targets) > 0
 }
 
 // FindAgent looks up an agent by name, case-insensitive. Returns nil if
@@ -73,17 +121,26 @@ func FindAgent(name string) *Agent {
 func DetectAgents(fs afero.Fs) []*Agent {
 	out := make([]*Agent, 0, len(AGENTS))
 	for i := range AGENTS {
-		p, ok := AGENTS[i].DetectPath()
-		if !ok {
-			continue
+		if agentDetected(fs, &AGENTS[i]) {
+			out = append(out, &AGENTS[i])
 		}
-		exists, err := afero.DirExists(fs, p)
-		if err != nil || !exists {
-			continue
-		}
-		out = append(out, &AGENTS[i])
 	}
 	return out
+}
+
+func agentDetected(fs afero.Fs, a *Agent) bool {
+	for _, name := range a.DetectEnvVars {
+		if os.Getenv(name) != "" {
+			return true
+		}
+	}
+
+	p, ok := a.DetectPath()
+	if !ok {
+		return false
+	}
+	exists, err := afero.DirExists(fs, p)
+	return err == nil && exists
 }
 
 // expandPath resolves a path containing `~` or `$XDG_CONFIG_HOME`.

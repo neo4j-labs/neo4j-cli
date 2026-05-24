@@ -6,6 +6,7 @@ package skill
 import (
 	"encoding/json"
 	"io/fs"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -90,15 +91,15 @@ func (r installResults) MarshalJSON() ([]byte, error) {
 func renderInstallResult(cmd *cobra.Command, cfg *clicfg.Config, skillName, action string, targets []*Agent) {
 	rows := make([]installResultRow, 0, len(targets))
 	for _, a := range targets {
-		sp, _ := a.SkillsPath()
-		var path string
-		if sp != "" {
-			path = sp + "/" + skillName
+		skillTargets, _ := a.SkillTargets()
+		paths := make([]string, 0, len(skillTargets))
+		for _, target := range skillTargets {
+			paths = append(paths, filepath.Join(target.SkillsRoot, skillName))
 		}
 		rows = append(rows, installResultRow{
 			Agent:       a.Name,
 			DisplayName: a.DisplayName,
-			SkillsPath:  path,
+			SkillsPath:  strings.Join(paths, ","),
 			Action:      action,
 		})
 	}

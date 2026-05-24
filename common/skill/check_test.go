@@ -68,3 +68,29 @@ func TestCheckCmd_NoneInstalled(t *testing.T) {
 	out := f.stdout.String()
 	assert.Contains(t, strings.ToLower(out), "no installed skills")
 }
+
+func TestCheckCmd_ConductorPartialInstall(t *testing.T) {
+	f := newFixture(t, "/home/alice", "json", "conductor")
+	codex := skill.FindAgent("codex")
+	sp, _ := codex.SkillsPath()
+	skillFile := filepath.Join(sp, testSkillName, "SKILL.md")
+	require.NoError(t, f.fs.MkdirAll(filepath.Dir(skillFile), 0755))
+	require.NoError(t, afero.WriteFile(f.fs, skillFile, []byte("---\nversion: 1.7.0\n---\n"), 0600))
+
+	err := f.exec(t, "check")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "drift")
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+	var conductor map[string]any
+	for _, row := range rows {
+		if row["agent"] == "conductor" {
+			conductor = row
+			break
+		}
+	}
+	require.NotNil(t, conductor)
+	assert.Equal(t, "partial", conductor["status"])
+	assert.Equal(t, "codex:1.7.0,claude-code:missing", conductor["installed_version"])
+}

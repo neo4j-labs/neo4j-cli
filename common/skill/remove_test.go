@@ -59,6 +59,27 @@ func TestRemoveCmd_UnknownAgent(t *testing.T) {
 	err := f.exec(t, "remove", "vscode")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown agent")
+	assert.Contains(t, err.Error(), "conductor")
+}
+
+func TestRemoveCmd_ConductorRemovesBackingAgents(t *testing.T) {
+	f := newFixture(t, "/home/alice", "json", "conductor")
+	require.NoError(t, f.exec(t, "install", "conductor"))
+	f.resetBuffers()
+
+	require.NoError(t, f.exec(t, "remove", "conductor"))
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "conductor", rows[0]["agent"])
+
+	for _, agentName := range []string{"codex", "claude-code"} {
+		a := skill.FindAgent(agentName)
+		sp, _ := a.SkillsPath()
+		exists, _ := afero.DirExists(f.fs, filepath.Join(sp, testSkillName))
+		assert.False(t, exists, "%s backing skill should be removed", agentName)
+	}
 }
 
 func TestRemoveCmd_HelpListsAgents(t *testing.T) {

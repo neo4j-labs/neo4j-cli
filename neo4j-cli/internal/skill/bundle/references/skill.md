@@ -47,7 +47,7 @@ Install the skill bundle into supported AI agents
 
 Without an argument, installs into every detected agent. With an [agent] argument (case-insensitive), installs into that single agent. Unknown agent names exit non-zero with the list of valid names.
 
-Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
+Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, conductor, pi, opencode, junie
 
 Usage: `neo4j-cli skill install [agent]`
 
@@ -110,7 +110,7 @@ Remove the installed skill bundle
 
 Without an argument, removes from every detected agent. With an [agent] argument (case-insensitive), removes from that single agent. Idempotent: a second run on a clean target is a no-op.
 
-Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
+Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, conductor, pi, opencode, junie
 
 Usage: `neo4j-cli skill remove [agent]`
 

@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Add Conductor as a supported agent skill install target.
+time: 2026-05-24T19:14:40.972356+03:00

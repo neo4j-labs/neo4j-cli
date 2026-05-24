@@ -63,6 +63,27 @@ func TestInstallCmd_UnknownAgent(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown agent")
 	assert.Contains(t, err.Error(), "valid agents:")
+	assert.Contains(t, err.Error(), "conductor")
+}
+
+func TestInstallCmd_ConductorInstallsBackingAgents(t *testing.T) {
+	f := newFixture(t, "/home/alice", "json", "conductor")
+
+	require.NoError(t, f.exec(t, "install", "conductor"))
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "conductor", rows[0]["agent"])
+	assert.Contains(t, rows[0]["skills_path"].(string), ".codex")
+	assert.Contains(t, rows[0]["skills_path"].(string), ".claude")
+
+	for _, agentName := range []string{"codex", "claude-code"} {
+		a := skill.FindAgent(agentName)
+		sp, _ := a.SkillsPath()
+		exists, _ := afero.Exists(f.fs, filepath.Join(sp, testSkillName, "SKILL.md"))
+		assert.True(t, exists, "%s backing skill should be installed", agentName)
+	}
 }
 
 func TestInstallCmd_NoAgentsDetected(t *testing.T) {

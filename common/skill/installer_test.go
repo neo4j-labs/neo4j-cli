@@ -40,6 +40,7 @@ body
 // (cursor) so DetectAgents returns those two. Returns the configured fs.
 func setupHomeWithAgents(t *testing.T, home string, names ...string) afero.Fs {
 	t.Helper()
+	clearConductorEnv(t)
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "xdg"))
 
@@ -55,6 +56,7 @@ func setupHomeWithAgents(t *testing.T, home string, names ...string) afero.Fs {
 }
 
 func TestInstallNoAgentsDetected(t *testing.T) {
+	clearConductorEnv(t)
 	t.Setenv("HOME", "/home/alice")
 	t.Setenv("XDG_CONFIG_HOME", "")
 
@@ -116,6 +118,7 @@ func TestInstallUnknownAgent(t *testing.T) {
 }
 
 func TestInstallSingleAgentNotDetected(t *testing.T) {
+	clearConductorEnv(t)
 	t.Setenv("HOME", "/home/alice")
 	t.Setenv("XDG_CONFIG_HOME", "")
 	memFs := afero.NewMemMapFs() // no agent dirs created
@@ -160,6 +163,35 @@ func TestInstallNilBundle(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestInstallConductorInstallsBackingAgents(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+
+	got, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.2.3", "conductor")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "conductor", got[0].Name)
+
+	for _, agentName := range []string{"codex", "claude-code"} {
+		a := FindAgent(agentName)
+		require.NotNil(t, a)
+		sp, ok := a.SkillsPath()
+		require.True(t, ok)
+		skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
+		data, err := afero.ReadFile(memFs, skillFile)
+		require.NoError(t, err, "SKILL.md missing for %s", agentName)
+		assert.Contains(t, string(data), "version: 1.2.3")
+	}
+}
+
+func TestInstallAllDetectedIncludesConductorWhenDetected(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+
+	got, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.2.3", "")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "conductor", got[0].Name)
+}
+
 func TestRemoveAllDetected(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
 	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1", "")
@@ -202,6 +234,22 @@ func TestRemoveEmptySkillName(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRemoveConductorRemovesBackingAgents(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.2.3", "conductor")
+	require.NoError(t, err)
+
+	_, err = Remove(memFs, skillNameForTests, "conductor")
+	require.NoError(t, err)
+
+	for _, agentName := range []string{"codex", "claude-code"} {
+		a := FindAgent(agentName)
+		sp, _ := a.SkillsPath()
+		exists, _ := afero.DirExists(memFs, filepath.Join(sp, skillNameForTests))
+		assert.False(t, exists, "skill dir should be gone for %s", agentName)
+	}
+}
+
 func TestList(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
 
@@ -239,6 +287,33 @@ func TestList(t *testing.T) {
 	w := rows[idx("windsurf")]
 	assert.False(t, w.Detected)
 	assert.False(t, w.Installed)
+}
+
+func TestListConductorPartialInstall(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+	codex := FindAgent("codex")
+	sp, _ := codex.SkillsPath()
+	skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
+	require.NoError(t, memFs.MkdirAll(filepath.Dir(skillFile), 0755))
+	require.NoError(t, afero.WriteFile(memFs, skillFile, []byte("---\nversion: 1.7.0\n---\n"), 0600))
+
+	rows, err := List(memFs, skillNameForTests)
+	require.NoError(t, err)
+
+	var conductor AgentInstall
+	for _, row := range rows {
+		if row.Agent.Name == "conductor" {
+			conductor = row
+			break
+		}
+	}
+	require.NotNil(t, conductor.Agent)
+	assert.True(t, conductor.Detected)
+	assert.True(t, conductor.Installed)
+	assert.Equal(t, "codex:1.7.0,claude-code:missing", conductor.InstalledVersion)
+	require.Len(t, conductor.Details, 2)
+	assert.True(t, conductor.Details[0].Installed)
+	assert.False(t, conductor.Details[1].Installed)
 }
 
 func TestCheckNoDrift(t *testing.T) {
@@ -292,6 +367,51 @@ func TestCheckUnknownVersion(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, "unknown-version", rows[0].Status)
 	assert.Equal(t, "", rows[0].InstalledVersion)
+}
+
+func TestCheckConductorNoDrift(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.0.0", "conductor")
+	require.NoError(t, err)
+
+	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
+	require.NoError(t, err)
+	assert.False(t, drift)
+	require.Len(t, rows, 3)
+	var conductor CheckRow
+	for _, row := range rows {
+		if row.Agent.Name == "conductor" {
+			conductor = row
+			break
+		}
+	}
+	require.NotNil(t, conductor.Agent)
+	assert.Equal(t, "ok", conductor.Status)
+	assert.Equal(t, "codex:1.0.0,claude-code:1.0.0", conductor.InstalledVersion)
+}
+
+func TestCheckConductorPartialInstall(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "conductor")
+	codex := FindAgent("codex")
+	sp, _ := codex.SkillsPath()
+	skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
+	require.NoError(t, memFs.MkdirAll(filepath.Dir(skillFile), 0755))
+	require.NoError(t, afero.WriteFile(memFs, skillFile, []byte("---\nversion: 1.0.0\n---\n"), 0600))
+
+	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, drift)
+	require.Len(t, rows, 2)
+	var conductor CheckRow
+	for _, row := range rows {
+		if row.Agent.Name == "conductor" {
+			conductor = row
+			break
+		}
+	}
+	require.NotNil(t, conductor.Agent)
+	assert.Equal(t, "partial", conductor.Status)
+	assert.Equal(t, "codex:1.0.0,claude-code:missing", conductor.InstalledVersion)
 }
 
 func TestParseVersion(t *testing.T) {
