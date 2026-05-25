@@ -1,0 +1,3 @@
+## task-001 — 2026-05-25T09:55:00Z
+Added coerceDriverValue helper normalising dbtype temporals/Duration/time.Time/containers/graph entities into JSON-safe forms, plus table-driven unit tests.
+Files: +neo4j-cli/query/coerce.go, +neo4j-cli/query/coerce_test.go

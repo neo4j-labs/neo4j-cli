@@ -27,7 +27,7 @@ tasks:
       a temporal, `dbtype.Node` / `dbtype.Relationship` / `dbtype.Path` with
       temporal `Props`, scalar passthroughs (`int64`, `float64`, `string`,
       `bool`, `nil`, an unknown struct).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`neo4j-cli/query/coerce.go` exists with Neo4j copyright header and a single exported-or-package-private `coerceDriverValue(v any) any` function"
@@ -37,7 +37,7 @@ tasks:
       - "`go test ./neo4j-cli/query/...` green"
       - "`make fmt-check` and `make lint` clean"
       - "`make license-check` clean"
-    completed_at: null
+    completed_at: 2026-05-25T09:55:00Z
 
   - id: task-002
     title: "Wire coerceDriverValue into the query response builder"
