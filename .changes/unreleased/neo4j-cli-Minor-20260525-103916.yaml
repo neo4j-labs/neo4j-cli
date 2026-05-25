@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Curl installer now prompts to install the agent-skill bundle when run in an interactive terminal; set NEO4J_CLI_AUTO_INSTALL_SKILL=1 or =0 for unattended installs.
-time: 2026-05-25T10:39:16.117623+02:00

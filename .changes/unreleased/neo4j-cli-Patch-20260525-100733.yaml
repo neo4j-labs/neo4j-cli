@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: :schema now detects and reports the active graph engine (e.g. Virtual Graph) and supported Cypher versions via dbms.components(), and the query skill teaches agents which Cypher constructs to avoid on Virtual Graphs (CLI-177).
-time: 2026-05-25T10:07:33.051684+02:00
