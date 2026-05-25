@@ -257,6 +257,7 @@ tasks:
 
   - id: task-009
     title: "Shared confirm-gate test helper (review finding #3)"
+    status: completed
     description: |
       With tasks 007 and 008 collapsing the leaf-side gate code, the gating
       tests in 16 leaf `*_test.go` files are now near-identical: drive
@@ -292,7 +293,6 @@ tasks:
       Target net deletion across the 16 leaf test files of ≥1500 lines.
       Test coverage of the gate paths is preserved or improved (the helper's
       assertions are uniform and explicit).
-    status: pending
     dependencies:
       - task-008
     acceptance_criteria:
@@ -301,7 +301,7 @@ tasks:
       - "Net line deletion across leaf `*_test.go` files is ≥1500 vs the pre-task-009 tree."
       - "`make test` passes; per-leaf coverage of pre-flight / happy-path branches unchanged."
       - "`make fmt-check`, `make lint`, `make license-check` all green."
-    completed_at: null
+    completed_at: 2026-05-25T13:30:00Z
 
   - id: task-010
     title: "Audit and remove now-redundant SilenceUsage placements (review finding #4)"

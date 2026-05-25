@@ -4,13 +4,11 @@
 package instance_test
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -249,83 +247,23 @@ func TestDeleteInstanceError(t *testing.T) {
 	}
 }
 
-func TestDeleteInstanceConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	registerProjectsMock(&helper)
-
+func TestDeleteInstanceConfirmGate(t *testing.T) {
 	instanceId := testDeleteInstanceID
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-
-	err := helper.ExecuteCommandE(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
-
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "pass both --yes and --force") {
-		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
-	}
-	mockHandler.AssertCalledTimes(1) // pre-flight GET only, no DELETE
-}
-
-func TestDeleteInstanceConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	registerProjectsMock(&helper)
-
-	instanceId := testDeleteInstanceID
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
-
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
-
-	mockHandler.AssertCalledTimes(2)
-	mockHandler.AssertCalledWithMethod(http.MethodDelete)
-}
-
-func TestDeleteInstanceConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetStdin("y\n")
-	registerProjectsMock(&helper)
-
-	instanceId := testDeleteInstanceID
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
-
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
-
-	mockHandler.AssertCalledTimes(2)
-	mockHandler.AssertCalledWithMethod(http.MethodDelete)
-	helper.AssertErrContainsStrings([]string{"Delete instance"})
-}
-
-func TestDeleteInstanceConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetStdin("N\n")
-	registerProjectsMock(&helper)
-
-	instanceId := testDeleteInstanceID
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
-
-	err := helper.ExecuteCommandE(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
-
-	if !errors.Is(err, confirm.ErrCancelled) {
-		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
-	}
-	mockHandler.AssertCalledTimes(1) // pre-flight GET only
-	helper.AssertErrContainsStrings([]string{"cancelled."})
+	base := fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID)
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "aura instance delete",
+		NoFlagsArgs:   base,
+		BothFlagsArgs: base + " --yes --force",
+		ResourceLabel: "instance",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			helper := testutils.NewAuraTestHelper(t)
+			t.Cleanup(helper.Close)
+			registerProjectsMock(&helper)
+			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+			mock.AddResponse(http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
+			helper.SetStdin(stdin)
+			err := helper.ExecuteCommandE(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}
+		},
+	})
 }

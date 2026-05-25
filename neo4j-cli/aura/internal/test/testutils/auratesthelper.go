@@ -243,6 +243,20 @@ func (helper *AuraTestHelper) AssertConfigValue(key string, expected string) {
 	assert.Equal(helper.t, formattedExpected, formattedActual)
 }
 
+// CredentialsValue returns the raw JSON encoding of the credential field at
+// key (gjson-style path). Useful for confirmtest sinks that need to detect
+// whether the credentials store was mutated without asserting equality.
+func (helper *AuraTestHelper) CredentialsValue(key string) string {
+	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+	assert.Nil(helper.t, err)
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+
+	out, err := io.ReadAll(file)
+	assert.Nil(helper.t, err)
+
+	return gjson.Get(string(out), key).String()
+}
+
 func (helper *AuraTestHelper) AssertCredentialsValue(key string, expected string) { // TODO: merge with assertConfig
 	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
 	assert.Nil(helper.t, err)

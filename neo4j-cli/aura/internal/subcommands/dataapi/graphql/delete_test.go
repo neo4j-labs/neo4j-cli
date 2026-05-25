@@ -4,13 +4,11 @@
 package graphql_test
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -69,81 +67,23 @@ func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
 }
 
-func TestDeleteGraphQLDataApiConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
+func TestDeleteGraphQLDataApiConfirmGate(t *testing.T) {
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, "{}")
-
-	err := helper.ExecuteCommandE(fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw", instanceId, dataApiId))
-
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "pass both --yes and --force") {
-		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
-	}
-	mockHandler.AssertCalledTimes(0)
-}
-
-func TestDeleteGraphQLDataApiConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
-	instanceId := "2f49c2b3"
-	dataApiId := "afdb4e9d"
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{"data": {"id": "afdb4e9d", "status": "deleting"}}`)
-
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw --yes --force", instanceId, dataApiId))
-
-	mockHandler.AssertCalledTimes(1)
-	mockHandler.AssertCalledWithMethod(http.MethodDelete)
-}
-
-func TestDeleteGraphQLDataApiConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetStdin("y\n")
-	helper.SetConfigValue("flag.aura-beta", true)
-	instanceId := "2f49c2b3"
-	dataApiId := "afdb4e9d"
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{"data": {"id": "afdb4e9d", "status": "deleting"}}`)
-
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw", instanceId, dataApiId))
-
-	mockHandler.AssertCalledTimes(1)
-	mockHandler.AssertCalledWithMethod(http.MethodDelete)
-	helper.AssertErrContainsStrings([]string{"Delete graphql"})
-}
-
-func TestDeleteGraphQLDataApiConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	helper := testutils.NewAuraTestHelper(t)
-	defer helper.Close()
-
-	helper.SetStdin("N\n")
-	helper.SetConfigValue("flag.aura-beta", true)
-	instanceId := "2f49c2b3"
-	dataApiId := "afdb4e9d"
-	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, "{}")
-
-	err := helper.ExecuteCommandE(fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw", instanceId, dataApiId))
-
-	if !errors.Is(err, confirm.ErrCancelled) {
-		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
-	}
-	mockHandler.AssertCalledTimes(0)
-	helper.AssertErrContainsStrings([]string{"cancelled."})
+	base := fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw", instanceId, dataApiId)
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "aura data-api graphql delete",
+		NoFlagsArgs:   base,
+		BothFlagsArgs: base + " --yes --force",
+		ResourceLabel: "graphql",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			helper := testutils.NewAuraTestHelper(t)
+			t.Cleanup(helper.Close)
+			helper.SetConfigValue("flag.aura-beta", true)
+			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{"data": {"id": "afdb4e9d", "status": "deleting"}}`)
+			helper.SetStdin(stdin)
+			err := helper.ExecuteCommandE(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}
+		},
+	})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,22 +101,22 @@ func managedContainerForDelete(name string) Container {
 	}
 }
 
-func TestDelete_TTY_Yes_RemovesContainerAndCredential(t *testing.T) {
-	// REQ-F-050/F-051: TTY + `y` confirms; both the container and the
-	// stored dbms credential are removed; the prompt is written to stderr.
-	withStdinIsTerminal(t, true)
-	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
-		map[string]string{"dev": "secret"},
-		"y\n",
-	)
-
-	require.NoError(t, s.cmd.run("dev"))
-	require.Len(t, s.fake.RemoveForceCalls, 1)
-	assert.Equal(t, "dev", s.fake.RemoveForceCalls[0])
-	_, err := s.cfg.Credentials.Dbms.Get("dev")
-	require.Error(t, err, "credential should have been removed")
-	assert.Contains(t, s.cmd.err.String(), `Delete docker "dev"?`)
+func TestDelete_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "docker delete",
+		NoFlagsArgs:   "dev",
+		BothFlagsArgs: "dev --yes --force",
+		ResourceLabel: "docker",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			s := newDeleteSetup(t,
+				map[string]Container{"dev": managedContainerForDelete("dev")},
+				map[string]string{"dev": "secret"},
+				stdin,
+			)
+			err := s.cmd.run(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: s.cmd.err.String(), Invoked: len(s.fake.RemoveForceCalls) > 0}
+		},
+	})
 }
 
 func TestDelete_TTY_YesUppercase_Confirms(t *testing.T) {
@@ -142,23 +143,6 @@ func TestDelete_TTY_Yes_Word_Confirms(t *testing.T) {
 
 	require.NoError(t, s.cmd.run("dev"))
 	require.Len(t, s.fake.RemoveForceCalls, 1)
-}
-
-func TestDelete_TTY_No_Cancels(t *testing.T) {
-	// `n` cancels; neither the container nor the credential is touched.
-	withStdinIsTerminal(t, true)
-	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
-		map[string]string{"dev": "secret"},
-		"n\n",
-	)
-
-	runErr := s.cmd.run("dev")
-	require.ErrorIs(t, runErr, confirm.ErrCancelled)
-	assert.Empty(t, s.fake.RemoveForceCalls, "RemoveForce must not fire on cancel")
-	_, err := s.cfg.Credentials.Dbms.Get("dev")
-	require.NoError(t, err, "credential must remain on cancel")
-	assert.Contains(t, s.cmd.err.String(), "cancelled.")
 }
 
 func TestDelete_TTY_EmptyLine_DefaultsToCancel(t *testing.T) {
@@ -211,43 +195,6 @@ func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
 	assert.Equal(t, 2, ce.Code)
 	assert.Contains(t, err.Error(), "pass both --yes and --force")
 	assert.Empty(t, s.fake.RemoveForceCalls)
-}
-
-func TestDelete_NonTTY_NeitherFlag_Exit2(t *testing.T) {
-	// Scripts / piped callers must pass both --yes and --force; without them
-	// the leaf surfaces a usage error and nothing is touched.
-	withStdinIsTerminal(t, false)
-	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
-		map[string]string{"dev": "secret"},
-		"",
-	)
-
-	err := s.cmd.run("dev")
-	require.Error(t, err)
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, err.Error(), "pass both --yes and --force")
-	assert.Empty(t, s.fake.RemoveForceCalls)
-	_, getErr := s.cfg.Credentials.Dbms.Get("dev")
-	require.NoError(t, getErr, "credential must remain on non-TTY without flags")
-}
-
-func TestDelete_NonTTY_BothFlags_Proceeds(t *testing.T) {
-	// --yes --force on a non-TTY skips the prompt entirely; both container
-	// and credential go away.
-	withStdinIsTerminal(t, false)
-	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
-		map[string]string{"dev": "secret"},
-		"",
-	)
-
-	require.NoError(t, s.cmd.run("dev --yes --force"))
-	require.Len(t, s.fake.RemoveForceCalls, 1)
-	_, err := s.cfg.Credentials.Dbms.Get("dev")
-	require.Error(t, err)
 }
 
 func TestDelete_TTY_BothFlags_SkipsPromptAndRemoves(t *testing.T) {
