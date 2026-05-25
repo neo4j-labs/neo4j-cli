@@ -91,13 +91,13 @@ tasks:
       "..."`; otherwise hand-author the YAML per AGENTS.md "Changie Notes"
       (filename `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`, fields
       `project / kind / body / time`).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A new file `.changes/unreleased/neo4j-cli-Patch-*.yaml` exists"
       - "YAML has `project: neo4j-cli`, `kind: Patch`, single-quoted body, RFC3339 `time`"
       - "Body mentions graph engine detection, Cypher version surface, and CLI-177"
-    completed_at: null
+    completed_at: 2026-05-25T08:09:27Z
 
   - id: task-005
     title: "Run all CI gates and smoke-check plain Neo4j payload"

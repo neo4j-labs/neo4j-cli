@@ -5,3 +5,8 @@ Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
 ## TASK-002 — 2026-05-25T08:08:25Z
 Updated `database` bullet in query-additions.md to mention `cypher_versions` and `graph_engine`, and added a new "Virtual Graphs / Graph Engine" H2 documenting the GAIAGT-768 forbidden construct set, detection rule, and simplify-rather-than-retry guidance. `make fmt-check` clean; `make test` only fails on the expected `TestGenerator_RoundTrip` bundle-drift for `bundle/query-additions.md`, which task-003 will fix via `go generate`.
 Files: ~neo4j-cli/internal/skill/query-additions.md, ~.plans/tasks-detect-graph-engine-in-schema.yml, ~.plans/progress-detect-graph-engine-in-schema.txt
+
+## TASK-004 — 2026-05-25T08:09:27Z
+Added Patch changie entry for CLI-177 covering graph_engine detection + cypher_versions surface. Generated via `changie new` in an isolated worktree (ran in parallel with task-002), then cherry-picked into the feature branch.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260525-100733.yaml
+Decisions: parallel-via-worktree to disjoin from task-002's main-tree edits; bookkeeping (YAML status flip + this entry) done in parent after cherry-pick.
