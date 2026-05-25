@@ -167,10 +167,30 @@ success "Installed → ${BOLD}${INSTALLED_PATH}${RESET}"
 echo ""
 "$INSTALLED_PATH" --version 2>/dev/null || true
 
-# ── Auto-install skill ────────────────────────
-if [ "${NEO4J_CLI_AUTO_INSTALL_SKILL:-}" = "1" ]; then
-  "$INSTALLED_PATH" skill install --rw || true
-fi
+# ── Skill install ─────────────────────────────
+# Precedence: env-var override > interactive prompt > skip.
+# Under `curl | bash`, stdin is the pipe so `[ -t 0 ]` is false — read from
+# /dev/tty (the controlling terminal) instead. /dev/tty is unreadable in CI /
+# sandboxed environments, which gives us a clean "skip prompt" signal.
+case "${NEO4J_CLI_AUTO_INSTALL_SKILL:-}" in
+  1)
+    "$INSTALLED_PATH" skill install --rw || true
+    ;;
+  0)
+    : # explicit opt-out
+    ;;
+  *)
+    if [ -t 1 ] && [ -r /dev/tty ]; then
+      echo ""
+      printf "%b" "${BOLD}Install neo4j-cli skill bundle for detected AI agents?${RESET} [Y/n] "
+      read -r answer < /dev/tty || answer=""
+      case "${answer}" in
+        n|N|no|NO) ;;
+        *) "$INSTALLED_PATH" skill install --rw || true ;;
+      esac
+    fi
+    ;;
+esac
 
 # ── PATH check ────────────────────────────────
 case ":${PATH}:" in
