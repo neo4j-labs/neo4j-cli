@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Gate destructive operations on a new --yes --force confirmation: every `*/delete` and `*/remove` leaf (aura instance/deployment/agent/customer-managed-key/data-api/graphanalytics/auth-provider/cors-policy allowed-origin, docker, desktop dbms/connection, credential aura-client/dbms/embed) now requires both flags in non-TTY contexts or prompts y/N on a TTY. Back-compat break: `docker delete --force` (without --yes) and `desktop {dbms,connection} delete --yes` (without --force) now exit 2 in non-TTY contexts; pass both flags going forward.'
+time: 2026-05-25T11:31:26.975101+02:00

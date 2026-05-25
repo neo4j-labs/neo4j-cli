@@ -139,7 +139,7 @@ tasks:
       AGENTS.md template. Run the full gate set: `make fmt-check`,
       `make lint`, `make test`, `make license-check`. Execute the audit §12
       #6/#7 smoke commands locally and capture their exit codes.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -148,4 +148,4 @@ tasks:
       - "`timeout 10 ./bin/neo4j-cli aura instance delete x --rw < /dev/null` exits 2 (NOT 124, NOT 130)."
       - "`timeout 10 ./bin/neo4j-cli aura instance delete x --rw --yes < /dev/null` exits 2 with a message demanding `--force`."
       - "Smoke results captured in the PR description or task log."
-    completed_at: null
+    completed_at: 2026-05-25T11:35:00Z

@@ -90,19 +90,28 @@ Removes an aura-client credential
 
 Remove a stored Aura Console API client credential by name.
 
-Usage: `neo4j-cli credential aura-client remove`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential aura-client remove [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove an aura-client credential by name
-neo4j-cli credential aura-client remove work --rw
+neo4j-cli credential aura-client remove work --rw --yes --force
 
 # Remove the personal credential
-neo4j-cli credential aura-client remove personal --rw
+neo4j-cli credential aura-client remove personal --rw --yes --force
 
 # Remove a stale credential that no longer authenticates
-neo4j-cli credential aura-client remove old-tenant --rw
+neo4j-cli credential aura-client remove old-tenant --rw --yes --force
 ```
 
 ### neo4j-cli credential aura-client use

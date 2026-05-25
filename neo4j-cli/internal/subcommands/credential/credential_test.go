@@ -5,6 +5,7 @@ package credential_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -29,6 +32,7 @@ type credentialTestHelper struct {
 	out         *bytes.Buffer
 	err         *bytes.Buffer
 	credentials string
+	stdin       string
 	fs          afero.Fs
 	t           *testing.T
 }
@@ -55,7 +59,11 @@ func (h *credentialTestHelper) setCredentialsValue(key string, value interface{}
 	h.credentials = creds
 }
 
-func (h *credentialTestHelper) executeCommand(command string) {
+func (h *credentialTestHelper) setStdin(in string) {
+	h.stdin = in
+}
+
+func (h *credentialTestHelper) executeCommand(command string) error {
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
@@ -72,8 +80,9 @@ func (h *credentialTestHelper) executeCommand(command string) {
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
+	cmd.SetIn(strings.NewReader(h.stdin))
 
-	cmd.Execute() //nolint:errcheck // cobra prints the error itself; test assertions check cmd output
+	return cmd.Execute()
 }
 
 func (h *credentialTestHelper) assertCredentialsValue(key string, expected string) {
@@ -115,7 +124,7 @@ func (h *credentialTestHelper) assertErr(expected string) {
 func TestCredentialAddAuraClientRequiresRw(t *testing.T) {
 	h := newCredentialTestHelper(t)
 
-	h.executeCommand("aura-client add --name test --client-id testclientid --client-secret testclientsecret")
+	h.executeCommand("aura-client add --name test --client-id testclientid --client-secret testclientsecret") //nolint:errcheck // error checked via assertErr
 
 	h.assertErr("Error: this command writes; pass --rw to allow it")
 }
@@ -163,7 +172,7 @@ func TestCredentialAddAuraClient(t *testing.T) {
 				h.setCredentialsValue("aura.default-credential", tc.initialDefault)
 			}
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
@@ -238,7 +247,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			h.assertErr("")
 			if tc.wantOut != "" {
@@ -269,23 +278,25 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 		{
 			name:            "named credential is removed",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			command:         "aura-client remove --rw test",
+			command:         "aura-client remove --rw --yes --force test",
 			wantCredentials: "[]",
 		},
 		{
 			name:         "missing credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "aura-client remove --rw nonexistent",
+			command:      "aura-client remove --rw --yes --force nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent to remove",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
@@ -296,6 +307,83 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 			h.assertCredentialsValue("aura.credentials", tc.wantCredentials)
 		})
 	}
+}
+
+func TestCredentialRemoveAuraClientConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	h := newCredentialTestHelper(t)
+	h.setCredentialsValue("aura.credentials", []map[string]string{
+		{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"},
+	})
+
+	err := h.executeCommand("aura-client remove --rw test")
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
+	}
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != 2 {
+		t.Fatalf("err = %v, want *clierr.CLIError with exit 2", err)
+	}
+	// Credential must still be present (no mutation).
+	h.assertCredentialsValue("aura.credentials", `[{"client-id":"testclientid","client-secret":"testclientsecret","name":"test"}]`)
+}
+
+func TestCredentialRemoveAuraClientConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	h := newCredentialTestHelper(t)
+	h.setCredentialsValue("aura.credentials", []map[string]string{
+		{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"},
+	})
+
+	if err := h.executeCommand("aura-client remove --rw --yes --force test"); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	h.assertCredentialsValue("aura.credentials", `[]`)
+}
+
+func TestCredentialRemoveAuraClientConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	h := newCredentialTestHelper(t)
+	h.setCredentialsValue("aura.credentials", []map[string]string{
+		{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"},
+	})
+	h.setStdin("y\n")
+
+	if err := h.executeCommand("aura-client remove --rw test"); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	h.assertCredentialsValue("aura.credentials", `[]`)
+
+	errOut, err := io.ReadAll(h.err)
+	assert.Nil(t, err)
+	assert.Contains(t, string(errOut), "Delete aura-client")
+}
+
+func TestCredentialRemoveAuraClientConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	h := newCredentialTestHelper(t)
+	h.setCredentialsValue("aura.credentials", []map[string]string{
+		{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"},
+	})
+	h.setStdin("N\n")
+
+	if err := h.executeCommand("aura-client remove --rw test"); err != nil {
+		t.Fatalf("expected nil on cancel, got %v", err)
+	}
+	// Credential is unchanged on cancellation.
+	h.assertCredentialsValue("aura.credentials", `[{"client-id":"testclientid","client-secret":"testclientsecret","name":"test"}]`)
+
+	errOut, err := io.ReadAll(h.err)
+	assert.Nil(t, err)
+	assert.Contains(t, string(errOut), "cancelled.")
 }
 
 // --- use aura-client tests ---
@@ -332,7 +420,7 @@ func TestCredentialUseAuraClient(t *testing.T) {
 				h.setCredentialsValue("aura.default-credential", tc.initialDefault)
 			}
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
