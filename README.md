@@ -3,10 +3,10 @@
 ## Installation
 
 ```bash
-NEO4J_CLI_AUTO_INSTALL_SKILL=1 curl -sSfL https://neo4j.sh/install.sh | bash
+curl -sSfL https://neo4j.sh/install.sh | bash
 ```
 
-Setting `NEO4J_CLI_AUTO_INSTALL_SKILL=1` automatically runs `neo4j-cli skill install --rw` after the binary is placed, so AI agent skill bundles are ready immediately. Omit the prefix to skip skill installation.
+In an interactive terminal the installer asks whether to install the agent-skill bundle. For unattended installs prepend `NEO4J_CLI_AUTO_INSTALL_SKILL=1` to opt in or `=0` to opt out — the same env var is honoured by the npm postinstall and Homebrew formula.
 
 Verify with `neo4j-cli --help`.
 
