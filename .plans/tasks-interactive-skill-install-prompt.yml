@@ -1,7 +1,7 @@
 feature: interactive-skill-install-prompt
 prd: ./prd-interactive-skill-install-prompt.md
 created_at: 2026-05-25T08:35:43Z
-updated_at: 2026-05-25T08:35:43Z
+updated_at: 2026-05-25T08:43:28Z
 
 tasks:
   - id: task-001
@@ -13,7 +13,7 @@ tasks:
       only if both `[ -t 1 ]` and `[ -r /dev/tty ]` are true, reading the answer via
       `read -r answer < /dev/tty`. Default-yes (Enter installs). Preserve the
       `|| true` suppression so a failed `skill install` never breaks the installer.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Env var =1 still triggers `neo4j-cli skill install --rw` with no prompt"
@@ -22,7 +22,7 @@ tasks:
       - "Env var unset + non-interactive (no /dev/tty or stdout not TTY) skips silently"
       - "A non-zero exit from skill install does not propagate (installer still exits 0)"
       - "Existing four bats tests in tests/install-neo4j-cli.bats pass unchanged"
-    completed_at: null
+    completed_at: 2026-05-25T08:43:28Z
 
   - id: task-002
     title: "PowerShell installer: switch with UserInteractive prompt"
@@ -33,7 +33,7 @@ tasks:
       if `[Environment]::UserInteractive -and -not [Console]::IsInputRedirected`
       then `Read-Host` and install unless the response matches `^(n|no)$`. Preserve
       CRLF line endings (AGENTS.md PowerShell installer note).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Env var =1 still triggers `neo4j-cli skill install --rw` with no prompt"
@@ -43,7 +43,7 @@ tasks:
       - "A throw from skill install is caught (installer continues, no terminating error)"
       - "File saved with CRLF line endings (verified with python3 -c 'import sys; print(open(p,\"rb\").read().count(b\"\\r\\n\"))')"
       - "Existing Pester tests in tests/install-neo4j-cli.Tests.ps1 still pass"
-    completed_at: null
+    completed_at: 2026-05-25T08:43:28Z
 
   - id: task-003
     title: "README: drop env-var prefix from curl one-liner, add TTY-mode note"
@@ -55,7 +55,7 @@ tasks:
       installer prompts in a terminal and that `NEO4J_CLI_AUTO_INSTALL_SKILL=1` or
       `=0` skips the prompt for unattended installs. Leave the brew (line 15) and
       npm (line 16) examples unchanged — those channels don't prompt.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Line 6 of README.md is the bare curl one-liner with no env-var prefix"
@@ -63,7 +63,7 @@ tasks:
       - "Brew and npm lines still carry their `NEO4J_CLI_AUTO_INSTALL_SKILL=1 ` prefix"
       - "`Verify with `neo4j-cli --help`` line remains"
       - "No other README sections touched"
-    completed_at: null
+    completed_at: 2026-05-25T08:43:28Z
 
   - id: task-004
     title: "Changelog entry via changie"
@@ -75,13 +75,13 @@ tasks:
       terminal; set NEO4J_CLI_AUTO_INSTALL_SKILL=1 or =0 for unattended installs."`
       If changie isn't installed locally, hand-author the YAML under
       .changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml per AGENTS.md.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A new YAML file exists under .changes/unreleased/ tagged project: neo4j-cli, kind: Minor"
       - "Body describes the interactive prompt and the env-var override"
       - "File parses correctly (changie batch / changie latest still works)"
-    completed_at: null
+    completed_at: 2026-05-25T08:43:28Z
 
   - id: task-005
     title: "Final gates: make test, fmt-check, lint, bats"
@@ -92,7 +92,7 @@ tasks:
       installer changes are shell/PowerShell, so no Go tests should be affected.
       Pester tests are Windows-only and validated in CI; do not block local
       completion on `pwsh` availability.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -103,4 +103,4 @@ tasks:
       - "`make fmt-check` exits 0 (no unformatted .go files)"
       - "`make lint` exits 0"
       - "`bats distribution/installation-scripts/tests/install-neo4j-cli.bats` exits 0 with all four tests passing"
-    completed_at: null
+    completed_at: 2026-05-25T08:43:28Z
