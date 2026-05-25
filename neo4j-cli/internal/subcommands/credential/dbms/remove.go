@@ -29,21 +29,19 @@ neo4j-cli credential dbms remove staging --rw --yes --force
 neo4j-cli credential dbms remove prod --rw --yes --force`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
-		RunE:        nil,
-	}
-
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if err := confirmFlags.Require(cmd, args[0]); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := confirm.Require(cmd, args[0]); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
 			}
-			return err
-		}
-		return cfg.Credentials.Dbms.Remove(args[0])
+			return cfg.Credentials.Dbms.Remove(args[0])
+		},
 	}
+
+	confirm.Register(cmd)
 
 	return cmd
 }

@@ -34,50 +34,49 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 		Long: `This subcommand deletes a Graph Analytics Serverless session by id.
 
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sessionID := strings.TrimSpace(args[0])
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		sessionID := strings.TrimSpace(args[0])
-
-		cmd.SilenceUsage = true
-		_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-		if err != nil {
-			return err
-		}
-
-		if _, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID); err != nil {
-			return err
-		}
-
-		if err := confirmFlags.Require(cmd, sessionID); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
-		resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method: http.MethodDelete,
-		})
-		if err != nil {
-			// On 404 the API layer's parseResourceFromRequest mis-segments
-			// the nested /graph-analytics/sessions/<id> path (extracts
-			// "graph-analytic"). Rewrite the context so the user gets
-			// session-specific Suggestion text. The preflight
-			// FetchAndVerifySessionInProject already covers the
-			// ownership-mismatch path.
-			return utils.WithNotFoundContext(err, "graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
-		}
+			if _, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, projectID); err != nil {
+				return err
+			}
 
-		if statusCode == http.StatusAccepted {
-			output.PrintBody(cmd, cfg, resBody, []string{"id"})
-		}
-		return nil
+			if err := confirm.Require(cmd, sessionID); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
+
+			path := fmt.Sprintf("/graph-analytics/sessions/%s", sessionID)
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method: http.MethodDelete,
+			})
+			if err != nil {
+				// On 404 the API layer's parseResourceFromRequest mis-segments
+				// the nested /graph-analytics/sessions/<id> path (extracts
+				// "graph-analytic"). Rewrite the context so the user gets
+				// session-specific Suggestion text. The preflight
+				// FetchAndVerifySessionInProject already covers the
+				// ownership-mismatch path.
+				return utils.WithNotFoundContext(err, "graph-analytics-session", sessionID, "Run 'neo4j-cli aura graph-analytics session list --project-id <id>' to see sessions in this project.")
+			}
+
+			if statusCode == http.StatusAccepted {
+				output.PrintBody(cmd, cfg, resBody, []string{"id"})
+			}
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
+
 	return cmd
 }

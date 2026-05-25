@@ -28,6 +28,20 @@ func newTestCmd(t *testing.T, parentName string, in string) (*cobra.Command, *by
 	return leaf, out, errOut
 }
 
+func setFlags(t *testing.T, cmd *cobra.Command, yes, force bool) {
+	t.Helper()
+	if yes {
+		if err := cmd.Flags().Set("yes", "true"); err != nil {
+			t.Fatalf("set --yes: %v", err)
+		}
+	}
+	if force {
+		if err := cmd.Flags().Set("force", "true"); err != nil {
+			t.Fatalf("set --force: %v", err)
+		}
+	}
+}
+
 func TestRequire(t *testing.T) {
 	type want struct {
 		errSentinel       error
@@ -137,11 +151,10 @@ func TestRequire(t *testing.T) {
 			confirm.SetStdinIsTerminalForTest(t, func() bool { return tc.isTTY })
 
 			leaf, _, errOut := newTestCmd(t, "instance", tc.stdin)
-			f := confirm.Register(leaf)
-			f.Yes = tc.yes
-			f.Force = tc.force
+			confirm.Register(leaf)
+			setFlags(t, leaf, tc.yes, tc.force)
 
-			err := f.Require(leaf, "inst-1")
+			err := confirm.Require(leaf, "inst-1")
 
 			if tc.want.errSentinel != nil {
 				if !errors.Is(err, tc.want.errSentinel) {
@@ -177,9 +190,9 @@ func TestRequire_EmptyResourceID_OmitsEmptyQuotes(t *testing.T) {
 	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
 
 	leaf, _, errOut := newTestCmd(t, "deployment", "N\n")
-	f := confirm.Register(leaf)
+	confirm.Register(leaf)
 
-	err := f.Require(leaf, "")
+	err := confirm.Require(leaf, "")
 	if !errors.Is(err, confirm.ErrCancelled) {
 		t.Fatalf("err = %v, want ErrCancelled", err)
 	}
@@ -196,9 +209,9 @@ func TestRequire_EmptyResourceID_NonTTY_OmitsEmptyQuotes(t *testing.T) {
 	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
 
 	leaf, _, _ := newTestCmd(t, "deployment", "")
-	f := confirm.Register(leaf)
+	confirm.Register(leaf)
 
-	err := f.Require(leaf, "")
+	err := confirm.Require(leaf, "")
 	var ce *clierr.CLIError
 	if !errors.As(err, &ce) {
 		t.Fatalf("err = %v, want *clierr.CLIError", err)
@@ -213,7 +226,7 @@ func TestRequire_EmptyResourceID_NonTTY_OmitsEmptyQuotes(t *testing.T) {
 
 func TestRegister_BothFlagsBound(t *testing.T) {
 	leaf, _, _ := newTestCmd(t, "instance", "")
-	_ = confirm.Register(leaf)
+	confirm.Register(leaf)
 
 	for _, name := range []string{"yes", "force"} {
 		if leaf.Flags().Lookup(name) == nil {
@@ -226,9 +239,9 @@ func TestRequire_ResourceTypeFromParent(t *testing.T) {
 	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
 
 	leaf, _, _ := newTestCmd(t, "agent", "")
-	f := confirm.Register(leaf)
+	confirm.Register(leaf)
 
-	err := f.Require(leaf, "agt-42")
+	err := confirm.Require(leaf, "agt-42")
 	if err == nil {
 		t.Fatal("expected error")
 	}

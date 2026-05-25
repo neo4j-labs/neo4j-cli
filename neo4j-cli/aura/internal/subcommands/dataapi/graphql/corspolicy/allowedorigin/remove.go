@@ -50,88 +50,86 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.ex
 # Remove an allowed origin and capture the response as JSON
 neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			originToRemove := strings.TrimSpace(args[0])
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		originToRemove := strings.TrimSpace(args[0])
-
-		existingOrigins, err := getExistingOrigins(cfg, dataApiId, instanceId)
-		if err != nil {
-			return err
-		}
-
-		newOrigins := []string{}
-		originFound := false
-
-		for _, origin := range existingOrigins {
-			if origin != originToRemove {
-				newOrigins = append(newOrigins, origin)
-			} else {
-				originFound = true
+			existingOrigins, err := getExistingOrigins(cfg, dataApiId, instanceId)
+			if err != nil {
+				return err
 			}
-		}
 
-		if !originFound {
-			cmd.SilenceUsage = true
-			return clierr.NewUsageError("Origin \"%s\" not found in allowed origins", originToRemove)
-		}
+			newOrigins := []string{}
+			originFound := false
 
-		cmd.SilenceUsage = true
-
-		if err := confirmFlags.Require(cmd, originToRemove); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
-			}
-			return err
-		}
-
-		body := map[string]any{
-			"security": map[string]any{
-				"cors_policy": map[string]any{
-					"allowed_origins": newOrigins,
-				},
-			},
-		}
-
-		// TODO: theres currently a bug with the API that means you cannot send a body with only an empty array.
-		// Therefore, as a temporary fix we add this dummy data that is ignored
-		if len(newOrigins) == 0 {
-			body["test"] = "ignore me"
-		}
-
-		path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, dataApiId)
-		resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			PostBody: body,
-			Method:   http.MethodPatch,
-		})
-		if err != nil {
-			return err
-		}
-
-		// NOTE: Update should not return OK (200), it always returns 202, checking both just in case
-		if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-			if len(newOrigins) == 0 {
-				fmt.Fprintln(cmd.ErrOrStderr(), "New allowed origins: []") //nolint:errcheck // narration to stderr; write errors are not actionable
-			} else {
-				fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
-			}
-			output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-			if wait {
-				fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-				pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusUpdating)
-				if err != nil {
-					return err
+			for _, origin := range existingOrigins {
+				if origin != originToRemove {
+					newOrigins = append(newOrigins, origin)
+				} else {
+					originFound = true
 				}
-
-				fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
-		}
-		return nil
+
+			if !originFound {
+				cmd.SilenceUsage = true
+				return clierr.NewUsageError("Origin \"%s\" not found in allowed origins", originToRemove)
+			}
+
+			cmd.SilenceUsage = true
+
+			if err := confirm.Require(cmd, originToRemove); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
+
+			body := map[string]any{
+				"security": map[string]any{
+					"cors_policy": map[string]any{
+						"allowed_origins": newOrigins,
+					},
+				},
+			}
+
+			// TODO: theres currently a bug with the API that means you cannot send a body with only an empty array.
+			// Therefore, as a temporary fix we add this dummy data that is ignored
+			if len(newOrigins) == 0 {
+				body["test"] = "ignore me"
+			}
+
+			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, dataApiId)
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				PostBody: body,
+				Method:   http.MethodPatch,
+			})
+			if err != nil {
+				return err
+			}
+
+			// NOTE: Update should not return OK (200), it always returns 202, checking both just in case
+			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
+				if len(newOrigins) == 0 {
+					fmt.Fprintln(cmd.ErrOrStderr(), "New allowed origins: []") //nolint:errcheck // narration to stderr; write errors are not actionable
+				} else {
+					fmt.Fprintf(cmd.ErrOrStderr(), "New allowed origins: [\"%s\"]\n", strings.Join(newOrigins, "\", \"")) //nolint:errcheck // narration to stderr; write errors are not actionable
+				}
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
+				if wait {
+					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
+					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, dataApiId, api.GraphQLDataApiStatusUpdating)
+					if err != nil {
+						return err
+					}
+
+					fmt.Fprintln(cmd.ErrOrStderr(), "GraphQL Data API Status:", pollResponse.Data.Status) //nolint:errcheck // narration to stderr; write errors are not actionable
+				}
+			}
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance the GraphQL Data API is connected to")
 	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

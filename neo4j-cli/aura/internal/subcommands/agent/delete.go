@@ -45,44 +45,42 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
-		RunE: nil,
-	}
-
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
-		if err != nil {
-			return err
-		}
-
-		agentId := args[0]
-
-		cmd.SilenceUsage = true
-
-		if err := confirmFlags.Require(cmd, agentId); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+		RunE: func(cmd *cobra.Command, args []string) error {
+			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+			if err != nil {
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId)
-		_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method:  http.MethodDelete,
-			Version: api.AuraApiVersion2,
-		})
-		if err != nil {
-			return err
-		}
+			agentId := args[0]
 
-		if api.IsSuccessful(statusCode) {
-			cmd.Println("Agent deleted successfully", agentId)
-		}
+			cmd.SilenceUsage = true
 
-		return nil
+			if err := confirm.Require(cmd, agentId); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
+
+			path := fmt.Sprintf("/organizations/%s/projects/%s/agents/%s", organizationId, projectId, agentId)
+			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersion2,
+			})
+			if err != nil {
+				return err
+			}
+
+			if api.IsSuccessful(statusCode) {
+				cmd.Println("Agent deleted successfully", agentId)
+			}
+
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
 	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project/tenant ID")

@@ -38,49 +38,47 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 # Delete and pipe the response status through jq
 neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json | jq -r '.data.status'`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			instanceID := strings.TrimSpace(args[0])
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		instanceID := strings.TrimSpace(args[0])
-
-		cmd.SilenceUsage = true
-		_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-		if err != nil {
-			return err
-		}
-
-		if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
-			return err
-		}
-
-		if err := confirmFlags.Require(cmd, instanceID); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/instances/%s", instanceID)
-		resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method: http.MethodDelete,
-		})
+			if _, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID); err != nil {
+				return err
+			}
 
-		if err != nil {
-			return err
-		}
-		// NOTE: Instance delete should not return OK (200), it always returns 202
-		if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-			responseData := api.ParseBody(resBody)
-			renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
-			output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
-		}
+			if err := confirm.Require(cmd, instanceID); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
 
-		return nil
+			path := fmt.Sprintf("/instances/%s", instanceID)
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method: http.MethodDelete,
+			})
+
+			if err != nil {
+				return err
+			}
+			// NOTE: Instance delete should not return OK (200), it always returns 202
+			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
+				responseData := api.ParseBody(resBody)
+				renamed := utils.RenameResponseField(responseData, "tenant_id", "project_id")
+				output.PrintBodyMap(cmd, cfg, renamed, []string{"id", "name", "project_id", "status", "connection_url", "cloud_provider", "region", "type", "memory"})
+			}
+
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	return cmd
 }

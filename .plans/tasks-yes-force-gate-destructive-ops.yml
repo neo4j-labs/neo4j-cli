@@ -192,7 +192,7 @@ tasks:
       Bundle regen is NOT required: flag bindings and help strings are
       unchanged (TestGenerator_RoundTrip must remain green without
       regenerating). Verify via `make test`.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -202,7 +202,7 @@ tasks:
       - "`common/confirm/confirm_test.go` updated for the new API; all existing TTY × flag-state scenarios still covered."
       - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
       - "TestGenerator_RoundTrip passes WITHOUT re-running `go generate` (flag/help text unchanged)."
-    completed_at: null
+    completed_at: 2026-05-25T12:30:00Z
 
   - id: task-008
     title: "Centralise cancellation handling (review finding #1)"

@@ -30,22 +30,20 @@ neo4j-cli aura credential remove staging --rw --yes --force
 # Remove and confirm by listing remaining credentials as JSON
 neo4j-cli aura credential remove my-creds --rw --yes --force && neo4j-cli aura credential list --format json`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
-
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		credName := strings.TrimSpace(args[0])
-		if err := confirmFlags.Require(cmd, credName); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+		RunE: func(cmd *cobra.Command, args []string) error {
+			credName := strings.TrimSpace(args[0])
+			if err := confirm.Require(cmd, credName); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
 			}
-			return err
-		}
-		return cfg.Credentials.Aura.Remove(credName)
+			return cfg.Credentials.Aura.Remove(credName)
+		},
 	}
+
+	confirm.Register(cmd)
 
 	return cmd
 }

@@ -49,45 +49,43 @@ neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-0
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
-		RunE: nil,
-	}
-
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
-		if err != nil {
-			return err
-		}
-
-		cmd.SilenceUsage = true
-
-		if err := confirmFlags.Require(cmd, deploymentId); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+		RunE: func(cmd *cobra.Command, args []string) error {
+			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+			if err != nil {
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId)
-		_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method:  http.MethodDelete,
-			Version: api.AuraApiVersion2,
-		})
-		if err != nil {
-			return err
-		}
+			cmd.SilenceUsage = true
 
-		if api.IsSuccessful(statusCode) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "deployment-token for deployment %s deleted\n", deploymentId) //nolint:errcheck // narration to stderr; write errors are not actionable
-			output.PrintBodyMap(cmd, cfg,
-				api.NewSingleValueResponseData(map[string]any{"deleted": true, "deployment_id": deploymentId}),
-				[]string{"deleted", "deployment_id"})
-		}
+			if err := confirm.Require(cmd, deploymentId); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
 
-		return nil
+			path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId)
+			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersion2,
+			})
+			if err != nil {
+				return err
+			}
+
+			if api.IsSuccessful(statusCode) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "deployment-token for deployment %s deleted\n", deploymentId) //nolint:errcheck // narration to stderr; write errors are not actionable
+				output.PrintBodyMap(cmd, cfg,
+					api.NewSingleValueResponseData(map[string]any{"deleted": true, "deployment_id": deploymentId}),
+					[]string{"deleted", "deployment_id"})
+			}
+
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
 	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")

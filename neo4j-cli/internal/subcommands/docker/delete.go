@@ -50,64 +50,62 @@ neo4j-cli docker delete dev --yes --force --rw
 # Delete and confirm by listing remaining managed containers
 neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format json`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			client := clientFactory()
+			ctx := cmd.Context()
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-		client := clientFactory()
-		ctx := cmd.Context()
-
-		// Inspect first so we can refuse non-managed / missing containers
-		// before mutating any daemon state (REQ-F-053). Only the
-		// "container does not exist" branch maps to unknown-name; other
-		// Inspect errors (daemon down, permission denied, …) propagate
-		// verbatim so the operator can fix the real cause.
-		container, err := client.Inspect(ctx, name)
-		if err != nil {
-			cmd.SilenceUsage = true
-			if errors.Is(err, ErrNotFound) {
+			// Inspect first so we can refuse non-managed / missing containers
+			// before mutating any daemon state (REQ-F-053). Only the
+			// "container does not exist" branch maps to unknown-name; other
+			// Inspect errors (daemon down, permission denied, …) propagate
+			// verbatim so the operator can fix the real cause.
+			container, err := client.Inspect(ctx, name)
+			if err != nil {
+				cmd.SilenceUsage = true
+				if errors.Is(err, ErrNotFound) {
+					return unknownContainerError(name)
+				}
+				return err
+			}
+			if !container.Managed {
+				cmd.SilenceUsage = true
 				return unknownContainerError(name)
 			}
-			return err
-		}
-		if !container.Managed {
+
 			cmd.SilenceUsage = true
-			return unknownContainerError(name)
-		}
-
-		cmd.SilenceUsage = true
-		if err := confirmFlags.Require(cmd, name); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-				return nil
+			if err := confirm.Require(cmd, name); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
+					return nil
+				}
+				return err
 			}
-			return err
-		}
 
-		if err := client.RemoveForce(ctx, name); err != nil {
-			// dockerClient.RemoveForce wraps captured stderr verbatim in
-			// a clierr.UsageError (REQ-F-061); surface as-is.
-			return err
-		}
+			if err := client.RemoveForce(ctx, name); err != nil {
+				// dockerClient.RemoveForce wraps captured stderr verbatim in
+				// a clierr.UsageError (REQ-F-061); surface as-is.
+				return err
+			}
 
-		// REQ-F-050: best-effort credential removal. A missing credential
-		// is NOT an error — the container went away successfully, the
-		// credential just wasn't stored (e.g. --no-store-credential at
-		// create time, or it was already removed manually). Any other
-		// failure shape is surfaced verbatim.
-		if cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
-			if err := cfg.Credentials.Dbms.Remove(name); err != nil {
-				if !strings.HasPrefix(err.Error(), missingCredentialErrorPrefix) {
-					return err
+			// REQ-F-050: best-effort credential removal. A missing credential
+			// is NOT an error — the container went away successfully, the
+			// credential just wasn't stored (e.g. --no-store-credential at
+			// create time, or it was already removed manually). Any other
+			// failure shape is surfaced verbatim.
+			if cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
+				if err := cfg.Credentials.Dbms.Remove(name); err != nil {
+					if !strings.HasPrefix(err.Error(), missingCredentialErrorPrefix) {
+						return err
+					}
 				}
 			}
-		}
 
-		return nil
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	return cmd
 }

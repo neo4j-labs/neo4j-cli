@@ -36,49 +36,47 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 # Delete and confirm by piping the response through jq
 neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json | jq -r '.data.deleted'`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmkID := strings.TrimSpace(args[0])
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		cmkID := strings.TrimSpace(args[0])
-
-		cmd.SilenceUsage = true
-		_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-		if err != nil {
-			return err
-		}
-
-		if _, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID); err != nil {
-			return err
-		}
-
-		if err := confirmFlags.Require(cmd, cmkID); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+			cmd.SilenceUsage = true
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/customer-managed-keys/%s", cmkID)
-		_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method: http.MethodDelete,
-		})
-		if err != nil {
-			return err
-		}
+			if _, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, projectID); err != nil {
+				return err
+			}
 
-		if statusCode == http.StatusNoContent {
-			fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", cmkID) //nolint:errcheck // narration to stderr; write errors are not actionable
-			output.PrintBodyMap(cmd, cfg,
-				api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": cmkID}),
-				[]string{"deleted", "id"})
-		}
+			if err := confirm.Require(cmd, cmkID); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
+			}
 
-		return nil
+			path := fmt.Sprintf("/customer-managed-keys/%s", cmkID)
+			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method: http.MethodDelete,
+			})
+			if err != nil {
+				return err
+			}
+
+			if statusCode == http.StatusNoContent {
+				fmt.Fprintf(cmd.ErrOrStderr(), "customer-managed-key %s deleted\n", cmkID) //nolint:errcheck // narration to stderr; write errors are not actionable
+				output.PrintBodyMap(cmd, cfg,
+					api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": cmkID}),
+					[]string{"deleted", "id"})
+			}
+
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	return cmd
 }

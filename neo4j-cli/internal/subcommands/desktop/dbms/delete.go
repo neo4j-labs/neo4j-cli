@@ -33,66 +33,64 @@ neo4j-cli desktop dbms delete my-dbms-id --yes --force --rw
 neo4j-cli desktop dbms delete my-dbms-id --yes --force --format json --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
-		RunE:        nil,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			ctx := cmd.Context()
+			fs := cfg.Aura.Fs()
+			port, _ := cmd.Flags().GetInt(portFlag)
+			id := args[0]
+
+			client, err := newDesktopClientFn(ctx, fs, port)
+			if err != nil {
+				return err
+			}
+
+			if err := confirm.Require(cmd, id); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
+					return nil
+				}
+				return err
+			}
+
+			deleted, err := client.DeleteDbms(ctx, id)
+			if err != nil {
+				return err
+			}
+
+			// Desktop's DELETE returns a snapshot whose `status` reflects the
+			// pre-delete state (e.g. "stopped") — confusing for a deleted row.
+			// Emit a confirmation shape: one line on table/toon, `{id, name,
+			// deleted: true}` on JSON.
+			name := ""
+			if deleted != nil {
+				name = deleted.Name
+			}
+			displayName := name
+			if displayName == "" {
+				displayName = id
+			}
+
+			switch output.ResolveOutput(cmd, cfg) {
+			case "json":
+				payload := struct {
+					ID      string `json:"id"`
+					Name    string `json:"name"`
+					Deleted bool   `json:"deleted"`
+				}{ID: id, Name: name, Deleted: true}
+				buf, jerr := json.MarshalIndent(payload, "", "\t")
+				if jerr != nil {
+					return jerr
+				}
+				cmd.Println(string(buf))
+			default:
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted DBMS %q (%s).\n", displayName, id)
+			}
+			return nil
+		},
 	}
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		ctx := cmd.Context()
-		fs := cfg.Aura.Fs()
-		port, _ := cmd.Flags().GetInt(portFlag)
-		id := args[0]
-
-		client, err := newDesktopClientFn(ctx, fs, port)
-		if err != nil {
-			return err
-		}
-
-		if err := confirmFlags.Require(cmd, id); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-				return nil
-			}
-			return err
-		}
-
-		deleted, err := client.DeleteDbms(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		// Desktop's DELETE returns a snapshot whose `status` reflects the
-		// pre-delete state (e.g. "stopped") — confusing for a deleted row.
-		// Emit a confirmation shape: one line on table/toon, `{id, name,
-		// deleted: true}` on JSON.
-		name := ""
-		if deleted != nil {
-			name = deleted.Name
-		}
-		displayName := name
-		if displayName == "" {
-			displayName = id
-		}
-
-		switch output.ResolveOutput(cmd, cfg) {
-		case "json":
-			payload := struct {
-				ID      string `json:"id"`
-				Name    string `json:"name"`
-				Deleted bool   `json:"deleted"`
-			}{ID: id, Name: name, Deleted: true}
-			buf, jerr := json.MarshalIndent(payload, "", "\t")
-			if jerr != nil {
-				return jerr
-			}
-			cmd.Println(string(buf))
-		default:
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted DBMS %q (%s).\n", displayName, id)
-		}
-		return nil
-	}
+	confirm.Register(cmd)
 
 	return cmd
 }

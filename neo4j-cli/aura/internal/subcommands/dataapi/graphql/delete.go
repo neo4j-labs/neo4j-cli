@@ -35,38 +35,36 @@ neo4j-cli aura data-api graphql delete 11111111 --instance-id 00000000 --rw --ye
 # Delete a GraphQL Data API discovered via list
 neo4j-cli aura data-api graphql delete $(neo4j-cli aura data-api graphql list --instance-id 00000000 --format json | jq -r '.data[0].id') --instance-id 00000000 --rw --yes --force`,
 		Args: cobra.ExactArgs(1),
-		RunE: nil,
-	}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			graphqlId := strings.TrimSpace(args[0])
 
-	confirmFlags := confirm.Register(cmd)
-
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		graphqlId := strings.TrimSpace(args[0])
-
-		if err := confirmFlags.Require(cmd, graphqlId); err != nil {
-			if errors.Is(err, confirm.ErrCancelled) {
-				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-				return nil
+			if err := confirm.Require(cmd, graphqlId); err != nil {
+				if errors.Is(err, confirm.ErrCancelled) {
+					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+					return nil
+				}
+				return err
 			}
-			return err
-		}
 
-		path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
+			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
 
-		resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-			Method: http.MethodDelete,
-		})
-		if err != nil {
-			return err
-		}
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+				Method: http.MethodDelete,
+			})
+			if err != nil {
+				return err
+			}
 
-		// NOTE: delete should not return OK (200), it always returns 202, checking both just in case
-		if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-			output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
-		}
-		return nil
+			// NOTE: delete should not return OK (200), it always returns 202, checking both just in case
+			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
+				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "status", "url"})
+			}
+			return nil
+		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to delete the Data API for")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
