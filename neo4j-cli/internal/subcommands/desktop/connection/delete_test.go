@@ -17,8 +17,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop"
@@ -48,7 +48,6 @@ func newDeleteHelper(t *testing.T) *deleteHelper {
 	if err != nil {
 		t.Fatalf("GetTestFs: %v", err)
 	}
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
 	return &deleteHelper{
 		t:   t,
 		in:  &bytes.Buffer{},
@@ -120,37 +119,29 @@ func TestDelete_RequiresID(t *testing.T) {
 	}
 }
 
-// TestDelete_NonTTY_WithoutFlags_Exit2: non-TTY without both flags must hard-
-// error so accidental piped invocations cannot silently delete a connection.
-func TestDelete_NonTTY_WithoutFlags_Exit2(t *testing.T) {
-	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	var deleteCalls atomic.Int32
-	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
-			deleteCalls.Add(1)
-		}
-		t.Errorf("non-TTY without flags must not hit the API; got %s %s", r.Method, r.URL.Path)
+// TestDelete_ConfirmGate is the canonical (TTY × flag-state) replay shared
+// across every destructive leaf. Variant tests below cover scenarios the
+// canonical replay doesn't (OnlyYes/OnlyForce, JSON shape, empty stdin, …).
+func TestDelete_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "desktop connection delete",
+		NoFlagsArgs:   "connection delete " + validDeleteID + " --format json",
+		BothFlagsArgs: "connection delete " + validDeleteID + " --yes --force --format json",
+		ResourceLabel: "connection",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			h := newDeleteHelper(t)
+			h.in.WriteString(stdin)
+			var deleteCalls atomic.Int32
+			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					deleteCalls.Add(1)
+					_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
+				}
+			})
+			err := h.run(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: h.err.String(), Invoked: deleteCalls.Load() > 0}
+		},
 	})
-
-	err := h.run(`connection delete ` + validDeleteID)
-	if err == nil {
-		t.Fatalf("expected usage error when non-TTY and flags are missing")
-	}
-	var ce *clierr.CLIError
-	if !errors.As(err, &ce) {
-		t.Fatalf("expected *clierr.CLIError, got %v", err)
-	}
-	if ce.Code != 2 {
-		t.Fatalf("expected exit 2, got %d", ce.Code)
-	}
-	if !strings.Contains(err.Error(), "pass both --yes and --force") {
-		t.Fatalf("expected error to mention 'pass both --yes and --force', got: %v", err)
-	}
-	if deleteCalls.Load() != 0 {
-		t.Fatalf("expected zero DELETE calls in non-TTY+no-flags path; got %d", deleteCalls.Load())
-	}
 }
 
 // Deliberate back-compat break: `desktop connection delete --yes` (non-TTY)
@@ -312,6 +303,7 @@ func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 // TestDelete_TTY_WithBothFlags_SkipsPrompt: TTY + both flags skips the prompt.
 func TestDelete_TTY_WithBothFlags_SkipsPrompt(t *testing.T) {
 	h := newDeleteHelper(t)
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
 
 	var listCalls atomic.Int32
 	var deleteCalls atomic.Int32
@@ -342,73 +334,10 @@ func TestDelete_TTY_WithBothFlags_SkipsPrompt(t *testing.T) {
 	}
 }
 
-// TestDelete_TTY_PromptYes_Proceeds: TTY + no flags + affirmative answer →
-// prompt is rendered on stderr, DELETE fires after confirmation.
-func TestDelete_TTY_PromptYes_Proceeds(t *testing.T) {
-	for _, answer := range []string{"y\n", "Y\n", "yes\n", "YES\n", "Yes\n", "  y  \n"} {
-		t.Run(strings.TrimSpace(answer), func(t *testing.T) {
-			h := newDeleteHelper(t)
-			h.in.WriteString(answer)
-
-			var deleteCalls atomic.Int32
-			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-				switch {
-				case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
-					deleteCalls.Add(1)
-					_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
-				default:
-					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-				}
-			})
-
-			if err := h.run(`connection delete ` + validDeleteID + ` --format json`); err != nil {
-				t.Fatalf("run: %v", err)
-			}
-			if deleteCalls.Load() != 1 {
-				t.Fatalf("expected 1 DELETE on confirm; got %d", deleteCalls.Load())
-			}
-			if !strings.Contains(h.err.String(), `Delete connection "`+validDeleteID+`"?`) {
-				t.Fatalf("expected prompt text on stderr; got: %s", h.err.String())
-			}
-		})
-	}
-}
-
-// TestDelete_TTY_PromptNo_Cancels: TTY + no flags + non-affirmative answer →
-// cancelled (exit 0), no DELETE call.
-func TestDelete_TTY_PromptNo_Cancels(t *testing.T) {
-	for _, answer := range []string{"n\n", "N\n", "no\n", "\n", "anything else\n"} {
-		t.Run(strings.TrimSpace(answer), func(t *testing.T) {
-			h := newDeleteHelper(t)
-			h.in.WriteString(answer)
-
-			var deleteCalls atomic.Int32
-			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method == http.MethodDelete {
-					deleteCalls.Add(1)
-					t.Errorf("DELETE should not fire on non-affirmative answer; got %s", r.URL.Path)
-				} else {
-					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-				}
-			})
-
-			err := h.run(`connection delete ` + validDeleteID + ` --format json`)
-			if !errors.Is(err, confirm.ErrCancelled) {
-				t.Fatalf("expected confirm.ErrCancelled on cancel; got: %v", err)
-			}
-			if deleteCalls.Load() != 0 {
-				t.Fatalf("expected zero DELETE calls on cancel; got %d", deleteCalls.Load())
-			}
-			if !strings.Contains(h.err.String(), "cancelled.") {
-				t.Fatalf("expected 'cancelled.' on stderr; got: %s", h.err.String())
-			}
-		})
-	}
-}
-
 // TestDelete_TTY_EmptyStdin_Cancels: TTY + empty stdin → cancelled exit 0.
 func TestDelete_TTY_EmptyStdin_Cancels(t *testing.T) {
 	h := newDeleteHelper(t)
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
 	// Empty buffer simulates immediate EOF.
 
 	var deleteCalls atomic.Int32

@@ -4,12 +4,14 @@
 package dbms_test
 
 import (
-	"errors"
-	"strings"
+	"io"
+	"path/filepath"
 	"testing"
 
-	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
+	"github.com/tidwall/gjson"
 )
 
 func TestDbmsCredentialRemove(t *testing.T) {
@@ -79,73 +81,30 @@ func TestDbmsCredentialRemove(t *testing.T) {
 	}
 }
 
-func TestDbmsCredentialRemoveConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	h := newDbmsTestHelper(t)
-	h.setCredentialsValue("dbms.credentials", []map[string]interface{}{
-		{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+func TestDbmsCredentialRemove_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "credential dbms remove",
+		NoFlagsArgs:   "remove mydb",
+		BothFlagsArgs: "remove mydb --yes --force",
+		ResourceLabel: "dbms",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			h := newDbmsTestHelper(t)
+			h.setCredentialsValue("dbms.credentials", []map[string]interface{}{
+				{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
+			})
+			h.setStdin(stdin)
+			err := h.executeCommand(args)
+			file, ferr := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+			if ferr != nil {
+				t.Fatalf("open credentials: %v", ferr)
+			}
+			defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+			contents, rerr := io.ReadAll(file)
+			if rerr != nil {
+				t.Fatalf("read credentials: %v", rerr)
+			}
+			invoked := gjson.Get(string(contents), "dbms.credentials").String() == "[]"
+			return confirmtest.GateRunResult{Err: err, Stderr: h.err.String(), Invoked: invoked}
+		},
 	})
-
-	err := h.executeCommand("remove mydb")
-
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	if !strings.Contains(err.Error(), "pass both --yes and --force") {
-		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
-	}
-	var ce *clierr.CLIError
-	if !errors.As(err, &ce) || ce.Code != 2 {
-		t.Fatalf("err = %v, want *clierr.CLIError with exit 2", err)
-	}
-	// Credential must still be present (no mutation).
-	h.assertCredentialsValue("dbms.credentials", `[{"database-name":"neo4j","name":"mydb","password":"secret","uri":"bolt://localhost:7687","username":"neo4j"}]`)
-}
-
-func TestDbmsCredentialRemoveConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
-
-	h := newDbmsTestHelper(t)
-	h.setCredentialsValue("dbms.credentials", []map[string]interface{}{
-		{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
-	})
-
-	if err := h.executeCommand("remove mydb --yes --force"); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	h.assertCredentialsValue("dbms.credentials", `[]`)
-}
-
-func TestDbmsCredentialRemoveConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	h := newDbmsTestHelper(t)
-	h.setCredentialsValue("dbms.credentials", []map[string]interface{}{
-		{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
-	})
-	h.setStdin("y\n")
-
-	if err := h.executeCommand("remove mydb"); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	h.assertCredentialsValue("dbms.credentials", `[]`)
-	h.assertErr("Delete dbms")
-}
-
-func TestDbmsCredentialRemoveConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
-
-	h := newDbmsTestHelper(t)
-	h.setCredentialsValue("dbms.credentials", []map[string]interface{}{
-		{"name": "mydb", "username": "neo4j", "password": "secret", "database-name": "neo4j", "uri": "bolt://localhost:7687"},
-	})
-	h.setStdin("N\n")
-
-	if err := h.executeCommand("remove mydb"); !errors.Is(err, confirm.ErrCancelled) {
-		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
-	}
-	// Credential is unchanged on cancellation.
-	h.assertCredentialsValue("dbms.credentials", `[{"database-name":"neo4j","name":"mydb","password":"secret","uri":"bolt://localhost:7687","username":"neo4j"}]`)
-	h.assertErr("cancelled.")
 }

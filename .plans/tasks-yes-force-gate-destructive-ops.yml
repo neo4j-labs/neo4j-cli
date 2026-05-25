@@ -372,7 +372,7 @@ tasks:
       Reference the dbms / docker / instance test files for the established
       pattern; see `common/confirm/confirmtest/confirmtest.go` for the helper
       surface.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -381,4 +381,4 @@ tasks:
       - "Net deletion across the four files >=250 lines."
       - "Leaf-specific tests (pre-flight, happy-path, JSON shape, etc.) preserved verbatim and still pass."
       - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
-    completed_at: null
+    completed_at: 2026-05-25T14:15:00Z
