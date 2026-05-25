@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Render temporal column values (Date, DateTime, Duration, ...) as ISO-8601 strings in query JSON and table output instead of empty {}.
+time: 2026-05-25T11:56:02.322306+02:00
