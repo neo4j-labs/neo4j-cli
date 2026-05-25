@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
@@ -31,6 +32,7 @@ type dbmsTestHelper struct {
 	// paths (e.g. "/tmp/creds.txt"), values are the file contents. Use this
 	// to drive --env flag tests without touching the real filesystem.
 	files map[string]string
+	stdin string
 	fs    afero.Fs
 	t     *testing.T
 }
@@ -81,8 +83,13 @@ func (h *dbmsTestHelper) executeCommand(command string) error {
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
+	cmd.SetIn(strings.NewReader(h.stdin))
 
 	return cmd.Execute()
+}
+
+func (h *dbmsTestHelper) setStdin(in string) {
+	h.stdin = in
 }
 
 func (h *dbmsTestHelper) assertCredentialsValue(key string, expected string) {

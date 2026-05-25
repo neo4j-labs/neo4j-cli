@@ -1,0 +1,384 @@
+feature: yes-force-gate-destructive-ops
+prd: ./prd-yes-force-gate-destructive-ops.md
+created_at: 2026-05-25T08:21:34Z
+updated_at: 2026-05-25T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Build common/confirm package with Register, Require, ErrCancelled, TTY seam"
+    description: |
+      Create the shared `common/confirm/` package per PRD §REQ-F-001..F-007. The
+      package exposes `Flags{Yes, Force}`, `Register(cmd) *Flags`, `(*Flags).Require(cmd, resourceID) error`,
+      sentinel `ErrCancelled`, a package-local `stdinIsTerminal` var, and
+      `SetStdinIsTerminalForTest(t, fn)`. `Require` derives the resource type
+      from `cmd.Parent().Name()`, prompts on TTY, returns `clierr.NewUsageError`
+      (exit 2) on non-TTY when either flag is missing, and returns
+      `ErrCancelled` when the TTY prompt is declined. Stdin is read from
+      `cmd.InOrStdin()`; prompt is written to `cmd.ErrOrStderr()`. Reuse the
+      bufio line-read pattern from `neo4j-cli/internal/subcommands/docker/delete.go:promptForDelete`.
+      EOF / read error with zero bytes = cancellation. The package must NOT
+      import anything from `neo4j-cli/internal/...` (Go internal-package rule).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Package compiles at `common/confirm/`; `go build ./common/confirm/...` succeeds."
+      - "Table-driven `confirm_test.go` covers all five states: non-TTY+neither, non-TTY+only-yes, non-TTY+only-force, non-TTY+both, TTY+missing-y-answer, TTY+missing-N-answer, TTY+both — and asserts no prompt is written when both flags are set."
+      - "Non-TTY missing-flag path returns a `*clierr.CLIError` with exit code 2 whose message contains 'pass both --yes and --force'."
+      - "TTY cancellation path returns `confirm.ErrCancelled` and `errors.Is(err, confirm.ErrCancelled)` is true."
+      - "Empty `resourceID` renders prompt/error copy without empty quotes (e.g. 'this deployment' rather than 'deployment \"\"')."
+      - "Copyright header present; package contains no import of `github.com/neo4j/cli/neo4j-cli/internal/...`."
+    completed_at: 2026-05-25T09:00:00Z
+
+  - id: task-002
+    title: "Wire confirm gate into 9 Aura production-tier destructive leaves"
+    description: |
+      Apply `confirm.Register` + `confirmFlags.Require(cmd, id)` to each of the
+      nine Aura/DataAPI leaves listed in PRD §REQ-F-010 items 1-9. The two
+      leaves without a positional (`deployment/delete.go`,
+      `deployment/token/delete.go`) pass either `""` or the flag-resolved
+      deployment ID into `Require`. After `Require` returns
+      `confirm.ErrCancelled`, leaves print `cancelled.` to stderr and return
+      `nil` (exit 0). Extend each leaf's `Long:` field per REQ-F-030 and add at
+      least one `--yes --force` invocation to `Example:` per REQ-F-031. Update
+      colocated `*_test.go` files: existing tests that hit RunE directly need
+      `--yes --force` appended to keep passing; add new cases per REQ-F-011/F-012
+      covering non-TTY-without-flags (exit 2), non-TTY-with-flags (proceeds),
+      TTY+y (proceeds), TTY+N (cancelled).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All 9 leaves register `--yes` and `--force` and call `confirmFlags.Require` before any HTTP request."
+      - "Each leaf's `Example:` block has ≥3 examples including one with `--yes --force`; `TestAllLeafCommands_HaveExamples` passes."
+      - "Each leaf has new test cases for the four (TTY × flag-state) gating paths; `go test ./neo4j-cli/aura/internal/subcommands/...` is green."
+      - "Cancelled TTY prompt writes 'cancelled.' to stderr, makes no HTTP call, and returns exit 0."
+      - "`make fmt-check` and `make lint` pass for the Aura subtree."
+    completed_at: 2026-05-25T09:30:00Z
+
+  - id: task-003
+    title: "Migrate 3 local single-flag leaves (docker, desktop dbms, desktop connection) to shared helper"
+    description: |
+      Replace the inline `--yes`-only or `--force`-only plumbing in
+      `neo4j-cli/internal/subcommands/docker/delete.go`,
+      `neo4j-cli/internal/subcommands/desktop/dbms/delete.go`, and
+      `neo4j-cli/internal/subcommands/desktop/connection/delete.go` per PRD
+      §REQ-F-020. Remove the local `force` / `yes` bool var, local
+      `stdinIsTerminal` / `deleteStdinIsTTYFn` var, local `promptForDelete`
+      function, and existing single-flag gate. Delegate to
+      `confirm.Register` + `confirmFlags.Require` so both `--yes` and `--force`
+      are bound and required in non-TTY contexts. Preserve the existing
+      "cancelled" exit-0 behaviour via `errors.Is(err, confirm.ErrCancelled)`.
+      Rewrite the colocated `*_test.go` cases that assert the old single-flag
+      shape; remove or rewrite `SetDeleteStdinIsTTYFnForTest` callers to use
+      `confirm.SetStdinIsTerminalForTest`. This is a deliberate break:
+      `docker delete --force` (non-TTY) and `desktop * delete --yes`
+      (non-TTY) now exit 2 — call this out in test names.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "No `force bool` / `yes bool` / `stdinIsTerminal` / `deleteStdinIsTTYFn` / `promptForDelete` symbols remain in the three leaf files."
+      - "Each leaf registers both `--yes` and `--force` via `confirm.Register` and calls `confirmFlags.Require` at the top of `RunE`."
+      - "Tests assert the new behaviour: non-TTY with only `--yes` (or only `--force`) → exit 2 with 'pass both --yes and --force'; non-TTY with both → proceeds; TTY without flags → prompts and either proceeds (y) or cancels (N)."
+      - "Docker leaf's `--force`-then-RemoveForce wiring still works (the underlying `docker rm -f` semantics are unchanged); test stays green with `--yes --force`."
+      - "`go test ./neo4j-cli/internal/subcommands/docker/... ./neo4j-cli/internal/subcommands/desktop/...` passes."
+    completed_at: 2026-05-25T10:00:00Z
+
+  - id: task-004
+    title: "Wire confirm gate into 3 credential remove leaves"
+    description: |
+      Apply `confirm.Register` + `confirmFlags.Require(cmd, args[0])` to the
+      three credential-remove leaves per PRD §REQ-F-010 items 13-15:
+      `neo4j-cli/internal/subcommands/credential/dbms/remove.go`,
+      `neo4j-cli/internal/subcommands/credential/embed/remove.go`,
+      `neo4j-cli/aura/internal/subcommands/credential/remove.go`. These delete
+      a local credential file entry; the gate behaviour is identical to the
+      Aura leaves. Extend `Long:` per REQ-F-030 and `Example:` per REQ-F-031.
+      Add the four (TTY × flag-state) gating test cases to each colocated
+      `*_test.go`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "All 3 credential-remove leaves register `--yes` and `--force` and call `confirmFlags.Require` before mutating the credential store."
+      - "Each leaf has new test cases for the four gating paths; `go test ./neo4j-cli/internal/subcommands/credential/... ./neo4j-cli/aura/internal/subcommands/credential/...` is green."
+      - "Each leaf's `Example:` block satisfies the ≥3-examples invariant and includes one `--yes --force` invocation."
+      - "Cancelled TTY prompt makes no change to the credentials file and returns exit 0 with 'cancelled.' on stderr."
+    completed_at: 2026-05-25T11:10:00Z
+
+  - id: task-005
+    title: "Regenerate skill bundle for new --yes / --force flags"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to refresh
+      `neo4j-cli/internal/skill/bundle/SKILL.md` and
+      `neo4j-cli/internal/skill/bundle/references/*.md` so they reflect the
+      `--yes` and `--force` flags now bound on every destructive leaf, plus
+      the updated `Long:` and `Example:` copy from tasks 002-004. Commit the
+      regenerated bundle in the same change as the leaf edits. Verify
+      `TestGenerator_RoundTrip` is green afterwards.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` completes cleanly."
+      - "Regenerated `references/{instance,deployment,agent,customermanagedkey,dataapi,graphanalytics,credential,docker,desktop}.md` (where applicable) document `--yes` and `--force`."
+      - "`make generate-check` against a freshly committed tree shows no diff in `internal/skill/bundle/**`."
+      - "`go test ./neo4j-cli/internal/skill/... -run TestGenerator_RoundTrip` passes."
+    completed_at: 2026-05-25T11:40:00Z
+
+  - id: task-006
+    title: "Add Minor changelog entry, run full gates, manual smoke test"
+    description: |
+      Add a single `Minor` changelog entry per PRD §REQ-F-050 documenting the
+      new gate AND the back-compat break for docker/desktop non-TTY callers.
+      Use `changie new --projects neo4j-cli --kind Minor --body "<body>"` if
+      changie is installed; otherwise hand-author
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` per the
+      AGENTS.md template. Run the full gate set: `make fmt-check`,
+      `make lint`, `make test`, `make license-check`. Execute the audit §12
+      #6/#7 smoke commands locally and capture their exit codes.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "A new `.changes/unreleased/neo4j-cli-Minor-*.yaml` file exists with `project: neo4j-cli`, `kind: Minor`, and body covering both the new gate and the docker/desktop break."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all pass."
+      - "`timeout 10 ./bin/neo4j-cli aura instance delete x --rw < /dev/null` exits 2 (NOT 124, NOT 130)."
+      - "`timeout 10 ./bin/neo4j-cli aura instance delete x --rw --yes < /dev/null` exits 2 with a message demanding `--force`."
+      - "Smoke results captured in the PR description or task log."
+    completed_at: 2026-05-25T11:35:00Z
+
+  # ---------------------------------------------------------------------------
+  # Post-review refactors (stellar-review findings on the integrated branch).
+  # Behaviour is preserved end-to-end; these tasks collapse copy-paste and the
+  # two-phase construction shape that the original API forced into every leaf.
+  # ---------------------------------------------------------------------------
+
+  - id: task-007
+    title: "Collapse two-phase command construction (review finding #2)"
+    description: |
+      The current `confirm.Register(cmd) *Flags` API forces 14 destructive
+      leaves into a two-phase shape: `RunE: nil` in the struct literal, then
+      `cmd.RunE = func(...)` patched in after `confirm.Register` returns the
+      *Flags. Refactor so the leaf can hold its RunE inside a single struct
+      literal again.
+
+      Change the `common/confirm` API:
+        - `confirm.Register(cmd *cobra.Command)` becomes a side-effect-only
+          registration (no return value). It still binds `--yes` and `--force`.
+        - Add a package-level `confirm.Require(cmd *cobra.Command, resourceID string) error`
+          that looks up `--yes` and `--force` from `cmd.Flags()` at call time
+          and runs the same gate logic. Behaviour identical to the current
+          `(*Flags).Require`.
+        - Delete the `Flags` struct + `(*Flags).Require` method (no leaf needs
+          to keep the bound struct around; the closure dependency was the
+          smell, not a requirement). If a future caller genuinely needs the
+          bound struct, it can be reintroduced.
+        - `ErrCancelled` and `SetStdinIsTerminalForTest` keep their current
+          shape (task-008 reworks cancellation, not this task).
+
+      Update each of the 16 destructive leaves:
+        - Move RunE back inside the `&cobra.Command{...}` struct literal.
+        - Replace `confirmFlags := confirm.Register(cmd)` + `confirmFlags.Require(cmd, id)`
+          with `confirm.Register(cmd)` (after the struct literal, as a side
+          effect before `return cmd`) and `confirm.Require(cmd, id)` (inside RunE).
+        - Drop the `RunE: nil` placeholder.
+
+      Update tests as needed (mostly mechanical — the unit-test seam was
+      `confirm.SetStdinIsTerminalForTest`, not the *Flags receiver).
+
+      Bundle regen is NOT required: flag bindings and help strings are
+      unchanged (TestGenerator_RoundTrip must remain green without
+      regenerating). Verify via `make test`.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "`common/confirm/confirm.go`: `Register` returns nothing; `Require` is a package-level func taking `*cobra.Command` + resourceID."
+      - "No leaf file contains `RunE: nil` or a post-literal `cmd.RunE = func(...)` patch for the destructive gate."
+      - "Every destructive leaf uses `confirm.Register(cmd)` (side effect) and `confirm.Require(cmd, id)` (in RunE)."
+      - "`common/confirm/confirm_test.go` updated for the new API; all existing TTY × flag-state scenarios still covered."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+      - "TestGenerator_RoundTrip passes WITHOUT re-running `go generate` (flag/help text unchanged)."
+    completed_at: 2026-05-25T12:30:00Z
+
+  - id: task-008
+    title: "Centralise cancellation handling (review finding #1)"
+    description: |
+      The 6-line `if errors.Is(err, confirm.ErrCancelled) { ... }` block is
+      copy-pasted in 16 leaves. Eliminate the boilerplate by handling
+      cancellation in the helper + at the top-level error renderer.
+
+      Changes to `common/confirm/confirm.go`:
+        - On declined TTY prompt, `confirm.Require` itself writes
+          `"cancelled.\n"` to `cmd.ErrOrStderr()`, sets
+          `cmd.SilenceErrors = true` and `cmd.SilenceUsage = true`, then
+          returns `ErrCancelled`.
+        - `ErrCancelled` remains exported (the chokepoint needs to match it).
+
+      Changes to `neo4j-cli/main.go`:
+        - After `cmd.Execute()`, before `exitCodeFor` / `clierr.Render`, add
+          an `errors.Is(err, confirm.ErrCancelled)` check that swallows the
+          error: emit no further output, exit code 0.
+        - Alternatively wire it into `clierr.Render` if that fits better;
+          either way, exactly one place handles it.
+
+      Changes to all 16 destructive leaves:
+        - Delete the entire `if errors.Is(err, confirm.ErrCancelled) { print + return nil }` block.
+        - Each gate-call collapses to: `if err := confirm.Require(cmd, id); err != nil { return err }`.
+        - Drop `errors` and `confirm.ErrCancelled` imports where no longer needed.
+        - Drop the `//nolint:errcheck // narration to stderr` annotations that
+          were only present for the cancellation print.
+
+      Tests update:
+        - `common/confirm/confirm_test.go`: assert that on cancellation
+          `Require` writes `cancelled.\n` to stderr, sets the two Silence
+          flags on the command, and returns `ErrCancelled`.
+        - Leaf tests already assert `cancelled.` on stderr on the TTY-N path;
+          those keep passing because the helper now does the printing.
+        - Add ONE test at the main / app level (e.g. `neo4j-cli/main_test.go`
+          or `neo4j-cli/app/app_test.go`) that exercises the
+          `ErrCancelled → exit 0` integration without going through every leaf.
+
+      Bundle regen NOT required.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`confirm.Require` writes `cancelled.\\n` to stderr and sets `cmd.SilenceErrors` + `cmd.SilenceUsage` on the cancellation path."
+      - "Exactly one chokepoint (in `neo4j-cli/main.go` or `clierr.Render`) intercepts `confirm.ErrCancelled` and exits 0 cleanly."
+      - "Zero leaves contain `errors.Is(err, confirm.ErrCancelled)` or a `cancelled.` literal — grep returns no matches outside `common/confirm/` and the chokepoint."
+      - "Zero leaves contain `//nolint:errcheck // narration to stderr` annotations tied to the cancellation print."
+      - "An integration-level test asserts that a cancelled prompt yields exit 0 with `cancelled.` on stderr and no `Error:` prefix from cobra."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: 2026-05-25T13:00:00Z
+
+  - id: task-009
+    title: "Shared confirm-gate test helper (review finding #3)"
+    status: completed
+    description: |
+      With tasks 007 and 008 collapsing the leaf-side gate code, the gating
+      tests in 16 leaf `*_test.go` files are now near-identical: drive
+      TTY-or-not, drive flag-or-not, assert exit code / stderr / that the
+      destructive sink was/wasn't called. Extract the replay into a shared
+      helper.
+
+      Build `common/confirm/confirmtest/confirmtest.go` (or `common/confirm/confirmtest.go`
+      with a `confirmtest` build-only tag — pick the cleanest layout) exposing:
+
+      ```go
+      type LeafGateCase struct {
+          Name          string
+          NewCmd        func(t *testing.T) (*cobra.Command, *MockSink)
+          Args          []string  // positional + non-gate flags
+          ResourceLabel string    // expected to appear in error / prompt
+      }
+
+      func AssertLeafGate(t *testing.T, c LeafGateCase)
+      ```
+
+      `AssertLeafGate` runs the four scenarios:
+        - non-TTY without flags → exit 2; stderr contains "pass both --yes and --force"; sink NOT invoked.
+        - non-TTY with both flags → sink invoked; exit code 0 (or whatever the sink yields).
+        - TTY + `y\n` → sink invoked.
+        - TTY + empty `\n` → sink NOT invoked; stderr ends with `cancelled.`; exit code 0.
+
+      Migrate each leaf's `*_test.go`:
+        - Replace the four hand-rolled gating tests with `confirmtest.AssertLeafGate(t, LeafGateCase{...})`.
+        - Keep leaf-specific tests for pre-flight branches (ownership check failure, missing flags, malformed args) as-is.
+        - Keep at least one leaf-specific happy-path test that exercises the destructive HTTP/FS call end-to-end.
+
+      Target net deletion across the 16 leaf test files of ≥1500 lines.
+      Test coverage of the gate paths is preserved or improved (the helper's
+      assertions are uniform and explicit).
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "New `common/confirm/confirmtest/` package (or equivalent location) with `AssertLeafGate` + `LeafGateCase` exported and self-tested."
+      - "All 16 destructive-leaf `*_test.go` files use `confirmtest.AssertLeafGate` for the four canonical gating scenarios; no hand-rolled equivalents remain."
+      - "Net line deletion across leaf `*_test.go` files is ≥1500 vs the pre-task-009 tree."
+      - "`make test` passes; per-leaf coverage of pre-flight / happy-path branches unchanged."
+      - "`make fmt-check`, `make lint`, `make license-check` all green."
+    completed_at: 2026-05-25T13:30:00Z
+
+  - id: task-010
+    title: "Audit and remove now-redundant SilenceUsage placements (review finding #4)"
+    description: |
+      Once task-008 has `confirm.Require` set `cmd.SilenceUsage = true` and
+      `cmd.SilenceErrors = true` on the cancellation path, several leaves'
+      defensive `cmd.SilenceUsage = true` calls are no longer needed (they
+      were guarding against cobra's default usage-on-error printing for the
+      gate path).
+
+      Audit every destructive leaf:
+        - If a `cmd.SilenceUsage = true` was added solely to suppress
+          usage printing on the confirm gate path, remove it.
+        - If `cmd.SilenceUsage = true` is still needed for a different
+          error path (e.g. pre-flight failures), leave it but keep the
+          placement consistent: ONE call per leaf, set as the first statement
+          inside `RunE`, before pre-flight.
+
+      Particular hot spots: `docker/delete.go` (currently sets it 3× across
+      branches), `deployment/delete.go`, `deployment/token/delete.go`.
+
+      This is a small cleanup pass; no behaviour change beyond the
+      cancellation-path tidying already covered by task-008.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "Each destructive leaf has at most one `cmd.SilenceUsage = true` statement, placed as the first line of `RunE` when it is present at all."
+      - "No leaf relies on cobra's default usage printing for the confirm-gate path (verified by an integration test or by manual review documented in the progress file)."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: 2026-05-25T10:25:27Z
+
+  - id: task-011
+    title: "Migrate the remaining 4 leaves' gating tests to confirmtest.AssertLeafGate"
+    description: |
+      Task-009 migrated 12 of 16 destructive leaves' gating tests to the
+      shared `confirmtest.AssertLeafGate` helper before hitting a session
+      boundary. Finish the job for the four remaining leaves.
+
+      Affected test files:
+        - `neo4j-cli/internal/subcommands/desktop/connection/delete_test.go`
+        - `neo4j-cli/internal/subcommands/credential/dbms/remove_test.go`
+        - `neo4j-cli/internal/subcommands/credential/embed/remove_test.go`
+        - `neo4j-cli/internal/subcommands/credential/credential_test.go` (the
+          aura-client remove block)
+
+      Each file currently carries ~80 lines of hand-rolled gating scaffolding
+      across four scenarios (NonTTY without flags / NonTTY with both /
+      TTY+`y\n` / TTY+`\n`). Pattern from the 12 already migrated leaves:
+      collapse the four scenarios into a single `TestDelete_ConfirmGate`
+      (or `TestRemove_ConfirmGate`) that calls
+      `confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{...})` with a
+      `Run` closure that drives the leaf-specific test helper and reports
+      `(Err, Stderr, Invoked)`.
+
+      Constraints (from task-009's lessons):
+        - The leaf's helper (e.g. `newDeleteHelper`, `newRemoveHelper`) MUST
+          NOT call `confirm.SetStdinIsTerminalForTest` at construction time —
+          that clobbers AssertLeafGate's per-scenario TTY seam via LIFO
+          Cleanup restoration. If a leaf helper currently does that, remove
+          it and add explicit `confirm.SetStdinIsTerminalForTest(t, ...)`
+          calls to the tests that relied on the default.
+        - Keep ALL leaf-specific tests (pre-flight failures, happy-path with
+          both flags, JSON shape, no-credentials-write, etc.). Only the four
+          canonical gating cases get replaced.
+        - Bundle regen NOT required (no leaf source changes).
+
+      Reference the dbms / docker / instance test files for the established
+      pattern; see `common/confirm/confirmtest/confirmtest.go` for the helper
+      surface.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "All four files above use `confirmtest.AssertLeafGate` and no longer carry hand-rolled NonTTY/TTY+y/TTY+N gating scaffolding."
+      - "No leaf helper calls `confirm.SetStdinIsTerminalForTest` at construction time; explicit per-test calls cover what the default used to."
+      - "Net deletion across the four files >=250 lines."
+      - "Leaf-specific tests (pre-flight, happy-path, JSON shape, etc.) preserved verbatim and still pass."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: 2026-05-25T14:15:00Z

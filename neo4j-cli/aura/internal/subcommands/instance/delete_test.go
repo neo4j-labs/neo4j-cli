@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -56,7 +57,7 @@ func TestDeleteInstance(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -100,7 +101,7 @@ func TestDeleteInstanceWithDefaultWorkspace(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --rw", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --rw --yes --force", instanceId))
 
 	mockHandler.AssertCalledTimes(2)
 	helper.AsssertOk()
@@ -150,7 +151,7 @@ func TestDeleteInstanceNotInProject(t *testing.T) {
 	// Instance belongs to a different project.
 	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, "other-project-id"))
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
 	helper.AssertErr(fmt.Sprintf("Error: could not find instance %s in project %s", instanceId, testListProjectID))
 	helper.AssertUsageNotShown()
@@ -180,7 +181,7 @@ func TestDeleteInstanceWithTrailingNewline(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("instance delete %s\"\n\" --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("instance delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -235,7 +236,7 @@ func TestDeleteInstanceError(t *testing.T) {
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
 			mockHandler.AddResponse(testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
+			helper.ExecuteCommand(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw --yes --force", instanceId, testListOrgID, testListProjectID))
 
 			mockHandler.AssertCalledTimes(2)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -244,4 +245,25 @@ func TestDeleteInstanceError(t *testing.T) {
 			helper.AssertErr(testCase.expectedError)
 		})
 	}
+}
+
+func TestDeleteInstanceConfirmGate(t *testing.T) {
+	instanceId := testDeleteInstanceID
+	base := fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID)
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "aura instance delete",
+		NoFlagsArgs:   base,
+		BothFlagsArgs: base + " --yes --force",
+		ResourceLabel: "instance",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			helper := testutils.NewAuraTestHelper(t)
+			t.Cleanup(helper.Close)
+			registerProjectsMock(&helper)
+			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testListProjectID))
+			mock.AddResponse(http.StatusAccepted, `{"data": {"id": "`+instanceId+`", "status": "deleting"}}`)
+			helper.SetStdin(stdin)
+			err := helper.ExecuteCommandE(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}
+		},
+	})
 }

@@ -77,7 +77,7 @@ neo4j-cli desktop connection create --name aura-dev --uri neo4j+s://xyz789.datab
 
 Delete a saved remote DB connection registered with Neo4j Desktop 2
 
-Delete a saved remote DB connection profile by id. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. On an interactive terminal the command prompts for confirmation before deleting; pass `--yes` to skip the prompt. When stdin is not a TTY (CI / piped input) the command refuses to delete without `--yes` so accidental deletions cannot happen silently. Desktop owns the saved connection's credential lifecycle — the `connection:<id>` safeStorage entry is removed by Desktop as part of the DELETE; this leaf does NOT mutate `~/.neo4j/cli/credentials.json`. Find connection ids with `neo4j-cli desktop list`.
+Delete a saved remote DB connection profile by id. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. Desktop owns the saved connection's credential lifecycle — the `connection:<id>` safeStorage entry is removed by Desktop as part of the DELETE; this leaf does NOT mutate `~/.neo4j/cli/credentials.json`. Find connection ids with `neo4j-cli desktop list`.
 
 Usage: `neo4j-cli desktop connection delete <id> [flags]`
 
@@ -85,7 +85,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--yes` | bool | false | Skip the interactive y/N confirmation; required when stdin is not a terminal |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
@@ -94,10 +95,10 @@ Examples:
 neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --rw
 
 # Delete a saved connection without prompting (scripts, CI, non-TTY shells)
-neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes --rw
+neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes --force --rw
 
 # Delete a saved connection and emit a machine-readable confirmation for scripting
-neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes --format json --rw
+neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes --force --format json --rw
 ```
 
 ### neo4j-cli desktop connection list
@@ -207,7 +208,7 @@ neo4j-cli desktop dbms create --name my-dbms --version 5.21.0 --password superse
 
 Delete a DBMS managed by the local Neo4j Desktop 2 install
 
-Delete a DBMS managed by the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. On an interactive terminal the command prompts for confirmation before deleting; pass `--yes` to skip the prompt. When stdin is not a TTY (CI / piped input) the command refuses to delete without `--yes` so accidental deletions cannot happen silently. This leaf does NOT mutate `~/.neo4j/cli/credentials.json` — Desktop owns the credential lifecycle (REQ-F-025); any persisted neo4j-cli credential pointing at this DBMS is left intact and must be cleaned up via `credential dbms remove`.
+Delete a DBMS managed by the local Neo4j Desktop 2 install. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. This leaf does NOT mutate `~/.neo4j/cli/credentials.json` — Desktop owns the credential lifecycle (REQ-F-025); any persisted neo4j-cli credential pointing at this DBMS is left intact and must be cleaned up via `credential dbms remove`.
 
 Usage: `neo4j-cli desktop dbms delete <id> [flags]`
 
@@ -215,7 +216,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--yes` | bool | false | Skip the interactive y/N confirmation; required when stdin is not a terminal |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
@@ -224,10 +226,10 @@ Examples:
 neo4j-cli desktop dbms delete my-dbms-id --rw
 
 # Delete a DBMS without prompting (scripts, CI, non-TTY shells)
-neo4j-cli desktop dbms delete my-dbms-id --yes --rw
+neo4j-cli desktop dbms delete my-dbms-id --yes --force --rw
 
 # Delete a DBMS and emit a machine-readable confirmation for scripting
-neo4j-cli desktop dbms delete my-dbms-id --yes --format json --rw
+neo4j-cli desktop dbms delete my-dbms-id --yes --force --format json --rw
 ```
 
 ### neo4j-cli desktop dbms list

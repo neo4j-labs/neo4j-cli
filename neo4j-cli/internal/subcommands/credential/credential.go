@@ -7,6 +7,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/dbms"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/embed"
@@ -192,24 +193,33 @@ neo4j-cli credential aura-client list --format toon`,
 }
 
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "Removes an aura-client credential",
-		Long:  "Remove a stored Aura Console API client credential by name.",
+		Long: `Remove a stored Aura Console API client credential by name.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Remove an aura-client credential by name
-neo4j-cli credential aura-client remove work --rw
+neo4j-cli credential aura-client remove work --rw --yes --force
 
 # Remove the personal credential
-neo4j-cli credential aura-client remove personal --rw
+neo4j-cli credential aura-client remove personal --rw --yes --force
 
 # Remove a stale credential that no longer authenticates
-neo4j-cli credential aura-client remove old-tenant --rw`,
+neo4j-cli credential aura-client remove old-tenant --rw --yes --force`,
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := confirm.Require(cmd, args[0]); err != nil {
+				return err
+			}
 			return cfg.Credentials.Aura.Remove(args[0])
 		},
 	}
+
+	confirm.Register(cmd)
+
+	return cmd
 }
 
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {

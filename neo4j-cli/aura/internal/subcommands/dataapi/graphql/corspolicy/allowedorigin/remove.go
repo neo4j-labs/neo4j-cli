@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -36,17 +37,21 @@ func NewRemoveCmd(cfg *clicfg.Config) *cobra.Command {
 
 Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
 
-Removing an allowed origin from the CORS policy of a GraphQL Data API means that most browsers are no longer able to make requests to the GraphQL Data API from a web app that is served from the specified origin.`,
+Removing an allowed origin from the CORS policy of a GraphQL Data API means that most browsers are no longer able to make requests to the GraphQL Data API from a web app that is served from the specified origin.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Remove an allowed origin from the CORS policy
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
+neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Remove an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw
+neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw --yes --force
 
 # Remove an allowed origin and capture the response as JSON
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json`,
+neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			originToRemove := strings.TrimSpace(args[0])
 
 			existingOrigins, err := getExistingOrigins(cfg, dataApiId, instanceId)
@@ -66,11 +71,13 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.ex
 			}
 
 			if !originFound {
-				cmd.SilenceUsage = true
 				return clierr.NewUsageError("Origin \"%s\" not found in allowed origins", originToRemove)
 			}
 
-			cmd.SilenceUsage = true
+			if err := confirm.Require(cmd, originToRemove); err != nil {
+				return err
+			}
+
 			body := map[string]any{
 				"security": map[string]any{
 					"cors_policy": map[string]any{
@@ -115,6 +122,8 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.ex
 			return nil
 		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance the GraphQL Data API is connected to")
 	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

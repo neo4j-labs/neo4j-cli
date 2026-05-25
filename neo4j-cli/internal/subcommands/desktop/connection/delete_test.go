@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop"
@@ -45,7 +48,6 @@ func newDeleteHelper(t *testing.T) *deleteHelper {
 	if err != nil {
 		t.Fatalf("GetTestFs: %v", err)
 	}
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return true }))
 	return &deleteHelper{
 		t:   t,
 		in:  &bytes.Buffer{},
@@ -96,7 +98,7 @@ func TestDelete_RejectsNonUUID(t *testing.T) {
 		return nil, nil
 	}))
 
-	err := h.run(`connection delete not-a-uuid --yes`)
+	err := h.run(`connection delete not-a-uuid --yes --force`)
 	if err == nil {
 		t.Fatalf("expected usage error for non-UUID id")
 	}
@@ -117,37 +119,72 @@ func TestDelete_RequiresID(t *testing.T) {
 	}
 }
 
-// TestDelete_NonTTY_WithoutYes_ExitsNonZero: non-TTY without --yes must hard-
-// error so accidental piped invocations cannot silently delete a connection.
-func TestDelete_NonTTY_WithoutYes_ExitsNonZero(t *testing.T) {
-	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+// TestDelete_ConfirmGate is the canonical (TTY × flag-state) replay shared
+// across every destructive leaf. Variant tests below cover scenarios the
+// canonical replay doesn't (OnlyYes/OnlyForce, JSON shape, empty stdin, …).
+func TestDelete_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "desktop connection delete",
+		NoFlagsArgs:   "connection delete " + validDeleteID + " --format json",
+		BothFlagsArgs: "connection delete " + validDeleteID + " --yes --force --format json",
+		ResourceLabel: "connection",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			h := newDeleteHelper(t)
+			h.in.WriteString(stdin)
+			var deleteCalls atomic.Int32
+			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodDelete {
+					deleteCalls.Add(1)
+					_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
+				}
+			})
+			err := h.run(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: h.err.String(), Invoked: deleteCalls.Load() > 0}
+		},
+	})
+}
 
-	var deleteCalls atomic.Int32
+// Deliberate back-compat break: `desktop connection delete --yes` (non-TTY)
+// used to proceed; the shared gate now requires BOTH --yes and --force.
+func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
+	h := newDeleteHelper(t)
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
-			deleteCalls.Add(1)
-		}
-		t.Errorf("non-TTY without --yes must not hit the API; got %s %s", r.Method, r.URL.Path)
+		t.Errorf("non-TTY without --force must not hit the API; got %s %s", r.Method, r.URL.Path)
 	})
 
-	err := h.run(`connection delete ` + validDeleteID)
+	err := h.run(`connection delete ` + validDeleteID + ` --yes`)
 	if err == nil {
-		t.Fatalf("expected usage error when non-TTY and --yes is missing")
+		t.Fatalf("expected usage error when --force is missing")
 	}
-	if !strings.Contains(err.Error(), "--yes") {
-		t.Fatalf("expected error to mention --yes, got: %v", err)
-	}
-	if deleteCalls.Load() != 0 {
-		t.Fatalf("expected zero DELETE calls in non-TTY+no-yes path; got %d", deleteCalls.Load())
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("expected error to mention 'pass both --yes and --force', got: %v", err)
 	}
 }
 
-// TestDelete_NonTTY_WithYes_DeletesWithoutPrompt: --yes proceeds straight to
-// DELETE with no prompt and no preceding GET / list call.
-func TestDelete_NonTTY_WithYes_DeletesWithoutPrompt(t *testing.T) {
+func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+
+	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("non-TTY without --yes must not hit the API; got %s %s", r.Method, r.URL.Path)
+	})
+
+	err := h.run(`connection delete ` + validDeleteID + ` --force`)
+	if err == nil {
+		t.Fatalf("expected usage error when --yes is missing")
+	}
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("expected error to mention 'pass both --yes and --force', got: %v", err)
+	}
+}
+
+// TestDelete_NonTTY_WithBothFlags_DeletesWithoutPrompt: both flags proceed
+// straight to DELETE with no prompt and no preceding GET / list call.
+func TestDelete_NonTTY_WithBothFlags_DeletesWithoutPrompt(t *testing.T) {
+	h := newDeleteHelper(t)
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var listCalls atomic.Int32
 	var deleteCalls atomic.Int32
@@ -155,7 +192,7 @@ func TestDelete_NonTTY_WithYes_DeletesWithoutPrompt(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
 			listCalls.Add(1)
-			t.Errorf("--yes path must not issue a confirmation list; got GET %s", r.URL.Path)
+			t.Errorf("--yes --force path must not issue a confirmation list; got GET %s", r.URL.Path)
 		case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
 			deleteCalls.Add(1)
 			_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod","connectionUri":"neo4j+s://abc"}`))
@@ -164,11 +201,11 @@ func TestDelete_NonTTY_WithYes_DeletesWithoutPrompt(t *testing.T) {
 		}
 	})
 
-	if err := h.run(`connection delete ` + validDeleteID + ` --yes --format json`); err != nil {
+	if err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format json`); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if listCalls.Load() != 0 {
-		t.Fatalf("--yes path must not issue a confirmation list; got %d", listCalls.Load())
+		t.Fatalf("--yes --force path must not issue a confirmation list; got %d", listCalls.Load())
 	}
 	if deleteCalls.Load() != 1 {
 		t.Fatalf("expected exactly 1 DELETE call; got %d", deleteCalls.Load())
@@ -191,11 +228,11 @@ func TestDelete_NonTTY_WithYes_DeletesWithoutPrompt(t *testing.T) {
 	}
 }
 
-// TestDelete_NonTTY_WithYes_TableConfirmation: default (table) format emits a
-// quoted-name one-line confirmation mirroring `desktop delete`.
-func TestDelete_NonTTY_WithYes_TableConfirmation(t *testing.T) {
+// TestDelete_NonTTY_WithBothFlags_TableConfirmation: default (table) format
+// emits a quoted-name one-line confirmation.
+func TestDelete_NonTTY_WithBothFlags_TableConfirmation(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -205,7 +242,7 @@ func TestDelete_NonTTY_WithYes_TableConfirmation(t *testing.T) {
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 	})
 
-	if err := h.run(`connection delete ` + validDeleteID + ` --yes --format table`); err != nil {
+	if err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format table`); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	got := strings.TrimSpace(h.out.String())
@@ -215,11 +252,11 @@ func TestDelete_NonTTY_WithYes_TableConfirmation(t *testing.T) {
 	}
 }
 
-// TestDelete_NonTTY_WithYes_ToonConfirmation: toon format gets the same one-
+// TestDelete_NonTTY_WithBothFlags_ToonConfirmation: toon format gets the same one-
 // line confirmation as table.
-func TestDelete_NonTTY_WithYes_ToonConfirmation(t *testing.T) {
+func TestDelete_NonTTY_WithBothFlags_ToonConfirmation(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -229,7 +266,7 @@ func TestDelete_NonTTY_WithYes_ToonConfirmation(t *testing.T) {
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 	})
 
-	if err := h.run(`connection delete ` + validDeleteID + ` --yes --format toon`); err != nil {
+	if err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format toon`); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	got := strings.TrimSpace(h.out.String())
@@ -243,7 +280,7 @@ func TestDelete_NonTTY_WithYes_ToonConfirmation(t *testing.T) {
 // omits `name`, the confirmation line falls back to the id in both positions.
 func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -253,7 +290,7 @@ func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 	})
 
-	if err := h.run(`connection delete ` + validDeleteID + ` --yes --format table`); err != nil {
+	if err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format table`); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	got := strings.TrimSpace(h.out.String())
@@ -263,9 +300,10 @@ func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 	}
 }
 
-// TestDelete_TTY_WithYes_SkipsPrompt: TTY + --yes also skips the prompt.
-func TestDelete_TTY_WithYes_SkipsPrompt(t *testing.T) {
+// TestDelete_TTY_WithBothFlags_SkipsPrompt: TTY + both flags skips the prompt.
+func TestDelete_TTY_WithBothFlags_SkipsPrompt(t *testing.T) {
 	h := newDeleteHelper(t)
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 
 	var listCalls atomic.Int32
 	var deleteCalls atomic.Int32
@@ -273,7 +311,7 @@ func TestDelete_TTY_WithYes_SkipsPrompt(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
 			listCalls.Add(1)
-			t.Errorf("--yes path must not issue a confirmation list; got GET %s", r.URL.Path)
+			t.Errorf("--yes --force path must not issue a confirmation list; got GET %s", r.URL.Path)
 		case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
 			deleteCalls.Add(1)
 			_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
@@ -282,175 +320,42 @@ func TestDelete_TTY_WithYes_SkipsPrompt(t *testing.T) {
 		}
 	})
 
-	if err := h.run(`connection delete ` + validDeleteID + ` --yes --format json`); err != nil {
+	if err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format json`); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if listCalls.Load() != 0 {
-		t.Fatalf("--yes must not issue a list call; got %d", listCalls.Load())
+		t.Fatalf("--yes --force must not issue a list call; got %d", listCalls.Load())
 	}
 	if deleteCalls.Load() != 1 {
 		t.Fatalf("expected 1 DELETE; got %d", deleteCalls.Load())
 	}
-	if strings.Contains(h.out.String(), "Delete connection") {
-		t.Fatalf("--yes path leaked the prompt text to stdout; got: %s", h.out.String())
+	if strings.Contains(h.err.String(), "Delete connection") {
+		t.Fatalf("--yes --force path leaked the prompt text to stderr; got: %s", h.err.String())
 	}
 }
 
-// TestDelete_TTY_PromptYes_Proceeds: TTY + no --yes + affirmative answer →
-// list is consulted for the prompt label, then DELETE fires.
-func TestDelete_TTY_PromptYes_Proceeds(t *testing.T) {
-	for _, answer := range []string{"y\n", "Y\n", "yes\n", "YES\n", "Yes\n", "  y  \n"} {
-		t.Run(strings.TrimSpace(answer), func(t *testing.T) {
-			h := newDeleteHelper(t)
-			h.in.WriteString(answer)
-
-			var deleteCalls atomic.Int32
-			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
-					_, _ = w.Write([]byte(`[{"id":"` + validDeleteID + `","name":"aura-prod"}]`))
-				case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
-					deleteCalls.Add(1)
-					_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
-				default:
-					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-				}
-			})
-
-			if err := h.run(`connection delete ` + validDeleteID + ` --format json`); err != nil {
-				t.Fatalf("run: %v", err)
-			}
-			if deleteCalls.Load() != 1 {
-				t.Fatalf("expected 1 DELETE on confirm; got %d", deleteCalls.Load())
-			}
-			if !strings.Contains(h.out.String(), "Delete connection") {
-				t.Fatalf("expected prompt text on stdout; got: %s", h.out.String())
-			}
-			if !strings.Contains(h.out.String(), `"aura-prod"`) || !strings.Contains(h.out.String(), "("+validDeleteID+")") {
-				t.Fatalf("prompt must name the connection %q and id %q; got: %s", "aura-prod", validDeleteID, h.out.String())
-			}
-		})
-	}
-}
-
-// TestDelete_TTY_PromptNo_Aborts: TTY + no --yes + non-affirmative answer →
-// aborts with non-zero exit, no DELETE call.
-func TestDelete_TTY_PromptNo_Aborts(t *testing.T) {
-	for _, answer := range []string{"n\n", "N\n", "no\n", "\n", "anything else\n"} {
-		t.Run(strings.TrimSpace(answer), func(t *testing.T) {
-			h := newDeleteHelper(t)
-			h.in.WriteString(answer)
-
-			var deleteCalls atomic.Int32
-			h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
-					_, _ = w.Write([]byte(`[{"id":"` + validDeleteID + `","name":"aura-prod"}]`))
-				case r.Method == http.MethodDelete:
-					deleteCalls.Add(1)
-					t.Errorf("DELETE should not fire on non-affirmative answer; got %s", r.URL.Path)
-				default:
-					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-				}
-			})
-
-			err := h.run(`connection delete ` + validDeleteID + ` --format json`)
-			if err == nil {
-				t.Fatalf("expected non-zero exit when user declines")
-			}
-			if deleteCalls.Load() != 0 {
-				t.Fatalf("expected zero DELETE calls on decline; got %d", deleteCalls.Load())
-			}
-		})
-	}
-}
-
-// TestDelete_TTY_EmptyStdin_Aborts: TTY + empty stdin (closed pipe) → aborts
-// without firing DELETE.
-func TestDelete_TTY_EmptyStdin_Aborts(t *testing.T) {
+// TestDelete_TTY_EmptyStdin_Cancels: TTY + empty stdin → cancelled exit 0.
+func TestDelete_TTY_EmptyStdin_Cancels(t *testing.T) {
 	h := newDeleteHelper(t)
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 	// Empty buffer simulates immediate EOF.
 
 	var deleteCalls atomic.Int32
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
-			_, _ = w.Write([]byte(`[{"id":"` + validDeleteID + `","name":"aura-prod"}]`))
-		case r.Method == http.MethodDelete:
+		if r.Method == http.MethodDelete {
 			deleteCalls.Add(1)
 			t.Errorf("DELETE should not fire when stdin EOFs before any input")
-		default:
+		} else {
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 	})
 
 	err := h.run(`connection delete ` + validDeleteID + ` --format json`)
-	if err == nil {
-		t.Fatalf("expected non-zero exit when stdin EOFs without input")
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on EOF cancel; got: %v", err)
 	}
 	if deleteCalls.Load() != 0 {
 		t.Fatalf("expected zero DELETE on EOF; got %d", deleteCalls.Load())
-	}
-}
-
-// TestDelete_TTY_PromptNameless_WhenConnectionMissingFromList: if the id is
-// missing from the list (stale state, race) the prompt is rendered without
-// the name. The user still has to confirm.
-func TestDelete_TTY_PromptNameless_WhenConnectionMissingFromList(t *testing.T) {
-	h := newDeleteHelper(t)
-	h.in.WriteString("y\n")
-
-	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
-			// Empty list — the connection is not visible.
-			_, _ = w.Write([]byte(`[]`))
-		case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
-			_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `"}`))
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	})
-
-	if err := h.run(`connection delete ` + validDeleteID + ` --format json`); err != nil {
-		t.Fatalf("run: %v", err)
-	}
-	// Prompt must include the id but not a quoted name (which would be
-	// misleading when we couldn't resolve the name).
-	if !strings.Contains(h.out.String(), "Delete connection") || !strings.Contains(h.out.String(), "("+validDeleteID+")") {
-		t.Fatalf("expected nameless prompt with id; got: %s", h.out.String())
-	}
-	if strings.Contains(h.out.String(), `Delete connection "`) {
-		t.Fatalf("expected nameless prompt (no quoted name) when list misses the id; got: %s", h.out.String())
-	}
-}
-
-// TestDelete_TTY_PromptNameless_WhenListErrors: if ListConnections errors we
-// still let the user delete by id alone — a flaky list endpoint shouldn't
-// block a delete the user clearly intends. The prompt falls back to nameless.
-func TestDelete_TTY_PromptNameless_WhenListErrors(t *testing.T) {
-	h := newDeleteHelper(t)
-	h.in.WriteString("y\n")
-
-	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/fastify/api/connections":
-			w.WriteHeader(http.StatusInternalServerError)
-		case r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID:
-			_, _ = w.Write([]byte(`{"id":"` + validDeleteID + `","name":"aura-prod"}`))
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	})
-
-	if err := h.run(`connection delete ` + validDeleteID + ` --format json`); err != nil {
-		t.Fatalf("run: %v", err)
-	}
-	if strings.Contains(h.out.String(), `Delete connection "`) {
-		t.Fatalf("expected nameless prompt (no quoted name) when list errors; got: %s", h.out.String())
-	}
-	if !strings.Contains(h.out.String(), "("+validDeleteID+")") {
-		t.Fatalf("expected id in prompt; got: %s", h.out.String())
 	}
 }
 
@@ -458,7 +363,7 @@ func TestDelete_TTY_PromptNameless_WhenListErrors(t *testing.T) {
 // any connection must surface a clear error via the shared transport.
 func TestDelete_UnknownUUID_Surfaces404(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
@@ -469,7 +374,7 @@ func TestDelete_UnknownUUID_Surfaces404(t *testing.T) {
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 	})
 
-	err := h.run(`connection delete ` + validDeleteID + ` --yes --format json`)
+	err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format json`)
 	if err == nil {
 		t.Fatalf("expected error on unknown UUID")
 	}
@@ -501,8 +406,7 @@ func TestDelete_Annotated_Write(t *testing.T) {
 	}
 }
 
-// TestDelete_Example_FlushLeft mirrors the create / update equivalents: every
-// new leaf carries a flush-left Example with ≥3 invocations.
+// TestDelete_Example_FlushLeft mirrors the create / update equivalents.
 func TestDelete_Example_FlushLeft(t *testing.T) {
 	cfg := clicfg.NewConfig(mustTestFs(t), "test", clicfg.GlobalScope)
 	parent := desktop.NewCmd(cfg)
@@ -535,7 +439,7 @@ func TestDelete_Example_FlushLeft(t *testing.T) {
 // reaches the client constructor seam.
 func TestDelete_PortFlagPropagates(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var gotPort int
 	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
@@ -543,7 +447,7 @@ func TestDelete_PortFlagPropagates(t *testing.T) {
 		return nil, desktopclient.UnreachableError()
 	}))
 
-	_ = h.run(`connection delete ` + validDeleteID + ` --yes --port 44231 --format json`)
+	_ = h.run(`connection delete ` + validDeleteID + ` --yes --force --port 44231 --format json`)
 	if gotPort != 44231 {
 		t.Fatalf("expected --port=44231 to propagate; got %d", gotPort)
 	}
@@ -553,12 +457,12 @@ func TestDelete_PortFlagPropagates(t *testing.T) {
 // canonical error mapping when Desktop is not running.
 func TestDelete_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newDeleteHelper(t)
-	t.Cleanup(connection.SetStdinIsTTYFnForTest(func() bool { return false }))
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))
 
-	err := h.run(`connection delete ` + validDeleteID + ` --yes --format json`)
+	err := h.run(`connection delete ` + validDeleteID + ` --yes --force --format json`)
 	if err == nil {
 		t.Fatalf("expected error when desktop is unreachable")
 	}
