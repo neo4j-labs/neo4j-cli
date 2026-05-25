@@ -97,8 +97,8 @@ func TestRemoveCredentialConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 	helper.SetCredentialsValue("aura.credentials", []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}})
 
 	err := helper.ExecuteCommandE("credential remove test --rw")
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 
 	helper.AssertCredentialsValue("aura.credentials", `[{"client-id":"testclientid","client-secret":"testclientsecret","name":"test"}]`)

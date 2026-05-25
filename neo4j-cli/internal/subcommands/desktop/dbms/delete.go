@@ -5,7 +5,6 @@ package dbms
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -46,10 +45,6 @@ neo4j-cli desktop dbms delete my-dbms-id --yes --force --format json --rw`,
 			}
 
 			if err := confirm.Require(cmd, id); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-					return nil
-				}
 				return err
 			}
 

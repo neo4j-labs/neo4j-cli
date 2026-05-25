@@ -393,8 +393,8 @@ func TestDelete_TTY_PromptNo_Cancels(t *testing.T) {
 			})
 
 			err := h.run(`connection delete ` + validDeleteID + ` --format json`)
-			if err != nil {
-				t.Fatalf("expected nil err on cancel; got: %v", err)
+			if !errors.Is(err, confirm.ErrCancelled) {
+				t.Fatalf("expected confirm.ErrCancelled on cancel; got: %v", err)
 			}
 			if deleteCalls.Load() != 0 {
 				t.Fatalf("expected zero DELETE calls on cancel; got %d", deleteCalls.Load())
@@ -422,8 +422,8 @@ func TestDelete_TTY_EmptyStdin_Cancels(t *testing.T) {
 	})
 
 	err := h.run(`connection delete ` + validDeleteID + ` --format json`)
-	if err != nil {
-		t.Fatalf("expected nil err on EOF cancel; got: %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on EOF cancel; got: %v", err)
 	}
 	if deleteCalls.Load() != 0 {
 		t.Fatalf("expected zero DELETE on EOF; got %d", deleteCalls.Load())

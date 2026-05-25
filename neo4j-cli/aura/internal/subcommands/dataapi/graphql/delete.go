@@ -4,7 +4,6 @@
 package graphql
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -40,10 +39,6 @@ neo4j-cli aura data-api graphql delete $(neo4j-cli aura data-api graphql list --
 			graphqlId := strings.TrimSpace(args[0])
 
 			if err := confirm.Require(cmd, graphqlId); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

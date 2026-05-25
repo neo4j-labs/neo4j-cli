@@ -4,6 +4,7 @@
 package customermanagedkey_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -279,8 +280,8 @@ func TestDeleteCustomerManagedKeyConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(1)
 	helper.AssertErrContainsStrings([]string{"cancelled."})

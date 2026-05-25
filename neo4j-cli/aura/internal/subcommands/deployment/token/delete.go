@@ -4,7 +4,6 @@
 package token
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -58,10 +57,6 @@ neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-0
 			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, deploymentId); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

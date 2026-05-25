@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/spf13/afero"
 )
@@ -120,6 +121,11 @@ func main() {
 	cfg.Events.Flush() // Send out any remaining events
 
 	if err != nil {
+		// Intercept confirm.ErrCancelled before render: cancellation is exit-0,
+		// not exit-1, and the helper already wrote "cancelled." to stderr.
+		if errors.Is(err, confirm.ErrCancelled) {
+			os.Exit(0)
+		}
 		format := resolveFormatForRender(os.Args[1:], cfg.Global.Format())
 		clierr.Render(err, os.Stdout, os.Stderr, format)
 		os.Exit(exitCodeFor(err))

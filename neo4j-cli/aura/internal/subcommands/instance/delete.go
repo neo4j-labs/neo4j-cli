@@ -4,7 +4,6 @@
 package instance
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -52,10 +51,6 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 			}
 
 			if err := confirm.Require(cmd, instanceID); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

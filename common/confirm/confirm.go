@@ -54,7 +54,9 @@ func Register(cmd *cobra.Command) {
 //   - both flags set ⇒ proceed (no prompt).
 //   - non-TTY with either flag missing ⇒ *clierr.CLIError (exit 2).
 //   - TTY with either flag missing ⇒ prompt; y/Y/yes proceeds, anything else
-//     returns ErrCancelled.
+//     writes "cancelled." to stderr, silences cobra's own error/usage output,
+//     and returns ErrCancelled. The top-level main intercepts ErrCancelled and
+//     exits 0 with no further output, so leaves can just `return err`.
 //
 // resourceID is interpolated into the prompt and error copy; pass "" when the
 // leaf has no positional argument and copy degrades to "this <type>".
@@ -87,12 +89,21 @@ func Require(cmd *cobra.Command, resourceID string) error {
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Delete %s? This action is irreversible. [y/N] ", target)
 	reader := bufio.NewReader(cmd.InOrStdin())
 	line, err := reader.ReadString('\n')
-	if err != nil && line == "" {
-		return ErrCancelled
+	if err == nil || line != "" {
+		answer := strings.ToLower(strings.TrimSpace(line))
+		if answer == "y" || answer == "yes" {
+			return nil
+		}
 	}
-	answer := strings.ToLower(strings.TrimSpace(line))
-	if answer == "y" || answer == "yes" {
-		return nil
-	}
+	return cancel(cmd)
+}
+
+// cancel narrates the cancellation to stderr, silences cobra's default
+// error/usage rendering for this command, and returns ErrCancelled. The
+// chokepoint in `neo4j-cli/main.go` matches ErrCancelled and exits 0.
+func cancel(cmd *cobra.Command) error {
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
 	return ErrCancelled
 }

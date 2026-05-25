@@ -11,7 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/neo4j-cli/app"
+	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -223,4 +227,59 @@ func TestResolveFormatForRender(t *testing.T) {
 			assert.Equal(t, tc.want, resolveFormatForRender(tc.args, tc.bound))
 		})
 	}
+}
+
+// TestConfirmCancellation_EndToEnd exercises the integration of the confirm
+// helper with the main.go chokepoint: drive a destructive leaf (`credential
+// aura-client remove`) with TTY=true and empty stdin so the prompt cancels,
+// then assert the bits the chokepoint relies on:
+//   - cmd.Execute returns confirm.ErrCancelled (so the main.go check fires).
+//   - exitCodeFor would map any leftover error to non-zero, but the main.go
+//     chokepoint short-circuits before exitCodeFor, exiting 0.
+//   - The helper wrote "cancelled." to stderr (no further output needed).
+//   - SilenceErrors is set on the leaf so cobra does NOT prepend "Error: ".
+//   - stdout is empty (no envelope, no narration).
+func TestConfirmCancellation_EndToEnd(t *testing.T) {
+	// Force TTY for the duration of this test so confirm.Require prompts.
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	fs, err := testfs.GetTestFs("{}", `{
+		"aura": {
+			"credentials": [
+				{"name": "work", "client-id": "id", "client-secret": "sec"}
+			],
+			"default-credential": "work"
+		}
+	}`)
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetIn(strings.NewReader("")) // empty stdin → immediate EOF → cancellation
+	cmd.SetArgs([]string{"credential", "aura-client", "remove", "work", "--rw"})
+
+	execErr := cmd.Execute()
+
+	require.Error(t, execErr)
+	require.True(t, errors.Is(execErr, confirm.ErrCancelled),
+		"cmd.Execute must return confirm.ErrCancelled so main.go's chokepoint can exit 0; got %v", execErr)
+
+	// main.go's chokepoint runs `os.Exit(0)` for this error class — verify the
+	// exitCodeFor mapping would otherwise produce non-zero (proves the
+	// chokepoint adds real behaviour rather than being a no-op).
+	assert.NotEqual(t, 0, exitCodeFor(execErr), "without the chokepoint exitCodeFor would map ErrCancelled to non-zero")
+
+	assert.Contains(t, stderr.String(), "cancelled.", "helper must narrate the cancellation to stderr")
+	assert.NotContains(t, stderr.String(), "Error:", "cobra's default 'Error:' prefix must be suppressed via SilenceErrors")
+	assert.Empty(t, stdout.String(), "stdout must stay empty on cancellation")
+
+	// The credential must still be present — cancellation aborts before any
+	// mutation.
+	cred, err := cfg.Credentials.Aura.Get("work")
+	require.NoError(t, err)
+	assert.Equal(t, "id", cred.ClientId)
 }

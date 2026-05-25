@@ -4,6 +4,7 @@
 package agent_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -150,8 +151,8 @@ func TestDeleteAgentConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("agent delete %s --organization-id=%s --project-id=%s --rw", agentId, organizationId, projectId))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(0)
 	helper.AssertErrContainsStrings([]string{"cancelled."})

@@ -4,6 +4,7 @@
 package allowedorigin_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -379,8 +380,8 @@ func TestRemoveAllowedOriginConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(1)
 	helper.AssertErrContainsStrings([]string{"cancelled."})

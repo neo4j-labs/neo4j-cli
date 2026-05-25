@@ -4,7 +4,6 @@
 package deployment
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -58,10 +57,6 @@ neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --yes
 			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, deploymentId); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

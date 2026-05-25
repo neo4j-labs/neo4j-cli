@@ -4,6 +4,7 @@
 package graphql_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -140,8 +141,8 @@ func TestDeleteGraphQLDataApiConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("data-api graphql delete --instance-id %s %s --rw", instanceId, dataApiId))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(0)
 	helper.AssertErrContainsStrings([]string{"cancelled."})

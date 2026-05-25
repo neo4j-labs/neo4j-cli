@@ -4,6 +4,7 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -322,8 +323,8 @@ func TestDeleteInstanceConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("instance delete %s --organization-id %s --project-id %s --rw", instanceId, testListOrgID, testListProjectID))
 
-	if err != nil {
-		t.Fatalf("expected nil (exit 0) on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(1) // pre-flight GET only
 	helper.AssertErrContainsStrings([]string{"cancelled."})

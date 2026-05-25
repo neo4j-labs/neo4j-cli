@@ -4,8 +4,6 @@
 package credential
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -33,10 +31,6 @@ neo4j-cli aura credential remove my-creds --rw --yes --force && neo4j-cli aura c
 		RunE: func(cmd *cobra.Command, args []string) error {
 			credName := strings.TrimSpace(args[0])
 			if err := confirm.Require(cmd, credName); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 			return cfg.Credentials.Aura.Remove(credName)

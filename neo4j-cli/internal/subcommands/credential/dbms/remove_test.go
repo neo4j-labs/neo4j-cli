@@ -142,8 +142,8 @@ func TestDbmsCredentialRemoveConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 	})
 	h.setStdin("N\n")
 
-	if err := h.executeCommand("remove mydb"); err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if err := h.executeCommand("remove mydb"); !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	// Credential is unchanged on cancellation.
 	h.assertCredentialsValue("dbms.credentials", `[{"database-name":"neo4j","name":"mydb","password":"secret","uri":"bolt://localhost:7687","username":"neo4j"}]`)

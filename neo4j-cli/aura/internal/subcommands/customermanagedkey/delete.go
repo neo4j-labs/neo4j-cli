@@ -4,7 +4,6 @@
 package customermanagedkey
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -50,10 +49,6 @@ neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 
 			}
 
 			if err := confirm.Require(cmd, cmkID); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

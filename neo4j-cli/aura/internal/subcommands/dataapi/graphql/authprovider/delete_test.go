@@ -4,6 +4,7 @@
 package authprovider_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -150,8 +151,8 @@ func TestDeleteAuthProviderConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 
 	err := helper.ExecuteCommandE(fmt.Sprintf("data-api graphql auth-provider delete %s --instance-id %s --data-api-id %s --rw", authProviderId, instanceId, dataApiId))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(0)
 	helper.AssertErrContainsStrings([]string{"cancelled."})

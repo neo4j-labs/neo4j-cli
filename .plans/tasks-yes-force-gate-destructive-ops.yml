@@ -243,7 +243,7 @@ tasks:
           `ErrCancelled → exit 0` integration without going through every leaf.
 
       Bundle regen NOT required.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -253,7 +253,7 @@ tasks:
       - "Zero leaves contain `//nolint:errcheck // narration to stderr` annotations tied to the cancellation print."
       - "An integration-level test asserts that a cancelled prompt yields exit 0 with `cancelled.` on stderr and no `Error:` prefix from cobra."
       - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
-    completed_at: null
+    completed_at: 2026-05-25T13:00:00Z
 
   - id: task-009
     title: "Shared confirm-gate test helper (review finding #3)"

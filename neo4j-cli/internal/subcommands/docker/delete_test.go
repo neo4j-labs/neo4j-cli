@@ -153,7 +153,8 @@ func TestDelete_TTY_No_Cancels(t *testing.T) {
 		"n\n",
 	)
 
-	require.NoError(t, s.cmd.run("dev"))
+	runErr := s.cmd.run("dev")
+	require.ErrorIs(t, runErr, confirm.ErrCancelled)
 	assert.Empty(t, s.fake.RemoveForceCalls, "RemoveForce must not fire on cancel")
 	_, err := s.cfg.Credentials.Dbms.Get("dev")
 	require.NoError(t, err, "credential must remain on cancel")
@@ -169,7 +170,7 @@ func TestDelete_TTY_EmptyLine_DefaultsToCancel(t *testing.T) {
 		"\n",
 	)
 
-	require.NoError(t, s.cmd.run("dev"))
+	require.ErrorIs(t, s.cmd.run("dev"), confirm.ErrCancelled)
 	assert.Empty(t, s.fake.RemoveForceCalls)
 	assert.Contains(t, s.cmd.err.String(), "cancelled.")
 }

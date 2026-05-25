@@ -4,9 +4,6 @@
 package embed
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/spf13/cobra"
@@ -32,10 +29,6 @@ neo4j-cli credential embed remove hf-bge --rw --yes --force`,
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := confirm.Require(cmd, args[0]); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 			return cfg.Credentials.Embed.Remove(args[0])

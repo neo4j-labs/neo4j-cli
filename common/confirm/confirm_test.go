@@ -48,6 +48,7 @@ func TestRequire(t *testing.T) {
 		errContains       string
 		expectUsageExit2  bool
 		expectPromptWrite bool
+		expectCancelled   bool
 	}
 
 	tests := []struct {
@@ -115,6 +116,7 @@ func TestRequire(t *testing.T) {
 			want: want{
 				errSentinel:       confirm.ErrCancelled,
 				expectPromptWrite: true,
+				expectCancelled:   true,
 			},
 		},
 		{
@@ -124,6 +126,7 @@ func TestRequire(t *testing.T) {
 			want: want{
 				errSentinel:       confirm.ErrCancelled,
 				expectPromptWrite: true,
+				expectCancelled:   true,
 			},
 		},
 		{
@@ -133,6 +136,7 @@ func TestRequire(t *testing.T) {
 			want: want{
 				errSentinel:       confirm.ErrCancelled,
 				expectPromptWrite: true,
+				expectCancelled:   true,
 			},
 		},
 		{
@@ -175,12 +179,29 @@ func TestRequire(t *testing.T) {
 				t.Fatalf("unexpected err: %v", err)
 			}
 
-			wroteSomething := errOut.Len() > 0
+			stderr := errOut.String()
+			wroteSomething := stderr != ""
 			if tc.want.expectPromptWrite && !wroteSomething {
 				t.Fatalf("expected prompt written to stderr; got nothing")
 			}
 			if !tc.want.expectPromptWrite && wroteSomething {
-				t.Fatalf("expected NO prompt; stderr=%q", errOut.String())
+				t.Fatalf("expected NO prompt; stderr=%q", stderr)
+			}
+
+			if tc.want.expectCancelled {
+				if !strings.HasSuffix(stderr, "cancelled.\n") {
+					t.Fatalf("stderr=%q, want it to end with %q", stderr, "cancelled.\n")
+				}
+				if !leaf.SilenceErrors {
+					t.Fatalf("SilenceErrors = false, want true on cancellation")
+				}
+				if !leaf.SilenceUsage {
+					t.Fatalf("SilenceUsage = false, want true on cancellation")
+				}
+			} else {
+				if strings.Contains(stderr, "cancelled.") {
+					t.Fatalf("stderr=%q, did not expect cancelled. on non-cancelled path", stderr)
+				}
 			}
 		})
 	}

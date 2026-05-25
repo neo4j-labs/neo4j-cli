@@ -5,7 +5,6 @@ package docker
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -75,10 +74,6 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 
 			cmd.SilenceUsage = true
 			if err := confirm.Require(cmd, name); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-					return nil
-				}
 				return err
 			}
 

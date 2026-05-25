@@ -5,7 +5,6 @@ package connection
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -60,10 +59,6 @@ neo4j-cli desktop connection delete f4e2f3c0-1111-2222-3333-444455556666 --yes -
 			}
 
 			if err := confirm.Require(cmd, id); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-					return nil
-				}
 				return err
 			}
 

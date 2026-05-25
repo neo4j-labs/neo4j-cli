@@ -4,7 +4,6 @@
 package authprovider
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,10 +42,6 @@ neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api g
 			authProviderId := strings.TrimSpace(args[0])
 
 			if err := confirm.Require(cmd, authProviderId); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

@@ -375,8 +375,8 @@ func TestCredentialRemoveAuraClientConfirmGate_TTYAnswerN_Cancels(t *testing.T) 
 	})
 	h.setStdin("N\n")
 
-	if err := h.executeCommand("aura-client remove --rw test"); err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if err := h.executeCommand("aura-client remove --rw test"); !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	// Credential is unchanged on cancellation.
 	h.assertCredentialsValue("aura.credentials", `[{"client-id":"testclientid","client-secret":"testclientsecret","name":"test"}]`)

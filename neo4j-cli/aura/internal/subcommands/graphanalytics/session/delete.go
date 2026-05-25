@@ -4,7 +4,6 @@
 package session
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -48,10 +47,6 @@ Destructive: requires --yes --force (or a y answer at the TTY prompt) when invok
 			}
 
 			if err := confirm.Require(cmd, sessionID); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

@@ -4,7 +4,6 @@
 package allowedorigin
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -77,10 +76,6 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.ex
 			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, originToRemove); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 

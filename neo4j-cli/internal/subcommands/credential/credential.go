@@ -4,9 +4,6 @@
 package credential
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
@@ -214,10 +211,6 @@ neo4j-cli credential aura-client remove old-tenant --rw --yes --force`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := confirm.Require(cmd, args[0]); err != nil {
-				if errors.Is(err, confirm.ErrCancelled) {
-					fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
-					return nil
-				}
 				return err
 			}
 			return cfg.Credentials.Aura.Remove(args[0])

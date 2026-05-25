@@ -141,8 +141,8 @@ func TestEmbedCredentialRemoveConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 	})
 	h.setStdin("N\n")
 
-	if err := h.executeCommand("remove first"); err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if err := h.executeCommand("remove first"); !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	h.assertCredentialsValue("embed.credentials", `[{"api-key":"k1","base-url":"u","dimensions":0,"model":"m","name":"first","provider":"openai"}]`)
 	h.assertErr("cancelled.")

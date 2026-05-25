@@ -4,6 +4,7 @@
 package deployment_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -215,8 +216,8 @@ func TestDeleteDeploymentConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
 	helper.SetConfigValue("flag.aura-beta", true)
 	err := helper.ExecuteCommandE(fmt.Sprintf("deployment delete %s --organization-id %s --project-id %s --rw", deploymentId, organizationId, projectId))
 
-	if err != nil {
-		t.Fatalf("expected nil on cancel, got %v", err)
+	if !errors.Is(err, confirm.ErrCancelled) {
+		t.Fatalf("expected confirm.ErrCancelled on cancel, got %v", err)
 	}
 	mockHandler.AssertCalledTimes(0)
 	helper.AssertErrContainsStrings([]string{"cancelled."})
