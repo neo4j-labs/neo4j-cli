@@ -69,7 +69,7 @@ tasks:
       (references derived from cobra Long/Short/Example are unaffected because
       this task does not touch any command's help text). Commit the regenerated
       bundle in the same commit as the additions change.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -77,7 +77,7 @@ tasks:
       - "Only `bundle/query-additions.md` is modified in the diff (no spurious references/* changes)"
       - "`make generate-check` passes after the regen"
       - "Bundle changes committed alongside the source additions change"
-    completed_at: null
+    completed_at: 2026-05-25T08:12:30Z
 
   - id: task-004
     title: "Add Patch changelog entry for CLI-177"
