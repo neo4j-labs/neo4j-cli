@@ -96,7 +96,7 @@ tasks:
       Aura leaves. Extend `Long:` per REQ-F-030 and `Example:` per REQ-F-031.
       Add the four (TTY × flag-state) gating test cases to each colocated
       `*_test.go`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -104,7 +104,7 @@ tasks:
       - "Each leaf has new test cases for the four gating paths; `go test ./neo4j-cli/internal/subcommands/credential/... ./neo4j-cli/aura/internal/subcommands/credential/...` is green."
       - "Each leaf's `Example:` block satisfies the ≥3-examples invariant and includes one `--yes --force` invocation."
       - "Cancelled TTY prompt makes no change to the credentials file and returns exit 0 with 'cancelled.' on stderr."
-    completed_at: null
+    completed_at: 2026-05-25T11:10:00Z
 
   - id: task-005
     title: "Regenerate skill bundle for new --yes / --force flags"

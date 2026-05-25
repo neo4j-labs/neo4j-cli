@@ -4,7 +4,12 @@
 package embed_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
+
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 )
 
 func TestEmbedCredentialRemove(t *testing.T) {
@@ -24,7 +29,7 @@ func TestEmbedCredentialRemove(t *testing.T) {
 				{"name": "second", "provider": "ollama", "model": "m2", "base-url": "u2", "dimensions": 0, "api-key": ""},
 			},
 			initialDefault:  "first",
-			command:         "remove second",
+			command:         "remove second --yes --force",
 			wantCredentials: `[{"name":"first","provider":"openai","model":"m","base-url":"u","dimensions":0,"api-key":"k1"}]`,
 			wantDefault:     "first",
 		},
@@ -35,7 +40,7 @@ func TestEmbedCredentialRemove(t *testing.T) {
 				{"name": "second", "provider": "ollama", "model": "m2", "base-url": "u2", "dimensions": 0, "api-key": ""},
 			},
 			initialDefault:  "first",
-			command:         "remove first",
+			command:         "remove first --yes --force",
 			wantCredentials: `[{"name":"second","provider":"ollama","model":"m2","base-url":"u2","dimensions":0,"api-key":""}]`,
 			wantDefault:     "",
 		},
@@ -45,13 +50,15 @@ func TestEmbedCredentialRemove(t *testing.T) {
 				{"name": "first", "provider": "openai", "model": "m", "base-url": "u", "dimensions": 0, "api-key": "k1"},
 			},
 			initialDefault: "first",
-			command:        "remove nonexistent",
+			command:        "remove nonexistent --yes --force",
 			wantErr:        "could not find credential with name nonexistent to remove",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
 			h := newEmbedTestHelper(t)
 			h.setCredentialsValue("embed.credentials", tc.initialCreds)
 			if tc.initialDefault != "" {
@@ -70,4 +77,73 @@ func TestEmbedCredentialRemove(t *testing.T) {
 			h.assertCredentialsValue("embed.default-credential", tc.wantDefault)
 		})
 	}
+}
+
+func TestEmbedCredentialRemoveConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	h := newEmbedTestHelper(t)
+	h.setCredentialsValue("embed.credentials", []map[string]interface{}{
+		{"name": "first", "provider": "openai", "model": "m", "base-url": "u", "dimensions": 0, "api-key": "k1"},
+	})
+
+	err := h.executeCommand("remove first")
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
+	}
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) || ce.Code != 2 {
+		t.Fatalf("err = %v, want *clierr.CLIError with exit 2", err)
+	}
+	h.assertCredentialsValue("embed.credentials", `[{"api-key":"k1","base-url":"u","dimensions":0,"model":"m","name":"first","provider":"openai"}]`)
+}
+
+func TestEmbedCredentialRemoveConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	h := newEmbedTestHelper(t)
+	h.setCredentialsValue("embed.credentials", []map[string]interface{}{
+		{"name": "first", "provider": "openai", "model": "m", "base-url": "u", "dimensions": 0, "api-key": "k1"},
+	})
+
+	if err := h.executeCommand("remove first --yes --force"); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	h.assertCredentialsValue("embed.credentials", `[]`)
+}
+
+func TestEmbedCredentialRemoveConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	h := newEmbedTestHelper(t)
+	h.setCredentialsValue("embed.credentials", []map[string]interface{}{
+		{"name": "first", "provider": "openai", "model": "m", "base-url": "u", "dimensions": 0, "api-key": "k1"},
+	})
+	h.setStdin("y\n")
+
+	if err := h.executeCommand("remove first"); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	h.assertCredentialsValue("embed.credentials", `[]`)
+	h.assertErr("Delete embed")
+}
+
+func TestEmbedCredentialRemoveConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	h := newEmbedTestHelper(t)
+	h.setCredentialsValue("embed.credentials", []map[string]interface{}{
+		{"name": "first", "provider": "openai", "model": "m", "base-url": "u", "dimensions": 0, "api-key": "k1"},
+	})
+	h.setStdin("N\n")
+
+	if err := h.executeCommand("remove first"); err != nil {
+		t.Fatalf("expected nil on cancel, got %v", err)
+	}
+	h.assertCredentialsValue("embed.credentials", `[{"api-key":"k1","base-url":"u","dimensions":0,"model":"m","name":"first","provider":"openai"}]`)
+	h.assertErr("cancelled.")
 }

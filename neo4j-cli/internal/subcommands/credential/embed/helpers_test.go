@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
@@ -28,6 +29,7 @@ type embedTestHelper struct {
 	out         *bytes.Buffer
 	err         *bytes.Buffer
 	credentials string
+	stdin       string
 	fs          afero.Fs
 	t           *testing.T
 }
@@ -69,8 +71,13 @@ func (h *embedTestHelper) executeCommand(command string) error {
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
+	cmd.SetIn(strings.NewReader(h.stdin))
 
 	return cmd.Execute()
+}
+
+func (h *embedTestHelper) setStdin(in string) {
+	h.stdin = in
 }
 
 func (h *embedTestHelper) assertCredentialsValue(key string, expected string) {
