@@ -325,11 +325,11 @@ tasks:
 
       This is a small cleanup pass; no behaviour change beyond the
       cancellation-path tidying already covered by task-008.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
       - "Each destructive leaf has at most one `cmd.SilenceUsage = true` statement, placed as the first line of `RunE` when it is present at all."
       - "No leaf relies on cobra's default usage printing for the confirm-gate path (verified by an integration test or by manual review documented in the progress file)."
       - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
-    completed_at: null
+    completed_at: 2026-05-25T10:25:27Z

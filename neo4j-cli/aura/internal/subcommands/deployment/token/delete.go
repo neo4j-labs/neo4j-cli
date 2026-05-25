@@ -49,12 +49,12 @@ neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-0
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, deploymentId); err != nil {
 				return err

@@ -50,6 +50,8 @@ neo4j-cli docker delete dev --yes --force --rw
 neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			name := args[0]
 			client := clientFactory()
 			ctx := cmd.Context()
@@ -61,18 +63,15 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 			// verbatim so the operator can fix the real cause.
 			container, err := client.Inspect(ctx, name)
 			if err != nil {
-				cmd.SilenceUsage = true
 				if errors.Is(err, ErrNotFound) {
 					return unknownContainerError(name)
 				}
 				return err
 			}
 			if !container.Managed {
-				cmd.SilenceUsage = true
 				return unknownContainerError(name)
 			}
 
-			cmd.SilenceUsage = true
 			if err := confirm.Require(cmd, name); err != nil {
 				return err
 			}

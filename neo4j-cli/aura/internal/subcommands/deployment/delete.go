@@ -47,14 +47,14 @@ neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --yes
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
 			if err != nil {
 				return err
 			}
 
 			deploymentId := strings.TrimSpace(args[0])
-
-			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, deploymentId); err != nil {
 				return err

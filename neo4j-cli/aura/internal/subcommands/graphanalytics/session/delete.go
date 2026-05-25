@@ -34,9 +34,10 @@ neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-0000000000
 
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			sessionID := strings.TrimSpace(args[0])
 
-			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err

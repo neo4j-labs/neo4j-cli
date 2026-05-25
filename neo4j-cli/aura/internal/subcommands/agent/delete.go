@@ -45,14 +45,14 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
 			if err != nil {
 				return err
 			}
 
 			agentId := args[0]
-
-			cmd.SilenceUsage = true
 
 			if err := confirm.Require(cmd, agentId); err != nil {
 				return err
