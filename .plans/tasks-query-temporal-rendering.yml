@@ -1,0 +1,115 @@
+feature: query-temporal-rendering
+prd: ./prd-query-temporal-rendering.md
+created_at: 2026-05-25T09:41:32Z
+updated_at: 2026-05-25T09:41:32Z
+
+tasks:
+  - id: task-001
+    title: "Add coerceDriverValue helper + table-driven unit tests"
+    description: |
+      Create `neo4j-cli/query/coerce.go` with a single recursive helper
+      `coerceDriverValue(v any) any` that normalises driver-native values which
+      don't round-trip through `encoding/json`. The switch covers
+      `dbtype.Date`, `dbtype.LocalDateTime`, `dbtype.LocalTime`, `dbtype.Time`,
+      `dbtype.Duration` (return `.String()`), native `time.Time` (return
+      `t.Format(time.RFC3339Nano)`), `[]any` and `map[string]any` (recurse
+      in-place), and `dbtype.Node` / `dbtype.Relationship` / `dbtype.Path`
+      (recurse into the shared `Props` map; for `Path`, iterate `Nodes` and
+      `Relationships`). All other types pass through unchanged. Mutating the
+      shared `Props` map in place is safe because driver records aren't reused
+      after `result.Collect`. File MUST start with the Neo4j copyright header
+      (see AGENTS.md license-check note).
+
+      Add `neo4j-cli/query/coerce_test.go` with table-driven tests in the same
+      idiom as existing `output_test.go`. Required cases: each of the five
+      `dbtype` temporal types → expected ISO-8601 string, `time.Time` →
+      RFC3339Nano, `[]any` containing a temporal, `map[string]any` containing
+      a temporal, `dbtype.Node` / `dbtype.Relationship` / `dbtype.Path` with
+      temporal `Props`, scalar passthroughs (`int64`, `float64`, `string`,
+      `bool`, `nil`, an unknown struct).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli/query/coerce.go` exists with Neo4j copyright header and a single exported-or-package-private `coerceDriverValue(v any) any` function"
+      - "Switch handles all five `dbtype` temporal types, native `time.Time`, `[]any`, `map[string]any`, `dbtype.Node`, `dbtype.Relationship`, `dbtype.Path`"
+      - "Default branch returns the input unchanged"
+      - "`neo4j-cli/query/coerce_test.go` is table-driven, mirrors `output_test.go` style, and covers every type in the switch plus passthrough cases"
+      - "`go test ./neo4j-cli/query/...` green"
+      - "`make fmt-check` and `make lint` clean"
+      - "`make license-check` clean"
+    completed_at: null
+
+  - id: task-002
+    title: "Wire coerceDriverValue into the query response builder"
+    description: |
+      In `neo4j-cli/query/connect.go` inside `runStatementResponseImpl`,
+      replace the bulk `copy(row, rec.Values)` at lines 573-577 with a per-cell
+      coerce loop:
+
+      ```go
+      for _, rec := range records {
+          row := make([]any, len(rec.Values))
+          for i, v := range rec.Values {
+              row[i] = coerceDriverValue(v)
+          }
+          resp.Data.Values = append(resp.Data.Values, row)
+      }
+      ```
+
+      `formatCell` in `output.go` is NOT changed — coerced strings flow through
+      its existing `case string` branch. Both `--format json` (via
+      `renderResult.MarshalJSON` → `json.Marshal(rows)`) and `--format table`
+      (via `renderResult.AsArray` → `formatCell`) read from `resp.Data.Values`,
+      so this single seam fixes both formats.
+
+      Verify with a quick build (`make build`) that the package still compiles
+      and `go test ./neo4j-cli/query/...` stays green.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`copy(row, rec.Values)` is gone in `runStatementResponseImpl`"
+      - "Per-cell loop calls `coerceDriverValue` on each value before appending the row"
+      - "`output.go` `formatCell` is unchanged"
+      - "`go test ./neo4j-cli/query/...` green"
+      - "`make build` succeeds"
+      - "`make fmt-check` and `make lint` clean"
+    completed_at: null
+
+  - id: task-003
+    title: "Lock string-passthrough contract in output_test.go and add changelog entry"
+    description: |
+      Extend the existing table-driven tests in `neo4j-cli/query/output_test.go`
+      with a case that feeds an ISO-8601 string row through `rowsFromValues` +
+      `renderResult.MarshalJSON` (asserting `"d":"2026-05-25"`) and through
+      `renderResult.AsArray` + `formatCell` (asserting the cell renders as
+      `2026-05-25` flush, NO surrounding quotes, NO `{}`). This locks the
+      contract that `formatCell` passes already-coerced strings through
+      untouched, so future refactors don't regress the fix.
+
+      Add a `changie` Patch entry under `.changes/unreleased/`:
+
+      ```
+      changie new --projects neo4j-cli --kind Patch --body \
+        "Render temporal column values (Date, DateTime, Duration, ...) as ISO-8601 strings in query JSON and table output instead of empty {}."
+      ```
+
+      If `changie` is not installed locally, hand-author a YAML file per
+      AGENTS.md "Changie Notes" (`.changes/unreleased/neo4j-cli-Patch-<ts>.yaml`
+      with `project / kind / body / time` fields).
+
+      Final gate run before marking complete: `make test`, `make fmt-check`,
+      `make lint`, `make generate-check`, `make license-check` — all clean.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`output_test.go` has a case asserting JSON renders `\"d\":\"2026-05-25\"` for an ISO-8601 string row"
+      - "`output_test.go` has a case asserting table `formatCell` renders the ISO string flush (no quotes, no braces)"
+      - "Changelog entry exists at `.changes/unreleased/neo4j-cli-Patch-*.yaml` with the specified body"
+      - "`make test` green"
+      - "`make fmt-check` clean"
+      - "`make lint` clean"
+      - "`make generate-check` clean (no skill-bundle drift)"
+      - "`make license-check` clean"
+    completed_at: null
