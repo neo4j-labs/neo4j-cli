@@ -5,3 +5,7 @@ Files: +neo4j-cli/query/coerce.go, +neo4j-cli/query/coerce_test.go
 ## task-002 — 2026-05-25T10:05:00Z
 Replaced bulk copy(row, rec.Values) in runStatementResponseImpl with a per-cell coerceDriverValue loop so JSON and table renderers receive normalised temporal/graph values.
 Files: ~neo4j-cli/query/connect.go
+
+## task-003 — 2026-05-25T11:58:00Z
+Locked the string-passthrough contract in output_test.go with 3 new tests (formatCell ISO-8601 cases, JSON envelope row, table cell row) and added a Patch changelog entry for the temporal-rendering fix.
+Files: ~neo4j-cli/query/output_test.go, +.changes/unreleased/neo4j-cli-Patch-20260525-115602.yaml

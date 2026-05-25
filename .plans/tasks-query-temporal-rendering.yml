@@ -100,7 +100,7 @@ tasks:
 
       Final gate run before marking complete: `make test`, `make fmt-check`,
       `make lint`, `make generate-check`, `make license-check` — all clean.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -112,4 +112,4 @@ tasks:
       - "`make lint` clean"
       - "`make generate-check` clean (no skill-bundle drift)"
       - "`make license-check` clean"
-    completed_at: null
+    completed_at: 2026-05-25T11:58:00Z

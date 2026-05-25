@@ -188,6 +188,61 @@ func TestRenderRows_JSON(t *testing.T) {
 	}
 }
 
+// TestFormatCell_ISO8601StringPassthrough locks the contract that
+// coerceDriverValue-emitted ISO-8601 strings flow through formatCell's string
+// branch unchanged — no surrounding quotes, no JSON braces. A regression here
+// would re-introduce the empty-{} rendering for temporal columns.
+func TestFormatCell_ISO8601StringPassthrough(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+	}{
+		{name: "Date", in: "2026-05-25"},
+		{name: "LocalDateTime", in: "2026-05-25T10:30:00"},
+		{name: "LocalTime", in: "10:30:00"},
+		{name: "Time", in: "10:30:00Z"},
+		{name: "Duration", in: "P1Y2M3DT4H5M6S"},
+		{name: "RFC3339", in: "2026-05-25T10:30:00Z"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := formatCell(tc.in)
+			assert.Equal(t, tc.in, got, "ISO string must pass through formatCell unchanged")
+			assert.NotContains(t, got, `"`, "no surrounding quotes")
+			assert.NotContains(t, got, "{", "no JSON braces")
+			assert.NotContains(t, got, "}", "no JSON braces")
+		})
+	}
+}
+
+// TestRenderRows_JSON_TemporalStringRow asserts that an ISO-8601 string row
+// renders as a bare JSON string under the column key, confirming the
+// MarshalJSON path emits coerced temporals as strings, not {}.
+func TestRenderRows_JSON_TemporalStringRow(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "json")
+	renderRows(cmd, cfg, []string{"d"}, []map[string]any{{"d": "2026-05-25"}}, false, 0)
+
+	out := stdout.String()
+	var got decodedResult
+	require.NoError(t, json.Unmarshal([]byte(out), &got), "output must be valid JSON envelope; got: %s", out)
+	require.Len(t, got.Rows, 1)
+	assert.Equal(t, "2026-05-25", got.Rows[0]["d"], "temporal string must serialise as a JSON string, not {} or other type")
+	assert.Contains(t, out, `"d": "2026-05-25"`, "raw JSON must contain the key:value pair as a string (tab-indented format)")
+	assert.NotContains(t, out, `"d": {}`, "must not render as empty JSON object")
+}
+
+// TestRenderRows_Table_TemporalStringRow asserts that an ISO-8601 string row
+// renders flush in the table cell — no surrounding quotes, no JSON braces.
+func TestRenderRows_Table_TemporalStringRow(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "table")
+	renderRows(cmd, cfg, []string{"d"}, []map[string]any{{"d": "2026-05-25"}}, false, 0)
+
+	out := stdout.String()
+	assert.Contains(t, out, "2026-05-25", "table cell must contain the ISO string flush; got: %s", out)
+	assert.NotContains(t, out, `"2026-05-25"`, "table cell must not wrap the ISO string in quotes")
+	assert.NotContains(t, out, "{}", "table cell must not render as empty JSON object")
+}
+
 func TestRenderRows_JSON_PreservesColumnOrder(t *testing.T) {
 	cmd, cfg, stdout := newRenderCmd(t, "json")
 	renderRows(cmd, cfg, []string{"z", "a", "m"}, []map[string]any{
