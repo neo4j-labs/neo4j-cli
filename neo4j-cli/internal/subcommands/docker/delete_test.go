@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,14 +78,12 @@ func newDeleteSetup(t *testing.T, containers map[string]Container, creds map[str
 	}
 }
 
-// withStdinIsTerminal swaps the stdinIsTerminal package-level seam so tests
-// can deterministically pick the TTY / non-TTY branch without standing up
-// a real PTY. Restored on cleanup.
+// withStdinIsTerminal swaps the confirm package's TTY detector so tests can
+// deterministically pick the TTY / non-TTY branch without standing up a real
+// PTY. Restored on cleanup.
 func withStdinIsTerminal(t *testing.T, isTTY bool) {
 	t.Helper()
-	orig := stdinIsTerminal
-	stdinIsTerminal = func() bool { return isTTY }
-	t.Cleanup(func() { stdinIsTerminal = orig })
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return isTTY })
 }
 
 func managedContainerForDelete(name string) Container {
@@ -115,7 +115,7 @@ func TestDelete_TTY_Yes_RemovesContainerAndCredential(t *testing.T) {
 	assert.Equal(t, "dev", s.fake.RemoveForceCalls[0])
 	_, err := s.cfg.Credentials.Dbms.Get("dev")
 	require.Error(t, err, "credential should have been removed")
-	assert.Contains(t, s.cmd.err.String(), `Delete container dev and its dbms credential? [y/N]`)
+	assert.Contains(t, s.cmd.err.String(), `Delete docker "dev"?`)
 }
 
 func TestDelete_TTY_YesUppercase_Confirms(t *testing.T) {
@@ -174,9 +174,47 @@ func TestDelete_TTY_EmptyLine_DefaultsToCancel(t *testing.T) {
 	assert.Contains(t, s.cmd.err.String(), "cancelled.")
 }
 
-func TestDelete_NonTTY_NoForce_UsageError(t *testing.T) {
-	// REQ-F-052: scripts / piped callers must pass --force; without it the
-	// leaf surfaces a usage error and nothing is touched.
+// Deliberate back-compat break: `docker delete --force` (non-TTY) used to
+// proceed; the shared gate now requires BOTH --yes and --force.
+func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
+	withStdinIsTerminal(t, false)
+	s := newDeleteSetup(t,
+		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]string{"dev": "secret"},
+		"",
+	)
+
+	err := s.cmd.run("dev --force")
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %v", err)
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, err.Error(), "pass both --yes and --force")
+	assert.Empty(t, s.fake.RemoveForceCalls)
+}
+
+// Deliberate back-compat break: `docker delete --yes` (non-TTY) used to be
+// unsupported (only --force existed); the shared gate now requires BOTH flags.
+func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
+	withStdinIsTerminal(t, false)
+	s := newDeleteSetup(t,
+		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]string{"dev": "secret"},
+		"",
+	)
+
+	err := s.cmd.run("dev --yes")
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %v", err)
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, err.Error(), "pass both --yes and --force")
+	assert.Empty(t, s.fake.RemoveForceCalls)
+}
+
+func TestDelete_NonTTY_NeitherFlag_Exit2(t *testing.T) {
+	// Scripts / piped callers must pass both --yes and --force; without them
+	// the leaf surfaces a usage error and nothing is touched.
 	withStdinIsTerminal(t, false)
 	s := newDeleteSetup(t,
 		map[string]Container{"dev": managedContainerForDelete("dev")},
@@ -186,31 +224,18 @@ func TestDelete_NonTTY_NoForce_UsageError(t *testing.T) {
 
 	err := s.cmd.run("dev")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "non-TTY caller must pass --force to confirm deletion")
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, err.Error(), "pass both --yes and --force")
 	assert.Empty(t, s.fake.RemoveForceCalls)
 	_, getErr := s.cfg.Credentials.Dbms.Get("dev")
-	require.NoError(t, getErr, "credential must remain on non-TTY without --force")
+	require.NoError(t, getErr, "credential must remain on non-TTY without flags")
 }
 
-func TestDelete_Force_TTY_SkipsPromptAndRemoves(t *testing.T) {
-	// --force on a TTY skips the prompt entirely; nothing is read from stdin,
-	// no prompt is written to stderr, both container and credential go away.
-	withStdinIsTerminal(t, true)
-	s := newDeleteSetup(t,
-		map[string]Container{"dev": managedContainerForDelete("dev")},
-		map[string]string{"dev": "secret"},
-		"", // stdin must not be read at all
-	)
-
-	require.NoError(t, s.cmd.run("dev --force"))
-	require.Len(t, s.fake.RemoveForceCalls, 1)
-	_, err := s.cfg.Credentials.Dbms.Get("dev")
-	require.Error(t, err)
-	assert.NotContains(t, s.cmd.err.String(), "Delete container")
-}
-
-func TestDelete_Force_NonTTY_SkipsPromptAndRemoves(t *testing.T) {
-	// --force on a non-TTY (the script path) also skips the prompt.
+func TestDelete_NonTTY_BothFlags_Proceeds(t *testing.T) {
+	// --yes --force on a non-TTY skips the prompt entirely; both container
+	// and credential go away.
 	withStdinIsTerminal(t, false)
 	s := newDeleteSetup(t,
 		map[string]Container{"dev": managedContainerForDelete("dev")},
@@ -218,10 +243,27 @@ func TestDelete_Force_NonTTY_SkipsPromptAndRemoves(t *testing.T) {
 		"",
 	)
 
-	require.NoError(t, s.cmd.run("dev --force"))
+	require.NoError(t, s.cmd.run("dev --yes --force"))
 	require.Len(t, s.fake.RemoveForceCalls, 1)
 	_, err := s.cfg.Credentials.Dbms.Get("dev")
 	require.Error(t, err)
+}
+
+func TestDelete_TTY_BothFlags_SkipsPromptAndRemoves(t *testing.T) {
+	// --yes --force on a TTY also skips the prompt; nothing is read from
+	// stdin, no prompt is written to stderr.
+	withStdinIsTerminal(t, true)
+	s := newDeleteSetup(t,
+		map[string]Container{"dev": managedContainerForDelete("dev")},
+		map[string]string{"dev": "secret"},
+		"", // stdin must not be read at all
+	)
+
+	require.NoError(t, s.cmd.run("dev --yes --force"))
+	require.Len(t, s.fake.RemoveForceCalls, 1)
+	_, err := s.cfg.Credentials.Dbms.Get("dev")
+	require.Error(t, err)
+	assert.NotContains(t, s.cmd.err.String(), "Delete docker")
 }
 
 func TestDelete_NonManagedContainer_UnknownError(t *testing.T) {
@@ -242,7 +284,7 @@ func TestDelete_NonManagedContainer_UnknownError(t *testing.T) {
 		"y\n",
 	)
 
-	err := s.cmd.run("someones-postgres --force")
+	err := s.cmd.run("someones-postgres --yes --force")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `no managed container named "someones-postgres"`)
 	assert.Contains(t, err.Error(), "neo4j-cli docker list")
@@ -254,7 +296,7 @@ func TestDelete_MissingContainer_UnknownError(t *testing.T) {
 	withStdinIsTerminal(t, true)
 	s := newDeleteSetup(t, nil, nil, "y\n")
 
-	err := s.cmd.run("ghost --force")
+	err := s.cmd.run("ghost --yes --force")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `no managed container named "ghost"`)
 	assert.Empty(t, s.fake.RemoveForceCalls)
@@ -291,7 +333,7 @@ func TestDelete_DockerRemoveError_Surfaced(t *testing.T) {
 		return errors.New("docker rm -f dev: Error response from daemon: container is in use")
 	}
 
-	err := s.cmd.run("dev --force")
+	err := s.cmd.run("dev --yes --force")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "container is in use")
 	_, credErr := s.cfg.Credentials.Dbms.Get("dev")
@@ -330,7 +372,7 @@ func TestDelete_InspectDaemonError_Propagated(t *testing.T) {
 		return Container{}, errors.New("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 
-	err := s.cmd.run("dev --force")
+	err := s.cmd.run("dev --yes --force")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Cannot connect to the Docker daemon",
 		"daemon errors must surface verbatim so the operator can fix the real cause")

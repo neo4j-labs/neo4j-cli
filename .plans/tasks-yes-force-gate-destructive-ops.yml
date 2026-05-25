@@ -73,7 +73,7 @@ tasks:
       `confirm.SetStdinIsTerminalForTest`. This is a deliberate break:
       `docker delete --force` (non-TTY) and `desktop * delete --yes`
       (non-TTY) now exit 2 — call this out in test names.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -82,7 +82,7 @@ tasks:
       - "Tests assert the new behaviour: non-TTY with only `--yes` (or only `--force`) → exit 2 with 'pass both --yes and --force'; non-TTY with both → proceeds; TTY without flags → prompts and either proceeds (y) or cancels (N)."
       - "Docker leaf's `--force`-then-RemoveForce wiring still works (the underlying `docker rm -f` semantics are unchanged); test stays green with `--yes --force`."
       - "`go test ./neo4j-cli/internal/subcommands/docker/... ./neo4j-cli/internal/subcommands/desktop/...` passes."
-    completed_at: null
+    completed_at: 2026-05-25T10:00:00Z
 
   - id: task-004
     title: "Wire confirm gate into 3 credential remove leaves"
