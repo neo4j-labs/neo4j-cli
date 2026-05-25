@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCoerceDriverValue_Scalars(t *testing.T) {
@@ -127,7 +128,7 @@ func TestCoerceDriverValue_GraphEntities(t *testing.T) {
 		}
 		got := coerceDriverValue(node)
 		gotNode, ok := got.(dbtype.Node)
-		assert.True(t, ok, "expected dbtype.Node, got %T", got)
+		require.True(t, ok, "expected dbtype.Node, got %T", got)
 		assert.Equal(t, "2026-05-25", gotNode.Props["birthday"])
 		assert.Equal(t, "alice", gotNode.Props["name"])
 	})
@@ -140,7 +141,7 @@ func TestCoerceDriverValue_GraphEntities(t *testing.T) {
 		}
 		got := coerceDriverValue(rel)
 		gotRel, ok := got.(dbtype.Relationship)
-		assert.True(t, ok, "expected dbtype.Relationship, got %T", got)
+		require.True(t, ok, "expected dbtype.Relationship, got %T", got)
 		assert.Equal(t, "2026-05-25", gotRel.Props["since"])
 	})
 
@@ -156,7 +157,7 @@ func TestCoerceDriverValue_GraphEntities(t *testing.T) {
 		}
 		got := coerceDriverValue(path)
 		gotPath, ok := got.(dbtype.Path)
-		assert.True(t, ok, "expected dbtype.Path, got %T", got)
+		require.True(t, ok, "expected dbtype.Path, got %T", got)
 		assert.Equal(t, "2026-05-25", gotPath.Nodes[0].Props["birthday"])
 		assert.Equal(t, "2026-05-25", gotPath.Nodes[1].Props["birthday"])
 		assert.Equal(t, "2026-05-25", gotPath.Relationships[0].Props["since"])

@@ -9,3 +9,8 @@ Files: ~neo4j-cli/query/connect.go
 ## task-003 — 2026-05-25T11:58:00Z
 Locked the string-passthrough contract in output_test.go with 3 new tests (formatCell ISO-8601 cases, JSON envelope row, table cell row) and added a Patch changelog entry for the temporal-rendering fix.
 Files: ~neo4j-cli/query/output_test.go, +.changes/unreleased/neo4j-cli-Patch-20260525-115602.yaml
+
+## task-004 — 2026-05-25T12:15:00Z
+Collapsed Node/Relationship/Path branches in coerce.go to delegate to the map case via coerceDriverValue(val.Props); switched graph-entity type assertions in coerce_test.go to require.True so failed assertions short-circuit.
+Files: ~neo4j-cli/query/coerce.go, ~neo4j-cli/query/coerce_test.go
+Decisions: Props map mutation survives pass-by-value because Node/Relationship Props is a reference-type map.

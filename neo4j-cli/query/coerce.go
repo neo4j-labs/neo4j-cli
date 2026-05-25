@@ -43,25 +43,17 @@ func coerceDriverValue(v any) any {
 		}
 		return val
 	case dbtype.Node:
-		for k, item := range val.Props {
-			val.Props[k] = coerceDriverValue(item)
-		}
+		coerceDriverValue(val.Props)
 		return val
 	case dbtype.Relationship:
-		for k, item := range val.Props {
-			val.Props[k] = coerceDriverValue(item)
-		}
+		coerceDriverValue(val.Props)
 		return val
 	case dbtype.Path:
 		for i := range val.Nodes {
-			for k, item := range val.Nodes[i].Props {
-				val.Nodes[i].Props[k] = coerceDriverValue(item)
-			}
+			coerceDriverValue(val.Nodes[i])
 		}
 		for i := range val.Relationships {
-			for k, item := range val.Relationships[i].Props {
-				val.Relationships[i].Props[k] = coerceDriverValue(item)
-			}
+			coerceDriverValue(val.Relationships[i])
 		}
 		return val
 	default:
