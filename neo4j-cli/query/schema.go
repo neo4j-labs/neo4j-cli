@@ -30,13 +30,23 @@ type schemaResult struct {
 }
 
 // databaseInfo holds optional metadata pulled from CALL dbms.components() and
-// SHOW SETTINGS. Either field can be empty/missing if the corresponding query
+// SHOW SETTINGS. Any field can be empty/missing if the corresponding query
 // fails — failures of these optional probes do NOT fail the command.
 type databaseInfo struct {
-	Name            string   `json:"name,omitempty"`
-	Versions        []string `json:"versions,omitempty"`
-	Edition         string   `json:"edition,omitempty"`
-	DefaultLanguage string   `json:"default_language,omitempty"`
+	Name            string       `json:"name,omitempty"`
+	Versions        []string     `json:"versions,omitempty"`
+	Edition         string       `json:"edition,omitempty"`
+	DefaultLanguage string       `json:"default_language,omitempty"`
+	CypherVersions  []string     `json:"cypher_versions,omitempty"`
+	GraphEngine     *graphEngine `json:"graph_engine,omitempty"`
+}
+
+// graphEngine describes a non-kernel engine row returned by dbms.components()
+// (e.g. "Virtual Graph"). The literal `name` from the server is preserved so
+// renames carry through with no code change.
+type graphEngine struct {
+	Name     string   `json:"name"`
+	Versions []string `json:"versions,omitempty"`
 }
 
 // nodeProperty is one row from CALL db.schema.nodeTypeProperties().
@@ -256,15 +266,35 @@ func fetchTabular(ctx context.Context, c *conn, stmt string) ([]map[string]any, 
 // fetchDatabaseInfo runs the optional CALL dbms.components() + SHOW SETTINGS
 // probes. Errors are swallowed: a missing-or-disallowed probe just leaves the
 // corresponding field empty. Returns nil if both probes failed entirely.
+//
+// dbms.components() emits one row per component; rows are matched by literal
+// `name` (not row index) so server-side ordering changes do not break
+// detection. "Neo4j Kernel" populates Versions+Edition, "Cypher" populates
+// CypherVersions, any other name populates GraphEngine (first non-kernel /
+// non-Cypher wins).
 func fetchDatabaseInfo(ctx context.Context, c *conn) *databaseInfo {
 	info := &databaseInfo{}
 	gotAny := false
 
 	if res, err := runStatement(ctx, c, "CALL dbms.components()", nil); err == nil && len(res.Rows) > 0 {
 		idx := indexBy(res.Columns)
-		row := res.Rows[0]
-		info.Versions = asStringSlice(rowGet(row, idx, "versions"))
-		info.Edition = asString(rowGet(row, idx, "edition"))
+		for _, row := range res.Rows {
+			name := asString(rowGet(row, idx, "name"))
+			switch name {
+			case "Neo4j Kernel":
+				info.Versions = asStringSlice(rowGet(row, idx, "versions"))
+				info.Edition = asString(rowGet(row, idx, "edition"))
+			case "Cypher":
+				info.CypherVersions = asStringSlice(rowGet(row, idx, "versions"))
+			default:
+				if info.GraphEngine == nil && name != "" {
+					info.GraphEngine = &graphEngine{
+						Name:     name,
+						Versions: asStringSlice(rowGet(row, idx, "versions")),
+					}
+				}
+			}
+		}
 		gotAny = true
 	}
 

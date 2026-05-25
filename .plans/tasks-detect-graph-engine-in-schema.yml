@@ -22,7 +22,6 @@ tasks:
       `CypherVersions == ["5","25"]` and `GraphEngine == nil`. Add two new tests:
       `TestSchema_DetectsGraphEngine` (VG row appended) and
       `TestSchema_GraphEngine_KernelRowOrderInsensitive` (VG row first).
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "`databaseInfo` has new `CypherVersions []string` (json `cypher_versions,omitempty`) and `GraphEngine *graphEngine` (json `graph_engine,omitempty`) fields"
@@ -32,7 +31,8 @@ tasks:
       - "New tests `TestSchema_DetectsGraphEngine` and `TestSchema_GraphEngine_KernelRowOrderInsensitive` both pass"
       - "Plain-Neo4j payload shape is byte-identical to today when no Cypher / VG row is present (omitempty)"
       - "`go test ./neo4j-cli/query/...` is green"
-    completed_at: null
+    status: completed
+    completed_at: 2026-05-25T08:05:11Z
 
   - id: task-002
     title: "Update query-additions.md with graph_engine bullet + Virtual Graphs section"

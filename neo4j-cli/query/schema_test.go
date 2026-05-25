@@ -87,7 +87,10 @@ func happySchemaSeam() *schemaSeam {
 	)
 	s.resp["CALL dbms.components()"] = makeQueryResponse(
 		[]string{"name", "versions", "edition"},
-		[][]any{{"Neo4j Kernel", []any{"5.20.0"}, "community"}},
+		[][]any{
+			{"Neo4j Kernel", []any{"5.20.0"}, "community"},
+			{"Cypher", []any{"5", "25"}, ""},
+		},
 	)
 	s.resp["SHOW SETTINGS YIELD name, value WHERE name = 'db.query.default_language' RETURN value"] = makeQueryResponse(
 		[]string{"value"},
@@ -117,6 +120,8 @@ func TestSchema_HappyPath_JSON(t *testing.T) {
 	assert.Equal(t, []string{"5.20.0"}, got.Database.Versions)
 	assert.Equal(t, "community", got.Database.Edition)
 	assert.Equal(t, "CYPHER 25", got.Database.DefaultLanguage)
+	assert.Equal(t, []string{"5", "25"}, got.Database.CypherVersions)
+	assert.Nil(t, got.Database.GraphEngine)
 
 	require.Len(t, got.Nodes, 2)
 	assert.Equal(t, ":Person", got.Nodes[0].NodeType)
@@ -337,6 +342,78 @@ func TestSchema_OptionalQueryFailureSwallowed(t *testing.T) {
 	assert.NotEmpty(t, got.Relationships)
 	assert.NotEmpty(t, got.Indexes)
 	assert.NotEmpty(t, got.Constraints)
+}
+
+// TestSchema_DetectsGraphEngine asserts that a non-kernel, non-Cypher row
+// returned by dbms.components() populates databaseInfo.GraphEngine with the
+// row's literal name and versions, while kernel and Cypher fields continue to
+// populate from their own rows.
+func TestSchema_DetectsGraphEngine(t *testing.T) {
+	s := happySchemaSeam()
+	s.resp["CALL dbms.components()"] = makeQueryResponse(
+		[]string{"name", "versions", "edition"},
+		[][]any{
+			{"Neo4j Kernel", []any{"5.20.0"}, "community"},
+			{"Cypher", []any{"5", "25"}, ""},
+			{"Virtual Graph", []any{"1.2.3"}, ""},
+		},
+	)
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":schema",
+	)
+	require.NoError(t, err)
+
+	var got schemaResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
+
+	require.NotNil(t, got.Database)
+	assert.Equal(t, []string{"5.20.0"}, got.Database.Versions)
+	assert.Equal(t, "community", got.Database.Edition)
+	assert.Equal(t, []string{"5", "25"}, got.Database.CypherVersions)
+	require.NotNil(t, got.Database.GraphEngine)
+	assert.Equal(t, "Virtual Graph", got.Database.GraphEngine.Name)
+	assert.Equal(t, []string{"1.2.3"}, got.Database.GraphEngine.Versions)
+}
+
+// TestSchema_GraphEngine_KernelRowOrderInsensitive locks the invariant that
+// fetchDatabaseInfo matches by literal `name`, not row index — a Virtual Graph
+// row at position 0 must still populate GraphEngine, and a kernel row at a
+// later position must still populate Versions/Edition.
+func TestSchema_GraphEngine_KernelRowOrderInsensitive(t *testing.T) {
+	s := happySchemaSeam()
+	s.resp["CALL dbms.components()"] = makeQueryResponse(
+		[]string{"name", "versions", "edition"},
+		[][]any{
+			{"Virtual Graph", []any{"1.2.3"}, ""},
+			{"Neo4j Kernel", []any{"5.20.0"}, "community"},
+			{"Cypher", []any{"5", "25"}, ""},
+		},
+	)
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":schema",
+	)
+	require.NoError(t, err)
+
+	var got schemaResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
+
+	require.NotNil(t, got.Database)
+	assert.Equal(t, []string{"5.20.0"}, got.Database.Versions)
+	assert.Equal(t, "community", got.Database.Edition)
+	assert.Equal(t, []string{"5", "25"}, got.Database.CypherVersions)
+	require.NotNil(t, got.Database.GraphEngine)
+	assert.Equal(t, "Virtual Graph", got.Database.GraphEngine.Name)
+	assert.Equal(t, []string{"1.2.3"}, got.Database.GraphEngine.Versions)
 }
 
 // TestSchema_StripRelTypeWrap covers the unwrap helper across the shapes the

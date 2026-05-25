@@ -1,0 +1,3 @@
+## task-001 — 2026-05-25T08:05:11Z
+Extended databaseInfo with CypherVersions + GraphEngine fields; fetchDatabaseInfo now iterates all dbms.components() rows and matches by literal `name`. Tests cover plain Neo4j, VG row appended, and VG row first (order-insensitive).
+Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
