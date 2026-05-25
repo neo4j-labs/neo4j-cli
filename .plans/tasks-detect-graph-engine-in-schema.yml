@@ -1,0 +1,148 @@
+feature: detect-graph-engine-in-schema
+prd: ./prd-detect-graph-engine-in-schema.md
+created_at: 2026-05-25T08:00:40Z
+updated_at: 2026-05-25T08:00:40Z
+
+tasks:
+  - id: task-001
+    title: "Extend databaseInfo + iterate dbms.components() rows in :schema"
+    description: |
+      In `neo4j-cli/query/schema.go`, add a new nested `graphEngine` struct
+      (`Name string`, `Versions []string`) and extend `databaseInfo` with two
+      `omitempty` fields: `CypherVersions []string` (json `cypher_versions`) and
+      `GraphEngine *graphEngine` (json `graph_engine`). Rewrite
+      `fetchDatabaseInfo` so it iterates every row from `CALL dbms.components()`
+      and switches on the row's `name` field: `"Neo4j Kernel"` populates
+      `Versions` + `Edition`, `"Cypher"` populates `CypherVersions`, any other
+      name populates `GraphEngine` (first non-kernel / non-Cypher wins). Preserve
+      existing warn-and-continue behaviour: a failed `dbms.components()` call
+      still leaves the fields empty and returns nil when nothing populated.
+      Update `happySchemaSeam` in `schema_test.go` to emit both `Neo4j Kernel`
+      and `Cypher` rows; extend `TestSchema_HappyPath_JSON` to assert
+      `CypherVersions == ["5","25"]` and `GraphEngine == nil`. Add two new tests:
+      `TestSchema_DetectsGraphEngine` (VG row appended) and
+      `TestSchema_GraphEngine_KernelRowOrderInsensitive` (VG row first).
+    dependencies: []
+    acceptance_criteria:
+      - "`databaseInfo` has new `CypherVersions []string` (json `cypher_versions,omitempty`) and `GraphEngine *graphEngine` (json `graph_engine,omitempty`) fields"
+      - "`graphEngine` struct has `Name string` (json `name`) and `Versions []string` (json `versions,omitempty`)"
+      - "`fetchDatabaseInfo` iterates ALL rows and matches by literal `name` (not row index)"
+      - "Existing `TestSchema_HappyPath_JSON` updated with multi-row fixture and asserts the two new fields"
+      - "New tests `TestSchema_DetectsGraphEngine` and `TestSchema_GraphEngine_KernelRowOrderInsensitive` both pass"
+      - "Plain-Neo4j payload shape is byte-identical to today when no Cypher / VG row is present (omitempty)"
+      - "`go test ./neo4j-cli/query/...` is green"
+    status: completed
+    completed_at: 2026-05-25T08:05:11Z
+
+  - id: task-002
+    title: "Update query-additions.md with graph_engine bullet + Virtual Graphs section"
+    description: |
+      Edit `neo4j-cli/internal/skill/query-additions.md`. In the "What `:schema`
+      returns" bullet for `database` (around line 26), mention the new
+      `cypher_versions` (e.g. `["5","25"]` — which dialects the server
+      understands; `default_language` is the default) and `graph_engine` fields,
+      with a forward link to the new section. Add a new H2 section
+      "Virtual Graphs / Graph Engine" after "Cypher 25 vs Cypher 5 syntax" that
+      teaches agents: (a) detection rule
+      `database.graph_engine.name == "Virtual Graph"`, (b) the current forbidden
+      constructs (`WITH`, `CALL`, `UNWIND`, `range()`, var-length /
+      Quantified Path Patterns, subquery expressions like `EXISTS { ... }`, all
+      writes — `CREATE`/`MERGE`/`SET`/`INSERT`/`DELETE`/`REMOVE`/`DROP`/`ALTER`/`START`/`STOP`/`GRANT`/`REVOKE`,
+      `apoc.*`), (c) guidance to simplify rather than retry verbatim, (d) note
+      that the restriction set will shrink over time.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`database` bullet mentions both `cypher_versions` and `graph_engine`"
+      - "New H2 'Virtual Graphs / Graph Engine' section placed after the Cypher 25 vs 5 section"
+      - "Forbidden constructs listed verbatim per GAIAGT-768"
+      - "Detection rule (`graph_engine.name == \"Virtual Graph\"`) is explicit"
+      - "Tone matches existing additions.md (agent-friendly, terse, code-fenced examples where useful)"
+    completed_at: 2026-05-25T08:08:25Z
+
+  - id: task-003
+    title: "Regenerate skill bundle after query-additions.md change"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` so the updated
+      `query-additions.md` is copied into `neo4j-cli/internal/skill/bundle/`.
+      Inspect the bundle diff: only `bundle/query-additions.md` should change
+      (references derived from cobra Long/Short/Example are unaffected because
+      this task does not touch any command's help text). Commit the regenerated
+      bundle in the same commit as the additions change.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` runs cleanly"
+      - "Only `bundle/query-additions.md` is modified in the diff (no spurious references/* changes)"
+      - "`make generate-check` passes after the regen"
+      - "Bundle changes committed alongside the source additions change"
+    completed_at: 2026-05-25T08:12:30Z
+
+  - id: task-004
+    title: "Add Patch changelog entry for CLI-177"
+    description: |
+      Add a `Patch` changie entry under `.changes/unreleased/` describing the
+      user-facing change: `:schema` now detects and reports the active graph
+      engine (e.g. Virtual Graph) and supported Cypher versions via
+      `dbms.components()`, and the `query` skill teaches agents which Cypher
+      constructs to avoid on Virtual Graphs. Reference CLI-177. If `changie` is
+      installed, prefer `changie new --projects neo4j-cli --kind Patch --body
+      "..."`; otherwise hand-author the YAML per AGENTS.md "Changie Notes"
+      (filename `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml`, fields
+      `project / kind / body / time`).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A new file `.changes/unreleased/neo4j-cli-Patch-*.yaml` exists"
+      - "YAML has `project: neo4j-cli`, `kind: Patch`, single-quoted body, RFC3339 `time`"
+      - "Body mentions graph engine detection, Cypher version surface, and CLI-177"
+    completed_at: 2026-05-25T08:09:27Z
+
+  - id: task-005
+    title: "Run all CI gates and smoke-check plain Neo4j payload"
+    description: |
+      Final verification: run `make test`, `make fmt-check`, `make lint`,
+      `make license-check`, and `make generate-check` in sequence; all must
+      pass. Then perform a manual smoke test against a fresh ephemeral
+      enterprise container: `./bin/neo4j-cli docker create --rw --name cli177
+      --edition enterprise --ephemeral --env-out-file /tmp/cli177.env --wait`,
+      then `./bin/neo4j-cli query --rw --env /tmp/cli177.env :schema
+      --format json | jq .database` and confirm `graph_engine` is absent while
+      `cypher_versions == ["5","25"]`. Tear down the container with
+      `docker rm -f cli177 && rm -f /tmp/cli177.env`.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make test` passes (all OS in CI, but local at minimum)"
+      - "`make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
+      - "Smoke test on plain Neo4j shows `graph_engine` absent and `cypher_versions == [\"5\",\"25\"]`"
+      - "Ephemeral container cleaned up after the smoke test"
+    completed_at: 2026-05-25T08:20:00Z
+
+  - id: task-006
+    title: "Collapse duplicate graph-engine tests into one table-driven test"
+    description: |
+      Stellar review flagged `TestSchema_DetectsGraphEngine` and
+      `TestSchema_GraphEngine_KernelRowOrderInsensitive` in
+      `neo4j-cli/query/schema_test.go` as ~95% duplicates — same harness, same
+      canned response shape, identical assertion block; only the row order in
+      the `dbms.components()` fixture differs. Collapse them into a single
+      table-driven test (e.g. `TestSchema_DetectsGraphEngine`) with two `t.Run`
+      sub-cases ("vg_row_last" and "vg_row_first"). Share the kernel / cypher /
+      vg row fixtures and the assertion block. Keep failure-message specificity
+      via `t.Run` names. Net delta should be ~−45 lines in `schema_test.go`.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Only one Go test function covers graph-engine detection (e.g. `TestSchema_DetectsGraphEngine`)"
+      - "Two `t.Run` sub-cases exercise both row orders (`vg_row_last`, `vg_row_first`)"
+      - "Assertion block appears once, not duplicated across cases"
+      - "`go test ./neo4j-cli/query/... -run TestSchema_DetectsGraphEngine` is green"
+      - "`make test`, `make fmt-check`, `make lint` all pass"
+    completed_at: 2026-05-25T08:30:00Z

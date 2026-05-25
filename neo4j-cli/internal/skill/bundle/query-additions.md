@@ -23,7 +23,7 @@ Use the schema output to:
 
 `neo4j-cli query :schema` returns a single structured payload (TOON by default, JSON via `--format json`, table via `--format table`) with these top-level fields:
 
-- **`database`** — optional metadata: `name`, `versions[]` (e.g. `["5.26.0"]`), `edition` (`community`/`enterprise`), `default_language` (`CYPHER 5` or `CYPHER 25`). Missing if the server / role can't run `dbms.components()` or `SHOW SETTINGS`.
+- **`database`** — optional metadata: `name`, `versions[]` (e.g. `["5.26.0"]`), `edition` (`community`/`enterprise`), `default_language` (`CYPHER 5` or `CYPHER 25`), `cypher_versions[]` (e.g. `["5","25"]` — which dialects the server understands; `default_language` is the one it picks by default), and `graph_engine` (`{name, versions[]}` — present only when the DBMS reports a non-kernel engine row, e.g. Aura's Virtual Graph; see "Virtual Graphs / Graph Engine" below). Missing if the server / role can't run `dbms.components()` or `SHOW SETTINGS`.
 - **`nodes[]`** — one row per (node-label-set, property) pair. Fields: `nodeType`, `nodeLabels[]`, `propertyName`, `propertyTypes[]`, `mandatory`. Flat shape: a single label with three properties appears as three rows.
 - **`relationships[]`** — one row per (relType, property) pair. Fields: `relType`, `propertyName`, `propertyTypes[]`, `mandatory`. Flat, same as `nodes`.
 - **`relationship_paths[]`** — one row per distinct `(from-labels)-[:relType]->(to-labels)` shape. Fields: `relType`, `from[]`, `to[]`. Use this to confirm direction and endpoint labels.
@@ -133,6 +133,38 @@ Vector-index querying differs by Cypher version:
 Cypher 25 also supports multi-label vector indexes (`FOR (n:Movie|Actor) ON n.embedding`) and filterable `WITH` properties. The `CALL db.index.vector.queryNodes` form still works in Cypher 25 but is deprecated.
 
 Read `database.default_language` from `:schema` to pick the right dialect. If unsure which version the DB supports, start with the Cypher 5 form — it works everywhere.
+
+## Virtual Graphs / Graph Engine
+
+When `:schema` returns `database.graph_engine`, the connected DBMS is running a non-kernel engine and supports only a subset of Cypher. Detect and adapt:
+
+```
+database.graph_engine.name == "Virtual Graph"  ⇒  apply the restrictions below
+```
+
+Forbidden on Virtual Graphs (today):
+
+- `WITH`
+- `CALL`
+- `UNWIND`
+- `range()`
+- Variable-length relationships (e.g. `-[:REL*1..3]->`)
+- Quantified Path Patterns
+- Subquery expressions (`EXISTS { ... }`, `COUNT { ... }`, `COLLECT { ... }`)
+- All writes: `CREATE`, `MERGE`, `SET`, `INSERT`, `DELETE`, `REMOVE`, `DROP`, `ALTER`, `START`, `STOP`, `GRANT`, `REVOKE`
+- `apoc.*` procedures
+
+Stick to `MATCH … WHERE … RETURN` plus literal pattern matching:
+
+```cypher
+MATCH (p:Person)-[:WORKS_AT]->(c:Company {name: 'Acme'})
+WHERE p.age > 30
+RETURN p.name, p.age
+```
+
+If a Virtual Graph rejects a query, **simplify** rather than retry verbatim — drop the offending construct, inline the value, or split the work across multiple read queries you compose client-side.
+
+The restriction set will shrink over time as the Virtual Graph engine adds support; re-check `:schema` and this section when behaviour changes.
 
 ## Tips
 
