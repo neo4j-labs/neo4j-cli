@@ -333,3 +333,52 @@ tasks:
       - "No leaf relies on cobra's default usage printing for the confirm-gate path (verified by an integration test or by manual review documented in the progress file)."
       - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
     completed_at: 2026-05-25T10:25:27Z
+
+  - id: task-011
+    title: "Migrate the remaining 4 leaves' gating tests to confirmtest.AssertLeafGate"
+    description: |
+      Task-009 migrated 12 of 16 destructive leaves' gating tests to the
+      shared `confirmtest.AssertLeafGate` helper before hitting a session
+      boundary. Finish the job for the four remaining leaves.
+
+      Affected test files:
+        - `neo4j-cli/internal/subcommands/desktop/connection/delete_test.go`
+        - `neo4j-cli/internal/subcommands/credential/dbms/remove_test.go`
+        - `neo4j-cli/internal/subcommands/credential/embed/remove_test.go`
+        - `neo4j-cli/internal/subcommands/credential/credential_test.go` (the
+          aura-client remove block)
+
+      Each file currently carries ~80 lines of hand-rolled gating scaffolding
+      across four scenarios (NonTTY without flags / NonTTY with both /
+      TTY+`y\n` / TTY+`\n`). Pattern from the 12 already migrated leaves:
+      collapse the four scenarios into a single `TestDelete_ConfirmGate`
+      (or `TestRemove_ConfirmGate`) that calls
+      `confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{...})` with a
+      `Run` closure that drives the leaf-specific test helper and reports
+      `(Err, Stderr, Invoked)`.
+
+      Constraints (from task-009's lessons):
+        - The leaf's helper (e.g. `newDeleteHelper`, `newRemoveHelper`) MUST
+          NOT call `confirm.SetStdinIsTerminalForTest` at construction time —
+          that clobbers AssertLeafGate's per-scenario TTY seam via LIFO
+          Cleanup restoration. If a leaf helper currently does that, remove
+          it and add explicit `confirm.SetStdinIsTerminalForTest(t, ...)`
+          calls to the tests that relied on the default.
+        - Keep ALL leaf-specific tests (pre-flight failures, happy-path with
+          both flags, JSON shape, no-credentials-write, etc.). Only the four
+          canonical gating cases get replaced.
+        - Bundle regen NOT required (no leaf source changes).
+
+      Reference the dbms / docker / instance test files for the established
+      pattern; see `common/confirm/confirmtest/confirmtest.go` for the helper
+      surface.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "All four files above use `confirmtest.AssertLeafGate` and no longer carry hand-rolled NonTTY/TTY+y/TTY+N gating scaffolding."
+      - "No leaf helper calls `confirm.SetStdinIsTerminalForTest` at construction time; explicit per-test calls cover what the default used to."
+      - "Net deletion across the four files >=250 lines."
+      - "Leaf-specific tests (pre-flight, happy-path, JSON shape, etc.) preserved verbatim and still pass."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: null
