@@ -572,7 +572,9 @@ func runStatementResponseImpl(ctx context.Context, c *conn, statement string, pa
 			resp.Data.Values = make([][]any, 0, len(records))
 			for _, rec := range records {
 				row := make([]any, len(rec.Values))
-				copy(row, rec.Values)
+				for i, v := range rec.Values {
+					row[i] = coerceDriverValue(v)
+				}
 				resp.Data.Values = append(resp.Data.Values, row)
 			}
 		} else {

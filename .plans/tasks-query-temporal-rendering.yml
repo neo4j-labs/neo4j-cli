@@ -64,7 +64,7 @@ tasks:
 
       Verify with a quick build (`make build`) that the package still compiles
       and `go test ./neo4j-cli/query/...` stays green.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -74,7 +74,7 @@ tasks:
       - "`go test ./neo4j-cli/query/...` green"
       - "`make build` succeeds"
       - "`make fmt-check` and `make lint` clean"
-    completed_at: null
+    completed_at: 2026-05-25T10:05:00Z
 
   - id: task-003
     title: "Lock string-passthrough contract in output_test.go and add changelog entry"
