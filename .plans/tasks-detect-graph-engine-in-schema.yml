@@ -111,7 +111,7 @@ tasks:
       --format json | jq .database` and confirm `graph_engine` is absent while
       `cypher_versions == ["5","25"]`. Tear down the container with
       `docker rm -f cli177 && rm -f /tmp/cli177.env`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -122,4 +122,4 @@ tasks:
       - "`make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
       - "Smoke test on plain Neo4j shows `graph_engine` absent and `cypher_versions == [\"5\",\"25\"]`"
       - "Ephemeral container cleaned up after the smoke test"
-    completed_at: null
+    completed_at: 2026-05-25T08:20:00Z
