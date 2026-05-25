@@ -1,0 +1,106 @@
+feature: interactive-skill-install-prompt
+prd: ./prd-interactive-skill-install-prompt.md
+created_at: 2026-05-25T08:35:43Z
+updated_at: 2026-05-25T08:35:43Z
+
+tasks:
+  - id: task-001
+    title: "Bash installer: case-dispatch with TTY prompt via /dev/tty"
+    description: |
+      Replace lines 170-173 of distribution/installation-scripts/install-neo4j-cli.sh
+      (the current `if [ "${NEO4J_CLI_AUTO_INSTALL_SKILL:-}" = "1" ]` block) with a
+      three-arm case on the env var: "1" -> install, "0" -> skip, default -> prompt
+      only if both `[ -t 1 ]` and `[ -r /dev/tty ]` are true, reading the answer via
+      `read -r answer < /dev/tty`. Default-yes (Enter installs). Preserve the
+      `|| true` suppression so a failed `skill install` never breaks the installer.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Env var =1 still triggers `neo4j-cli skill install --rw` with no prompt"
+      - "Env var =0 skips the skill install with no prompt"
+      - "Env var unset + interactive TTY prompts [Y/n], Enter/y/yes installs, n/no skips"
+      - "Env var unset + non-interactive (no /dev/tty or stdout not TTY) skips silently"
+      - "A non-zero exit from skill install does not propagate (installer still exits 0)"
+      - "Existing four bats tests in tests/install-neo4j-cli.bats pass unchanged"
+    completed_at: null
+
+  - id: task-002
+    title: "PowerShell installer: switch with UserInteractive prompt"
+    description: |
+      Replace lines 189-192 of distribution/installation-scripts/install-neo4j-cli.ps1
+      with a switch on `$env:NEO4J_CLI_AUTO_INSTALL_SKILL`: "1" -> install via
+      `& neo4j-cli skill install --rw` wrapped in try/catch; "0" -> skip; default ->
+      if `[Environment]::UserInteractive -and -not [Console]::IsInputRedirected`
+      then `Read-Host` and install unless the response matches `^(n|no)$`. Preserve
+      CRLF line endings (AGENTS.md PowerShell installer note).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Env var =1 still triggers `neo4j-cli skill install --rw` with no prompt"
+      - "Env var =0 skips with no prompt"
+      - "Env var unset + interactive PowerShell host prompts [Y/n], Enter/y installs, n/no skips"
+      - "Env var unset + non-interactive host (Pester / CI) skips silently"
+      - "A throw from skill install is caught (installer continues, no terminating error)"
+      - "File saved with CRLF line endings (verified with python3 -c 'import sys; print(open(p,\"rb\").read().count(b\"\\r\\n\"))')"
+      - "Existing Pester tests in tests/install-neo4j-cli.Tests.ps1 still pass"
+    completed_at: null
+
+  - id: task-003
+    title: "README: drop env-var prefix from curl one-liner, add TTY-mode note"
+    description: |
+      In README.md, edit line 6 (curl one-liner) to remove the
+      `NEO4J_CLI_AUTO_INSTALL_SKILL=1 ` prefix so it reads
+      `curl -sSfL https://neo4j.sh/install.sh | bash`. Replace the explanatory
+      paragraph at line 9 with a single short sentence noting that the curl
+      installer prompts in a terminal and that `NEO4J_CLI_AUTO_INSTALL_SKILL=1` or
+      `=0` skips the prompt for unattended installs. Leave the brew (line 15) and
+      npm (line 16) examples unchanged — those channels don't prompt.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Line 6 of README.md is the bare curl one-liner with no env-var prefix"
+      - "A one-sentence note immediately below documents the TTY prompt and env-var override"
+      - "Brew and npm lines still carry their `NEO4J_CLI_AUTO_INSTALL_SKILL=1 ` prefix"
+      - "`Verify with `neo4j-cli --help`` line remains"
+      - "No other README sections touched"
+    completed_at: null
+
+  - id: task-004
+    title: "Changelog entry via changie"
+    description: |
+      Add a user-facing Minor changelog entry under .changes/unreleased/ describing
+      the new interactive prompt. Prefer the non-interactive command:
+      `changie new --projects neo4j-cli --kind Minor --body "Curl installer now
+      prompts to install the agent-skill bundle when run in an interactive
+      terminal; set NEO4J_CLI_AUTO_INSTALL_SKILL=1 or =0 for unattended installs."`
+      If changie isn't installed locally, hand-author the YAML under
+      .changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml per AGENTS.md.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A new YAML file exists under .changes/unreleased/ tagged project: neo4j-cli, kind: Minor"
+      - "Body describes the interactive prompt and the env-var override"
+      - "File parses correctly (changie batch / changie latest still works)"
+    completed_at: null
+
+  - id: task-005
+    title: "Final gates: make test, fmt-check, lint, bats"
+    description: |
+      Run the full gate set per AGENTS.md before marking complete: `make test`,
+      `make fmt-check`, `make lint`, and
+      `bats distribution/installation-scripts/tests/install-neo4j-cli.bats`. The
+      installer changes are shell/PowerShell, so no Go tests should be affected.
+      Pester tests are Windows-only and validated in CI; do not block local
+      completion on `pwsh` availability.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`make test` exits 0"
+      - "`make fmt-check` exits 0 (no unformatted .go files)"
+      - "`make lint` exits 0"
+      - "`bats distribution/installation-scripts/tests/install-neo4j-cli.bats` exits 0 with all four tests passing"
+    completed_at: null
