@@ -1,3 +1,7 @@
 ## task-001 — 2026-05-25T08:05:11Z
 Extended databaseInfo with CypherVersions + GraphEngine fields; fetchDatabaseInfo now iterates all dbms.components() rows and matches by literal `name`. Tests cover plain Neo4j, VG row appended, and VG row first (order-insensitive).
 Files: ~neo4j-cli/query/schema.go, ~neo4j-cli/query/schema_test.go
+
+## TASK-002 — 2026-05-25T08:08:25Z
+Updated `database` bullet in query-additions.md to mention `cypher_versions` and `graph_engine`, and added a new "Virtual Graphs / Graph Engine" H2 documenting the GAIAGT-768 forbidden construct set, detection rule, and simplify-rather-than-retry guidance. `make fmt-check` clean; `make test` only fails on the expected `TestGenerator_RoundTrip` bundle-drift for `bundle/query-additions.md`, which task-003 will fix via `go generate`.
+Files: ~neo4j-cli/internal/skill/query-additions.md, ~.plans/tasks-detect-graph-engine-in-schema.yml, ~.plans/progress-detect-graph-engine-in-schema.txt

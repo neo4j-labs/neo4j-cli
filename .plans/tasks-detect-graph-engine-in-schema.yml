@@ -50,7 +50,7 @@ tasks:
       writes — `CREATE`/`MERGE`/`SET`/`INSERT`/`DELETE`/`REMOVE`/`DROP`/`ALTER`/`START`/`STOP`/`GRANT`/`REVOKE`,
       `apoc.*`), (c) guidance to simplify rather than retry verbatim, (d) note
       that the restriction set will shrink over time.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`database` bullet mentions both `cypher_versions` and `graph_engine`"
@@ -58,7 +58,7 @@ tasks:
       - "Forbidden constructs listed verbatim per GAIAGT-768"
       - "Detection rule (`graph_engine.name == \"Virtual Graph\"`) is explicit"
       - "Tone matches existing additions.md (agent-friendly, terse, code-fenced examples where useful)"
-    completed_at: null
+    completed_at: 2026-05-25T08:08:25Z
 
   - id: task-003
     title: "Regenerate skill bundle after query-additions.md change"
