@@ -132,11 +132,11 @@ func TestSmoke_Lifecycle(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(boltPort), asString(getRow["bolt-port"]), "get bolt-port mismatch")
 	assert.Equal(t, strconv.Itoa(httpPort), asString(getRow["http-port"]), "get http-port mismatch")
 
-	// Phase 4 — delete. --force skips the TTY confirmation; --rw passes the
-	// write gate even when stdout is not a TTY in CI. Then verify with a
-	// direct `docker ps -a --filter name=^<name>$` that the daemon no longer
-	// knows about the container.
-	_, _, err = runDockerSubcommand(t, cfg, "delete", name, "--force", "--rw")
+	// Phase 4 — delete. --yes --force are required in non-TTY (CI) contexts;
+	// --rw passes the write gate. Then verify with a direct
+	// `docker ps -a --filter name=^<name>$` that the daemon no longer knows
+	// about the container.
+	_, _, err = runDockerSubcommand(t, cfg, "delete", name, "--yes", "--force", "--rw")
 	require.NoError(t, err, "delete phase failed")
 
 	out, dockerErr := exec.Command("docker", "ps", "-a",
