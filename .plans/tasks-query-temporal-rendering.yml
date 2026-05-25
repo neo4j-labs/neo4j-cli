@@ -1,7 +1,7 @@
 feature: query-temporal-rendering
 prd: ./prd-query-temporal-rendering.md
 created_at: 2026-05-25T09:41:32Z
-updated_at: 2026-05-25T09:41:32Z
+updated_at: 2026-05-25T10:03:39Z
 
 tasks:
   - id: task-001
@@ -113,3 +113,102 @@ tasks:
       - "`make generate-check` clean (no skill-bundle drift)"
       - "`make license-check` clean"
     completed_at: 2026-05-25T11:58:00Z
+
+  - id: task-004
+    title: "Code-judo: collapse Node/Relationship/Path branches in coerce.go to delegate to the map case"
+    description: |
+      Stellar review flagged structural duplication in `neo4j-cli/query/coerce.go`:
+      the `dbtype.Node`, `dbtype.Relationship`, and `dbtype.Path` branches each
+      open-code the same `for k, v := range props { props[k] = coerce(v) }` loop
+      that already exists in the `map[string]any` case. Four inlined copies of
+      the same map-walk.
+
+      Refactor the three branches to delegate back to the recursion. Because
+      `Props` is a `map[string]any` (reference type), calling
+      `coerceDriverValue(val.Props)` routes to the existing map case and
+      mutates the same underlying map. Inside `Path`, recurse on each
+      `val.Nodes[i]` / `val.Relationships[i]` to delegate to the Node /
+      Relationship branches in turn:
+
+      ```go
+      case dbtype.Node:
+          coerceDriverValue(val.Props)
+          return val
+      case dbtype.Relationship:
+          coerceDriverValue(val.Props)
+          return val
+      case dbtype.Path:
+          for i := range val.Nodes {
+              coerceDriverValue(val.Nodes[i])
+          }
+          for i := range val.Relationships {
+              coerceDriverValue(val.Relationships[i])
+          }
+          return val
+      ```
+
+      Existing `coerce_test.go` cases for Node / Relationship / Path Props
+      must continue to pass unchanged — this is a pure structural rewrite,
+      no behaviour change.
+
+      Also in `coerce_test.go`, fix the type-assertion idiom in the three
+      graph-entity subtests (`Node`, `Relationship`, `Path`): replace
+      `assert.True(t, ok, ...)` with `require.True(t, ok, ...)` so that a
+      failed type assertion short-circuits instead of panicking on the
+      subsequent `.Props[...]` access. Add `require` to the import list if
+      it isn't already there.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`coerce.go` `Node` and `Relationship` cases each call `coerceDriverValue(val.Props)` instead of inlining a map walk"
+      - "`coerce.go` `Path` case recurses on `val.Nodes[i]` and `val.Relationships[i]` instead of inlining map walks"
+      - "Behaviour-preserving: every existing test in `coerce_test.go` passes unchanged"
+      - "Type assertions in `coerce_test.go` `Node` / `Relationship` / `Path` subtests use `require.True` instead of `assert.True`"
+      - "`go test ./neo4j-cli/query/...` green"
+      - "`make fmt-check` and `make lint` clean"
+    completed_at: null
+
+  - id: task-005
+    title: "Fold thin temporal-string tests into existing TestRenderRows_JSON / TestRenderRows_Table tables"
+    description: |
+      Stellar review flagged that the three new test functions in
+      `neo4j-cli/query/output_test.go` —
+      `TestFormatCell_ISO8601StringPassthrough`,
+      `TestRenderRows_JSON_TemporalStringRow`,
+      `TestRenderRows_Table_TemporalStringRow` — are thin and overlap with
+      the existing `TestRenderRows_JSON` / `TestRenderRows_Table` table-driven
+      tests. They all assert "an ISO-shaped string flows through unchanged",
+      a contract the existing rendering tables already exercise.
+
+      Refactor:
+
+      1. Delete the three new top-level test functions.
+      2. Add one new case to the existing `TestRenderRows_JSON` table covering
+         a temporal-shaped string row (e.g. `{"d": "2026-05-25"}`) and assert
+         that JSON output contains `"d": "2026-05-25"` and NOT `"d": {}` /
+         `"d": "..."` malformations.
+      3. Add a matching case to `TestRenderRows_Table` confirming the table
+         cell renders the ISO string flush (no surrounding quotes, no
+         `{}`).
+      4. Drop the time-stamped block comment ("A regression here would
+         re-introduce the empty-{} rendering for temporal columns") — by
+         folding into the existing tables the contract becomes self-evident,
+         so no separate prose is needed. If a short doc-comment on the new
+         case label is useful, keep it framing the invariant ("temporal
+         string passes through formatCell verbatim"), NOT the bug history.
+
+      The goal is zero new top-level test functions; the regression guard
+      lives as new rows in the existing tables.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "`TestFormatCell_ISO8601StringPassthrough`, `TestRenderRows_JSON_TemporalStringRow`, and `TestRenderRows_Table_TemporalStringRow` are deleted from `output_test.go`"
+      - "`TestRenderRows_JSON` has a new case asserting `{\"d\": \"2026-05-25\"}` renders as `\"d\": \"2026-05-25\"` (and NOT `{}`)"
+      - "`TestRenderRows_Table` has a new case asserting the same row renders flush in the table cell (no quotes, no `{}`)"
+      - "No comment in `output_test.go` references the empty-`{}` regression or anchors to the current fix"
+      - "`go test ./neo4j-cli/query/...` green"
+      - "`make fmt-check` and `make lint` clean"
+    completed_at: null
