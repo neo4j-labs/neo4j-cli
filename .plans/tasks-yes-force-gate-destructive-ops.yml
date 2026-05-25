@@ -116,7 +116,7 @@ tasks:
       the updated `Long:` and `Example:` copy from tasks 002-004. Commit the
       regenerated bundle in the same change as the leaf edits. Verify
       `TestGenerator_RoundTrip` is green afterwards.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -126,7 +126,7 @@ tasks:
       - "Regenerated `references/{instance,deployment,agent,customermanagedkey,dataapi,graphanalytics,credential,docker,desktop}.md` (where applicable) document `--yes` and `--force`."
       - "`make generate-check` against a freshly committed tree shows no diff in `internal/skill/bundle/**`."
       - "`go test ./neo4j-cli/internal/skill/... -run TestGenerator_RoundTrip` passes."
-    completed_at: null
+    completed_at: 2026-05-25T11:40:00Z
 
   - id: task-006
     title: "Add Minor changelog entry, run full gates, manual smoke test"

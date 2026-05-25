@@ -194,19 +194,28 @@ Removes a dbms credential
 
 Remove a stored Bolt connection profile by name. Linked embed-credential references on other profiles are not modified.
 
-Usage: `neo4j-cli credential dbms remove <name>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential dbms remove <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove a dbms credential by name
-neo4j-cli credential dbms remove local --rw
+neo4j-cli credential dbms remove local --rw --yes --force
 
 # Remove a staging dbms credential
-neo4j-cli credential dbms remove staging --rw
+neo4j-cli credential dbms remove staging --rw --yes --force
 
 # Remove a prod dbms credential
-neo4j-cli credential dbms remove prod --rw
+neo4j-cli credential dbms remove prod --rw --yes --force
 ```
 
 ### neo4j-cli credential dbms set-embed
@@ -318,19 +327,28 @@ Removes an embed credential
 
 Remove a stored embedding-provider credential by name. Removal is non-cascading: dbms credentials linked to the removed embed credential keep their `embed-credential` field; the stale link is reported lazily at query time. Run `credential dbms list` to find linked profiles or `credential dbms set-embed <dbms-name>` to clear them.
 
-Usage: `neo4j-cli credential embed remove <name>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential embed remove <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove an embed credential by name
-neo4j-cli credential embed remove openai-small --rw
+neo4j-cli credential embed remove openai-small --rw --yes --force
 
 # Remove the local Ollama embed credential
-neo4j-cli credential embed remove ollama-nomic --rw
+neo4j-cli credential embed remove ollama-nomic --rw --yes --force
 
 # Remove a HuggingFace embed credential
-neo4j-cli credential embed remove hf-bge --rw
+neo4j-cli credential embed remove hf-bge --rw --yes --force
 ```
 
 ### neo4j-cli credential embed use

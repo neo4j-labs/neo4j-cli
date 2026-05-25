@@ -106,26 +106,30 @@ Deletes an agent
 
 Deletes an agent by its ID.
 
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
 Usage: `neo4j-cli aura agent delete <id> [flags]`
 
 Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
 | `--organization-id` | string | - | Organization ID |
 | `--project-id` | string | - | Project/tenant ID |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Delete an agent by ID
-neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete an agent in a specific organization and project
-neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete an agent and emit the response as JSON
-neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --format json
+neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json
 ```
 
 ### neo4j-cli aura agent get
@@ -350,19 +354,28 @@ Deletes a Customer Managed Key from Aura.
 
 Note that you can only delete a Key if it is not being used by any instances, otherwise you will get an error with the reason field set to encryption-key-is-active.
 
-Usage: `neo4j-cli aura customer-managed-key delete <id>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura customer-managed-key delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Delete a customer managed key by ID
-neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
 
 # Delete a key and emit JSON for scripting
-neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
 
 # Delete and confirm by piping the response through jq
-neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.deleted'
+neo4j-cli aura customer-managed-key delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json | jq -r '.data.deleted'
 ```
 
 ### neo4j-cli aura customer-managed-key get
@@ -478,19 +491,28 @@ Delete a Graph Analytics Serverless session
 
 This subcommand deletes a Graph Analytics Serverless session by id.
 
-Usage: `neo4j-cli aura graph-analytics session delete <id>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura graph-analytics session delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Delete a session by ID
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
 
 # Delete a session and emit JSON for scripting
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
 
 # Delete a session, suppressing all stdout output
-neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw > /dev/null
+neo4j-cli aura graph-analytics session delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force > /dev/null
 ```
 
 #### neo4j-cli aura graph-analytics session get
@@ -618,19 +640,28 @@ Deleting an instance is an asynchronous operation. You can poll the current stat
 
 If another operation is being performed on the instance you are trying to delete, an error will be returned that indicates that deletion cannot be performed.
 
-Usage: `neo4j-cli aura instance delete <id>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura instance delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Delete an instance by ID
-neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
 
 # Delete an instance and emit the response as JSON
-neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
 
 # Delete and pipe the response status through jq
-neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --format json | jq -r '.data.status'
+neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json | jq -r '.data.status'
 ```
 
 ### neo4j-cli aura instance get

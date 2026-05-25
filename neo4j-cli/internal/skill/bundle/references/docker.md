@@ -72,7 +72,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 Remove a Neo4j container and its dbms credential
 
-Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. On a TTY, you are prompted to confirm before deletion; non-TTY callers MUST pass --force to confirm. A missing dbms credential is NOT an error — the container is still removed. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
+Remove a Neo4j Docker container by name and best-effort delete its stored dbms credential. Only containers carrying `org.neo4j.cli.managed=true` are eligible; unknown or unmanaged names return a usage error pointing at `neo4j-cli docker list`. Destructive: requires `--yes --force` (or a `y` answer at the TTY prompt) when invoked non-interactively. A missing dbms credential is NOT an error — the container is still removed. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error.
 
 Usage: `neo4j-cli docker delete <name> [flags]`
 
@@ -80,7 +80,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--force` | bool | false | Skip the TTY confirmation prompt. Required for non-TTY callers. |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
@@ -89,10 +90,10 @@ Examples:
 neo4j-cli docker delete dev --rw
 
 # Skip the prompt (required for scripts / non-TTY callers)
-neo4j-cli docker delete dev --force --rw
+neo4j-cli docker delete dev --yes --force --rw
 
 # Delete and confirm by listing remaining managed containers
-neo4j-cli docker delete dev --force --rw && neo4j-cli docker list --format json
+neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format json
 ```
 
 ## neo4j-cli docker get
