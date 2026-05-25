@@ -54,8 +54,8 @@ type LeafGateCase struct {
 	ResourceLabel string
 
 	// Run executes the leaf for one scenario and returns the result. The
-	// confirmtest helper toggles the TTY seam (via SetStdinIsTerminalForTest)
-	// before calling Run; Run does NOT need to set it.
+	// confirmtest helper toggles the TTY seam (via SetStdinIsTerminal +
+	// t.Cleanup) before calling Run; Run does NOT need to set it.
 	Run func(t *testing.T, args string, stdin string) GateRunResult
 }
 
@@ -77,7 +77,7 @@ func AssertLeafGate(t *testing.T, c LeafGateCase) {
 	t.Helper()
 
 	t.Run("NonTTY_WithoutFlags_Exit2", func(t *testing.T) {
-		confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+		t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 		got := c.Run(t, c.NoFlagsArgs, "")
 
 		if got.Err == nil {
@@ -99,7 +99,7 @@ func AssertLeafGate(t *testing.T, c LeafGateCase) {
 	})
 
 	t.Run("NonTTY_WithBothFlags_Proceeds", func(t *testing.T) {
-		confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+		t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 		got := c.Run(t, c.BothFlagsArgs, "")
 
 		if errors.Is(got.Err, confirm.ErrCancelled) {
@@ -111,7 +111,7 @@ func AssertLeafGate(t *testing.T, c LeafGateCase) {
 	})
 
 	t.Run("TTY_AnswerY_Proceeds", func(t *testing.T) {
-		confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+		t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 		got := c.Run(t, c.NoFlagsArgs, "y\n")
 
 		if errors.Is(got.Err, confirm.ErrCancelled) {
@@ -126,7 +126,7 @@ func AssertLeafGate(t *testing.T, c LeafGateCase) {
 	})
 
 	t.Run("TTY_AnswerN_Cancels", func(t *testing.T) {
-		confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+		t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 		got := c.Run(t, c.NoFlagsArgs, "N\n")
 
 		if !errors.Is(got.Err, confirm.ErrCancelled) {

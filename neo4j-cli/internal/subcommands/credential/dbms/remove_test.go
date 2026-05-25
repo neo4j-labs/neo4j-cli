@@ -59,7 +59,7 @@ func TestDbmsCredentialRemove(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+			t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 			h := newDbmsTestHelper(t)
 			h.setCredentialsValue("dbms.credentials", tc.initialCreds)

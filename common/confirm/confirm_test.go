@@ -152,7 +152,7 @@ func TestRequire(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			confirm.SetStdinIsTerminalForTest(t, func() bool { return tc.isTTY })
+			t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return tc.isTTY }))
 
 			leaf, _, errOut := newTestCmd(t, "instance", tc.stdin)
 			confirm.Register(leaf)
@@ -208,7 +208,7 @@ func TestRequire(t *testing.T) {
 }
 
 func TestRequire_EmptyResourceID_OmitsEmptyQuotes(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 
 	leaf, _, errOut := newTestCmd(t, "deployment", "N\n")
 	confirm.Register(leaf)
@@ -227,7 +227,7 @@ func TestRequire_EmptyResourceID_OmitsEmptyQuotes(t *testing.T) {
 }
 
 func TestRequire_EmptyResourceID_NonTTY_OmitsEmptyQuotes(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	leaf, _, _ := newTestCmd(t, "deployment", "")
 	confirm.Register(leaf)
@@ -257,7 +257,7 @@ func TestRegister_BothFlagsBound(t *testing.T) {
 }
 
 func TestRequire_ResourceTypeFromParent(t *testing.T) {
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	leaf, _, _ := newTestCmd(t, "agent", "")
 	confirm.Register(leaf)

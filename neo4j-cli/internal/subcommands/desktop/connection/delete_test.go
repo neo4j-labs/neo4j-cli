@@ -148,7 +148,7 @@ func TestDelete_ConfirmGate(t *testing.T) {
 // used to proceed; the shared gate now requires BOTH --yes and --force.
 func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("non-TTY without --force must not hit the API; got %s %s", r.Method, r.URL.Path)
@@ -165,7 +165,7 @@ func TestDelete_NonTTY_OnlyYes_Exit2(t *testing.T) {
 
 func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("non-TTY without --yes must not hit the API; got %s %s", r.Method, r.URL.Path)
@@ -184,7 +184,7 @@ func TestDelete_NonTTY_OnlyForce_Exit2(t *testing.T) {
 // straight to DELETE with no prompt and no preceding GET / list call.
 func TestDelete_NonTTY_WithBothFlags_DeletesWithoutPrompt(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var listCalls atomic.Int32
 	var deleteCalls atomic.Int32
@@ -232,7 +232,7 @@ func TestDelete_NonTTY_WithBothFlags_DeletesWithoutPrompt(t *testing.T) {
 // emits a quoted-name one-line confirmation.
 func TestDelete_NonTTY_WithBothFlags_TableConfirmation(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -256,7 +256,7 @@ func TestDelete_NonTTY_WithBothFlags_TableConfirmation(t *testing.T) {
 // line confirmation as table.
 func TestDelete_NonTTY_WithBothFlags_ToonConfirmation(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -280,7 +280,7 @@ func TestDelete_NonTTY_WithBothFlags_ToonConfirmation(t *testing.T) {
 // omits `name`, the confirmation line falls back to the id in both positions.
 func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete && r.URL.Path == "/fastify/api/connections/"+validDeleteID {
@@ -303,7 +303,7 @@ func TestDelete_FallsBackToIDWhenNameMissing(t *testing.T) {
 // TestDelete_TTY_WithBothFlags_SkipsPrompt: TTY + both flags skips the prompt.
 func TestDelete_TTY_WithBothFlags_SkipsPrompt(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 
 	var listCalls atomic.Int32
 	var deleteCalls atomic.Int32
@@ -337,7 +337,7 @@ func TestDelete_TTY_WithBothFlags_SkipsPrompt(t *testing.T) {
 // TestDelete_TTY_EmptyStdin_Cancels: TTY + empty stdin → cancelled exit 0.
 func TestDelete_TTY_EmptyStdin_Cancels(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 	// Empty buffer simulates immediate EOF.
 
 	var deleteCalls atomic.Int32
@@ -363,7 +363,7 @@ func TestDelete_TTY_EmptyStdin_Cancels(t *testing.T) {
 // any connection must surface a clear error via the shared transport.
 func TestDelete_UnknownUUID_Surfaces404(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	h.withHandler(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
@@ -439,7 +439,7 @@ func TestDelete_Example_FlushLeft(t *testing.T) {
 // reaches the client constructor seam.
 func TestDelete_PortFlagPropagates(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 
 	var gotPort int
 	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, port int) (*desktopclient.Client, error) {
@@ -457,7 +457,7 @@ func TestDelete_PortFlagPropagates(t *testing.T) {
 // canonical error mapping when Desktop is not running.
 func TestDelete_DesktopUnreachable_ReturnsCanonicalError(t *testing.T) {
 	h := newDeleteHelper(t)
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 	t.Cleanup(connection.SetNewDesktopClientFnForTest(func(_ context.Context, _ afero.Fs, _ int) (*desktopclient.Client, error) {
 		return nil, desktopclient.UnreachableError()
 	}))

@@ -84,7 +84,7 @@ func newDeleteSetup(t *testing.T, containers map[string]Container, creds map[str
 // PTY. Restored on cleanup.
 func withStdinIsTerminal(t *testing.T, isTTY bool) {
 	t.Helper()
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return isTTY })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return isTTY }))
 }
 
 func managedContainerForDelete(name string) Container {

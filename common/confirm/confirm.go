@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"testing"
 
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
@@ -27,19 +26,22 @@ import (
 var ErrCancelled = errors.New("confirmation cancelled")
 
 // stdinIsTerminal is the package-local TTY detector; swapped by
-// SetStdinIsTerminalForTest so leaf tests can drive both branches without a
-// real PTY.
+// SetStdinIsTerminal so tests can drive both branches without a real PTY.
 var stdinIsTerminal = func() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
-// SetStdinIsTerminalForTest overrides the TTY detector for the duration of
-// the test and restores it via t.Cleanup.
-func SetStdinIsTerminalForTest(t *testing.T, fn func() bool) {
-	t.Helper()
+// SetStdinIsTerminal overrides the TTY detector and returns a restore func.
+// Callers in tests wire it through t.Cleanup:
+//
+//	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
+//
+// The package intentionally does not import "testing" — that import would
+// register test-runner flags in flag.CommandLine at process startup.
+func SetStdinIsTerminal(fn func() bool) (restore func()) {
 	prev := stdinIsTerminal
 	stdinIsTerminal = fn
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	return func() { stdinIsTerminal = prev }
 }
 
 // Register binds --yes and --force on cmd. Both default to false. Call as a

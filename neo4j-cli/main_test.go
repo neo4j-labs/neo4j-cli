@@ -241,7 +241,7 @@ func TestResolveFormatForRender(t *testing.T) {
 //   - stdout is empty (no envelope, no narration).
 func TestConfirmCancellation_EndToEnd(t *testing.T) {
 	// Force TTY for the duration of this test so confirm.Require prompts.
-	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return true }))
 
 	fs, err := testfs.GetTestFs("{}", `{
 		"aura": {
