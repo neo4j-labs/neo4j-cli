@@ -1,7 +1,7 @@
 feature: yes-force-gate-destructive-ops
 prd: ./prd-yes-force-gate-destructive-ops.md
 created_at: 2026-05-25T08:21:34Z
-updated_at: 2026-05-25T08:21:34Z
+updated_at: 2026-05-25T12:00:00Z
 
 tasks:
   - id: task-001
@@ -149,3 +149,187 @@ tasks:
       - "`timeout 10 ./bin/neo4j-cli aura instance delete x --rw --yes < /dev/null` exits 2 with a message demanding `--force`."
       - "Smoke results captured in the PR description or task log."
     completed_at: 2026-05-25T11:35:00Z
+
+  # ---------------------------------------------------------------------------
+  # Post-review refactors (stellar-review findings on the integrated branch).
+  # Behaviour is preserved end-to-end; these tasks collapse copy-paste and the
+  # two-phase construction shape that the original API forced into every leaf.
+  # ---------------------------------------------------------------------------
+
+  - id: task-007
+    title: "Collapse two-phase command construction (review finding #2)"
+    description: |
+      The current `confirm.Register(cmd) *Flags` API forces 14 destructive
+      leaves into a two-phase shape: `RunE: nil` in the struct literal, then
+      `cmd.RunE = func(...)` patched in after `confirm.Register` returns the
+      *Flags. Refactor so the leaf can hold its RunE inside a single struct
+      literal again.
+
+      Change the `common/confirm` API:
+        - `confirm.Register(cmd *cobra.Command)` becomes a side-effect-only
+          registration (no return value). It still binds `--yes` and `--force`.
+        - Add a package-level `confirm.Require(cmd *cobra.Command, resourceID string) error`
+          that looks up `--yes` and `--force` from `cmd.Flags()` at call time
+          and runs the same gate logic. Behaviour identical to the current
+          `(*Flags).Require`.
+        - Delete the `Flags` struct + `(*Flags).Require` method (no leaf needs
+          to keep the bound struct around; the closure dependency was the
+          smell, not a requirement). If a future caller genuinely needs the
+          bound struct, it can be reintroduced.
+        - `ErrCancelled` and `SetStdinIsTerminalForTest` keep their current
+          shape (task-008 reworks cancellation, not this task).
+
+      Update each of the 16 destructive leaves:
+        - Move RunE back inside the `&cobra.Command{...}` struct literal.
+        - Replace `confirmFlags := confirm.Register(cmd)` + `confirmFlags.Require(cmd, id)`
+          with `confirm.Register(cmd)` (after the struct literal, as a side
+          effect before `return cmd`) and `confirm.Require(cmd, id)` (inside RunE).
+        - Drop the `RunE: nil` placeholder.
+
+      Update tests as needed (mostly mechanical — the unit-test seam was
+      `confirm.SetStdinIsTerminalForTest`, not the *Flags receiver).
+
+      Bundle regen is NOT required: flag bindings and help strings are
+      unchanged (TestGenerator_RoundTrip must remain green without
+      regenerating). Verify via `make test`.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "`common/confirm/confirm.go`: `Register` returns nothing; `Require` is a package-level func taking `*cobra.Command` + resourceID."
+      - "No leaf file contains `RunE: nil` or a post-literal `cmd.RunE = func(...)` patch for the destructive gate."
+      - "Every destructive leaf uses `confirm.Register(cmd)` (side effect) and `confirm.Require(cmd, id)` (in RunE)."
+      - "`common/confirm/confirm_test.go` updated for the new API; all existing TTY × flag-state scenarios still covered."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+      - "TestGenerator_RoundTrip passes WITHOUT re-running `go generate` (flag/help text unchanged)."
+    completed_at: null
+
+  - id: task-008
+    title: "Centralise cancellation handling (review finding #1)"
+    description: |
+      The 6-line `if errors.Is(err, confirm.ErrCancelled) { ... }` block is
+      copy-pasted in 16 leaves. Eliminate the boilerplate by handling
+      cancellation in the helper + at the top-level error renderer.
+
+      Changes to `common/confirm/confirm.go`:
+        - On declined TTY prompt, `confirm.Require` itself writes
+          `"cancelled.\n"` to `cmd.ErrOrStderr()`, sets
+          `cmd.SilenceErrors = true` and `cmd.SilenceUsage = true`, then
+          returns `ErrCancelled`.
+        - `ErrCancelled` remains exported (the chokepoint needs to match it).
+
+      Changes to `neo4j-cli/main.go`:
+        - After `cmd.Execute()`, before `exitCodeFor` / `clierr.Render`, add
+          an `errors.Is(err, confirm.ErrCancelled)` check that swallows the
+          error: emit no further output, exit code 0.
+        - Alternatively wire it into `clierr.Render` if that fits better;
+          either way, exactly one place handles it.
+
+      Changes to all 16 destructive leaves:
+        - Delete the entire `if errors.Is(err, confirm.ErrCancelled) { print + return nil }` block.
+        - Each gate-call collapses to: `if err := confirm.Require(cmd, id); err != nil { return err }`.
+        - Drop `errors` and `confirm.ErrCancelled` imports where no longer needed.
+        - Drop the `//nolint:errcheck // narration to stderr` annotations that
+          were only present for the cancellation print.
+
+      Tests update:
+        - `common/confirm/confirm_test.go`: assert that on cancellation
+          `Require` writes `cancelled.\n` to stderr, sets the two Silence
+          flags on the command, and returns `ErrCancelled`.
+        - Leaf tests already assert `cancelled.` on stderr on the TTY-N path;
+          those keep passing because the helper now does the printing.
+        - Add ONE test at the main / app level (e.g. `neo4j-cli/main_test.go`
+          or `neo4j-cli/app/app_test.go`) that exercises the
+          `ErrCancelled → exit 0` integration without going through every leaf.
+
+      Bundle regen NOT required.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`confirm.Require` writes `cancelled.\\n` to stderr and sets `cmd.SilenceErrors` + `cmd.SilenceUsage` on the cancellation path."
+      - "Exactly one chokepoint (in `neo4j-cli/main.go` or `clierr.Render`) intercepts `confirm.ErrCancelled` and exits 0 cleanly."
+      - "Zero leaves contain `errors.Is(err, confirm.ErrCancelled)` or a `cancelled.` literal — grep returns no matches outside `common/confirm/` and the chokepoint."
+      - "Zero leaves contain `//nolint:errcheck // narration to stderr` annotations tied to the cancellation print."
+      - "An integration-level test asserts that a cancelled prompt yields exit 0 with `cancelled.` on stderr and no `Error:` prefix from cobra."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: null
+
+  - id: task-009
+    title: "Shared confirm-gate test helper (review finding #3)"
+    description: |
+      With tasks 007 and 008 collapsing the leaf-side gate code, the gating
+      tests in 16 leaf `*_test.go` files are now near-identical: drive
+      TTY-or-not, drive flag-or-not, assert exit code / stderr / that the
+      destructive sink was/wasn't called. Extract the replay into a shared
+      helper.
+
+      Build `common/confirm/confirmtest/confirmtest.go` (or `common/confirm/confirmtest.go`
+      with a `confirmtest` build-only tag — pick the cleanest layout) exposing:
+
+      ```go
+      type LeafGateCase struct {
+          Name          string
+          NewCmd        func(t *testing.T) (*cobra.Command, *MockSink)
+          Args          []string  // positional + non-gate flags
+          ResourceLabel string    // expected to appear in error / prompt
+      }
+
+      func AssertLeafGate(t *testing.T, c LeafGateCase)
+      ```
+
+      `AssertLeafGate` runs the four scenarios:
+        - non-TTY without flags → exit 2; stderr contains "pass both --yes and --force"; sink NOT invoked.
+        - non-TTY with both flags → sink invoked; exit code 0 (or whatever the sink yields).
+        - TTY + `y\n` → sink invoked.
+        - TTY + empty `\n` → sink NOT invoked; stderr ends with `cancelled.`; exit code 0.
+
+      Migrate each leaf's `*_test.go`:
+        - Replace the four hand-rolled gating tests with `confirmtest.AssertLeafGate(t, LeafGateCase{...})`.
+        - Keep leaf-specific tests for pre-flight branches (ownership check failure, missing flags, malformed args) as-is.
+        - Keep at least one leaf-specific happy-path test that exercises the destructive HTTP/FS call end-to-end.
+
+      Target net deletion across the 16 leaf test files of ≥1500 lines.
+      Test coverage of the gate paths is preserved or improved (the helper's
+      assertions are uniform and explicit).
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "New `common/confirm/confirmtest/` package (or equivalent location) with `AssertLeafGate` + `LeafGateCase` exported and self-tested."
+      - "All 16 destructive-leaf `*_test.go` files use `confirmtest.AssertLeafGate` for the four canonical gating scenarios; no hand-rolled equivalents remain."
+      - "Net line deletion across leaf `*_test.go` files is ≥1500 vs the pre-task-009 tree."
+      - "`make test` passes; per-leaf coverage of pre-flight / happy-path branches unchanged."
+      - "`make fmt-check`, `make lint`, `make license-check` all green."
+    completed_at: null
+
+  - id: task-010
+    title: "Audit and remove now-redundant SilenceUsage placements (review finding #4)"
+    description: |
+      Once task-008 has `confirm.Require` set `cmd.SilenceUsage = true` and
+      `cmd.SilenceErrors = true` on the cancellation path, several leaves'
+      defensive `cmd.SilenceUsage = true` calls are no longer needed (they
+      were guarding against cobra's default usage-on-error printing for the
+      gate path).
+
+      Audit every destructive leaf:
+        - If a `cmd.SilenceUsage = true` was added solely to suppress
+          usage printing on the confirm gate path, remove it.
+        - If `cmd.SilenceUsage = true` is still needed for a different
+          error path (e.g. pre-flight failures), leave it but keep the
+          placement consistent: ONE call per leaf, set as the first statement
+          inside `RunE`, before pre-flight.
+
+      Particular hot spots: `docker/delete.go` (currently sets it 3× across
+      branches), `deployment/delete.go`, `deployment/token/delete.go`.
+
+      This is a small cleanup pass; no behaviour change beyond the
+      cancellation-path tidying already covered by task-008.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "Each destructive leaf has at most one `cmd.SilenceUsage = true` statement, placed as the first line of `RunE` when it is present at all."
+      - "No leaf relies on cobra's default usage printing for the confirm-gate path (verified by an integration test or by manual review documented in the progress file)."
+      - "`make fmt-check`, `make lint`, `make test`, `make license-check` all green."
+    completed_at: null
