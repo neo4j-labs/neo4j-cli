@@ -611,7 +611,7 @@ func TestDesktopDelete(t *testing.T) {
 		"name": "to-go", "status": "stopped",
 	})
 
-	code, stdout, stderr := runCLI(t, fx, "desktop", "dbms", "delete", id, "--yes", "--rw", "--format", "json")
+	code, stdout, stderr := runCLI(t, fx, "desktop", "dbms", "delete", id, "--yes", "--force", "--rw", "--format", "json")
 	defer dumpOnFail(t, fx, stdout, stderr)
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
@@ -741,7 +741,7 @@ func TestDesktopConnection_Delete(t *testing.T) {
 	})
 
 	code, stdout, stderr := runCLI(t, fx,
-		"desktop", "connection", "delete", id, "--yes", "--rw", "--format", "json",
+		"desktop", "connection", "delete", id, "--yes", "--force", "--rw", "--format", "json",
 	)
 	defer dumpOnFail(t, fx, stdout, stderr)
 	if code != 0 {
@@ -1015,7 +1015,7 @@ func TestDesktop_DeleteUnknown(t *testing.T) {
 	scenarioPOST(t, fx, scenarioReset, nil)
 	const unknown = "11111111-2222-3333-4444-555555555555"
 
-	code, _, stderr := runCLI(t, fx, "desktop", "dbms", "delete", unknown, "--yes", "--rw", "--format", "json")
+	code, _, stderr := runCLI(t, fx, "desktop", "dbms", "delete", unknown, "--yes", "--force", "--rw", "--format", "json")
 	if code == 0 {
 		t.Fatalf("expected non-zero exit; got 0\nstderr: %s", stderr)
 	}
@@ -1088,7 +1088,7 @@ func TestDesktopConnection_DeleteUnknown(t *testing.T) {
 	const unknown = "11111111-2222-3333-4444-555555555555"
 
 	code, _, stderr := runCLI(t, fx,
-		"desktop", "connection", "delete", unknown, "--yes", "--rw",
+		"desktop", "connection", "delete", unknown, "--yes", "--force", "--rw",
 	)
 	if code == 0 {
 		t.Fatalf("expected non-zero exit; got 0\nstderr: %s", stderr)
