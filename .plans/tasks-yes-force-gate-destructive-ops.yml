@@ -18,7 +18,7 @@ tasks:
       bufio line-read pattern from `neo4j-cli/internal/subcommands/docker/delete.go:promptForDelete`.
       EOF / read error with zero bytes = cancellation. The package must NOT
       import anything from `neo4j-cli/internal/...` (Go internal-package rule).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Package compiles at `common/confirm/`; `go build ./common/confirm/...` succeeds."
@@ -27,7 +27,7 @@ tasks:
       - "TTY cancellation path returns `confirm.ErrCancelled` and `errors.Is(err, confirm.ErrCancelled)` is true."
       - "Empty `resourceID` renders prompt/error copy without empty quotes (e.g. 'this deployment' rather than 'deployment \"\"')."
       - "Copyright header present; package contains no import of `github.com/neo4j/cli/neo4j-cli/internal/...`."
-    completed_at: null
+    completed_at: 2026-05-25T09:00:00Z
 
   - id: task-002
     title: "Wire confirm gate into 9 Aura production-tier destructive leaves"

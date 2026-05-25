@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-25T09:00:00Z
+Built common/confirm package: Flags{Yes,Force}, Register, (*Flags).Require, ErrCancelled, stdinIsTerminal seam, SetStdinIsTerminalForTest. Table-driven tests cover all TTY/flag-state combos; resourceID="" degrades to "this <type>".
+Files: +common/confirm/confirm.go, +common/confirm/confirm_test.go
