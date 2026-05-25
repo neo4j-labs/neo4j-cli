@@ -38,7 +38,7 @@ func newAuthedServer(t *testing.T, salt, clientID string, handler http.HandlerFu
 		}
 		// Verify the JWT against the documented signing key.
 		key := fmt.Sprintf("%s-%s-%s", salt, srv.URL, clientID)
-		_, err := jwt.Parse(gotTok, func(_ *jwt.Token) (any, error) { return []byte(key), nil })
+		_, err := jwt.Parse(gotTok, func(_ *jwt.Token) (any, error) { return []byte(key), nil }, jwt.WithTimeFunc(nowFn))
 		if err != nil {
 			t.Errorf("X-API-Token did not verify with composite key: %v", err)
 			http.Error(w, "bad token", http.StatusUnauthorized)
@@ -79,7 +79,7 @@ func TestNewClient_TokenSignedWithCompositeKey(t *testing.T) {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Method)
 		}
 		return []byte(expectedKey), nil
-	})
+	}, jwt.WithTimeFunc(nowFn))
 	if err != nil {
 		t.Fatalf("token did not verify with composite key: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestNewClient_TokenWrongKeyDoesNotVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	_, err = jwt.Parse(cl.token, func(_ *jwt.Token) (any, error) { return []byte("wrong-key"), nil })
+	_, err = jwt.Parse(cl.token, func(_ *jwt.Token) (any, error) { return []byte("wrong-key"), nil }, jwt.WithTimeFunc(nowFn))
 	if err == nil {
 		t.Fatalf("expected verification to fail with wrong key")
 	}
