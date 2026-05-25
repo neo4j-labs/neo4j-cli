@@ -32,6 +32,7 @@ type AuraTestHelper struct {
 	Server       *httptest.Server
 	out          *bytes.Buffer
 	err          *bytes.Buffer
+	stdin        string
 	cfg          string
 	credentials  string
 	fs           afero.Fs
@@ -77,8 +78,15 @@ func (helper *AuraTestHelper) ExecuteCommandE(command string) error {
 
 	cmd.SetOut(helper.out)
 	cmd.SetErr(helper.err)
+	cmd.SetIn(strings.NewReader(helper.stdin))
 
 	return cmd.Execute()
+}
+
+// SetStdin buffers stdin for the next ExecuteCommand call. Used by confirm
+// gating tests that drive the y/N prompt.
+func (helper *AuraTestHelper) SetStdin(in string) {
+	helper.stdin = in
 }
 
 func (helper *AuraTestHelper) SetConfig(cfg string) {

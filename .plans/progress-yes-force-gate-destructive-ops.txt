@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-05-25T09:00:00Z
 Built common/confirm package: Flags{Yes,Force}, Register, (*Flags).Require, ErrCancelled, stdinIsTerminal seam, SetStdinIsTerminalForTest. Table-driven tests cover all TTY/flag-state combos; resourceID="" degrades to "this <type>".
 Files: +common/confirm/confirm.go, +common/confirm/confirm_test.go
+
+## TASK-002 — 2026-05-25T09:30:00Z
+Wired confirm gate into all 9 Aura destructive leaves: instance, deployment, agent, customer-managed-key, data-api graphql, graphanalytics session, auth-provider, deployment token, cors-policy allowed-origin. Extended Long/Example per REQ-F-030/F-031; added SetStdin to AuraTestHelper; added 4 gating tests per leaf. Bundle regen deferred to task-005.
+Files: ~neo4j-cli/aura/internal/subcommands/{instance,deployment,agent,customermanagedkey,dataapi/graphql,dataapi/graphql/authprovider,dataapi/graphql/corspolicy/allowedorigin,deployment/token,graphanalytics/session}/{delete.go,delete_test.go,remove.go,remove_test.go}, ~neo4j-cli/aura/internal/test/testutils/auratesthelper.go
+Decisions: gate placed after pre-flight ownership validation but before destructive HTTP call so org/project-missing tests need no flag update; AuraTestHelper.SetStdin chosen over per-test cobra tree rebuild for ergonomics.

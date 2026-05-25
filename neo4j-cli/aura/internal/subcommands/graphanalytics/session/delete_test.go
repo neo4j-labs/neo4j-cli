@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +26,7 @@ func TestDeleteSession(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -46,7 +48,7 @@ func TestDeleteSessionWithDefaultWorkspace(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw", testSessionID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw --yes --force", testSessionID))
 
 	mockHandler.AssertCalledTimes(2)
 	helper.AsssertOk()
@@ -115,7 +117,7 @@ func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw", sessionId, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -141,7 +143,7 @@ func TestDeleteSessionNotFound_HasSuggestion(t *testing.T) {
 		]
 	}`)
 
-	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
 
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
@@ -174,7 +176,7 @@ func TestDeleteSessionError(t *testing.T) {
 }
 `)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", sessionId, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -183,4 +185,77 @@ func TestDeleteSessionError(t *testing.T) {
 	helper.AssertErr(`Error: [
 	session with id s-f5138f3b-7956 not found
 ]`)
+}
+
+func TestDeleteSessionConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
+	}
+	mockHandler.AssertCalledTimes(1)
+}
+
+func TestDeleteSessionConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}
+
+func TestDeleteSessionConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetStdin("y\n")
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+	helper.AssertErrContainsStrings([]string{"Delete session"})
+}
+
+func TestDeleteSessionConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetStdin("N\n")
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+
+	if err != nil {
+		t.Fatalf("expected nil on cancel, got %v", err)
+	}
+	mockHandler.AssertCalledTimes(1)
+	helper.AssertErrContainsStrings([]string{"cancelled."})
 }

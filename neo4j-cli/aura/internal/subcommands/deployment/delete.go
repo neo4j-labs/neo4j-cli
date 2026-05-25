@@ -4,11 +4,13 @@
 package deployment
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
@@ -30,47 +32,63 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "delete",
 		Short:       "Delete the given deployment",
-		Long:        "Deletes the given Fleet Manager deployment. This will only delete the deployment from Fleet Manager without affecting the actual running database. It is advised to disable Fleet Management for the database using `call fleetManagement.disable()`",
+		Long: `Deletes the given Fleet Manager deployment. This will only delete the deployment from Fleet Manager without affecting the actual running database. It is advised to disable Fleet Management for the database using ` + "`call fleetManagement.disable()`" + `.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Delete a deployment by ID
-neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete a deployment in a specific organization and project
-neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete a deployment and emit the response as JSON for scripting
-neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --format json`,
+neo4j-cli aura deployment delete 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
-			if err != nil {
-				return err
-			}
-
-			deploymentId := strings.TrimSpace(args[0])
-			path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId)
-
-			cmd.SilenceUsage = true
-			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:  http.MethodDelete,
-				Version: api.AuraApiVersion2,
-			})
-			if err != nil {
-				return err
-			}
-
-			if api.IsSuccessful(statusCode) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "deployment %s deleted\n", deploymentId) //nolint:errcheck // narration to stderr; write errors are not actionable
-				output.PrintBodyMap(cmd, cfg,
-					api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": deploymentId}),
-					[]string{"deleted", "id"})
-			}
-
-			return nil
-		},
+		RunE: nil,
 	}
+
+	confirmFlags := confirm.Register(cmd)
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
+		if err != nil {
+			return err
+		}
+
+		deploymentId := strings.TrimSpace(args[0])
+
+		cmd.SilenceUsage = true
+
+		if err := confirmFlags.Require(cmd, deploymentId); err != nil {
+			if errors.Is(err, confirm.ErrCancelled) {
+				fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.") //nolint:errcheck // narration to stderr; write errors are not actionable
+				return nil
+			}
+			return err
+		}
+
+		path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s", organizationId, projectId, deploymentId)
+		_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
+			Method:  http.MethodDelete,
+			Version: api.AuraApiVersion2,
+		})
+		if err != nil {
+			return err
+		}
+
+		if api.IsSuccessful(statusCode) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "deployment %s deleted\n", deploymentId) //nolint:errcheck // narration to stderr; write errors are not actionable
+			output.PrintBodyMap(cmd, cfg,
+				api.NewSingleValueResponseData(map[string]any{"deleted": true, "id": deploymentId}),
+				[]string{"deleted", "id"})
+		}
+
+		return nil
+	}
+
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
 	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
 

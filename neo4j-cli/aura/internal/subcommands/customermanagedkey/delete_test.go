@@ -6,8 +6,10 @@ package customermanagedkey_test
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -25,7 +27,7 @@ func TestDeleteCustomerManagedKey(t *testing.T) {
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
 			mockHandler.AddResponse(http.StatusNoContent, "")
 
-			helper.ExecuteCommand(fmt.Sprintf("%s delete %s --organization-id %s --project-id %s --rw", command, testCMKID, testOrgID, testProjectID))
+			helper.ExecuteCommand(fmt.Sprintf("%s delete %s --organization-id %s --project-id %s --rw --yes --force", command, testCMKID, testOrgID, testProjectID))
 
 			mockHandler.AssertCalledTimes(2)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -51,7 +53,7 @@ func TestDeleteCustomerManagedKeyWithDefaultWorkspace(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
 	mockHandler.AddResponse(http.StatusNoContent, "")
 
-	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --rw", testCMKID))
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --rw --yes --force", testCMKID))
 
 	mockHandler.AssertCalledTimes(2)
 	helper.AssertErrContainsStrings([]string{fmt.Sprintf("customer-managed-key %s deleted", testCMKID)})
@@ -116,7 +118,7 @@ func TestDeleteCustomerManagedKeyWithTrailingNewline(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", cmkId), http.StatusOK, cmkGetBody(cmkId, testProjectID))
 	mockHandler.AddResponse(http.StatusNoContent, "")
 
-	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s\"\n\" --organization-id %s --project-id %s --rw", cmkId, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", cmkId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -137,7 +139,7 @@ func TestDeleteCustomerManagedKey_StdoutIsValidJSON(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
 	mockHandler.AddResponse(http.StatusNoContent, "")
 
-	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --format json", testCMKID, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --yes --force --format json", testCMKID, testOrgID, testProjectID))
 
 	helper.AssertOutIsValidJSON()
 }
@@ -151,7 +153,7 @@ func TestDeleteCustomerManagedKey_TableFormat(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
 	mockHandler.AddResponse(http.StatusNoContent, "")
 
-	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --format table", testCMKID, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --yes --force --format table", testCMKID, testOrgID, testProjectID))
 
 	helper.AssertOutContainsStrings([]string{"DELETED", "ID", "true", testCMKID})
 	helper.AssertErrContainsStrings([]string{fmt.Sprintf("customer-managed-key %s deleted", testCMKID)})
@@ -200,7 +202,7 @@ func TestDeleteCustomerManagedKeyError(t *testing.T) {
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
 			mockHandler.AddResponse(testCase.statusCode, testCase.returnBody)
 
-			helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
+			helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --yes --force", testCMKID, testOrgID, testProjectID))
 
 			mockHandler.AssertCalledTimes(2)
 			mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -209,4 +211,77 @@ func TestDeleteCustomerManagedKeyError(t *testing.T) {
 			helper.AssertErr(testCase.expectedError)
 		})
 	}
+}
+
+func TestDeleteCustomerManagedKeyConfirmGate_NonTTYWithoutFlags_Exit2(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pass both --yes and --force") {
+		t.Fatalf("error %q missing 'pass both --yes and --force'", err.Error())
+	}
+	mockHandler.AssertCalledTimes(1)
+}
+
+func TestDeleteCustomerManagedKeyConfirmGate_NonTTYWithBothFlags_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return false })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
+	mockHandler.AddResponse(http.StatusNoContent, "")
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw --yes --force", testCMKID, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+}
+
+func TestDeleteCustomerManagedKeyConfirmGate_TTYAnswerY_Proceeds(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetStdin("y\n")
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
+	mockHandler.AddResponse(http.StatusNoContent, "")
+
+	helper.ExecuteCommand(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
+
+	mockHandler.AssertCalledTimes(2)
+	mockHandler.AssertCalledWithMethod(http.MethodDelete)
+	helper.AssertErrContainsStrings([]string{"Delete customer-managed-key"})
+}
+
+func TestDeleteCustomerManagedKeyConfirmGate_TTYAnswerN_Cancels(t *testing.T) {
+	confirm.SetStdinIsTerminalForTest(t, func() bool { return true })
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetStdin("N\n")
+	registerProjectsMock(&helper)
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/customer-managed-keys/%s", testCMKID), http.StatusOK, cmkGetBody(testCMKID, testProjectID))
+
+	err := helper.ExecuteCommandE(fmt.Sprintf("customer-managed-key delete %s --organization-id %s --project-id %s --rw", testCMKID, testOrgID, testProjectID))
+
+	if err != nil {
+		t.Fatalf("expected nil on cancel, got %v", err)
+	}
+	mockHandler.AssertCalledTimes(1)
+	helper.AssertErrContainsStrings([]string{"cancelled."})
 }

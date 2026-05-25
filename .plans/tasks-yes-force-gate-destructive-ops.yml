@@ -44,7 +44,7 @@ tasks:
       `--yes --force` appended to keep passing; add new cases per REQ-F-011/F-012
       covering non-TTY-without-flags (exit 2), non-TTY-with-flags (proceeds),
       TTY+y (proceeds), TTY+N (cancelled).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -53,7 +53,7 @@ tasks:
       - "Each leaf has new test cases for the four (TTY × flag-state) gating paths; `go test ./neo4j-cli/aura/internal/subcommands/...` is green."
       - "Cancelled TTY prompt writes 'cancelled.' to stderr, makes no HTTP call, and returns exit 0."
       - "`make fmt-check` and `make lint` pass for the Aura subtree."
-    completed_at: null
+    completed_at: 2026-05-25T09:30:00Z
 
   - id: task-003
     title: "Migrate 3 local single-flag leaves (docker, desktop dbms, desktop connection) to shared helper"
