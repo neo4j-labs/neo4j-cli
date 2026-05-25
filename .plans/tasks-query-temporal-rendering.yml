@@ -200,7 +200,6 @@ tasks:
 
       The goal is zero new top-level test functions; the regression guard
       lives as new rows in the existing tables.
-    status: pending
     dependencies:
       - task-003
       - task-004
@@ -211,4 +210,5 @@ tasks:
       - "No comment in `output_test.go` references the empty-`{}` regression or anchors to the current fix"
       - "`go test ./neo4j-cli/query/...` green"
       - "`make fmt-check` and `make lint` clean"
-    completed_at: null
+    status: completed
+    completed_at: 2026-05-25T12:35:00Z

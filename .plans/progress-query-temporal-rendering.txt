@@ -14,3 +14,7 @@ Files: ~neo4j-cli/query/output_test.go, +.changes/unreleased/neo4j-cli-Patch-202
 Collapsed Node/Relationship/Path branches in coerce.go to delegate to the map case via coerceDriverValue(val.Props); switched graph-entity type assertions in coerce_test.go to require.True so failed assertions short-circuit.
 Files: ~neo4j-cli/query/coerce.go, ~neo4j-cli/query/coerce_test.go
 Decisions: Props map mutation survives pass-by-value because Node/Relationship Props is a reference-type map.
+
+## task-005 — 2026-05-25T12:35:00Z
+Folded the three thin temporal-string tests into existing TestRenderRows_JSON / TestRenderRows_Table tables as new rows; added optional wantRowValues / wantRawContains / wantRawNotContains fields to the JSON table struct and wantNotInBody to the Table struct to keep assertions data-driven.
+Files: ~neo4j-cli/query/output_test.go

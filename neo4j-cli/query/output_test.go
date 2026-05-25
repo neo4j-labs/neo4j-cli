@@ -130,6 +130,9 @@ func TestRenderRows_JSON(t *testing.T) {
 		wantTruncated       bool
 		wantArraysTruncated int
 		wantRowCount        int
+		wantRowValues       []map[string]any // optional: decoded row equality
+		wantRawContains     []string         // optional: raw output substrings
+		wantRawNotContains  []string         // optional: raw output forbidden substrings
 	}{
 		{
 			name:                "happy path with two rows",
@@ -171,6 +174,20 @@ func TestRenderRows_JSON(t *testing.T) {
 			wantArraysTruncated: 0,
 			wantRowCount:        0,
 		},
+		{
+			// temporal string passes through MarshalJSON verbatim as a JSON string.
+			name:                "temporal-shaped string serialises as JSON string",
+			columns:             []string{"d"},
+			rows:                []map[string]any{{"d": "2026-05-25"}},
+			truncated:           false,
+			arraysTruncated:     0,
+			wantTruncated:       false,
+			wantArraysTruncated: 0,
+			wantRowCount:        1,
+			wantRowValues:       []map[string]any{{"d": "2026-05-25"}},
+			wantRawContains:     []string{`"d": "2026-05-25"`},
+			wantRawNotContains:  []string{`"d": {}`},
+		},
 	}
 
 	for _, tc := range tests {
@@ -178,69 +195,24 @@ func TestRenderRows_JSON(t *testing.T) {
 			cmd, cfg, stdout := newRenderCmd(t, "json")
 			renderRows(cmd, cfg, tc.columns, tc.rows, tc.truncated, tc.arraysTruncated)
 
+			out := stdout.String()
 			var got decodedResult
-			require.NoError(t, json.Unmarshal(stdout.Bytes(), &got))
+			require.NoError(t, json.Unmarshal([]byte(out), &got))
 			assert.Equal(t, tc.columns, got.Columns)
 			assert.Equal(t, tc.wantTruncated, got.Truncated)
 			assert.Equal(t, tc.wantArraysTruncated, got.ArraysTruncated)
 			assert.Len(t, got.Rows, tc.wantRowCount)
+			if tc.wantRowValues != nil {
+				assert.Equal(t, tc.wantRowValues, got.Rows)
+			}
+			for _, s := range tc.wantRawContains {
+				assert.Contains(t, out, s)
+			}
+			for _, s := range tc.wantRawNotContains {
+				assert.NotContains(t, out, s)
+			}
 		})
 	}
-}
-
-// TestFormatCell_ISO8601StringPassthrough locks the contract that
-// coerceDriverValue-emitted ISO-8601 strings flow through formatCell's string
-// branch unchanged — no surrounding quotes, no JSON braces. A regression here
-// would re-introduce the empty-{} rendering for temporal columns.
-func TestFormatCell_ISO8601StringPassthrough(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-	}{
-		{name: "Date", in: "2026-05-25"},
-		{name: "LocalDateTime", in: "2026-05-25T10:30:00"},
-		{name: "LocalTime", in: "10:30:00"},
-		{name: "Time", in: "10:30:00Z"},
-		{name: "Duration", in: "P1Y2M3DT4H5M6S"},
-		{name: "RFC3339", in: "2026-05-25T10:30:00Z"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := formatCell(tc.in)
-			assert.Equal(t, tc.in, got, "ISO string must pass through formatCell unchanged")
-			assert.NotContains(t, got, `"`, "no surrounding quotes")
-			assert.NotContains(t, got, "{", "no JSON braces")
-			assert.NotContains(t, got, "}", "no JSON braces")
-		})
-	}
-}
-
-// TestRenderRows_JSON_TemporalStringRow asserts that an ISO-8601 string row
-// renders as a bare JSON string under the column key, confirming the
-// MarshalJSON path emits coerced temporals as strings, not {}.
-func TestRenderRows_JSON_TemporalStringRow(t *testing.T) {
-	cmd, cfg, stdout := newRenderCmd(t, "json")
-	renderRows(cmd, cfg, []string{"d"}, []map[string]any{{"d": "2026-05-25"}}, false, 0)
-
-	out := stdout.String()
-	var got decodedResult
-	require.NoError(t, json.Unmarshal([]byte(out), &got), "output must be valid JSON envelope; got: %s", out)
-	require.Len(t, got.Rows, 1)
-	assert.Equal(t, "2026-05-25", got.Rows[0]["d"], "temporal string must serialise as a JSON string, not {} or other type")
-	assert.Contains(t, out, `"d": "2026-05-25"`, "raw JSON must contain the key:value pair as a string (tab-indented format)")
-	assert.NotContains(t, out, `"d": {}`, "must not render as empty JSON object")
-}
-
-// TestRenderRows_Table_TemporalStringRow asserts that an ISO-8601 string row
-// renders flush in the table cell — no surrounding quotes, no JSON braces.
-func TestRenderRows_Table_TemporalStringRow(t *testing.T) {
-	cmd, cfg, stdout := newRenderCmd(t, "table")
-	renderRows(cmd, cfg, []string{"d"}, []map[string]any{{"d": "2026-05-25"}}, false, 0)
-
-	out := stdout.String()
-	assert.Contains(t, out, "2026-05-25", "table cell must contain the ISO string flush; got: %s", out)
-	assert.NotContains(t, out, `"2026-05-25"`, "table cell must not wrap the ISO string in quotes")
-	assert.NotContains(t, out, "{}", "table cell must not render as empty JSON object")
 }
 
 func TestRenderRows_JSON_PreservesColumnOrder(t *testing.T) {
@@ -259,11 +231,12 @@ func TestRenderRows_JSON_PreservesColumnOrder(t *testing.T) {
 
 func TestRenderRows_Table(t *testing.T) {
 	tests := []struct {
-		name        string
-		columns     []string
-		rows        []map[string]any
-		wantHeaders []string // expected header column substrings (lower-cased compare)
-		wantInBody  []string // substrings expected in the rendered body
+		name          string
+		columns       []string
+		rows          []map[string]any
+		wantHeaders   []string // expected header column substrings (lower-cased compare)
+		wantInBody    []string // substrings expected in the rendered body
+		wantNotInBody []string // substrings forbidden in the rendered body
 	}{
 		{
 			name:        "scalar string + number + bool",
@@ -293,6 +266,15 @@ func TestRenderRows_Table(t *testing.T) {
 			wantHeaders: []string{"n"},
 			wantInBody:  []string{"null"},
 		},
+		{
+			// temporal string passes through formatCell verbatim (flush, no quotes, no braces).
+			name:          "temporal-shaped string renders flush",
+			columns:       []string{"d"},
+			rows:          []map[string]any{{"d": "2026-05-25"}},
+			wantHeaders:   []string{"d"},
+			wantInBody:    []string{"2026-05-25"},
+			wantNotInBody: []string{`"2026-05-25"`, "{}"},
+		},
 	}
 
 	for _, tc := range tests {
@@ -307,6 +289,9 @@ func TestRenderRows_Table(t *testing.T) {
 			}
 			for _, body := range tc.wantInBody {
 				assert.Contains(t, out, body, "missing body cell text %q in table output", body)
+			}
+			for _, body := range tc.wantNotInBody {
+				assert.NotContains(t, out, body, "forbidden body cell text %q in table output", body)
 			}
 		})
 	}
