@@ -186,9 +186,19 @@ try {
     Write-Host ""
     Write-Ok "Done! Run 'neo4j-cli --help' to get started."
 
-    # -- Auto-install skill (opt-in) ------------------------------------------
-    if ($env:NEO4J_CLI_AUTO_INSTALL_SKILL -eq "1") {
-        try { & neo4j-cli skill install --rw } catch { }
+    # -- Skill install --------------------------------------------------------
+    # Precedence: env-var override > interactive prompt > skip.
+    switch ($env:NEO4J_CLI_AUTO_INSTALL_SKILL) {
+        '1' { try { & neo4j-cli skill install --rw } catch { } }
+        '0' { }
+        default {
+            if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+                $resp = Read-Host "Install neo4j-cli skill bundle for detected AI agents? [Y/n]"
+                if ($resp -notmatch '^(n|no)$') {
+                    try { & neo4j-cli skill install --rw } catch { }
+                }
+            }
+        }
     }
 
 } finally {

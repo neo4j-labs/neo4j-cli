@@ -74,6 +74,8 @@ Installed skill bundles are auto-refreshed in the background whenever the binary
 
 `--rw` is required for any command that mutates state (Aura API, local config, credentials, skills, write Cypher) when running under an agent harness or non-interactive script. In an interactive terminal `--rw` is auto-applied — humans typing at a prompt don't need the flag. Read-only commands (`skill list`, `skill check`, `skill print`, `query <read>`, `aura instance list`) never need it.
 
+Destructive leaves (any `… delete` / `… remove` — Aura instance/deployment/agent/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, `docker delete`, `desktop dbms/connection delete`, `credential aura-client/dbms/embed remove`) gate on both `--yes` and `--force` in addition to `--rw`. On a TTY either missing flag prompts y/N; in non-TTY contexts both must be passed or the command exits 2.
+
 Additional Neo4j skills for AI agents: https://github.com/neo4j-contrib/neo4j-skills
 
 ## Links

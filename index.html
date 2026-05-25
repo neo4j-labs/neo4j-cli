@@ -757,14 +757,18 @@
      override this and restore full syntax highlighting.
      Scoped with :has(.agentic-line) so blocks WITHOUT an agent prompt
      (e.g. install commands in Quickstart steps 1–2) keep full color. */
-  /* Quickstart step-cmds stay full contrast in both modes — this is a
-     copy-these-commands guide, not an agentic showcase. Dim sweep is
-     intentionally kept only on #examplesSection below. */
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line),
+  #quickstartSteps:not(.cli-mode) .step-cmd:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.copy-icon) {
+    color: var(--fg-faint) !important;
+  }
 
   /* #examplesSection IS the .examples element (id+class on same div), so the
      :not(.cli-mode) check goes on the id selector directly — not a descendant
      match. Earlier `#examplesSection .examples` looked for a child and never fired. */
-  /* Dim sweep removed — full contrast in both modes for readability. */
+  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line),
+  #examplesSection:not(.cli-mode) .example-pane pre:has(.agentic-line) *:not(.agentic-line):not(.agentic-line *):not(.out):not(.out *) {
+    color: var(--fg-faint) !important;
+  }
 
   /* ---------- Quickstart ---------- */
   .steps {
@@ -1346,7 +1350,7 @@
 <span class="comment"># stop / start / delete</span>
 <span class="prompt">$</span> neo4j-cli docker stop dev <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli docker start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--force</span> <span class="flag">--rw</span>   <span class="comment"># removes container + stored credential</span>
+<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>   <span class="comment"># removes container + stored credential</span>
 
 <span class="comment"># ephemeral: throwaway container, no credential stored</span>
 <span class="prompt">$</span> neo4j-cli docker create <span class="flag">--name</span> tmp <span class="flag">--ephemeral</span> <span class="flag">--env-out-file</span> /tmp/n.env <span class="flag">--wait</span> <span class="flag">--rw</span>
@@ -1702,7 +1706,7 @@
 <span class="prompt">$</span> neo4j-cli docker get dev
 <span class="prompt">$</span> neo4j-cli docker stop dev <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli docker start dev <span class="flag">--wait</span> <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--force</span> <span class="flag">--rw</span>    <span class="comment"># removes container + stored credential</span></pre>
+<span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>    <span class="comment"># removes container + stored credential</span></pre>
               <p><code>create</code> auto-stores a <code>dbms</code> credential (named after <code>--name</code>) so <code>neo4j-cli query --credential dev</code> connects immediately. Host ports default to 7474/7687 and auto-increment when taken. Pass <code>--version 5.26.0</code> to pin a Neo4j version; <code>--accept-license</code> upgrades to the commercial license.</p>
               <p><strong>Ephemeral containers</strong> (<code>--ephemeral</code>) run with <code>docker run --rm</code> — no credential is persisted. Pass <code>--env-out-file &lt;path&gt;</code> to write an env-file for <code>query --env</code>:</p>
               <pre><span class="prompt">$</span> neo4j-cli docker create <span class="flag">--name</span> tmp <span class="flag">--ephemeral</span> <span class="flag">--env-out-file</span> /tmp/n.env <span class="flag">--wait</span> <span class="flag">--rw</span>
@@ -1739,7 +1743,7 @@
 <span class="prompt">$</span> neo4j-cli desktop connection create <span class="flag">--name</span> aura-prod \
     <span class="flag">--uri</span> neo4j+s://abc123.databases.neo4j.io <span class="flag">--username</span> neo4j <span class="flag">--rw</span>      <span class="comment"># prompts for password on TTY</span>
 <span class="prompt">$</span> neo4j-cli desktop connection update &lt;id&gt; <span class="flag">--description</span> <span class="string">"dev tier"</span> <span class="flag">--rw</span>
-<span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--rw</span></pre>
+<span class="prompt">$</span> neo4j-cli desktop connection delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
               <p>Query against the currently-running Desktop DBMS or a saved connection without restating credentials:</p>
               <pre><span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop <span class="string">'MATCH (n) RETURN count(n)'</span>
 <span class="prompt">$</span> neo4j-cli query <span class="flag">--credential</span> desktop-connection:&lt;uuid&gt; <span class="string">'MATCH (n) RETURN count(n)'</span></pre>
@@ -1761,6 +1765,9 @@
                 <li><strong>Non-interactive scripts</strong> — CI, piped invocations, redirected stdout, <code>nohup</code>.</li>
               </ul>
               <p>Disable telemetry without writing config: <code>DO_NOT_TRACK=1 neo4j-cli …</code></p>
+              <p><strong>Destructive leaves</strong> (any <code>… delete</code> / <code>… remove</code> — Aura instance/deployment/agent/CMK/data-api/graph-analytics/auth-provider/CORS allowed-origin, <code>docker delete</code>, <code>desktop dbms/connection delete</code>, <code>credential aura-client/dbms/embed remove</code>) gate on both <code>--yes</code> and <code>--force</code>. On a TTY either flag missing triggers a y/N prompt; in non-TTY contexts both must be passed or the command exits 2.</p>
+              <pre><span class="prompt">$</span> neo4j-cli docker delete dev <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli aura instance delete &lt;id&gt; <span class="flag">--yes</span> <span class="flag">--force</span> <span class="flag">--rw</span></pre>
             </div>
           </details>
           <!-- END:docs:write-gate -->
