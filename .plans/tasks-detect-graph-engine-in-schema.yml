@@ -123,3 +123,26 @@ tasks:
       - "Smoke test on plain Neo4j shows `graph_engine` absent and `cypher_versions == [\"5\",\"25\"]`"
       - "Ephemeral container cleaned up after the smoke test"
     completed_at: 2026-05-25T08:20:00Z
+
+  - id: task-006
+    title: "Collapse duplicate graph-engine tests into one table-driven test"
+    description: |
+      Stellar review flagged `TestSchema_DetectsGraphEngine` and
+      `TestSchema_GraphEngine_KernelRowOrderInsensitive` in
+      `neo4j-cli/query/schema_test.go` as ~95% duplicates — same harness, same
+      canned response shape, identical assertion block; only the row order in
+      the `dbms.components()` fixture differs. Collapse them into a single
+      table-driven test (e.g. `TestSchema_DetectsGraphEngine`) with two `t.Run`
+      sub-cases ("vg_row_last" and "vg_row_first"). Share the kernel / cypher /
+      vg row fixtures and the assertion block. Keep failure-message specificity
+      via `t.Run` names. Net delta should be ~−45 lines in `schema_test.go`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Only one Go test function covers graph-engine detection (e.g. `TestSchema_DetectsGraphEngine`)"
+      - "Two `t.Run` sub-cases exercise both row orders (`vg_row_last`, `vg_row_first`)"
+      - "Assertion block appears once, not duplicated across cases"
+      - "`go test ./neo4j-cli/query/... -run TestSchema_DetectsGraphEngine` is green"
+      - "`make test`, `make fmt-check`, `make lint` all pass"
+    completed_at: null
