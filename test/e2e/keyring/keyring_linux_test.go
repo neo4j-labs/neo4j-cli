@@ -15,8 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// stripDBUS returns a copy of env with DBUS_SESSION_BUS_ADDRESS removed.
-// Used by no-daemon tests to simulate a headless environment.
+// stripDBUS returns a copy of env with DBUS_SESSION_BUS_ADDRESS replaced by an
+// invalid socket path. Using an explicit but nonexistent path causes godbus to
+// fail fast with ENOENT rather than falling back to dbus-launch --autolaunch,
+// which can block for ~4 minutes per subprocess call on headless runners.
 func stripDBUS(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, e := range env {
@@ -25,6 +27,9 @@ func stripDBUS(env []string) []string {
 		}
 		out = append(out, e)
 	}
+	// Replace with an invalid path so godbus fails fast (ENOENT) rather than
+	// falling back to dbus-launch --autolaunch (~4 min hang).
+	out = append(out, "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-dbus-socket")
 	return out
 }
 
