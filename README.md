@@ -48,6 +48,8 @@ neo4j-cli skill check                    # version drift vs running binary
 neo4j-cli skill remove [agent]           # idempotent
 ```
 
+Using a multi-agent orchestrator like [Conductor](https://www.conductor.build)? It reuses the underlying agents' skill directories (e.g. Claude Code, Codex), so `skill install` with no argument covers every detected agent in one go, and `skill check` surfaces any version drift between them.
+
 ## Credentials
 
 `neo4j-cli` stores three kinds of credentials in `credentials.json` under your OS config directory. All three trees share the same `add / list / use / remove` shape; `use` sets the default consumed by downstream commands.
