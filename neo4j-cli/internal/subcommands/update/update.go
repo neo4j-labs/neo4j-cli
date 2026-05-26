@@ -98,7 +98,8 @@ func NewCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 			"to opt into alpha/beta/rc tags. When the running binary lives under a known package-manager " +
 			"prefix (Homebrew, npm-global, pipx, uv tool), the command refuses to overwrite and prints the " +
 			"channel-correct upgrade command instead — pass `--force` to override. " +
-			"After a successful swap, any installed agent skill bundles are refreshed automatically.",
+			"After a successful swap, any installed agent skill bundles are refreshed automatically. " +
+			"See SECURITY.md in the repo for the supply-chain trust root and accepted residual risks.",
 		Example: `# Self-update to the latest stable release
 neo4j-cli update
 
@@ -436,6 +437,15 @@ func runUpdate(ctx context.Context, cmd *cobra.Command, cfg *clicfg.Config, opts
 	// proceeded past the passthrough hint (so users can audit "I forced an
 	// update on top of a homebrew binary"). Plain-text path is unaffected.
 	result.installMethod = string(method)
+
+	// REQ-F-004: when --force has overridden a package-manager-managed binary,
+	// emit the channel-correct warning to stderr BEFORE the plain-text narrative
+	// and BEFORE swapFn — the warning must surface regardless of --format mode
+	// (it's for humans; JSON scripts can redirect stderr) and must not be lost
+	// to a swap failure.
+	if opts.force && method != InstallMethodBinary {
+		fmt.Fprint(cmd.ErrOrStderr(), ForceOverrideWarning(method, currentBinaryPath)) //nolint:errcheck // warning to stderr; write errors are not actionable
+	}
 
 	// Plain-text path emits the running narrative ("Current version", "Checking
 	// for updates...") inline so the user sees progress before swap completes.

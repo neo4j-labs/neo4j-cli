@@ -153,75 +153,137 @@ func classify(absPath string) InstallMethod {
 	return InstallMethodBinary
 }
 
+// channelLabel returns the human-readable channel name for a given install
+// method. Used by both Hint (passthrough preamble) and ForceOverrideWarning
+// (warning header) so the wording stays in lockstep across both surfaces.
+// Returns the empty string for InstallMethodBinary.
+func channelLabel(method InstallMethod) string {
+	switch method {
+	case InstallMethodHomebrew:
+		return "Homebrew"
+	case InstallMethodNpm:
+		return "npm/pnpm/yarn"
+	case InstallMethodPipx:
+		return "pipx"
+	case InstallMethodUv:
+		return "uv tool"
+	default:
+		return ""
+	}
+}
+
+// uninstallCmd returns the channel-correct uninstall command for a given
+// install method. Used by both the Hint passthrough remediation block and the
+// new --force ForceOverrideWarning so the command has one source of truth.
+// Returns the empty string for InstallMethodBinary.
+func uninstallCmd(method InstallMethod) string {
+	switch method {
+	case InstallMethodHomebrew:
+		return "brew uninstall neo4j-cli"
+	case InstallMethodNpm:
+		return "npm uninstall -g @neo4j-labs/cli"
+	case InstallMethodPipx:
+		return "pipx uninstall neo4j-cli"
+	case InstallMethodUv:
+		return "uv tool uninstall neo4j-cli"
+	default:
+		return ""
+	}
+}
+
+// selfManagedBlock returns the two-line "uninstall + curl install" remediation
+// block (each line two-space indented) appended to Hint output and emitted
+// inside ForceOverrideWarning. The uninstall line is now presented as required
+// (no "optional —" annotation per REQ-F-004) because PATH needs to be cleared
+// of the package-manager binary for the new self-managed binary to resolve.
+// Returns the empty string for InstallMethodBinary.
+func selfManagedBlock(method InstallMethod) string {
+	uninst := uninstallCmd(method)
+	if uninst == "" {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "  %s\n", uninst)
+	fmt.Fprintf(&b, "  %s\n", installScriptCmd)
+	return b.String()
+}
+
+// ForceOverrideWarning returns the multi-line stderr warning emitted when
+// `update --force` overrides a detected package-manager install. The block
+// names the detected channel and the resolved binary path, flags the revert
+// risk, then offers the channel-correct self-managed remediation via
+// selfManagedBlock (so wording stays in lockstep with Hint).
+//
+// Returns the empty string for InstallMethodBinary — there's nothing to warn
+// about when the binary is self-managed.
+//
+// The returned string ends in a single trailing newline so the call site uses
+// fmt.Fprint (NOT Fprintln) without producing a double blank line.
+func ForceOverrideWarning(method InstallMethod, path string) string {
+	label := channelLabel(method)
+	if label == "" {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Warning: --force overriding detected %s install at %s.\n", label, path)
+	b.WriteString("The package manager may revert this change on next upgrade.\n")
+	b.WriteString("\n")
+	b.WriteString("To avoid this in future, switch to a self-managed install (so `neo4j-cli update` works directly):\n")
+	b.WriteString(selfManagedBlock(method))
+	return b.String()
+}
+
 // Hint returns the user-facing passthrough message for a given install method.
 // The shape follows REQ-F-010a: a top-line preamble, the channel-correct
 // upgrade command, then a "switch to a self-managed install" block carrying
-// the install-script command and the OPTIONAL uninstall command.
+// the channel-correct uninstall command and the install-script command.
 //
 // Returns the empty string for InstallMethodBinary — there is no passthrough
 // hint when self-update is the right answer.
 func Hint(method InstallMethod) string {
 	switch method {
 	case InstallMethodHomebrew:
-		return formatHint(
-			"Installed via Homebrew.",
-			"brew upgrade neo4j-cli",
-			"brew uninstall neo4j-cli",
-		)
+		return formatHint(method, "brew upgrade neo4j-cli")
 	case InstallMethodNpm:
 		// REQ-F-009 calls out pnpm / yarn equivalents alongside npm because
 		// any of the three could have produced the @neo4j-labs/cli node_modules
 		// layout. List all three so the user picks the one matching their
 		// project tooling.
-		return formatHintMulti(
-			"Installed via npm-compatible package manager (global).",
-			[]string{
-				"npm i -g @neo4j-labs/cli@latest",
-				"pnpm add -g @neo4j-labs/cli@latest",
-				"yarn global add @neo4j-labs/cli@latest",
-			},
-			"npm uninstall -g @neo4j-labs/cli",
-		)
+		return formatHintMulti(method, []string{
+			"npm i -g @neo4j-labs/cli@latest",
+			"pnpm add -g @neo4j-labs/cli@latest",
+			"yarn global add @neo4j-labs/cli@latest",
+		})
 	case InstallMethodPipx:
-		return formatHint(
-			"Installed via pipx.",
-			"pipx upgrade neo4j-cli",
-			"pipx uninstall neo4j-cli",
-		)
+		return formatHint(method, "pipx upgrade neo4j-cli")
 	case InstallMethodUv:
-		return formatHint(
-			"Installed via uv tool.",
-			"uv tool upgrade neo4j-cli",
-			"uv tool uninstall neo4j-cli",
-		)
+		return formatHint(method, "uv tool upgrade neo4j-cli")
 	default:
 		return ""
 	}
 }
 
 // formatHint composes the three-block passthrough message documented in
-// REQ-F-010a. The uninstall line is annotated with the PATH-order rationale
-// so users understand why it's optional.
-func formatHint(channel, upgradeCmd, uninstallCmd string) string {
-	return formatHintMulti(channel, []string{upgradeCmd}, uninstallCmd)
+// REQ-F-010a using the channel label and remediation block helpers.
+func formatHint(method InstallMethod, upgradeCmd string) string {
+	return formatHintMulti(method, []string{upgradeCmd})
 }
 
 // formatHintMulti is the npm-flavoured variant of formatHint that lists more
 // than one upgrade command (pnpm / yarn alongside npm per REQ-F-009). The
 // preamble switches to "run one of:" when more than one command is offered.
-func formatHintMulti(channel string, upgradeCmds []string, uninstallCmd string) string {
+func formatHintMulti(method InstallMethod, upgradeCmds []string) string {
 	preamble := "To upgrade in place, run:"
 	if len(upgradeCmds) > 1 {
 		preamble = "To upgrade in place, run one of:"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s\n", channel, preamble)
+	fmt.Fprintf(&b, "Installed via %s. %s\n", channelLabel(method), preamble)
 	for _, cmd := range upgradeCmds {
 		fmt.Fprintf(&b, "  %s\n", cmd)
 	}
 	b.WriteString("\n")
 	b.WriteString("To switch to a self-managed install (so 'neo4j-cli update' works directly):\n")
-	fmt.Fprintf(&b, "  %s   # optional — only needed if PATH still resolves the package-manager binary\n", uninstallCmd)
-	fmt.Fprintf(&b, "  %s\n", installScriptCmd)
+	b.WriteString(selfManagedBlock(method))
 	return b.String()
 }

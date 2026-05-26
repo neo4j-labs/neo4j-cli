@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -79,6 +80,15 @@ var waitTimeout = 60 * time.Second
 // up a real Bolt endpoint.
 var waitForBoltFn = WaitForBolt
 
+// versionPattern is the package-level allowlist for `--version` values flowing
+// into the docker image tag (REQ-F-002). Compiled once via regexp.MustCompile
+// per the in-repo precompiled-regex idiom (see common/skill/installer.go:32).
+// Accepts digit-dot sequences with an optional `-enterprise` suffix
+// (covers semver `5`, `5.20`, `5.20.0`, calver `2026.04`, and the redundant
+// `-enterprise` suffix that the edition branch in create.go strips before
+// re-applying) plus the bare literal `latest`.
+var versionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*(-enterprise)?$|^latest$`)
+
 // newCreateCmd builds the `neo4j-cli docker create` leaf. The leaf performs
 // the port-conflict pre-flight (REQ-F-013) and the name-collision auto-suffix
 // (REQ-F-014) before touching docker so a clash never leaves a half-created
@@ -93,6 +103,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPort          int
 		password          string
 		noStoreCredential bool
+		noPrintPassword   bool
 		wait              bool
 		ephemeral         bool
 		envOutFile        string
@@ -110,6 +121,7 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		httpPortFlag          = "http-port"
 		passwordFlag          = "password"
 		noStoreCredentialFlag = "no-store-credential"
+		noPrintPasswordFlag   = "no-print-password"
 		ephemeralFlag         = "ephemeral"
 		envOutFileFlag        = "env-out-file"
 		dataDirFlag           = "data-dir"
@@ -141,7 +153,9 @@ func newCreateCmd(cfg *clicfg.Config) *cobra.Command {
 			"Use --data-dir / --logs-dir / --import-dir to bind-mount host directories at /data, /logs, /import " +
 			"inside the container. Paths support `~` and environment-variable expansion and are resolved to absolute " +
 			"paths; missing directories are created at mode 0o755. All three volume flags are incompatible with " +
-			"--ephemeral.",
+			"--ephemeral. " +
+			"Pass --no-print-password to omit the generated password from stdout output; retrieve it later via " +
+			"`neo4j-cli credential dbms get <name>`.",
 		Example: `# Create an enterprise container with auto-generated password and store a dbms credential
 neo4j-cli docker create --name dev --rw
 
@@ -170,6 +184,17 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				return clierr.NewUsageError(`invalid argument %q for "--%s" flag: must be one of "community" or "enterprise"`, edition, editionFlag)
 			}
 
+			// Validate --version against the package-level allowlist BEFORE
+			// any other pre-flight or docker side effect (REQ-F-001..005).
+			// The canonical form is reassigned to the outer `version` so the
+			// image-construction block, LabelVersion label, and output row
+			// all see the trimmed / -enterprise-stripped value.
+			canonicalVersion, err := validateVersion(version)
+			if err != nil {
+				return err
+			}
+			version = canonicalVersion
+
 			// --env-out-file / --ephemeral compatibility (REQ-F-017). --env-out-file
 			// is a child of --ephemeral (it only changes WHERE the env blob
 			// goes); rejecting it standalone keeps the contract honest.
@@ -180,6 +205,23 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 			if ephemeral && noStoreCredential {
 				return clierr.NewUsageError("--%s is incompatible with --%s (ephemeral already skips credential persistence)", noStoreCredentialFlag, ephemeralFlag)
+			}
+			// --no-print-password incompatibilities. The flag is meaningful only
+			// when the password remains recoverable through some other channel
+			// (stored dbms credential, operator-supplied --password, or the
+			// ephemeral .env blob via --env-out-file). Reject combos that would
+			// leave NO recovery path.
+			if noPrintPassword && ephemeral {
+				return clierr.NewUsageError(
+					"--%s is incompatible with --%s (ephemeral emits a .env blob; use --%s to write it to a file)",
+					noPrintPasswordFlag, ephemeralFlag, envOutFileFlag,
+				)
+			}
+			if noPrintPassword && noStoreCredential && password == "" {
+				return clierr.NewUsageError(
+					"--%s with --%s would discard the generated password unrecoverably; supply --%s explicitly or drop one of the flags",
+					noPrintPasswordFlag, noStoreCredentialFlag, passwordFlag,
+				)
 			}
 
 			// Volume-mount flags (--data-dir / --logs-dir / --import-dir) are
@@ -372,6 +414,9 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 
 			// Render the result. Field order mirrors what an operator wants
 			// at a glance: identity, image identity, ports, connection details.
+			// When --no-print-password is set, the password is omitted from
+			// both the map and the fields slice so every format (JSON, table,
+			// TOON) suppresses it at a single point.
 			row := map[string]any{
 				"name":      chosenName,
 				"edition":   edition,
@@ -380,9 +425,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				"http-port": httpPort,
 				"uri":       uri,
 				"username":  "neo4j",
-				"password":  resolvedPassword,
 			}
-			fields := []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username", "password"}
+			fields := []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username"}
+			if !noPrintPassword {
+				row["password"] = resolvedPassword
+				fields = append(fields, "password")
+			}
 			commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 
 			return nil
@@ -398,6 +446,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	cmd.Flags().IntVar(&httpPort, httpPortFlag, 7474, "Host port to publish for the HTTP browser (container 7474). Auto-incremented along with --bolt-port if taken.")
 	cmd.Flags().StringVar(&password, passwordFlag, "", "Neo4j password. When empty, a 16-byte base64 URL-safe password is generated.")
 	cmd.Flags().BoolVar(&noStoreCredential, noStoreCredentialFlag, false, "Skip persisting a dbms credential for this container.")
+	cmd.Flags().BoolVar(&noPrintPassword, noPrintPasswordFlag, false, "Don't include the generated password in stdout output. Retrieve later via `neo4j-cli credential dbms get <name>`.")
 	cmd.Flags().BoolVar(&ephemeral, ephemeralFlag, false, "Run with `docker run --rm`; skip credential persistence and emit a .env blob consumable by `query --env`.")
 	cmd.Flags().StringVar(&envOutFile, envOutFileFlag, "", "When --ephemeral, write the .env blob to this path (mode 0600) instead of stdout. Writes via a temp file in the same directory and atomically renames; a pre-existing symlink at the path is replaced by a regular file.")
 	cmd.Flags().StringVar(&dataDir, dataDirFlag, "", "Host directory to bind-mount at /data inside the container. Empty = no mount (data lives in the container layer and is lost on delete). Path supports `~` and environment-variable expansion; resolved to an absolute path; created at mode 0o755 if missing. Incompatible with --ephemeral.")
@@ -630,6 +679,30 @@ func expandHostPath(s string) (string, error) {
 		return "", fmt.Errorf("resolve absolute path: %w", err)
 	}
 	return abs, nil
+}
+
+// validateVersion enforces the `--version` allowlist (REQ-F-001..005) before
+// the value flows into the docker image tag at create.go's image-construction
+// block. The contract:
+//   - TrimSpace the input before matching so `--version " 5.20 "` is accepted
+//     and the trimmed value flows downstream unchanged.
+//   - Regex-match against versionPattern. On miss return a clierr.UsageError
+//     that names BOTH the expected format and the ORIGINAL (untrimmed) input
+//     so the operator sees exactly what they passed.
+//   - On hit, strip any trailing `-enterprise` suffix. The image-construction
+//     block re-appends `-enterprise` when --edition enterprise, so leaving
+//     the suffix in place would yield e.g. `neo4j:5.20-enterprise-enterprise`
+//     (unpublished tag, broken pull). Stripping makes the suffix harmless in
+//     both editions: enterprise re-adds it, community drops it.
+func validateVersion(version string) (string, error) {
+	trimmed := strings.TrimSpace(version)
+	if !versionPattern.MatchString(trimmed) {
+		return "", clierr.NewUsageError(
+			"invalid argument %q for \"--version\" flag: must match digits/dots with optional -enterprise suffix (e.g. 5.20, 5.20.0, 5.20-enterprise, latest)",
+			version,
+		)
+	}
+	return strings.TrimSuffix(trimmed, "-enterprise"), nil
 }
 
 // resolveHostDir expands a `--data-dir` / `--logs-dir` / `--import-dir` flag

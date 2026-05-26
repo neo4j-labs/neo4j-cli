@@ -33,6 +33,7 @@ var AGENTS = []Agent{
 	{Name: "cursor", DisplayName: "Cursor", DetectDir: "~/.cursor", SkillsDir: "~/.cursor/skills"},
 	{Name: "windsurf", DisplayName: "Windsurf", DetectDir: "~/.codeium/windsurf", SkillsDir: "~/.codeium/windsurf/skills"},
 	{Name: "copilot", DisplayName: "Copilot", DetectDir: "~/.copilot", SkillsDir: "~/.copilot/skills"},
+	{Name: "antigravity", DisplayName: "Antigravity", DetectDir: "~/.gemini/antigravity", SkillsDir: "~/.gemini/antigravity/skills"},
 	{Name: "gemini-cli", DisplayName: "Gemini CLI", DetectDir: "~/.gemini", SkillsDir: "~/.gemini/skills"},
 	{Name: "cline", DisplayName: "Cline", DetectDir: "~/.cline", SkillsDir: "~/.agents/skills"},
 	{Name: "codex", DisplayName: "Codex", DetectDir: "~/.codex", SkillsDir: "~/.codex/skills"},

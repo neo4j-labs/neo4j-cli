@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -50,6 +51,27 @@ func altRuntimeHint(lookPath func(string) (string, error)) string {
 // errors.Is(err, ErrNotFound) and translate to the documented unknown-name
 // usage error only on that match.
 var ErrNotFound = errors.New("docker: container not found")
+
+// sensitiveAssignmentRe matches `KEY=VALUE` env-style assignments whose LHS
+// contains AUTH or PASSWORD (case-insensitive), tolerating whitespace around
+// `=`. Group 1 captures the full LHS including the `=` so the replacement
+// template can preserve it while masking the value. The pattern is shared by
+// argv-echo (redactArgs) and docker stderr (redactString) so a future
+// tightening edits one regex, not two algorithms.
+var sensitiveAssignmentRe = regexp.MustCompile(`(?i)(\w*(?:AUTH|PASSWORD)\w*\s*=\s*)(\S+)`)
+
+// redactString returns s with every `KEY=VALUE` assignment whose LHS contains
+// AUTH or PASSWORD (case-insensitive) rewritten as `KEY=<redacted>`. The
+// underlying regex `(?i)(\w*(?:AUTH|PASSWORD)\w*\s*=\s*)(\S+)` captures the
+// full LHS (including `=`) in group 1 and the non-whitespace value in group 2;
+// the replacement template `${1}<redacted>` keeps the LHS verbatim. Backed by
+// ReplaceAllString so multi-match stderr blobs (e.g. multi-line docker errors
+// echoing several env vars) are fully covered, not just the first hit.
+// Single source of truth for credential redaction across the argv echo and
+// docker's own captured stderr.
+func redactString(s string) string {
+	return sensitiveAssignmentRe.ReplaceAllString(s, "${1}<redacted>")
+}
 
 // dockerClient abstracts the host `docker` CLI. The default execClient shells
 // out via os/exec; tests inject a fake (see helpers_test.go). Every method
@@ -147,34 +169,31 @@ func (c *execClient) run(ctx context.Context, args ...string) (string, error) {
 		// `docker run -e NEO4J_AUTH=neo4j/<secret>` would otherwise leak the
 		// generated password to the terminal and any captured shell/CI logs
 		// on non-zero exit. The argv passed to exec is untouched; redaction
-		// is only applied to the user-facing error string.
-		return "", clierr.NewUsageError("docker %s: %s", strings.Join(redactArgs(args), " "), msg)
+		// is only applied to the user-facing error string. The same
+		// redaction is applied to docker's own captured stderr (CLI-162) so
+		// third-party wrappers (alias docker=podman, lazydocker) and any
+		// future docker release that echoes argv-with-env on failure cannot
+		// leak the value through the stderr surface.
+		return "", clierr.NewUsageError("docker %s: %s", strings.Join(redactArgs(args), " "), redactString(msg))
 	}
 	return stdout.String(), nil
 }
 
 // redactArgs returns a copy of args with any element shaped like a sensitive
-// env-var assignment (LHS contains AUTH or PASSWORD) replaced by `<LHS>=<redacted>`.
-// Non-env elements are preserved unchanged and the input slice is never mutated.
-// Match is performed on the uppercase-folded LHS so case variants are caught,
-// even though Neo4j's own env-var names are uppercase by convention.
+// env-var assignment (LHS contains AUTH or PASSWORD) replaced by
+// `<LHS>=<redacted>`. Non-env elements are preserved unchanged and the input
+// slice is never mutated. Per-element redaction is delegated to redactString,
+// so the LHS match is regex-driven and case-insensitive (the previous
+// strings.ToUpper LHS-fold is now folded into the (?i) flag on the shared
+// regex). The nil/empty short-circuit is preserved: nil input returns nil,
+// empty input returns an empty slice.
 func redactArgs(args []string) []string {
 	if args == nil {
 		return nil
 	}
 	out := make([]string, len(args))
 	for i, a := range args {
-		eq := strings.IndexByte(a, '=')
-		if eq <= 0 {
-			out[i] = a
-			continue
-		}
-		lhs := strings.ToUpper(a[:eq])
-		if strings.Contains(lhs, "AUTH") || strings.Contains(lhs, "PASSWORD") {
-			out[i] = a[:eq] + "=<redacted>"
-			continue
-		}
-		out[i] = a
+		out[i] = redactString(a)
 	}
 	return out
 }

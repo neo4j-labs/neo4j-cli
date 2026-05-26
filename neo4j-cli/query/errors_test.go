@@ -99,6 +99,50 @@ func TestCategorizeBoltError_Mapping(t *testing.T) {
 	}
 }
 
+// TestCategorizeBoltError_ServerRespondedHTTP locks the wrong-port-family
+// reclassification: when the driver reports "server responded HTTP" the
+// failure is user-input misconfiguration (URI points at an HTTP listener,
+// not a Bolt one), so categorizeBoltError must surface it as a UsageError
+// with an actionable hint naming the Bolt port and the https:// alternative.
+// The branch fires for both plain-text errors and fmt.Errorf-wrapped chains.
+func TestCategorizeBoltError_ServerRespondedHTTP(t *testing.T) {
+	cases := []struct {
+		name string
+		in   error
+	}{
+		{
+			name: "plain driver text",
+			in:   errors.New("server responded HTTP. Make sure you are not trying to connect to the http endpoint (HTTP defaults to port 7474 whereas BOLT defaults to port 7687)"),
+		},
+		{
+			name: "wrapped via fmt.Errorf",
+			in:   fmt.Errorf("query: open driver: %w", errors.New("server responded HTTP. wrong port")),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := categorizeBoltError(tc.in)
+			require.Error(t, got)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(got, &ce), "expected *clierr.CLIError, got %T", got)
+			// NewUsageError → exit code 2 (usage_error). This is a
+			// user-input misconfiguration, not a transport-level retryable
+			// failure, so neither validation (6) nor upstream (8) fit.
+			assert.Equal(t, 2, ce.Code, "wrong-port-family must surface as UsageError")
+
+			msg := got.Error()
+			assert.Contains(t, msg, "server responded HTTP", "message names the driver symptom")
+			assert.Contains(t, msg, "7687", "hint names the default Bolt port")
+			assert.Contains(t, msg, "https://", "hint mentions the https:// alternative for the auto-rewrite path")
+			// Original driver error chain is preserved so errors.Is/As still
+			// reaches the inner sentinel.
+			assert.Contains(t, msg, tc.in.Error(), "wrap preserves the driver error text")
+		})
+	}
+}
+
 // TestCategorizeBoltError_PreservesWrappedChain locks that errors.As reaches
 // the original *neo4j.Neo4jError through the CLIError wrap so future code that
 // inspects driver-specific error types (e.g. retry decisions) keeps working.

@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
@@ -1569,4 +1570,215 @@ func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) 
 	_, statErr := mem.Stat("/tmp/n.env")
 	assert.True(t, os.IsNotExist(statErr) || statErr != nil,
 		"final env-file path must not exist after a rename failure; got stat err %v", statErr)
+}
+
+// TestCreate_VersionValidation pins the --version allowlist (REQ-F-001..005).
+// Reject cases assert the value is refused with a usage error naming --version
+// AND the original bad input, and no docker run is recorded. Accept cases
+// assert the canonical (trimmed, -enterprise-stripped) value is what flows
+// into both the image tag (last argv token) and the LabelVersion label —
+// mirrors the TestCreate_InvalidEdition_ReturnsUsageError shape.
+func TestCreate_VersionValidation(t *testing.T) {
+	rejects := []struct {
+		name    string
+		version string
+	}{
+		{"registry prefix", "evilregistry.com/neo4j:latest"},
+		{"trailing tag colon", "4.4:malicious"},
+		{"digest suffix", "4.4@sha256:deadbeef"},
+		{"registry plus digest", "evil.com/neo4j@sha256:deadbeef"},
+		{"shell metachar", "5.1.2$enterprise"},
+		{"empty string", ""},
+		{"double dot", "5..20"},
+		{"non-enterprise suffix", "5.20-community"},
+	}
+
+	for _, tc := range rejects {
+		t.Run("reject/"+tc.name, func(t *testing.T) {
+			args := fmt.Sprintf("--name dev --version %s --no-store-credential", shlexQuote(tc.version))
+			fake, _, _, err := runCreate(t, args)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--version",
+				"error must name the offending flag; got %q", err.Error())
+			assert.Contains(t, err.Error(), tc.version,
+				"error must echo the original bad input %q; got %q", tc.version, err.Error())
+			assert.Empty(t, fake.RunCalls,
+				"docker run must not be invoked on invalid --version: %v", fake.RunCalls)
+		})
+	}
+
+	accepts := []struct {
+		name        string
+		version     string
+		edition     string
+		wantImage   string
+		wantVersion string
+	}{
+		{"latest + enterprise → bare enterprise tag", "latest", "enterprise", "neo4j:enterprise", "latest"},
+		{"single digit + community", "5", "community", "neo4j:5", "5"},
+		{"dotted + community", "5.1.2", "community", "neo4j:5.1.2", "5.1.2"},
+		{"suffixed + enterprise no double", "5.20-enterprise", "enterprise", "neo4j:5.20-enterprise", "5.20"},
+		{"suffixed + community strips suffix", "5.20-enterprise", "community", "neo4j:5.20", "5.20"},
+		{"calver + community", "2026.04", "community", "neo4j:2026.04", "2026.04"},
+		{"whitespace trimmed + community", "  5.1.2  ", "community", "neo4j:5.1.2", "5.1.2"},
+	}
+
+	for _, tc := range accepts {
+		t.Run("accept/"+tc.name, func(t *testing.T) {
+			args := fmt.Sprintf("--name dev --version %s --edition %s --no-store-credential", shlexQuote(tc.version), tc.edition)
+			fake, _, _, err := runCreate(t, args)
+			require.NoError(t, err)
+			argv := runArgv(t, fake)
+			assert.Equal(t, tc.wantImage, argv[len(argv)-1],
+				"image tag (last argv token) must be canonical; got argv=%v", argv)
+			assert.True(t, containsPair(argv, "--label", LabelVersion+"="+tc.wantVersion),
+				"LabelVersion must carry canonical version %q; argv=%v", tc.wantVersion, argv)
+		})
+	}
+}
+
+// TestCreate_NoPrintPassword_OmitsPasswordFromOutput — CLI-161. When the
+// flag is set, every output format (JSON, default table, TOON) must omit
+// the `password` field from rendered stdout. The generated password still
+// flows into the docker run argv (NEO4J_AUTH=...) and into the persisted
+// dbms credential — only the rendering surface is suppressed.
+func TestCreate_NoPrintPassword_OmitsPasswordFromOutput(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x55}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x55}, generatedPasswordBytes))
+
+	tests := []struct {
+		name string
+		args string
+	}{
+		{"json", "--name dev --no-print-password --format json"},
+		{"default-table", "--name dev --no-print-password"},
+		{"toon", "--name dev --no-print-password --format toon"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, stdout, err := runCreate(t, tc.args)
+			require.NoError(t, err)
+			assert.NotContains(t, stdout, expectedPassword,
+				"%s output must NOT contain the generated password substring; got: %q", tc.name, stdout)
+			assert.NotContains(t, stdout, "password",
+				"%s output must NOT mention the password field key; got: %q", tc.name, stdout)
+		})
+	}
+}
+
+// TestCreate_NoPrintPassword_DefaultStillRendersPassword pins the regression
+// guard: without --no-print-password, JSON output continues to carry the
+// generated password verbatim. Without this assertion the redaction test
+// above could pass even if the password field were globally dropped.
+func TestCreate_NoPrintPassword_DefaultStillRendersPassword(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x66}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x66}, generatedPasswordBytes))
+
+	_, _, stdout, err := runCreate(t, "--name dev --format json")
+	require.NoError(t, err)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, expectedPassword, rows[0]["password"],
+		"default invocation must still surface the generated password in JSON output")
+}
+
+// TestCreate_NoPrintPassword_StoresCredentialForRecovery — CLI-161. With
+// --no-print-password set alone, the generated password is omitted from
+// stdout but the dbms credential is still persisted under the chosen name,
+// so `neo4j-cli credential dbms get <name>` recovers it. This is the
+// documented recovery contract.
+func TestCreate_NoPrintPassword_StoresCredentialForRecovery(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x77}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x77}, generatedPasswordBytes))
+
+	_, cfg, stdout, err := runCreate(t, "--name dev --no-print-password --format json")
+	require.NoError(t, err)
+	assert.NotContains(t, stdout, expectedPassword,
+		"stdout must NOT contain the generated password substring; got: %q", stdout)
+
+	cred, err := cfg.Credentials.Dbms.Get("dev")
+	require.NoError(t, err, "credential must be persisted so `credential dbms get` can recover the password")
+	assert.Equal(t, "neo4j", cred.Username)
+	assert.Equal(t, expectedPassword, cred.Password,
+		"stored credential must carry the generated password verbatim")
+}
+
+// TestCreate_NoPrintPassword_NoStoreCredential_WithoutExplicitPassword_Errors —
+// CLI-161. The flag combination would discard the generated password with
+// no recovery channel (neither stdout, nor a stored credential, nor an
+// operator-supplied --password). RunE must return a *clierr.CLIError with
+// Code=2 (usage) naming --password, and docker run must NOT be invoked.
+func TestCreate_NoPrintPassword_NoStoreCredential_WithoutExplicitPassword_Errors(t *testing.T) {
+	fake, _, _, err := runCreate(t, "--name dev --no-print-password --no-store-credential")
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	assert.Equal(t, 2, ce.Code, "must be a usage error (Code=2)")
+	assert.Contains(t, err.Error(), "--password",
+		"error message must name --password as the explicit-opt-in escape hatch; got: %q", err.Error())
+	assert.Empty(t, fake.RunCalls,
+		"docker run must NOT execute when --no-print-password + --no-store-credential without --password collide")
+}
+
+// TestCreate_NoPrintPassword_NoStoreCredential_WithExplicitPassword_Succeeds —
+// CLI-161. The same combo is ALLOWED when the operator supplies --password
+// explicitly — they already know the password, so suppressing stdout is
+// safe and storing nothing is the documented "no on-disk footprint" path.
+func TestCreate_NoPrintPassword_NoStoreCredential_WithExplicitPassword_Succeeds(t *testing.T) {
+	const explicitPassword = "operator-known-secret"
+	_, cfg, stdout, err := runCreate(t, "--name dev --no-print-password --no-store-credential --password "+explicitPassword)
+	require.NoError(t, err)
+
+	assert.NotContains(t, stdout, explicitPassword,
+		"stdout must NOT contain the explicit password substring; got: %q", stdout)
+	assert.Empty(t, cfg.Credentials.Dbms.List(),
+		"--no-store-credential must skip credential persistence even when --no-print-password is set")
+}
+
+// TestCreate_NoPrintPassword_Ephemeral_Errors — CLI-161. The flag is
+// incompatible with --ephemeral because ephemeral's primary output IS the
+// password-bearing .env blob. The error must name --env-out-file as the
+// alternative for operators who want the credential off stdout. Docker
+// run must NOT be invoked.
+func TestCreate_NoPrintPassword_Ephemeral_Errors(t *testing.T) {
+	fake, _, _, _, _, err := runCreateForEphemeral(t, "--name tmp --no-print-password --ephemeral")
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
+	assert.Equal(t, 2, ce.Code, "must be a usage error (Code=2)")
+	assert.Contains(t, err.Error(), "--env-out-file",
+		"error message must name --env-out-file as the file-based alternative; got: %q", err.Error())
+	assert.Empty(t, fake.RunCalls,
+		"docker run must NOT execute when --no-print-password + --ephemeral collide")
+}
+
+// TestCreate_NoPrintPassword_StdoutAndStderrFreeOfPassword — CLI-161 / PRD
+// verification (g). The redaction contract covers BOTH stdout and stderr:
+// no diagnostic narration (port fallback, name collision, wait info, etc.)
+// may leak the resolved password. This pins the combined surface so any
+// future stderr line that accidentally interpolates the password breaks
+// the test.
+func TestCreate_NoPrintPassword_StdoutAndStderrFreeOfPassword(t *testing.T) {
+	origRand := randSource
+	randSource = constantReader{b: 0x88}
+	defer func() { randSource = origRand }()
+	expectedPassword := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x88}, generatedPasswordBytes))
+
+	_, _, stdout, stderr, err := runCreateWithOccupiedPortsAndStderr(t,
+		"--name dev --no-print-password --format json")
+	require.NoError(t, err)
+
+	combined := stdout + stderr
+	assert.NotContains(t, combined, expectedPassword,
+		"combined stdout+stderr must NOT contain the generated password; stdout=%q stderr=%q", stdout, stderr)
 }

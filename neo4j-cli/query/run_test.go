@@ -1150,7 +1150,7 @@ func TestRunQuery_EmbedParam_ProviderErrorAbortsBeforeExplain(t *testing.T) {
 	// Swap driverOpener to panic so we prove no Bolt driver is ever opened.
 	origOpener := driverOpener
 	t.Cleanup(func() { driverOpener = origOpener })
-	driverOpener = func(_, _, _, _ string) (neo4j.Driver, error) {
+	driverOpener = func(_, _, _, _ string, _ bool) (neo4j.Driver, error) {
 		panic("driverOpener must not be called when embed errors before driver-open")
 	}
 
@@ -1206,4 +1206,41 @@ func TestRunQuery_EmbedParam_MultipleJobsPreserveOrder(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, stub.calls)
 	assert.Equal(t, []string{"first", "second"}, stub.inputs)
+}
+
+// TestRunQuery_DebugFlagDoesNotChangeStdout locks REQ-F-009: running with
+// --debug=true vs --debug=false against the same seam-stubbed response must
+// produce byte-identical stdout. Driver-side debug output is routed to stderr
+// (see TestBuildDriverConfigurer_DebugOnAttachesStderrLogger) — stdout stays
+// reserved for the rendered query result so `--format json` pipelines remain
+// safe under --debug.
+func TestRunQuery_DebugFlagDoesNotChangeStdout(t *testing.T) {
+	runOnce := func(t *testing.T, debugArg string) string {
+		t.Helper()
+		t.Setenv("NEO4J_DEBUG", "")
+
+		r := newSeamRouter()
+		r.resp["EXPLAIN RETURN 1 AS n"] = func() *queryResponse {
+			resp := makeQueryResponse([]string{"n"}, [][]any{})
+			resp.QueryType = neo4j.QueryTypeReadOnly
+			return resp
+		}()
+		r.resp["RETURN 1 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(1)}})
+		r.install(t)
+
+		h := newRunHarness(t, "json")
+		err := h.execute(t,
+			"--uri=neo4j://example:7687",
+			"--password=pw",
+			debugArg,
+			"RETURN 1 AS n",
+		)
+		require.NoError(t, err)
+		return h.stdout.String()
+	}
+
+	debugOff := runOnce(t, "--debug=false")
+	debugOn := runOnce(t, "--debug=true")
+	assert.Equal(t, debugOff, debugOn,
+		"--debug must not alter stdout bytes (driver output is routed to stderr)")
 }

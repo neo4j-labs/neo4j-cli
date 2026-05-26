@@ -9,8 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -237,7 +240,7 @@ func withRunStatementSeam(t *testing.T, fn func(ctx context.Context, c *conn, st
 		driverOpener = origOpener
 	})
 	runStatementResponseFn = fn
-	driverOpener = func(target, username, password, userAgent string) (neo4j.Driver, error) {
+	driverOpener = func(target, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
 		return &noopDriver{}, nil
 	}
 }
@@ -576,6 +579,104 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			assert.Equal(t, tc.wantUsername, c.username)
 			assert.Equal(t, tc.wantPassword, c.password)
 			assert.Equal(t, tc.wantDatabase, c.database)
+		})
+	}
+}
+
+// TestResolveDebug_FlagAndEnvPrecedence locks the six precedence cases for the
+// --debug / NEO4J_DEBUG resolver per REQ-F-002/F-003: explicit flag wins
+// outright (so --debug=false beats NEO4J_DEBUG=1); when the flag is not set the
+// env value is consulted with strict-`1` acceptance (any other value, including
+// `true` / `yes` / `on` / `0`, leaves debug OFF).
+func TestResolveDebug_FlagAndEnvPrecedence(t *testing.T) {
+	tests := []struct {
+		name      string
+		flagArgs  []string
+		envValue  string // empty string means env unset
+		wantDebug bool
+	}{
+		{name: "flag on, env unset", flagArgs: []string{"--debug"}, envValue: "", wantDebug: true},
+		{name: "env=1, no flag", flagArgs: nil, envValue: "1", wantDebug: true},
+		{name: "flag on, env=1", flagArgs: []string{"--debug"}, envValue: "1", wantDebug: true},
+		{name: "both off", flagArgs: nil, envValue: "", wantDebug: false},
+		{name: "env=true (not '1') leaves debug off", flagArgs: nil, envValue: "true", wantDebug: false},
+		{name: "explicit --debug=false overrides env=1", flagArgs: []string{"--debug=false"}, envValue: "1", wantDebug: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NEO4J_DEBUG", tc.envValue)
+
+			cmd, _ := newTestCmd(t)
+			require.NoError(t, cmd.ParseFlags(tc.flagArgs))
+
+			assert.Equal(t, tc.wantDebug, resolveDebug(cmd))
+		})
+	}
+}
+
+// TestBuildDriverConfigurer_DebugOffLeavesLogNil verifies the default-off path:
+// the configurer produced by driverOpener leaves config.Config.Log at its nil
+// default so the Bolt driver stays silent (REQ-F-001/F-007).
+func TestBuildDriverConfigurer_DebugOffLeavesLogNil(t *testing.T) {
+	cfg := &config.Config{}
+	buildDriverConfigurer("neo4j-cli/vtest", false)(cfg)
+
+	assert.Nil(t, cfg.Log, "debug=false must leave config.Config.Log nil")
+	assert.Equal(t, "neo4j-cli/vtest", cfg.UserAgent, "non-empty userAgent must still be wired")
+}
+
+// TestBuildDriverConfigurer_DebugOnAttachesStderrLogger verifies the debug-on
+// path: c.Log is the stderr adapter and Debugf actually writes when invoked.
+// The buffer substitutes for os.Stderr — the production logger writes to
+// os.Stderr but the type is identical, so we instantiate one with a buffer
+// writer to assert non-stdout routing.
+func TestBuildDriverConfigurer_DebugOnAttachesStderrLogger(t *testing.T) {
+	cfg := &config.Config{}
+	buildDriverConfigurer("neo4j-cli/vtest", true)(cfg)
+
+	require.NotNil(t, cfg.Log, "debug=true must wire config.Config.Log")
+	logger, ok := cfg.Log.(*stderrLogger)
+	require.True(t, ok, "config.Config.Log must be the in-package stderr adapter")
+	assert.Equal(t, log.Level(log.DEBUG), logger.level, "stderrLogger must be at DEBUG level")
+
+	// Replace the writer with a buffer so we can prove a Debugf call routes
+	// through the adapter (and would have gone to stderr in production, not
+	// stdout — locks the no-stdout-corruption contract).
+	var buf bytes.Buffer
+	logger.w = &buf
+	logger.Debugf("driver", "1", "hello %s", "world")
+	assert.Contains(t, buf.String(), "DEBUG")
+	assert.Contains(t, buf.String(), "hello world")
+}
+
+// TestBuildDriverConfigurer_ConnectionAcquisitionTimeout asserts the configurer
+// caps the driver's ConnectionAcquisitionTimeout at 10s for interactive CLI use
+// regardless of the debug flag. The driver default of 1m reads as a hang in a
+// terminal session; 10s leaves headroom for one or two retries through a
+// transient blip while surfacing permanent misconfigurations (e.g. HTTP on the
+// Bolt port — see task-007) within seconds.
+func TestBuildDriverConfigurer_ConnectionAcquisitionTimeout(t *testing.T) {
+	for _, debug := range []bool{false, true} {
+		t.Run(map[bool]string{false: "debug=false", true: "debug=true"}[debug], func(t *testing.T) {
+			cfg := &config.Config{}
+			buildDriverConfigurer("neo4j-cli/vtest", debug)(cfg)
+			assert.Equal(t, 10*time.Second, cfg.ConnectionAcquisitionTimeout)
+		})
+	}
+}
+
+// TestBuildDriverConfigurer_MaxTransactionRetryTime asserts the configurer caps
+// the driver's managed-transaction retry budget at 10s regardless of debug. The
+// driver default of 30s otherwise lets the retry loop bound the wall-clock
+// failure window when ConnectionAcquisitionTimeout itself fires quickly (e.g.
+// HTTP-on-Bolt-port surfaces in <1s per attempt, so the loop just keeps
+// retrying for ~30s total).
+func TestBuildDriverConfigurer_MaxTransactionRetryTime(t *testing.T) {
+	for _, debug := range []bool{false, true} {
+		t.Run(map[bool]string{false: "debug=false", true: "debug=true"}[debug], func(t *testing.T) {
+			cfg := &config.Config{}
+			buildDriverConfigurer("neo4j-cli/vtest", debug)(cfg)
+			assert.Equal(t, 10*time.Second, cfg.MaxTransactionRetryTime)
 		})
 	}
 }

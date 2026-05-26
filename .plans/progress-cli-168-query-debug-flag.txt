@@ -1,0 +1,38 @@
+## TASK-001 — 2026-05-19T00:00:00Z
+Add stderrLogger adapter (Error/Warnf/Infof/Debugf to stderr), conn.debug field, extend driverOpener seam to 5 args; migrate test stubs.
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/embed_test.go, ~neo4j-cli/query/run_test.go
+
+## TASK-002 — 2026-05-19T00:00:00Z
+Register --debug persistent flag on query parent; resolveDebug() wires flag-then-env precedence (strict NEO4J_DEBUG=1) into conn.debug on both credential and standard paths. Regen of skill bundle was required so make test stayed green; task-005 will be a verification step.
+Files: ~neo4j-cli/query/query.go, ~neo4j-cli/query/connect.go, ~neo4j-cli/internal/skill/bundle/references/query.md
+Decisions: regenerated skill bundle in this task (not task-005) to keep TestGenerator_RoundTrip green per task-002 AC.
+
+## TASK-003 — 2026-05-19T00:00:00Z
+Extract driverOpener configurer into buildDriverConfigurer helper; add tests covering six flag/env precedence cases, default-off c.Log==nil, debug-on stderrLogger wiring (Debugf routes to buffer), and stdout byte-identity between --debug=false/true.
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~neo4j-cli/query/run_test.go
+Decisions: extracted configurer into a named helper so tests can run it against a synthetic *config.Config without going through neo4j.NewDriver; log.DEBUG is an untyped int constant so compared via log.Level(log.DEBUG).
+
+## TASK-004 — 2026-05-19T00:00:00Z
+Bump .agents/query.md driverOpener note from 4 args to 5; add one line on debug bool param setting c.Log=stderrLogger(log.DEBUG).
+Files: ~.agents/query.md
+
+## TASK-005 — 2026-05-19T00:00:00Z
+Verified skill bundle reflects --debug (references/query.md row present); go generate produced no diff; make test/fmt-check/lint all clean. Bundle regen happened in task-002.
+Files: (none)
+
+## TASK-006 — 2026-05-19T20:20:00Z
+Added Minor changelog entry for --debug flag / NEO4J_DEBUG=1 env var, stderr routing, and BoltLogger follow-up note via changie.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260519-201954.yaml
+
+## TASK-007 — 2026-05-19T21:00:00Z
+categorizeBoltError now reclassifies driver "server responded HTTP" errors as UsageError (exit 2) with hint naming Bolt port 7687 and https:// rewrite path; added table test covering plain + fmt.Errorf-wrapped chains.
+Files: ~neo4j-cli/query/errors.go, ~neo4j-cli/query/errors_test.go
+Decisions: task description said `NewUsageError` (exit 2) but AC text said "exit code 6" — followed the explicit function-name instruction; exit 2 (usage_error) fits user-input misconfiguration better than 6 (validation) or 8 (upstream).
+
+## TASK-008 — 2026-05-19T21:15:00Z
+buildDriverConfigurer now caps ConnectionAcquisitionTimeout at 10s regardless of debug; added debug=false/true table test + Minor changelog entry.
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, +.changes/unreleased/neo4j-cli-Minor-20260519-211252.yaml
+
+## TASK-009 — 2026-05-19T21:30:00Z
+buildDriverConfigurer also caps MaxTransactionRetryTime at 10s; added mirror table test; updated task-008's changelog entry in place to cover both timeouts (avoids duplicate near-identical release notes).
+Files: ~neo4j-cli/query/connect.go, ~neo4j-cli/query/connect_test.go, ~.changes/unreleased/neo4j-cli-Minor-20260519-211252.yaml

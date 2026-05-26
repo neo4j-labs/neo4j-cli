@@ -51,11 +51,13 @@ jobs:
 
           # Narrow tool allowlist (PRD REQ-F-007). `Bash(tee:*)` is the narrowest
           # form that lets Claude write the one-word verdict to /tmp/claude-verdict.txt
-          # (`echo pass | tee /tmp/claude-verdict.txt`). No general `Bash`, no
-          # `Write`/`Edit` on repo files, no `curl`/`wget`.
+          # (`echo pass | tee /tmp/claude-verdict.txt`). `Bash(gh api:*)` lets the
+          # summary step look up + PATCH an existing claude[bot] comment so each
+          # push updates one comment instead of appending a new one. No general
+          # `Bash`, no `Write`/`Edit` on repo files, no `curl`/`wget`.
           claude_args: >-
             --allowed-tools
-            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(tee:*),Read,Grep,Glob"
+            "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(tee:*),Read,Grep,Glob"
 
       - name: Enforce verdict
         # Fail-closed: missing verdict file is treated as fail so an early Claude

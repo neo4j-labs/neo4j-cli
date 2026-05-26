@@ -26,3 +26,14 @@ func PrintBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []str
 
 	PrintBodyMap(cmd, cfg, values, fields)
 }
+
+// PrintRawBody prints a bare-JSON response body (no `{"data": ...}` envelope).
+// Used for endpoints (e.g. the Aura Agents API) whose response shape is a bare
+// array or a bare object at the top level. The response is wrapped in a
+// `{"data": ...}` envelope via PrintBodyMap for consistency with other Aura commands.
+func PrintRawBody(cmd *cobra.Command, cfg *clicfg.Config, body []byte, fields []string) {
+	if len(body) == 0 {
+		return
+	}
+	PrintBodyMap(cmd, cfg, api.ParseRawBody(body), fields)
+}

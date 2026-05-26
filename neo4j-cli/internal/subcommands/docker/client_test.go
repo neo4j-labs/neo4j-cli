@@ -82,6 +82,80 @@ func TestRedactArgs(t *testing.T) {
 	}
 }
 
+// TestRedactString covers the stderr-redaction helper used by execClient.run
+// when wrapping captured docker stderr (CLI-162). The helper is the single
+// source of truth shared with redactArgs and must mask any
+// `KEY=VALUE` assignment whose LHS contains AUTH or PASSWORD
+// (case-insensitive, tolerating whitespace around `=`) across multi-line
+// blobs, while leaving operational error sentences untouched. Cases mirror
+// the Oplane verification subset for REQ-F-001 / REQ-NF-004.
+func TestRedactString(t *testing.T) {
+	cases := []struct {
+		name           string
+		in             string
+		want           string
+		wantNotContain []string // substrings that must NOT appear (secrets)
+		wantContain    []string // substrings that MUST still appear (surrounding non-sensitive text)
+	}{
+		{
+			name:           "single-line stderr with NEO4J_AUTH",
+			in:             "docker: Error response from daemon: NEO4J_AUTH=neo4j/hunter2 is invalid",
+			want:           "docker: Error response from daemon: NEO4J_AUTH=<redacted> is invalid",
+			wantNotContain: []string{"hunter2"},
+			wantContain:    []string{"Error response from daemon", "is invalid"},
+		},
+		{
+			name: "multi-line blob with two PASSWORD mentions",
+			in: "failed to start container:\n" +
+				"  env MY_PASSWORD=hunter2 rejected\n" +
+				"  env OTHER_PASSWORD=swordfish rejected",
+			want: "failed to start container:\n" +
+				"  env MY_PASSWORD=<redacted> rejected\n" +
+				"  env OTHER_PASSWORD=<redacted> rejected",
+			wantNotContain: []string{"hunter2", "swordfish"},
+			wantContain:    []string{"failed to start container", "rejected"},
+		},
+		{
+			name:           "unicode value masked",
+			in:             "NEO4J_AUTH=neo4j/密码1234 not accepted",
+			want:           "NEO4J_AUTH=<redacted> not accepted",
+			wantNotContain: []string{"密码1234", "neo4j/密码"},
+			wantContain:    []string{"not accepted"},
+		},
+		{
+			name:           "mixed-case LHS with whitespace around equals",
+			in:             "config rejected: Neo4j_Auth = secret xyz",
+			want:           "config rejected: Neo4j_Auth = <redacted> xyz",
+			wantNotContain: []string{"secret"},
+			wantContain:    []string{"config rejected", "xyz"},
+		},
+		{
+			name:        "operational sentence with no sensitive assignment returned verbatim",
+			in:          "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?",
+			want:        "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?",
+			wantContain: []string{"Cannot connect", "docker daemon running"},
+		},
+		{
+			name: "empty string returns empty string",
+			in:   "",
+			want: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := redactString(tc.in)
+			assert.Equal(t, tc.want, got)
+			for _, s := range tc.wantNotContain {
+				assert.NotContains(t, got, s, "redactString must mask secret substring %q", s)
+			}
+			for _, s := range tc.wantContain {
+				assert.Contains(t, got, s, "redactString must preserve non-sensitive substring %q", s)
+			}
+		})
+	}
+}
+
 // TestClassifyInspectError exercises the stderr-substring classifier that
 // execClient.Inspect uses to distinguish "container does not exist" from
 // operational docker failures (daemon down, permission denied, rootless

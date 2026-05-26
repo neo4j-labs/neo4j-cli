@@ -4,8 +4,7 @@ name: publish-pypi
 #
 # Two triggers:
 #   - workflow_run (auto): fires after `release.yml` succeeds. Reads the
-#     dist/ and release-meta.json artifacts uploaded by release.yml, gates
-#     on include_neo4j == 'true' so non-neo4j-cli runs are skipped.
+#     dist/ and release-meta.json artifacts uploaded by release.yml.
 #   - workflow_dispatch (manual): for failure recovery. Takes a `version`
 #     input (no leading v), downloads existing GH release archives via
 #     `gh release download`, extracts them into the dist/<archive_basename>/
@@ -53,10 +52,8 @@ jobs:
     # handlers: even if a malicious workflow named "release" ran on a fork
     # PR or non-default branch, this gate prevents us from consuming its
     # artifacts. release.yml is itself restricted to push-to-main upstream,
-    # but CodeQL does not trace that — the guard belongs here. The
-    # include_neo4j gate is applied per-step below (after we have downloaded
-    # the release-meta.json artifact and parsed it). For workflow_dispatch we
-    # always run.
+    # but CodeQL does not trace that — the guard belongs here. For
+    # workflow_dispatch we always run.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
@@ -65,7 +62,6 @@ jobs:
     outputs:
       original_version: ${{ steps.versions.outputs.original_version }}
       pep440_version: ${{ steps.versions.outputs.pep440_version }}
-      include_neo4j: ${{ steps.versions.outputs.include_neo4j }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -85,41 +81,23 @@ jobs:
         id: meta
         if: github.event_name == 'workflow_run'
         run: |
-          # release-meta.json is a compact `{version, include_neo4j}` blob.
-          # Surface both as step outputs so downstream gates and the wheel
-          # build can read them uniformly.
+          # release-meta.json is a compact `{version}` blob. Surface version
+          # as a step output so the wheel build can read it.
           META_FILE="${{ runner.temp }}/release-meta/release-meta.json"
           if [ ! -f "${META_FILE}" ]; then
             echo "ERROR: release-meta.json not found in artifact" >&2
             exit 1
           fi
           VERSION=$(jq -r '.version' "${META_FILE}")
-          INCLUDE_NEO4J=$(jq -r '.include_neo4j' "${META_FILE}")
           if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "ERROR: Invalid version in release-meta.json: ${VERSION}" >&2
             exit 1
           fi
-          if [[ "${INCLUDE_NEO4J}" != "true" && "${INCLUDE_NEO4J}" != "false" ]]; then
-            echo "ERROR: Invalid include_neo4j in release-meta.json: ${INCLUDE_NEO4J}" >&2
-            exit 1
-          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
-          echo "[publish-pypi] auto path: version=${VERSION} include_neo4j=${INCLUDE_NEO4J}"
-
-      - name: Skip — no neo4j-cli release in this run (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j != 'true'
-        env:
-          INCLUDE_NEO4J: ${{ steps.meta.outputs.include_neo4j }}
-        run: |
-          echo "[publish-pypi] include_neo4j=$INCLUDE_NEO4J — skipping pypi publish"
+          echo "[publish-pypi] auto path: version=${VERSION}"
 
       - name: Download dist artifact (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j == 'true'
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dist
@@ -128,9 +106,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Verify dist archives against release checksums (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j == 'true'
+        if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.meta.outputs.version }}
@@ -156,9 +132,7 @@ jobs:
           ( cd "${DOWNLOADED}" && sha256sum -c "${CHECKSUMS}" )
 
       - name: Prepare dist from downloaded artifact (auto)
-        if: >-
-          github.event_name == 'workflow_run' &&
-          steps.meta.outputs.include_neo4j == 'true'
+        if: github.event_name == 'workflow_run'
         run: |
           # The dist artifact carries GoReleaser's full working dir: archives
           # (.tar.gz / .zip) + raw build dirs + metadata. The wheel-build step
@@ -243,20 +217,12 @@ jobs:
 
       - name: Resolve versions (original tag + PEP 440 form)
         id: versions
-        # Skip on the auto-path no-op case (include_neo4j != 'true'). All
-        # downstream steps gate on the same condition; we still emit
-        # `include_neo4j` so the smoke-test/publish jobs can read it.
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         env:
           # workflow_run path reads version from release-meta.json (parsed in
           # `meta` step). workflow_dispatch reads it from the input. Both are
           # bare semver (no leading v).
           RAW_VERSION: >-
             ${{ github.event_name == 'workflow_dispatch' && inputs.version || steps.meta.outputs.version }}
-          INCLUDE_NEO4J: >-
-            ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.meta.outputs.include_neo4j }}
         run: |
           # Single canonical normalisation pass — both auto and manual paths
           # converge here. The original tag (e.g. 0.1.0-alpha.6) is what the
@@ -266,21 +232,14 @@ jobs:
           PEP440=$(.github/scripts/version-to-pep440.sh "${ORIGINAL}")
           echo "original_version=${ORIGINAL}" >> $GITHUB_OUTPUT
           echo "pep440_version=${PEP440}" >> $GITHUB_OUTPUT
-          echo "include_neo4j=${INCLUDE_NEO4J}" >> $GITHUB_OUTPUT
-          echo "[publish-pypi] original=${ORIGINAL} pep440=${PEP440} include_neo4j=${INCLUDE_NEO4J}"
+          echo "[publish-pypi] original=${ORIGINAL} pep440=${PEP440}"
 
       - name: Set up Python
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.x"
 
       - name: Install build dependencies
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         env:
           # Belt-and-braces with --no-cache-dir below: env var disables the
           # cache for any nested pip invocation too (e.g. build backends
@@ -296,9 +255,6 @@ jobs:
         run: pip install --no-cache-dir --require-hashes -r .github/workflows/requirements-build.txt
 
       - name: Build wheels from GoReleaser binaries
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         env:
           ORIGINAL_VERSION: ${{ steps.versions.outputs.original_version }}
           PEP440_VERSION: ${{ steps.versions.outputs.pep440_version }}
@@ -379,9 +335,6 @@ jobs:
           ls -la wheels/
 
       - name: Upload wheels artifact
-        if: >-
-          github.event_name == 'workflow_dispatch' ||
-          steps.meta.outputs.include_neo4j == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels
@@ -391,7 +344,6 @@ jobs:
 
   smoke-test:
     needs: build
-    if: needs.build.outputs.include_neo4j == 'true'
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -410,10 +362,8 @@ jobs:
 
   publish:
     needs: [build, smoke-test]
-    # Skip publish on dry_run; otherwise gate on the same include_neo4j
-    # condition the build job already enforces.
+    # Skip publish on dry_run.
     if: >-
-      needs.build.outputs.include_neo4j == 'true' &&
       !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
     runs-on: ubuntu-latest
     permissions: {}
