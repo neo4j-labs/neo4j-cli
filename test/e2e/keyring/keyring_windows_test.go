@@ -179,7 +179,7 @@ func TestKeyring_Windows_RemoveCleansKeyring(t *testing.T) {
 
 	// Remove the credential via the CLI.
 	exitCode, _, stderr = runCLI(t, bin,
-		[]string{"credential", "dbms", "remove", "wintoremove", "--rw"},
+		[]string{"credential", "dbms", "remove", "wintoremove", "--rw", "--yes", "--force"},
 		env,
 	)
 	require.Equal(t, 0, exitCode, "credential dbms remove must succeed; stderr=%s", stderr)

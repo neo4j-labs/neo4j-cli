@@ -245,7 +245,7 @@ func TestKeyring_Darwin_RemoveCleansKeyring(t *testing.T) {
 
 	// Remove the credential via the CLI.
 	exitCode, _, stderr = runCLI(t, bin,
-		[]string{"credential", "dbms", "remove", "darwin-smoke-remove", "--rw"},
+		[]string{"credential", "dbms", "remove", "darwin-smoke-remove", "--rw", "--yes", "--force"},
 		env,
 	)
 	require.Equal(t, 0, exitCode, "credential dbms remove must succeed; stderr=%s", stderr)

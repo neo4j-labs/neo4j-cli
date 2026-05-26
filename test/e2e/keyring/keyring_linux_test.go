@@ -298,7 +298,7 @@ func TestKeyring_WithDaemon_RemoveCleansKeyring(t *testing.T) {
 
 	// Remove the credential.
 	exitCode, _, stderr = runCLI(t, bin,
-		[]string{"credential", "dbms", "remove", "toremove", "--rw"},
+		[]string{"credential", "dbms", "remove", "toremove", "--rw", "--yes", "--force"},
 		env,
 	)
 	require.Equal(t, 0, exitCode, "credential dbms remove must succeed; stderr=%s", stderr)
