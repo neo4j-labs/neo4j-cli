@@ -3,10 +3,10 @@
 ## Installation
 
 ```bash
-NEO4J_CLI_AUTO_INSTALL_SKILL=1 curl -sSfL https://neo4j.sh/install.sh | bash
+curl -sSfL https://neo4j.sh/install.sh | bash
 ```
 
-Setting `NEO4J_CLI_AUTO_INSTALL_SKILL=1` automatically runs `neo4j-cli skill install --rw` after the binary is placed, so AI agent skill bundles are ready immediately. Omit the prefix to skip skill installation.
+In an interactive terminal the installer asks whether to install the agent-skill bundle. For unattended installs prepend `NEO4J_CLI_AUTO_INSTALL_SKILL=1` to opt in or `=0` to opt out — the same env var is honoured by the npm postinstall and Homebrew formula.
 
 Verify with `neo4j-cli --help`.
 
@@ -47,6 +47,8 @@ neo4j-cli skill list                     # per-agent install state
 neo4j-cli skill check                    # version drift vs running binary
 neo4j-cli skill remove [agent]           # idempotent
 ```
+
+Using a multi-agent orchestrator like [Conductor](https://www.conductor.build)? It reuses the underlying agents' skill directories (e.g. Claude Code, Codex), so `skill install` with no argument covers every detected agent in one go, and `skill check` surfaces any version drift between them.
 
 ## Credentials
 

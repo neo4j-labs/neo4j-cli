@@ -1,5 +1,10 @@
 # neo4j-cli query
 
+## Contents
+
+- [neo4j-cli query :embed](#neo4j-cli-query-embed)
+- [neo4j-cli query :schema](#neo4j-cli-query-schema)
+
 Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol
 
 Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
@@ -10,7 +15,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-c, --credential` | string | - | Name of a stored dbms credential to use for the connection (see 'neo4j-cli credential dbms list') |
+| `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
 | `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
 | `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
@@ -44,6 +49,15 @@ neo4j-cli query "MATCH (p:Person {name: $name}) RETURN p" --param name=Alice --f
 
 # Embed text inline as a vector parameter via the :embed modifier
 neo4j-cli query "CALL db.index.vector.queryNodes('idx', 5, $v) YIELD node RETURN node" --param v:embed="hello world" --format json
+
+# Route to the single running Neo4j Desktop 2 DBMS at runtime (no persisted credential)
+neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop --format json
+
+# Route to a saved Neo4j Desktop 2 remote connection by uuid (see 'neo4j-cli desktop list')
+neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop-connection:f4e2f3c0-1111-2222-3333-444455556666 --format json
+
+# Use a persisted dbms credential by name (see 'neo4j-cli credential dbms list')
+neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 
 # Write Cypher requires --rw (opt-in)
 neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json

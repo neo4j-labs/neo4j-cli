@@ -1,0 +1,805 @@
+feature: cli-32-desktop-remote-connections
+prd: ./prd-cli-32-desktop-remote-connections.md
+created_at: 2026-05-21T00:00:00Z
+updated_at: 2026-05-21T13:45:00Z
+
+tasks:
+  - id: task-001
+    title: "`desktopclient`: Connection type + CRUD endpoints + GetCredentialsByKey rename"
+    description: |
+      Extend `neo4j-cli/internal/desktopclient/` with the wire surface for
+      saved DB connections and generalise the credentials call. In `types.go`
+      add `Connection` mirroring relate's shape (id, name, description, tags,
+      project, metadata, connectionUri, createdAt?, manifestPath? — omitempty
+      on optionals) plus `ConnectionCreateArgs` (name, connectionUri, username,
+      password, description?) and `ConnectionUpdateArgs` (all five optional).
+      In `client.go` add `ListConnections`, `CreateConnection`,
+      `UpdateConnection`, `DeleteConnection` (GET /connections, POST
+      /connections, PATCH /connections/:id, DELETE /connections/:id). Rename
+      `GetCredentials(ctx, dbmsId)` to `GetCredentialsByKey(ctx, key string)`
+      and update its single existing call site in `neo4j-cli/query/desktop.go`
+      to pass `"dbms:<id>"`. `UpdateConnection` body must contain only the
+      keys the caller set (build a `map[string]any`) so empty-string is a
+      legitimate update for `description`. Hermetic tests with
+      `httptest.NewServer` mirroring the existing `desktopclient` test
+      patterns. See REQ-F-108, REQ-F-109.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ListConnections`, `CreateConnection`, `UpdateConnection`, `DeleteConnection` all round-trip against a mock relate server"
+      - "`GetCredentialsByKey` accepts both `dbms:<uuid>` and `connection:<uuid>` shapes; the renamed call site in `query/desktop.go` compiles and existing dbms-creds tests still pass"
+      - "`UpdateConnection` PATCH body contains ONLY fields the caller supplied; empty-string description is preserved (covered by a dedicated test)"
+      - "REQ-F-008 / REQ-F-010 / REQ-F-024 transport error mapping applies uniformly to the new endpoints (probe miss, 401, 5xx)"
+      - "Every new `.go` file carries the Neo4j copyright header"
+      - "`make test && make fmt-check && make lint && make license-check` all pass"
+    completed_at: 2026-05-21T00:00:00Z
+
+  - id: task-002
+    title: "`query --credential` prefix dispatch + drop implicit Desktop fallthrough"
+    description: |
+      Rewrite `resolveConn` in `neo4j-cli/query/connect.go` and the resolvers in
+      `neo4j-cli/query/desktop.go`. Sniff `--credential` for two prefixes
+      BEFORE the persisted-store lookup: `desktop` (exact) routes to
+      `resolveDesktopActiveDbmsCredential` (filter `/dbmss` by `status ==
+      "started"`, 0/>1 yield REQ-F-101 errors); `desktop-connection:<uuid>`
+      routes to `resolveDesktopConnectionCredential(uuid)` (validate UUID via
+      `github.com/google/uuid.Parse`, list connections, match by id only,
+      fetch creds via `GetCredentialsByKey("connection:<uuid>")`, URI from
+      `connection.connectionUri`). Anything else continues into the existing
+      persisted-store-only path — DELETE the implicit Desktop fallthrough
+      (REQ-F-026) and the no-`-c` single-DBMS auto-select (REQ-F-027); remove
+      `resolveDesktopCredentialFn`, the `Set...ForTest` seam if no longer
+      needed, and the corresponding tests. Both new resolvers share the probe
+      + client setup via a private helper and route null-creds through the
+      existing REQ-F-028 prompt path unchanged. Update the `--credential`
+      flag description in `neo4j-cli/query/query.go` to document the new
+      forms. See REQ-F-101, REQ-F-102, REQ-F-103, REQ-F-110, REQ-F-111.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`-c desktop` resolves the single status==started DBMS; 0 running and defensive >1 produce the REQ-F-101 messages"
+      - "`-c desktop-connection:<valid-uuid>` resolves the matching connection; malformed UUID yields a usage error pointing at `desktop list`; unknown UUID yields a fatal error"
+      - "Unprefixed `-c <name>` NEVER instantiates the desktop client — covered by `TestResolveConn_UnprefixedCredName_NoDesktopFallthrough`"
+      - "Old REQ-F-026 implicit-fallthrough and REQ-F-027 auto-select tests are removed; new tests cover all matrices listed in the plan (`DesktopActive_*`, `DesktopConnection_*`)"
+      - "Null-creds path still prompts on TTY and fatals on non-TTY for both resolvers (REQ-F-028 unchanged)"
+      - "`--credential` flag help text mentions both prefix forms"
+      - "`make test && make fmt-check && make lint` pass"
+    completed_at: 2026-05-21T01:00:00Z
+
+  - id: task-003
+    title: "`desktop list` unified output: Local DBMSes + Remote connections"
+    description: |
+      Rewrite `neo4j-cli/internal/subcommands/desktop/list.go` to render a
+      unified output covering both DBMSes and saved connections. Run
+      `desktopclient.ListDbmss` (with existing concurrent enrichment) and
+      `desktopclient.ListConnections` in parallel. Table format: two labelled
+      sections `Local DBMSes` (existing columns) and `Remote connections`
+      (id, name, connectionUri, project); empty section prints `(none)` row.
+      `--format json` returns `{"dbmss": [...DbmsInfo...], "connections":
+      [...Connection...]}` (BREAKING vs current `[]DbmsInfo`). `--format
+      toon` mirrors the JSON shape. Rewrite `list_test.go` to cover the new
+      shape: dbmss-only, connections-only, both populated, both empty.
+      Snapshot the JSON output. See REQ-F-104.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Table output renders two labelled sections; each section uses its own column set; empty section prints `(none)`"
+      - "`--format json` returns `{dbmss, connections}` with the documented sub-shapes; snapshot test confirms"
+      - "`--format toon` mirrors the JSON shape"
+      - "Both endpoint calls run in parallel; total wall time is bounded by the slower of the two (regression test via mock latency)"
+      - "Empty connections AND empty dbmss case still produces the existing 'restart Desktop with NEO4J_DESKTOP_ENV…' stderr hint when REQ-F-001's inactive-env condition is met"
+      - "Bundle regenerated via `go generate ./neo4j-cli/internal/skill/...`; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make generate-check` pass"
+    completed_at: 2026-05-21T02:00:00Z
+
+  - id: task-004
+    title: "`desktop connection` parent + `create` leaf"
+    description: |
+      Create new package `neo4j-cli/internal/subcommands/desktop/connection/`
+      following the one-file-per-leaf layout from AGENTS.md. `connection.go`
+      is the parent (non-runnable, mounted next to `env` in
+      `neo4j-cli/internal/subcommands/desktop/desktop.go`). `create.go`
+      defines `desktop connection create --name <n> --uri <u> --username
+      <user> [--password <p>] [--description <d>]`; `--name`, `--uri`,
+      `--username` required (`MarkFlagRequired`); `--password` optional on
+      the flag surface but mandatory at runtime — prompt via the REQ-F-028
+      stdin helper on a TTY, error on non-TTY. POST via
+      `desktopclient.CreateConnection`. Write command
+      (`Annotations{"write":"true"}`, requires `--rw`). On success render
+      the returned Connection in the requested `--format`. Add a flush-left
+      `Example:` with ≥3 invocations covering both `--password` and
+      stdin-prompt flows. Colocated `create_test.go`. See REQ-F-105.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Mounted parent reachable via `neo4j-cli desktop connection`; help renders"
+      - "Missing any of `--name`, `--uri`, `--username` errors via Cobra's required-flag enforcement"
+      - "Without `--password` on a TTY the user is prompted; on a non-TTY a usage error fires"
+      - "Duplicate-name (Desktop returns 400) surfaces a clear error message"
+      - "Successful create renders the returned Connection in table/json/toon"
+      - "Flush-left `Example:` present, ≥3 invocations, passes `TestAllLeafCommands_HaveExamples`"
+      - "Bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make generate-check` pass"
+    completed_at: 2026-05-21T03:00:00Z
+
+  - id: task-005
+    title: "`desktop connection update <id>` leaf"
+    description: |
+      Add `update.go` to `neo4j-cli/internal/subcommands/desktop/connection/`.
+      Positional `<id>` is UUID-only (validate via `uuid.Parse`; reject with
+      `clierr.NewUsageError` mentioning `desktop list`). Optional mutating
+      flags `--name --uri --username --password --description`. Require at
+      least one mutating flag via `cobra.Command.Flags().Changed()` checks;
+      zero yields the REQ-F-106 usage error. Build the PATCH body as a
+      `map[string]any` containing ONLY the supplied keys so empty-string is
+      a legitimate update for `description`. `--password` with an empty
+      value triggers the stdin prompt on TTY. PATCH via
+      `desktopclient.UpdateConnection`. Write command, requires `--rw`.
+      Flush-left `Example:` with ≥3 invocations covering single-field,
+      multi-field, and password-rotation flows. Colocated
+      `update_test.go`. See REQ-F-106.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Positional `<id>` rejects non-UUID input with a usage error"
+      - "Zero mutating flags yields the REQ-F-106 usage error before any HTTP call"
+      - "PATCH body contains only keys the user supplied — partial-PATCH test confirms by snapshotting the mock-server received body"
+      - "Unknown UUID surfaces a clear error (relate's 404 mapped via existing transport)"
+      - "`--password` (empty value) triggers stdin prompt on TTY; non-TTY errors"
+      - "Flush-left `Example:` present; passes `TestAllLeafCommands_HaveExamples`"
+      - "Bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make generate-check` pass"
+    completed_at: 2026-05-21T04:00:00Z
+
+  - id: task-006
+    title: "`desktop connection delete <id>` leaf"
+    description: |
+      Add `delete.go` to
+      `neo4j-cli/internal/subcommands/desktop/connection/`. Positional `<id>`
+      is UUID-only. `--yes` skips the TTY confirm. Without `--yes` on a TTY
+      prompt `Delete connection '<name>' (<id>)? [y/N]` (resolve the name
+      via `ListConnections` for the prompt label; if the connection is gone
+      already, prompt without a name). Without `--yes` on a non-TTY error.
+      DELETE via `desktopclient.DeleteConnection`. Print a confirmation
+      line on success mirroring the task-021 desktop delete shape. Write
+      command, requires `--rw`. Flush-left `Example:` with ≥3 invocations
+      covering `--yes` and confirm flows. Colocated `delete_test.go`. See
+      REQ-F-107.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Positional `<id>` rejects non-UUID input with a usage error"
+      - "Without `--yes` on a TTY a confirm prompt is shown (label includes connection name when resolvable)"
+      - "Without `--yes` on a non-TTY a usage error fires before any HTTP call"
+      - "`--yes` skips the prompt and proceeds straight to DELETE"
+      - "Successful delete prints the confirmation line"
+      - "Unknown UUID surfaces a clear error"
+      - "Flush-left `Example:` present; passes `TestAllLeafCommands_HaveExamples`"
+      - "Bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make generate-check` pass"
+    completed_at: 2026-05-21T05:00:00Z
+
+  - id: task-007
+    title: "Skill bundle reference docs + changelog entries"
+    description: |
+      Final consolidation. Reference doc updates (after each prior task ran
+      `go generate`, the SKILL.md/references are already regenerated from
+      cobra; this task verifies and tightens any non-generated prose). In
+      `neo4j-cli/internal/skill/bundle/references/query.md` rewrite the
+      `-c, --credential` row in the flag table to describe both prefix
+      forms and persisted-store-only behavior for unprefixed values; add
+      a worked example block. In
+      `neo4j-cli/internal/skill/bundle/references/credential.md` add a
+      short note that the `desktop` and `desktop-connection:` forms are
+      runtime-resolved and not stored. In
+      `neo4j-cli/internal/skill/bundle/references/desktop.md` document the
+      `connection` subtree, the unified `desktop list` JSON shape, and the
+      query prefix flow. Add THREE changie entries under
+      `.changes/unreleased/` via `changie new --projects neo4j-cli --kind
+      Minor --body "…"`: (1) `desktop connection create/update/delete`
+      subtree, (2) `query --credential` prefix dispatch + removal of
+      implicit fallthrough/auto-select, (3) `desktop list` unified output
+      (BREAKING JSON shape). Final full gate run. See REQ-F-112, REQ-F-114.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`references/query.md` documents both `desktop` and `desktop-connection:<uuid>` forms with example invocations"
+      - "`references/credential.md` notes that Desktop prefixes are runtime-resolved, not stored"
+      - "`references/desktop.md` documents the `connection` subtree AND the unified `desktop list` `{dbmss, connections}` JSON shape"
+      - "Three changie entries land under `.changes/unreleased/` with kind `Minor` and the documented bodies"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass"
+      - "`TestGenerator_RoundTrip` passes (bundle has no drift)"
+      - "`TestAllLeafCommands_HaveExamples` passes (every new leaf carries a flush-left Example)"
+    completed_at: 2026-05-21T06:00:00Z
+
+  - id: task-008
+    title: "Drop `project` column from desktop connection table output"
+    description: |
+      The Non-Goals in the PRD explicitly excluded surfacing Desktop's
+      `tags`, `project`, or `metadata` fields on connections, but `project`
+      leaked into the default table column set in two places. Remove it so
+      it matches the `tags` / `metadata` treatment (still parsed in the wire
+      struct, never rendered as a column). Edits:
+      - `neo4j-cli/internal/subcommands/desktop/list.go:48` — drop `"project"`
+        from `connectionListFields`; update the Long help string at line ~94
+        so the Remote connections column list reads `id, name, connectionUri`;
+        drop the `commonoutput.StripControl(c.Project)` element from the row
+        builder at line ~252 so column and value counts stay in sync.
+      - `neo4j-cli/internal/subcommands/desktop/connection/create.go:27` —
+        drop `"project"` from `connectionCreateFields` (reused by `update.go`
+        at line 139, so no separate edit needed there); drop the
+        `"project": r.Item.Project` map entry from the `AsArray` projection
+        at ~line 143.
+      - Update colocated tests that assert the `PROJECT` column header or
+        the projected value: `desktop/list_test.go` references at lines
+        ~210/214/215/388/390/391/401/704; flip them to assert the column
+        is ABSENT. JSON-payload fixtures that include `"project":"…"` stay
+        as-is — relate still sends the field, and `--format json` returns
+        the full wire payload (Connection.Project remains on the struct).
+      - `Connection.Project` in `neo4j-cli/internal/desktopclient/types.go`
+        stays; `tags` / `metadata` already do.
+      - Regenerate the skill bundle (the Long change touches
+        `references/desktop.md`).
+      Final gates.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`desktop list --format table` Remote connections section header is `ID NAME CONNECTIONURI` (no PROJECT column)"
+      - "`desktop connection create` / `update` table output does NOT include a PROJECT column"
+      - "`desktop list --format json` STILL includes the `project` key on each connection (wire field preserved)"
+      - "`Connection.Project` field remains on the struct in `desktopclient/types.go`"
+      - "Tests that previously asserted PROJECT column presence now assert absence and pass"
+      - "Bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass"
+    completed_at: 2026-05-21T07:00:00Z
+
+  - id: task-009
+    title: "Fix `query -c desktop`: status field is empty on `GET /dbmss`"
+    description: |
+      `bin/neo4j-cli query -c desktop "RETURN 1"` reports "no running DBMS"
+      even when one is started. Root cause: in
+      `neo4j-cli/query/desktop.go:82` the filter is
+      `if list[i].Status == "started"` against the result of
+      `client.ListDbmss(ctx)`. `ListDbmss` calls `GET /dbmss` which returns
+      the lightweight `Dbms` shape WITHOUT a `status` field (see
+      `packages/web/src/fastify/routes/dbms.routes.ts:7-17`). Status lives
+      on `DbmsInfo` from `GET /dbmss/info` (with optional `dbmsIds` /
+      `onlineCheck` query params) or per-id `GET /dbmss/:id`. So
+      `list[i].Status` is always empty and the filter never matches.
+
+      Fix: add a `ListDbmssInfo(ctx) ([]DbmsInfo, error)` method on
+      `desktopclient.Client` that hits `GET /dbmss/info` (no query params —
+      empty list returns all), and switch
+      `resolveDesktopActiveDbmsCredential` to use it. The DBMS list code
+      path in `desktop list` already enriches by issuing per-id
+      `GetDbms(id)` calls; consider whether to leave that as-is or
+      refactor to use the same `/dbmss/info` endpoint — keep this task
+      scoped to the query bug fix (one endpoint addition + one filter
+      site), refactor of `desktop list` enrichment is out of scope.
+
+      Add a regression test that exercises the running-DBMS path against
+      a mock relate server returning `status: "started"` on
+      `/dbmss/info`. Update any existing `DesktopActive_*` tests that
+      mocked `/dbmss` to mock `/dbmss/info` instead. Manual verify with a
+      live Desktop:
+      `bin/neo4j-cli query -c desktop "RETURN 1"` against the running
+      DBMS connects successfully.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`bin/neo4j-cli query -c desktop \"RETURN 1\"` succeeds against a live Desktop with one running DBMS (manual verify)"
+      - "New `ListDbmssInfo` method on `desktopclient.Client` hits `GET /dbmss/info` and returns `[]DbmsInfo`"
+      - "`resolveDesktopActiveDbmsCredential` filters that result by `status == \"started\"`"
+      - "All `TestResolveConn_DesktopActive_*` tests mock `/dbmss/info` (not `/dbmss`) and pass, including the previously-broken `_OneRunningUsesIt` case"
+      - "`desktop list` behavior unchanged (still uses `ListDbmss` + per-id enrichment)"
+      - "`make test && make fmt-check && make lint && make license-check` all pass"
+    completed_at: 2026-05-21T08:00:00Z
+
+  - id: task-010
+    title: "Tighten `desktop` parent Long help: drop API + env mentions"
+    description: |
+      The `desktop` parent `Long` field in
+      `neo4j-cli/internal/subcommands/desktop/desktop.go:45-50` is verbose
+      and surfaces implementation details users don't need. Specifically
+      drop:
+      - The mention of Desktop's authenticated local HTTP API
+        (`http://localhost:<port>/fastify/api`).
+      - The entire `desktop env list` paragraph (the env subtree is being
+        removed in task-011, so its description goes too).
+      - The `NEO4J_DESKTOP_ENV` switching note.
+
+      Keep: a one-sentence purpose statement and the `--rw` reminder for
+      write commands. Regenerate the skill bundle
+      (`go generate ./neo4j-cli/internal/skill/...`) — the bundle's
+      `references/desktop.md` is built from cobra `Long` strings, so the
+      change propagates automatically. Order this AFTER task-011 so the
+      env-removal lands first and we don't briefly reference a
+      now-deleted subtree; alternatively, fold this into task-011 if the
+      next iteration prefers it bundled.
+
+      No tests assert the Long text verbatim; the round-trip test only
+      checks bundle ↔ source consistency.
+    status: completed
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "`desktop` Long no longer mentions any HTTP API URL or path"
+      - "`desktop` Long no longer mentions `desktop env list` or `NEO4J_DESKTOP_ENV`"
+      - "`desktop` Long still states the purpose (manage local Desktop DBMSes) and that writes require `--rw`"
+      - "Bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`make test && make fmt-check && make lint && make license-check` all pass"
+    completed_at: 2026-05-21T13:00:00Z
+
+  - id: task-011
+    title: "Remove the `desktop env` subtree entirely"
+    description: |
+      The `desktop env list` leaf is being dropped from the user-facing
+      tree to keep the surface small and avoid surfacing
+      Desktop-internal env metadata. Delete:
+      - The mount line in
+        `neo4j-cli/internal/subcommands/desktop/desktop.go` that calls
+        `cmd.AddCommand(newEnvCmd(cfg))`.
+      - All files implementing the env subtree:
+        `neo4j-cli/internal/subcommands/desktop/env.go` (parent),
+        `neo4j-cli/internal/subcommands/desktop/env_list.go` (leaf),
+        and their colocated `_test.go` files.
+      - The `desktop env list` Note hint emitted by `desktop list` when
+        the active env is empty but other on-disk envs hold DBMSes (see
+        the REQ-F-001-style hint in `desktop/list.go` — drop the entire
+        stderr-only paragraph that suggests `desktop env list` /
+        `NEO4J_DESKTOP_ENV`).
+      - Bundle references: regenerate
+        (`go generate ./neo4j-cli/internal/skill/...`) so
+        `references/desktop.md` and `references/env.md` (if it exists)
+        drop out.
+
+      Keep: the `desktopclient/envconfig.go` env-resolution helper —
+      `desktopclient` still needs it internally to locate the active
+      Desktop env for HTTP discovery / salt loading. Only the
+      USER-FACING subcommand goes away.
+
+      Search for remaining references via
+      `grep -rn "env list\|NEO4J_DESKTOP_ENV\|envCmd\|newEnvCmd" neo4j-cli/`
+      and clean up any straggling Examples or doc lines.
+
+      Bump no semver — pre-merge branch, so dropping a leaf is fine; add
+      ONE changie entry noting the removal alongside the existing
+      task-007 entries (or fold the note into the task-007 changelog
+      file if simpler).
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "`bin/neo4j-cli desktop env` returns the cobra unknown-command error (subtree absent)"
+      - "No source files for `env` / `env_list` remain under `neo4j-cli/internal/subcommands/desktop/`"
+      - "`desktop list` no longer emits the inactive-env stderr hint"
+      - "Bundle regenerated; `references/desktop.md` does not mention env; no `references/env.md` exists"
+      - "`TestGenerator_RoundTrip` passes (no bundle drift)"
+      - "`TestAllLeafCommands_HaveExamples` passes (no stale Example references)"
+      - "`make test && make fmt-check && make lint && make license-check && make generate-check` all pass"
+      - "ONE changie entry under `.changes/unreleased/` records the removal (or appends to the task-007 desktop-list changelog if simpler)"
+    completed_at: 2026-05-21T12:20:00Z
+
+  - id: task-012
+    title: "Build a relate-shaped fixture HTTP server for desktop e2e"
+    status: completed
+    description: |
+      Add `test/e2e/desktop_fixture/main.go` — a standalone Go HTTP server
+      that mimics Neo4j Desktop 2's relate API surface so CI runners can
+      exercise `bin/neo4j-cli desktop ...` and `query -c desktop[-connection]`
+      end-to-end without installing the real Desktop app. Mirrors the
+      pattern of `test/e2e/release_fixture/` (single PID, prints
+      `listening on http://127.0.0.1:<port>` to first stdout line, graceful
+      SIGTERM cleanup).
+
+      Endpoints (must match relate's real route shapes per
+      `packages/web/src/fastify/routes/{dbms,connections}.routes.ts` and
+      `packages/electron/src/api/credentials.routes.ts`):
+      - `GET /fastify/api-docs` — probe target; respond 200 with any body
+      - `GET /fastify/api/dbmss` → lightweight `[]Dbms` (NO status field —
+        critical: the task-009 bug rode in via tests that put status here)
+      - `GET /fastify/api/dbmss/info` → `[]DbmsInfo` WITH status
+      - `GET /fastify/api/dbmss/:id` → single `DbmsInfo` with status
+      - `GET /fastify/api/dbmss/versions` → version catalogue
+      - `POST /fastify/api/dbmss` → create
+      - `DELETE /fastify/api/dbmss/:id`
+      - `POST /fastify/api/dbmss/:id/start`
+      - `POST /fastify/api/dbmss/:id/stop`
+      - `GET /fastify/api/connections` → `[]Connection`
+      - `POST /fastify/api/connections`
+      - `PATCH /fastify/api/connections/:id`
+      - `DELETE /fastify/api/connections/:id`
+      - `GET /fastify/api/credentials/:key` → `{username, password}` or
+        `null` (key shape `dbms:<id>` or `connection:<id>`)
+
+      Auth middleware: validate `X-Client-Id` + HS256 `X-API-Token` (same
+      composite-key signing as Desktop). Use a FIXED test salt — the e2e
+      binary (task-013) signs with the same value. Reject with 401 only
+      when the scenario admin (below) flips `auth_mode=reject`.
+
+      Scenario admin (in-process state machine):
+      - `POST /_scenario/reset` — clear all state to defaults (empty
+        lists, default salt)
+      - `POST /_scenario/dbms` body
+        `{id?, name, status, connectionUri, version, edition, creds?}` —
+        add/replace a DBMS row; `creds: null` means "Desktop has no
+        stored creds" (REQ-F-028 path)
+      - `POST /_scenario/connection` body
+        `{id?, name, connectionUri, description?, creds?}` — add/replace
+      - `POST /_scenario/auth_mode` body `{mode: "accept"|"reject"|"500"}`
+        — make all subsequent requests 401 or 500 for transport-error tests
+      - `POST /_scenario/transition` body
+        `{id, from_status, to_status, after_calls?}` — used to simulate
+        `start --wait` polling (e.g. "after 2 `/dbmss/:id` reads, flip to
+        started")
+      - Admin endpoints are unauthenticated (out-of-band control plane)
+
+      CLI flags: `--port 0` (default — pick free port), `--salt
+      "testsalt"` (default fixed value matching the e2e seam), `--client-id
+      <uuid>` (default any). Log every authed request to stderr so test
+      failures are diagnosable.
+
+      Build standalone with `go build ./test/e2e/desktop_fixture`; CI
+      builds it once per matrix entry and spawns it from the e2e Go test
+      harness.
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "Fixture builds cross-platform (linux, darwin, windows) with no cgo"
+      - "First stdout line is exactly `listening on http://127.0.0.1:<port>`"
+      - "JWT validation rejects unsigned / wrong-salt requests with 401"
+      - "All listed endpoints respond per relate's exact shape; `/dbmss` carries NO status field, `/dbmss/info` DOES"
+      - "Scenario admin endpoints can replay any state needed for task-014 scenarios without restarting the process"
+      - "SIGTERM exits within 1s; no goroutine leaks"
+      - "Fixture has its own `*_test.go` covering scenario state mutations and JWT validation"
+    completed_at: 2026-05-21T14:00:00Z
+
+  - id: task-013
+    title: "Add `e2e_desktop_seams` build-tagged overrides to desktopclient"
+    description: |
+      The production `bin/neo4j-cli` probes ports 44222..44232, reads the
+      salt from `<dataDir>/relate.secret.key`, and resolves the data dir
+      from env walk / per-OS defaults. None of that works against the
+      fixture in task-012. Add a build-tag-gated seam:
+
+      `neo4j-cli/internal/desktopclient/seams_e2e.go` with
+      `//go:build e2e_desktop_seams`:
+      - When `NEO4J_CLI_DESKTOP_E2E_PORT` is set, `ProbePort` returns it
+        verbatim without scanning or `/api-docs` validation.
+      - When `NEO4J_CLI_DESKTOP_E2E_SALT` is set, the salt loader returns
+        its value instead of reading the keyfile.
+      - When `NEO4J_CLI_DESKTOP_E2E_DATA_DIR` is set, `ResolveDataDir`
+        returns it; the env-discovery walk is skipped.
+      - Same seam wraps the HTTP-origin lookup (used in JWT signing) —
+        env override `NEO4J_CLI_DESKTOP_E2E_HTTP_ORIGIN`.
+
+      `neo4j-cli/internal/desktopclient/seams_default.go` with
+      `//go:build !e2e_desktop_seams` — no-op shims so production keeps
+      the original behaviour. Mirror the layout of
+      `neo4j-cli/internal/subcommands/update/seams_e2e.go` and its
+      `seams_default.go` counterpart.
+
+      `seams_default_test.go` adds `TestDesktopE2ESeams_NotCompiledByDefault`
+      asserting that the e2e file does not contribute symbols when built
+      without the tag — copy the exact assertion the update package uses
+      (env vars are ignored, ProbePort still scans).
+
+      Build verification: `go build -tags e2e_desktop_seams -o
+      bin/neo4j-cli-desktop-e2e ./neo4j-cli` succeeds; running the
+      resulting binary with the four env vars set causes ALL relate
+      calls to go to the fixture URL with the fixture salt.
+    status: completed
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`seams_e2e.go` builds only under `-tags e2e_desktop_seams`; `seams_default.go` is the production path"
+      - "Without the tag, the four env vars have no effect (`TestDesktopE2ESeams_NotCompiledByDefault` passes)"
+      - "With the tag, `NEO4J_CLI_DESKTOP_E2E_PORT` bypasses the 44222..44232 probe"
+      - "With the tag, `NEO4J_CLI_DESKTOP_E2E_SALT` bypasses the salt-file loader"
+      - "With the tag, `NEO4J_CLI_DESKTOP_E2E_DATA_DIR` bypasses env discovery"
+      - "With the tag, `NEO4J_CLI_DESKTOP_E2E_HTTP_ORIGIN` is used in JWT signing in place of the env-walked origin"
+      - "Production `make build` artifact (no tag) still passes existing desktopclient unit tests"
+      - "`make test && make fmt-check && make lint && make license-check` all pass"
+    completed_at: 2026-05-21T15:00:00Z
+
+  - id: task-014
+    title: "Desktop e2e test suite: scenarios covering every endpoint we use"
+    description: |
+      Add `test/e2e/desktop/desktop_test.go` with `//go:build e2e_desktop`,
+      mirroring `test/e2e/exitcodes/exitcodes_test.go`. Helpers spawn the
+      task-012 fixture, set the task-013 env vars to point at it, and
+      drive `bin/neo4j-cli-desktop-e2e <args>` as a subprocess. Each
+      scenario calls `/_scenario/reset` first so cases are order-independent
+      and can run in parallel.
+
+      **Happy-path coverage** (assert exit 0, stdout JSON shape, fixture
+      received the expected HTTP request shape):
+      - `desktop list` — empty, dbmss-only (status=started + stopped),
+        connections-only, both populated; verify `{dbmss, connections}`
+        JSON shape
+      - `desktop create --name X --version Y --password Z --rw` — POST,
+        then start, then poll `/dbmss/:id` until status=started (use
+        `/_scenario/transition` to flip status after N reads)
+      - `desktop create --rw` (no --version) — fixture serves multiple
+        versions, asserts the latest stable enterprise version is picked
+      - `desktop start <id> --wait --rw` — POST + poll loop
+      - `desktop stop <id> --wait --rw` — same
+      - `desktop delete <id> --yes --rw`
+      - `desktop connection create --name --uri --username --password --rw`
+      - `desktop connection create --name --uri --username --description --rw`
+        (no --password, non-TTY → asserts the non-TTY usage error fires
+        BEFORE any HTTP call)
+      - `desktop connection update <id> --description X --rw` — partial
+        PATCH; fixture asserts only `description` key in body
+      - `desktop connection update <id> --name Y --uri Z --username W
+        --password V --rw` — full PATCH
+      - `desktop connection delete <id> --yes --rw`
+      - `query -c desktop "RETURN 1"` against a fixture-served DBMS with
+        `connectionUri=bolt://127.0.0.1:1` — asserts exit code is NOT 1
+        with "no running DBMS"; asserts stderr DOES surface a Bolt-level
+        connect-refused error. (We're not running real Neo4j on CI;
+        proving credential resolution dispatched correctly is the goal.)
+      - `query -c desktop-connection:<uuid> "RETURN 1"` — same shape
+
+      **DBMS-status matrix** (every status value the filter sees, against
+      `-c desktop`):
+      - 1 started → exit 0 (Bolt connect-refused class, see above)
+      - 0 started (only stopped/starting/stopping DBMSes present) →
+        exit 1, message `No running DBMS in Neo4j Desktop 2. Start one
+        with 'neo4j-cli desktop start <id>'.`
+      - 2 started (defensive, shouldn't happen per Desktop UI) → exit 1,
+        message lists both ids
+      - 0 DBMSes at all → exit 1, same "no running DBMS" message
+      - The status filter must NOT match `starting` or `stopping` (cover
+        each explicitly)
+
+      **Connection-prefix sad paths:**
+      - `desktop-connection:not-a-uuid` → exit 2, usage error mentioning
+        `desktop list`
+      - `desktop-connection:<unknown-but-valid-uuid>` → exit 1, "no
+        connection with id" fatal
+      - `desktop-connection:<known-uuid>` but creds endpoint returns
+        `null`, stdin closed → REQ-F-028 non-TTY fatal
+
+      **Transport sad paths:**
+      - Fixture down (kill before invocation) → REQ-F-008 canonical
+        "doesn't appear to be running" message + exit 1
+      - Fixture mid-request EOF (slam-close mid-stream via
+        `/_scenario/auth_mode=close`) → same REQ-F-008 message
+      - Fixture `/_scenario/auth_mode=reject` → 401 → REQ-F-010 auth
+        restart hint
+      - Fixture `/_scenario/auth_mode=500` → REQ-F-024 truncated-body
+        message, exit 1
+
+      **Resource sad paths:**
+      - `desktop create --name duplicate --rw` against fixture returning
+        400 → surfaces error, exit 1
+      - `desktop delete <unknown-id>` → 404 surfaces, exit 3
+      - `desktop start <unknown-id>` / `desktop stop <unknown-id>` → same
+      - `desktop connection create` duplicate name → 400 surfaces
+      - `desktop connection update <unknown-id>` → 404 surfaces
+      - `desktop connection delete <unknown-id>` → 404 surfaces
+
+      Use `test/e2e/check_json` (already exists) for shape assertions
+      where possible; for stderr-message assertions, do plain
+      `strings.Contains` against the captured stderr buffer.
+
+      Build verification: `go test -tags=e2e_desktop -count=1
+      ./test/e2e/desktop/...` passes locally on Linux + macOS (Windows
+      coverage validated by CI in task-015).
+    status: completed
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "Test file uses `//go:build e2e_desktop` and is NOT picked up by `go test ./...` without the tag"
+      - "Each test resets fixture state via `/_scenario/reset` so cases are independent and `t.Parallel()`-safe"
+      - "Every endpoint exercised by the production binary has at least one happy-path AND one sad-path scenario"
+      - "DBMS status matrix covers `started` (match), `starting` (no match), `stopping` (no match), `stopped` (no match)"
+      - "REQ-F-008 (unreachable), REQ-F-010 (401), REQ-F-024 (5xx), REQ-F-028 (null-creds non-TTY) each have a dedicated test"
+      - "All exit-code categories surfaced by desktop / query are asserted: 0 success, 1 fatal, 2 usage, 3 not_found, 4 auth_error"
+      - "Test failures print the fixture's stderr log (request trace) so CI logs are debuggable"
+      - "Total wall time under 60s on a Linux CI runner"
+    completed_at: 2026-05-21T16:00:00Z
+
+  - id: task-015
+    title: "Wire desktop e2e step into CI test workflow"
+    status: completed
+    description: |
+      Add new steps to `.github/workflows/test.yml` after the existing
+      update-e2e blocks. The desktop e2e step runs on the full OS matrix
+      (ubuntu / macos / windows) — no real Desktop install required since
+      the fixture is portable Go.
+
+      Steps to add (per matrix entry):
+      1. **Build e2e binary** —
+         `go build -tags e2e_desktop_seams -o bin/neo4j-cli-desktop-e2e
+         ./neo4j-cli` (on Windows the suffix is `.exe`; mirror the
+         os-switch pattern already in the update e2e step).
+      2. **Build fixture** —
+         `go build -o "${stage}/desktop-fixture" ./test/e2e/desktop_fixture`.
+      3. **Run e2e suite** —
+         `go test -tags=e2e_desktop -count=1 -timeout=180s
+         ./test/e2e/desktop/...` with env vars:
+         - `NEO4J_CLI_DESKTOP_E2E_BINARY` → absolute path to the built
+           binary
+         - `NEO4J_CLI_DESKTOP_E2E_FIXTURE` → absolute path to the fixture
+         The Go test harness spawns the fixture and captures its port —
+         the workflow step just runs `go test`.
+      4. **Cleanup** — the test harness handles fixture teardown via
+         `t.Cleanup`; no workflow-level trap needed.
+
+      Existing patterns to mirror:
+      - Cross-OS binary-name resolution (Windows `.exe` suffix logic from
+        the tier-1 update e2e step)
+      - Step-scoped env vars only (no GITHUB_ENV leakage)
+      - Comment block above the step explaining the gap it covers (per
+        the existing update e2e comments)
+
+      Optional: gate the step behind a `paths:` filter so it only runs
+      when desktop/desktopclient files change. Default to running on
+      every push — the fixture is cheap (≤60s per OS).
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "`.github/workflows/test.yml` has a new step block titled `Desktop e2e (...)` after the update-e2e blocks"
+      - "Step runs on ubuntu, macos, AND windows matrix entries"
+      - "Step builds the seam binary with `-tags e2e_desktop_seams` and the fixture as a separate binary"
+      - "Step invokes `go test -tags=e2e_desktop` against `./test/e2e/desktop/...`"
+      - "Total step wall time ≤180s on the slowest runner (windows)"
+      - "Failing scenarios surface the fixture request trace in the GitHub Actions log"
+      - "No real Neo4j install, no real Desktop install, no real GitHub API call"
+      - "Production `make build` artifact remains unchanged (no seam file contribution)"
+    completed_at: 2026-05-21T17:00:00Z
+
+  - id: task-016
+    title: "Fix Windows path resolution: `defaultDataDir()` + `EnvConfigDir()` per-OS"
+    status: completed
+    description: |
+      `neo4j-cli desktop` tree breaks on a fresh Windows Desktop-2 install
+      because two hardcoded path fallbacks in `desktopclient` don't match
+      what Desktop-2 actually writes. macOS works by accident; Linux mostly
+      works because the default kicks in; Windows is broken end-to-end
+      (salt file not found → all `desktop` commands hit REQ-F-008
+      "Desktop unreachable" despite Desktop running).
+
+      Source of truth (read these once for context):
+      - `../neo4j-desktop-2/packages/electron/src/app-paths.ts:42-52`
+      - `../neo4j-desktop-2/packages/common/src/utils/env-paths.ts`
+      - `../neo4j-desktop-2/packages/electron/src/api/relate-env-setup.ts:56-67`
+        (the electron override INTENTIONALLY omits `config` so env JSONs
+        fall back to the deprecated `env-paths.ts` locations)
+
+      ## Bug 1 — `defaultDataDir()` Windows branch
+
+      `neo4j-cli/internal/desktopclient/discovery.go:225`
+
+      Current (wrong):
+      ```go
+      case "windows":
+          return filepath.Join(home, ".Neo4jDesktop2", "Application", "Data"), nil
+      ```
+
+      Fix:
+      ```go
+      case "windows":
+          return filepath.Join(home, ".Neo4jDesktop2", "Data"), nil
+      ```
+
+      Why: on Windows, Desktop-2's `applicationPath` is just
+      `<home>\.Neo4jDesktop2` (no `\Application` suffix — special case in
+      `app-paths.ts:42-52`). Then `data` = `applicationPath + \Data`. So
+      the real on-disk salt path is `<home>\.Neo4jDesktop2\Data\relate.secret.key`.
+
+      ## Bug 2 — `EnvConfigDir()` per-OS
+
+      `neo4j-cli/internal/desktopclient/envconfig.go:34-40`
+
+      Current (wrong — only macOS matches):
+      ```go
+      func EnvConfigDir() (string, error) {
+          base, err := userConfigDirFn()
+          if err != nil {
+              return "", err
+          }
+          return filepath.Join(base, "com.Neo4j.Relate", "Config", "environments"), nil
+      }
+      ```
+
+      Replace with a GOOS switch mirroring `defaultDataDir()`. The legacy
+      relate name + base differ per OS (see `env-paths.ts`):
+      - macOS: `<home>/Library/Application Support/com.Neo4j.Relate/Config/environments`
+        (= `userConfigDir() + com.Neo4j.Relate/Config/environments`)
+      - Windows: `%APPDATA%\Neo4j\Relate\Config\environments`
+        (= `userConfigDir() + Neo4j\Relate\Config\environments`)
+      - Linux: `<home>/.config/neo4j-relate/environments`
+        (= `userConfigDir() + neo4j-relate/environments` — note: no
+        `Config` segment on Linux per `env-paths.ts:112-128`)
+
+      Use `goosFn()` (existing seam at `discovery.go:54`) so tests on
+      any host can drive every branch.
+
+      ## Fallout
+
+      `ResolveDataDir` precedence is unchanged: env var
+      (`NEO4J_DESKTOP_DATA_PATH`) → env JSON `relateDataPath` (now
+      discoverable on Windows + Linux after bug 2) → per-OS default
+      (now correct on Windows after bug 1).
+
+      ## Tests to update
+
+      Existing seam-mocked tests (run on every OS, both branches via
+      `SetGOOSFnForTest`):
+      - `neo4j-cli/internal/desktopclient/discovery_test.go:269-271` —
+        change the `windows` expectation from
+        `<home>/.Neo4jDesktop2/Application/Data` to
+        `<home>/.Neo4jDesktop2/Data`.
+      - Add `TestEnvConfigDir_PerOS` exercising all three branches via
+        `SetGOOSFnForTest` + `SetUserConfigDirFnForTest`.
+      - Keep existing `discovery_test.go` env-walk tests; they exercise
+        `LoadEnvs` against the (now per-OS) `EnvConfigDir` and should
+        still pass because they wire `userConfigDirFn` directly.
+
+      New native-OS tests (defense-in-depth — each test runs on ALL
+      runners but assertion branches on `runtime.GOOS` directly, so each
+      CI matrix entry exercises only its own native path. Catches drift
+      in `os.UserHomeDir` / `os.UserConfigDir` shape that the mocked
+      seam tests can't see):
+      - `TestDefaultDataDir_NativeOS` — call `defaultDataDir()` WITHOUT
+        overriding `goosFn`/`homeDirFn`. Switch on `runtime.GOOS`:
+        - darwin: assert path has suffix
+          `Library/Application Support/neo4j-desktop/Application/Data`
+        - linux: assert suffix `.config/neo4j-desktop/Application/Data`
+        - windows: assert suffix `\.Neo4jDesktop2\Data` (NOT
+          `\Application\Data`)
+        Use `strings.HasSuffix` + `filepath.FromSlash` so the suffix
+        literal stays portable.
+      - `TestEnvConfigDir_NativeOS` — same pattern against
+        `EnvConfigDir()`. Suffix per OS:
+        - darwin: `com.Neo4j.Relate/Config/environments`
+        - windows: `Neo4j\Relate\Config\environments`
+        - linux: `neo4j-relate/environments`
+
+      Both native tests are pure: no afero, no FS writes, no Desktop
+      install required. They run inside the existing
+      `neo4j-cli/internal/desktopclient/...` test target, so the CI
+      matrix (`.github/workflows/test.yml` — ubuntu/macos/windows)
+      picks them up with no workflow edits.
+
+      ## Out of scope
+
+      - Live Windows verification — no Windows dev machine available.
+        Rely on CI matrix (ubuntu/macos/windows) + e2e seams (which
+        short-circuit prod paths via `NEO4J_CLI_DESKTOP_E2E_*` and
+        are unaffected).
+      - Renaming `EnvConfigDir` or restructuring envconfig.go.
+      - Adding new env vars or flags.
+
+      ## Verification
+
+      Hone gate (mandatory):
+      - `make test && make fmt-check && make lint && make license-check && make generate-check`
+
+      No live Windows verification possible.
+    dependencies: []
+    acceptance_criteria:
+      - "`defaultDataDir()` Windows branch returns `<home>/.Neo4jDesktop2/Data` (no `Application` segment)"
+      - "`EnvConfigDir()` returns per-OS paths matching `env-paths.ts` (deprecated-but-canonical relate config locations)"
+      - "Existing `discovery_test.go` Windows expectation updated and passing"
+      - "New `TestEnvConfigDir_PerOS` covers macOS, windows, and linux branches via `SetGOOSFnForTest`"
+      - "New `TestDefaultDataDir_NativeOS` + `TestEnvConfigDir_NativeOS` exercise the unmocked `runtime.GOOS` branch — each CI runner (ubuntu/macos/windows) asserts its own native path shape"
+      - "All gates green on full OS matrix (`make test && make fmt-check && make lint && make license-check && make generate-check`)"
+      - "No changes to seams build tag / e2e fixture behavior"
+      - "No changes to the prod `ResolveDataDir` precedence"
+      - "No new CI workflow steps needed (existing matrix picks up the new tests)"
+    completed_at: 2026-05-21T18:00:00Z

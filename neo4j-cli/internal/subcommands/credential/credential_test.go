@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/test/utils/testfs"
@@ -30,6 +32,7 @@ type credentialTestHelper struct {
 	out         *bytes.Buffer
 	err         *bytes.Buffer
 	credentials string
+	stdin       string
 	fs          afero.Fs
 	t           *testing.T
 }
@@ -56,11 +59,15 @@ func (h *credentialTestHelper) setCredentialsValue(key string, value interface{}
 	h.credentials = creds
 }
 
-func (h *credentialTestHelper) executeCommand(command string) {
-	h.executeCommandWithConfig(command, "{}")
+func (h *credentialTestHelper) setStdin(in string) {
+	h.stdin = in
 }
 
-func (h *credentialTestHelper) executeCommandWithConfig(command string, configJSON string) {
+func (h *credentialTestHelper) executeCommand(command string) error {
+	return h.executeCommandWithConfig(command, "{}")
+}
+
+func (h *credentialTestHelper) executeCommandWithConfig(command string, configJSON string) error {
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
@@ -77,8 +84,9 @@ func (h *credentialTestHelper) executeCommandWithConfig(command string, configJS
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
+	cmd.SetIn(strings.NewReader(h.stdin))
 
-	cmd.Execute() //nolint:errcheck // cobra prints the error itself; test assertions check cmd output
+	return cmd.Execute()
 }
 
 func (h *credentialTestHelper) assertCredentialsValue(key string, expected string) {
@@ -120,7 +128,7 @@ func (h *credentialTestHelper) assertErr(expected string) {
 func TestCredentialAddAuraClientRequiresRw(t *testing.T) {
 	h := newCredentialTestHelper(t)
 
-	h.executeCommand("aura-client add --name test --client-id testclientid --client-secret testclientsecret")
+	h.executeCommand("aura-client add --name test --client-id testclientid --client-secret testclientsecret") //nolint:errcheck // error checked via assertErr
 
 	h.assertErr("Error: this command writes; pass --rw to allow it")
 }
@@ -168,7 +176,7 @@ func TestCredentialAddAuraClient(t *testing.T) {
 				h.setCredentialsValue("aura.default-credential", tc.initialDefault)
 			}
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
@@ -243,7 +251,7 @@ func TestCredentialListAuraClient(t *testing.T) {
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			h.assertErr("")
 			if tc.wantOut != "" {
@@ -274,23 +282,25 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 		{
 			name:            "named credential is removed",
 			initialCreds:    []map[string]string{{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"}},
-			command:         "aura-client remove --rw test",
+			command:         "aura-client remove --rw --yes --force test",
 			wantCredentials: "[]",
 		},
 		{
 			name:         "missing credential returns an error",
 			initialCreds: []map[string]string{},
-			command:      "aura-client remove --rw nonexistent",
+			command:      "aura-client remove --rw --yes --force nonexistent",
 			wantErr:      "Error: could not find credential with name nonexistent to remove",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+
 			h := newCredentialTestHelper(t)
 			h.setCredentialsValue("aura.credentials", tc.initialCreds)
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)
@@ -321,7 +331,7 @@ func TestCredentialRemoveAuraClient_KeyringMode(t *testing.T) {
 		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/client-secret", "s3cr3t"))
 		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/access-token", "tok"))
 
-		h.executeCommandWithConfig("aura-client remove --rw prod", keyringConfig)
+		h.executeCommandWithConfig("aura-client remove --rw --yes --force prod", keyringConfig) //nolint:errcheck
 
 		h.assertErr("")
 		h.assertCredentialsValue("aura.credentials", "[]")
@@ -341,7 +351,7 @@ func TestCredentialRemoveAuraClient_KeyringMode(t *testing.T) {
 		})
 		// No keyring entries seeded — ErrNotFound on delete must not block removal
 
-		h.executeCommandWithConfig("aura-client remove --rw prod", keyringConfig)
+		h.executeCommandWithConfig("aura-client remove --rw --yes --force prod", keyringConfig) //nolint:errcheck
 
 		h.assertErr("")
 		h.assertCredentialsValue("aura.credentials", "[]")
@@ -356,13 +366,41 @@ func TestCredentialRemoveAuraClient_KeyringMode(t *testing.T) {
 		// Seed a keyring entry that must NOT be deleted in insecure mode
 		assert.Nil(t, gokeyring.Set("neo4j-cli", "aura/prod/client-secret", "s3cr3t"))
 
-		h.executeCommand("aura-client remove --rw prod")
+		h.executeCommand("aura-client remove --rw --yes --force prod") //nolint:errcheck
 
 		h.assertErr("")
 		// Keyring entry must still be present (insecure mode does not clean up)
 		val, err := gokeyring.Get("neo4j-cli", "aura/prod/client-secret")
 		assert.NoError(t, err)
 		assert.Equal(t, "s3cr3t", val)
+	})
+}
+
+func TestCredentialRemoveAuraClient_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "credential aura-client remove",
+		NoFlagsArgs:   "aura-client remove --rw test",
+		BothFlagsArgs: "aura-client remove --rw --yes --force test",
+		ResourceLabel: "aura-client",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			h := newCredentialTestHelper(t)
+			h.setCredentialsValue("aura.credentials", []map[string]string{
+				{"name": "test", "client-id": "testclientid", "client-secret": "testclientsecret"},
+			})
+			h.setStdin(stdin)
+			err := h.executeCommand(args)
+			file, ferr := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+			if ferr != nil {
+				t.Fatalf("open credentials: %v", ferr)
+			}
+			defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+			contents, rerr := io.ReadAll(file)
+			if rerr != nil {
+				t.Fatalf("read credentials: %v", rerr)
+			}
+			invoked := gjson.Get(string(contents), "aura.credentials").String() == "[]"
+			return confirmtest.GateRunResult{Err: err, Stderr: h.err.String(), Invoked: invoked}
+		},
 	})
 }
 
@@ -400,7 +438,7 @@ func TestCredentialUseAuraClient(t *testing.T) {
 				h.setCredentialsValue("aura.default-credential", tc.initialDefault)
 			}
 
-			h.executeCommand(tc.command)
+			h.executeCommand(tc.command) //nolint:errcheck // error checked via assertErr
 
 			if tc.wantErr != "" {
 				h.assertErr(tc.wantErr)

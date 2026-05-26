@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/shlex"
@@ -31,6 +32,7 @@ type dbmsTestHelper struct {
 	// paths (e.g. "/tmp/creds.txt"), values are the file contents. Use this
 	// to drive --env flag tests without touching the real filesystem.
 	files map[string]string
+	stdin string
 	fs    afero.Fs
 	t     *testing.T
 }
@@ -85,8 +87,13 @@ func (h *dbmsTestHelper) executeCommandWithConfig(command string, configJSON str
 	cmd.SetArgs(args)
 	cmd.SetOut(h.out)
 	cmd.SetErr(h.err)
+	cmd.SetIn(strings.NewReader(h.stdin))
 
 	return cmd.Execute()
+}
+
+func (h *dbmsTestHelper) setStdin(in string) {
+	h.stdin = in
 }
 
 func (h *dbmsTestHelper) assertCredentialsValue(key string, expected string) {
@@ -147,6 +154,18 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			initialDefault: "mydb",
 			command:        "add --name mydb --username neo4j --password secret --uri bolt://localhost:7687",
 			wantErr:        "already have credential with name mydb",
+		},
+		{
+			name:         "reserved name 'desktop' is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name desktop --username neo4j --password secret --uri bolt://localhost:7687",
+			wantErr:      `credential name "desktop" is reserved`,
+		},
+		{
+			name:         "reserved 'desktop-connection:' prefix is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name desktop-connection:abc123 --username neo4j --password secret --uri bolt://localhost:7687",
+			wantErr:      `credential name "desktop-connection:abc123" is reserved`,
 		},
 		{
 			name:            "custom database-name is stored",

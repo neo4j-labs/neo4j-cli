@@ -43,7 +43,8 @@ func newAddCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Add a Neo4j Bolt connection profile. The first credential added becomes the default. " +
 			"Pass `--embed-credential <name>` to link this profile to an existing embed credential — " +
 			"`query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. " +
-			"Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.",
+			"Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values. " +
+			"The name `desktop` and any name starting with `desktop-connection:` are reserved by `query --credential` runtime dispatch and cannot be used.",
 		Example: `# Add a dbms credential from an Aura-exported credentials file
 neo4j-cli credential dbms add --env ./Neo4j-12345-Created-2025-01-01.txt --rw
 
@@ -54,9 +55,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --embed-credential openai-small --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse the optional --env before applying any defaults so we can
-			// distinguish "file had the key but with empty value" (error) from
-			// "file didn't have the key" (fall through to flag/default).
+			// Distinguish file-had-empty-value (error) from file-missing-key (fall through to flag/default).
 			var (
 				fileVals    = map[string]string{}
 				filePresent = map[string]bool{}
@@ -69,17 +68,11 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				fileVals, filePresent = filterAuraEnvKeys(vals, present)
 			}
 
-			// Track which flags the user explicitly set so we can prefer them
-			// over file values per REQ-F-005 / REQ-F-010.
 			changed := func(flag string) bool {
 				f := cmd.Flag(flag)
 				return f != nil && f.Changed
 			}
 
-			// Merge file → flag for each recognised field. The flag default is
-			// the empty string for everything except --database-name (which
-			// defaults to "neo4j"); the merge logic for database-name is
-			// special-cased below to respect REQ-F-006.
 			merge := func(envKey, flagName string, flagVal string) string {
 				if changed(flagName) {
 					return flagVal
@@ -97,20 +90,15 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 			password = merge(envPassword, passwordFlag, password)
 			uri = merge(envURI, uriFlag, uri)
 
-			// database-name: special-case the "neo4j" default. The flag default
-			// loads into databaseName even when the user didn't pass it, so we
-			// rebuild it from scratch using Changed-vs-present semantics.
+			// database-name has a non-empty flag default ("neo4j"), so rebuild via Changed-vs-present.
 			switch {
 			case changed(databaseNameFlag):
-				// keep the user-provided databaseName as-is.
 			case filePresent[envDatabase]:
 				databaseName = fileVals[envDatabase]
 			default:
 				databaseName = "neo4j"
 			}
 
-			// REQ-F-006: if any recognised file key was present with an empty
-			// value AND no flag override won, it's a usage error.
 			for _, c := range []struct {
 				envKey   string
 				flagName string
@@ -126,7 +114,6 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 				}
 			}
 
-			// REQ-F-007: surface the first missing required field.
 			for _, req := range []struct {
 				flag   string
 				value  string
@@ -168,9 +155,6 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 	return cmd
 }
 
-// filterAuraEnvKeys narrows envfile.Parse's domain-neutral maps to the keys
-// the dbms add command recognises. Unrecognised keys (including
-// AURA_INSTANCEID) are silently discarded.
 func filterAuraEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
 	recognised := map[string]bool{
 		"NEO4J_URI":         true,

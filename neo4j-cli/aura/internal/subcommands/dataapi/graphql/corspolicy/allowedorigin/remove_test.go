@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -78,7 +79,7 @@ func TestRemoveAllowedOriginWithRemainingOrigins(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -115,7 +116,7 @@ func TestRemoveAllowedOriginWithNoExistingOrigins(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -154,7 +155,7 @@ func TestRemoveAllowedOriginLastAllowedOrigin(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -199,7 +200,7 @@ func TestRemoveAllowedOriginWithTrailingNewline(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove --instance-id %s --data-api-id %s --rw %s\"\n\"", instanceId, dataApiId, allowedOrigin))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove --instance-id %s --data-api-id %s --rw --yes --force %s\"\n\"", instanceId, dataApiId, allowedOrigin))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -241,7 +242,7 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --format table --rw", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --format table --rw --yes --force", allowedOrigin, instanceId, dataApiId))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -252,5 +253,38 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 	helper.AssertOut(expectedResponse)
 	helper.AssertErrContainsStrings([]string{
 		`New allowed origins: ["https://test1.com", "https://test2.com"]`,
+	})
+}
+
+func TestRemoveAllowedOriginConfirmGate(t *testing.T) {
+	mockGetResponse := fmt.Sprintf(`{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "my-data-api-1",
+			"status": "ready",
+			"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql",
+			"security": {
+				"cors_policy": {
+					"allowed_origins": ["https://test1.com", "%s"]
+				}
+			}
+		}
+	}`, allowedOrigin)
+	base := fmt.Sprintf("data-api graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId)
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "aura data-api graphql cors-policy allowed-origin remove",
+		NoFlagsArgs:   base,
+		BothFlagsArgs: base + " --yes --force",
+		ResourceLabel: "allowed-origin",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			helper := testutils.NewAuraTestHelper(t)
+			t.Cleanup(helper.Close)
+			helper.SetConfigValue("flag.aura-beta", true)
+			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
+			mock.AddResponse(http.StatusAccepted, mockPatchResponse)
+			helper.SetStdin(stdin)
+			err := helper.ExecuteCommandE(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodPatch)}
+		},
 	})
 }

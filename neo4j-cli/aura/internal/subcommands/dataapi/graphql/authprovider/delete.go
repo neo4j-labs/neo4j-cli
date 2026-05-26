@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/spf13/cobra"
@@ -24,19 +25,26 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "delete <id>",
 		Short:       "Delete a GraphQL Data API authentication provider",
-		Long:        "Deletes a GraphQL Data API authentication provider. This action can not be undone.",
+		Long: `Deletes a GraphQL Data API authentication provider. This action can not be undone.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Delete an authentication provider
-neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw
+neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Delete an authentication provider and capture the response as JSON
-neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --format json
+neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
 
 # Delete the first authentication provider returned by list
-neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw`,
+neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw --yes --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			authProviderId := strings.TrimSpace(args[0])
+
+			if err := confirm.Require(cmd, authProviderId); err != nil {
+				return err
+			}
+
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
@@ -53,6 +61,8 @@ neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api g
 			return nil
 		},
 	}
+
+	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&instanceId, "instance-id", "", "(required) The ID of the instance to delete the Data API for")
 	cmd.MarkFlagRequired("instance-id") //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

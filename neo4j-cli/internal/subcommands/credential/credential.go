@@ -4,12 +4,10 @@
 package credential
 
 import (
-	"fmt"
-
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/envfile"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/dbms"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential/embed"
@@ -23,7 +21,9 @@ func NewCredentialCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "Manage stored credentials. Three subtrees are available: " +
 			"`aura-client` for Aura Console API client credentials, " +
 			"`dbms` for Neo4j Bolt connection profiles consumed by `query`, " +
-			"and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.",
+			"and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`. " +
+			"Note: `query --credential desktop` and `query --credential desktop-connection:<uuid>` are runtime-resolved against the running Neo4j Desktop 2 instance and are NOT stored here — Desktop owns those credential lifecycles. " +
+			"See `neo4j-cli desktop list` to discover saved Desktop connections.",
 	}
 
 	cmd.AddCommand(NewAuraClientCredentialCmd(cfg))
@@ -87,9 +87,7 @@ neo4j-cli credential aura-client add --name work --env ~/Downloads/aura-client-c
 neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse the optional --env first so we can distinguish
-			// "file had the key but with empty value" (error) from
-			// "file didn't have the key" (fall through to flag).
+			// Distinguish file-had-empty-value (error) from file-missing-key (fall through to flag).
 			var (
 				fileVals    = map[string]string{}
 				filePresent = map[string]bool{}
@@ -156,9 +154,6 @@ neo4j-cli credential aura-client use personal --rw`,
 	return cmd
 }
 
-// filterAuraClientEnvKeys narrows envfile.Parse's domain-neutral maps to the
-// keys the aura-client add command recognises. Unrecognised keys are silently
-// discarded.
 func filterAuraClientEnvKeys(vals map[string]string, present map[string]bool) (map[string]string, map[string]bool) {
 	recognised := map[string]bool{
 		"CLIENT_ID":     true,
@@ -198,33 +193,33 @@ neo4j-cli credential aura-client list --format toon`,
 }
 
 func newCredentialRemoveCmd(cfg *clicfg.Config) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "Removes an aura-client credential",
-		Long:  "Remove a stored Aura Console API client credential by name.",
+		Long: `Remove a stored Aura Console API client credential by name.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Remove an aura-client credential by name
-neo4j-cli credential aura-client remove work --rw
+neo4j-cli credential aura-client remove work --rw --yes --force
 
 # Remove the personal credential
-neo4j-cli credential aura-client remove personal --rw
+neo4j-cli credential aura-client remove personal --rw --yes --force
 
 # Remove a stale credential that no longer authenticates
-neo4j-cli credential aura-client remove old-tenant --rw`,
+neo4j-cli credential aura-client remove old-tenant --rw --yes --force`,
 		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			if err := cfg.Credentials.Aura.Remove(name); err != nil {
+			if err := confirm.Require(cmd, args[0]); err != nil {
 				return err
 			}
-			if cfg.Credentials.StorageMode() == credentials.StorageModeKeyring {
-				if err := cfg.Credentials.DeleteKeyringEntries("aura", name); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err) //nolint:errcheck // warning write to stderr; original removal already succeeded
-				}
-			}
-			return nil
+			return cfg.Credentials.RemoveAura(args[0], cmd.ErrOrStderr())
 		},
 	}
+
+	confirm.Register(cmd)
+
+	return cmd
 }
 
 func newCredentialUseCmd(cfg *clicfg.Config) *cobra.Command {

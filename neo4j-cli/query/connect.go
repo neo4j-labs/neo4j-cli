@@ -20,7 +20,9 @@ import (
 	"github.com/subosito/gotenv"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/dotenv"
+	"github.com/neo4j/cli/common/clierr"
 )
 
 const (
@@ -159,19 +161,22 @@ var runStatementResponseFn = runStatementResponseImpl
 
 // resolveConn merges connection settings from .env, OS environment, and
 // command-line flags (lowest → highest precedence). When --credential is set,
-// the named stored credential is used directly; passing any of --uri/--username/
-// --password/--database alongside --credential is an error. When none of the
-// four connection params (uri, username, password, database) are explicitly
-// provided, the stored default database credential (if any) is used instead.
-// Partial explicit overrides (some but not all of the four params) are
-// rejected with a descriptive error. The returned conn does NOT hold an open
-// driver — callers should fill in the password (prompt if needed) and then
-// call c.openDriver(ctx) before issuing queries, and defer c.driver.Close(ctx)
-// for cleanup.
+// the value is dispatched on its prefix: `desktop` resolves the single
+// running Desktop DBMS; `desktop-connection:<uuid>` resolves a saved
+// Desktop connection by UUID; any other value is a persisted-store lookup
+// (no implicit Desktop fallthrough). Passing any of
+// --uri/--username/--password/--database alongside --credential is an error.
+// When none of the four connection params (uri, username, password,
+// database) are explicitly provided, the stored default database credential
+// (if any) is used instead. Partial explicit overrides (some but not all of
+// the four params) are rejected with a descriptive error. The returned conn
+// does NOT hold an open driver — callers should fill in the password
+// (prompt if needed) and then call c.openDriver(ctx) before issuing
+// queries, and defer c.driver.Close(ctx) for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
-	// --credential: when set, look up the named credential and use it directly.
-	// Dotenv / env vars are skipped entirely. None of --uri/--username/
-	// --password/--database may be set alongside it.
+	// --credential: when set, dispatch on the value's prefix. Dotenv / env
+	// vars are skipped entirely. None of --uri/--username/--password/
+	// --database may be set alongside it.
 	if f := cmd.Flag("credential"); f != nil && f.Changed {
 		credName := f.Value.String()
 
@@ -189,37 +194,48 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 				strings.Join(conflicting, ", "))
 		}
 
+		if credName == desktopCredentialPrefix {
+			ctx := cmd.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Aura.Fs())
+			if err != nil {
+				return nil, err
+			}
+			return finishDesktopMatch(cmd, cfg, match)
+		}
+
+		// Prefix sniff happens BEFORE the persisted lookup so the literal
+		// `desktop-connection:` namespace is reserved regardless of any
+		// persisted entry that happens to share the name.
+		if strings.HasPrefix(credName, desktopConnectionPrefix) {
+			raw := strings.TrimPrefix(credName, desktopConnectionPrefix)
+			ctx := cmd.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Aura.Fs(), raw)
+			if err != nil {
+				return nil, err
+			}
+			return finishDesktopMatch(cmd, cfg, match)
+		}
+
+		// Anything else is a persisted-store lookup. No Desktop fallthrough —
+		// a miss surfaces a single error pointing at `credential dbms add`
+		// and the two Desktop prefix forms.
 		cred, err := cfg.Credentials.Dbms.Get(credName)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"query: credential %q not found; run 'neo4j-cli credential dbms list' to see available credentials",
+			return nil, clierr.NewFatalError(
+				"no persisted credential %q. "+
+					"Run 'neo4j-cli credential dbms add' to register a connection, "+
+					"or use '--credential desktop' / '--credential desktop-connection:<uuid>' "+
+					"for a running Neo4j Desktop 2 DBMS or saved Neo4j Desktop 2 connection.",
 				credName)
 		}
 
-		uri := cred.URI
-		rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
-		if didRewrite {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
-				displayOrig, rewritten)
-			uri = rewritten
-		}
-		if warning != "" {
-			cmd.PrintErrln(warning)
-		}
-
-		version := cfg.Version
-		if version == "" {
-			version = "dev"
-		}
-		return &conn{
-			uri:       uri,
-			username:  cred.Username,
-			password:  cred.Password,
-			database:  cred.DatabaseName,
-			userAgent: "neo4j-cli/v" + version,
-			debug:     resolveDebug(cmd),
-		}, nil
+		return buildConnFromPersistedCred(cred, cfg, cmd), nil
 	}
 
 	// --credential not set: load dotenv and use the standard resolution path.
@@ -274,9 +290,14 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	hasStoredCred := storedCred != nil
 
 	switch {
+	case !hasStoredCred && explicitCount == 0:
+		// No stored credential, no explicit params — fall through to
+		// built-in defaults. Users opt into a Desktop DBMS via
+		// `--credential desktop` or `--credential desktop-connection:<uuid>`.
+
 	case !hasStoredCred:
-		// No stored credential — existing behaviour: apply what was given and
-		// let built-in defaults fill in the blanks below.
+		// No stored credential and some explicit params provided — apply
+		// what was given and let built-in defaults fill in the blanks below.
 
 	case explicitCount == 0:
 		// Stored credential available and no explicit params — use the credential.
@@ -332,6 +353,68 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 		userAgent: userAgent,
 		debug:     resolveDebug(cmd),
 	}, nil
+}
+
+// finishDesktopMatch turns a *desktopMatch into a *conn, applying the
+// null-creds prompt/fatal branch when Desktop returned a match but no
+// stored credentials. A nil match is a programming error — resolvers MUST
+// return either a non-nil match or an error.
+func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMatch) (*conn, error) {
+	if match == nil {
+		return nil, clierr.NewFatalError("query: internal: desktop resolver returned nil match without error")
+	}
+	if match.creds != nil {
+		return buildConnFromDesktopMatch(match, cfg, cmd), nil
+	}
+	// Desktop knows the resource but has no stored credentials (legacy DBMS
+	// / safeStorage unavailable). On a TTY prompt for the password; on a
+	// non-TTY fatal with the 3-option hint.
+	name, id := desktopMatchIdentity(match)
+	c := buildConnFromDesktopMatch(match, cfg, cmd)
+	if !stdinIsTTY() {
+		return nil, clierr.NewFatalError(
+			"Neo4j Desktop 2 has no stored credentials for %q (%s). "+
+				"Pass --password (and optionally --username) explicitly, "+
+				"or run 'credential dbms add' to register a connection, "+
+				"or open Desktop and use 'Reset password' on this resource.",
+			name, id)
+	}
+	pw, perr := promptPassword(cmd)
+	if perr != nil {
+		return nil, perr
+	}
+	c.password = pw
+	return c, nil
+}
+
+// buildConnFromPersistedCred turns a persisted DbmsCredential into the *conn
+// shape resolveConn returns, applying the same URI-normalisation +
+// stderr-info-line wiring the inline --credential path used to do.
+func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Config, cmd *cobra.Command) *conn {
+	uri := cred.URI
+	rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
+	if didRewrite {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
+			displayOrig, rewritten)
+		uri = rewritten
+	}
+	if warning != "" {
+		cmd.PrintErrln(warning)
+	}
+
+	version := cfg.Version
+	if version == "" {
+		version = "dev"
+	}
+	return &conn{
+		uri:       uri,
+		username:  cred.Username,
+		password:  cred.Password,
+		database:  cred.DatabaseName,
+		userAgent: "neo4j-cli/v" + version,
+		debug:     resolveDebug(cmd),
+	}
 }
 
 // resolveDebug merges the `--debug` flag with the `NEO4J_DEBUG` env var. Flag
@@ -489,7 +572,9 @@ func runStatementResponseImpl(ctx context.Context, c *conn, statement string, pa
 			resp.Data.Values = make([][]any, 0, len(records))
 			for _, rec := range records {
 				row := make([]any, len(rec.Values))
-				copy(row, rec.Values)
+				for i, v := range rec.Values {
+					row[i] = coerceDriverValue(v)
+				}
 				resp.Data.Values = append(resp.Data.Values, row)
 			}
 		} else {

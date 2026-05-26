@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Add skill install support for Antigravity CLI.
-time: 2026-05-21T08:35:44.706177+02:00

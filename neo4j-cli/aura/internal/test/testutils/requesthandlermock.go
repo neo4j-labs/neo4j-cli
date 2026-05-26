@@ -59,6 +59,18 @@ func (mock *requestHandlerMock) AssertCalledWithMethod(method string) {
 	assert.Fail(mock.t, fmt.Sprintf("Handler not called with method:\nexpected: %s, actual: %s", method, methods))
 }
 
+// CalledWithMethod reports whether the handler was invoked at least once with
+// the given HTTP method. Used by confirmtest.AssertLeafGate to detect whether
+// the destructive sink (DELETE) fired during a gating scenario.
+func (mock *requestHandlerMock) CalledWithMethod(method string) bool {
+	for _, call := range mock.Calls {
+		if call.Method == method {
+			return true
+		}
+	}
+	return false
+}
+
 func (mock *requestHandlerMock) AssertCalledWithQueryParam(param string, value string) {
 	for _, call := range mock.Calls {
 		if call.QueryParams.Has(param) && call.QueryParams.Get(param) == value {

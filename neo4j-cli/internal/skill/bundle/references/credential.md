@@ -21,7 +21,7 @@
 
 Manage and view credential values
 
-Manage stored credentials. Three subtrees are available: `aura-client` for Aura Console API client credentials, `dbms` for Neo4j Bolt connection profiles consumed by `query`, and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`.
+Manage stored credentials. Three subtrees are available: `aura-client` for Aura Console API client credentials, `dbms` for Neo4j Bolt connection profiles consumed by `query`, and `embed` for embedding-provider credentials consumed by `query --param NAME:embed=...` and `query :embed`. Note: `query --credential desktop` and `query --credential desktop-connection:<uuid>` are runtime-resolved against the running Neo4j Desktop 2 instance and are NOT stored here — Desktop owns those credential lifecycles. See `neo4j-cli desktop list` to discover saved Desktop connections.
 
 Usage: `neo4j-cli credential`
 
@@ -90,19 +90,28 @@ Removes an aura-client credential
 
 Remove a stored Aura Console API client credential by name.
 
-Usage: `neo4j-cli credential aura-client remove`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential aura-client remove [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove an aura-client credential by name
-neo4j-cli credential aura-client remove work --rw
+neo4j-cli credential aura-client remove work --rw --yes --force
 
 # Remove the personal credential
-neo4j-cli credential aura-client remove personal --rw
+neo4j-cli credential aura-client remove personal --rw --yes --force
 
 # Remove a stale credential that no longer authenticates
-neo4j-cli credential aura-client remove old-tenant --rw
+neo4j-cli credential aura-client remove old-tenant --rw --yes --force
 ```
 
 ### neo4j-cli credential aura-client use
@@ -138,7 +147,7 @@ Usage: `neo4j-cli credential dbms`
 
 Adds a dbms credential
 
-Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values.
+Add a Neo4j Bolt connection profile. The first credential added becomes the default. Pass `--embed-credential <name>` to link this profile to an existing embed credential — `query --credential <name>` will then pick up the embed config automatically. The link can be added later with `credential dbms set-embed`. Pass `--env <path>` to import a Neo4j Aura–exported credentials file (recognised keys: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE, AURA_INSTANCENAME); explicit flags override file values. The name `desktop` and any name starting with `desktop-connection:` are reserved by `query --credential` runtime dispatch and cannot be used.
 
 Usage: `neo4j-cli credential dbms add [flags]`
 
@@ -194,19 +203,28 @@ Removes a dbms credential
 
 Remove a stored Bolt connection profile by name. Linked embed-credential references on other profiles are not modified.
 
-Usage: `neo4j-cli credential dbms remove <name>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential dbms remove <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove a dbms credential by name
-neo4j-cli credential dbms remove local --rw
+neo4j-cli credential dbms remove local --rw --yes --force
 
 # Remove a staging dbms credential
-neo4j-cli credential dbms remove staging --rw
+neo4j-cli credential dbms remove staging --rw --yes --force
 
 # Remove a prod dbms credential
-neo4j-cli credential dbms remove prod --rw
+neo4j-cli credential dbms remove prod --rw --yes --force
 ```
 
 ### neo4j-cli credential dbms set-embed
@@ -318,19 +336,28 @@ Removes an embed credential
 
 Remove a stored embedding-provider credential by name. Removal is non-cascading: dbms credentials linked to the removed embed credential keep their `embed-credential` field; the stale link is reported lazily at query time. Run `credential dbms list` to find linked profiles or `credential dbms set-embed <dbms-name>` to clear them.
 
-Usage: `neo4j-cli credential embed remove <name>`
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli credential embed remove <name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
 ```
 # Remove an embed credential by name
-neo4j-cli credential embed remove openai-small --rw
+neo4j-cli credential embed remove openai-small --rw --yes --force
 
 # Remove the local Ollama embed credential
-neo4j-cli credential embed remove ollama-nomic --rw
+neo4j-cli credential embed remove ollama-nomic --rw --yes --force
 
 # Remove a HuggingFace embed credential
-neo4j-cli credential embed remove hf-bge --rw
+neo4j-cli credential embed remove hf-bge --rw --yes --force
 ```
 
 ### neo4j-cli credential embed use

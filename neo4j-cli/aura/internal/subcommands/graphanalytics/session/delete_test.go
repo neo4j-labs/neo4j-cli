@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ func TestDeleteSession(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -46,7 +47,7 @@ func TestDeleteSessionWithDefaultWorkspace(t *testing.T) {
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
 	mockHandler.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw", testSessionID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --rw --yes --force", testSessionID))
 
 	mockHandler.AssertCalledTimes(2)
 	helper.AsssertOk()
@@ -115,7 +116,7 @@ func TestDeleteSessionWithTrailingNewline(t *testing.T) {
 		}
 	  }`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw", sessionId, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -141,7 +142,7 @@ func TestDeleteSessionNotFound_HasSuggestion(t *testing.T) {
 		]
 	}`)
 
-	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID))
+	err := helper.ExecuteCommandE(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", testSessionID, testOrgID, testProjectID))
 
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T: %v", err, err)
@@ -174,7 +175,7 @@ func TestDeleteSessionError(t *testing.T) {
 }
 `)
 
-	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", sessionId, testOrgID, testProjectID))
+	helper.ExecuteCommand(fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw --yes --force", sessionId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -183,4 +184,24 @@ func TestDeleteSessionError(t *testing.T) {
 	helper.AssertErr(`Error: [
 	session with id s-f5138f3b-7956 not found
 ]`)
+}
+
+func TestDeleteSessionConfirmGate(t *testing.T) {
+	base := fmt.Sprintf("graph-analytics session delete %s --organization-id %s --project-id %s --rw", testSessionID, testOrgID, testProjectID)
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "aura graph-analytics session delete",
+		NoFlagsArgs:   base,
+		BothFlagsArgs: base + " --yes --force",
+		ResourceLabel: "session",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			helper := testutils.NewAuraTestHelper(t)
+			t.Cleanup(helper.Close)
+			registerProjectsMock(&helper)
+			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1/graph-analytics/sessions/%s", testSessionID), http.StatusOK, sessionGetBody(testSessionID, testProjectID))
+			mock.AddResponse(http.StatusAccepted, `{"data": {"id": "`+testSessionID+`"}}`)
+			helper.SetStdin(stdin)
+			err := helper.ExecuteCommandE(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: helper.PrintErr(), Invoked: mock.CalledWithMethod(http.MethodDelete)}
+		},
+	})
 }

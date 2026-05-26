@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
@@ -32,28 +33,34 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "delete",
 		Short:       "Delete the deployment token",
-		Long:        "Deletes the token for the given Fleet Manager deployment. After deleting the token, users should also disable Fleet Manager from the database using `call fleetManagement.disable();`",
+		Long: `Deletes the token for the given Fleet Manager deployment. After deleting the token, users should also disable Fleet Manager from the database using ` + "`call fleetManagement.disable();`" + `.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
 		Example: `# Delete the deployment token
-neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete the token in a specific organization and project
-neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 00000000-0000-0000-0000-000000000000 --rw --yes --force
 
 # Delete the token and emit the response as JSON for scripting
-neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw --format json`,
+neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-000000000000 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(0),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return utils.SetProjectFlagsAsRequired(cfg, cmd)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			organizationId, projectId, err := utils.SetProjetDefaults(cfg, organizationId, projectId)
 			if err != nil {
 				return err
 			}
 
-			path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId)
+			if err := confirm.Require(cmd, deploymentId); err != nil {
+				return err
+			}
 
-			cmd.SilenceUsage = true
+			path := fmt.Sprintf("/organizations/%s/projects/%s/fleet-manager/deployments/%s/token", organizationId, projectId, deploymentId)
 			_, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:  http.MethodDelete,
 				Version: api.AuraApiVersion2,
@@ -72,6 +79,9 @@ neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-0
 			return nil
 		},
 	}
+
+	confirm.Register(cmd)
+
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
 	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
 	cmd.Flags().StringVar(&deploymentId, deploymentIdFlag, "", "(required) Deployment ID")

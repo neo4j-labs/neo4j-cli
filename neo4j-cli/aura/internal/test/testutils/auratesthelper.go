@@ -32,6 +32,7 @@ type AuraTestHelper struct {
 	Server       *httptest.Server
 	out          *bytes.Buffer
 	err          *bytes.Buffer
+	stdin        string
 	cfg          string
 	credentials  string
 	fs           afero.Fs
@@ -77,8 +78,15 @@ func (helper *AuraTestHelper) ExecuteCommandE(command string) error {
 
 	cmd.SetOut(helper.out)
 	cmd.SetErr(helper.err)
+	cmd.SetIn(strings.NewReader(helper.stdin))
 
 	return cmd.Execute()
+}
+
+// SetStdin buffers stdin for the next ExecuteCommand call. Used by confirm
+// gating tests that drive the y/N prompt.
+func (helper *AuraTestHelper) SetStdin(in string) {
+	helper.stdin = in
 }
 
 func (helper *AuraTestHelper) SetConfig(cfg string) {
@@ -233,6 +241,20 @@ func (helper *AuraTestHelper) AssertConfigValue(key string, expected string) {
 	}
 
 	assert.Equal(helper.t, formattedExpected, formattedActual)
+}
+
+// CredentialsValue returns the raw JSON encoding of the credential field at
+// key (gjson-style path). Useful for confirmtest sinks that need to detect
+// whether the credentials store was mutated without asserting equality.
+func (helper *AuraTestHelper) CredentialsValue(key string) string {
+	file, err := helper.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
+	assert.Nil(helper.t, err)
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+
+	out, err := io.ReadAll(file)
+	assert.Nil(helper.t, err)
+
+	return gjson.Get(string(out), key).String()
 }
 
 func (helper *AuraTestHelper) AssertCredentialsValue(key string, expected string) { // TODO: merge with assertConfig
