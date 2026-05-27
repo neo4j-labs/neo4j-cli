@@ -792,7 +792,7 @@ tasks:
       see).
 
       Confirm CodeQL clears the alert on next push.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -801,4 +801,4 @@ tasks:
       - "Test asserts the prefix check is exercised (synthetic tar entry intercepted)"
       - "CodeQL go/zipslip alert clears on next PR push"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T19:30:00Z

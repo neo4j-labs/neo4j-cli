@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -230,6 +231,63 @@ func TestExtract_RejectsNilFsAndEmptyRoot(t *testing.T) {
 // Sanity: stdlib io interface satisfies our reader contract — extract reads
 // arbitrary streams, not just bytes.Buffer.
 var _ io.Reader = (*bytes.Reader)(nil)
+
+func TestVerifyDestPath(t *testing.T) {
+	sep := string(os.PathSeparator)
+	root := filepath.Join("cache", "content", "1.0.0")
+	cleanRoot := filepath.Clean(root)
+
+	tests := []struct {
+		name     string
+		destPath string
+		destRoot string
+		wantErr  bool
+	}{
+		{
+			name:     "child path inside root",
+			destPath: filepath.Join(root, "neo4j-cypher-skill", "SKILL.md"),
+			destRoot: root,
+		},
+		{
+			name:     "equal to cleaned root",
+			destPath: cleanRoot,
+			destRoot: root,
+		},
+		{
+			name:     "parent escape via dot-dot",
+			destPath: filepath.Join(root, "..", "etc", "passwd"),
+			destRoot: root,
+			wantErr:  true,
+		},
+		{
+			name:     "sibling directory escape (shared prefix without separator)",
+			destPath: cleanRoot + "-evil" + sep + "x",
+			destRoot: root,
+			wantErr:  true,
+		},
+		{
+			name:     "completely unrelated absolute path",
+			destPath: filepath.Join(sep+"tmp", "evil"),
+			destRoot: root,
+			wantErr:  true,
+		},
+		{
+			name:     "trailing-separator root still admits child",
+			destPath: filepath.Join(root, "file"),
+			destRoot: root + sep,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyDestPath(tc.destPath, tc.destRoot)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
 
 func TestClassifyEntry(t *testing.T) {
 	tests := []struct {

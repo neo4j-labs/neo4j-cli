@@ -88,6 +88,13 @@ func Extract(r io.Reader, destFs afero.Fs, destRoot string, allowed []string) er
 		}
 
 		destPath := filepath.Join(destRoot, filepath.FromSlash(rel))
+		// Defense-in-depth: classifyEntry already rejects `..` per segment, but
+		// this canonical Zip Slip prefix check is what CodeQL's go/zipslip
+		// taint analyzer recognizes — and a documented safety net should any
+		// future refactor weaken the upstream guard.
+		if err := verifyDestPath(destPath, destRoot); err != nil {
+			return err
+		}
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
@@ -158,6 +165,23 @@ func classifyEntry(hdr *tar.Header) (string, bool, error) {
 		return "", false, nil
 	}
 	return rel, true, nil
+}
+
+// verifyDestPath enforces the canonical Zip Slip guard: destPath must be
+// equal to filepath.Clean(destRoot) or have it as a prefix followed by the
+// OS path separator. Catches escape attempts that pass through filepath.Join
+// (e.g. `..`-bearing inputs that the upstream classifier would otherwise
+// have rejected). Defense-in-depth alongside classifyEntry's per-segment
+// `..` check.
+func verifyDestPath(destPath, destRoot string) error {
+	cleanRoot := filepath.Clean(destRoot)
+	if destPath == cleanRoot {
+		return nil
+	}
+	if !strings.HasPrefix(destPath, cleanRoot+string(os.PathSeparator)) {
+		return fmt.Errorf("catalog: tar entry path %q escapes destination root %q", destPath, cleanRoot)
+	}
+	return nil
 }
 
 // writeCapped streams src into destFs at destPath (mode 0600), enforcing a
