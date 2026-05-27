@@ -154,6 +154,35 @@ func TestInstallEmptySkillName(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestInstallRejectsInvalidSkillName is the defense-in-depth gate against
+// a compromised upstream catalog leaking path-traversal names past the
+// validator in catalog.skillEntriesFromPluginJSON. Without this gate
+// filepath.Join(skillsRoot, "..") cleans to skillsRoot's parent and
+// RemoveDir would wipe out the agent's whole skills/config dir.
+func TestInstallRejectsInvalidSkillName(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
+	bad := []string{"..", ".", "/", "foo/..", "./..", "  ..  ", ".git", "a/b/c", "foo\\bar"}
+	for _, name := range bad {
+		t.Run(name, func(t *testing.T) {
+			a := FindAgent("claude-code")
+			sp, _ := a.SkillsPath()
+			parent := filepath.Dir(sp)
+			// Seed a sibling so we can prove RemoveDir didn't escape.
+			sentinel := filepath.Join(parent, "sentinel.txt")
+			require.NoError(t, afero.WriteFile(memFs, sentinel, []byte("keep"), 0600))
+
+			_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, name, "claude-code")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid skill name")
+
+			// Parent directory and sentinel must still exist — Install must
+			// reject before any FS mutation.
+			exists, _ := afero.Exists(memFs, sentinel)
+			assert.True(t, exists, "Install must not touch FS when skill name is invalid")
+		})
+	}
+}
+
 func TestInstallNilBundle(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
 	_, err := Install(memFs, Source{Version: "1"}, skillNameForTests, "claude-code")

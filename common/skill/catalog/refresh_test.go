@@ -438,3 +438,25 @@ func TestIsReserved(t *testing.T) {
 	assert.False(t, IsReserved("neo4j-cypher-skill", "neo4j-cli"))
 	assert.False(t, IsReserved("", "neo4j-cli"))
 }
+
+// TestRefresh_DropsMaliciousUpstreamSkillNames asserts that the
+// extraction-allowlist path (Refresh -> skillEntriesFromPluginJSON)
+// silently drops upstream skill entries whose derived name fails
+// ValidSkillName. Without the filter a compromised upstream publishing
+// `"skills": [".."]` would (a) widen the tarball allowlist to include ".."
+// segments and (b) propagate through Lookup -> Install -> RemoveAll on
+// the parent skillsRoot directory.
+func TestRefresh_DropsMaliciousUpstreamSkillNames(t *testing.T) {
+	fx := newFixture(t)
+	// Inject path-traversal + hidden-name entries alongside one safe entry.
+	fx.pluginBody = []byte(`{"name":"neo4j-skills","version":"1.0.0","skills":["..",".","/",  "foo/..","./..",".git","./safe-skill"]}`)
+	// Tarball only carries the safe-skill payload — the extractor will only
+	// see "safe-skill" in the allowlist after filtering.
+	fx.tarballBody = makeTarball(t, "1.0.0", "safe-skill")
+
+	cat := fx.catalog()
+	require.NoError(t, cat.Refresh(context.Background(), fx.fs))
+
+	require.Len(t, cat.Skills, 1, "malicious upstream skill names must be dropped")
+	assert.Equal(t, "safe-skill", cat.Skills[0].Name)
+}

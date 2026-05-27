@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,4 +176,71 @@ func TestSkillNameFromPath(t *testing.T) {
 			assert.Equal(t, tc.want, skillNameFromPath(tc.in))
 		})
 	}
+}
+
+func TestValidSkillName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"happy path", "neo4j-cypher-skill", true},
+		{"alphanumeric", "skill123", true},
+		{"underscore", "neo4j_skill", true},
+		{"empty", "", false},
+		{"dot", ".", false},
+		{"double dot", "..", false},
+		{"forward slash", "foo/bar", false},
+		{"backslash", "foo\\bar", false},
+		{"leading dot", ".hidden", false},
+		{"leading dot git", ".git", false},
+		{"nul byte", "foo\x00bar", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, ValidSkillName(tc.in))
+		})
+	}
+}
+
+func TestLoad_DropsMaliciousUpstreamSkillNames(t *testing.T) {
+	// path.Base("..") == "..", path.Base("/") == "/",
+	// path.Base("foo/..") == "..", path.Base("./..") == "..", etc.
+	// All of these would otherwise reach Install where filepath.Join
+	// cleans `..` segments and RemoveAll escapes skillsRoot.
+	// Each entry's path.Base (after TrimSpace + "./" strip) lands on a name
+	// that must be rejected. "foo/.." -> "..", "./.." -> "..", "  ..  " ->
+	// "..", "/" -> "/", "." -> ".", ".git" -> ".git".
+	malicious := []string{
+		"..",
+		".",
+		"/",
+		"foo/..",
+		"./..",
+		"  ..  ",
+		".git",
+	}
+	var skillsJSON strings.Builder
+	for i, s := range malicious {
+		if i > 0 {
+			skillsJSON.WriteString(",")
+		}
+		// JSON-encode as a raw string entry.
+		skillsJSON.WriteString(`"`)
+		skillsJSON.WriteString(s)
+		skillsJSON.WriteString(`"`)
+	}
+	body := `{"name":"neo4j-skills","version":"1.0.0","skills":[` + skillsJSON.String() + `,"./safe-skill"]}`
+
+	memFs := afero.NewMemMapFs()
+	cacheRoot := filepath.Join("cache", "neo4j-cli", "skill-catalog")
+	require.NoError(t, memFs.MkdirAll(cacheRoot, 0755))
+	require.NoError(t, afero.WriteFile(memFs, filepath.Join(cacheRoot, "plugin.json"), []byte(body), 0600))
+
+	cat := New(Options{CacheRoot: cacheRoot})
+	require.NoError(t, cat.Load(memFs))
+
+	// Only the safe entry survives.
+	require.Len(t, cat.Skills, 1)
+	assert.Equal(t, "safe-skill", cat.Skills[0].Name)
 }

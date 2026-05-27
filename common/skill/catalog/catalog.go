@@ -113,11 +113,17 @@ func Stale(filesystem afero.Fs, cacheRoot string, ttl time.Duration) bool {
 // skillEntriesFromPluginJSON converts the raw upstream string list into
 // the in-memory SkillEntry slice. The single conversion path used by
 // both Load and Refresh.
+//
+// Entries whose derived name fails ValidSkillName are SILENTLY DROPPED.
+// This is defense against a compromised upstream catalog publishing
+// path-traversal names (e.g. ".."): such a name would otherwise reach
+// Install where filepath.Join(skillsRoot, name) escapes skillsRoot and
+// the cleanup RemoveAll deletes the parent directory.
 func skillEntriesFromPluginJSON(paths []string) []SkillEntry {
 	out := make([]SkillEntry, 0, len(paths))
 	for _, p := range paths {
 		name := skillNameFromPath(p)
-		if name == "" {
+		if !ValidSkillName(name) {
 			continue
 		}
 		out = append(out, SkillEntry{Name: name, Path: p})
@@ -136,4 +142,27 @@ func skillNameFromPath(p string) string {
 	}
 	p = strings.TrimPrefix(p, "./")
 	return path.Base(p)
+}
+
+// ValidSkillName reports whether name is safe to use as an on-disk skill
+// directory id. Rejects empty (after TrimSpace) / "." / ".." / names
+// containing '/' or '\\' / names containing whitespace / names starting
+// with '.' / names containing NUL bytes. The catalog package applies it
+// inside skillEntriesFromPluginJSON (so upstream-supplied names are
+// filtered at the conversion boundary); the parent skill package
+// re-checks it inside Install as defense-in-depth against a bypass.
+func ValidSkillName(name string) bool {
+	if strings.TrimSpace(name) != name {
+		return false
+	}
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	if strings.ContainsAny(name, "/\\\x00") {
+		return false
+	}
+	if name[0] == '.' {
+		return false
+	}
+	return true
 }

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/neo4j/cli/common/skill/catalog"
 	"github.com/spf13/afero"
 )
 
@@ -68,6 +69,9 @@ type AgentInstall struct {
 func Install(filesystem afero.Fs, src Source, skillName, agentFilter string) ([]*Agent, error) {
 	if skillName == "" {
 		return nil, errors.New("skill: empty skill name")
+	}
+	if !catalog.ValidSkillName(skillName) {
+		return nil, fmt.Errorf("skill: invalid skill name %q", skillName)
 	}
 	if src.FS == nil {
 		return nil, errors.New("skill: nil bundle FS")

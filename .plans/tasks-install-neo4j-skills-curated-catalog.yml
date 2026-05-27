@@ -520,7 +520,7 @@ tasks:
       "/", "foo/..", "./..", "  ..  "]` and assert (a) catalog Load /
       Refresh drop those entries and (b) Install rejects them if passed
       directly.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -529,7 +529,7 @@ tasks:
       - "Install in common/skill/installer.go returns an error when skillName fails validation (defense in depth)"
       - "Test fixtures cover '..', '.', '/', 'foo/..', './..', '  ..  ' across both catalog Load AND Install entry points"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T18:45:00Z
 
   - id: task-022
     title: "Cap plugin.json HTTP body read with io.LimitReader"
