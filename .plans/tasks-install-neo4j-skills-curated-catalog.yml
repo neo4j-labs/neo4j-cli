@@ -657,7 +657,7 @@ tasks:
       example-driven.
 
       No code changes; no bundle regen needed. Pure README edit.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -666,4 +666,4 @@ tasks:
       - "README.md mentions: curated catalog (neo4j-contrib/neo4j-skills), --all, --refresh, skill refresh leaf, --agent flag, self alias"
       - "Conductor/multi-agent paragraph preserved (still accurate)"
       - "make test / make fmt-check / make lint all clean (README edits should not affect any gate, but verify)"
-    completed_at: null
+    completed_at: 2026-05-27T17:36:06Z
