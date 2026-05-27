@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-05-27T12:45:00Z
 Scaffold common/skill/catalog pkg: SkillEntry/Catalog types, Load (afero plugin.json), Stale (fetched-at + ttl), URL constants, userCacheDirFn/nowFn seams.
 Files: +common/skill/catalog/source.go, +common/skill/catalog/cache.go, +common/skill/catalog/catalog.go, +common/skill/catalog/catalog_test.go
+
+## TASK-002 — 2026-05-27T13:00:00Z
+Secure tar+gzip extractor: streams .tar.gz, strips top-level dir, allowlists first-segment skill names, rejects traversal/absolute/symlink/hardlink/device/fifo, 20 MiB total decompressed cap via afero.Fs (0600/0755).
+Files: +common/skill/catalog/extract.go, +common/skill/catalog/extract_test.go
+Decisions: cap is total-decompressed across all entries (not per-file); NUL-in-name guard is defense-in-depth (Go's tar.Writer already rejects), tested via classifyEntry unit table.

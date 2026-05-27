@@ -33,7 +33,7 @@ tasks:
       symlinks (`tar.TypeSymlink`/`TypeLink`), device/fifo nodes; accept only
       `tar.TypeReg` + `tar.TypeDir`. Enforce a 20 MB max-decompressed-size cap.
       All writes go through `afero.Fs` with 0600 files / 0755 dirs.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Synthetic tarball with ../../../etc/passwd entry causes extract to error and abort"
@@ -41,7 +41,7 @@ tasks:
       - "Entry outside the allowlist is silently skipped; allowlisted skill content lands at content/<version>/<skill>/"
       - "Decompressed payload exceeding the cap aborts mid-stream with a size-limit error"
       - "Uses only archive/tar + compress/gzip stdlib — no third-party deps added to go.mod"
-    completed_at: null
+    completed_at: 2026-05-27T13:00:00Z
 
   - id: task-003
     title: "Implement Catalog.Refresh + Lookup with self-name collision guard"
@@ -75,7 +75,7 @@ tasks:
       line, or inserting it immediately before the closing `---` when upstream
       has none. Existing self-skill callers pass a Source backed by the
       embedded `bundle.FS` + binary version.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "Install signature accepts Source and existing self-skill flow continues to install with binary version"
