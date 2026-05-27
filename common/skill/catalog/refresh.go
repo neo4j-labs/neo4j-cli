@@ -98,6 +98,17 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 
 	// Tarball fetch + extract happens BEFORE writing plugin.json so a mid-
 	// refresh network or extraction failure leaves the prior cache intact.
+	//
+	// security: tarball integrity rests on HTTPS + GitHub's hosting of the
+	// neo4j-contrib/neo4j-skills repo. Upstream plugin.json does not publish a
+	// cryptographic digest (sha256/sha512) — the bytes-on-the-wire trust model
+	// is "whatever codeload.github.com serves for refs/heads/main". The
+	// extractor (Extract + classifyEntry + the inline Zip Slip prefix check)
+	// protects the local filesystem from a malicious tarball shape; this leaves
+	// only the SKILL.md CONTENT itself as the attack surface, which is
+	// equivalent to the supply-chain risk of trusting any GitHub-hosted asset.
+	// A future upstream PR adding a `sha256` field to plugin.json would let us
+	// verify here via io.TeeReader + sha256.New — tracked separately.
 	if cachedVersion != pj.Version {
 		tar, terr := fetch(ctx, doer, userAgent, TarballURL)
 		if terr != nil {
