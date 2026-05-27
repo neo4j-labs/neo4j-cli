@@ -60,8 +60,8 @@ func TestKeyring_NoDaemon_FirstRun_WritesInsecureAndWarns(t *testing.T) {
 	// Upgrade notice must appear on stderr
 	assert.Contains(t, stderr, "Warning: OS keyring is unavailable",
 		"must warn about keyring unavailability; stderr=%s", stderr)
-	assert.Contains(t, stderr, "neo4j-cli config set credential-storage keyring --rw",
-		"must suggest the migration command; stderr=%s", stderr)
+	assert.Contains(t, stderr, "gnome-keyring",
+		"must include keyring setup instructions; stderr=%s", stderr)
 }
 
 // TestKeyring_NoDaemon_ConfigSet_FailsWithNoCreds verifies that when there are
