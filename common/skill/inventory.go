@@ -66,10 +66,7 @@ func inventoryRowsForSkill(filesystem afero.Fs, skillName, source, availableVers
 			Agent:            &AGENTS[i],
 			AvailableVersion: availableVersion,
 		}
-		if dp, ok := AGENTS[i].DetectPath(); ok {
-			exists, _ := afero.DirExists(filesystem, dp)
-			row.Detected = exists
-		}
+		row.Detected = agentDetected(filesystem, &AGENTS[i])
 		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
 		row.Status = statusFor(row.Installed, row.InstalledVersion, row.AvailableVersion)
 		rows = append(rows, row)

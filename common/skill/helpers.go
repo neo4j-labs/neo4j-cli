@@ -69,7 +69,7 @@ func unknownSkillErr(name string) error {
 // readInstalledSkill reads the per-agent install state for `skillName`
 // from `filesystem`. Returns whether SKILL.md exists and the parsed
 // frontmatter `version:` (empty string when missing or unparseable).
-// Shared by the list + check leaves.
+// Shared by installer.List + BuildInventory.
 func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bool, string) {
 	sp, ok := agent.SkillsPath()
 	if !ok {
@@ -85,4 +85,15 @@ func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bo
 		return true, ""
 	}
 	return true, parseVersion(data)
+}
+
+// agentDetected reports whether `agent`'s DetectDir exists on `filesystem`.
+// Shared by installer.List + BuildInventory.
+func agentDetected(filesystem afero.Fs, agent *Agent) bool {
+	dp, ok := agent.DetectPath()
+	if !ok {
+		return false
+	}
+	exists, _ := afero.DirExists(filesystem, dp)
+	return exists
 }

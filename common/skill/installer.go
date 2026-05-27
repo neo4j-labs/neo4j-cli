@@ -46,22 +46,12 @@ var versionLineRe = regexp.MustCompile(`(?m)^[ \t]*version:[ \t]*([^\r\n]*?)[ \t
 // `version:` line within it.
 var frontmatterRe = regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---(\r?\n|\z)`)
 
-// AgentInstall describes the per-agent state surfaced by List / Check.
+// AgentInstall describes the per-agent state surfaced by List.
 type AgentInstall struct {
 	Agent            *Agent
 	Detected         bool   // DetectDir exists on disk
 	Installed        bool   // SKILL.md present in this agent's skills dir
 	InstalledVersion string // value of the `version:` frontmatter line, "" if not installed or unparseable
-}
-
-// CheckRow is a per-agent row produced by Check. Status is "ok", "drift",
-// or "unknown-version". Check returns rows only for installed agents — an
-// uninstalled agent is silently omitted.
-type CheckRow struct {
-	Agent            *Agent
-	InstalledVersion string
-	CurrentVersion   string
-	Status           string
 }
 
 // Install copies `src.FS` into each target agent's skills directory under
@@ -156,64 +146,11 @@ func List(filesystem afero.Fs, skillName string) ([]AgentInstall, error) {
 	out := make([]AgentInstall, 0, len(AGENTS))
 	for i := range AGENTS {
 		row := AgentInstall{Agent: &AGENTS[i]}
-
-		dp, ok := AGENTS[i].DetectPath()
-		if ok {
-			exists, _ := afero.DirExists(filesystem, dp)
-			row.Detected = exists
-		}
-
-		sp, ok := AGENTS[i].SkillsPath()
-		if ok {
-			skillFile := filepath.Join(sp, skillName, "SKILL.md")
-			if exists, _ := afero.Exists(filesystem, skillFile); exists {
-				row.Installed = true
-				if data, err := afero.ReadFile(filesystem, skillFile); err == nil {
-					row.InstalledVersion = parseVersion(data)
-				}
-			}
-		}
-
+		row.Detected = agentDetected(filesystem, &AGENTS[i])
+		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
 		out = append(out, row)
 	}
 	return out, nil
-}
-
-// Check parses each installed SKILL.md frontmatter `version:` and compares
-// to currentVersion. Returns one row per *installed* agent and a drift
-// bool that is true when at least one row's Status != "ok".
-//
-// Status values: "ok" (matches), "drift" (mismatch), "unknown-version"
-// (frontmatter missing/unparseable).
-func Check(filesystem afero.Fs, skillName, currentVersion string) ([]CheckRow, bool, error) {
-	rows, err := List(filesystem, skillName)
-	if err != nil {
-		return nil, false, err
-	}
-
-	var out []CheckRow
-	drift := false
-	for _, r := range rows {
-		if !r.Installed {
-			continue
-		}
-		status := "ok"
-		switch {
-		case r.InstalledVersion == "":
-			status = "unknown-version"
-			drift = true
-		case r.InstalledVersion != currentVersion:
-			status = "drift"
-			drift = true
-		}
-		out = append(out, CheckRow{
-			Agent:            r.Agent,
-			InstalledVersion: r.InstalledVersion,
-			CurrentVersion:   currentVersion,
-			Status:           status,
-		})
-	}
-	return out, drift, nil
 }
 
 // resolveTargets is the install-time agent filter. Mirrors Remove's logic

@@ -241,59 +241,6 @@ func TestList(t *testing.T) {
 	assert.False(t, w.Installed)
 }
 
-func TestCheckNoDrift(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.0.0"}, skillNameForTests, "claude-code")
-	require.NoError(t, err)
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.False(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "ok", rows[0].Status)
-	assert.Equal(t, "1.0.0", rows[0].InstalledVersion)
-	assert.Equal(t, "1.0.0", rows[0].CurrentVersion)
-}
-
-func TestCheckDrift(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "0.9.0"}, skillNameForTests, "claude-code")
-	require.NoError(t, err)
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.True(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "drift", rows[0].Status)
-	assert.Equal(t, "0.9.0", rows[0].InstalledVersion)
-}
-
-func TestCheckMissing(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	// Nothing installed.
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.False(t, drift)
-	assert.Empty(t, rows, "Check returns rows only for installed agents")
-}
-
-func TestCheckUnknownVersion(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	a := FindAgent("claude-code")
-	sp, _ := a.SkillsPath()
-	skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
-	require.NoError(t, memFs.MkdirAll(filepath.Dir(skillFile), 0755))
-	require.NoError(t, afero.WriteFile(memFs, skillFile, []byte("no frontmatter here\n"), 0600))
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.True(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "unknown-version", rows[0].Status)
-	assert.Equal(t, "", rows[0].InstalledVersion)
-}
-
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name string

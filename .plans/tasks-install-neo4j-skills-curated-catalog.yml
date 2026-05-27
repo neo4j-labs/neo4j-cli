@@ -346,7 +346,7 @@ tasks:
       `readInstalledSkill` per agent. After the refactor the package has
       ONE implementation of "read installed state for skill × agent",
       called by both surfaces.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -354,7 +354,7 @@ tasks:
       - "installer.List is implemented in terms of readInstalledSkill (single source of truth for per-agent install state)"
       - "skillrefresh + update callers still compile and pass their tests"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T17:30:00Z
 
   - id: task-017
     title: "Unify skill-name resolver across install / print / remove"
