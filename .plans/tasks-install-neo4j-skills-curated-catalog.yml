@@ -892,7 +892,7 @@ tasks:
 
       After landing, push and verify CodeQL clears the `go/zipslip`
       alert on the next run.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -901,4 +901,4 @@ tasks:
       - "classifyEntry's per-segment '..' rejection unchanged (still the first line of defense)"
       - "CodeQL go/zipslip alert clears on next push (verify via `gh api .../code-scanning/alerts`)"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T20:00:00Z
