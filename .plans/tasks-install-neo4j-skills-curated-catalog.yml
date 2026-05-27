@@ -623,3 +623,47 @@ tasks:
       - "Test covers two successive refreshes with different versions (stale dir removed) and one refresh with pj.Version='..' (rejected, prior cache intact)"
       - "make test / make fmt-check / make lint all clean"
     completed_at: 2026-05-27T17:11:22Z
+
+  - id: task-024
+    title: "Refresh README.md 'Agent skills' section to reflect the new skill surface"
+    description: |
+      Doc-drift finding. The skill-bundle inputs (additions.md,
+      description.txt) and the regenerated bundle correctly describe the
+      new catalog surface, but README.md lines 37–51 still teach the old
+      positional-as-agent shape that task-006 explicitly hard-broke.
+
+      Three concrete bugs in the example block:
+
+      1. Line 45: `neo4j-cli skill install claude-code` is exactly the
+         shape that now errors with `unknown skill: claude-code; did you
+         mean '--agent claude-code'?`. README actively teaches a
+         broken command.
+      2. Line 48: `neo4j-cli skill remove [agent]` is wrong twice over —
+         positional is now `[skill-name]` and `remove` requires either
+         a positional OR `--all`.
+      3. Line 39 + the surrounding paragraph say "ships an embedded
+         skill bundle" and never mention: the curated catalog at
+         `github.com/neo4j-contrib/neo4j-skills`, `--all`, `--refresh`,
+         the new `skill refresh` leaf, the `--agent` flag, or the
+         `self` canonical name + binary-name alias.
+
+      Fix: rewrite lines 37–51 so the prose introduces both the
+      embedded self-skill AND the curated catalog, then replace the
+      example block with one that uses the new shape — install with
+      `--agent`, install a catalog skill by name, `--all`, `--refresh`,
+      the `refresh` leaf, `remove self`, `remove --all`. Keep the
+      Conductor / multi-agent paragraph intact (it's still accurate).
+      Tone + length should match the rest of README — concise,
+      example-driven.
+
+      No code changes; no bundle regen needed. Pure README edit.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "README.md no longer contains 'skill install claude-code' as an example"
+      - "README.md no longer documents 'skill remove [agent]' — uses '[skill-name]' or '--all' shape"
+      - "README.md mentions: curated catalog (neo4j-contrib/neo4j-skills), --all, --refresh, skill refresh leaf, --agent flag, self alias"
+      - "Conductor/multi-agent paragraph preserved (still accurate)"
+      - "make test / make fmt-check / make lint all clean (README edits should not affect any gate, but verify)"
+    completed_at: null
