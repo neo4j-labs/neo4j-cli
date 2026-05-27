@@ -11,7 +11,7 @@ Extend `neo4j-cli skill` so it can install any skill from the curated `github.co
 - One unified `neo4j-cli skill` UX installs **either** the embedded self-skill **or** any curated catalog skill into any supported agent (Claude Code, Cursor, Windsurf, Codex, Gemini-CLI, etc.).
 - HTTPS-based discovery and content fetch from `neo4j-contrib/neo4j-skills`; no binary-bloat embedding of the catalog.
 - Cache the upstream `plugin.json` and gate refresh on its single `version` field — one HTTP GET answers "is anything stale?" for the whole catalog.
-- Preserve the self-skill (`neo4j-cli`) as an immovable entry; never accidentally remove it during bulk operations.
+- Preserve the self-skill (`self`) as an immovable entry; never accidentally remove it during bulk operations.
 - Keep the existing five-leaf shape (`install`, `remove`, `list`, `check`, `print`) plus one new leaf (`refresh`).
 
 ## Non-Goals
@@ -59,10 +59,10 @@ Extend `neo4j-cli skill` so it can install any skill from the curated `github.co
 
 **Self-skill handling**
 
-- REQ-F-020: Self-skill is identified by name `neo4j-cli` (current `skillName` arg passed to `skill.NewCmd`) and shown as `source: embedded` in `skill list` output, always at the top.
-- REQ-F-021: Self-skill is also addressable by the alias `self` in every command that takes a `<skill-name>` positional (`install`, `remove`, `print`). `neo4j-cli skill install self` ≡ `neo4j-cli skill install neo4j-cli` ≡ `neo4j-cli skill install` (no-arg). `self` is reserved — catalog Lookup must reject any upstream skill called `self`.
+- REQ-F-020: Self-skill is identified by the canonical name `self` and shown as `source: embedded` in `skill list` output, always at the top. The binary name (`neo4j-cli`, from the `skillName` arg passed to `skill.NewCmd`) is accepted as an alias for back-compat.
+- REQ-F-021: Self-skill is addressable as `self` (canonical) or as the binary name `neo4j-cli` (alias) in every command that takes a `<skill-name>` positional (`install`, `remove`, `print`). `neo4j-cli skill install` (no-arg) ≡ `neo4j-cli skill install self` ≡ `neo4j-cli skill install neo4j-cli`. Both names are reserved — catalog Lookup must reject any upstream skill called `self` or matching the binary name.
 - REQ-F-022: `skill remove --all` never removes the self-skill.
-- REQ-F-023: `skill remove neo4j-cli` (or `skill remove self`) is allowed and prints a hint: `Run 'neo4j-cli skill install' to reinstall.`
+- REQ-F-023: `skill remove self` (or `skill remove neo4j-cli`) is allowed and prints a hint: `Run 'neo4j-cli skill install' to reinstall.`
 - REQ-F-024: `skill install --all` always includes the self-skill.
 
 ### Non-Functional Requirements
@@ -114,7 +114,7 @@ func (c *Catalog) Stale(ttl time.Duration) bool                       // based o
 
 **Soft-fail vs hard-fail for cache** — `list`/`check` tolerate a missing cache (show only the self-skill with a hint to run `refresh`); `install <catalog-skill>` requires the cache and triggers an auto-refresh if missing.
 
-**Self-skill name conflict** — the user-facing decision was to keep `neo4j-cli` as the self-skill name, with `self` as an additional reserved alias. If upstream ever adds a skill called `neo4j-cli` or `self`, we have a collision; the catalog Lookup must check both and fail closed (catalog cannot shadow self). One guard in `Catalog.Lookup` rejecting either name from the upstream side.
+**Self-skill name conflict** — the user-facing decision was to use `self` as the canonical self-skill name, with the binary name (`neo4j-cli`) as a back-compat alias. If upstream ever adds a skill called `self` or matching the binary name, we have a collision; the catalog Lookup must check both and fail closed (catalog cannot shadow self). One guard in `Catalog.Lookup` rejecting either name from the upstream side.
 
 **Path-traversal hardening** — every tar entry must `filepath.Clean(path)`, reject if it starts with `..` or `/`, reject symlinks (`tar.TypeSymlink`/`TypeLink`), reject device/fifo nodes; only `tar.TypeReg` + `tar.TypeDir` allowed. Top-of-archive dir name (`neo4j-skills-<sha>/`) is stripped before allowlist check.
 
@@ -135,9 +135,9 @@ func (c *Catalog) Stale(ttl time.Duration) bool                       // based o
 - [ ] `neo4j-cli skill install <name> --agent claude-code` installs into one agent only.
 - [ ] `neo4j-cli skill install claude-code` (legacy form, no matching skill) exits non-zero with `unknown skill: claude-code; did you mean '--agent claude-code'?`.
 - [ ] `neo4j-cli skill remove --all` removes every catalog skill from every detected agent but leaves the self-skill on disk.
-- [ ] `neo4j-cli skill remove neo4j-cli` removes the self-skill and prints `Run 'neo4j-cli skill install' to reinstall.`. Same behaviour via `neo4j-cli skill remove self`.
-- [ ] `neo4j-cli skill install self` and `neo4j-cli skill print self` resolve to the embedded self-skill.
-- [ ] A synthetic upstream `plugin.json` listing a skill named `self` or `neo4j-cli` is rejected by catalog Lookup.
+- [ ] `neo4j-cli skill remove self` removes the self-skill and prints `Run 'neo4j-cli skill install' to reinstall.`. Same behaviour via the alias `neo4j-cli skill remove neo4j-cli`.
+- [ ] `neo4j-cli skill install self` and `neo4j-cli skill print self` resolve to the embedded self-skill (canonical). Alias form `… install neo4j-cli` / `… print neo4j-cli` resolves to the same.
+- [ ] A synthetic upstream `plugin.json` listing a skill named `self` or matching the binary name (`neo4j-cli`) is rejected by catalog Lookup.
 - [ ] `neo4j-cli skill list` (with populated cache) lists the self-skill + every catalog entry × every detected agent, with `installed_version`, `available_version`, `status`.
 - [ ] `neo4j-cli skill list` (cold cache) shows only the self-skill and a note pointing at `neo4j-cli skill refresh`.
 - [ ] `neo4j-cli skill check` exits zero when all installed skills match their source version; exits non-zero when any drifts. Tested by hand-editing an installed SKILL.md's `version:` and re-running.
