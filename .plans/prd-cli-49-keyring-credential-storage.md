@@ -33,7 +33,7 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 - REQ-F-004: **Forward migration** — `neo4j-cli config set credential-storage keyring` triggers migration before saving the config value. All existing credential secrets are written to the keyring and scrubbed from the JSON file. The config value is only persisted if all migrations succeed. If there are no credentials to migrate, the command succeeds normally.
 - REQ-F-005: **Reverse migration** — `neo4j-cli config set credential-storage insecure` triggers migration before saving the config value. All existing credential secrets are read from the keyring and written back to the JSON file, then deleted from the keyring. The config value is only persisted if all migrations succeed.
 - REQ-F-010: **Atomic migration rollback** — if migration fails part-way through (e.g., keyring write succeeds for 3 of 5 credentials then errors), all already-migrated entries are rolled back (keyring entries deleted for forward migration; JSON fields re-zeroed for reverse migration) and the config value is left unchanged. The error message identifies which credential caused the failure.
-- REQ-F-006: If `credential-storage: keyring` and a keyring operation fails (keyring unavailable, daemon not running, permission denied, etc.), the CLI must return a clear error explaining that the keyring is unavailable and instructing the user to run `neo4j-cli config set credential-storage insecure`.
+- REQ-F-006: If `credential-storage: keyring` and a keyring operation fails (keyring unavailable, daemon not running, permission denied, etc.), the CLI must return a clear error explaining that the keyring is unavailable and including platform-specific instructions for how to set up the required keyring daemon or service (REQ-F-020).
 - REQ-F-007: Keyring entries use a consistent naming scheme: service `neo4j-cli`, user key `<type>/<credential-name>/<field>` (e.g., `aura/my-cred/client-secret`, `dbms/mydb/password`, `embed/openai/api-key`).
 - REQ-F-008: `credential <type> remove` must also delete the associated keyring entries when `credential-storage: keyring`.
 - REQ-F-009: `credential list` and `credential get` output is unchanged — secrets are never printed regardless of storage mode.
@@ -45,12 +45,18 @@ Replace plaintext secret storage in `credentials.json` with OS-native keyring st
 - REQ-F-013: **Missing-secret behaviour during migration** — applied symmetrically in both directions (forward: empty value in JSON; reverse: `ErrNotFound` from keyring):
   - **Aura `ClientSecret`** and **Dbms `Password`**: treated as required — a missing value is a hard error. Migration aborts, rolls back, config unchanged. Error message names the credential and suggests removing it with `neo4j-cli credential <type> remove <name>` before retrying.
   - **Aura `AccessToken`** and **Embed `APIKey`**: treated as optional/cacheable — a missing value is silently skipped (no keyring entry written for forward; empty value written to JSON for reverse). A keyring error *other than* `ErrNotFound` (e.g., daemon unavailable, permission denied) is still a hard error for all field types.
-- REQ-F-014: **First-run keyring availability probe** — when first-run default detection (REQ-F-011) would write `credential-storage: keyring` (i.e., no existing credentials), the keyring is first probed for availability. If the probe fails (e.g., `dbus-launch` not found on Linux), a warning is emitted to stderr and `credential-storage: insecure` is written instead. The warning names the failure and provides the command to retry once the keyring daemon is available.
-- REQ-F-015: **Explicit keyring probe on `config set credential-storage keyring`** — before accepting `keyring` as the new mode (regardless of whether credentials exist), the keyring is probed. If unavailable, the command returns a `UsageError` identifying the keyring failure and instructing the user to either fix the keyring daemon or run `neo4j-cli config set credential-storage insecure --rw`. The config key is not written.
+- REQ-F-014: **First-run keyring availability probe** — when first-run default detection (REQ-F-011) would write `credential-storage: keyring` (i.e., no existing credentials), the keyring is first probed for availability. If the probe fails (e.g., `dbus-launch` not found on Linux), a warning is emitted to stderr and `credential-storage: insecure` is written instead. The warning names the failure and includes platform-specific setup instructions (REQ-F-020) so the user can configure the keyring and retry.
+- REQ-F-015: **Explicit keyring probe on `config set credential-storage keyring`** — before accepting `keyring` as the new mode (regardless of whether credentials exist), the keyring is probed. If unavailable, the command returns a `UsageError` identifying the keyring failure and including platform-specific setup instructions (REQ-F-020). The config key is not written.
 - REQ-F-016: **Silent JSON fallback for missing keyring entries during credential load** — when `credential-storage: keyring` is configured and `keyring.Get()` returns `ErrNotFound` for a sensitive field during `load()`, if the JSON value for that field is non-empty, silently use the JSON value without warning or error. Hard-error only when both the keyring entry and the JSON value are absent/empty for a required field (`ClientSecret`, `Password`). Optional fields (`AccessToken`, `APIKey`) remain silently skipped when both are absent. This makes the CLI resilient to out-of-sync states where a credential was written to JSON while keyring mode was already configured (e.g., a new credential added via direct JSON edit, or an incomplete migration).
 - REQ-F-017: **Repair migration — `config set credential-storage keyring` is idempotent** — `config set credential-storage keyring --rw` runs `MigrateToKeyring()` even when `credential-storage` is already `keyring`. Since `load()` now populates in-memory credential fields from JSON fallback (REQ-F-016), the repair pass has access to the JSON-resident secrets and writes them into the keyring, scrubbing them from `credentials.json`. Credentials already correctly stored in the keyring are unaffected (their in-memory values, loaded from the keyring, are written back — effectively a no-op). This allows users to explicitly repair an out-of-sync state by re-running the same command.
 - REQ-F-018: **Reverse migration handles JSON-only credentials** — during `MigrateToInsecure()`, if `keyring.Get()` returns `ErrNotFound` for a sensitive field but the in-memory credential struct already has a non-empty value for that field (populated via the REQ-F-016 JSON fallback during `load()`), the field is already present in JSON — treat it as a no-op (no keyring read needed, no error). This allows `config set credential-storage insecure --rw` to succeed when transitioning away from a partially-migrated or out-of-sync keyring state.
 - REQ-F-019: **Auto-migration on load** — when `load()` uses the REQ-F-016 JSON fallback for any sensitive field (keyring `ErrNotFound` but JSON value present), immediately attempt to write that value to the keyring and scrub it from `credentials.json`. This auto-migration fires on every command that loads credentials, without requiring `--rw`. If the keyring write fails (e.g., the daemon is temporarily unavailable), the attempt is silently abandoned for this invocation and the JSON value continues to be used — the next command will retry automatically. Auto-migration is per-field and per-credential: a failure on one does not block others. A successful auto-migration leaves the credential fully in keyring mode with no trace in `credentials.json`, without any user action.
+- REQ-F-020: **Platform-specific keyring setup instructions** — all keyring unavailability errors (REQ-F-006, REQ-F-015) and first-run probe warnings (REQ-F-014) must include platform-specific instructions for how to configure the required keyring, rather than a generic insecure fallback hint. A `keyringSetupHint() string` helper (resolved at runtime via `runtime.GOOS`) returns the appropriate text:
+  - **Linux**: instructions to install the Secret Service daemon and start it, e.g. `sudo apt-get install gnome-keyring libsecret-1-0` and `gnome-keyring-daemon --start --components=secrets`.
+  - **macOS**: instruction to unlock the login Keychain, e.g. `security unlock-keychain ~/Library/Keychains/login.keychain-db`.
+  - **Windows**: instruction to verify the Credential Manager service is running, e.g. `Get-Service VaultSvc` in PowerShell or via `services.msc`.
+  - **Other platforms**: a generic "ensure your system keyring daemon is running" message.
+  The insecure fallback hint (`neo4j-cli config set credential-storage insecure --rw`) is removed from all keyring unavailability messages and warnings.
 
 ### Non-Functional Requirements
 
@@ -117,6 +123,21 @@ Fix: add a Windows-specific CI step immediately before "Keyring smoke (Windows)"
   if: matrix.os == 'windows-latest'
   run: go build -o bin/neo4j-cli.exe ./neo4j-cli
 ```
+
+### Platform-Specific Keyring Setup Hint
+
+A `keyringSetupHint() string` helper function lives in `common/clicfg/credentials/keyring_hint.go` and returns a short, human-readable multi-line string describing how to configure the required keyring on the current platform. It uses `runtime.GOOS` to select the message:
+
+- `linux`: installs `gnome-keyring libsecret-1-0` via apt and starts the daemon with `gnome-keyring-daemon --start --components=secrets`. Distros not using apt should also include a note pointing to their Secret Service equivalent (e.g., `kwallet` on KDE).
+- `darwin`: unlocks the login Keychain via `security unlock-keychain ~/Library/Keychains/login.keychain-db`.
+- `windows`: checks the Credential Manager service via `Get-Service VaultSvc` in PowerShell, or navigates to `Control Panel > Credential Manager`.
+- Other: a generic "ensure your system keyring daemon is running" message.
+
+This helper is called from two sites:
+1. `MigrateToKeyring()` in `common/clicfg/credentials/credentials.go` — appended to the `clierr.UsageError` message on probe failure.
+2. `initCredentialStorageDefault` in `neo4j-cli/app/app.go` — appended to the stderr warning on probe failure.
+
+The insecure fallback sentence is removed from both sites.
 
 ### Library Choice
 
@@ -311,6 +332,10 @@ The exact `dbus-run-session` + gnome-keyring unlock incantation (empty passphras
 - [ ] `neo4j-cli config set credential-storage insecure` migrates secrets back to the JSON file and only persists the config change on success.
 - [ ] If migration fails part-way through, already-migrated entries are rolled back and the config value is unchanged.
 - [ ] On a headless machine (no keyring daemon), `neo4j-cli config set credential-storage keyring` returns a clear error and leaves `credential-storage` unchanged.
+- [ ] On Linux with no Secret Service daemon, the keyring unavailability error includes platform-specific setup instructions (e.g., `gnome-keyring`) and does NOT include the insecure fallback hint (`neo4j-cli config set credential-storage insecure --rw`).
+- [ ] On macOS with a locked Keychain, the keyring unavailability error includes `security unlock-keychain` instructions and does NOT include the insecure fallback hint.
+- [ ] On Windows with Credential Manager unavailable, the keyring unavailability error includes Credential Manager service check instructions and does NOT include the insecure fallback hint.
+- [ ] The first-run probe warning (REQ-F-014) on Linux without a daemon also uses the platform-specific setup hint rather than the insecure fallback hint.
 - [ ] `credential <type> remove` deletes the associated keyring entries when in keyring mode.
 - [ ] If a keyring entry is unexpectedly missing, the CLI returns a clear error naming the affected credential.
 - [ ] Forward migration with a missing required secret (empty `ClientSecret` or `Password` in JSON) returns an error naming the credential, rolls back, and leaves config unchanged.
