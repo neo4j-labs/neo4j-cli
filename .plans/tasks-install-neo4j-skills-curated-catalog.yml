@@ -13,7 +13,7 @@ tasks:
       and the read-only `Load(fs, cacheRoot)` + `Stale(ttl)` functions plus the
       test seams (`userCacheDirFn`, `nowFn`). No network or extraction yet —
       `Load` reads cached `plugin.json` + `fetched-at` via afero only.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Package compiles with hardcoded raw.githubusercontent / codeload URLs in source.go"
@@ -21,7 +21,7 @@ tasks:
       - "Load parses a fixture plugin.json from an afero mem fs and populates Version + Skills"
       - "Stale(ttl) returns true on missing fetched-at, false when nowFn-fetched diff < ttl"
       - "userCacheDirFn package var overrides os.UserCacheDir in tests"
-    completed_at: null
+    completed_at: 2026-05-27T12:45:00Z
 
   - id: task-002
     title: "Implement secure tar+gzip extractor with allowlist + traversal guards"

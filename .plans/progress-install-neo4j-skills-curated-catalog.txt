@@ -1,0 +1,3 @@
+## TASK-001 — 2026-05-27T12:45:00Z
+Scaffold common/skill/catalog pkg: SkillEntry/Catalog types, Load (afero plugin.json), Stale (fetched-at + ttl), URL constants, userCacheDirFn/nowFn seams.
+Files: +common/skill/catalog/source.go, +common/skill/catalog/cache.go, +common/skill/catalog/catalog.go, +common/skill/catalog/catalog_test.go
