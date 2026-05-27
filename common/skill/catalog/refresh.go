@@ -27,9 +27,10 @@ const refreshTimeout = 30 * time.Second
 // receiver's in-memory Version/Skills fields are replaced with the
 // upstream view on success.
 //
-// HTTP plumbing is read from the receiver: a nil Doer uses
-// http.DefaultClient; an empty BinaryVersion renders the User-Agent as
-// `neo4j-cli/dev`. The total wall-clock budget is capped at 30 s.
+// HTTP plumbing is read from the receiver's constructor-time deps: a nil
+// Doer falls back to http.DefaultClient; an empty BinaryVersion renders
+// the User-Agent as `neo4j-cli/dev`. The total wall-clock budget is
+// capped at 30 s.
 //
 // On a successful plugin.json fetch the cache root is created if missing,
 // plugin.json + the fetched-at marker are rewritten, and — only when the
@@ -53,11 +54,11 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 		return errors.New("catalog: nil filesystem")
 	}
 
-	doer := c.Doer
+	doer := c.doer
 	if doer == nil {
 		doer = http.DefaultClient
 	}
-	userAgent := userAgentFor(c.BinaryVersion)
+	userAgent := userAgentFor(c.binaryVersion)
 
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
@@ -162,21 +163,6 @@ func (c *Catalog) Lookup(filesystem afero.Fs, name, binaryName string) (*SkillEn
 		return nil, nil, fmt.Errorf("catalog: content for %q missing at %s (run skill refresh)", name, dir)
 	}
 	return found, afero.NewIOFS(afero.NewBasePathFs(filesystem, dir)), nil
-}
-
-// skillEntriesFromPluginJSON converts the raw upstream string list into
-// the in-memory SkillEntry slice. Mirrors Load's logic so refresh and
-// load produce identical catalog shapes.
-func skillEntriesFromPluginJSON(paths []string) []SkillEntry {
-	out := make([]SkillEntry, 0, len(paths))
-	for _, p := range paths {
-		name := skillNameFromPath(p)
-		if name == "" {
-			continue
-		}
-		out = append(out, SkillEntry{Name: name, Path: p})
-	}
-	return out
 }
 
 // userAgentFor renders the User-Agent header value. Falls back to `dev`

@@ -92,11 +92,11 @@ func newFixture(t *testing.T) *catalogFixture {
 }
 
 func (fx *catalogFixture) catalog() *Catalog {
-	return &Catalog{
+	return New(Options{
+		CacheRoot:     fx.cacheRoot,
 		Doer:          fx.doer,
 		BinaryVersion: "test-1.2.3",
-		cacheRoot:     fx.cacheRoot,
-	}
+	})
 }
 
 // makeTarball builds an in-memory gzipped tar containing a SKILL.md for
@@ -309,8 +309,8 @@ func TestRefresh_NetworkFailure_LeavesPriorCacheIntact(t *testing.T) {
 	assert.Equal(t, "prior", string(gotSkill))
 
 	// Caller can still Load the prior catalog and Lookup the prior skill.
-	loaded, lerr := Load(fx.fs, fx.cacheRoot)
-	require.NoError(t, lerr)
+	loaded := New(Options{CacheRoot: fx.cacheRoot})
+	require.NoError(t, loaded.Load(fx.fs))
 	assert.Equal(t, "0.9.0", loaded.Version)
 	_, sub, lerr := loaded.Lookup(fx.fs, "neo4j-cypher-skill", "neo4j-cli")
 	require.NoError(t, lerr)
@@ -343,10 +343,10 @@ func TestRefresh_NilGuards(t *testing.T) {
 	var nilCat *Catalog
 	require.Error(t, nilCat.Refresh(context.Background(), afero.NewMemMapFs()))
 
-	c := &Catalog{} // empty cacheRoot
+	c := New(Options{}) // empty cacheRoot
 	require.Error(t, c.Refresh(context.Background(), afero.NewMemMapFs()))
 
-	c2 := &Catalog{cacheRoot: "x"}
+	c2 := New(Options{CacheRoot: "x"})
 	require.Error(t, c2.Refresh(context.Background(), nil))
 }
 
@@ -380,11 +380,9 @@ func TestLookup_RejectsReservedNames(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cat := &Catalog{
-				Version:   "1.0.0",
-				Skills:    []SkillEntry{{Name: tc.skillName, Path: "./" + tc.skillName}},
-				cacheRoot: "cache",
-			}
+			cat := New(Options{CacheRoot: "cache"})
+			cat.Version = "1.0.0"
+			cat.Skills = []SkillEntry{{Name: tc.skillName, Path: "./" + tc.skillName}}
 			_, _, err := cat.Lookup(afero.NewMemMapFs(), tc.skillName, tc.binaryName)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "reserved")
@@ -393,32 +391,26 @@ func TestLookup_RejectsReservedNames(t *testing.T) {
 }
 
 func TestLookup_UnknownSkill_Errors(t *testing.T) {
-	cat := &Catalog{
-		Version:   "1.0.0",
-		Skills:    []SkillEntry{{Name: "neo4j-cypher-skill", Path: "./neo4j-cypher-skill"}},
-		cacheRoot: "cache",
-	}
+	cat := New(Options{CacheRoot: "cache"})
+	cat.Version = "1.0.0"
+	cat.Skills = []SkillEntry{{Name: "neo4j-cypher-skill", Path: "./neo4j-cypher-skill"}}
 	_, _, err := cat.Lookup(afero.NewMemMapFs(), "missing-skill", "neo4j-cli")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `"missing-skill"`)
 }
 
 func TestLookup_MissingContent_Errors(t *testing.T) {
-	cat := &Catalog{
-		Version:   "1.0.0",
-		Skills:    []SkillEntry{{Name: "neo4j-cypher-skill", Path: "./neo4j-cypher-skill"}},
-		cacheRoot: "cache",
-	}
+	cat := New(Options{CacheRoot: "cache"})
+	cat.Version = "1.0.0"
+	cat.Skills = []SkillEntry{{Name: "neo4j-cypher-skill", Path: "./neo4j-cypher-skill"}}
 	_, _, err := cat.Lookup(afero.NewMemMapFs(), "neo4j-cypher-skill", "neo4j-cli")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing")
 }
 
 func TestLookup_EmptyVersion_Errors(t *testing.T) {
-	cat := &Catalog{
-		Skills:    []SkillEntry{{Name: "x", Path: "./x"}},
-		cacheRoot: "cache",
-	}
+	cat := New(Options{CacheRoot: "cache"})
+	cat.Skills = []SkillEntry{{Name: "x", Path: "./x"}}
 	_, _, err := cat.Lookup(afero.NewMemMapFs(), "x", "neo4j-cli")
 	require.Error(t, err)
 }
@@ -428,7 +420,8 @@ func TestLookup_NilAndEmptyGuards(t *testing.T) {
 	_, _, err := nilCat.Lookup(afero.NewMemMapFs(), "x", "neo4j-cli")
 	require.Error(t, err)
 
-	cat := &Catalog{Version: "1.0.0", cacheRoot: "cache"}
+	cat := New(Options{CacheRoot: "cache"})
+	cat.Version = "1.0.0"
 	_, _, err = cat.Lookup(afero.NewMemMapFs(), "", "neo4j-cli")
 	require.Error(t, err)
 }

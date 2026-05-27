@@ -430,7 +430,7 @@ tasks:
       Also: `refresh.go:170 skillEntriesFromPluginJSON` duplicates the
       inline conversion loop in `catalog.go:71`. One helper, called from
       both.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -439,7 +439,7 @@ tasks:
       - "skillEntriesFromPluginJSON is the single conversion path used by both Load and Refresh"
       - "loadOrRefreshCatalog no longer mutates Catalog fields after construction"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T15:16:12Z
 
   - id: task-020
     title: "Polish: shared mutually-exclusive guard, self-source via resolver, dead-render trim, file rename"

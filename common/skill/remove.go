@@ -85,8 +85,8 @@ func runRemove(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, 
 	if err != nil {
 		return fmt.Errorf("skill: resolve cache root: %w", err)
 	}
-	cat, lerr := catalog.Load(cfg.Aura.Fs(), cacheRoot)
-	if lerr != nil {
+	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
+	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
 		cat = nil
 	}
 
@@ -126,8 +126,8 @@ func runRemoveAll(cmd *cobra.Command, cfg *clicfg.Config, skillName, agentFilter
 	if err != nil {
 		return fmt.Errorf("skill: resolve cache root: %w", err)
 	}
-	cat, _ := catalog.Load(cfg.Aura.Fs(), cacheRoot)
-	if cat == nil {
+	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
+	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill catalog cache is empty; nothing to remove\n")
 		renderInstallRows(cmd, cfg, nil, "removed")
 		return nil

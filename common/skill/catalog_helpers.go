@@ -111,25 +111,17 @@ func loadOrRefreshCatalog(ctx context.Context, cfg *clicfg.Config, opts catalogO
 		return catalogLoad{}, fmt.Errorf("skill: resolve cache root: %w", err)
 	}
 
-	cached, loadErr := catalog.Load(filesystem, cacheRoot)
-	cacheCold := loadErr != nil
+	newOpts := catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version}
+	if catalogHTTPDoer != nil {
+		newOpts.Doer = catalogHTTPDoer()
+	}
+	cat := catalog.New(newOpts)
+	cacheCold := cat.Load(filesystem) != nil
 
 	needRefresh := opts.forceRefresh || cacheCold || catalog.Stale(filesystem, cacheRoot, CatalogTTL)
 	if !needRefresh {
-		return catalogLoad{Cat: cached}, nil
+		return catalogLoad{Cat: cat}, nil
 	}
-
-	// Either no cache yet, or a refresh was explicitly requested or the
-	// cache is stale. Build a Catalog instance to drive Refresh through.
-	cat := cached
-	if cat == nil {
-		cat = &catalog.Catalog{}
-	}
-	cat.BinaryVersion = cfg.Version
-	if catalogHTTPDoer != nil {
-		cat.Doer = catalogHTTPDoer()
-	}
-	cat.SetCacheRoot(cacheRoot)
 
 	if rerr := cat.Refresh(ctx, filesystem); rerr != nil {
 		if cacheCold {
@@ -141,7 +133,7 @@ func loadOrRefreshCatalog(ctx context.Context, cfg *clicfg.Config, opts catalogO
 			}
 			return catalogLoad{Warn: rerr}, nil
 		}
-		return catalogLoad{Cat: cached, Warn: rerr}, nil
+		return catalogLoad{Cat: cat, Warn: rerr}, nil
 	}
 	return catalogLoad{Cat: cat}, nil
 }

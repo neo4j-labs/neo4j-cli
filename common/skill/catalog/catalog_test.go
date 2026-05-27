@@ -30,8 +30,8 @@ func TestLoad_PopulatesVersionAndSkills(t *testing.T) {
 	require.NoError(t, memFs.MkdirAll(cacheRoot, 0755))
 	require.NoError(t, afero.WriteFile(memFs, filepath.Join(cacheRoot, "plugin.json"), []byte(samplePluginJSON), 0600))
 
-	cat, err := Load(memFs, cacheRoot)
-	require.NoError(t, err)
+	cat := New(Options{CacheRoot: cacheRoot})
+	require.NoError(t, cat.Load(memFs))
 
 	assert.Equal(t, "1.0.0", cat.Version)
 	require.Len(t, cat.Skills, 3)
@@ -72,10 +72,16 @@ func TestLoad_Errors(t *testing.T) {
 			memFs := afero.NewMemMapFs()
 			tc.setup(memFs, tc.cacheRoot)
 
-			_, err := Load(memFs, tc.cacheRoot)
+			cat := New(Options{CacheRoot: tc.cacheRoot})
+			err := cat.Load(memFs)
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestLoad_NilReceiver_Errors(t *testing.T) {
+	var nilCat *Catalog
+	assert.Error(t, nilCat.Load(afero.NewMemMapFs()))
 }
 
 func TestStale(t *testing.T) {

@@ -61,8 +61,8 @@ func runPrint(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, s
 	if cerr != nil {
 		return fmt.Errorf("skill: resolve cache root: %w", cerr)
 	}
-	cat, lerr := catalog.Load(cfg.Aura.Fs(), cacheRoot)
-	if lerr != nil {
+	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
+	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
 		cat = nil
 	}
 

@@ -23,20 +23,36 @@ type SkillEntry struct {
 	Path string
 }
 
-// Catalog is the in-memory view of the cached marketplace metadata. It
-// carries the cacheRoot so callers can resolve per-skill content paths
-// via Lookup without re-deriving the cache location.
-//
-// Doer + BinaryVersion are the network-side knobs read by Refresh: a nil
-// Doer falls back to http.DefaultClient, an empty BinaryVersion renders
-// the User-Agent as `neo4j-cli/dev`. Tests inject an httptest server
-// via Doer; production callers leave both fields zero.
+// Options carries the constructor-time dependencies for a Catalog: the
+// on-disk cache root, the optional HTTP client (nil = http.DefaultClient
+// at Refresh time), and the running binary version (used for the
+// outgoing User-Agent header).
+type Options struct {
+	CacheRoot     string
+	Doer          HTTPDoer
+	BinaryVersion string
+}
+
+// Catalog is the cached marketplace view plus the deps Refresh needs.
+// Version + Skills are the in-memory data; cacheRoot / doer /
+// binaryVersion are dependencies wired at construction via New.
 type Catalog struct {
 	Version       string
 	Skills        []SkillEntry
-	Doer          HTTPDoer
-	BinaryVersion string
 	cacheRoot     string
+	doer          HTTPDoer
+	binaryVersion string
+}
+
+// New constructs a Catalog with the given dependencies. Version + Skills
+// start empty; call Load to read the cached `plugin.json`, or Refresh to
+// fetch upstream and re-extract.
+func New(opts Options) *Catalog {
+	return &Catalog{
+		cacheRoot:     opts.CacheRoot,
+		doer:          opts.Doer,
+		binaryVersion: opts.BinaryVersion,
+	}
 }
 
 // pluginJSON mirrors the upstream marketplace metadata shape. Only the
@@ -48,63 +64,37 @@ type pluginJSON struct {
 	Skills  []string `json:"skills"`
 }
 
-// Load reads the cached `plugin.json` from `cacheRoot` and returns a
-// populated Catalog. Does not touch the network. Returns an error
-// wrapping fs.ErrNotExist when the cache is cold so callers can
+// Load reads the cached `plugin.json` from the receiver's cache root and
+// populates Version + Skills. Does not touch the network. Returns an
+// error wrapping fs.ErrNotExist when the cache is cold so callers can
 // distinguish "no cache" from a malformed cache.
-func Load(filesystem afero.Fs, cacheRoot string) (*Catalog, error) {
-	if cacheRoot == "" {
-		return nil, errors.New("catalog: empty cache root")
+func (c *Catalog) Load(filesystem afero.Fs) error {
+	if c == nil {
+		return errors.New("catalog: nil receiver")
+	}
+	if c.cacheRoot == "" {
+		return errors.New("catalog: empty cache root")
 	}
 
-	data, err := afero.ReadFile(filesystem, pluginJSONPath(cacheRoot))
+	data, err := afero.ReadFile(filesystem, pluginJSONPath(c.cacheRoot))
 	if err != nil {
-		return nil, fmt.Errorf("catalog: read plugin.json: %w", err)
+		return fmt.Errorf("catalog: read plugin.json: %w", err)
 	}
 
 	var pj pluginJSON
 	if jerr := json.Unmarshal(data, &pj); jerr != nil {
-		return nil, fmt.Errorf("catalog: parse plugin.json: %w", jerr)
+		return fmt.Errorf("catalog: parse plugin.json: %w", jerr)
 	}
 
-	skills := make([]SkillEntry, 0, len(pj.Skills))
-	for _, p := range pj.Skills {
-		name := skillNameFromPath(p)
-		if name == "" {
-			continue
-		}
-		skills = append(skills, SkillEntry{Name: name, Path: p})
-	}
-
-	return &Catalog{
-		Version:   pj.Version,
-		Skills:    skills,
-		cacheRoot: cacheRoot,
-	}, nil
-}
-
-// SetCacheRoot binds the catalog to a cache root for subsequent
-// Refresh / Lookup calls. Callers that build a Catalog directly (not
-// via Load) need this to point the receiver at the on-disk cache.
-func (c *Catalog) SetCacheRoot(root string) {
-	if c == nil {
-		return
-	}
-	c.cacheRoot = root
-}
-
-// CacheRoot returns the bound cache root for this Catalog. Exposed for
-// tests and callers that need to derive content paths.
-func (c *Catalog) CacheRoot() string {
-	if c == nil {
-		return ""
-	}
-	return c.cacheRoot
+	c.Version = pj.Version
+	c.Skills = skillEntriesFromPluginJSON(pj.Skills)
+	return nil
 }
 
 // Stale reports whether the cached `plugin.json` is missing or older
 // than `ttl`. A missing cache or missing/unparseable `fetched-at`
-// timestamp is treated as stale.
+// timestamp is treated as stale. Free-standing because it has no need
+// for the deps a Catalog carries — it's a pure filesystem probe.
 func Stale(filesystem afero.Fs, cacheRoot string, ttl time.Duration) bool {
 	if cacheRoot == "" {
 		return true
@@ -118,6 +108,21 @@ func Stale(filesystem afero.Fs, cacheRoot string, ttl time.Duration) bool {
 		return true
 	}
 	return nowFn().Sub(ts) >= ttl
+}
+
+// skillEntriesFromPluginJSON converts the raw upstream string list into
+// the in-memory SkillEntry slice. The single conversion path used by
+// both Load and Refresh.
+func skillEntriesFromPluginJSON(paths []string) []SkillEntry {
+	out := make([]SkillEntry, 0, len(paths))
+	for _, p := range paths {
+		name := skillNameFromPath(p)
+		if name == "" {
+			continue
+		}
+		out = append(out, SkillEntry{Name: name, Path: p})
+	}
+	return out
 }
 
 // skillNameFromPath derives the skill id from an upstream `plugin.json`
