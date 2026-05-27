@@ -46,20 +46,56 @@ func TestInstallCmd_JSON(t *testing.T) {
 	assert.Contains(t, rows[0]["skills_path"].(string), testSkillName)
 }
 
-func TestInstallCmd_SingleAgentArg(t *testing.T) {
+func TestInstallCmd_AgentFlag(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code", "cursor")
 
-	require.NoError(t, f.exec(t, "install", "Claude-Code")) // case-insensitive
+	require.NoError(t, f.exec(t, "install", "--agent", "Claude-Code")) // case-insensitive
 
 	out := f.stdout.String()
 	assert.Contains(t, out, "claude-code")
 	assert.NotContains(t, out, "cursor", "single-agent install must not touch cursor")
 }
 
-func TestInstallCmd_UnknownAgent(t *testing.T) {
+func TestInstallCmd_PositionalSelf(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table", "claude-code")
+
+	require.NoError(t, f.exec(t, "install", "self"))
+	out := f.stdout.String()
+	assert.Contains(t, out, "claude-code")
+	assert.Contains(t, out, "installed")
+}
+
+func TestInstallCmd_PositionalBinaryNameAlias(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table", "claude-code")
+
+	require.NoError(t, f.exec(t, "install", testSkillName))
+	out := f.stdout.String()
+	assert.Contains(t, out, "claude-code")
+	assert.Contains(t, out, "installed")
+}
+
+func TestInstallCmd_PositionalAgentHardBreak(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table", "claude-code")
+
+	err := f.exec(t, "install", "claude-code")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown skill: claude-code")
+	assert.Contains(t, err.Error(), "did you mean '--agent claude-code'?")
+}
+
+func TestInstallCmd_PositionalUnknownSkill(t *testing.T) {
 	f := newFixture(t, "/home/alice", "default", "claude-code")
 
-	err := f.exec(t, "install", "vscode")
+	err := f.exec(t, "install", "no-such-skill")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown skill: no-such-skill")
+	assert.NotContains(t, err.Error(), "did you mean", "non-agent unknown skill must not suggest --agent")
+}
+
+func TestInstallCmd_AgentFlagUnknown(t *testing.T) {
+	f := newFixture(t, "/home/alice", "default", "claude-code")
+
+	err := f.exec(t, "install", "--agent", "vscode")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown agent")
 	assert.Contains(t, err.Error(), "valid agents:")
@@ -86,5 +122,7 @@ func TestInstallCmd_HelpListsAgents(t *testing.T) {
 	// Example block surfaces both forms.
 	assert.Contains(t, out, "Examples:")
 	assert.Contains(t, out, "skill install")
-	assert.Contains(t, out, "skill install claude-code")
+	assert.Contains(t, out, "--agent claude-code")
+	// The --agent flag must appear in --help.
+	assert.Contains(t, out, "--agent")
 }

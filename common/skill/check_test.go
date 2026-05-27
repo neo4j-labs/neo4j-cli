@@ -18,7 +18,7 @@ import (
 
 func TestCheckCmd_NoDrift(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code")
-	require.NoError(t, f.exec(t, "install", "claude-code"))
+	require.NoError(t, f.exec(t, "install", "--agent", "claude-code"))
 	f.resetBuffers()
 
 	require.NoError(t, f.exec(t, "check"))
@@ -29,7 +29,7 @@ func TestCheckCmd_NoDrift(t *testing.T) {
 
 func TestCheckCmd_Drift(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code")
-	require.NoError(t, f.exec(t, "install", "claude-code"))
+	require.NoError(t, f.exec(t, "install", "--agent", "claude-code"))
 
 	// Mutate the installed SKILL.md to a stale version.
 	cc := skill.FindAgent("claude-code")
@@ -49,7 +49,7 @@ func TestCheckCmd_Drift(t *testing.T) {
 
 func TestCheckCmd_JSON(t *testing.T) {
 	f := newFixture(t, "/home/alice", "json", "claude-code")
-	require.NoError(t, f.exec(t, "install", "claude-code"))
+	require.NoError(t, f.exec(t, "install", "--agent", "claude-code"))
 	f.resetBuffers()
 
 	require.NoError(t, f.exec(t, "check"))

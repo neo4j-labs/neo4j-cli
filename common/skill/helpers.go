@@ -33,3 +33,32 @@ func agentNames() []string {
 	}
 	return names
 }
+
+// isAgentName reports whether name matches a known agent in AGENTS
+// (case-insensitive). Used by the hard-break guard so a user typing
+// `skill install claude-code` (the old positional shape) gets a clear
+// pointer to `--agent claude-code` instead of a generic "unknown skill"
+// error.
+func isAgentName(name string) bool {
+	return FindAgent(name) != nil
+}
+
+// didYouMeanAgentErr returns the hard-break usage error mandated by
+// REQ-F-012 when a `<skill-name>` positional matches a known agent name
+// instead of a real skill. The lowercased canonical form is suggested so
+// the user can copy-paste the fix.
+func didYouMeanAgentErr(name string) error {
+	a := FindAgent(name)
+	canonical := strings.ToLower(name)
+	if a != nil {
+		canonical = a.Name
+	}
+	return clierr.NewUsageError("unknown skill: %s; did you mean '--agent %s'?", name, canonical)
+}
+
+// unknownSkillErr is the generic non-agent-collision branch of the
+// positional-skill validator. Catalog wiring in later tasks may wrap
+// this with a refresh hint; for now it's a plain usage error.
+func unknownSkillErr(name string) error {
+	return clierr.NewUsageError("unknown skill: %s", name)
+}

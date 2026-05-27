@@ -14,7 +14,7 @@ import (
 
 func TestListCmd_Table(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code")
-	require.NoError(t, f.exec(t, "install", "claude-code"))
+	require.NoError(t, f.exec(t, "install", "--agent", "claude-code"))
 	f.resetBuffers()
 
 	require.NoError(t, f.exec(t, "list"))
@@ -33,7 +33,7 @@ func TestListCmd_Table(t *testing.T) {
 
 func TestListCmd_JSON(t *testing.T) {
 	f := newFixture(t, "/home/alice", "json", "claude-code")
-	require.NoError(t, f.exec(t, "install", "claude-code"))
+	require.NoError(t, f.exec(t, "install", "--agent", "claude-code"))
 	f.resetBuffers()
 
 	require.NoError(t, f.exec(t, "list"))

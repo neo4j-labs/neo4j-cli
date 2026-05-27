@@ -114,7 +114,7 @@ tasks:
       known skill but matches an agent name, error with
       `unknown skill: <name>; did you mean '--agent <name>'?`. Update Long /
       Example / help text. No silent fall-through to the old positional shape.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -123,7 +123,7 @@ tasks:
       - "Positional that resolves to a known skill name proceeds; unknown positional matching an agent name yields the did-you-mean error and non-zero exit"
       - "Help text + Example blocks for each leaf reflect the new shape"
       - "Old form 'skill install claude-code' (no matching skill) fails with the hard-break error in a colocated test"
-    completed_at: null
+    completed_at: 2026-05-27T13:30:00Z
 
   - id: task-007
     title: "Wire install leaf for catalog skills (--all, --refresh, auto-refresh, network policy)"

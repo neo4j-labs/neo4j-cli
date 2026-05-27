@@ -43,22 +43,28 @@ neo4j-cli skill check --format toon
 
 ## neo4j-cli skill install
 
-Install the skill bundle into supported AI agents
+Install a skill bundle into supported AI agents
 
-Without an argument, installs into every detected agent. With an [agent] argument (case-insensitive), installs into that single agent. Unknown agent names exit non-zero with the list of valid names.
+Without a positional, installs the embedded self-skill into every detected agent. With a [skill-name] positional, installs that named skill (self-skill or catalog skill). Use --agent <name> (case-insensitive) to scope the install to one agent. Passing an agent name as the positional is a hard error — use --agent <name> instead.
 
 Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
 
-Usage: `neo4j-cli skill install [agent]`
+Usage: `neo4j-cli skill install [skill-name] [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent` | string | - | Restrict install to a single agent (case-insensitive). See --help for supported agents. |
 
 Examples:
 
 ```
-# Install the skill into every detected agent
+# Install the embedded self-skill into every detected agent
 neo4j-cli skill install --rw
 
-# Install the skill into a single agent (case-insensitive name)
-neo4j-cli skill install claude-code --rw
+# Install the embedded self-skill into a single agent
+neo4j-cli skill install --agent claude-code --rw
 
 # Install and emit the result as JSON (machine-readable)
 neo4j-cli skill install --format json --rw
@@ -85,45 +91,51 @@ neo4j-cli skill list --format toon
 
 ## neo4j-cli skill print
 
-Print the embedded SKILL.md to stdout
+Print a skill's SKILL.md to stdout
 
-Writes the bundled SKILL.md verbatim to stdout so you can preview the skill markdown before running `skill install`. The {{VERSION}} placeholder is left literal; substitution happens at install time.
+Writes the SKILL.md for the named skill verbatim to stdout. Defaults to the embedded self-skill when no positional is supplied. The {{VERSION}} placeholder in the self-skill bundle is left literal; substitution happens at install time. Passing an agent name as the positional is a hard error — use the --agent flag on install/remove instead.
 
-Usage: `neo4j-cli skill print`
+Usage: `neo4j-cli skill print [skill-name]`
 
 Examples:
 
 ```
-# Print the embedded SKILL.md to stdout
+# Print the embedded self-skill SKILL.md to stdout
 neo4j-cli skill print
+
+# Print the self-skill explicitly by canonical name
+neo4j-cli skill print self
 
 # Save the embedded SKILL.md to a file for review
 neo4j-cli skill print > skill-preview.md
-
-# Print the embedded SKILL.md (--format is accepted for parity but ignored — output is always raw markdown)
-neo4j-cli skill print --format json
 ```
 
 ## neo4j-cli skill remove
 
-Remove the installed skill bundle
+Remove an installed skill bundle
 
-Without an argument, removes from every detected agent. With an [agent] argument (case-insensitive), removes from that single agent. Idempotent: a second run on a clean target is a no-op.
+Removes the named skill (self-skill or catalog skill) from every detected agent. Use --agent <name> (case-insensitive) to scope the removal to one agent. Passing an agent name as the positional is a hard error — use --agent <name> instead. Idempotent: a second run on a clean target is a no-op.
 
 Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
 
-Usage: `neo4j-cli skill remove [agent]`
+Usage: `neo4j-cli skill remove <skill-name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--agent` | string | - | Restrict remove to a single agent (case-insensitive). See --help for supported agents. |
 
 Examples:
 
 ```
-# Remove the skill from every detected agent
-neo4j-cli skill remove --rw
+# Remove the self-skill from every detected agent
+neo4j-cli skill remove self --rw
 
-# Remove the skill from a single agent (case-insensitive name)
-neo4j-cli skill remove claude-code --rw
+# Remove the self-skill from a single agent
+neo4j-cli skill remove self --agent claude-code --rw
 
 # Remove and emit the result as JSON (machine-readable)
-neo4j-cli skill remove --format json --rw
+neo4j-cli skill remove self --format json --rw
 ```
 

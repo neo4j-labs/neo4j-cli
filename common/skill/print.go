@@ -4,6 +4,7 @@
 package skill
 
 import (
+	"errors"
 	"io/fs"
 
 	"github.com/spf13/cobra"
@@ -11,28 +12,44 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 )
 
-func newPrintCmd(_ *clicfg.Config, bundle fs.FS, _ string) *cobra.Command {
+func newPrintCmd(_ *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	return &cobra.Command{
-		Use:   "print",
-		Short: "Print the embedded SKILL.md to stdout",
-		Long: "Writes the bundled SKILL.md verbatim to stdout so you can " +
-			"preview the skill markdown before running `skill install`. " +
-			"The {{VERSION}} placeholder is left literal; substitution " +
-			"happens at install time.",
-		Example: `# Print the embedded SKILL.md to stdout
+		Use:   "print [skill-name]",
+		Short: "Print a skill's SKILL.md to stdout",
+		Long: "Writes the SKILL.md for the named skill verbatim to stdout. " +
+			"Defaults to the embedded self-skill when no positional is " +
+			"supplied. The {{VERSION}} placeholder in the self-skill bundle " +
+			"is left literal; substitution happens at install time. Passing " +
+			"an agent name as the positional is a hard error — use the " +
+			"--agent flag on install/remove instead.",
+		Example: `# Print the embedded self-skill SKILL.md to stdout
 neo4j-cli skill print
 
-# Save the embedded SKILL.md to a file for review
-neo4j-cli skill print > skill-preview.md
+# Print the self-skill explicitly by canonical name
+neo4j-cli skill print self
 
-# Print the embedded SKILL.md (--format is accepted for parity but ignored — output is always raw markdown)
-neo4j-cli skill print --format json`,
-		Args: cobra.NoArgs,
+# Save the embedded SKILL.md to a file for review
+neo4j-cli skill print > skill-preview.md`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			data, err := fs.ReadFile(bundle, "SKILL.md")
+			skillArg := ""
+			if len(args) == 1 {
+				skillArg = args[0]
+			}
+
+			src, err := resolveSkillSource(bundle, "", skillName, skillArg)
 			if err != nil {
 				return err
+			}
+			// Print never injects a version — keep the bundled
+			// frontmatter (incl. {{VERSION}} placeholder) verbatim.
+			data, rerr := fs.ReadFile(src.FS, "SKILL.md")
+			if rerr != nil {
+				if errors.Is(rerr, fs.ErrNotExist) {
+					return errors.New("skill: SKILL.md not found in bundle")
+				}
+				return rerr
 			}
 			cmd.Print(string(data))
 			return nil

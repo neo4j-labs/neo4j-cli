@@ -21,9 +21,42 @@ func TestPrintCmd_RawSkillMd(t *testing.T) {
 	assert.NotContains(t, out, "version: 1.7.0")
 }
 
-func TestPrintCmd_RejectsPositionalArg(t *testing.T) {
+func TestPrintCmd_PositionalSelf(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table")
 
-	err := f.exec(t, "print", "extra")
+	require.NoError(t, f.exec(t, "print", "self"))
+	out := f.stdout.String()
+	assert.Contains(t, out, "name: neo4j-cli")
+}
+
+func TestPrintCmd_PositionalBinaryNameAlias(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table")
+
+	require.NoError(t, f.exec(t, "print", testSkillName))
+	out := f.stdout.String()
+	assert.Contains(t, out, "name: neo4j-cli")
+}
+
+func TestPrintCmd_PositionalAgentHardBreak(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table")
+
+	err := f.exec(t, "print", "claude-code")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown skill: claude-code")
+	assert.Contains(t, err.Error(), "did you mean '--agent claude-code'?")
+}
+
+func TestPrintCmd_PositionalUnknownSkill(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table")
+
+	err := f.exec(t, "print", "no-such-skill")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown skill: no-such-skill")
+}
+
+func TestPrintCmd_RejectsExtraArgs(t *testing.T) {
+	f := newFixture(t, "/home/alice", "table")
+
+	err := f.exec(t, "print", "self", "extra")
 	require.Error(t, err)
 }
