@@ -146,13 +146,14 @@ func skillNameFromPath(p string) string {
 
 // ValidSkillName reports whether name is safe to use as an on-disk skill
 // directory id. Rejects empty (after TrimSpace) / "." / ".." / names
-// containing '/' or '\\' / names containing whitespace / names starting
+// containing '/' or '\\' / names containing any whitespace (surrounding
+// or embedded space, tab, newline, carriage return) / names starting
 // with '.' / names containing NUL bytes. The catalog package applies it
 // inside skillEntriesFromPluginJSON (so upstream-supplied names are
 // filtered at the conversion boundary); the parent skill package
 // re-checks it inside Install as defense-in-depth against a bypass.
 func ValidSkillName(name string) bool {
-	if strings.TrimSpace(name) != name {
+	if strings.TrimSpace(name) != name || strings.ContainsAny(name, " \t\n\r") {
 		return false
 	}
 	if name == "" || name == "." || name == ".." {

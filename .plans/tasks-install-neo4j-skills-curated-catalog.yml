@@ -707,7 +707,7 @@ tasks:
       Test: add cases for `"foo bar"`, `"foo\nbar"`, `"foo\tbar"`,
       `"foo\rbar"` to the existing `TestValidSkillName` table — all should
       return false.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -715,7 +715,7 @@ tasks:
       - "Existing valid names ('foo', 'neo4j-cypher-skill', etc.) still return true"
       - "Test coverage expanded to embedded-whitespace cases"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T17:52:53Z
 
   - id: task-026
     title: "Add a third invocation to skill refresh Example block (AGENTS.md ≥3 gate)"

@@ -195,6 +195,12 @@ func TestValidSkillName(t *testing.T) {
 		{"leading dot", ".hidden", false},
 		{"leading dot git", ".git", false},
 		{"nul byte", "foo\x00bar", false},
+		{"embedded space", "foo bar", false},
+		{"embedded newline", "foo\nbar", false},
+		{"embedded tab", "foo\tbar", false},
+		{"embedded carriage return", "foo\rbar", false},
+		{"leading space", " foo", false},
+		{"trailing newline", "foo\n", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

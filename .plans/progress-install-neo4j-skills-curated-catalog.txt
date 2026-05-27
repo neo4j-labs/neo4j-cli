@@ -125,3 +125,8 @@ Decisions: kept `skill install neo4j-cypher-skill` as the canonical catalog-name
 
 ## REVIEW — 2026-05-27T17:50:41Z
 Added 3 CI-bot tasks (task-025..task-027) — security-review medium, conventions-review medium, CodeQL high (defense-in-depth).
+
+## TASK-025 — 2026-05-27T17:52:53Z
+CI security-review fix: ValidSkillName now rejects embedded whitespace. Combined predicate `strings.TrimSpace(name) != name || strings.ContainsAny(name, " \t\n\r")` closes the embedded-`\n`/`\r`/`\t`/interior-space gap left by the prior TrimSpace-only check. Closes the YAML-frontmatter prompt-injection vector for a compromised `plugin.json` setting `"version":"1.0.0\nmalicious: payload"` (would currently pass, create a newline-bearing dir on Linux, and corrupt installed SKILL.md frontmatter via injectVersion). Doc-comment updated to spell out "surrounding or embedded space, tab, newline, carriage return". Test table grew 6 rows: "foo bar", "foo\nbar", "foo\tbar", "foo\rbar", " foo", "foo\n" — all expect false. All gates clean: make test (catalog suite), fmt-check, lint, license-check, generate-check (only source-side + task-yml diff, no bundle drift per AGENTS.md Makefile Notes).
+Files: ~common/skill/catalog/catalog.go, ~common/skill/catalog/catalog_test.go
+Decisions: kept the combined TrimSpace + ContainsAny predicate (vs ContainsAny-only) — TrimSpace catches Unicode whitespace at the edges (e.g. non-breaking space U+00A0) that the ASCII set " \t\n\r" misses, and the ContainsAny term explicitly closes the embedded-ASCII-whitespace gap the bot called out; doc-comment now reads "surrounding or embedded" so the contract matches behaviour.
