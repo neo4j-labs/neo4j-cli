@@ -62,3 +62,6 @@ Decisions: trimmed "from the terminal via the neo4j-cli CLI" / "questions" / "Cy
 ## TASK-014 — 2026-05-27T16:05:00Z
 Major changelog entry filed via `changie new --projects neo4j-cli --kind Major` capturing both the positional-arg hard break (`skill install <agent>` removed — `--agent <name>` required) and the new catalog surface (catalog install by name, --all, --refresh, new `skill refresh` leaf). All final gates clean: make test / fmt-check / lint / license-check; generate-check shows only the task-yml in_progress flip (no bundle drift), per AGENTS.md Makefile Notes.
 Files: +.changes/unreleased/neo4j-cli-Major-20260527-160133.yaml
+
+## REVIEW — 2026-05-27T14:45:48Z
+Added 6 review tasks (task-015..task-020).

@@ -292,3 +292,188 @@ tasks:
       - "make fmt-check passes"
       - "make lint passes"
     completed_at: 2026-05-27T16:05:00Z
+
+  - id: task-015
+    title: "Collapse list + check into one inventory abstraction"
+    description: |
+      `common/skill/list.go` and `common/skill/check.go` ship as parallel
+      implementations of the same idea: build "one row per (self + catalog)
+      × agents", classify status, render JSON/table/toon. Each owns its own
+      Row struct (ListRow / CheckRowView), its own JSON shape (listResultRow
+      / checkResultRow), its own AsArray, its own MarshalJSON, its own
+      iteration helper (rowsForSkill / checkRowsForSkill), its own status
+      classifier (statusFor / checkStatus). Check is literally
+      `list().filter(installed).failIf(driftOrUnknownVersion)`. Two copies
+      of the iteration + classification will drift the moment anyone adds
+      a column — `list.go` already renders `installed` as `"yes"/"no"` via
+      `boolStr` while check has no installed column at all.
+
+      Refactor: introduce one `InventoryRow` carrying everything both leaves
+      need (skill, source, *Agent, detected, installed, installed_version,
+      available_version, status) and one `BuildInventory(fs, binaryName,
+      version, cat) []InventoryRow` builder. `list` renders all rows;
+      `check` filters to installed rows and returns a ValidationError when
+      any row's status is `drift` or `unknown-version`. One status
+      classifier (`statusFor` already covers all four states; delete
+      `checkStatus`). One JSON shape (or keep two thin render funcs that
+      select the column subset). One iteration. Delete the duplicate
+      `rowsForSkill` / `checkRowsForSkill` pair.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Single InventoryRow + BuildInventory(...) used by both list.go and check.go"
+      - "checkRowsForSkill and rowsForSkill are gone (one iteration helper remains)"
+      - "checkStatus is deleted; statusFor is the single classifier"
+      - "All existing list_test.go + check_test.go cases pass with the unified builder"
+      - "make test / make fmt-check / make lint / make generate-check all clean"
+    completed_at: null
+
+  - id: task-016
+    title: "Delete legacy installer.Check/CheckRow; dedupe List vs readInstalledSkill"
+    description: |
+      `common/skill/installer.go:188 Check()` and `installer.go:60 CheckRow`
+      are dead outside `installer_test.go`. Task-010's agent preserved them
+      "for binary compatibility" but there are no non-test callers — the
+      new `check.go` rolled its own `CheckRowView`. Delete `Check`,
+      `CheckRow`, `TestCheckNoDrift`, and `TestCheckDriftAndUnknown`. The
+      package surface shrinks immediately.
+
+      Adjacent duplication: `installer.go:151 List()` and `helpers.go:73
+      readInstalledSkill` both do per-agent "is this skill installed +
+      what version". `installer.List` IS used (skillrefresh + update in
+      `neo4j-cli/internal/...`), so it stays — but rework it so it calls
+      `readInstalledSkill` per agent. After the refactor the package has
+      ONE implementation of "read installed state for skill × agent",
+      called by both surfaces.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "installer.Check, installer.CheckRow, TestCheckNoDrift, TestCheckDriftAndUnknown are removed"
+      - "installer.List is implemented in terms of readInstalledSkill (single source of truth for per-agent install state)"
+      - "skillrefresh + update callers still compile and pass their tests"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-017
+    title: "Unify skill-name resolver across install / print / remove"
+    description: |
+      `catalog_helpers.go:resolveCatalogSkillSource` and
+      `print.go:resolvePrintSource` are the same five-step branch
+      (empty → self bundle; ResolveSelf → self bundle; catalog.Lookup →
+      catalog skill; isAgentName → did-you-mean-agent hard-break; otherwise
+      → unknown-skill). The only delta is return type: install needs
+      `Source` (FS + Version for frontmatter injection), print needs
+      `fs.FS` (no version injection). One resolver returning `Source`
+      satisfies both — print discards `.Version`. Print's "no network"
+      constraint is satisfied by passing `cat == nil` (caller decides
+      whether to refresh), not by forking the function.
+
+      While there, replace `remove.go:catalogSkillKnown` (the third walk
+      over `cat.Skills`) with a call to the same resolver (or to
+      `cat.Lookup`, discarding the FS). Three places that load+inspect the
+      catalog by name should be one.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "resolvePrintSource is gone; print.go calls the unified resolver"
+      - "catalogSkillKnown is gone; remove.go uses the same resolver / cat.Lookup"
+      - "All print/install/remove tests pass against the single resolver"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-018
+    title: "Centralize catalog-load warn + cold-cache hint emission"
+    description: |
+      The verbatim line `warning: skill catalog refresh failed, using
+      cached content: %v\n` is copy-pasted into `install.go:101`,
+      `list.go:73`, `check.go:64`. `refresh.go:66` reformulates the same
+      idea differently. Changing wording today requires editing four
+      files.
+
+      Same shape for the cold-cache hint: `list.go:80` and `print.go:109`
+      compose their own "run `skill refresh`" lines with slightly
+      different phrasing.
+
+      Push both into `loadOrRefreshCatalog` (or expose a
+      `LoadResult.PrintWarn(w io.Writer)` + `.PrintColdCacheHint(w, skill)`
+      method pair) so each leaf becomes a single helper call. Wording lives
+      in one place.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "No leaf file contains the literal 'warning: skill catalog refresh failed' string — emission goes through one helper"
+      - "Cold-cache hint composition lives in one place; list.go and print.go both call it"
+      - "Existing tests asserting the warn / cold-cache wording still pass (update assertions if needed)"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-019
+    title: "Refactor Catalog struct: separate data from deps; dedupe skill-entry conversion"
+    description: |
+      `catalog.Catalog` mixes data (Version, Skills) with dependencies
+      (Doer, BinaryVersion) and location (cacheRoot, plus SetCacheRoot /
+      CacheRoot getter+setter pair). `loadOrRefreshCatalog` patches the
+      Load() result back together by hand (`cat.BinaryVersion = ...; if
+      catalogHTTPDoer != nil { cat.Doer = ... }; cat.SetCacheRoot(...)`).
+      That assembly is plumbing the type itself should own.
+
+      Cleanest reshape: `catalog.New(opts CatalogOpts) *Catalog` where
+      `CatalogOpts{CacheRoot, Doer, BinaryVersion}` carries the deps; the
+      returned service exposes `Load() / Refresh(ctx, fs) / Lookup(fs,
+      name, binaryName) / Stale(fs, ttl)`. Data fields (Version, Skills)
+      stay on the type; the field-set-after-construction dance disappears.
+
+      Also: `refresh.go:170 skillEntriesFromPluginJSON` duplicates the
+      inline conversion loop in `catalog.go:71`. One helper, called from
+      both.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Catalog has a single constructor that takes CacheRoot + Doer + BinaryVersion (no after-the-fact field assignment in callers)"
+      - "SetCacheRoot setter is removed (deps set at construction)"
+      - "skillEntriesFromPluginJSON is the single conversion path used by both Load and Refresh"
+      - "loadOrRefreshCatalog no longer mutates Catalog fields after construction"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-020
+    title: "Polish: shared mutually-exclusive guard, self-source via resolver, dead-render trim, file rename"
+    description: |
+      Smaller direct fixes called out in the review.
+
+      - `install.go:107 runInstallAll` mints `Source{FS: bundle, Version:
+        cfg.Version}` for the self-skill instead of calling
+        `resolveCatalogSkillSource(..., skillArg="")`. After task-017 the
+        resolver IS the canonical path — `runInstallAll` should call it
+        with the empty arg too.
+      - `install.go:64` and `remove.go:58` hand-roll the
+        `--all + positional` rejection. Either factor into a shared
+        `mutuallyExclusive(flag, posArg)` helper or use cobra's
+        `MarkFlagsMutuallyExclusive` against a synthetic arg.
+      - `remove.go:128` calls `renderInstallRows(cmd, cfg, nil, "removed")`
+        purely to emit the "No agents to remove." line after a stderr
+        "nothing to remove" message already covered the case — in JSON
+        mode it emits `[]` after the stderr note. Drop the redundant call.
+      - Rename `common/skill/catalog_helpers.go` → `catalog_load.go` so
+        grep finds the load helpers under a name that describes them.
+      - Optional, only if natural after task-016 + task-019 land: split
+        `common/skill/installer.go` into `installer.go` (Install / Remove
+        / resolveTargets) + `bundle_copy.go` (Source, regexes,
+        copyBundleWithVersion, injectVersion, parseVersion). Skip if the
+        split feels forced.
+    status: pending
+    dependencies:
+      - task-017
+    source: review
+    acceptance_criteria:
+      - "runInstallAll's self-skill install goes through the unified resolver, not a hand-built Source"
+      - "Single --all / [skill-name] mutual-exclusion helper used by both install and remove"
+      - "remove.go cold-cache branch no longer calls renderInstallRows with a nil slice"
+      - "catalog_helpers.go is renamed to catalog_load.go (or whichever name maps to its contents)"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
