@@ -353,6 +353,10 @@ func runCLIWithTimeout(t *testing.T, fx *fixture, timeout time.Duration, args ..
 	}
 	if runtime.GOOS == "linux" {
 		env = append(env, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"))
+		// Prevent dbus-launch --autolaunch hang on headless runners: an explicit
+		// nonexistent socket makes godbus return ENOENT immediately instead of
+		// blocking ~30 s trying to auto-launch a D-Bus session.
+		env = append(env, "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-dbus-socket")
 	}
 	if runtime.GOOS == "windows" {
 		env = append(env, "LOCALAPPDATA="+home)
