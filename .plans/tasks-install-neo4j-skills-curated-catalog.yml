@@ -477,3 +477,149 @@ tasks:
       - "catalog_helpers.go is renamed to catalog_load.go (or whichever name maps to its contents)"
       - "make test / make fmt-check / make lint all clean"
     completed_at: 2026-05-27T18:30:00Z
+
+  - id: task-021
+    title: "Validate upstream skill names against path-traversal in catalog + installer"
+    description: |
+      HIGH security finding. `common/skill/catalog/catalog.go:127
+      skillNameFromPath` derives the skill id from an upstream
+      `plugin.json.skills[]` entry via `path.Base` after stripping `./`.
+      `path.Base` returns `".."` for `".."`, `"."` for `""` / `"."` /
+      `"./"`, and `"/"` for `"/"`. Any of these survive as `entry.Name`
+      and propagate through `cat.Lookup` → `Install(..., skillName, ...)`
+      → `dst := filepath.Join(skillsRoot, skillName)` where Join cleans
+      `..` segments so dst ESCAPES skillsRoot.
+
+      `Install` then calls `RemoveDir(dst)` which is `afero.Fs.RemoveAll`.
+      With a compromised upstream publishing `"skills": [".."]`, the call
+      chain on `--all` becomes `RemoveAll("/Users/x/.claude")` per
+      detected agent — destruction of the user's entire Claude config
+      directory. `cat.Lookup`'s existence probe does NOT defend (with
+      `name=".."`, `filepath.Join(contentPath, "..")` resolves to
+      `<cacheRoot>/content`, which exists, so Lookup returns success).
+      The tarball extractor correctly rejects `..` segments in tar entry
+      names but the SAME defense is missing for upstream-controlled
+      skill names — even though those names also feed a destructive op
+      (`RemoveAll`).
+
+      Reachable via supply-chain compromise of `neo4j-contrib/neo4j-skills`
+      (org takeover, malicious PR merged, or successful TLS MITM). The
+      blast radius is much larger than the upstream's normal attack
+      surface — treat as a privilege-escalation amplifier over baseline.
+
+      Fix: add a single `validSkillName(name string) bool` validator in
+      `common/skill/catalog/catalog.go` rejecting empty, `.`, `..`, any
+      name containing `/` or `\`, any name starting with `.` (also blocks
+      hidden-dir names). Apply it inside `skillEntriesFromPluginJSON` (or
+      `Load` + `Refresh`) to silently drop bad entries during conversion.
+      Add defense-in-depth in `common/skill/installer.go:Install` to
+      reject bad `skillName` even if catalog validation is somehow
+      bypassed.
+
+      Test: synthesize plugin.json fixtures with each of `["..", ".",
+      "/", "foo/..", "./..", "  ..  "]` and assert (a) catalog Load /
+      Refresh drop those entries and (b) Install rejects them if passed
+      directly.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "validSkillName(name) helper exists in common/skill/catalog and rejects empty, '.', '..', names containing '/' or '\\', names starting with '.'"
+      - "skillEntriesFromPluginJSON (used by Load + Refresh) silently drops entries that fail validSkillName"
+      - "Install in common/skill/installer.go returns an error when skillName fails validation (defense in depth)"
+      - "Test fixtures cover '..', '.', '/', 'foo/..', './..', '  ..  ' across both catalog Load AND Install entry points"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-022
+    title: "Cap plugin.json HTTP body read with io.LimitReader"
+    description: |
+      MEDIUM security finding. `common/skill/catalog/refresh.go:71`
+      reads the upstream `plugin.json` body via unbounded `io.ReadAll`:
+
+          body, err := fetch(ctx, doer, userAgent, PluginJSONURL)
+          ...
+          data, err := io.ReadAll(body)
+
+      No `io.LimitReader` wrapping. A malicious upstream (or successful
+      MITM) returning a 10 GB body forces the CLI to allocate it all in
+      memory before the JSON parser sees it. The tarball path is already
+      correctly capped at 20 MiB inside `Extract` (via per-entry
+      LimitReader + total-bytes accumulator) — but plugin.json is not.
+
+      Realistic impact: memory exhaustion / OOM-kill of the CLI process.
+      Not privesc, but a trivial DoS that crosses a network trust
+      boundary. The fix is one line.
+
+      Fix: wrap the body read with `io.LimitReader(body, maxPluginJSON+1)`
+      and reject when the cap is exceeded. A plugin.json is in the
+      kilobyte range; 1 MiB is generous. Pattern:
+
+          const maxPluginJSONBytes = 1 << 20
+          data, err := io.ReadAll(io.LimitReader(body, maxPluginJSONBytes+1))
+          if err != nil { ... }
+          if int64(len(data)) > maxPluginJSONBytes {
+              return fmt.Errorf("catalog: plugin.json exceeds %d byte cap", maxPluginJSONBytes)
+          }
+
+      Test: httptest server returning > 1 MiB body produces the cap
+      error; <= 1 MiB body parses normally.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "plugin.json body read uses io.LimitReader with a per-call cap (≤ 1 MiB suggested)"
+      - "Refresh returns a clear error when the body exceeds the cap"
+      - "Test asserts the cap with a > 1 MiB httptest-served body"
+      - "Existing happy-path tests still pass with the LimitReader wrapper"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-023
+    title: "Prune stale cache versions; validate pj.Version against same allowlist"
+    description: |
+      MEDIUM security finding. `common/skill/catalog/refresh.go:96`
+      extracts to `content/<version>/` and `cache.go:46 contentPath` joins
+      `cacheRoot/content/version`. Two problems:
+
+      1. Old `content/<version>/` subtrees are never reclaimed. Every
+         upstream version bump appends another extraction. With a 20 MiB
+         per-extract cap, after 100 refreshes there's up to ~2 GiB of
+         stale data. A malicious upstream bumping version on every fetch
+         (or even a fast-moving honest one) accumulates disk usage
+         indefinitely. Combined with the unbounded body finding
+         (task-022), this becomes a more effective exhaustion vector.
+
+      2. The same path-traversal class from task-021 applies to
+         `pj.Version` itself — `contentPath(cacheRoot, "..")` resolves to
+         `cacheRoot/content/..` = `cacheRoot`. MkdirAll on destRoot would
+         then point at the cache root rather than a version subtree. The
+         tarball allowlist + classifyEntry guards limit the blast radius
+         to inside cacheRoot, but the defense is still missing one
+         layer.
+
+      Fix part A: after a successful tarball extract + plugin.json
+      write, list `<cacheRoot>/content/` and `RemoveAll` any subdirectory
+      whose name isn't the new `c.Version`. One `afero.ReadDir` + a
+      selective remove loop.
+
+      Fix part B: validate `pj.Version` with the same allowlist
+      task-021 establishes for skill names (no empty, no `.`, no `..`,
+      no `/` or `\`, no leading `.`). Reject the refresh entirely if the
+      upstream version is unsafe — the catalog stays at its prior good
+      state.
+
+      Test: simulate two successive refreshes with different versions
+      and assert the old `content/<v1>/` subtree is gone after the second
+      refresh; assert a refresh with `pj.Version = ".."` is rejected and
+      the cache is untouched.
+    status: pending
+    dependencies:
+      - task-021
+    source: review
+    acceptance_criteria:
+      - "Refresh prunes stale content/<version>/ subtrees after a successful refresh; only the current pj.Version remains"
+      - "Refresh rejects an upstream plugin.json with an unsafe Version (validated against the same allowlist as skill names)"
+      - "Test covers two successive refreshes with different versions (stale dir removed) and one refresh with pj.Version='..' (rejected, prior cache intact)"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
