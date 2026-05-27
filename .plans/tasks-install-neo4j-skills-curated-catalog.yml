@@ -667,3 +667,138 @@ tasks:
       - "Conductor/multi-agent paragraph preserved (still accurate)"
       - "make test / make fmt-check / make lint all clean (README edits should not affect any gate, but verify)"
     completed_at: 2026-05-27T17:36:06Z
+
+  - id: task-025
+    title: "Fix ValidSkillName to reject embedded whitespace (\\n / \\r / \\t / space)"
+    description: |
+      CI security-review bot caught this. Found by the `golang-security`
+      skill running in `security-review` GitHub Action on PR #178.
+
+      `common/skill/catalog/catalog.go:155 ValidSkillName` doc-comment
+      claims it rejects "names containing whitespace", but the
+      implementation only catches LEADING/TRAILING whitespace via
+      `strings.TrimSpace(name) != name`. Embedded characters like `\n`,
+      `\r`, `\t`, or interior space pass through unchecked. The check
+      currently does:
+
+          if strings.TrimSpace(name) != name { return false }
+
+      Real risk: a compromised upstream `plugin.json` could set
+      `"version": "1.0.0\nmalicious: payload"`. This currently passes
+      `ValidSkillName`, gets written as a path component via
+      `contentPath` (creates a directory with a newline on Linux), and
+      gets injected into installed SKILL.md frontmatter via
+      `injectVersion`, corrupting YAML and inserting content AI agents
+      would read as instructions — prompt injection.
+
+      This is the follow-on from the MEDIUM #4 frontmatter-injection
+      finding in the original golang-security audit, which I'd downgraded
+      because upstream-control implies SKILL.md control. The bot is right
+      that the cheap fix here closes the legibility gap regardless.
+
+      Fix: tighten the check to also reject embedded whitespace. The bot's
+      suggested patch:
+
+          if strings.TrimSpace(name) != name ||
+             strings.ContainsAny(name, " \t\n\r") {
+              return false
+          }
+
+      Test: add cases for `"foo bar"`, `"foo\nbar"`, `"foo\tbar"`,
+      `"foo\rbar"` to the existing `TestValidSkillName` table — all should
+      return false.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "ValidSkillName returns false for names containing embedded \\n, \\r, \\t, or interior space"
+      - "Existing valid names ('foo', 'neo4j-cypher-skill', etc.) still return true"
+      - "Test coverage expanded to embedded-whitespace cases"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-026
+    title: "Add a third invocation to skill refresh Example block (AGENTS.md ≥3 gate)"
+    description: |
+      CI conventions-review bot caught this. `common/skill/refresh.go:29`
+      defines an Example block with only 2 invocations. AGENTS.md "Cobra
+      Help / Skill Bundle Rendering Notes" mandates ≥3 invocations on
+      every runnable leaf, each preceded by a `# comment` line with
+      blank-line separators. The local gate test
+      (`TestAllLeafCommands_HaveExamples`) presumably has a tolerance OR
+      isn't counting cobra Examples correctly — investigate that during
+      the fix and tighten the test if it's the test that's lenient.
+
+      Concrete shape — add a third invocation per the bot's suggestion:
+
+          # Force a catalog refresh
+          neo4j-cli skill refresh --rw
+
+          # Emit the result as JSON (machine-readable)
+          neo4j-cli skill refresh --format json --rw
+
+          # Refresh and view result in toon format
+          neo4j-cli skill refresh --format toon --rw
+
+      After editing, run `go generate ./neo4j-cli/internal/skill/...` to
+      refresh the bundled `references/skill.md`. Also check whether
+      `TestAllLeafCommands_HaveExamples` should be tightened to actually
+      enforce the ≥3 rule (so this drift is caught locally next time, not
+      by CI bot).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "common/skill/refresh.go has ≥3 Example invocations matching the AGENTS.md format (# comment + blank line + cmd)"
+      - "Skill bundle regenerated to reflect the new Example"
+      - "TestAllLeafCommands_HaveExamples passes; if it was lenient and missed this, tighten it to enforce ≥3"
+      - "make test / make fmt-check / make lint / make generate-check all clean"
+    completed_at: null
+
+  - id: task-027
+    title: "Add canonical Zip Slip prefix check in extract.go to silence CodeQL (defense in depth)"
+    description: |
+      CodeQL flagged `common/skill/catalog/extract.go:66` as a "Zip Slip"
+      (`go/zipslip`) high-severity alert. The current code IS actually
+      safe — `classifyEntry` explicitly rejects any segment equal to
+      `..`, rejects absolute paths, rejects symlinks/hardlinks/devices,
+      and strips the top-level archive dir. But CodeQL's taint analyzer
+      doesn't pattern-match the per-segment loop and reports the alert
+      anyway.
+
+      Two reasonable fixes:
+
+      1. **Belt-and-braces:** after computing `destPath :=
+         filepath.Join(destRoot, filepath.FromSlash(rel))`, add the
+         canonical Zip Slip guard that CodeQL recognizes:
+
+             cleanRoot := filepath.Clean(destRoot) + string(os.PathSeparator)
+             if !strings.HasPrefix(destPath, cleanRoot) {
+                 return fmt.Errorf("catalog: tar entry %q escapes destination root", name)
+             }
+
+         The original per-segment `..` rejection stays — this is true
+         defense-in-depth, not a replacement.
+
+      2. **Suppress with a justified comment** — riskier (future
+         refactors might remove the underlying protection without the
+         scanner noticing). Skip unless option 1 turns out to be
+         awkward.
+
+      Prefer option 1. Add a test that synthesizes a tar entry crafted to
+      defeat the per-segment check but still produce a destPath outside
+      destRoot (hard to construct given the current guards — but the
+      prefix check is then a documented safety net that future readers
+      see).
+
+      Confirm CodeQL clears the alert on next push.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "extract.go writes a file/dir only when destPath has the cleaned-destRoot prefix"
+      - "Original per-segment '..' check in classifyEntry is preserved (not replaced)"
+      - "Test asserts the prefix check is exercised (synthetic tar entry intercepted)"
+      - "CodeQL go/zipslip alert clears on next PR push"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
