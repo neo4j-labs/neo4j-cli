@@ -564,7 +564,7 @@ tasks:
 
       Test: httptest server returning > 1 MiB body produces the cap
       error; <= 1 MiB body parses normally.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -573,7 +573,7 @@ tasks:
       - "Test asserts the cap with a > 1 MiB httptest-served body"
       - "Existing happy-path tests still pass with the LimitReader wrapper"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T19:00:00Z
 
   - id: task-023
     title: "Prune stale cache versions; validate pj.Version against same allowlist"

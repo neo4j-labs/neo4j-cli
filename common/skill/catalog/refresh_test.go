@@ -439,6 +439,28 @@ func TestIsReserved(t *testing.T) {
 	assert.False(t, IsReserved("", "neo4j-cli"))
 }
 
+// TestRefresh_PluginJSONBodyCap asserts that an upstream plugin.json
+// body exceeding maxPluginJSONBytes is rejected with the cap error and
+// without attempting to parse the JSON. Guards against memory-exhaustion
+// DoS from a malicious upstream or successful MITM.
+func TestRefresh_PluginJSONBodyCap(t *testing.T) {
+	fx := newFixture(t)
+	// Build a body one byte over the cap, prefixed with valid JSON so we
+	// can be sure rejection happens at the size check, not the parser.
+	oversized := make([]byte, maxPluginJSONBytes+1)
+	for i := range oversized {
+		oversized[i] = ' '
+	}
+	copy(oversized, []byte(`{"name":"neo4j-skills","version":"1.0.0","skills":[]}`))
+	fx.pluginBody = oversized
+
+	cat := fx.catalog()
+	err := cat.Refresh(context.Background(), fx.fs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds")
+	assert.Contains(t, err.Error(), "byte cap")
+}
+
 // TestRefresh_DropsMaliciousUpstreamSkillNames asserts that the
 // extraction-allowlist path (Refresh -> skillEntriesFromPluginJSON)
 // silently drops upstream skill entries whose derived name fails

@@ -22,6 +22,11 @@ import (
 // shorter deadline.
 const refreshTimeout = 30 * time.Second
 
+// maxPluginJSONBytes caps the plugin.json body read so a malicious upstream
+// or successful MITM cannot force unbounded in-memory allocation. Real
+// plugin.json payloads are in the kilobyte range; 1 MiB is generous.
+const maxPluginJSONBytes int64 = 1 << 20
+
 // Refresh fetches the upstream plugin.json (and, when its version differs
 // from cached state, the repo tarball) and updates the on-disk cache. The
 // receiver's in-memory Version/Skills fields are replaced with the
@@ -69,9 +74,12 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 	}
 	defer func() { _ = body.Close() }()
 
-	data, err := io.ReadAll(body)
+	data, err := io.ReadAll(io.LimitReader(body, maxPluginJSONBytes+1))
 	if err != nil {
 		return fmt.Errorf("catalog: read plugin.json body: %w", err)
+	}
+	if int64(len(data)) > maxPluginJSONBytes {
+		return fmt.Errorf("catalog: plugin.json exceeds %d byte cap", maxPluginJSONBytes)
 	}
 
 	var pj pluginJSON
