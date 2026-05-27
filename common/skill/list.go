@@ -6,7 +6,6 @@ package skill
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -131,15 +130,7 @@ func rowsForSkill(filesystem afero.Fs, skillName, source, availableVersion strin
 			exists, _ := afero.DirExists(filesystem, dp)
 			row.Detected = exists
 		}
-		if sp, ok := AGENTS[i].SkillsPath(); ok {
-			skillFile := filepath.Join(sp, skillName, "SKILL.md")
-			if exists, _ := afero.Exists(filesystem, skillFile); exists {
-				row.Installed = true
-				if data, err := afero.ReadFile(filesystem, skillFile); err == nil {
-					row.InstalledVersion = parseVersion(data)
-				}
-			}
-		}
+		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
 		row.Status = statusFor(row.Installed, row.InstalledVersion, row.AvailableVersion)
 		rows = append(rows, row)
 	}

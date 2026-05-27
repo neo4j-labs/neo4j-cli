@@ -22,16 +22,22 @@ Flags:
 
 ## neo4j-cli skill check
 
-Check installed skills for version drift against this binary
+Check installed skills for version drift
 
-Reads each installed SKILL.md frontmatter `version:` and compares to the running binary version. Exits non-zero on any drift; prints a per-agent table.
+Inspects every installed skill across detected agents and compares its frontmatter `version:` against the source version (binary version for the self-skill, plugin.json version for catalog skills). Columns: skill, agent, installed_version, current_version, status where status ∈ ok | drift | unknown-version. Exits non-zero when any row is drift or unknown-version. Auto-refreshes the catalog cache on 24h staleness when network is available; --refresh forces a fetch.
 
-Usage: `neo4j-cli skill check`
+Usage: `neo4j-cli skill check [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--refresh` | bool | false | Force a network refresh of the catalog before checking. |
 
 Examples:
 
 ```
-# Check installed skills for version drift (table output)
+# Check installed skills for version drift (table)
 neo4j-cli skill check
 
 # Check installed skills as JSON (machine-readable)
@@ -39,6 +45,9 @@ neo4j-cli skill check --format json
 
 # Check installed skills in toon format
 neo4j-cli skill check --format toon
+
+# Force a catalog refresh before checking
+neo4j-cli skill check --refresh
 ```
 
 ## neo4j-cli skill install

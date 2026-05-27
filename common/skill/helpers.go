@@ -6,7 +6,10 @@ package skill
 import (
 	"errors"
 	"io/fs"
+	"path/filepath"
 	"strings"
+
+	"github.com/spf13/afero"
 
 	"github.com/neo4j/cli/common/clierr"
 )
@@ -62,6 +65,27 @@ func didYouMeanAgentErr(name string) error {
 // this with a refresh hint; for now it's a plain usage error.
 func unknownSkillErr(name string) error {
 	return clierr.NewUsageError("unknown skill: %s", name)
+}
+
+// readInstalledSkill reads the per-agent install state for `skillName`
+// from `filesystem`. Returns whether SKILL.md exists and the parsed
+// frontmatter `version:` (empty string when missing or unparseable).
+// Shared by the list + check leaves.
+func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bool, string) {
+	sp, ok := agent.SkillsPath()
+	if !ok {
+		return false, ""
+	}
+	skillFile := filepath.Join(sp, skillName, "SKILL.md")
+	exists, _ := afero.Exists(filesystem, skillFile)
+	if !exists {
+		return false, ""
+	}
+	data, err := afero.ReadFile(filesystem, skillFile)
+	if err != nil {
+		return true, ""
+	}
+	return true, parseVersion(data)
 }
 
 // resolveSkillSource maps a positional skill-name to the Source the

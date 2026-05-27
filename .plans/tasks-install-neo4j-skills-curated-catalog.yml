@@ -202,7 +202,7 @@ tasks:
       status` where `status ∈ ok | drift | unknown-version`. Exit non-zero if
       any row is `drift` or `unknown-version`. Honour `--refresh` and
       `--format`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -212,7 +212,7 @@ tasks:
       - "Self-skill drift detected against the binary version"
       - "unknown-version status emitted when frontmatter lacks a version: line"
       - "--refresh forces a catalog refresh before the check"
-    completed_at: null
+    completed_at: 2026-05-27T15:00:00Z
 
   - id: task-011
     title: "Update print leaf to accept skill-name positional (catalog or self)"
