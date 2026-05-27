@@ -89,6 +89,9 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 	if pj.Version == "" {
 		return errors.New("catalog: upstream plugin.json has empty version")
 	}
+	if !ValidSkillName(pj.Version) {
+		return fmt.Errorf("catalog: upstream plugin.json has unsafe version %q", pj.Version)
+	}
 
 	cachedVersion := c.Version
 	upstreamSkills := skillEntriesFromPluginJSON(pj.Skills)
@@ -126,8 +129,34 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 		return fmt.Errorf("catalog: write fetched-at: %w", werr)
 	}
 
+	// Best-effort prune of content/<version>/ subtrees from prior catalog
+	// versions; a failure here doesn't undo the successful refresh.
+	_ = pruneStaleContent(filesystem, c.cacheRoot, pj.Version)
+
 	c.Version = pj.Version
 	c.Skills = upstreamSkills
+	return nil
+}
+
+// pruneStaleContent removes content/<version>/ subtrees whose version
+// doesn't match currentVersion. Stops at the first RemoveAll error and
+// returns it; the missing-content-dir case is not an error. Callers
+// typically ignore the return value — the prune is best-effort.
+func pruneStaleContent(filesystem afero.Fs, cacheRoot, currentVersion string) error {
+	contentRoot := filepath.Join(cacheRoot, "content")
+	entries, err := afero.ReadDir(filesystem, contentRoot)
+	if err != nil {
+		// Missing content dir on first refresh is normal — not an error.
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == currentVersion {
+			continue
+		}
+		if rerr := filesystem.RemoveAll(filepath.Join(contentRoot, e.Name())); rerr != nil {
+			return rerr
+		}
+	}
 	return nil
 }
 

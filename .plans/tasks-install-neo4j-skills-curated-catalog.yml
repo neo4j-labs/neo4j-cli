@@ -613,7 +613,7 @@ tasks:
       and assert the old `content/<v1>/` subtree is gone after the second
       refresh; assert a refresh with `pj.Version = ".."` is rejected and
       the cache is untouched.
-    status: pending
+    status: completed
     dependencies:
       - task-021
     source: review
@@ -622,4 +622,4 @@ tasks:
       - "Refresh rejects an upstream plugin.json with an unsafe Version (validated against the same allowlist as skill names)"
       - "Test covers two successive refreshes with different versions (stale dir removed) and one refresh with pj.Version='..' (rejected, prior cache intact)"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T17:11:22Z

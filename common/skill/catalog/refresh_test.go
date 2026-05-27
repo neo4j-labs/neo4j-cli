@@ -461,6 +461,78 @@ func TestRefresh_PluginJSONBodyCap(t *testing.T) {
 	assert.Contains(t, err.Error(), "byte cap")
 }
 
+// TestRefresh_PrunesStaleContentVersions asserts that a successful refresh
+// that bumps version removes the prior content/<v>/ subtree so cache disk
+// usage doesn't grow unbounded across refreshes.
+func TestRefresh_PrunesStaleContentVersions(t *testing.T) {
+	fx := newFixture(t)
+	fx.pluginBody = pluginJSONBody("1.0.0", "neo4j-cypher-skill")
+	fx.tarballBody = makeTarball(t, "1.0.0", "neo4j-cypher-skill")
+
+	cat := fx.catalog()
+	require.NoError(t, cat.Refresh(context.Background(), fx.fs))
+
+	oldDir := filepath.Join(fx.cacheRoot, "content", "1.0.0")
+	exists, err := afero.DirExists(fx.fs, oldDir)
+	require.NoError(t, err)
+	require.True(t, exists, "first refresh should populate content/1.0.0/")
+
+	// Second refresh at a new version: old content/1.0.0/ must be pruned,
+	// new content/2.0.0/ must exist.
+	fx.pluginBody = pluginJSONBody("2.0.0", "neo4j-cypher-skill")
+	fx.tarballBody = makeTarball(t, "2.0.0", "neo4j-cypher-skill")
+	require.NoError(t, cat.Refresh(context.Background(), fx.fs))
+
+	exists, err = afero.DirExists(fx.fs, oldDir)
+	require.NoError(t, err)
+	assert.False(t, exists, "stale content/1.0.0/ subtree should be pruned after version bump")
+
+	newDir := filepath.Join(fx.cacheRoot, "content", "2.0.0")
+	exists, err = afero.DirExists(fx.fs, newDir)
+	require.NoError(t, err)
+	assert.True(t, exists, "current content/2.0.0/ subtree should exist after refresh")
+}
+
+// TestRefresh_RejectsUnsafePluginVersion asserts that an upstream plugin.json
+// declaring a path-traversal version (e.g. "..") is rejected before any
+// cache mutation occurs — the prior good cache remains intact.
+func TestRefresh_RejectsUnsafePluginVersion(t *testing.T) {
+	fx := newFixture(t)
+
+	// Seed prior cache: plugin.json + fetched-at + content/0.9.0/.
+	priorPlugin := pluginJSONBody("0.9.0", "neo4j-cypher-skill")
+	require.NoError(t, fx.fs.MkdirAll(fx.cacheRoot, 0755))
+	require.NoError(t, afero.WriteFile(fx.fs, filepath.Join(fx.cacheRoot, "plugin.json"), priorPlugin, 0600))
+	priorStamp := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	require.NoError(t, afero.WriteFile(fx.fs, filepath.Join(fx.cacheRoot, "fetched-at"), []byte(priorStamp), 0600))
+	priorSkill := filepath.Join(fx.cacheRoot, "content", "0.9.0", "neo4j-cypher-skill", "SKILL.md")
+	require.NoError(t, fx.fs.MkdirAll(filepath.Dir(priorSkill), 0755))
+	require.NoError(t, afero.WriteFile(fx.fs, priorSkill, []byte("prior"), 0600))
+
+	// Upstream serves a malicious version. Tarball would never get fetched.
+	fx.pluginBody = []byte(`{"name":"neo4j-skills","version":"..","skills":["./neo4j-cypher-skill"]}`)
+
+	cat := fx.catalog()
+	cat.Version = "0.9.0"
+	err := cat.Refresh(context.Background(), fx.fs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsafe version")
+
+	// Prior cache untouched.
+	got, rerr := afero.ReadFile(fx.fs, filepath.Join(fx.cacheRoot, "plugin.json"))
+	require.NoError(t, rerr)
+	assert.Equal(t, priorPlugin, got)
+	gotStamp, rerr := afero.ReadFile(fx.fs, filepath.Join(fx.cacheRoot, "fetched-at"))
+	require.NoError(t, rerr)
+	assert.Equal(t, priorStamp, string(gotStamp))
+	gotSkill, rerr := afero.ReadFile(fx.fs, priorSkill)
+	require.NoError(t, rerr)
+	assert.Equal(t, "prior", string(gotSkill))
+
+	// Tarball must not have been fetched — pj.Version validation runs first.
+	assert.Equal(t, 0, fx.tarballHits)
+}
+
 // TestRefresh_DropsMaliciousUpstreamSkillNames asserts that the
 // extraction-allowlist path (Refresh -> skillEntriesFromPluginJSON)
 // silently drops upstream skill entries whose derived name fails
