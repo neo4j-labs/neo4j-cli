@@ -6,3 +6,7 @@ Files: +common/skill/catalog/source.go, +common/skill/catalog/cache.go, +common/
 Secure tar+gzip extractor: streams .tar.gz, strips top-level dir, allowlists first-segment skill names, rejects traversal/absolute/symlink/hardlink/device/fifo, 20 MiB total decompressed cap via afero.Fs (0600/0755).
 Files: +common/skill/catalog/extract.go, +common/skill/catalog/extract_test.go
 Decisions: cap is total-decompressed across all entries (not per-file); NUL-in-name guard is defense-in-depth (Go's tar.Writer already rejects), tested via classifyEntry unit table.
+
+## TASK-004 — 2026-05-27T12:50:10Z
+Introduce Source{FS, Version} in common/skill; Install now takes (fs, src, name, agentFilter). injectVersion rewrites or inserts the frontmatter version: line; placeholder substitution retired. update.go + skillrefresh.go wrap commonskill.Install to preserve their (bundle, version) seam shape.
+Files: ~common/skill/installer.go, ~common/skill/installer_test.go, ~common/skill/install.go, ~neo4j-cli/internal/skill/install_e2e_test.go, ~neo4j-cli/internal/skillrefresh/skillrefresh.go, ~neo4j-cli/internal/subcommands/update/update.go

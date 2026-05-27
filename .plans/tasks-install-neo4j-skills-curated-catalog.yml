@@ -75,7 +75,7 @@ tasks:
       line, or inserting it immediately before the closing `---` when upstream
       has none. Existing self-skill callers pass a Source backed by the
       embedded `bundle.FS` + binary version.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Install signature accepts Source and existing self-skill flow continues to install with binary version"
@@ -83,7 +83,7 @@ tasks:
       - "Frontmatter injection inserts a new version: line before --- when absent"
       - "All existing common/skill tests pass with the new Source wiring"
       - "resolveTargets is unchanged — agent resolution remains orthogonal"
-    completed_at: null
+    completed_at: 2026-05-27T12:50:10Z
 
   - id: task-005
     title: "Add 'self' canonical name + binary-name alias for the self-skill"

@@ -31,7 +31,7 @@ var (
 		return commonskill.List(filesystem, skillName)
 	}
 	installFn = func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
-		return commonskill.Install(filesystem, bundle, skillName, version, agentFilter)
+		return commonskill.Install(filesystem, commonskill.Source{FS: bundle, Version: version}, skillName, agentFilter)
 	}
 )
 

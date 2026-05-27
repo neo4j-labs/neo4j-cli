@@ -39,7 +39,7 @@ neo4j-cli skill install --format json --rw`,
 			if len(args) == 1 {
 				filter = args[0]
 			}
-			targets, err := Install(cfg.Aura.Fs(), bundle, skillName, cfg.Version, filter)
+			targets, err := Install(cfg.Aura.Fs(), Source{FS: bundle, Version: cfg.Version}, skillName, filter)
 			if err != nil {
 				return formatAgentErr(err)
 			}
