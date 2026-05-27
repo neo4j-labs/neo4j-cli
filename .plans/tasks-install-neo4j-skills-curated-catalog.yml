@@ -1,0 +1,294 @@
+feature: install-neo4j-skills-curated-catalog
+prd: ./prd-install-neo4j-skills-curated-catalog.md
+created_at: 2026-05-27T12:30:24Z
+updated_at: 2026-05-27T12:30:24Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold common/skill/catalog package (types, constants, Load, Stale)"
+    description: |
+      Create the new `common/skill/catalog/` package with the URL constants
+      (`plugin.json` + tarball) in `source.go`, the `Catalog` / `SkillEntry`
+      types, cache-path helpers under `os.UserCacheDir()/neo4j-cli/skill-catalog/`,
+      and the read-only `Load(fs, cacheRoot)` + `Stale(ttl)` functions plus the
+      test seams (`userCacheDirFn`, `nowFn`). No network or extraction yet —
+      `Load` reads cached `plugin.json` + `fetched-at` via afero only.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Package compiles with hardcoded raw.githubusercontent / codeload URLs in source.go"
+      - "Catalog and SkillEntry structs match the PRD shape (Name, Path, Version, cacheRoot)"
+      - "Load parses a fixture plugin.json from an afero mem fs and populates Version + Skills"
+      - "Stale(ttl) returns true on missing fetched-at, false when nowFn-fetched diff < ttl"
+      - "userCacheDirFn package var overrides os.UserCacheDir in tests"
+    completed_at: null
+
+  - id: task-002
+    title: "Implement secure tar+gzip extractor with allowlist + traversal guards"
+    description: |
+      Add `extract.go` to `common/skill/catalog/` exposing a pure extractor that
+      streams a `.tar.gz` reader, strips the top-level archive directory, and
+      writes only entries whose first path segment appears in a caller-supplied
+      allowlist (the `plugin.json.skills[]` names). Reject `..`/absolute paths,
+      symlinks (`tar.TypeSymlink`/`TypeLink`), device/fifo nodes; accept only
+      `tar.TypeReg` + `tar.TypeDir`. Enforce a 20 MB max-decompressed-size cap.
+      All writes go through `afero.Fs` with 0600 files / 0755 dirs.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Synthetic tarball with ../../../etc/passwd entry causes extract to error and abort"
+      - "Symlink entry and char-device entry both rejected with a clear error"
+      - "Entry outside the allowlist is silently skipped; allowlisted skill content lands at content/<version>/<skill>/"
+      - "Decompressed payload exceeding the cap aborts mid-stream with a size-limit error"
+      - "Uses only archive/tar + compress/gzip stdlib — no third-party deps added to go.mod"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement Catalog.Refresh + Lookup with self-name collision guard"
+    description: |
+      Wire HTTP fetch of `plugin.json` (User-Agent `neo4j-cli/<version>`, 30 s
+      timeout via injectable `httpDoer` seam) and conditional tarball download
+      into `Catalog.Refresh(ctx, fs)`. Re-extract via task-002 only when
+      `cached.version != upstream.version`. Implement `Lookup(name)` returning
+      the per-skill `fs.FS` rooted at `content/<version>/<name>/`; reject any
+      upstream skill named `self` or matching the binary name (fail-closed
+      collision guard).
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "Refresh against httptest server fetches plugin.json, writes cache, downloads tarball when version differs"
+      - "Refresh skips tarball download when cached.version == upstream.version"
+      - "Lookup returns fs.FS reading SKILL.md + references/* for the requested catalog skill"
+      - "Lookup rejects an upstream entry named 'self' with a clear error; same for an entry matching the binary name"
+      - "Refresh uses net/http.DefaultClient by default but accepts an httpDoer interface for tests"
+    completed_at: null
+
+  - id: task-004
+    title: "Refactor common/skill installer to take Source{FS, Version} + inject version frontmatter"
+    description: |
+      Introduce `Source{FS fs.FS; Version string}` in `common/skill/` and change
+      `Install(filesystem, src, skillName, agentFilter)` to consume it. Refactor
+      `copyBundleWithVersion` to inject `version: <Source.Version>` into the
+      copied SKILL.md YAML frontmatter — overwriting any existing `version:`
+      line, or inserting it immediately before the closing `---` when upstream
+      has none. Existing self-skill callers pass a Source backed by the
+      embedded `bundle.FS` + binary version.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Install signature accepts Source and existing self-skill flow continues to install with binary version"
+      - "Frontmatter injection overwrites a pre-existing version: line"
+      - "Frontmatter injection inserts a new version: line before --- when absent"
+      - "All existing common/skill tests pass with the new Source wiring"
+      - "resolveTargets is unchanged — agent resolution remains orthogonal"
+    completed_at: null
+
+  - id: task-005
+    title: "Add 'self' canonical name + binary-name alias for the self-skill"
+    description: |
+      Add resolution in `common/skill/` so that `self` is the canonical
+      self-skill name and the binary name (`neo4j-cli`, threaded via
+      `skill.NewCmd`'s skillName arg) is accepted as an alias. Both names must
+      be reserved against catalog Lookup (already enforced by task-003) and
+      accepted everywhere a `<skill-name>` positional is taken. Document the
+      reservation in helpers.go and wire the alias map through the installer.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "Resolver returns the embedded Source for both 'self' and the binary-name alias"
+      - "Resolver returns an error for any other unknown name (caller decides messaging)"
+      - "Unit test covers self / binary-name aliasing both directions"
+      - "Reserved-name list is the single source of truth shared with catalog.Lookup"
+    completed_at: null
+
+  - id: task-006
+    title: "Replace positional [agent] with --agent flag; positional becomes skill-name"
+    description: |
+      Update the cobra surface in `common/skill/` so `install`, `remove`, and
+      `print` accept an optional skill-name positional (validated against
+      self+catalog names) and a new `--agent <name>` flag (case-insensitive)
+      that scopes to one agent. Hard-break: if the positional doesn't match any
+      known skill but matches an agent name, error with
+      `unknown skill: <name>; did you mean '--agent <name>'?`. Update Long /
+      Example / help text. No silent fall-through to the old positional shape.
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "install/remove/print all accept --agent <name> with case-insensitive matching"
+      - "Positional that resolves to a known skill name proceeds; unknown positional matching an agent name yields the did-you-mean error and non-zero exit"
+      - "Help text + Example blocks for each leaf reflect the new shape"
+      - "Old form 'skill install claude-code' (no matching skill) fails with the hard-break error in a colocated test"
+    completed_at: null
+
+  - id: task-007
+    title: "Wire install leaf for catalog skills (--all, --refresh, auto-refresh, network policy)"
+    description: |
+      Extend `install.go` to install a catalog skill by name (via
+      `catalog.Lookup` + the Source-aware Install), to install everything when
+      `--all` is set (self-skill + each `plugin.json.skills[]` entry), and to
+      force `catalog.Refresh` when `--refresh` is set or the cache is missing /
+      older than 24 h. On network failure with no cache, fail with a clear
+      pointer to `neo4j-cli skill refresh`; with cache, log to stderr and
+      proceed using cached content (read commands), but install of a
+      catalog-only skill requires a usable cache.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "skill install <catalog-name> installs from cached content/<version>/<name>/ into every detected agent"
+      - "skill install --all installs the self-skill plus every catalog entry"
+      - "skill install --refresh forces plugin.json fetch + tarball check before installing"
+      - "Cold cache + network failure on a catalog install exits non-zero with a refresh hint"
+      - "Stale cache (>24 h) triggers auto-refresh on install when network is available"
+    completed_at: null
+
+  - id: task-008
+    title: "Wire remove leaf (--all, --agent, self-skill protection, alias hint)"
+    description: |
+      Update `remove.go` so the positional skill-name removes that skill from
+      every detected agent (or one when `--agent` is passed). `--all` removes
+      every catalog skill from every detected agent but never touches the
+      self-skill — note this in help text and in table output. Removing
+      `self` (or the binary-name alias) is allowed and prints
+      `Run 'neo4j-cli skill install' to reinstall.`. Missing installs are
+      idempotent — return success.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "skill remove <name> removes from all detected agents by default"
+      - "skill remove <name> --agent <one> scopes removal to that agent"
+      - "skill remove --all leaves the self-skill installed and reports the omission"
+      - "skill remove self (and binary-name alias) removes the self-skill and prints the reinstall hint"
+      - "Removing a name with no installation present exits zero (idempotent)"
+    completed_at: null
+
+  - id: task-009
+    title: "Rewrite list leaf: one row per (skill × agent), columns + cold-cache hint"
+    description: |
+      Rewrite `list.go` to produce one row per `(skill × agent)` combining the
+      self-skill (always first, source `embedded`) with every catalog entry
+      from the cached `plugin.json`. Columns: `skill, source, agent, detected,
+      installed, installed_version, available_version, status`. Auto-refresh on
+      24 h staleness when network is available; otherwise show cache as-is. On
+      a cold cache, show only the self-skill rows and emit a note pointing at
+      `neo4j-cli skill refresh`. Honour `--format json|table|toon` and
+      `--refresh` to force a fetch.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "Populated-cache run lists self + every catalog skill × every detected agent with the documented columns"
+      - "Cold-cache run shows only self-skill rows + the refresh-hint note"
+      - "Status field reflects installed/not-installed and drift state per skill+agent"
+      - "JSON/table/toon outputs all render the same shape via commonoutput.PrintBodyMap"
+      - "--refresh forces a fetch before listing"
+    completed_at: null
+
+  - id: task-010
+    title: "Rewrite check leaf for self + catalog drift detection"
+    description: |
+      Rewrite `check.go` to inspect every installed skill across detected
+      agents, comparing its frontmatter `version:` against the source version
+      (binary version for the self-skill, `plugin.json.version` for catalog
+      skills). Columns: `skill, agent, installed_version, current_version,
+      status` where `status ∈ ok | drift | unknown-version`. Exit non-zero if
+      any row is `drift` or `unknown-version`. Honour `--refresh` and
+      `--format`.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "Drift on any installed skill yields a non-zero exit with the offending row marked drift"
+      - "All-aligned installation exits zero"
+      - "Self-skill drift detected against the binary version"
+      - "unknown-version status emitted when frontmatter lacks a version: line"
+      - "--refresh forces a catalog refresh before the check"
+    completed_at: null
+
+  - id: task-011
+    title: "Update print leaf to accept skill-name positional (catalog or self)"
+    description: |
+      Update `print.go` so the positional `[skill-name]` resolves to either the
+      self-skill (`self` / binary-name alias, default when no arg) or a catalog
+      skill by name. For a catalog skill, print the cached SKILL.md via
+      `catalog.Lookup`. No network access — fail with a refresh hint if the
+      catalog cache is missing for a catalog skill.
+    status: pending
+    dependencies:
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "skill print (no arg) prints the embedded self-skill SKILL.md (today's behaviour preserved)"
+      - "skill print self and skill print <binary-name> both print the self-skill"
+      - "skill print <catalog-name> prints the cached SKILL.md for that catalog skill"
+      - "Missing catalog cache yields a clear error pointing at skill refresh; exit non-zero"
+    completed_at: null
+
+  - id: task-012
+    title: "Add new refresh leaf (skill/refresh.go + refresh_test.go)"
+    description: |
+      Add `refresh.go` / `refresh_test.go` to `common/skill/` exposing a new
+      `neo4j-cli skill refresh` leaf that always fetches the latest
+      `plugin.json` and re-extracts the tarball when `version` differs. Reuses
+      the same `catalog.Refresh` plumbing, follows the one-file-per-leaf cobra
+      layout, and registers with the parent via `cmd.AddCommand` in `skill.go`.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "skill refresh exists as a leaf and is listed in skill --help"
+      - "Refresh writes plugin.json + fetched-at; tarball re-extraction triggered only when version changes"
+      - "refresh_test.go covers happy path, no-op when version unchanged, and network failure with cache (warn) vs without cache (error)"
+      - "Mirrors install/remove/list/check layout (private newRefreshCmd constructor, parent AddCommand wiring)"
+    completed_at: null
+
+  - id: task-013
+    title: "Regenerate skill bundle (additions.md, description.txt, go generate)"
+    description: |
+      Update `neo4j-cli/internal/skill/additions.md` and
+      `neo4j-cli/internal/skill/description.txt` to describe the new
+      multi-skill surface, the `--all` / `--agent` / `--refresh` flags, and the
+      `refresh` leaf. Run `go generate ./neo4j-cli/internal/skill/...` to
+      refresh the committed bundle so `TestGenerator_RoundTrip` and
+      `make generate-check` both pass.
+    status: pending
+    dependencies:
+      - task-007
+      - task-008
+      - task-009
+      - task-010
+      - task-011
+      - task-012
+    acceptance_criteria:
+      - "additions.md mentions the curated catalog source, --all, --agent, --refresh, and the refresh leaf"
+      - "description.txt (single-paragraph, ≤1024 chars, third-person) reflects the new capability"
+      - "Bundle regeneration commits the updated references/skill.md and any other diff under internal/skill/bundle/"
+      - "make generate-check passes on the resulting clean tree"
+    completed_at: null
+
+  - id: task-014
+    title: "Add Major changelog entry + final gate run (make test/fmt-check/lint)"
+    description: |
+      File a changelog entry via `changie new --projects neo4j-cli --kind Major
+      --body "..."` capturing the positional-arg break (skill install <agent>
+      no longer works) and the new catalog surface. Run `make test`,
+      `make fmt-check`, and `make lint` as the final gates before closing out
+      the feature.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - ".changes/unreleased/neo4j-cli-Major-<YYYYMMDD>-<HHMMSS>.yaml exists with the documented breaking change body"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+    completed_at: null
