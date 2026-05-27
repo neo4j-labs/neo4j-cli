@@ -38,6 +38,9 @@ neo4j-cli skill print self
 # Print a curated catalog skill's cached SKILL.md
 neo4j-cli skill print neo4j-cypher-skill
 
+# Emit the SKILL.md (raw markdown — --format json is accepted for parity with other read cmds)
+neo4j-cli skill print --format json
+
 # Save the embedded SKILL.md to a file for review
 neo4j-cli skill print > skill-preview.md`,
 		Args: cobra.MaximumNArgs(1),

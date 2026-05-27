@@ -245,6 +245,10 @@ func TestAllLeafCommands_HaveExamples(t *testing.T) {
 				"command %q Example first line must be flush-left (no leading two-space indent); got %q", path, firstLine)
 			assert.GreaterOrEqual(t, countExampleInvocations(c.Example), 3,
 				"command %q Example must contain at least three invocations (each preceded by a `# comment` line per AGENTS.md); got Example=%q", path, c.Example)
+			if c.Annotations["write"] != "true" {
+				assert.True(t, strings.Contains(c.Example, "--format json"),
+					"read command %q Example must contain at least one `--format json` invocation (AGENTS.md read-cmd gate); got Example=%q", path, c.Example)
+			}
 		}
 		for _, sub := range c.Commands() {
 			if sub.Hidden {

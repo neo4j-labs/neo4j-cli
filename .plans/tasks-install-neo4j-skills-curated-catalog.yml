@@ -834,7 +834,7 @@ tasks:
       one alongside the existing `TestAllLeafCommands_HaveExamples` so
       this drift is caught locally next time, not by CI bot. (Skip if
       the existing test already covers it.)
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -842,7 +842,7 @@ tasks:
       - "Skill bundle regenerated so references/skill.md picks up the new Example"
       - "If no local gate enforces the read-cmd --format json rule, add one"
       - "make test / make fmt-check / make lint / make generate-check all clean"
-    completed_at: null
+    completed_at: 2026-05-27T19:45:00Z
 
   - id: task-029
     title: "Inline canonical Zip Slip prefix check so CodeQL recognizes the sanitizer"
