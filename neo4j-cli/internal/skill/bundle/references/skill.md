@@ -83,21 +83,32 @@ neo4j-cli skill install --format json --rw
 
 ## neo4j-cli skill list
 
-List supported agents and per-agent install state
+List skills × agents and per-row install state
 
-Usage: `neo4j-cli skill list`
+Lists one row per (skill × agent) combining the embedded self-skill (always first) with every curated catalog skill from the cached plugin.json. Columns: skill, source, agent, detected, installed, installed_version, available_version, status. Auto-refreshes the catalog cache on 24h staleness when network is available; otherwise shows cached content. On a cold cache only self-skill rows are listed and a hint is printed to stderr pointing at `skill refresh`. Use --refresh to force a network fetch.
+
+Usage: `neo4j-cli skill list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--refresh` | bool | false | Force a network refresh of the catalog before listing. |
 
 Examples:
 
 ```
-# List supported agents as a table
+# List skills × agents (table)
 neo4j-cli skill list
 
-# List supported agents as JSON (machine-readable)
+# List as JSON (machine-readable)
 neo4j-cli skill list --format json
 
-# List supported agents in toon format
+# List in toon format
 neo4j-cli skill list --format toon
+
+# Force a catalog refresh before listing
+neo4j-cli skill list --refresh
 ```
 
 ## neo4j-cli skill print

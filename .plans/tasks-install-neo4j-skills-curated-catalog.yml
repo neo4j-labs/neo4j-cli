@@ -180,7 +180,7 @@ tasks:
       a cold cache, show only the self-skill rows and emit a note pointing at
       `neo4j-cli skill refresh`. Honour `--format json|table|toon` and
       `--refresh` to force a fetch.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -190,7 +190,7 @@ tasks:
       - "Status field reflects installed/not-installed and drift state per skill+agent"
       - "JSON/table/toon outputs all render the same shape via commonoutput.PrintBodyMap"
       - "--refresh forces a fetch before listing"
-    completed_at: null
+    completed_at: 2026-05-27T14:30:00Z
 
   - id: task-010
     title: "Rewrite check leaf for self + catalog drift detection"
