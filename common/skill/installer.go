@@ -231,7 +231,7 @@ func injectVersion(data []byte, version string) []byte {
 	newLine := "version: " + version
 	var newInner string
 	if versionLineRe.MatchString(inner) {
-		newInner = versionLineRe.ReplaceAllString(inner, newLine)
+		newInner = versionLineRe.ReplaceAllLiteralString(inner, newLine)
 	} else {
 		trimmed := strings.TrimRight(inner, "\r\n")
 		if trimmed == "" {

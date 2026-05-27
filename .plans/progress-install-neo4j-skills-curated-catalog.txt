@@ -156,3 +156,7 @@ Decisions: Option A (inline + helper removed) over Option B (keep both) — 4-li
 
 ## REVIEW — 2026-05-27T18:14:00Z
 Added 2 more CI-bot tasks (task-030 ReplaceAllLiteralString, task-031 simplify Zip Slip pattern for CodeQL).
+
+## TASK-030 + TASK-031 — 2026-05-27T20:30:00Z
+Two CI-bot follow-ups. installer.injectVersion swapped ReplaceAllString → ReplaceAllLiteralString to close the `$1` backreference-expansion gap on upstream version strings; injectVersion test table grew one row asserting `version: $1` literally. extract.go's inline Zip Slip prefix check simplified to the canonical AST shape CodeQL recognizes (`if !strings.HasPrefix(destPath, filepath.Clean(destRoot)+string(os.PathSeparator))`) — dropped the cleanRoot var and the destPath==cleanRoot short-circuit (not load-bearing; classifyEntry already rejects empty rel so destPath is always strictly deeper than destRoot). All gates clean: make test, fmt-check, lint, license-check; generate-check shows only the in-flight source/test/tasks-yml diff (no bundle drift per AGENTS.md).
+Files: ~common/skill/installer.go, ~common/skill/installer_test.go, ~common/skill/catalog/extract.go

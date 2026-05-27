@@ -334,6 +334,12 @@ func TestInjectVersion(t *testing.T) {
 			version: "2.0",
 			want:    "---\r\nname: x\r\nversion: 2.0\r\n---\r\nbody\r\n",
 		},
+		{
+			name:    "treats $1 as literal (no regexp backreference expansion)",
+			in:      "---\nname: x\nversion: 0.0.1\n---\n",
+			version: "$1",
+			want:    "---\nname: x\nversion: $1\n---\n",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

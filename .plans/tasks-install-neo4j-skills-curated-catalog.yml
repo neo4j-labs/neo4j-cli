@@ -929,14 +929,14 @@ tasks:
       Test: add a case to the existing injectVersion table covering
       `version = "$1"` and verify the rewritten SKILL.md contains
       `version: $1` literally (not the expanded captured group).
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "injectVersion uses ReplaceAllLiteralString (not ReplaceAllString)"
       - "Test asserts that a version of '$1' is written literally to the SKILL.md frontmatter"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T20:30:00Z
 
   - id: task-031
     title: "Simplify inline Zip Slip prefix check to match CodeQL's canonical AST pattern"
@@ -974,7 +974,7 @@ tasks:
       `dismissed_reason: "false positive"` and a comment pointing at
       `classifyEntry`'s `..` rejection + this prefix check. Try the
       refactor first.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -983,4 +983,4 @@ tasks:
       - "Existing extract tests still pass"
       - "CodeQL go/zipslip alert clears on next push — if not, document the dismissal as a separate follow-up"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T20:30:00Z

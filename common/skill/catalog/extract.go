@@ -88,14 +88,11 @@ func Extract(r io.Reader, destFs afero.Fs, destRoot string, allowed []string) er
 		}
 
 		destPath := filepath.Join(destRoot, filepath.FromSlash(rel))
-		// Canonical Zip Slip prefix check, inlined so CodeQL's go/zipslip taint
-		// analyzer recognizes the sanitizer (it does not reliably follow helper
-		// functions). Defense-in-depth alongside classifyEntry's per-segment
-		// `..` rejection — kept as a documented safety net should any future
-		// refactor weaken the upstream guard.
-		cleanRoot := filepath.Clean(destRoot)
-		if destPath != cleanRoot && !strings.HasPrefix(destPath, cleanRoot+string(os.PathSeparator)) {
-			return fmt.Errorf("catalog: tar entry path %q escapes destination root %q", destPath, cleanRoot)
+		// Canonical Zip Slip prefix check — matches the AST shape CodeQL's
+		// go/zipslip sanitizer recognizes, and provides defense-in-depth over
+		// classifyEntry's per-segment `..` rejection.
+		if !strings.HasPrefix(destPath, filepath.Clean(destRoot)+string(os.PathSeparator)) {
+			return fmt.Errorf("catalog: tar entry path %q escapes destination root %q", destPath, destRoot)
 		}
 
 		switch hdr.Typeflag {
