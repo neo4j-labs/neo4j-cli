@@ -302,8 +302,8 @@ func (c *Credentials) MigrateToKeyring() error {
 	// Probe keyring availability before writing any entries.
 	if err := ProbeKeyringAvailability(); err != nil {
 		return clierr.NewUsageError(
-			"keyring is unavailable (%v); run `neo4j-cli config set credential-storage insecure --rw` to use plaintext storage instead",
-			err,
+			"keyring is unavailable (%v)\n%s",
+			err, KeyringSetupHint(),
 		)
 	}
 

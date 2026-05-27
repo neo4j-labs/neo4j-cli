@@ -138,8 +138,7 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 		// OS keyring daemon is unavailable (e.g. headless Linux without D-Bus).
 		if probeErr := credentials.ProbeKeyringAvailability(); probeErr != nil {
 			_, _ = fmt.Fprintf(stderr, "Warning: OS keyring is unavailable (%v); defaulting to plaintext credential storage.\n", probeErr)
-			_, _ = fmt.Fprintln(stderr, "To retry with keyring storage once the daemon is available, run:")
-			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
+			_, _ = fmt.Fprintln(stderr, credentials.KeyringSetupHint())
 			if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
 				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure)
 			}

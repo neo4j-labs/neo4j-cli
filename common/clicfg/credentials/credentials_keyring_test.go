@@ -671,7 +671,7 @@ func TestMigrateToKeyring_KeyringUnavailable(t *testing.T) {
 			migrateErr := creds.MigrateToKeyring()
 			require.Error(t, migrateErr)
 			assert.Contains(t, migrateErr.Error(), "keyring is unavailable")
-			assert.Contains(t, migrateErr.Error(), "insecure")
+			assert.NotContains(t, migrateErr.Error(), "config set credential-storage insecure")
 		})
 	}
 }
