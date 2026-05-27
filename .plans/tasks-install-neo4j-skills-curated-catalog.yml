@@ -283,7 +283,7 @@ tasks:
       no longer works) and the new catalog surface. Run `make test`,
       `make fmt-check`, and `make lint` as the final gates before closing out
       the feature.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -291,4 +291,4 @@ tasks:
       - "make test passes"
       - "make fmt-check passes"
       - "make lint passes"
-    completed_at: null
+    completed_at: 2026-05-27T16:05:00Z
