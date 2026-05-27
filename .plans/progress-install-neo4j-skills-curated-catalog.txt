@@ -15,3 +15,7 @@ Files: ~common/skill/installer.go, ~common/skill/installer_test.go, ~common/skil
 Catalog.Refresh (ctx, fs) + Lookup (fs, name, binaryName) with httpDoer seam on Catalog (Doer + BinaryVersion fields). Tarball fetch+extract happens BEFORE plugin.json write so mid-refresh failures leave prior cache intact. SelfCanonicalName + ReservedNames/IsReserved exported for task-005 alias map. httptest routing via per-test Doer; PluginJSONURL/TarballURL stay frozen const.
 Files: +common/skill/catalog/refresh.go, +common/skill/catalog/refresh_test.go, ~common/skill/catalog/source.go, ~common/skill/catalog/catalog.go, ~common/skill/catalog/cache.go
 Decisions: write plugin.json AFTER tarball extract so cache stays consistent on partial failure
+
+## TASK-005 — 2026-05-27T13:15:00Z
+ResolveSelf(bundle, version, binaryName, name) maps `self` + binary-name alias to the embedded Source via catalog.IsReserved; any other name yields ErrNotSelfSkill so install/remove/print leaves can fall through to catalog.Lookup. Reserved set stays owned by catalog (single source of truth); a contract test re-asserts that every catalog.ReservedNames entry is accepted by the resolver.
+Files: +common/skill/resolve.go, +common/skill/resolve_test.go

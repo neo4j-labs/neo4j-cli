@@ -94,7 +94,7 @@ tasks:
       be reserved against catalog Lookup (already enforced by task-003) and
       accepted everywhere a `<skill-name>` positional is taken. Document the
       reservation in helpers.go and wire the alias map through the installer.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -102,7 +102,7 @@ tasks:
       - "Resolver returns an error for any other unknown name (caller decides messaging)"
       - "Unit test covers self / binary-name aliasing both directions"
       - "Reserved-name list is the single source of truth shared with catalog.Lookup"
-    completed_at: null
+    completed_at: 2026-05-27T13:15:00Z
 
   - id: task-006
     title: "Replace positional [agent] with --agent flag; positional becomes skill-name"
