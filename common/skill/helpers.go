@@ -5,7 +5,6 @@ package skill
 
 import (
 	"errors"
-	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -86,27 +85,4 @@ func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bo
 		return true, ""
 	}
 	return true, parseVersion(data)
-}
-
-// resolveSkillSource maps a positional skill-name to the Source the
-// installer/printer should copy when no catalog is in play. Empty arg
-// defaults to the embedded self-skill; the self-skill resolver handles
-// the canonical / binary-alias names; anything else is either a
-// did-you-mean-agent hard-break (REQ-F-012) or an unknown-skill error.
-// Catalog-aware callers use resolveCatalogSkillSource instead.
-func resolveSkillSource(bundle fs.FS, version, binaryName, skillArg string) (Source, error) {
-	if skillArg == "" {
-		return Source{FS: bundle, Version: version}, nil
-	}
-	src, err := ResolveSelf(bundle, version, binaryName, skillArg)
-	if err == nil {
-		return src, nil
-	}
-	if !errors.Is(err, ErrNotSelfSkill) {
-		return Source{}, err
-	}
-	if isAgentName(skillArg) {
-		return Source{}, didYouMeanAgentErr(skillArg)
-	}
-	return Source{}, unknownSkillErr(skillArg)
 }

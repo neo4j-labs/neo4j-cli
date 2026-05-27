@@ -222,7 +222,7 @@ tasks:
       skill by name. For a catalog skill, print the cached SKILL.md via
       `catalog.Lookup`. No network access — fail with a refresh hint if the
       catalog cache is missing for a catalog skill.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -231,7 +231,7 @@ tasks:
       - "skill print self and skill print <binary-name> both print the self-skill"
       - "skill print <catalog-name> prints the cached SKILL.md for that catalog skill"
       - "Missing catalog cache yields a clear error pointing at skill refresh; exit non-zero"
-    completed_at: null
+    completed_at: 2026-05-27T15:30:00Z
 
   - id: task-012
     title: "Add new refresh leaf (skill/refresh.go + refresh_test.go)"

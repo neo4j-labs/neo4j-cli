@@ -124,7 +124,7 @@ neo4j-cli skill list --refresh
 
 Print a skill's SKILL.md to stdout
 
-Writes the SKILL.md for the named skill verbatim to stdout. Defaults to the embedded self-skill when no positional is supplied. The {{VERSION}} placeholder in the self-skill bundle is left literal; substitution happens at install time. Passing an agent name as the positional is a hard error — use the --agent flag on install/remove instead.
+Writes the SKILL.md for the named skill verbatim to stdout. Defaults to the embedded self-skill when no positional is supplied; pass 'self' (or the binary-name alias) for the same effect. Pass a curated catalog skill name to print its cached SKILL.md — print is offline-only and will not fetch the catalog. Run 'neo4j-cli skill refresh' first if the catalog cache is missing. The {{VERSION}} placeholder in the self-skill bundle is left literal; substitution happens at install time. Passing an agent name as the positional is a hard error — use the --agent flag on install/remove instead.
 
 Usage: `neo4j-cli skill print [skill-name]`
 
@@ -136,6 +136,9 @@ neo4j-cli skill print
 
 # Print the self-skill explicitly by canonical name
 neo4j-cli skill print self
+
+# Print a curated catalog skill's cached SKILL.md
+neo4j-cli skill print neo4j-cypher-skill
 
 # Save the embedded SKILL.md to a file for review
 neo4j-cli skill print > skill-preview.md
