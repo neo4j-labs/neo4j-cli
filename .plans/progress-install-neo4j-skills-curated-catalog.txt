@@ -65,3 +65,9 @@ Files: +.changes/unreleased/neo4j-cli-Major-20260527-160133.yaml
 
 ## REVIEW — 2026-05-27T14:45:48Z
 Added 6 review tasks (task-015..task-020).
+
+## TASK-015 — 2026-05-27T17:00:00Z
+Collapse list+check into shared inventory builder. New `common/skill/inventory.go` owns `InventoryRow` + `BuildInventory(fs, binaryName, version, cat)` + single `statusFor` classifier + the source/status constants + `boolStr`. `list.go` calls BuildInventory and renders all rows; `check.go` calls BuildInventory + `filterInstalled` and exits non-zero via `countCheckDrift` when any installed row is drift/unknown-version. Deleted: `ListRow`, `CheckRowView`, `buildListRows`, `buildCheckRows`, `rowsForSkill`, `checkRowsForSkill`, `checkStatus`, `countDrift`, `checkStatusOk`. JSON shapes preserved exactly — list keeps `available_version`, check keeps `current_version` (same value, different leaf-level column name); check renderer maps `installed` → `ok` so the `status: "ok"` JSON contract held in check_test.go survives. No source-level help-text changes so the bundle stays in sync (generate-check shows only the task-yml in_progress flip, no bundle drift, per AGENTS.md Makefile Notes). All gates clean: make test (250 pass), fmt-check, lint, license-check.
+Files: +common/skill/inventory.go, ~common/skill/list.go, ~common/skill/check.go
+Decisions: keep two leaf-level JSON column names (`available_version` vs `current_version`) rather than collapsing to one — preserves existing test assertions and matches each leaf's user-facing framing ("what's installable" vs "what the source has right now"); map `installed`→`ok` at render time inside check (single classifier in statusFor still returns the four canonical states); `boolStr` stays in inventory.go beside the only sites that need it (list table AsArray) — JSON/toon already get real bools via MarshalJSON.
+

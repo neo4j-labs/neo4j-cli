@@ -7,13 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	commonoutput "github.com/neo4j/cli/common/output"
-	"github.com/neo4j/cli/common/skill/catalog"
 )
 
 func newCheckCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
@@ -51,8 +49,8 @@ neo4j-cli skill check --refresh`,
 }
 
 // runCheck loads the catalog (auto-refresh + soft fallback), builds the
-// installed-only check rows, renders them, and exits non-zero when any
-// row reports drift or unknown-version.
+// inventory, filters to installed rows, renders them, and exits non-zero
+// when any installed row reports drift or unknown-version.
 func runCheck(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh bool) error {
 	load, err := loadOrRefreshCatalog(cmd.Context(), cfg, catalogOpts{
 		forceRefresh:       refresh,
@@ -65,86 +63,33 @@ func runCheck(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh 
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
 	}
 
-	rows := buildCheckRows(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat)
+	rows := filterInstalled(BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat))
 	renderCheckResult(cmd, cfg, rows)
 
-	drift := countDrift(rows)
+	drift := countCheckDrift(rows)
 	if drift > 0 {
 		return clierr.NewValidationError("skill: drift detected in %d skill(s) — run `%s skill install` to refresh", drift, skillName)
 	}
 	return nil
 }
 
-// CheckRowView is the per-(installed skill × agent) view surfaced by the
-// check leaf. Distinct from the legacy CheckRow returned by Check() so the
-// older self-only API stays binary-compatible for its existing callers.
-type CheckRowView struct {
-	Skill            string
-	Agent            *Agent
-	InstalledVersion string
-	CurrentVersion   string
-	Status           string
-}
-
-// buildCheckRows iterates self + catalog skills across the AGENTS catalog
-// and emits one row per *installed* (skill × agent). Reserved catalog
-// entries (collisions with self / binary-name) are skipped.
-func buildCheckRows(filesystem afero.Fs, binaryName, binaryVersion string, cat *catalog.Catalog) []CheckRowView {
-	out := make([]CheckRowView, 0, len(AGENTS))
-	out = append(out, checkRowsForSkill(filesystem, binaryName, binaryVersion)...)
-	if cat == nil {
-		return out
-	}
-	for _, entry := range cat.Skills {
-		if catalog.IsReserved(entry.Name, binaryName) {
-			continue
+// filterInstalled keeps only rows where the skill is installed for that
+// agent. Check is a drift gate — uninstalled rows have nothing to compare.
+func filterInstalled(rows []InventoryRow) []InventoryRow {
+	out := make([]InventoryRow, 0, len(rows))
+	for _, r := range rows {
+		if r.Installed {
+			out = append(out, r)
 		}
-		out = append(out, checkRowsForSkill(filesystem, entry.Name, cat.Version)...)
 	}
 	return out
 }
 
-// checkRowsForSkill returns one row per agent where `skillName` is
-// installed. Uninstalled agents are silently omitted — check is a drift
-// gate, not a presence report.
-func checkRowsForSkill(filesystem afero.Fs, skillName, currentVersion string) []CheckRowView {
-	rows := make([]CheckRowView, 0, len(AGENTS))
-	for i := range AGENTS {
-		installed, installedVersion := readInstalledSkill(filesystem, &AGENTS[i], skillName)
-		if !installed {
-			continue
-		}
-		rows = append(rows, CheckRowView{
-			Skill:            skillName,
-			Agent:            &AGENTS[i],
-			InstalledVersion: installedVersion,
-			CurrentVersion:   currentVersion,
-			Status:           checkStatus(installedVersion, currentVersion),
-		})
-	}
-	return rows
-}
-
-// checkStatus classifies one (installed) row. `unknown-version` fires
-// when the frontmatter has no parseable `version:` line; `drift` fires
-// when the parsed version disagrees with the source version; otherwise
-// the row is `ok`.
-func checkStatus(installedVersion, currentVersion string) string {
-	if installedVersion == "" {
-		return statusUnknownVersion
-	}
-	if installedVersion != currentVersion {
-		return statusDrift
-	}
-	return checkStatusOk
-}
-
-const checkStatusOk = "ok"
-
-// countDrift returns the count of rows that should trigger a non-zero
-// exit — drift + unknown-version. Used by runCheck to decide whether to
-// return a ValidationError.
-func countDrift(rows []CheckRowView) int {
+// countCheckDrift returns the number of installed rows that should trigger
+// a non-zero exit — drift + unknown-version. `installed` (status meaning
+// "installed and version-matched") collapses to `ok` for the check view
+// (see renderCheckResult).
+func countCheckDrift(rows []InventoryRow) int {
 	n := 0
 	for _, r := range rows {
 		if r.Status == statusDrift || r.Status == statusUnknownVersion {
@@ -154,7 +99,10 @@ func countDrift(rows []CheckRowView) int {
 	return n
 }
 
-// checkResultRow is the JSON shape emitted by check.
+// checkResultRow is the JSON shape emitted by check. Note `current_version`
+// is the same value as list's `available_version` — the column name
+// differs by convention (check phrases it as "what the source has right
+// now", list phrases it as "what's installable").
 type checkResultRow struct {
 	Skill            string `json:"skill"`
 	Agent            string `json:"agent"`
@@ -187,15 +135,21 @@ func (r checkResults) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]checkResultRow(r))
 }
 
-func renderCheckResult(cmd *cobra.Command, cfg *clicfg.Config, rows []CheckRowView) {
+func renderCheckResult(cmd *cobra.Command, cfg *clicfg.Config, rows []InventoryRow) {
 	out := make(checkResults, 0, len(rows))
 	for _, r := range rows {
+		// Check sees only installed rows: statusFor returned `installed`
+		// when version matched, but check phrases that case as `ok`.
+		status := r.Status
+		if status == statusInstalled {
+			status = statusOk
+		}
 		out = append(out, checkResultRow{
 			Skill:            r.Skill,
 			Agent:            r.Agent.Name,
 			InstalledVersion: r.InstalledVersion,
-			CurrentVersion:   r.CurrentVersion,
-			Status:           r.Status,
+			CurrentVersion:   r.AvailableVersion,
+			Status:           status,
 		})
 	}
 

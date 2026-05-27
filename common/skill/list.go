@@ -7,22 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
-	"github.com/neo4j/cli/common/skill/catalog"
-)
-
-const (
-	sourceEmbedded = "embedded"
-	sourceCatalog  = "catalog"
-
-	statusInstalled      = "installed"
-	statusNotInstalled   = "not-installed"
-	statusDrift          = "drift"
-	statusUnknownVersion = "unknown-version"
 )
 
 func newListCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
@@ -60,8 +48,8 @@ neo4j-cli skill list --refresh`,
 }
 
 // runList loads the catalog (auto-refresh + soft fallback) and renders
-// one row per (skill × agent). On a cold cache it lists only self-skill
-// rows and prints a refresh hint to stderr (REQ-F-019).
+// the full inventory. On a cold cache it lists only self-skill rows and
+// prints a refresh hint to stderr (REQ-F-019).
 func runList(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh bool) error {
 	load, err := loadOrRefreshCatalog(cmd.Context(), cfg, catalogOpts{
 		forceRefresh:       refresh,
@@ -74,7 +62,7 @@ func runList(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh b
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
 	}
 
-	rows := buildListRows(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat)
+	rows := BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat)
 
 	if load.Cat == nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill catalog cache is empty; only self-skill rows shown. Run '%s skill refresh' to populate the catalog.\n", skillName)
@@ -82,77 +70,6 @@ func runList(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh b
 
 	renderListResult(cmd, cfg, rows)
 	return nil
-}
-
-// ListRow is the per-(skill × agent) view surfaced by the list leaf.
-type ListRow struct {
-	Skill            string
-	Source           string
-	Agent            *Agent
-	Detected         bool
-	Installed        bool
-	InstalledVersion string
-	AvailableVersion string
-	Status           string
-}
-
-// buildListRows enumerates one row per (skill × agent). Self-skill rows
-// always come first; catalog rows follow in plugin.json order. Reserved
-// catalog entries (collisions with self / binary-name) are skipped.
-func buildListRows(filesystem afero.Fs, binaryName, binaryVersion string, cat *catalog.Catalog) []ListRow {
-	out := make([]ListRow, 0, len(AGENTS))
-	out = append(out, rowsForSkill(filesystem, binaryName, sourceEmbedded, binaryVersion)...)
-	if cat == nil {
-		return out
-	}
-	for _, entry := range cat.Skills {
-		if catalog.IsReserved(entry.Name, binaryName) {
-			continue
-		}
-		out = append(out, rowsForSkill(filesystem, entry.Name, sourceCatalog, cat.Version)...)
-	}
-	return out
-}
-
-// rowsForSkill returns one row per agent for `skillName`. detected/
-// installed/installed_version are read from `filesystem`; status is
-// computed against `availableVersion`.
-func rowsForSkill(filesystem afero.Fs, skillName, source, availableVersion string) []ListRow {
-	rows := make([]ListRow, 0, len(AGENTS))
-	for i := range AGENTS {
-		row := ListRow{
-			Skill:            skillName,
-			Source:           source,
-			Agent:            &AGENTS[i],
-			AvailableVersion: availableVersion,
-		}
-		if dp, ok := AGENTS[i].DetectPath(); ok {
-			exists, _ := afero.DirExists(filesystem, dp)
-			row.Detected = exists
-		}
-		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
-		row.Status = statusFor(row.Installed, row.InstalledVersion, row.AvailableVersion)
-		rows = append(rows, row)
-	}
-	return rows
-}
-
-// statusFor classifies a row. `not-installed` wins over version checks
-// because an absent install has no meaningful version to compare.
-// `unknown-version` fires when the installed SKILL.md frontmatter lacks a
-// parseable `version:` line — distinct from drift so users can see the
-// difference between "wrong version" and "no version at all".
-func statusFor(installed bool, installedVersion, availableVersion string) string {
-	if !installed {
-		return statusNotInstalled
-	}
-	if installedVersion == "" {
-		return statusUnknownVersion
-	}
-	if installedVersion != availableVersion {
-		return statusDrift
-	}
-	return statusInstalled
 }
 
 // listResultRow is the JSON shape emitted by list.
@@ -171,6 +88,8 @@ type listResultRow struct {
 type listResults []listResultRow
 
 // AsArray returns each row as a column-keyed map for table rendering.
+// JSON/toon paths bypass this via MarshalJSON to preserve real booleans;
+// the table renderer needs yes/no strings for readability.
 func (r listResults) AsArray() []map[string]any {
 	out := make([]map[string]any, 0, len(r))
 	for _, row := range r {
@@ -189,12 +108,12 @@ func (r listResults) AsArray() []map[string]any {
 }
 
 // MarshalJSON delegates to default slice marshalling, preserving the
-// existing JSON array-of-objects shape.
+// existing JSON array-of-objects shape with real booleans.
 func (r listResults) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]listResultRow(r))
 }
 
-func renderListResult(cmd *cobra.Command, cfg *clicfg.Config, rows []ListRow) {
+func renderListResult(cmd *cobra.Command, cfg *clicfg.Config, rows []InventoryRow) {
 	out := make(listResults, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, listResultRow{
@@ -213,11 +132,4 @@ func renderListResult(cmd *cobra.Command, cfg *clicfg.Config, rows []ListRow) {
 		"skill", "source", "agent", "detected", "installed",
 		"installed_version", "available_version", "status",
 	})
-}
-
-func boolStr(b bool) string {
-	if b {
-		return "yes"
-	}
-	return "no"
 }

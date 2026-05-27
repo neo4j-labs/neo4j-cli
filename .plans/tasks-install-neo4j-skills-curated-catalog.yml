@@ -318,7 +318,7 @@ tasks:
       `checkStatus`). One JSON shape (or keep two thin render funcs that
       select the column subset). One iteration. Delete the duplicate
       `rowsForSkill` / `checkRowsForSkill` pair.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -327,7 +327,7 @@ tasks:
       - "checkStatus is deleted; statusFor is the single classifier"
       - "All existing list_test.go + check_test.go cases pass with the unified builder"
       - "make test / make fmt-check / make lint / make generate-check all clean"
-    completed_at: null
+    completed_at: 2026-05-27T17:00:00Z
 
   - id: task-016
     title: "Delete legacy installer.Check/CheckRow; dedupe List vs readInstalledSkill"
