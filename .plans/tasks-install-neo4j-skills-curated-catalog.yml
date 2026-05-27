@@ -158,7 +158,7 @@ tasks:
       `self` (or the binary-name alias) is allowed and prints
       `Run 'neo4j-cli skill install' to reinstall.`. Missing installs are
       idempotent — return success.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -167,7 +167,7 @@ tasks:
       - "skill remove --all leaves the self-skill installed and reports the omission"
       - "skill remove self (and binary-name alias) removes the self-skill and prints the reinstall hint"
       - "Removing a name with no installation present exits zero (idempotent)"
-    completed_at: null
+    completed_at: 2026-05-27T14:00:00Z
 
   - id: task-009
     title: "Rewrite list leaf: one row per (skill × agent), columns + cold-cache hint"

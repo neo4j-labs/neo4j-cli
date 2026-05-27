@@ -125,23 +125,30 @@ neo4j-cli skill print > skill-preview.md
 
 Remove an installed skill bundle
 
-Removes the named skill (self-skill or catalog skill) from every detected agent. Use --agent <name> (case-insensitive) to scope the removal to one agent. Passing an agent name as the positional is a hard error — use --agent <name> instead. Idempotent: a second run on a clean target is a no-op.
+Removes the named skill (self-skill or catalog skill) from every detected agent. Use --agent <name> (case-insensitive) to scope the removal to one agent. Use --all to remove every curated catalog skill from every detected agent — the embedded self-skill is preserved. Passing 'self' (or the binary-name alias) removes the self-skill and prints a reinstall hint. Idempotent: a name with no installation present exits zero. Passing an agent name as the positional is a hard error — use --agent <name> instead. --all reads only the cached catalog; with no cache it is a no-op.
 
 Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
 
-Usage: `neo4j-cli skill remove <skill-name> [flags]`
+Usage: `neo4j-cli skill remove [skill-name] [flags]`
 
 Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--agent` | string | - | Restrict remove to a single agent (case-insensitive). See --help for supported agents. |
+| `--all` | bool | false | Remove every curated catalog skill (self-skill preserved). |
 
 Examples:
 
 ```
 # Remove the self-skill from every detected agent
 neo4j-cli skill remove self --rw
+
+# Remove a curated catalog skill from every detected agent
+neo4j-cli skill remove neo4j-cypher-skill --rw
+
+# Remove every catalog skill (self-skill is preserved)
+neo4j-cli skill remove --all --rw
 
 # Remove the self-skill from a single agent
 neo4j-cli skill remove self --agent claude-code --rw

@@ -161,7 +161,7 @@ func runInstallAll(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillNa
 		allRows = append(allRows, installRowsFor(entry.Name, "installed", targets)...)
 	}
 
-	renderInstallRows(cmd, cfg, allRows)
+	renderInstallRows(cmd, cfg, allRows, "installed")
 	if len(failures) > 0 {
 		return fmt.Errorf("skill: %d skill(s) failed to install:\n  - %s", len(failures), strings.Join(failures, "\n  - "))
 	}
@@ -191,13 +191,13 @@ func installRowsFor(skillName, action string, targets []*Agent) []installResultR
 
 // renderInstallRows emits a pre-built row set. Used by --all where the
 // rows span multiple skills; the single-skill path keeps using
-// renderInstallResult.
-func renderInstallRows(cmd *cobra.Command, cfg *clicfg.Config, rows []installResultRow) {
+// renderInstallResult. action is "installed" or "removed".
+func renderInstallRows(cmd *cobra.Command, cfg *clicfg.Config, rows []installResultRow, action string) {
 	if len(rows) == 0 && commonoutput.ResolveOutput(cmd, cfg) != "json" {
-		cmd.Println("No agents to install.")
+		cmd.Printf("No agents to %s.\n", strings.TrimSuffix(action, "ed"))
 		return
 	}
-	data := installResults{rows: rows, action: "installed"}
+	data := installResults{rows: rows, action: action}
 	commonoutput.PrintBodyMap(cmd, cfg, data, []string{"agent", "display_name", "skills_path", "action"})
 }
 
