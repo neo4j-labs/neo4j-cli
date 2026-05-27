@@ -260,7 +260,7 @@ tasks:
       `refresh` leaf. Run `go generate ./neo4j-cli/internal/skill/...` to
       refresh the committed bundle so `TestGenerator_RoundTrip` and
       `make generate-check` both pass.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -273,7 +273,7 @@ tasks:
       - "description.txt (single-paragraph, ≤1024 chars, third-person) reflects the new capability"
       - "Bundle regeneration commits the updated references/skill.md and any other diff under internal/skill/bundle/"
       - "make generate-check passes on the resulting clean tree"
-    completed_at: null
+    completed_at: 2026-05-27T13:59:22Z
 
   - id: task-014
     title: "Add Major changelog entry + final gate run (make test/fmt-check/lint)"
