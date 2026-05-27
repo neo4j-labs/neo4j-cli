@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"time"
 
@@ -56,6 +57,38 @@ type catalogLoad struct {
 	// after a network failure (REQ-F-019). The leaf should surface it to
 	// stderr and continue.
 	Warn error
+}
+
+// catalogRefreshWarnPrefix is the leading clause shared by every
+// network-failure-with-cache warning. Centralised so wording lives in
+// one place across install / list / check / refresh.
+const catalogRefreshWarnPrefix = "warning: skill catalog refresh failed, using cached content"
+
+// PrintWarn writes the standard "refresh failed, using cached content"
+// warning to w when the load fell back to cached content (l.Warn != nil
+// && l.Cat != nil). No-op otherwise so leaves can call it unconditionally.
+func (l catalogLoad) PrintWarn(w io.Writer) {
+	if l.Warn == nil || l.Cat == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "%s: %v\n", catalogRefreshWarnPrefix, l.Warn)
+}
+
+// PrintColdCacheHint writes the cold-cache hint to w when the catalog
+// cache is empty (l.Cat == nil). No-op when the catalog is populated.
+// Used by list (cold-cache fallback emits self-only rows + this hint).
+func (l catalogLoad) PrintColdCacheHint(w io.Writer, binaryName string) {
+	if l.Cat != nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "%s\n", coldCacheHint(binaryName))
+}
+
+// coldCacheHint returns the canonical "cache empty, run refresh" wording
+// shared by list (stderr) and print (error message). Wording lives in
+// one place; callers wrap it in whatever surrounding clause they need.
+func coldCacheHint(binaryName string) string {
+	return fmt.Sprintf("skill catalog cache is empty — run '%s skill refresh' to populate the catalog", binaryName)
 }
 
 // loadOrRefreshCatalog implements the auto-refresh policy from REQ-F-015,

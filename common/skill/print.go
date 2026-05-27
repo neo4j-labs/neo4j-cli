@@ -69,10 +69,7 @@ func runPrint(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, s
 	src, _, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
 	if err != nil {
 		if cat == nil && skillArg != "" && !catalog.IsReserved(skillArg, skillName) && !isAgentName(skillArg) {
-			return clierr.NewUsageError(
-				"unknown skill: %s; skill catalog cache is empty — run 'neo4j-cli skill refresh' once you have network connectivity",
-				skillArg,
-			)
+			return clierr.NewUsageError("unknown skill: %s; %s", skillArg, coldCacheHint(skillName))
 		}
 		return err
 	}

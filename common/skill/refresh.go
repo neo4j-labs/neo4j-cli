@@ -5,7 +5,6 @@ package skill
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -62,10 +61,7 @@ func runRefresh(cmd *cobra.Command, cfg *clicfg.Config, skillName string) error 
 		)
 	}
 
-	if load.Warn != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
-	}
+	load.PrintWarn(cmd.ErrOrStderr())
 
 	row := refreshResultRow{
 		Version:    load.Cat.Version,

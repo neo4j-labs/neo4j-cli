@@ -5,7 +5,6 @@ package skill
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -58,15 +57,11 @@ func runList(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh b
 	if err != nil {
 		return err
 	}
-	if load.Warn != nil && load.Cat != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
-	}
+	load.PrintWarn(cmd.ErrOrStderr())
 
 	rows := BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat)
 
-	if load.Cat == nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill catalog cache is empty; only self-skill rows shown. Run '%s skill refresh' to populate the catalog.\n", skillName)
-	}
+	load.PrintColdCacheHint(cmd.ErrOrStderr(), skillName)
 
 	renderListResult(cmd, cfg, rows)
 	return nil

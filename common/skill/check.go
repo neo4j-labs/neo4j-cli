@@ -5,7 +5,6 @@ package skill
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -59,9 +58,7 @@ func runCheck(cmd *cobra.Command, cfg *clicfg.Config, skillName string, refresh 
 	if err != nil {
 		return err
 	}
-	if load.Warn != nil && load.Cat != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
-	}
+	load.PrintWarn(cmd.ErrOrStderr())
 
 	rows := filterInstalled(BuildInventory(cfg.Aura.Fs(), skillName, cfg.Version, load.Cat))
 	renderCheckResult(cmd, cfg, rows)

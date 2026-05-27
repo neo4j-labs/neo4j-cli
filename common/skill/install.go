@@ -98,9 +98,7 @@ func runInstall(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName,
 		if err != nil {
 			return err
 		}
-		if load.Warn != nil {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: skill catalog refresh failed, using cached content: %v\n", load.Warn)
-		}
+		load.PrintWarn(cmd.ErrOrStderr())
 		cat = load.Cat
 	}
 

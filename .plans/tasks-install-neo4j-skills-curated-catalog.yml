@@ -401,7 +401,7 @@ tasks:
       `LoadResult.PrintWarn(w io.Writer)` + `.PrintColdCacheHint(w, skill)`
       method pair) so each leaf becomes a single helper call. Wording lives
       in one place.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -409,7 +409,7 @@ tasks:
       - "Cold-cache hint composition lives in one place; list.go and print.go both call it"
       - "Existing tests asserting the warn / cold-cache wording still pass (update assertions if needed)"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T18:00:00Z
 
   - id: task-019
     title: "Refactor Catalog struct: separate data from deps; dedupe skill-entry conversion"
