@@ -902,3 +902,85 @@ tasks:
       - "CodeQL go/zipslip alert clears on next push (verify via `gh api .../code-scanning/alerts`)"
       - "make test / make fmt-check / make lint all clean"
     completed_at: 2026-05-27T20:00:00Z
+
+  - id: task-030
+    title: "Use ReplaceAllLiteralString for SKILL.md version injection ($-expansion risk)"
+    description: |
+      CI security-review bot caught this. `common/skill/installer.go:234`
+      uses `versionLineRe.ReplaceAllString(inner, newLine)` where
+      `newLine = "version: " + version`. `regexp.ReplaceAllString`
+      expands `$1`, `$2`, `$0`, `${name}` as backreferences in the
+      replacement string. Since `ValidSkillName` ONLY rejects whitespace,
+      `/`, `\`, NUL, `.`/`..`, leading `.` — it does NOT reject `$` —
+      an upstream `plugin.json` with `"version": "$1"` passes validation
+      and gets expanded into the SKILL.md frontmatter as the previously-
+      captured version value (or other garbage).
+
+      Practical impact: low. The replacement would silently corrupt the
+      `version:` line in the installed SKILL.md (substituting the old
+      version, the whole match, an empty string, etc.), which would
+      then surface as `skill check` drift. Not a security boundary
+      break, but a real frontmatter-injection vector.
+
+      Fix: switch to `regexp.ReplaceAllLiteralString` which treats the
+      replacement as literal bytes. One-line change at the
+      `versionLineRe.ReplaceAllString(...)` call site.
+
+      Test: add a case to the existing injectVersion table covering
+      `version = "$1"` and verify the rewritten SKILL.md contains
+      `version: $1` literally (not the expanded captured group).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "injectVersion uses ReplaceAllLiteralString (not ReplaceAllString)"
+      - "Test asserts that a version of '$1' is written literally to the SKILL.md frontmatter"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-031
+    title: "Simplify inline Zip Slip prefix check to match CodeQL's canonical AST pattern"
+    description: |
+      CodeQL still flags `extract.go:66` as `go/zipslip` despite task-029
+      inlining the prefix check. The current form:
+
+          cleanRoot := filepath.Clean(destRoot)
+          if destPath != cleanRoot && !strings.HasPrefix(destPath, cleanRoot+string(os.PathSeparator)) {
+              return ...
+          }
+
+      doesn't match the canonical AST shape CodeQL's `go/zipslip`
+      query recognizes as a sanitizer. The shape it accepts is:
+
+          if !strings.HasPrefix(destPath, filepath.Clean(destRoot)+string(os.PathSeparator)) {
+              return ...
+          }
+
+      Differences: (a) `filepath.Clean(destRoot)` inlined in the
+      HasPrefix call instead of via a `cleanRoot` variable; (b) no
+      `destPath != cleanRoot` short-circuit.
+
+      The short-circuit isn't load-bearing here — classifyEntry already
+      rejects empty `rel` so `destPath = filepath.Join(destRoot, rel)`
+      with non-empty `rel` is always strictly deeper than `destRoot`.
+
+      Fix: simplify to the canonical form. Drop the cleanRoot variable
+      and the equality short-circuit. Keep the one-line comment
+      explaining the dual purpose. After landing, push and verify
+      CodeQL clears the alert.
+
+      If CodeQL STILL flags after this simplification, fall back to
+      dismissing the alert via the GitHub UI / API with
+      `dismissed_reason: "false positive"` and a comment pointing at
+      `classifyEntry`'s `..` rejection + this prefix check. Try the
+      refactor first.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Extract uses strings.HasPrefix(destPath, filepath.Clean(destRoot)+string(os.PathSeparator)) inline (no cleanRoot variable, no equality short-circuit)"
+      - "classifyEntry's per-segment '..' rejection unchanged"
+      - "Existing extract tests still pass"
+      - "CodeQL go/zipslip alert clears on next push — if not, document the dismissal as a separate follow-up"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
