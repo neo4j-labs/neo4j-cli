@@ -34,7 +34,7 @@ type SkillEntry struct {
 type Catalog struct {
 	Version       string
 	Skills        []SkillEntry
-	Doer          httpDoer
+	Doer          HTTPDoer
 	BinaryVersion string
 	cacheRoot     string
 }
@@ -81,6 +81,25 @@ func Load(filesystem afero.Fs, cacheRoot string) (*Catalog, error) {
 		Skills:    skills,
 		cacheRoot: cacheRoot,
 	}, nil
+}
+
+// SetCacheRoot binds the catalog to a cache root for subsequent
+// Refresh / Lookup calls. Callers that build a Catalog directly (not
+// via Load) need this to point the receiver at the on-disk cache.
+func (c *Catalog) SetCacheRoot(root string) {
+	if c == nil {
+		return
+	}
+	c.cacheRoot = root
+}
+
+// CacheRoot returns the bound cache root for this Catalog. Exposed for
+// tests and callers that need to derive content paths.
+func (c *Catalog) CacheRoot() string {
+	if c == nil {
+		return ""
+	}
+	return c.cacheRoot
 }
 
 // Stale reports whether the cached `plugin.json` is missing or older

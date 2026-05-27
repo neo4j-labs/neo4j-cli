@@ -45,7 +45,7 @@ neo4j-cli skill check --format toon
 
 Install a skill bundle into supported AI agents
 
-Without a positional, installs the embedded self-skill into every detected agent. With a [skill-name] positional, installs that named skill (self-skill or catalog skill). Use --agent <name> (case-insensitive) to scope the install to one agent. Passing an agent name as the positional is a hard error — use --agent <name> instead.
+Without a positional, installs the embedded self-skill into every detected agent. With a [skill-name] positional, installs that named skill (self-skill or a curated catalog skill from github.com/neo4j-contrib/neo4j-skills). Use --all to install the self-skill plus every catalog entry, --agent <name> (case-insensitive) to scope to one agent, and --refresh to force a network fetch of the catalog before installing. Passing an agent name as the positional is a hard error — use --agent <name> instead.
 
 Supported agents: claude-code, cursor, windsurf, copilot, antigravity, gemini-cli, cline, codex, pi, opencode, junie
 
@@ -56,6 +56,8 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--agent` | string | - | Restrict install to a single agent (case-insensitive). See --help for supported agents. |
+| `--all` | bool | false | Install the self-skill plus every curated catalog skill. |
+| `--refresh` | bool | false | Force a network refresh of the catalog before installing. |
 
 Examples:
 
@@ -63,7 +65,16 @@ Examples:
 # Install the embedded self-skill into every detected agent
 neo4j-cli skill install --rw
 
-# Install the embedded self-skill into a single agent
+# Install a curated catalog skill into every detected agent
+neo4j-cli skill install neo4j-cypher-skill --rw
+
+# Install the self-skill plus every catalog skill into every detected agent
+neo4j-cli skill install --all --rw
+
+# Force a catalog refresh before installing
+neo4j-cli skill install neo4j-cypher-skill --refresh --rw
+
+# Install the self-skill into a single agent
 neo4j-cli skill install --agent claude-code --rw
 
 # Install and emit the result as JSON (machine-readable)

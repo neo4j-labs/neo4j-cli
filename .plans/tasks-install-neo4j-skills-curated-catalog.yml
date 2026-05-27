@@ -136,7 +136,7 @@ tasks:
       pointer to `neo4j-cli skill refresh`; with cache, log to stderr and
       proceed using cached content (read commands), but install of a
       catalog-only skill requires a usable cache.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-006
@@ -146,7 +146,7 @@ tasks:
       - "skill install --refresh forces plugin.json fetch + tarball check before installing"
       - "Cold cache + network failure on a catalog install exits non-zero with a refresh hint"
       - "Stale cache (>24 h) triggers auto-refresh on install when network is available"
-    completed_at: null
+    completed_at: 2026-05-27T13:21:08Z
 
   - id: task-008
     title: "Wire remove leaf (--all, --agent, self-skill protection, alias hint)"

@@ -23,10 +23,11 @@ const TarballURL = "https://codeload.github.com/neo4j-contrib/neo4j-skills/tar.g
 // equals this constant.
 const SelfCanonicalName = "self"
 
-// httpDoer is the subset of net/http.Client used by Refresh. The default
+// HTTPDoer is the subset of net/http.Client used by Refresh. The default
 // is http.DefaultClient; tests inject an httptest server via the Doer
-// field on Catalog.
-type httpDoer interface {
+// field on Catalog. Exported so external callers can construct test
+// doubles without reaching into the package.
+type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 

@@ -192,7 +192,7 @@ func userAgentFor(version string) string {
 // fetch performs a context-bound HTTP GET against url with the
 // `User-Agent` header set and returns the response body on success
 // (status 2xx). Non-2xx responses error and close the body.
-func fetch(ctx context.Context, doer httpDoer, userAgent, url string) (io.ReadCloser, error) {
+func fetch(ctx context.Context, doer HTTPDoer, userAgent, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

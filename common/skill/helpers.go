@@ -5,6 +5,7 @@ package skill
 
 import (
 	"errors"
+	"io/fs"
 	"strings"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -61,4 +62,27 @@ func didYouMeanAgentErr(name string) error {
 // this with a refresh hint; for now it's a plain usage error.
 func unknownSkillErr(name string) error {
 	return clierr.NewUsageError("unknown skill: %s", name)
+}
+
+// resolveSkillSource maps a positional skill-name to the Source the
+// installer/printer should copy when no catalog is in play. Empty arg
+// defaults to the embedded self-skill; the self-skill resolver handles
+// the canonical / binary-alias names; anything else is either a
+// did-you-mean-agent hard-break (REQ-F-012) or an unknown-skill error.
+// Catalog-aware callers use resolveCatalogSkillSource instead.
+func resolveSkillSource(bundle fs.FS, version, binaryName, skillArg string) (Source, error) {
+	if skillArg == "" {
+		return Source{FS: bundle, Version: version}, nil
+	}
+	src, err := ResolveSelf(bundle, version, binaryName, skillArg)
+	if err == nil {
+		return src, nil
+	}
+	if !errors.Is(err, ErrNotSelfSkill) {
+		return Source{}, err
+	}
+	if isAgentName(skillArg) {
+		return Source{}, didYouMeanAgentErr(skillArg)
+	}
+	return Source{}, unknownSkillErr(skillArg)
 }
