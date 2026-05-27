@@ -6,6 +6,7 @@
 - [neo4j-cli skill install](#neo4j-cli-skill-install)
 - [neo4j-cli skill list](#neo4j-cli-skill-list)
 - [neo4j-cli skill print](#neo4j-cli-skill-print)
+- [neo4j-cli skill refresh](#neo4j-cli-skill-refresh)
 - [neo4j-cli skill remove](#neo4j-cli-skill-remove)
 
 Install agent skills for this CLI into supported AI agents
@@ -142,6 +143,24 @@ neo4j-cli skill print neo4j-cypher-skill
 
 # Save the embedded SKILL.md to a file for review
 neo4j-cli skill print > skill-preview.md
+```
+
+## neo4j-cli skill refresh
+
+Force a fresh download of the curated skill catalog
+
+Forces a network fetch of the curated catalog `plugin.json` from github.com/neo4j-contrib/neo4j-skills. When the upstream version differs from the cached one, the repo tarball is re-downloaded and extracted into the local cache. On network failure with a usable cache the previous content is preserved and a warning is emitted to stderr; on network failure with no cache the command exits non-zero with a connectivity hint.
+
+Usage: `neo4j-cli skill refresh`
+
+Examples:
+
+```
+# Force a catalog refresh
+neo4j-cli skill refresh --rw
+
+# Emit the result as JSON (machine-readable)
+neo4j-cli skill refresh --format json --rw
 ```
 
 ## neo4j-cli skill remove

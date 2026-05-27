@@ -241,7 +241,7 @@ tasks:
       `plugin.json` and re-extracts the tarball when `version` differs. Reuses
       the same `catalog.Refresh` plumbing, follows the one-file-per-leaf cobra
       layout, and registers with the parent via `cmd.AddCommand` in `skill.go`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -249,7 +249,7 @@ tasks:
       - "Refresh writes plugin.json + fetched-at; tarball re-extraction triggered only when version changes"
       - "refresh_test.go covers happy path, no-op when version unchanged, and network failure with cache (warn) vs without cache (error)"
       - "Mirrors install/remove/list/check layout (private newRefreshCmd constructor, parent AddCommand wiring)"
-    completed_at: null
+    completed_at: 2026-05-27T16:00:00Z
 
   - id: task-013
     title: "Regenerate skill bundle (additions.md, description.txt, go generate)"
