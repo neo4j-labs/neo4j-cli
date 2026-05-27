@@ -466,7 +466,7 @@ tasks:
         / resolveTargets) + `bundle_copy.go` (Source, regexes,
         copyBundleWithVersion, injectVersion, parseVersion). Skip if the
         split feels forced.
-    status: pending
+    status: completed
     dependencies:
       - task-017
     source: review
@@ -476,4 +476,4 @@ tasks:
       - "remove.go cold-cache branch no longer calls renderInstallRows with a nil slice"
       - "catalog_helpers.go is renamed to catalog_load.go (or whichever name maps to its contents)"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T18:30:00Z

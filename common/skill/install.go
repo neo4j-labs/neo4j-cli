@@ -61,8 +61,8 @@ neo4j-cli skill install --format json --rw`,
 				skillArg = args[0]
 			}
 
-			if installAll && skillArg != "" {
-				return fmt.Errorf("--all cannot be combined with a [skill-name] positional")
+			if err := mustNotCombineAllAndPositional(installAll, skillArg); err != nil {
+				return err
 			}
 
 			return runInstall(cmd, cfg, bundle, skillName, skillArg, agentFilter, installAll, refresh)
@@ -136,7 +136,11 @@ func runInstallAll(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillNa
 	var allRows []installResultRow
 	var failures []string
 
-	selfTargets, err := Install(cfg.Aura.Fs(), Source{FS: bundle, Version: cfg.Version}, skillName, agentFilter)
+	selfSrc, _, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, "")
+	if rerr != nil {
+		return rerr
+	}
+	selfTargets, err := Install(cfg.Aura.Fs(), selfSrc, skillName, agentFilter)
 	if err != nil {
 		return formatAgentErr(err)
 	}
@@ -146,12 +150,12 @@ func runInstallAll(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillNa
 		if catalog.IsReserved(entry.Name, skillName) {
 			continue
 		}
-		_, sub, lerr := cat.Lookup(cfg.Aura.Fs(), entry.Name, skillName)
+		src, _, lerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, entry.Name)
 		if lerr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", entry.Name, lerr))
 			continue
 		}
-		targets, ierr := Install(cfg.Aura.Fs(), Source{FS: sub, Version: cat.Version}, entry.Name, agentFilter)
+		targets, ierr := Install(cfg.Aura.Fs(), src, entry.Name, agentFilter)
 		if ierr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", entry.Name, formatAgentErr(ierr)))
 			continue

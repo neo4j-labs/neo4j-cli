@@ -56,8 +56,8 @@ neo4j-cli skill remove self --format json --rw`,
 				skillArg = args[0]
 			}
 
-			if removeAll && skillArg != "" {
-				return fmt.Errorf("--all cannot be combined with a [skill-name] positional")
+			if err := mustNotCombineAllAndPositional(removeAll, skillArg); err != nil {
+				return err
 			}
 			if !removeAll && skillArg == "" {
 				return fmt.Errorf("requires a [skill-name] positional or --all")
@@ -129,7 +129,6 @@ func runRemoveAll(cmd *cobra.Command, cfg *clicfg.Config, skillName, agentFilter
 	cat := catalog.New(catalog.Options{CacheRoot: cacheRoot, BinaryVersion: cfg.Version})
 	if lerr := cat.Load(cfg.Aura.Fs()); lerr != nil {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill catalog cache is empty; nothing to remove\n")
-		renderInstallRows(cmd, cfg, nil, "removed")
 		return nil
 	}
 

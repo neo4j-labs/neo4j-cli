@@ -66,6 +66,16 @@ func unknownSkillErr(name string) error {
 	return clierr.NewUsageError("unknown skill: %s", name)
 }
 
+// mustNotCombineAllAndPositional rejects the simultaneous use of `--all`
+// and a `[skill-name]` positional, shared by install + remove so the
+// wording stays in one place.
+func mustNotCombineAllAndPositional(allFlag bool, skillArg string) error {
+	if allFlag && skillArg != "" {
+		return clierr.NewUsageError("--all cannot be combined with a [skill-name] positional")
+	}
+	return nil
+}
+
 // readInstalledSkill reads the per-agent install state for `skillName`
 // from `filesystem`. Returns whether SKILL.md exists and the parsed
 // frontmatter `version:` (empty string when missing or unparseable).
