@@ -108,7 +108,7 @@ func runInstall(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName,
 		return runInstallAll(cmd, cfg, bundle, skillName, agentFilter, cat)
 	}
 
-	src, entry, err := resolveCatalogSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
+	src, entry, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
 	if err != nil {
 		return err
 	}

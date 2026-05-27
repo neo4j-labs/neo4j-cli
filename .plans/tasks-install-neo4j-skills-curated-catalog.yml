@@ -374,7 +374,7 @@ tasks:
       over `cat.Skills`) with a call to the same resolver (or to
       `cat.Lookup`, discarding the FS). Three places that load+inspect the
       catalog by name should be one.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -382,7 +382,7 @@ tasks:
       - "catalogSkillKnown is gone; remove.go uses the same resolver / cat.Lookup"
       - "All print/install/remove tests pass against the single resolver"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-27T17:45:00Z
 
   - id: task-018
     title: "Centralize catalog-load warn + cold-cache hint emission"

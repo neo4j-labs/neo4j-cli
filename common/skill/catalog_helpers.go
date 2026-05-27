@@ -113,15 +113,21 @@ func loadOrRefreshCatalog(ctx context.Context, cfg *clicfg.Config, opts catalogO
 	return catalogLoad{Cat: cat}, nil
 }
 
-// resolveCatalogSkillSource maps a positional skill-name to its Source.
+// resolveSkillSource maps a positional skill-name to its Source.
 // Consults the self-skill resolver first (REQ-F-021 alias map), then
-// falls back to catalog.Lookup. Returns a did-you-mean-agent usage error
-// when the name matches an agent (REQ-F-012) and an unknown-skill error
-// otherwise.
+// falls back to catalog.Lookup when `cat` is non-nil. Returns a
+// did-you-mean-agent usage error when the name matches an agent
+// (REQ-F-012) and an unknown-skill error otherwise.
 //
-// Caller is responsible for providing a non-nil catalog when the skill
-// name is expected to resolve to a catalog entry.
-func resolveCatalogSkillSource(bundle fs.FS, version string, cat *catalog.Catalog, filesystem afero.Fs, binaryName, skillArg string) (Source, *catalog.SkillEntry, error) {
+// A nil `cat` means the caller has not loaded the catalog (print's
+// offline-only mode, or a cold-cache remove). Catalog-name positionals
+// then fall straight to the unknown-skill branch — the caller decides
+// whether to dress that error with a refresh hint.
+//
+// Single resolver shared by install / print / remove so all three honour
+// the same self-alias map, agent-collision hard-break, and unknown-skill
+// shape.
+func resolveSkillSource(bundle fs.FS, version string, cat *catalog.Catalog, filesystem afero.Fs, binaryName, skillArg string) (Source, *catalog.SkillEntry, error) {
 	if skillArg == "" {
 		return Source{FS: bundle, Version: version}, nil, nil
 	}

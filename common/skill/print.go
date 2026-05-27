@@ -57,11 +57,26 @@ neo4j-cli skill print > skill-preview.md`,
 // reads from the embedded bundle; catalog skill names read from the on-
 // disk cache via catalog.Load — print never hits the network (REQ-NF-008).
 func runPrint(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, skillArg string) error {
-	src, err := resolvePrintSource(cfg, bundle, skillName, skillArg)
+	cacheRoot, cerr := catalogCacheRootFn()
+	if cerr != nil {
+		return fmt.Errorf("skill: resolve cache root: %w", cerr)
+	}
+	cat, lerr := catalog.Load(cfg.Aura.Fs(), cacheRoot)
+	if lerr != nil {
+		cat = nil
+	}
+
+	src, _, err := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
 	if err != nil {
+		if cat == nil && skillArg != "" && !catalog.IsReserved(skillArg, skillName) && !isAgentName(skillArg) {
+			return clierr.NewUsageError(
+				"unknown skill: %s; skill catalog cache is empty — run 'neo4j-cli skill refresh' once you have network connectivity",
+				skillArg,
+			)
+		}
 		return err
 	}
-	data, rerr := fs.ReadFile(src, "SKILL.md")
+	data, rerr := fs.ReadFile(src.FS, "SKILL.md")
 	if rerr != nil {
 		if errors.Is(rerr, fs.ErrNotExist) {
 			return errors.New("skill: SKILL.md not found in bundle")
@@ -70,46 +85,4 @@ func runPrint(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, s
 	}
 	cmd.Print(string(data))
 	return nil
-}
-
-// resolvePrintSource maps the positional skill-name to an fs.FS rooted at
-// the SKILL.md to print. Empty / self / binary-alias → embedded bundle.
-// Otherwise consults the cached catalog (no network). Cold cache yields a
-// usage error pointing at `skill refresh`; agent-name collisions yield the
-// shared did-you-mean-agent hard-break.
-func resolvePrintSource(cfg *clicfg.Config, bundle fs.FS, skillName, skillArg string) (fs.FS, error) {
-	if skillArg == "" {
-		return bundle, nil
-	}
-
-	src, err := ResolveSelf(bundle, cfg.Version, skillName, skillArg)
-	if err == nil {
-		return src.FS, nil
-	}
-	if !errors.Is(err, ErrNotSelfSkill) {
-		return nil, err
-	}
-
-	cacheRoot, cerr := catalogCacheRootFn()
-	if cerr != nil {
-		return nil, fmt.Errorf("skill: resolve cache root: %w", cerr)
-	}
-	cat, lerr := catalog.Load(cfg.Aura.Fs(), cacheRoot)
-	if lerr == nil {
-		_, sub, lookupErr := cat.Lookup(cfg.Aura.Fs(), skillArg, skillName)
-		if lookupErr == nil {
-			return sub, nil
-		}
-	}
-
-	if isAgentName(skillArg) {
-		return nil, didYouMeanAgentErr(skillArg)
-	}
-	if lerr != nil {
-		return nil, clierr.NewUsageError(
-			"unknown skill: %s; skill catalog cache is empty — run 'neo4j-cli skill refresh' once you have network connectivity",
-			skillArg,
-		)
-	}
-	return nil, unknownSkillErr(skillArg)
 }

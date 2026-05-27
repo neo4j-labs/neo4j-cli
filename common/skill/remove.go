@@ -5,6 +5,7 @@ package skill
 
 import (
 	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,7 +14,7 @@ import (
 	"github.com/neo4j/cli/common/skill/catalog"
 )
 
-func newRemoveCmd(cfg *clicfg.Config, skillName string) *cobra.Command {
+func newRemoveCmd(cfg *clicfg.Config, bundle fs.FS, skillName string) *cobra.Command {
 	var (
 		agentFilter string
 		removeAll   bool
@@ -62,7 +63,7 @@ neo4j-cli skill remove self --format json --rw`,
 				return fmt.Errorf("requires a [skill-name] positional or --all")
 			}
 
-			return runRemove(cmd, cfg, skillName, skillArg, agentFilter, removeAll)
+			return runRemove(cmd, cfg, bundle, skillName, skillArg, agentFilter, removeAll)
 		},
 	}
 	cmd.Flags().StringVar(&agentFilter, "agent", "", "Restrict remove to a single agent (case-insensitive). See --help for supported agents.")
@@ -75,34 +76,38 @@ neo4j-cli skill remove self --format json --rw`,
 // requires no catalog access for the self-skill; catalog skill names are
 // validated against the cached plugin.json so an unknown name hard-fails
 // instead of silently no-op'ing.
-func runRemove(cmd *cobra.Command, cfg *clicfg.Config, skillName, skillArg, agentFilter string, removeAll bool) error {
+func runRemove(cmd *cobra.Command, cfg *clicfg.Config, bundle fs.FS, skillName, skillArg, agentFilter string, removeAll bool) error {
 	if removeAll {
 		return runRemoveAll(cmd, cfg, skillName, agentFilter)
 	}
 
-	if catalog.IsReserved(skillArg, skillName) {
-		targets, err := Remove(cfg.Aura.Fs(), skillName, agentFilter)
-		if err != nil {
-			return formatAgentErr(err)
-		}
-		renderInstallResult(cmd, cfg, skillName, "removed", targets)
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Run '%s skill install' to reinstall.\n", skillName)
-		return nil
-	}
-
-	if isAgentName(skillArg) {
-		return didYouMeanAgentErr(skillArg)
-	}
-
-	if !catalogSkillKnown(cfg, skillArg) {
-		return unknownSkillErr(skillArg)
-	}
-
-	targets, err := Remove(cfg.Aura.Fs(), skillArg, agentFilter)
+	cacheRoot, err := catalogCacheRootFn()
 	if err != nil {
-		return formatAgentErr(err)
+		return fmt.Errorf("skill: resolve cache root: %w", err)
 	}
-	renderInstallResult(cmd, cfg, skillArg, "removed", targets)
+	cat, lerr := catalog.Load(cfg.Aura.Fs(), cacheRoot)
+	if lerr != nil {
+		cat = nil
+	}
+
+	_, entry, rerr := resolveSkillSource(bundle, cfg.Version, cat, cfg.Aura.Fs(), skillName, skillArg)
+	if rerr != nil {
+		return rerr
+	}
+
+	target := skillName
+	if entry != nil {
+		target = entry.Name
+	}
+
+	targets, ierr := Remove(cfg.Aura.Fs(), target, agentFilter)
+	if ierr != nil {
+		return formatAgentErr(ierr)
+	}
+	renderInstallResult(cmd, cfg, target, "removed", targets)
+	if entry == nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Run '%s skill install' to reinstall.\n", skillName)
+	}
 	return nil
 }
 
@@ -149,27 +154,4 @@ func runRemoveAll(cmd *cobra.Command, cfg *clicfg.Config, skillName, agentFilter
 		return fmt.Errorf("skill: %d skill(s) failed to remove:\n  - %s", len(failures), strings.Join(failures, "\n  - "))
 	}
 	return nil
-}
-
-// catalogSkillKnown returns true when the cached catalog lists `name` as
-// a skill. Used by single-skill remove to distinguish a known-but-not-
-// installed catalog skill (idempotent zero-exit) from an unknown name
-// (hard error). Cold cache → false: the remove path will surface
-// unknown-skill, which is correct because the catalog is the only way
-// to validate a non-self skill name.
-func catalogSkillKnown(cfg *clicfg.Config, name string) bool {
-	cacheRoot, err := catalogCacheRootFn()
-	if err != nil {
-		return false
-	}
-	cat, err := catalog.Load(cfg.Aura.Fs(), cacheRoot)
-	if err != nil || cat == nil {
-		return false
-	}
-	for _, e := range cat.Skills {
-		if e.Name == name {
-			return true
-		}
-	}
-	return false
 }
