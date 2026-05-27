@@ -745,7 +745,7 @@ tasks:
       `TestAllLeafCommands_HaveExamples` should be tightened to actually
       enforce the ≥3 rule (so this drift is caught locally next time, not
       by CI bot).
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -753,7 +753,7 @@ tasks:
       - "Skill bundle regenerated to reflect the new Example"
       - "TestAllLeafCommands_HaveExamples passes; if it was lenient and missed this, tighten it to enforce ≥3"
       - "make test / make fmt-check / make lint / make generate-check all clean"
-    completed_at: null
+    completed_at: 2026-05-27T18:15:00Z
 
   - id: task-027
     title: "Add canonical Zip Slip prefix check in extract.go to silence CodeQL (defense in depth)"

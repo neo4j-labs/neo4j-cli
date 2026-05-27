@@ -161,6 +161,9 @@ neo4j-cli skill refresh --rw
 
 # Emit the result as JSON (machine-readable)
 neo4j-cli skill refresh --format json --rw
+
+# Refresh and view result in toon format
+neo4j-cli skill refresh --format toon --rw
 ```
 
 ## neo4j-cli skill remove
