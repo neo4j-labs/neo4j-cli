@@ -26,10 +26,17 @@ type SkillEntry struct {
 // Catalog is the in-memory view of the cached marketplace metadata. It
 // carries the cacheRoot so callers can resolve per-skill content paths
 // via Lookup without re-deriving the cache location.
+//
+// Doer + BinaryVersion are the network-side knobs read by Refresh: a nil
+// Doer falls back to http.DefaultClient, an empty BinaryVersion renders
+// the User-Agent as `neo4j-cli/dev`. Tests inject an httptest server
+// via Doer; production callers leave both fields zero.
 type Catalog struct {
-	Version   string
-	Skills    []SkillEntry
-	cacheRoot string
+	Version       string
+	Skills        []SkillEntry
+	Doer          httpDoer
+	BinaryVersion string
+	cacheRoot     string
 }
 
 // pluginJSON mirrors the upstream marketplace metadata shape. Only the

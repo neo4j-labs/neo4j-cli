@@ -53,7 +53,7 @@ tasks:
       the per-skill `fs.FS` rooted at `content/<version>/<name>/`; reject any
       upstream skill named `self` or matching the binary name (fail-closed
       collision guard).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -63,7 +63,7 @@ tasks:
       - "Lookup returns fs.FS reading SKILL.md + references/* for the requested catalog skill"
       - "Lookup rejects an upstream entry named 'self' with a clear error; same for an entry matching the binary name"
       - "Refresh uses net/http.DefaultClient by default but accepts an httpDoer interface for tests"
-    completed_at: null
+    completed_at: 2026-05-27T12:59:07Z
 
   - id: task-004
     title: "Refactor common/skill installer to take Source{FS, Version} + inject version frontmatter"

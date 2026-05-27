@@ -10,3 +10,8 @@ Decisions: cap is total-decompressed across all entries (not per-file); NUL-in-n
 ## TASK-004 — 2026-05-27T12:50:10Z
 Introduce Source{FS, Version} in common/skill; Install now takes (fs, src, name, agentFilter). injectVersion rewrites or inserts the frontmatter version: line; placeholder substitution retired. update.go + skillrefresh.go wrap commonskill.Install to preserve their (bundle, version) seam shape.
 Files: ~common/skill/installer.go, ~common/skill/installer_test.go, ~common/skill/install.go, ~neo4j-cli/internal/skill/install_e2e_test.go, ~neo4j-cli/internal/skillrefresh/skillrefresh.go, ~neo4j-cli/internal/subcommands/update/update.go
+
+## TASK-003 — 2026-05-27T12:59:07Z
+Catalog.Refresh (ctx, fs) + Lookup (fs, name, binaryName) with httpDoer seam on Catalog (Doer + BinaryVersion fields). Tarball fetch+extract happens BEFORE plugin.json write so mid-refresh failures leave prior cache intact. SelfCanonicalName + ReservedNames/IsReserved exported for task-005 alias map. httptest routing via per-test Doer; PluginJSONURL/TarballURL stay frozen const.
+Files: +common/skill/catalog/refresh.go, +common/skill/catalog/refresh_test.go, ~common/skill/catalog/source.go, ~common/skill/catalog/catalog.go, ~common/skill/catalog/cache.go
+Decisions: write plugin.json AFTER tarball extract so cache stays consistent on partial failure

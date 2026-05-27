@@ -39,3 +39,10 @@ func pluginJSONPath(cacheRoot string) string {
 func fetchedAtPath(cacheRoot string) string {
 	return filepath.Join(cacheRoot, "fetched-at")
 }
+
+// contentPath returns the absolute on-disk path of the extracted content
+// root for a given catalog version. Per-skill files live one directory
+// deeper at `<contentPath>/<skillName>/`.
+func contentPath(cacheRoot, version string) string {
+	return filepath.Join(cacheRoot, "content", version)
+}
