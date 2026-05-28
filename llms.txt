@@ -20,7 +20,7 @@ npm install -g @neo4j-labs/cli
 
 - `neo4j-cli credential aura-client add` — store Aura Console API credentials (client ID + secret)
 - `neo4j-cli credential dbms add` — store Neo4j Bolt connection profiles for reuse via `--credential`
-- `neo4j-cli credential embed add` — store embedding-provider credentials (openai, ollama, huggingface)
+- `neo4j-cli credential embed add` — store embedding-provider credentials (openai, ollama, huggingface, gemini, vertex)
 - `neo4j-cli aura organization list` / `aura project list --organization-id <org-id>` — discover the org/project IDs that scope every other Aura command
 - `neo4j-cli aura workspace use <org-id>/<project-id> --rw` — pin a default org+project pair so `--organization-id` / `--project-id` can be omitted
 - `neo4j-cli aura instance list` — list Aura instances (table or JSON; needs an explicit `--organization-id` + `--project-id` unless a workspace is pinned)
@@ -38,11 +38,12 @@ npm install -g @neo4j-labs/cli
 - `neo4j-cli query :embed [text]` — compute an embedding vector standalone (no Bolt connection)
 - `neo4j-cli query --param NAME:embed=<text>` — bind an inline-embedded vector parameter
 - `neo4j-cli query 'CREATE ...' --rw` — write operations require `--rw`
-- `neo4j-cli skill install` — install the agent skill bundle into your AI assistant
-- `neo4j-cli skill list` — list supported agents and per-agent install state
+- `neo4j-cli skill install` — install the embedded self-skill into your AI assistant; pass a positional skill name to install a curated catalog skill from neo4j-contrib/neo4j-skills, `--agent <name>` to scope to one agent (positional agent name is a hard error), `--all` for self + every catalog skill, `--refresh` to re-download the catalog first
+- `neo4j-cli skill list` — list skills × agents and per-agent install state
 - `neo4j-cli skill check` — verify installed bundles for version drift
-- `neo4j-cli skill print` — preview the embedded SKILL.md before installing
-- `neo4j-cli skill remove` — remove an installed bundle (idempotent)
+- `neo4j-cli skill print` — preview a skill's SKILL.md before installing
+- `neo4j-cli skill remove` — remove a skill by name (`--agent <name>` to scope, `--all` for every catalog skill; self-skill preserved; idempotent)
+- `neo4j-cli skill refresh` — force a fresh download of the curated skill catalog
 - `neo4j-cli agent-context` — emit the full CLI command tree as a stable JSON envelope (commands, flags, exit codes, output formats) for AI-agent discovery; `--format` toon/table/json supported
 - `neo4j-cli update` — self-update the binary to the latest GitHub release (`update check` subcommand to report availability without downloading, `--pre-releases` for alpha/beta/rc, `--version <tag>` to pin)
 

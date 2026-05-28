@@ -1529,10 +1529,10 @@
 
 <span class="ok">✓</span> claude-code     v1.3.0  up to date
 <span class="ok">✓</span> cursor          v1.3.0  up to date
-<span class="info">!</span> windsurf        v1.2.0  <span class="flag">outdated</span> — run: neo4j-cli skill install windsurf --rw
+<span class="info">!</span> windsurf        v1.2.0  <span class="flag">outdated</span> — run: neo4j-cli skill install --agent windsurf --rw
 
 <span class="comment"># update the outdated one</span>
-<span class="prompt">$</span> neo4j-cli skill install windsurf <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>
 
 <span class="ok">✓</span> windsurf        updated to v1.3.0
 
@@ -1679,7 +1679,7 @@
           <span class="desc">Credentials</span>
         </div>
         <div class="ref-body">
-          <p>Three credential types share <code>add / list / use / remove</code>. All are stored in <code>credentials.json</code> under your OS config directory.</p>
+          <p>Three credential types share <code>add / list / use / remove</code>. New installs store secrets in the OS keyring by default (macOS Keychain, Windows Credential Store, Linux Secret Service). Switch storage with <code>neo4j-cli config set credential-storage keyring|insecure --rw</code>; <code>insecure</code> writes plaintext <code>credentials.json</code> under your OS config directory.</p>
           <p class="ref-sub"><span class="keyword">aura-client</span> — Aura Console API (client ID + secret). Required for any <code>aura …</code> command.</p>
           <pre><span class="prompt">$</span> neo4j-cli credential aura-client add <span class="flag">--name</span> prod <span class="flag">--client-id</span> &lt;id&gt; <span class="flag">--client-secret</span> &lt;secret&gt; <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli credential aura-client use prod</pre>
@@ -1687,7 +1687,7 @@
           <pre><span class="prompt">$</span> neo4j-cli credential dbms add <span class="flag">--name</span> prod <span class="flag">--uri</span> neo4j+s://… <span class="flag">--username</span> neo4j <span class="flag">--password</span> &lt;pw&gt; <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli credential dbms set-embed prod openai-shared   <span class="comment"># link an embed credential</span>
 <span class="prompt">$</span> neo4j-cli credential dbms use prod</pre>
-          <p class="ref-sub"><span class="keyword">embed</span> — Embedding providers (<code>openai</code> / <code>ollama</code> / <code>huggingface</code>). Consumed by <code>--param NAME:embed=…</code> and <code>query :embed</code>.</p>
+          <p class="ref-sub"><span class="keyword">embed</span> — Embedding providers (<code>openai</code> / <code>ollama</code> / <code>huggingface</code> / <code>gemini</code> / <code>vertex</code>). Consumed by <code>--param NAME:embed=…</code> and <code>query :embed</code>.</p>
           <pre><span class="prompt">$</span> neo4j-cli credential embed add <span class="flag">--name</span> openai-shared <span class="flag">--provider</span> openai <span class="flag">--model</span> text-embedding-3-small <span class="flag">--api-key</span> &lt;key&gt; <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli credential embed use openai-shared</pre>
         </div>
@@ -1713,7 +1713,7 @@
 <span class="keyword">NEO4J_DATABASE</span>=neo4j
 <span class="keyword">NEO4J_DEBUG</span>=1          <span class="comment"># enable driver diagnostics on stderr (same as --debug)</span></pre>
           <p class="ref-sub"><span class="keyword">Embedding env vars</span>:</p>
-          <pre><span class="keyword">NEO4J_EMBED_PROVIDER</span>=openai          <span class="comment"># openai | ollama | huggingface</span>
+          <pre><span class="keyword">NEO4J_EMBED_PROVIDER</span>=openai          <span class="comment"># openai | ollama | huggingface | gemini | vertex</span>
 <span class="keyword">NEO4J_EMBED_MODEL</span>=text-embedding-3-small
 <span class="keyword">NEO4J_EMBED_API_KEY</span>=sk-…             <span class="comment"># also reads OPENAI_API_KEY / HF_TOKEN</span>
 <span class="keyword">NEO4J_EMBED_BASE_URL</span>=https://…       <span class="comment"># custom endpoint (Ollama, HF dedicated)</span></pre>
@@ -1764,7 +1764,7 @@
   <span class="string">"CALL db.index.vector.queryNodes('idx', \$k, \$q) YIELD node, score RETURN node.title, score"</span>
 
 <span class="prompt">$</span> neo4j-cli query :embed <span class="string">"hello world"</span> <span class="flag">--format</span> json   <span class="comment"># standalone, no DB needed</span></pre>
-          <p>Providers and defaults: <span class="keyword">openai</span> (<code>api.openai.com/v1</code>) · <span class="keyword">ollama</span> (<code>localhost:11434</code>, no key) · <span class="keyword">huggingface</span> (serverless; set <code>--embed-base-url</code> for dedicated endpoint).</p>
+          <p>Providers and defaults: <span class="keyword">openai</span> (<code>api.openai.com/v1</code>) · <span class="keyword">ollama</span> (<code>localhost:11434</code>, no key) · <span class="keyword">huggingface</span> (serverless; set <code>--embed-base-url</code> for dedicated endpoint) · <span class="keyword">gemini</span> (<code>GEMINI_API_KEY</code> / <code>GOOGLE_API_KEY</code>) · <span class="keyword">vertex</span> (Application Default Credentials; needs <code>--vertex-project</code> + <code>--vertex-location</code>).</p>
           <p>Settings resolution (highest first): flag (<code>--embed-provider</code>, <code>--embed-model</code>, …) → env (<code>NEO4J_EMBED_PROVIDER</code>, <code>NEO4J_EMBED_MODEL</code>, …) → <code>.env</code> → stored embed credential → provider defaults.</p>
           <p>API-key priority: <code>OPENAI_API_KEY</code> / <code>HF_TOKEN</code> → <code>NEO4J_EMBED_API_KEY</code> → <code>.env</code> → stored credential. One <code>--credential dbms</code> can drive both connection and embedding when the dbms profile carries an embed link.</p>
         </div>
@@ -1899,9 +1899,9 @@
           <span class="desc">Output formats &amp; stdio</span>
         </div>
         <div class="ref-body">
-          <p class="ref-sub"><span class="keyword">--format</span> — explicit format override. Accepted values: <code>auto</code> (default), <code>table</code>, <code>json</code>, <code>plain</code>.</p>
-          <pre><span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (n) RETURN n LIMIT 5'</span>             <span class="comment"># auto: table on TTY, plain when piped</span>
-<span class="prompt">$</span> neo4j-cli query … <span class="flag">--format</span> json                         <span class="comment"># {columns, rows, truncated}</span>
+          <p class="ref-sub"><span class="keyword">--format</span> — explicit format override. Accepted values: <code>default</code>, <code>json</code>, <code>table</code>, <code>toon</code> (compact, agent-friendly).</p>
+          <pre><span class="prompt">$</span> neo4j-cli query <span class="string">'MATCH (n) RETURN n LIMIT 5'</span>             <span class="comment"># default: table on TTY, JSON when piped</span>
+<span class="prompt">$</span> neo4j-cli query … <span class="flag">--format</span> json                         <span class="comment"># {columns, rows, truncated, arrays_truncated}</span>
 <span class="prompt">$</span> neo4j-cli query … <span class="flag">--format</span> table                        <span class="comment"># force table even when piped</span>
 <span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> table               <span class="comment"># management commands support table too</span>
 <span class="prompt">$</span> neo4j-cli aura instance list <span class="flag">--format</span> json</pre>
@@ -1930,12 +1930,16 @@
         </div>
         <div class="ref-body">
           <p>Installs the embedded skill bundle (SKILL.md + per-subcommand references) into each detected agent's skill directory so agents know the full CLI API without guessing.</p>
-          <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>             <span class="comment"># all detected agents</span>
-<span class="prompt">$</span> neo4j-cli skill install claude-code <span class="flag">--rw</span>  <span class="comment"># target one agent</span>
-<span class="prompt">$</span> neo4j-cli skill list                      <span class="comment"># per-agent install state</span>
-<span class="prompt">$</span> neo4j-cli skill check                     <span class="comment"># version drift vs running binary</span>
-<span class="prompt">$</span> neo4j-cli skill remove [agent]            <span class="comment"># idempotent</span></pre>
+          <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>                       <span class="comment"># self-skill into all detected agents</span>
+<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--agent</span> claude-code <span class="flag">--rw</span>    <span class="comment"># scope to one agent (positional agent is an error)</span>
+<span class="prompt">$</span> neo4j-cli skill install neo4j-cypher-skill <span class="flag">--rw</span>     <span class="comment"># a curated catalog skill by name</span>
+<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span>                 <span class="comment"># self-skill + every catalog skill</span>
+<span class="prompt">$</span> neo4j-cli skill refresh <span class="flag">--rw</span>                       <span class="comment"># force a catalog re-download</span>
+<span class="prompt">$</span> neo4j-cli skill list                              <span class="comment"># skills × agents install state</span>
+<span class="prompt">$</span> neo4j-cli skill check                             <span class="comment"># version drift vs running binary</span>
+<span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># idempotent; positional is a skill name</span></pre>
           <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.</p>
+          <p>Catalog skills come from <a href="https://github.com/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener">neo4j-contrib/neo4j-skills</a>; pass <code>--refresh</code> on <code>install</code>/<code>list</code>/<code>check</code> to fetch the latest catalog before running.</p>
           <p>Installed skill bundles are refreshed automatically in the background whenever the binary version changes (after <code>neo4j-cli update</code>, a Homebrew/npm/pipx upgrade, or any other in-place swap). Opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>. The bundle covers Aura, Bolt queries, schema introspection, embeddings, credentials, and the write gate — everything agents need to drive the CLI correctly.</p>
         </div>
       </div>
