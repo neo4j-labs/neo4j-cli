@@ -181,7 +181,10 @@ func (c *Credentials) save() error {
 	if c.storageMode == StorageModeKeyring {
 		return c.saveWithKeyring()
 	}
+	return c.saveToJSON()
+}
 
+func (c *Credentials) saveToJSON() error {
 	data, err := json.Marshal(CredentialsFile{
 		Aura:  c.Aura,
 		Dbms:  c.Dbms,
@@ -190,7 +193,6 @@ func (c *Credentials) save() error {
 	if err != nil {
 		panic(err)
 	}
-
 	fileutils.WriteFile(c.fs, c.filePath, data)
 	return nil
 }
