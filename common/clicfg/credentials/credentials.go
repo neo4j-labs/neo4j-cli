@@ -363,15 +363,11 @@ func (c *Credentials) MigrateToInsecure() error {
 	return nil
 }
 
-// RemoveAura removes an Aura credential by name and, in keyring mode, deletes
-// its keyring entries. Keyring cleanup failures are written as warnings to
-// warnW and do not fail the removal.
-func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
-	cred, err := c.Aura.Get(name)
-	if err != nil {
-		return err
-	}
-	if err := c.Aura.Remove(name); err != nil {
+// removeAndCleanKeyring calls remove() and, if in keyring mode, deletes cred's
+// keyring entries. Keyring cleanup failures are written as warnings to warnW
+// and do not fail the overall removal.
+func (c *Credentials) removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error {
+	if err := remove(); err != nil {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
@@ -380,6 +376,17 @@ func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// RemoveAura removes an Aura credential by name and, in keyring mode, deletes
+// its keyring entries. Keyring cleanup failures are written as warnings to
+// warnW and do not fail the removal.
+func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
+	cred, err := c.Aura.Get(name)
+	if err != nil {
+		return err
+	}
+	return c.removeAndCleanKeyring(cred, func() error { return c.Aura.Remove(name) }, warnW)
 }
 
 // RemoveDbms removes a Dbms credential by name and, in keyring mode, deletes
@@ -390,15 +397,7 @@ func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := c.Dbms.Remove(name); err != nil {
-		return err
-	}
-	if c.storageMode == StorageModeKeyring {
-		if err := cred.deleteFromKeyring(defaultKeyring); err != nil {
-			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
-		}
-	}
-	return nil
+	return c.removeAndCleanKeyring(cred, func() error { return c.Dbms.Remove(name) }, warnW)
 }
 
 // RemoveEmbed removes an Embed credential by name and, in keyring mode, deletes
@@ -409,15 +408,7 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := c.Embed.Remove(name); err != nil {
-		return err
-	}
-	if c.storageMode == StorageModeKeyring {
-		if err := cred.deleteFromKeyring(defaultKeyring); err != nil {
-			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
-		}
-	}
-	return nil
+	return c.removeAndCleanKeyring(cred, func() error { return c.Embed.Remove(name) }, warnW)
 }
 
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the
@@ -522,6 +513,7 @@ func loadCredFromKeyring(cred keyringCredential, provider KeyringProvider, warnW
 			continue
 		}
 		if !errors.Is(err, ErrNotFound) {
+			fmt.Fprintf(warnW, "Warning: keyring read failed for %s: %v\n", f.key, err) //nolint:errcheck
 			return migrated
 		}
 		if *f.ptr != "" {

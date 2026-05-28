@@ -126,6 +126,32 @@ func TestSetStorageMode_KeyringMode_MissingRequired_Warn(t *testing.T) {
 	}
 }
 
+// TestSetStorageMode_KeyringMode_NonErrNotFound_Warns verifies that when
+// loadCredFromKeyring encounters a non-ErrNotFound error (e.g. keyring daemon
+// crash, permission denied), a warning is written to warnW and processing
+// stops for that credential. SetStorageMode still returns nil (warn-and-continue).
+func TestSetStorageMode_KeyringMode_NonErrNotFound_Warns(t *testing.T) {
+	mock := newMockKeyringProvider()
+	// Seed a value so Get would normally succeed; errorOnGetProvider will
+	// override it to return a non-ErrNotFound error for the client-secret key.
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"), "s3cr3t"))
+
+	failingProvider := &errorOnGetProvider{
+		inner:   mock,
+		failKey: credentials.KeyringKey("aura", "prod", "client-secret"),
+	}
+	credentials.SetKeyringProviderForTest(t, failingProvider)
+
+	fs, err := testfs.GetTestFs("{}", `{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`)
+	require.NoError(t, err)
+
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	var warnBuf bytes.Buffer
+	err = creds.SetStorageMode(credentials.StorageModeKeyring, &warnBuf)
+	require.NoError(t, err, "non-ErrNotFound keyring error must not cause SetStorageMode to fail")
+	assert.Contains(t, warnBuf.String(), "Warning: keyring read failed for aura/prod/client-secret")
+}
+
 // TestSetStorageMode_KeyringMode_PreMigrationFallback verifies that when
 // keyring mode is active but a required field has no keyring entry yet
 // (pre-migration state), the JSON value is used silently.

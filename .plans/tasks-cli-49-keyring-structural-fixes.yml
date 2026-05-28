@@ -396,7 +396,8 @@ tasks:
 
       No behaviour changes — the three methods must exhibit identical observable behaviour after the
       refactor. Run make test, make fmt-check, make lint as final gates.
-    status: not_started
+    status: completed
+    completed_at: "2026-05-28T18:00:00Z"
     source: review
     dependencies:
       - task-016
@@ -424,7 +425,8 @@ tasks:
       Add a test in the appropriate keyring test file asserting that when the mock keyring returns a
       non-ErrNotFound error for a field, the warning appears in the bytes.Buffer passed as warnW.
       Run make test, make fmt-check, make lint as final gates.
-    status: not_started
+    status: completed
+    completed_at: "2026-05-28T18:30:00Z"
     source: review
     dependencies:
       - task-017
