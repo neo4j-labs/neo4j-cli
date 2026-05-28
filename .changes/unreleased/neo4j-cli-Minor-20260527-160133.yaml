@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: '''neo4j-cli skill install <agent>'' no longer accepts a positional agent name — use --agent <name> instead. New: install any skill from the curated neo4j-contrib/neo4j-skills catalog, plus --all, --refresh, and a new ''skill refresh'' leaf.'
+time: 2026-05-27T16:01:33.372466+02:00
