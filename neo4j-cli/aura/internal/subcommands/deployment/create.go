@@ -78,7 +78,7 @@ neo4j-cli aura deployment create --name my-deployment --organization-id 00000000
 		},
 	}
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Deployment name")
 	cmd.Flags().StringVar(&connectionUrl, connectionUrlFlag, "", "An optional connection URL for the deployment")
 

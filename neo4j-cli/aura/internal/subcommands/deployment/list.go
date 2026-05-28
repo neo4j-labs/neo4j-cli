@@ -73,7 +73,7 @@ neo4j-cli aura deployment list --format json`,
 		},
 	}
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
 
 	return cmd
 }

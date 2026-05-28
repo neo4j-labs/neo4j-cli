@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Remove deprecated 'aura tenant list/get' commands and '--tenant-id' flag (deprecated in v1.4.0). Use 'aura project list', 'aura project get' (configuration details) or 'aura organization get' (org metadata), and '--project-id' instead.
+time: 2026-05-28T11:27:49.231954+02:00

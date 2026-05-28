@@ -52,6 +52,14 @@ func TestRegisterOrgProjectFlags_OrgID(t *testing.T) {
 	}
 }
 
+func TestRegisterOrgProjectFlags_NoTenantIDFlag(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	flags.RegisterOrgProjectFlags(cmd)
+
+	f := cmd.PersistentFlags().Lookup("tenant-id")
+	assert.Nil(t, f, "--tenant-id must not be registered after CLI-126 removal")
+}
+
 func TestRegisterOrgProjectFlags_ProjectID(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -88,42 +96,4 @@ func TestRegisterOrgProjectFlags_ProjectID(t *testing.T) {
 			assert.Equal(t, tc.wantProject, got)
 		})
 	}
-}
-
-func TestRegisterOrgProjectFlags_DeprecatedTenantID(t *testing.T) {
-	t.Run("tenant-id flag is marked deprecated", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "test"}
-		flags.RegisterOrgProjectFlags(cmd)
-
-		f := cmd.PersistentFlags().Lookup(flags.TenantIDFlag)
-		require.NotNil(t, f)
-		assert.Equal(t, "use --project-id instead", f.Deprecated)
-	})
-
-	t.Run("tenant-id accepts a value when supplied", func(t *testing.T) {
-		cmd := &cobra.Command{
-			Use:  "test",
-			RunE: func(cmd *cobra.Command, args []string) error { return nil },
-		}
-		flags.RegisterOrgProjectFlags(cmd)
-
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		cmd.SetArgs([]string{"--tenant-id", "tenant-789"})
-
-		require.NoError(t, cmd.Execute())
-		got, err := cmd.PersistentFlags().GetString(flags.TenantIDFlag)
-		require.NoError(t, err)
-		assert.Equal(t, "tenant-789", got)
-	})
-}
-
-func TestRegisterOrgProjectFlags_HidesTenantIDFromHelp(t *testing.T) {
-	cmd := &cobra.Command{Use: "test"}
-	flags.RegisterOrgProjectFlags(cmd)
-
-	usage := cmd.PersistentFlags().FlagUsages()
-	assert.Contains(t, usage, "--organization-id")
-	assert.Contains(t, usage, "--project-id")
-	assert.NotContains(t, usage, "--tenant-id")
 }

@@ -80,7 +80,7 @@ neo4j-cli aura import job get 00000000-0000-0000-0000-000000000000 --organizatio
 	}
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID targeting for import job")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
 	cmd.Flags().BoolVar(&showProgress, showProgressFlag, false, "Show progress details")
 
 	return cmd

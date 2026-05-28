@@ -164,8 +164,8 @@ To avoid confusion, this guide uses the term **flags** to refer to any named arg
     - ❌ `neo4j-cli aura instance snapshot list <instance-id>`
     - ✅ `neo4j-cli aura instance snapshot list --instance-id <instance-id>`
 - No arguments between commands
-    - ❌ `neo4j-cli aura tenant <tenant-id> instance get <id>`
-    - ✅ `neo4j-cli aura instance get <id> --tenant-id <tenant-id>`
+    - ❌ `neo4j-cli aura project <project-id> instance get <id>`
+    - ✅ `neo4j-cli aura instance get <id> --project-id <project-id>`
 - Flags, if set, take precedence over global configuration or default values
 - Flags should have descriptions, if the flag is expected to be always set. The description must start with `(required)`
 
