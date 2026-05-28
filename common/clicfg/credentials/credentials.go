@@ -203,7 +203,7 @@ func (c *Credentials) saveToJSON() error {
 // the OS keyring daemon is unavailable); file I/O and JSON marshal errors
 // still panic, consistent with the insecure-mode save() path.
 func (c *Credentials) saveWithKeyring() error {
-	// Write sensitive fields to keyring before zeroing them in the JSON snapshot.
+	// Write sensitive fields to keyring before zeroing them in the JSON file.
 	for _, cred := range c.Aura.Credentials {
 		if err := cred.writeToKeyring(defaultKeyring); err != nil {
 			return err
@@ -220,47 +220,39 @@ func (c *Credentials) saveWithKeyring() error {
 		}
 	}
 
-	// Build scrubbed snapshots for JSON serialisation.
-	auraSnap := &AuraCredentials{
-		DefaultCredential: c.Aura.DefaultCredential,
-		Credentials:       make([]*AuraCredential, len(c.Aura.Credentials)),
-	}
+	// Save sensitive field values, zero them in-memory, write scrubbed JSON,
+	// then restore. saveToJSON() panics on marshal/write errors so no error
+	// return path requires the restore — it is unconditional.
+	type auraFields struct{ secret, token string }
+	auraSaved := make([]auraFields, len(c.Aura.Credentials))
 	for i, cred := range c.Aura.Credentials {
-		cp := *cred
-		cp.ClientSecret = ""
-		cp.AccessToken = ""
-		auraSnap.Credentials[i] = &cp
+		auraSaved[i] = auraFields{cred.ClientSecret, cred.AccessToken}
+		cred.zeroSensitiveFields()
+	}
+	type dbmsFields struct{ pwd string }
+	dbmsSaved := make([]dbmsFields, len(c.Dbms.Credentials))
+	for i, cred := range c.Dbms.Credentials {
+		dbmsSaved[i] = dbmsFields{cred.Password}
+		cred.zeroSensitiveFields()
+	}
+	type embedFields struct{ key string }
+	embedSaved := make([]embedFields, len(c.Embed.Credentials))
+	for i, cred := range c.Embed.Credentials {
+		embedSaved[i] = embedFields{cred.APIKey}
+		cred.zeroSensitiveFields()
 	}
 
-	dbmsSnap := &DbmsCredentials{
-		DefaultCredential: c.Dbms.DefaultCredential,
-		Credentials:       make([]*DbmsCredential, len(c.Dbms.Credentials)),
+	_ = c.saveToJSON() //nolint:errcheck // saveToJSON always returns nil; panics on marshal/write error
+	for i, cred := range c.Aura.Credentials {
+		cred.ClientSecret = auraSaved[i].secret
+		cred.AccessToken = auraSaved[i].token
 	}
 	for i, cred := range c.Dbms.Credentials {
-		cp := *cred
-		cp.Password = ""
-		dbmsSnap.Credentials[i] = &cp
-	}
-
-	embedSnap := &EmbedCredentials{
-		DefaultCredential: c.Embed.DefaultCredential,
-		Credentials:       make([]*EmbedCredential, len(c.Embed.Credentials)),
+		cred.Password = dbmsSaved[i].pwd
 	}
 	for i, cred := range c.Embed.Credentials {
-		cp := *cred
-		cp.APIKey = ""
-		embedSnap.Credentials[i] = &cp
+		cred.APIKey = embedSaved[i].key
 	}
-
-	data, err := json.Marshal(CredentialsFile{
-		Aura:  auraSnap,
-		Dbms:  dbmsSnap,
-		Embed: embedSnap,
-	})
-	if err != nil {
-		panic(err)
-	}
-	fileutils.WriteFile(c.fs, c.filePath, data)
 	return nil
 }
 

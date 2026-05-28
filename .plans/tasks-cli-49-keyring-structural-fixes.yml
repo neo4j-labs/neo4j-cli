@@ -83,7 +83,7 @@ tasks:
       type's zeroSensitiveFields(), call saveToJSON(), then restore the saved values.
       This collapses ~30 lines to ~10 lines and eliminates the per-type snapshot variables.
       Restoration on panic is acceptable to omit (consistent with current marshal-panic behaviour).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-004
@@ -92,7 +92,7 @@ tasks:
       - "saveWithKeyring calls saveToJSON() instead of directly marshalling scrubbed copies"
       - "Sensitive in-memory fields are restored to their original values after saveToJSON() returns"
       - "make test passes; credentials written to keyring are still persisted correctly"
-    completed_at: null
+    completed_at: "2026-05-28T10:45:00Z"
 
   - id: task-006
     title: "Fix MigrateToInsecure: use saveToJSON() + own storageMode; simplify config/set.go"

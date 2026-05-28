@@ -13,3 +13,7 @@ Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~
 ## TASK-004 — 2026-05-28T10:30:00Z
 Replaced triple-iteration loops in saveWithKeyring, MigrateToKeyring (zero-fields portion), MigrateToInsecure, and loadSensitiveFieldsFromKeyring with calls to per-type writeToKeyring, zeroSensitiveFields, migrateFromKeyring, and loadFromKeyring methods; MigrateToKeyring rollback logic kept inline.
 Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-005 — 2026-05-28T10:45:00Z
+Replaced scrubbed-snapshot boilerplate in saveWithKeyring (auraSnap/dbmsSnap/embedSnap) with zero-restore pattern: save field values to locals, zero via zeroSensitiveFields(), call saveToJSON(), restore.
+Files: ~common/clicfg/credentials/credentials.go
