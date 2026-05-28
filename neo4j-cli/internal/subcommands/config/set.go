@@ -66,7 +66,7 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				//
 				// For the insecure target we only run MigrateToInsecure() when
 				// the mode actually changes to avoid spurious keyring reads.
-				credentialStorageModeChanged := false
+				// MigrateToInsecure sets storageMode = StorageModeInsecure itself.
 				if bareKey == "credential-storage" {
 					currentMode := cfg.Credentials.StorageMode()
 					if value == credentials.StorageModeKeyring {
@@ -75,14 +75,12 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 							cmd.SilenceUsage = true
 							return migrateErr
 						}
-						credentialStorageModeChanged = (currentMode != value)
 					} else if value == credentials.StorageModeInsecure && currentMode != value {
 						// Only migrate to insecure when actually switching modes.
 						if migrateErr := cfg.Credentials.MigrateToInsecure(); migrateErr != nil {
 							cmd.SilenceUsage = true
 							return migrateErr
 						}
-						credentialStorageModeChanged = true
 					}
 				}
 
@@ -91,14 +89,14 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 					return err
 				}
 
-				// Update in-memory storage mode after successfully persisting the
-				// config key so subsequent operations in this process use the new mode.
-				// Only update when the mode actually changed to avoid a redundant
-				// keyring reload.
-				if credentialStorageModeChanged {
-					if err := cfg.Credentials.SetStorageMode(value); err != nil {
-						cmd.SilenceUsage = true
-						return err
+				// For keyring mode: update in-process mode after persisting config
+				// so subsequent saves in this process use the keyring path.
+				if bareKey == "credential-storage" && value == credentials.StorageModeKeyring {
+					if cfg.Credentials.StorageMode() != credentials.StorageModeKeyring {
+						if err := cfg.Credentials.SetStorageMode(value); err != nil {
+							cmd.SilenceUsage = true
+							return err
+						}
 					}
 				}
 

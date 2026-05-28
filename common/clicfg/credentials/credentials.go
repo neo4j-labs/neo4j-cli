@@ -389,15 +389,11 @@ func (c *Credentials) MigrateToKeyring() error {
 // Any non-ErrNotFound keyring error is a hard error for all field types and
 // aborts migration.
 //
-// On full success: save() is called to persist the secrets to JSON, then
-// keyring.Delete() is called for all non-empty entries (best-effort: errors are
-// ignored).
+// On full success: storageMode is set to StorageModeInsecure, saveToJSON() is
+// called to persist the secrets to JSON, then keyring.Delete() is called for
+// all non-empty entries (best-effort: errors are ignored).
 //
-// The caller is responsible for persisting the "credential-storage" config key
-// and calling SetStorageMode(StorageModeInsecure) afterwards. This method
-// temporarily sets storageMode to insecure internally to flush secrets to JSON,
-// then restores it so the caller can observe the original mode and switch it
-// explicitly.
+// The caller is responsible for persisting the "credential-storage" config key.
 func (c *Credentials) MigrateToInsecure() error {
 	// Phase 1: read all sensitive fields from the keyring into in-memory structs.
 	// If any required field is missing (ErrNotFound) or any Get returns a
@@ -437,13 +433,11 @@ func (c *Credentials) MigrateToInsecure() error {
 		}
 	}
 
-	// Phase 2: persist secrets to JSON. Temporarily switch storageMode to
-	// insecure so save() writes the full plaintext values instead of calling
-	// saveWithKeyring() again.
-	prevMode := c.storageMode
+	// Phase 2: persist secrets to JSON and own the mode transition.
 	c.storageMode = StorageModeInsecure
-	_ = c.save() //nolint:errcheck // temporarily insecure; keyring path never reached
-	c.storageMode = prevMode
+	if err := c.saveToJSON(); err != nil {
+		return err
+	}
 
 	// Phase 3: delete keyring entries for all fields we successfully read
 	// (best-effort — errors are ignored).

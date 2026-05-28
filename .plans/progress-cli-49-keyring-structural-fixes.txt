@@ -17,3 +17,7 @@ Files: ~common/clicfg/credentials/credentials.go
 ## TASK-005 — 2026-05-28T10:45:00Z
 Replaced scrubbed-snapshot boilerplate in saveWithKeyring (auraSnap/dbmsSnap/embedSnap) with zero-restore pattern: save field values to locals, zero via zeroSensitiveFields(), call saveToJSON(), restore.
 Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-006 — 2026-05-28T11:30:00Z
+MigrateToInsecure now sets c.storageMode = StorageModeInsecure and calls saveToJSON() directly, removing the prevMode temporary mutation; config/set.go's credentialStorageModeChanged flag removed and post-migration SetStorageMode for the insecure path eliminated.
+Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommands/config/set.go

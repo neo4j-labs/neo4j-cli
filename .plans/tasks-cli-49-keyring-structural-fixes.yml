@@ -103,7 +103,7 @@ tasks:
       delegated this responsibility to callers. In config/set.go, remove the credentialStorageModeChanged
       flag and the post-migration SetStorageMode call for the MigrateToInsecure path, since
       MigrateToInsecure now handles it. Keep the SetStorageMode call after MigrateToKeyring.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -112,7 +112,7 @@ tasks:
       - "config/set.go has no post-migration SetStorageMode call for the insecure path"
       - "credentialStorageModeChanged flag is removed or simplified to cover only the keyring path"
       - "make test passes; migrating to insecure still writes plaintext to credentials.json"
-    completed_at: null
+    completed_at: "2026-05-28T11:30:00Z"
 
   - id: task-007
     title: "Thread io.Writer through SetStorageMode and loadSensitiveFieldsFromKeyring; update all call sites and tests"
