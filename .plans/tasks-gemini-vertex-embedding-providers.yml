@@ -60,7 +60,7 @@ tasks:
       wire them up. Update the default-case error message to also list
       `gemini` and `vertex` in the "must be one of" copy (so the wiring is
       ready when the cases are added).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -70,7 +70,7 @@ tasks:
       - "`Resolve` copies the two new fields from the base stored credential"
       - "`New` default-case error message lists `gemini` and `vertex`"
       - "`make test` and `make fmt-check` pass"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-004
     title: "Extend resolveAPIKey for the gemini env chain"

@@ -6,3 +6,8 @@ Decisions: go mod tidy strips truly-unused modules, so a tiny `//nolint:unused`-
 ## TASK-002 — 2026-05-28T00:00:00Z
 Added VertexProject/VertexLocation omitempty fields to EmbedCredential; extended EmbedCredentials.Add with two trailing string params; updated the sole production call site (credential/embed/add.go pass-through with empty strings) and all test call sites. PrintableEmbedCredentials.AsArray now adds vertex-* keys only when non-empty.
 Files: ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/embed_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go
+
+## TASK-003 — 2026-05-28T00:00:00Z
+Added ProviderGemini/ProviderVertex + envGeminiKey/envGoogleKey constants, VertexProject/VertexLocation Config fields, Resolve copy from stored cred, and extended New default-case "must be one of" message. New providers still fall through to the default until tasks 005/006 land.
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+Decisions: envGoogleKey is unused this commit (wired in task-004); kept it co-located with envGeminiKey for grep-locality.

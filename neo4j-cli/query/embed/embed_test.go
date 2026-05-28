@@ -361,6 +361,27 @@ func TestNew_InvalidProvider(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid embed provider")
 	assert.Contains(t, err.Error(), "bogus")
+	assert.Contains(t, err.Error(), ProviderGemini)
+	assert.Contains(t, err.Error(), ProviderVertex)
+}
+
+func TestResolve_StoredCred_CopiesVertexFields(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+
+	creds := `{"embed":{"default-credential":"v","credentials":[` +
+		`{"name":"v","provider":"vertex","model":"text-embedding-005",` +
+		`"base-url":"","dimensions":0,"api-key":"",` +
+		`"vertex-project":"my-project","vertex-location":"us-central1"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "vertex", got.Provider)
+	assert.Equal(t, "my-project", got.VertexProject)
+	assert.Equal(t, "us-central1", got.VertexLocation)
 }
 
 func TestProviderFactorySeam(t *testing.T) {

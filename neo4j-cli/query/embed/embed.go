@@ -39,12 +39,14 @@ type Provider interface {
 // does NOT validate (so the standalone :embed leaf can produce a clean usage
 // error path); validation lives in New.
 type Config struct {
-	Provider   string
-	Model      string
-	BaseURL    string
-	APIKey     string
-	Dimensions int
-	UserAgent  string
+	Provider       string
+	Model          string
+	BaseURL        string
+	APIKey         string
+	Dimensions     int
+	UserAgent      string
+	VertexProject  string
+	VertexLocation string
 }
 
 // Provider name constants shared by the cobra flag-validator (see credential
@@ -53,6 +55,8 @@ const (
 	ProviderOpenAI      = "openai"
 	ProviderOllama      = "ollama"
 	ProviderHuggingFace = "huggingface"
+	ProviderGemini      = "gemini"
+	ProviderVertex      = "vertex"
 )
 
 // Environment variable names. Keep these grouped here so a single grep across
@@ -65,6 +69,8 @@ const (
 	envEmbedAPIKey     = "NEO4J_EMBED_API_KEY"
 	envOpenAIKey       = "OPENAI_API_KEY"
 	envHFToken         = "HF_TOKEN"
+	envGeminiKey       = "GEMINI_API_KEY"
+	envGoogleKey       = "GOOGLE_API_KEY"
 )
 
 // providerFactory is the test seam for producer-side substitution. Production
@@ -171,6 +177,8 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 		out.BaseURL = base.BaseURL
 		out.Dimensions = base.Dimensions
 		out.APIKey = base.APIKey
+		out.VertexProject = base.VertexProject
+		out.VertexLocation = base.VertexLocation
 	}
 
 	// 2. .env walk-up (overrides stored cred, loses to env / flags).
@@ -352,8 +360,8 @@ func New(cfg Config) (Provider, error) {
 		return newHuggingFaceProvider(cfg), nil
 	default:
 		return nil, clierr.NewUsageError(
-			"invalid embed provider %q: must be one of %s, %s, %s",
-			cfg.Provider, ProviderOpenAI, ProviderOllama, ProviderHuggingFace)
+			"invalid embed provider %q: must be one of %s, %s, %s, %s, %s",
+			cfg.Provider, ProviderOpenAI, ProviderOllama, ProviderHuggingFace, ProviderGemini, ProviderVertex)
 	}
 }
 
