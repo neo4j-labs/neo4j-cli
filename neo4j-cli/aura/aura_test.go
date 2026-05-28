@@ -39,9 +39,6 @@ func TestNewCmdDoesNotRegisterRwFlag(t *testing.T) {
 	assert.Nil(t, cmd.PersistentFlags().Lookup("rw"))
 }
 
-// TestNewStandaloneCmdFlagErrorFuncWrapsAsUsageError asserts cobra's
-// flag-parse errors on the standalone aura root and its subcommands are
-// wrapped into *clierr.CLIError with exit code 2.
 func TestStandaloneAura_TenantCommandRemoved(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
