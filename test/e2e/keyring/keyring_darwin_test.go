@@ -6,6 +6,7 @@
 package keyring_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -90,7 +91,9 @@ func deleteKeychainEntry(t *testing.T, service, account string) {
 }
 
 // findKeychainPassword retrieves the password for service/account from the
-// macOS Keychain via /usr/bin/security. Fatals if the entry is not found.
+// macOS Keychain via /usr/bin/security. go-keyring stores values as
+// "go-keyring-base64:<base64>" in the Keychain, so this helper decodes that
+// prefix before returning. Fatals if the entry is not found.
 func findKeychainPassword(t *testing.T, service, account string) string {
 	t.Helper()
 	out, err := exec.Command(
@@ -98,7 +101,14 @@ func findKeychainPassword(t *testing.T, service, account string) string {
 		"-s", service, "-a", account, "-w",
 	).Output()
 	require.NoError(t, err, "expected keychain entry service=%s account=%s to exist", service, account)
-	return strings.TrimRight(string(out), "\n")
+	raw := strings.TrimRight(string(out), "\n")
+	const prefix = "go-keyring-base64:"
+	if strings.HasPrefix(raw, prefix) {
+		dec, decErr := base64.StdEncoding.DecodeString(raw[len(prefix):])
+		require.NoError(t, decErr, "decode go-keyring-base64 value for service=%s account=%s", service, account)
+		return string(dec)
+	}
+	return raw
 }
 
 // requireKeychainAbsent asserts that the given service/account entry does NOT
