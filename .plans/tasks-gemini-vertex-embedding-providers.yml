@@ -13,14 +13,14 @@ tasks:
       transitive deps stay contained to oauth2 + ADC helpers (notably
       `cloud.google.com/go/compute/metadata`). If the diff balloons beyond
       that, raise it before continuing — vertex scope may need a rethink.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`go.mod` contains a direct `require golang.org/x/oauth2 ...` entry"
       - "`go mod tidy` runs clean with no further diff"
       - "`go.sum` diff is limited to oauth2 + small ADC-related transitive deps"
       - "`make test` still passes (no other code changes yet)"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-002
     title: "Extend EmbedCredential schema with VertexProject and VertexLocation"
