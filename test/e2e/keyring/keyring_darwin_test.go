@@ -46,8 +46,8 @@ import (
 func setupDarwinHome(t *testing.T) (homeDir string, env []string) {
 	t.Helper()
 
-	if os.Getenv("CI") != "true" {
-		t.Skip("macOS Keychain e2e tests only run in CI (CI=true) to avoid writing to the local Keychain")
+	if os.Getenv("KEYRING_MACOS_E2E") != "true" {
+		t.Skip("macOS Keychain e2e tests only run when KEYRING_MACOS_E2E=true to avoid writing to the local Keychain")
 	}
 
 	home := t.TempDir()
@@ -288,8 +288,8 @@ func TestKeyring_Darwin_RemoveCleansKeyring(t *testing.T) {
 func withLockedKeychain(t *testing.T) {
 	t.Helper()
 
-	if os.Getenv("CI") != "true" {
-		t.Skip("macOS Keychain e2e tests only run in CI (CI=true) to avoid modifying the local Keychain")
+	if os.Getenv("KEYRING_MACOS_E2E") != "true" {
+		t.Skip("macOS Keychain e2e tests only run when KEYRING_MACOS_E2E=true to avoid modifying the local Keychain")
 	}
 
 	// Record the current default keychain so we can restore it afterwards.

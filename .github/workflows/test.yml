@@ -108,6 +108,8 @@ jobs:
             # already produced bin/neo4j-cli via `make build`.
             - name: Keyring smoke (macOS)
               if: matrix.os == 'macos-latest'
+              env:
+                KEYRING_MACOS_E2E: "true"
               run: go test -tags=keyring_smoke -count=1 -v ./test/e2e/keyring/...
 
             - name: HTTPS smoke test (--insecure against real Neo4j)
