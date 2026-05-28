@@ -31,3 +31,19 @@ Files: (verification only — no source changes)
 
 ## REVIEW — 2026-05-28T12:05:00Z
 Added 4 review tasks (task-008..task-011).
+
+## TASK-008 — 2026-05-28T12:08:00Z
+Deleted orphaned 3-line docstring above TestStandaloneAura_TenantCommandRemoved (it described the next-next function, was inserted between the docstring and its real target by task-003).
+Files: ~neo4j-cli/aura/aura_test.go
+
+## TASK-009 — 2026-05-28T12:10:00Z
+Replaced `"Project/tenant ID"` with `"Project ID"` (preserving `(required) ` prefix) across 19 leaf commands in agent/, deployment/{,database/,server/,server/database/,token/}/, import/job/; regenerated skill bundle.
+Files: ~neo4j-cli/aura/internal/subcommands/{agent,deployment,deployment/database,deployment/server,deployment/server/database,deployment/token,import/job}/*.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
+## TASK-010 — 2026-05-28T12:12:00Z
+Clarified changelog body so `project get` is the primary listed replacement for `tenant get`, with `organization get` retained for org-metadata callers.
+Files: ~.changes/unreleased/neo4j-cli-Minor-20260528-112749.yaml
+
+## TASK-011 — 2026-05-28T12:14:00Z
+Renamed TestStandaloneAura_TenantCommandRemoved → TestNewStandaloneCmd_RejectsRemovedTenantCommand to match sibling naming style in aura_test.go.
+Files: ~neo4j-cli/aura/aura_test.go

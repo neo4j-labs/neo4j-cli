@@ -1,7 +1,7 @@
 feature: cli-126-remove-deprecated-aura
 prd: ./prd-cli-126-remove-deprecated-aura.md
 created_at: 2026-05-28T11:00:00Z
-updated_at: 2026-05-28T11:45:00Z
+updated_at: 2026-05-28T12:15:00Z
 
 tasks:
   - id: task-001
@@ -179,13 +179,13 @@ tasks:
       with the project's default-no-comments convention; move only if the
       comment captures a non-obvious gotcha worth keeping (it doesn't — it just
       restates the test name).
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "`aura_test.go` no longer has a docstring whose content describes a different test than the one immediately below it."
       - "`make test` passes; nothing else in `aura_test.go` changed."
-    completed_at: null
+    completed_at: 2026-05-28T12:15:00Z
 
   - id: task-009
     title: "Sweep `\"Project/tenant ID\"` flag descriptions in agent/deployment/import subtrees"
@@ -204,7 +204,7 @@ tasks:
       same descriptions appear in `bundle/references/aura.md`). Confirm via
       `grep` that no source `.go` file outside `.plans/archive/` still contains
       the literal `"Project/tenant ID"`.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -213,7 +213,7 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass."
       - "`bin/neo4j-cli aura agent list --help` shows `--project-id string   Project ID` (no `tenant` text)."
 
-    completed_at: null
+    completed_at: 2026-05-28T12:15:00Z
 
   - id: task-010
     title: "Clarify changelog body re: tenant get → project get nuance"
@@ -233,14 +233,14 @@ tasks:
       (configuration details) or 'aura organization get' (org metadata), and
       '--project-id' instead." Keep the body single-line to match changie's
       output convention.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "`.changes/unreleased/neo4j-cli-Minor-20260528-112749.yaml` body names `project get` as the (primary) replacement for `tenant get`."
       - "Body remains single-line; YAML still parses (no schema regressions)."
       - "`make test` passes."
-    completed_at: null
+    completed_at: 2026-05-28T12:15:00Z
 
   - id: task-011
     title: "Rename TestStandaloneAura_TenantCommandRemoved to match file convention"
@@ -252,11 +252,11 @@ tasks:
       `TestNewStandaloneCmd_RejectsRemovedTenantCommand` (or similar — preserve
       the meaning, drop the underscore-after-prefix, follow the sibling style).
       Pure rename; no semantic change.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     source: review
     acceptance_criteria:
       - "Renamed test function follows the `TestNewStandaloneCmd...` prefix style used by `aura_test.go` siblings."
       - "`make test` passes (function still runs and asserts the same behaviour)."
-    completed_at: null
+    completed_at: 2026-05-28T12:15:00Z
