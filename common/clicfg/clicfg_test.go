@@ -192,9 +192,9 @@ func TestGlobalConfigCredentialStorage(t *testing.T) {
 		want       string
 	}{
 		{
-			name:       "returns keyring when credential-storage is absent",
+			name:       "returns insecure when credential-storage is absent",
 			configJSON: `{}`,
-			want:       "keyring",
+			want:       "insecure",
 		},
 		{
 			name:       "returns keyring when credential-storage is set to keyring",

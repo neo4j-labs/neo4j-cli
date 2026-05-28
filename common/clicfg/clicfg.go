@@ -461,13 +461,16 @@ func (config *GlobalConfig) Format() string {
 	return config.viper.GetString("format")
 }
 
-// CredentialStorage returns the configured credential storage mode.
-// It defaults to "keyring" when the key is absent from config.
+// CredentialStorage is a read accessor for the persisted credential-storage
+// value. It returns StorageModeInsecure when the key is absent from config,
+// matching the NewCredentials() boot default. First-run default logic (which
+// may choose "keyring" on capable platforms) lives in initCredentialStorageDefault
+// in neo4j-cli/app/app.go and writes the chosen value before this is called.
 func (config *GlobalConfig) CredentialStorage() string {
 	if v := config.viper.GetString("credential-storage"); v != "" {
 		return v
 	}
-	return "keyring"
+	return credentials.StorageModeInsecure
 }
 
 // CredentialStorageIsSet reports whether "credential-storage" has been
