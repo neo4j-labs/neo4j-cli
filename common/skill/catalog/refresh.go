@@ -27,6 +27,14 @@ const refreshTimeout = 30 * time.Second
 // plugin.json payloads are in the kilobyte range; 1 MiB is generous.
 const maxPluginJSONBytes int64 = 1 << 20
 
+// maxCompressedTarballBytes caps the bytes read from the tarball HTTP
+// response. Extract enforces a 20 MiB decompressed cap, but a malicious
+// upstream could otherwise stream arbitrarily large compressed payloads
+// until the 30 s context deadline fires, burning CPU and bandwidth. Real
+// neo4j-contrib/neo4j-skills tarballs are well under 1 MiB compressed;
+// 50 MiB is ample headroom for project growth.
+const maxCompressedTarballBytes int64 = 50 << 20
+
 // Refresh fetches the upstream plugin.json (and, when its version differs
 // from cached state, the repo tarball) and updates the on-disk cache. The
 // receiver's in-memory Version/Skills fields are replaced with the
@@ -124,7 +132,7 @@ func (c *Catalog) Refresh(ctx context.Context, filesystem afero.Fs) error {
 		for _, s := range upstreamSkills {
 			allowed = append(allowed, s.Name)
 		}
-		if eerr := Extract(tar, filesystem, destRoot, allowed); eerr != nil {
+		if eerr := Extract(io.LimitReader(tar, maxCompressedTarballBytes), filesystem, destRoot, allowed); eerr != nil {
 			return fmt.Errorf("catalog: extract tarball: %w", eerr)
 		}
 	}
