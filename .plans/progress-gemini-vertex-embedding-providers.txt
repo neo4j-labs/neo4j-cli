@@ -56,3 +56,7 @@ Added 3 review tasks (task-012..task-014) from golang-security audit: H1 SSRF/to
 Closed H1 SSRF/token-exfil. Added strict GCP region + project-ID regex validators in vertex.go (ValidateVertexLocation / ValidateVertexProject) used by both vertex.Embed (before URL build) and credential embed add (before storing) — single source of truth. Tests assert no HTTP dispatch occurs when validation rejects (handler t.Fatal); cover all four attack strings and five real regions plus equivalent project-ID coverage.
 Files: ~neo4j-cli/query/embed/vertex.go, ~neo4j-cli/query/embed/vertex_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
 Decisions: Exported validators live in the runtime embed package (vertex.go), imported by credential/embed/add.go as `embedrt` to avoid the package-name collision. Two existing vertex tests using project="p" updated to "my-project" so they pass the new validator without losing coverage.
+
+## TASK-013 — 2026-05-28T13:25:00Z
+Closed M1 unbounded happy-path body. Wrapped `io.ReadAll(resp.Body)` in doJSONRequest with `io.LimitReader(resp.Body, maxResponseBodyBytes)` (10 MiB const). Hardens all 5 providers at once. Added httpjson_test.go with oversize-server and under-cap cases.
+Files: ~neo4j-cli/query/embed/httpjson.go, +neo4j-cli/query/embed/httpjson_test.go

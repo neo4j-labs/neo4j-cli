@@ -74,9 +74,19 @@ func doJSONRequest(
 		return nil, fmt.Errorf("%s: HTTP %d: %s", provider, resp.StatusCode, bytes.TrimSpace(snippet))
 	}
 
-	raw, err := io.ReadAll(resp.Body)
+	// Cap the happy-path read at 10 MiB — ~100x the largest legitimate
+	// embedding response — to block a compromised proxy or attacker-controlled
+	// BaseURL from exhausting memory via a multi-GB 200 OK body. At-or-over
+	// the cap the JSON decode downstream fails with "unexpected EOF" rather
+	// than OOMing the process.
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("%s: read response: %w", provider, err)
 	}
 	return raw, nil
 }
+
+// maxResponseBodyBytes caps how much of a successful response body we will
+// buffer into memory. Set to 10 MiB; embedding responses are <100 KiB even
+// at the full 3072 dims gemini-embedding-001 returns.
+const maxResponseBodyBytes = 10 << 20

@@ -439,7 +439,7 @@ tasks:
       unchanged. At-or-over the cap the subsequent JSON decode fails
       with "unexpected EOF" — that's the correct failure mode (caller
       surfaces a decode error, not an OOM).
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -448,7 +448,7 @@ tasks:
       - "A new test exercises an oversize body and confirms the read is bounded"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T13:25:00Z
 
   - id: task-014
     title: "Scrub sensitive query params from URL in doJSONRequest network errors"
