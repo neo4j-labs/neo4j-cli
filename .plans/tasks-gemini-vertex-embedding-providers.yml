@@ -158,7 +158,7 @@ tasks:
       stubbed token source covering: missing project, missing location,
       missing ADC, happy path, dim-overlay sent in `parameters`, non-2xx,
       no token in error messages.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -174,7 +174,7 @@ tasks:
       - "`New` has a `case ProviderVertex` that returns `newVertexProvider(cfg)`"
       - "`vertex_test.go` covers the listed cases without touching real ADC"
       - "License header present; full test/lint/fmt/license gates pass"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-007
     title: "Extend `credential embed add` with vertex flags and provider entries"
