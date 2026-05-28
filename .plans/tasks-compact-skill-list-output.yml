@@ -1,0 +1,98 @@
+feature: compact-skill-list-output
+prd: ./prd-compact-skill-list-output.md
+created_at: 2026-05-28T06:31:42Z
+updated_at: 2026-05-28T06:31:42Z
+
+tasks:
+  - id: task-001
+    title: "Add aggregateCatalog worst-wins fold + unit tests"
+    description: |
+      Add a pure `aggregateCatalog(rows []InventoryRow) catalogSummary`
+      function to `common/skill/inventory.go`. It folds the per-agent
+      rows of one catalog skill into one summary row carrying the
+      aggregated worst-wins status, installed count, and ordered
+      installed-agent names. Pure function — no FS access, no cfg,
+      no rendering. The renderer in task-002 will consume it to build
+      the catalog section. The fold rules come straight from REQ-F-005
+      and REQ-F-004 in the PRD.
+
+      Shape:
+
+          type catalogSummary struct {
+              Skill            string
+              AvailableVersion string
+              Status           string   // worst-wins
+              InstalledCount   int      // 0..len(AGENTS)
+              InstalledAgents  []string // AGENTS catalog order
+          }
+
+      Status priority (worst wins):
+        1. drift               — any installed copy with mismatched version
+        2. unknown-version     — any installed copy with no parseable version
+        3. partial             — at least one installed AND at least one not
+        4. installed           — every agent has it at the matching version
+        5. not-installed       — zero installed
+
+      Table-driven test covers each priority transition plus edges:
+      empty rows slice, single-row inputs, all-installed, all-not-installed,
+      single drift among installed copies, drift+unknown-version mix
+      (drift wins), unknown-version+partial mix (unknown-version wins),
+      ordering of InstalledAgents matches AGENTS iteration order.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "aggregateCatalog is a pure function in common/skill/inventory.go (no FS, no cfg, no cobra)"
+      - "Worst-wins priority drift > unknown-version > partial > installed > not-installed is exercised by table-driven tests"
+      - "InstalledAgents preserves AGENTS catalog iteration order"
+      - "Edge cases covered: empty input, single-row, all-installed, zero-installed, mixed-priority"
+      - "make test / make fmt-check / make lint all clean"
+    completed_at: null
+
+  - id: task-002
+    title: "Two-section render in list leaf; update tests + regenerate bundle"
+    description: |
+      Rewrite `runList`'s render path in `common/skill/list.go` to
+      branch on `commonoutput.ResolveOutput(cmd, cfg)`:
+
+      - `json` → unchanged single PrintBodyMap over the flat
+        []InventoryRow (today's listResultRow + MarshalJSON path).
+        Byte-identical output to today for the same inputs.
+      - `table` / `toon` → two-section render:
+          1. `Self-skill:` heading + blank line + table over
+             self-skill rows (one per AGENT). Columns:
+             agent, detected, installed, installed_version,
+             available_version, status. No skill / source columns.
+          2. blank line + `Catalog:` heading + blank line + table
+             over aggregated catalog rows (one per skill via
+             aggregateCatalog). Columns: skill, available_version,
+             status, installed_in. installed_in formatted as
+             "—" / "N/11 (a, b, ...)" / "11/11" per REQ-F-004.
+
+      Cold-cache path: catalog section is omitted entirely; existing
+      stderr cold-cache hint still fires. Network-failure-with-cache
+      path: existing warn fires before the rendered output.
+
+      Update list.go's `Long` text with one sentence about the
+      compact default and the JSON-is-flat back-compat note. Run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the
+      committed bundle.
+
+      Rewrite the table/toon assertions in `common/skill/list_test.go`
+      for the new shape (count: ~39 rows total, two section headings,
+      installed_in cell wording for each aggregated-status case). JSON
+      assertions stay UNTOUCHED — they're the back-compat anchor.
+
+      No new flag. No change to BuildInventory, InventoryRow,
+      statusFor, or check.go. No new abstraction in common/output/.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "runList branches on ResolveOutput(cmd, cfg): json uses today's flat render path verbatim; table/toon go through the new two-section renderer"
+      - "Table/toon output prints 'Self-skill:' heading, the per-agent self table, a blank line, 'Catalog:' heading, the aggregated catalog table"
+      - "Catalog rows show installed_in as '—' (zero) / 'N/11 (names)' (1..10) / '11/11' (all)"
+      - "JSON output byte-identical to today for the same inputs; list_test.go JSON assertions pass unchanged"
+      - "list_test.go table/toon assertions updated for the new shape; cold-cache and warn-on-network-failure assertions still pass"
+      - "Skill bundle regenerated (`go generate ./neo4j-cli/internal/skill/...`); `make generate-check` clean on the committed tree"
+      - "make test / make fmt-check / make lint / make license-check all clean"
+    completed_at: null
