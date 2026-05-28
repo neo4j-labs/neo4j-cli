@@ -51,7 +51,7 @@ func TestRegisterWait(t *testing.T) {
 	}
 }
 
-func TestRegisterWait_HidesAliasFromHelp(t *testing.T) {
+func TestRegisterWait_DoesNotRegisterAwaitAlias(t *testing.T) {
 	var wait bool
 	cmd := &cobra.Command{Use: "test"}
 	flags.RegisterWait(cmd, &wait, "Waits until operation completes.")

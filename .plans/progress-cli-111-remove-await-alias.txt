@@ -43,3 +43,7 @@ Grep sweep: production-source `--await` references = 0 across common/, neo4j-cli
 
 ## REVIEW — 2026-05-28T12:00:00Z
 Added 2 review tasks (task-007..task-008). Investigation revealed TestAllLeafCommands_HaveExamples enforces only non-empty + flush-left first line — the "≥3 invocations" in AGENTS.md is convention, not gate. task-008 drops docker stop/start example padding and relaxes the doc convention to ≥2.
+
+## 2026-05-28 task-007
+Renamed TestRegisterWait_HidesAliasFromHelp → TestRegisterWait_DoesNotRegisterAwaitAlias in neo4j-cli/aura/internal/flags/wait_test.go:54. Body unchanged (both Contains(--wait) + NotContains(--await) assertions intact). New name reflects post-removal regression-guard intent.
+Gates: make fmt-check OK; make lint OK (0 issues); make test OK.

@@ -127,14 +127,14 @@ tasks:
       `TestRegisterWait_AwaitNotRegistered`. Keep the test body unchanged: both the
       positive `--wait` assertion and the negative `--await` regression assertion stay
       as-is.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/aura/internal/flags/wait_test.go no longer contains the function name 'TestRegisterWait_HidesAliasFromHelp'"
       - "A replacement test exists whose name reflects regression-guard intent (e.g. ends in 'DoesNotRegisterAwaitAlias' or 'AwaitNotRegistered')"
       - "Test body unchanged: both Contains(--wait) and NotContains(--await) assertions remain"
       - "go test ./neo4j-cli/aura/internal/flags/... passes"
-    completed_at: null
+    completed_at: 2026-05-28T12:35:00Z
 
   - id: task-008
     source: review
