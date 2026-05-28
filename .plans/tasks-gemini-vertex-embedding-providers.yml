@@ -709,7 +709,7 @@ tasks:
       Match the existing tone and concision. This is the
       authoritative reference for env-var setup; agents and humans
       both look at this section first.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "README's API-key table row lists `GEMINI_API_KEY` and `GOOGLE_API_KEY` alongside the existing env vars"
@@ -718,7 +718,7 @@ tasks:
       - "No skill-bundle regeneration needed (README is not part of the bundle)"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T17:15:00Z
 
   - id: task-018
     title: "Update SKILL.md embed-config tip to cover gemini env chain + vertex ADC"
@@ -777,4 +777,5 @@ tasks:
       - "`TestGenerator_RoundTrip` passes"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
+    status: in_progress
     completed_at: null

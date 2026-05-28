@@ -82,3 +82,7 @@ Files: ~neo4j-cli/internal/subcommands/credential/embed/embed.go, ~neo4j-cli/que
 
 ## REVIEW — 2026-05-28T17:00:00Z
 Added 2 review tasks (task-017..task-018): document gemini env chain + vertex ADC in README API-key section and SKILL.md embed-config tip.
+
+## TASK-017 — 2026-05-28T17:15:00Z
+Extended README API-key table row with GEMINI_API_KEY + GOOGLE_API_KEY; rewrote precedence prose to spell out gemini's per-provider env chain and added a dedicated Vertex sentence noting ADC auth (gcloud / GOOGLE_APPLICATION_CREDENTIALS) sits outside the API-key precedence.
+Files: ~README.md
