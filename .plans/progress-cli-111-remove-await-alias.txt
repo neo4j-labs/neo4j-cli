@@ -17,3 +17,9 @@ Gates: make fmt-check OK; make lint OK; docker + agentcontext tests pass; TestGe
 Dropped --await deprecation sentence from CONTRIBUTING.md §3.5.
 - CONTRIBUTING.md: removed the trailing sentence on line 211; --wait narrative kept unchanged.
 Gates: make fmt-check OK; make lint OK; make test OK except TestGenerator_RoundTrip (expected; owned by task-004). No new failures.
+
+## 2026-05-28 task-004
+Regenerated neo4j-cli skill bundle.
+- ran go generate ./neo4j-cli/internal/skill/...
+- bundle diff: only neo4j-cli/internal/skill/bundle/references/docker.md changed — two --await example blocks removed; "docker stop staging --wait --rw" added (from task-002 source edit).
+Gates: make fmt-check OK; make lint OK; make test OK (TestGenerator_RoundTrip now green); make generate-check noise limited to the hone in_progress YAML flip + the bundle work product (expected per AGENTS.md).

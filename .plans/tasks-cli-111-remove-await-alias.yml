@@ -66,14 +66,14 @@ tasks:
       `neo4j-cli/internal/skill/bundle/references/docker.md` (lines 167-168 and 194-195) plus any
       incidental flag-section cleanup. No other bundle file should change beyond the source-side edits
       in task-002 propagating through render. Verify with `make generate-check`.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "neo4j-cli/internal/skill/bundle/references/docker.md contains no --await text"
       - "make generate-check is clean (no unexpected drift beyond the docker.md update)"
       - "TestGenerator_RoundTrip passes"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-005
     title: "Add Minor changelog entry for the alias removal"
