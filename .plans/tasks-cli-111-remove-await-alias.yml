@@ -51,12 +51,12 @@ tasks:
       In `CONTRIBUTING.md` §3.5 (around line 211), drop the sentence
       "`--await` is accepted as a deprecated alias for one release and will be removed in the following release."
       The paragraph keeps its `--wait` narrative unchanged.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CONTRIBUTING.md §3.5 paragraph mentions --wait only, no --await text"
       - "grep -n '\\-\\-await' CONTRIBUTING.md returns no hits"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-004
     title: "Regenerate neo4j-cli skill bundle"
