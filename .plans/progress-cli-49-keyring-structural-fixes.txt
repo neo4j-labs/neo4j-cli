@@ -51,3 +51,6 @@ Files: ~common/clicfg/credentials/credentials.go
 ## TASK-009 — 2026-05-28T13:00:00Z
 Defined keyringCredential interface (7 methods) in keyring.go; updated writeToKeyring signature on all three types to accept *[]string for written-key tracking; added saveSensitiveFields, restoreSensitiveFields, and validateForMigration to each type; added compile-time interface assertions; added allCredentials() on Credentials; updated all call sites (credentials.go and *_keyring_test.go files) to pass nil for the new parameter.
 Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go
+
+## REVIEW — 2026-05-28T16:30:00Z
+Added 3 review tasks (task-014..task-016).

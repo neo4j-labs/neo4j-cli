@@ -274,3 +274,102 @@ tasks:
       - "Compile-time interface assertions still pass"
       - "make test, make fmt-check, make lint all pass"
     completed_at: "2026-05-28T16:00:00Z"
+
+  - id: task-014
+    title: "Make MigrateToKeyring own its storageMode transition; simplify set.go"
+    description: |
+      MigrateToInsecure() sets c.storageMode = StorageModeInsecure as an internal side effect.
+      MigrateToKeyring() does not — it leaves storageMode unchanged and expects the caller to call
+      SetStorageMode() after persisting the config key. This asymmetry forces set.go to have two
+      separate credential-storage if-blocks: one for migration (both directions) and a second one
+      only for the keyring direction to call SetStorageMode. Any future maintainer reading the code
+      must understand this hidden coupling to avoid double-setting or missing the mode update.
+
+      Fix: at the end of MigrateToKeyring(), after zeroSensitiveFields() and save() succeed, set
+      c.storageMode = StorageModeKeyring directly (mirroring MigrateToInsecure). In set.go, remove
+      the second if-block that conditionally calls cfg.Credentials.SetStorageMode for the keyring
+      path; the migration method now owns the transition for both directions. The doc comment on
+      MigrateToKeyring that says "This method must be called while storageMode is still
+      StorageModeInsecure" and "The caller should call SetStorageMode after persisting the config
+      key" must be removed or corrected — the precondition is already wrong (the repair pass calls
+      MigrateToKeyring when storageMode is already keyring and it works correctly because fields are
+      zeroed before save() is called).
+
+      Note on save() dispatch: MigrateToKeyring zeroes all sensitive fields before calling save(). If
+      storageMode is insecure at that point, save() calls saveToJSON() (correct, scrubs JSON). If
+      storageMode is already keyring (repair pass), save() calls saveWithKeyring(), which finds all
+      fields zeroed and writes no keyring entries, then scrubs JSON — also correct. Setting
+      c.storageMode = StorageModeKeyring AFTER save() avoids any dispatch ambiguity and is the
+      cleanest placement.
+    status: pending
+    source: review
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "MigrateToKeyring() sets c.storageMode = StorageModeKeyring after save() returns nil"
+      - "The doc comment on MigrateToKeyring no longer says 'must be called while storageMode is insecure' or 'caller should call SetStorageMode'"
+      - "set.go has no post-migration if-block that calls cfg.Credentials.SetStorageMode for the keyring path"
+      - "set.go's credential-storage handling is a single symmetric block: migrate then persist config (SetStorageMode call removed)"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-015
+    title: "Remove remaining misleading storageMode comment from MigrateToKeyring"
+    description: |
+      After task-014, MigrateToKeyring() will set c.storageMode = StorageModeKeyring itself. Any
+      remaining caller-contract language in the doc comment (e.g. references to the caller being
+      responsible for mode transitions, or the SetStorageMode call) should be scrubbed to avoid
+      confusing future readers. This is a documentation-only cleanup pass on credentials.go focused
+      on MigrateToKeyring and any adjacent doc comments that referenced the old storageMode
+      precondition.
+    status: pending
+    source: review
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "MigrateToKeyring's doc comment contains no references to storageMode preconditions or caller-managed mode transitions"
+      - "No other comment in credentials.go or set.go references the old 'caller calls SetStorageMode after MigrateToKeyring' pattern"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-016
+    title: "Replace 6 keyringCredential interface methods with sensitiveFields() for generic implementations"
+    description: |
+      The keyringCredential interface currently has 8 methods. Five of them (zeroSensitiveFields,
+      saveSensitiveFields, restoreSensitiveFields, validateForMigration, and to a large extent
+      writeToKeyring and loadFromKeyring) exist solely to service the generic loops in
+      saveWithKeyring, MigrateToKeyring, and loadSensitiveFieldsFromKeyring. These methods are
+      implementation-detail helpers for a single caller leaking into the interface. The per-type
+      code (aura.go, dbms.go, embed.go) each implement them separately with positional slice
+      indexing and identical structural logic.
+
+      Code-judo move: add a sensitiveField struct to keyring.go:
+        type sensitiveField struct {
+            ptr      *string  // pointer into the credential struct field
+            key      string   // full keyring key string (e.g. "aura/prod/client-secret")
+            required bool     // true: missing → hard error; false: missing → silent skip
+        }
+      Replace the five per-type methods with a single sensitiveFields() []sensitiveField method on
+      each credential type (AuraCredential, DbmsCredential, EmbedCredential). Implement
+      zeroSensitiveFields, validateForMigration, the keyring-write loop, the keyring-read loop
+      (loadFromKeyring/migrateFromKeyring), and the save/zero/restore dance generically in
+      credentials.go using the sensitiveFields() slice. The keyringCredential interface shrinks to
+      two methods: sensitiveFields() []sensitiveField and deleteFromKeyring(provider KeyringProvider)
+      error. Remove the five replaced methods from all three concrete types. Update compile-time
+      assertions. Run make test, make fmt-check, make lint as final gates.
+
+      Per-type sensitiveFields() implementations:
+        AuraCredential: [{&c.ClientSecret, "aura/<name>/client-secret", true},
+                         {&c.AccessToken,  "aura/<name>/access-token",  false}]
+        DbmsCredential: [{&c.Password, "dbms/<name>/password", true}]
+        EmbedCredential:[{&c.APIKey,   "embed/<name>/api-key", false}]
+    status: pending
+    source: review
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "sensitiveField struct defined in keyring.go with ptr *string, key string, required bool"
+      - "sensitiveFields() []sensitiveField method exists on *AuraCredential, *DbmsCredential, *EmbedCredential"
+      - "zeroSensitiveFields, saveSensitiveFields, restoreSensitiveFields, validateForMigration removed from all three concrete types"
+      - "keyringCredential interface has exactly two methods: sensitiveFields() []sensitiveField and deleteFromKeyring(provider KeyringProvider) error"
+      - "saveWithKeyring, MigrateToKeyring, loadSensitiveFieldsFromKeyring, MigrateToInsecure all use generic sensitiveFields() loops"
+      - "Compile-time interface assertions still pass for all three types"
+      - "make test, make fmt-check, make lint all pass"
