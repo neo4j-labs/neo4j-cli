@@ -50,14 +50,14 @@ tasks:
       PATH, hand-author the YAML under .changes/unreleased/ with filename
       `neo4j-cli-Patch-<YYYYMMDD>-<HHMMSS>.yaml` and fields project / kind /
       body / time per the AGENTS.md fallback.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "A new YAML file exists under .changes/unreleased/ tagged project: neo4j-cli and kind: Patch"
       - "Body references OPTIONAL MATCH and vector / full-text search additions to the Virtual Graph forbidden list"
       - "File follows the existing naming convention used by other entries in .changes/unreleased/"
-    completed_at: null
+    completed_at: 2026-05-28T13:55:00Z
 
   - id: task-004
     title: "Run final gates: make test, make fmt-check, make lint, make generate-check"

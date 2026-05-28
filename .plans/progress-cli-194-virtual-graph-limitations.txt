@@ -5,3 +5,7 @@ Files: ~neo4j-cli/internal/skill/query-additions.md
 ## TASK-002 — 2026-05-28T12:00:00Z
 Regenerated skill bundle so the committed copy of query-additions.md matches source.
 Files: ~neo4j-cli/internal/skill/bundle/query-additions.md
+
+## TASK-003 — 2026-05-28T13:55:00Z
+Added Patch changelog entry via `changie new` describing the Virtual Graph forbidden-list additions.
+Files: ~.changes/unreleased/neo4j-cli-Patch-20260528-135434.yaml
