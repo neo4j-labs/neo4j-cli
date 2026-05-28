@@ -15,14 +15,14 @@ tasks:
       the `--wait --await` row, the `deprecationMsg` const, the `wantDeprecated` field, and the stderr-capture
       machinery; keep the `neither flag` and `--wait` rows. Keep `TestRegisterWait_HidesAliasFromHelp` intact
       (positive `--wait` + negative `--await` assertions both stay as regression insurance).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "common/flags/wait.go no longer contains AwaitFlagAlias, the second BoolVar, or the MarkDeprecated call"
       - "neo4j-cli/aura/internal/flags/wait.go no longer re-exports AwaitFlagAlias"
       - "neo4j-cli/aura/internal/flags/wait_test.go retains exactly two table rows (neither + --wait) and the HidesAliasFromHelp test"
       - "go build ./... compiles; go test ./common/flags/... ./neo4j-cli/aura/internal/flags/... passes"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-002
     title: "Strip --await from docker start/stop Examples and delete create_test alias test"

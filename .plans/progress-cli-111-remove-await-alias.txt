@@ -1,0 +1,7 @@
+## 2026-05-28 task-001
+Dropped --await binding from common/flags and aura delegator + pruned wait_test.go.
+- common/flags/wait.go: removed AwaitFlagAlias const, second BoolVar, MarkDeprecated block; updated RegisterWait doc.
+- neo4j-cli/aura/internal/flags/wait.go: removed AwaitFlagAlias re-export; updated comments.
+- neo4j-cli/aura/internal/flags/wait_test.go: reduced to two table rows (neither + --wait); dropped deprecationMsg, wantDeprecated, stderr capture; HidesAliasFromHelp retained.
+Gates: go build OK; go test ./common/flags/... ./neo4j-cli/aura/internal/flags/... OK; make fmt-check OK; make lint OK.
+Note: full `make test` fails on TestCreate_Wait_AwaitAlias_StillWorks — that test is deleted in task-002 (expected).
