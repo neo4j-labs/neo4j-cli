@@ -86,3 +86,7 @@ Added 2 review tasks (task-017..task-018): document gemini env chain + vertex AD
 ## TASK-017 — 2026-05-28T17:15:00Z
 Extended README API-key table row with GEMINI_API_KEY + GOOGLE_API_KEY; rewrote precedence prose to spell out gemini's per-provider env chain and added a dedicated Vertex sentence noting ADC auth (gcloud / GOOGLE_APPLICATION_CREDENTIALS) sits outside the API-key precedence.
 Files: ~README.md
+
+## TASK-018 — 2026-05-28T17:30:00Z
+Rewrote the embed-config tip in additions.md to cover the gemini env chain (GEMINI_API_KEY then GOOGLE_API_KEY) and a dedicated vertex sentence noting ADC auth, no `--api-key`, and stored-cred-only `--vertex-project` / `--vertex-location`. Regenerated bundle.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
