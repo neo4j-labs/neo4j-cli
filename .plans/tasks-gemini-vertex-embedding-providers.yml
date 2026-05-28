@@ -247,3 +247,88 @@ tasks:
       - "`project: neo4j-cli` and `kind: Minor` are set"
       - "`time:` is an RFC3339 timestamp"
     completed_at: 2026-05-28T14:28:21Z
+
+  - id: task-010
+    title: "Fix gemini/vertex example model in `credential embed add`"
+    description: |
+      Both the Gemini and Vertex examples in
+      `neo4j-cli/internal/subcommands/credential/embed/add.go` (currently
+      around lines 58 and 61) use `--model text-embedding-004`. CLI-193's
+      whole point is unblocking users on Document Intelligence graphs that
+      embed with `gemini-embedding-001`, and the PRD's acceptance criteria
+      name that exact model. These examples ship into `--help` output AND
+      into the regenerated skill bundle at
+      `neo4j-cli/internal/skill/bundle/references/credential.md:312-315`,
+      so they're what every human user and every agent will copy. The
+      legacy `text-embedding-004` model won't match the vectors a DI graph
+      already stores, so following the example today produces broken
+      results. Change both examples to use
+      `--model gemini-embedding-001 --dimensions 3072`. Regenerate the
+      skill bundle via `go generate ./neo4j-cli/internal/skill/...` so
+      `references/credential.md` matches. `TestGenerator_RoundTrip` is
+      the gate.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Both Gemini and Vertex examples in `add.go` use `--model gemini-embedding-001 --dimensions 3072`"
+      - "Skill bundle regenerated; `references/credential.md` reflects the new examples"
+      - "`make test` passes (round-trip gate green)"
+      - "`make fmt-check` and `make lint` pass"
+    source: review
+    completed_at: null
+
+  - id: task-011
+    title: "Extract doJSONRequest helper; refactor all 5 embed providers"
+    description: |
+      The new `gemini.go` and `vertex.go` providers, along with the
+      existing `openai.go`, `huggingface.go`, and `ollama.go`, all
+      duplicate ~30 lines of identical JSON-POST boilerplate: build
+      `http.Request`, set `Content-Type`/`Accept`/`User-Agent`,
+      `client.Do(req)`, defer-close response body, status-range check,
+      read up to 4 KiB of body on non-2xx and wrap with
+      `<provider>: HTTP <code>: <snippet>`, `json.NewDecoder().Decode()`.
+      We now have 5 copies of this. The marginal cost of a 6th provider
+      keeps rising, and the "no auth header in error text" invariant
+      lives implicitly in 5 places.
+
+      Extract a `doJSONRequest` helper (or similarly named) inside the
+      `embed` package that takes context, *http.Client, method, URL,
+      request body (as bytes or marshallable struct), arbitrary headers
+      (the per-provider auth header plus standard set), the provider
+      name for the error prefix, and a decode target. The helper handles
+      URL validation via `urlcheck.ValidateRemoteURL`, marshalling (if
+      we pass a struct), request building, header setting (with
+      automatic Content-Type/Accept/User-Agent), Do(), status check, 4
+      KiB snippet on non-2xx, decode. Provider-specific auth headers
+      (Authorization Bearer, x-goog-api-key, etc.) are passed in via the
+      caller's headers map so the helper stays auth-agnostic.
+
+      Refactor all 5 providers to call the helper. Each `Embed` shrinks
+      to: validate required cfg fields, build the per-provider request
+      struct, call the helper, post-process (gemini normalizes;
+      huggingface picks the first sub-array; etc.). All existing tests
+      must pass unchanged — the helper is a pure refactor with no
+      observable behavior change. If a test relies on a specific error
+      wording, keep the wording the same.
+
+      Watch the boundaries: the helper must NOT echo any Authorization /
+      x-goog-api-key value into errors (the request, not the response,
+      carries them — same invariant as today), and the urlcheck step
+      must happen BEFORE the request is built so SSRF tests still pass.
+      Don't change file ownership of the per-provider structs — each
+      provider keeps its own request/response struct definitions in its
+      own file.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "A `doJSONRequest`-style helper exists in the embed package and centralises HTTP request build + status check + 4KiB snippet + JSON decode"
+      - "All 5 providers (openai, ollama, huggingface, gemini, vertex) call the helper instead of duplicating the boilerplate"
+      - "Per-provider `Embed` methods are visibly shorter and contain only request-shape + post-processing logic"
+      - "No existing test required modification (pure refactor)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` still passes (no bundle drift introduced)"
+      - "Auth header values (Authorization Bearer / x-goog-api-key) still never appear in any error message"
+      - "`urlcheck.ValidateRemoteURL` still runs before the request is built so SSRF tests stay green"
+    source: review
+    completed_at: null
