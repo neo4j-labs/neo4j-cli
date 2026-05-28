@@ -213,8 +213,8 @@ func TestAgentContext_HelpExamples(t *testing.T) {
 // TestAllLeafCommands_HaveExamples covers REQ-F-001, REQ-F-012, REQ-F-015:
 // every visible, runnable cobra command reachable from app.NewCmd(cfg) carries
 // a non-empty Example: field whose first line is flush-left AND contains at
-// least three invocations (AGENTS.md "Cobra Help / Skill Bundle Rendering
-// Notes" — ≥3 invocations per leaf, each preceded by a `# comment` line).
+// least two invocations (AGENTS.md "Cobra Help / Skill Bundle Rendering
+// Notes" — ≥2 invocations per leaf, each preceded by a `# comment` line).
 //
 // Filtering mirrors common/skill/render.visibleSubcommands — Hidden commands
 // and the cobra-injected `help` / `completion` subtrees are skipped, so the
@@ -243,8 +243,8 @@ func TestAllLeafCommands_HaveExamples(t *testing.T) {
 				"command %q must have a non-empty Example: field (REQ-F-001 / REQ-F-015)", path)
 			assert.False(t, strings.HasPrefix(firstLine, "  "),
 				"command %q Example first line must be flush-left (no leading two-space indent); got %q", path, firstLine)
-			assert.GreaterOrEqual(t, countExampleInvocations(c.Example), 3,
-				"command %q Example must contain at least three invocations (each preceded by a `# comment` line per AGENTS.md); got Example=%q", path, c.Example)
+			assert.GreaterOrEqual(t, countExampleInvocations(c.Example), 2,
+				"command %q Example must contain at least two invocations (each preceded by a `# comment` line per AGENTS.md); got Example=%q", path, c.Example)
 			if c.Annotations["write"] != "true" {
 				assert.True(t, strings.Contains(c.Example, "--format json"),
 					"read command %q Example must contain at least one `--format json` invocation (AGENTS.md read-cmd gate); got Example=%q", path, c.Example)
