@@ -89,6 +89,29 @@ func deleteKeychainEntry(t *testing.T, service, account string) {
 	}
 }
 
+// findKeychainPassword retrieves the password for service/account from the
+// macOS Keychain via /usr/bin/security. Fatals if the entry is not found.
+func findKeychainPassword(t *testing.T, service, account string) string {
+	t.Helper()
+	out, err := exec.Command(
+		"/usr/bin/security", "find-generic-password",
+		"-s", service, "-a", account, "-w",
+	).Output()
+	require.NoError(t, err, "expected keychain entry service=%s account=%s to exist", service, account)
+	return strings.TrimRight(string(out), "\n")
+}
+
+// requireKeychainAbsent asserts that the given service/account entry does NOT
+// exist in the macOS Keychain.
+func requireKeychainAbsent(t *testing.T, service, account string) {
+	t.Helper()
+	_, err := exec.Command(
+		"/usr/bin/security", "find-generic-password",
+		"-s", service, "-a", account, "-w",
+	).Output()
+	require.Error(t, err, "expected keychain entry service=%s account=%s to be absent", service, account)
+}
+
 // ===========================================================================
 // Happy-path tests — macOS Keychain always available
 // ===========================================================================
@@ -126,6 +149,8 @@ func TestKeyring_Darwin_CredentialAddDoesNotStoreSecretInJSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "darwinsecret",
 		"password must not be stored in credentials.json in keyring mode")
+	assert.Equal(t, "darwinsecret", findKeychainPassword(t, "neo4j-cli", "dbms/darwin-smoke-add/password"),
+		"password must be stored in the Keychain in keyring mode")
 
 	// Clean up Keychain entries written during this test.
 	t.Cleanup(func() {
@@ -159,6 +184,8 @@ func TestKeyring_Darwin_ForwardMigration(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "darwinmigratesecret",
 		"password must be removed from credentials.json after migration to keyring")
+	assert.Equal(t, "darwinmigratesecret", findKeychainPassword(t, "neo4j-cli", "dbms/darwin-migrate-fwd/password"),
+		"password must be stored in the Keychain after migration to keyring")
 
 	// config.json must now say keyring.
 	cfg := readConfigJSON(t, home)
@@ -191,6 +218,8 @@ func TestKeyring_Darwin_ReverseMigration(t *testing.T) {
 		env,
 	)
 	require.Equal(t, 0, exitCode, "forward migration must succeed; stderr=%s", stderr)
+	assert.Equal(t, "darwinreversesecret", findKeychainPassword(t, "neo4j-cli", "dbms/darwin-migrate-rev/password"),
+		"password must be stored in the Keychain after forward migration")
 
 	// Step 3: migrate back to insecure (reverse migration).
 	exitCode, _, stderr = runCLI(t, bin,
@@ -206,6 +235,7 @@ func TestKeyring_Darwin_ReverseMigration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "darwinreversesecret",
 		"password must be restored to credentials.json after reverse migration")
+	requireKeychainAbsent(t, "neo4j-cli", "dbms/darwin-migrate-rev/password")
 
 	// config.json must say insecure.
 	cfg := readConfigJSON(t, home)
@@ -242,6 +272,8 @@ func TestKeyring_Darwin_RemoveCleansKeyring(t *testing.T) {
 		env,
 	)
 	require.Equal(t, 0, exitCode, "credential dbms add must succeed; stderr=%s", stderr)
+	assert.Equal(t, "darwinremovesecret", findKeychainPassword(t, "neo4j-cli", "dbms/darwin-smoke-remove/password"),
+		"password must be stored in the Keychain after add in keyring mode")
 
 	// Remove the credential via the CLI.
 	exitCode, _, stderr = runCLI(t, bin,
@@ -257,6 +289,7 @@ func TestKeyring_Darwin_RemoveCleansKeyring(t *testing.T) {
 	require.True(t, ok, "credentials.json must have a dbms section")
 	dbmsCreds, _ := dbms["credentials"].([]interface{})
 	assert.Empty(t, dbmsCreds, "dbms credentials list must be empty after remove")
+	requireKeychainAbsent(t, "neo4j-cli", "dbms/darwin-smoke-remove/password")
 
 	// Indirect keyring probe: switch to insecure. If the Keychain entry for
 	// "darwin-smoke-remove" were still present, MigrateToInsecure would have tried
