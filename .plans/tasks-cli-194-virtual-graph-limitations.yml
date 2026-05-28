@@ -67,7 +67,7 @@ tasks:
       `make test` runs TestGenerator_RoundTrip (the bundle-drift gate) along
       with the rest of the suite. `make fmt-check` and `make lint` are the
       formatting and lint gates per AGENTS.md.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -76,4 +76,4 @@ tasks:
       - "`make test` exits 0 (TestGenerator_RoundTrip in particular passes)"
       - "`make fmt-check` exits 0"
       - "`make lint` exits 0"
-    completed_at: null
+    completed_at: 2026-05-28T14:00:00Z
