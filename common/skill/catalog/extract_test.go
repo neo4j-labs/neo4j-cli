@@ -264,6 +264,8 @@ func TestClassifyEntry(t *testing.T) {
 		{name: "hardlink", hdr: &tar.Header{Name: "top/x", Typeflag: tar.TypeLink}, wantErr: true},
 		{name: "char device", hdr: &tar.Header{Name: "top/x", Typeflag: tar.TypeChar}, wantErr: true},
 		{name: "fifo", hdr: &tar.Header{Name: "top/x", Typeflag: tar.TypeFifo}, wantErr: true},
+		{name: "pax global header skipped", hdr: &tar.Header{Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader}, wantOK: false},
+		{name: "pax extended header skipped", hdr: &tar.Header{Name: "top/skill/SKILL.md", Typeflag: tar.TypeXHeader}, wantOK: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

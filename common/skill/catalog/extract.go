@@ -137,6 +137,12 @@ func classifyEntry(hdr *tar.Header) (string, bool, error) {
 
 	switch hdr.Typeflag {
 	case tar.TypeReg, tar.TypeDir: //nolint:staticcheck
+	case tar.TypeXHeader, tar.TypeXGlobalHeader:
+		// PAX extended/global headers are metadata containers the Go tar
+		// reader merges into the next real entry — never written to disk.
+		// GitHub's codeload tarballs always include a leading
+		// `pax_global_header` so silently skipping is the correct behaviour.
+		return "", false, nil
 	case tar.TypeSymlink, tar.TypeLink:
 		return "", false, fmt.Errorf("catalog: rejecting link tar entry %q (type %c)", name, hdr.Typeflag)
 	default:
