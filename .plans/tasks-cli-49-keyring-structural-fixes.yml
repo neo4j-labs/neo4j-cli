@@ -1,7 +1,7 @@
 feature: cli-49-keyring-structural-fixes
 prd: ./prd-cli-49-keyring-structural-fixes.md
 created_at: 2026-05-28T00:00:00Z
-updated_at: 2026-05-28T13:00:00Z
+updated_at: 2026-05-28T18:00:00Z
 
 tasks:
   - id: task-001
@@ -375,4 +375,61 @@ tasks:
       - "keyringCredential interface has exactly two methods: sensitiveFields() []sensitiveField and deleteFromKeyring(provider KeyringProvider) error"
       - "saveWithKeyring, MigrateToKeyring, loadSensitiveFieldsFromKeyring, MigrateToInsecure all use generic sensitiveFields() loops"
       - "Compile-time interface assertions still pass for all three types"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-017
+    title: "Extract removeAndCleanKeyring helper; deduplicate RemoveAura/Dbms/Embed"
+    description: |
+      RemoveAura, RemoveDbms, and RemoveEmbed in credentials.go are line-for-line copies of the same
+      three-step pattern: Get the credential item, call the type-specific Remove, then (in keyring mode)
+      call cred.deleteFromKeyring and write any error as a warning to warnW.
+
+      Add a private method on Credentials:
+        func (c *Credentials) removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error
+
+      The method calls remove(); if that succeeds and storageMode == StorageModeKeyring, it calls
+      cred.deleteFromKeyring(defaultKeyring) and writes any non-nil error as a warning to warnW. No
+      error is returned for keyring cleanup failures.
+
+      Rewrite each Remove* method to: Get the item, return the Get error if any, then delegate to
+      c.removeAndCleanKeyring(cred, func() error { return c.Xxx.Remove(name) }, warnW).
+
+      No behaviour changes — the three methods must exhibit identical observable behaviour after the
+      refactor. Run make test, make fmt-check, make lint as final gates.
+    status: not_started
+    source: review
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error method exists on Credentials"
+      - "RemoveAura, RemoveDbms, and RemoveEmbed each call c.removeAndCleanKeyring with no inline storageMode check or deleteFromKeyring call"
+      - "No storageMode == StorageModeKeyring check and no deleteFromKeyring call appear in the bodies of RemoveAura/RemoveDbms/RemoveEmbed"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-018
+    title: "Warn on non-ErrNotFound errors in loadCredFromKeyring"
+    description: |
+      In loadCredFromKeyring (credentials.go, the startup/SetStorageMode path), when a keyring read
+      returns an error that is not ErrNotFound, the function currently silently stops processing
+      remaining sensitive fields and returns migrated=false with no output. The warnW parameter is
+      threaded through this call chain for exactly this purpose but goes unused on this path.
+
+      Fix: before the early return on a non-ErrNotFound error, write a warning to warnW:
+        fmt.Fprintf(warnW, "Warning: keyring read failed for %s: %v\n", f.key, err) //nolint:errcheck
+        return migrated
+
+      This surfaces unexpected keyring I/O failures (daemon crash, permission denied) immediately
+      rather than letting the user encounter confusing downstream auth errors.
+
+      Add a test in the appropriate keyring test file asserting that when the mock keyring returns a
+      non-ErrNotFound error for a field, the warning appears in the bytes.Buffer passed as warnW.
+      Run make test, make fmt-check, make lint as final gates.
+    status: not_started
+    source: review
+    dependencies:
+      - task-017
+    acceptance_criteria:
+      - "loadCredFromKeyring writes 'Warning: keyring read failed for <key>: <err>' to warnW before returning on non-ErrNotFound errors"
+      - "A test asserts the warning appears in the warnW buffer when the keyring returns an unexpected error"
+      - "ErrNotFound paths (missing field, auto-migrate) are unaffected"
       - "make test, make fmt-check, make lint all pass"

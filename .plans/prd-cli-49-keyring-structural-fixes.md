@@ -68,7 +68,15 @@ The keyring credential storage implementation (`common/clicfg/credentials/`) is 
 - **REQ-NF-002**: No new exported symbols except the per-type keyring methods in REQ-F-001 (which must be exported since they are called from `credentials.go` in the same package — they may remain unexported).
 - **REQ-NF-003**: All existing tests in `credentials_keyring_test.go` must continue to pass. Any test that previously captured `os.Stderr` output for warning assertions must be updated to assert against the `io.Writer` passed to `SetStorageMode`.
 
+- **REQ-F-012**: Extract a private `removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error` method on `Credentials` that captures the three-step pattern shared by `RemoveAura`, `RemoveDbms`, and `RemoveEmbed`: call `remove()`, then — only when `c.storageMode == StorageModeKeyring` — call `cred.deleteFromKeyring(defaultKeyring)` and write any error to `warnW` as a warning. Rewrite all three `Remove*` methods to: (1) call the type-specific `Get`, (2) call `c.removeAndCleanKeyring(cred, func() error { return c.Xxx.Remove(name) }, warnW)`. Any future change to keyring cleanup policy (retry logic, warning format, audit logging) then requires a single edit.
+
+- **REQ-F-013**: In `loadCredFromKeyring` (`credentials.go`), when a sensitive field read returns a non-`ErrNotFound` error, write a warning to `warnW` before returning — consistent with how `warnW` is used for missing required fields in the same function. The fix replaces the silent `return migrated` with `fmt.Fprintf(warnW, "Warning: keyring read failed for %s: %v\n", f.key, err)` before returning, so the user receives a diagnostic when keyring I/O fails unexpectedly (daemon crash, permission denied) rather than seeing confusing downstream auth failures with no indication of root cause.
+
 ## Technical Considerations
+
+- **`removeAndCleanKeyring` parameter ordering**: The `cred keyringCredential` parameter comes before `remove func() error` so callers read naturally as "for this credential, call this removal function". The `warnW` comes last to match the existing `Remove*` signatures and Go convention for optional writers.
+
+- **`loadCredFromKeyring` warning format**: Use `"Warning: keyring read failed for %s: %v\n"` with `f.key` and `err` as arguments — parallel to the existing missing-field warning and consistent with the `//nolint:errcheck` pattern used elsewhere in this function for best-effort `fmt.Fprintf` calls.
 
 - **`writeToKeyring` signature change**: The existing per-type `writeToKeyring(provider KeyringProvider) error` must become `writeToKeyring(provider KeyringProvider, written *[]string) error`. The `written` pointer is nil-safe: implementations append to `*written` only when `written != nil`. `saveWithKeyring` passes `nil`; `MigrateToKeyring` passes `&writtenKeys`. All existing call sites (`saveWithKeyring` loop in task-005 output) must be updated to pass the second argument.
 
@@ -110,6 +118,11 @@ The keyring credential storage implementation (`common/clicfg/credentials/`) is 
 - [ ] `AuraCredentials`, `DbmsCredentials`, and `EmbedCredentials` each have a `deleteFromKeyring(provider KeyringProvider, name string) error` method encapsulating all keyring keys for that type.
 - [ ] `RemoveAura`, `RemoveDbms`, and `RemoveEmbed` call the per-type `deleteFromKeyring` methods directly; no string-based type discriminator is passed.
 - [ ] All field-name knowledge for keyring deletion lives in the per-type files (`aura.go`, `dbms.go`, `embed.go`).
+- [ ] A private `removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error` method exists on `Credentials` and contains the only copy of the get→remove→keyring-cleanup logic.
+- [ ] `RemoveAura`, `RemoveDbms`, and `RemoveEmbed` each call `c.removeAndCleanKeyring` and contain no inline `storageMode` check or `deleteFromKeyring` call.
+- [ ] `loadCredFromKeyring` writes `"Warning: keyring read failed for %s: %v\n"` to `warnW` for any non-`ErrNotFound` error before returning `migrated`.
+- [ ] A test covers the non-`ErrNotFound` error path in `loadCredFromKeyring` and asserts the warning appears in the `warnW` buffer.
+- [ ] `make test`, `make lint`, `make fmt-check` pass.
 
 ## Out of Scope
 
