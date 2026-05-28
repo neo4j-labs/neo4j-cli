@@ -29,6 +29,10 @@ Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo
 ## TASK-008 — 2026-05-28T12:00:00Z
 Final gates: make test, make fmt-check, make lint all pass with 0 issues after all structural refactors.
 
+## TASK-010 — 2026-05-28T14:00:00Z
+Rewrote saveWithKeyring and MigrateToKeyring to use c.allCredentials() iterator; also collapsed remaining triple loops in MigrateToInsecure and loadSensitiveFieldsFromKeyring per reviewer feedback; removed stale comment on allCredentials(). No per-type inline loops remain anywhere in credentials.go.
+Files: ~common/clicfg/credentials/credentials.go
+
 ## TASK-009 — 2026-05-28T13:00:00Z
 Defined keyringCredential interface (7 methods) in keyring.go; updated writeToKeyring signature on all three types to accept *[]string for written-key tracking; added saveSensitiveFields, restoreSensitiveFields, and validateForMigration to each type; added compile-time interface assertions; added allCredentials() on Credentials; updated all call sites (credentials.go and *_keyring_test.go files) to pass nil for the new parameter.
 Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go

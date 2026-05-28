@@ -58,10 +58,7 @@ func NewCredentials(fs afero.Fs, configPrefix string) *Credentials {
 	return &c
 }
 
-// allCredentials returns all credentials across Aura, Dbms, and Embed in that
-// order, as the keyringCredential interface. This is used by credential-agnostic
-// loops in saveWithKeyring, MigrateToKeyring, and related functions.
-func (c *Credentials) allCredentials() []keyringCredential { //nolint:unused // consumed in task-010
+func (c *Credentials) allCredentials() []keyringCredential {
 	result := make([]keyringCredential, 0, len(c.Aura.Credentials)+len(c.Dbms.Credentials)+len(c.Embed.Credentials))
 	for _, cred := range c.Aura.Credentials {
 		result = append(result, cred)
@@ -219,18 +216,9 @@ func (c *Credentials) saveToJSON() error {
 // the OS keyring daemon is unavailable); file I/O and JSON marshal errors
 // still panic, consistent with the insecure-mode save() path.
 func (c *Credentials) saveWithKeyring() error {
-	// Write sensitive fields to keyring before zeroing them in the JSON file.
-	for _, cred := range c.Aura.Credentials {
-		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
-			return err
-		}
-	}
-	for _, cred := range c.Dbms.Credentials {
-		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
-			return err
-		}
-	}
-	for _, cred := range c.Embed.Credentials {
+	all := c.allCredentials()
+
+	for _, cred := range all {
 		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
 			return err
 		}
@@ -239,35 +227,14 @@ func (c *Credentials) saveWithKeyring() error {
 	// Save sensitive field values, zero them in-memory, write scrubbed JSON,
 	// then restore. saveToJSON() panics on marshal/write errors so no error
 	// return path requires the restore — it is unconditional.
-	type auraFields struct{ secret, token string }
-	auraSaved := make([]auraFields, len(c.Aura.Credentials))
-	for i, cred := range c.Aura.Credentials {
-		auraSaved[i] = auraFields{cred.ClientSecret, cred.AccessToken}
+	saved := make([][]string, len(all))
+	for i, cred := range all {
+		saved[i] = cred.saveSensitiveFields()
 		cred.zeroSensitiveFields()
 	}
-	type dbmsFields struct{ pwd string }
-	dbmsSaved := make([]dbmsFields, len(c.Dbms.Credentials))
-	for i, cred := range c.Dbms.Credentials {
-		dbmsSaved[i] = dbmsFields{cred.Password}
-		cred.zeroSensitiveFields()
-	}
-	type embedFields struct{ key string }
-	embedSaved := make([]embedFields, len(c.Embed.Credentials))
-	for i, cred := range c.Embed.Credentials {
-		embedSaved[i] = embedFields{cred.APIKey}
-		cred.zeroSensitiveFields()
-	}
-
 	_ = c.saveToJSON() //nolint:errcheck // saveToJSON always returns nil; panics on marshal/write error
-	for i, cred := range c.Aura.Credentials {
-		cred.ClientSecret = auraSaved[i].secret
-		cred.AccessToken = auraSaved[i].token
-	}
-	for i, cred := range c.Dbms.Credentials {
-		cred.Password = dbmsSaved[i].pwd
-	}
-	for i, cred := range c.Embed.Credentials {
-		cred.APIKey = embedSaved[i].key
+	for i, cred := range all {
+		cred.restoreSensitiveFields(saved[i])
 	}
 	return nil
 }
@@ -306,81 +273,35 @@ func (c *Credentials) MigrateToKeyring() error {
 		)
 	}
 
-	// written tracks every (user-key) pair written so far so we can roll back
+	all := c.allCredentials()
+
+	// writtenKeys tracks every keyring key written so far so we can roll back
 	// on partial failure.
-	type entry struct{ user string }
-	var written []entry
+	var writtenKeys []string
 
 	rollback := func() {
-		for _, e := range written {
-			// best-effort; ignore errors on rollback
-			_ = defaultKeyring.Delete(ServiceName, e.user)
+		for _, key := range writtenKeys {
+			_ = defaultKeyring.Delete(ServiceName, key)
 		}
 	}
 
-	setKey := func(user, value string) error {
-		if err := defaultKeyring.Set(ServiceName, user, value); err != nil {
-			rollback()
-			return fmt.Errorf("keyring set %s: %w", user, err)
-		}
-		written = append(written, entry{user: user})
-		return nil
-	}
-
-	// --- Aura credentials ---
-	for _, cred := range c.Aura.Credentials {
-		// ClientSecret is required
-		if cred.ClientSecret == "" {
-			rollback()
-			return clierr.NewUsageError(
-				"cannot migrate credential %q: aura client-secret is empty; run `credential aura-client remove %s` and re-add it",
-				cred.Name, cred.Name,
-			)
-		}
-		if err := setKey(KeyringKey("aura", cred.Name, "client-secret"), cred.ClientSecret); err != nil {
-			return err
-		}
-		// AccessToken is optional
-		if cred.AccessToken != "" {
-			if err := setKey(KeyringKey("aura", cred.Name, "access-token"), cred.AccessToken); err != nil {
-				return err
-			}
-		}
-	}
-
-	// --- Dbms credentials ---
-	for _, cred := range c.Dbms.Credentials {
-		// Password is required
-		if cred.Password == "" {
-			rollback()
-			return clierr.NewUsageError(
-				"cannot migrate credential %q: dbms password is empty; run `credential dbms remove %s` and re-add it",
-				cred.Name, cred.Name,
-			)
-		}
-		if err := setKey(KeyringKey("dbms", cred.Name, "password"), cred.Password); err != nil {
+	// Validate all credentials before writing any keyring entries.
+	for _, cred := range all {
+		if err := cred.validateForMigration(); err != nil {
 			return err
 		}
 	}
 
-	// --- Embed credentials ---
-	for _, cred := range c.Embed.Credentials {
-		// APIKey is optional
-		if cred.APIKey != "" {
-			if err := setKey(KeyringKey("embed", cred.Name, "api-key"), cred.APIKey); err != nil {
-				return err
-			}
+	// Write sensitive fields to the keyring, tracking each written key for rollback.
+	for _, cred := range all {
+		if err := cred.writeToKeyring(defaultKeyring, &writtenKeys); err != nil {
+			rollback()
+			return err
 		}
 	}
 
 	// Zero sensitive in-memory fields and persist scrubbed JSON.
-	for _, cred := range c.Aura.Credentials {
-		cred.zeroSensitiveFields()
-	}
-	for _, cred := range c.Dbms.Credentials {
-		cred.zeroSensitiveFields()
-	}
-	for _, cred := range c.Embed.Credentials {
+	for _, cred := range all {
 		cred.zeroSensitiveFields()
 	}
 	if err := c.save(); err != nil {
@@ -425,24 +346,7 @@ func (c *Credentials) MigrateToInsecure() error {
 		}
 	}
 
-	// --- Aura credentials ---
-	for _, cred := range c.Aura.Credentials {
-		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
-			zero()
-			return err
-		}
-	}
-
-	// --- Dbms credentials ---
-	for _, cred := range c.Dbms.Credentials {
-		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
-			zero()
-			return err
-		}
-	}
-
-	// --- Embed credentials ---
-	for _, cred := range c.Embed.Credentials {
+	for _, cred := range c.allCredentials() {
 		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
 			zero()
 			return err
@@ -572,17 +476,7 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
 	// (idempotent) and produce a scrubbed JSON snapshot.
 	anyMigrated := false
 
-	for _, cred := range c.Aura.Credentials {
-		if cred.loadFromKeyring(defaultKeyring, warnW) {
-			anyMigrated = true
-		}
-	}
-	for _, cred := range c.Dbms.Credentials {
-		if cred.loadFromKeyring(defaultKeyring, warnW) {
-			anyMigrated = true
-		}
-	}
-	for _, cred := range c.Embed.Credentials {
+	for _, cred := range c.allCredentials() {
 		if cred.loadFromKeyring(defaultKeyring, warnW) {
 			anyMigrated = true
 		}

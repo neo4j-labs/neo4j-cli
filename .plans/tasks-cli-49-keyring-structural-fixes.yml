@@ -186,7 +186,7 @@ tasks:
       single iterations over c.allCredentials(). MigrateToKeyring passes &writtenKeys to
       writeToKeyring for exact rollback tracking. saveWithKeyring passes nil. Run make test,
       make fmt-check, and make lint as final gates.
-    status: in_progress
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -194,7 +194,7 @@ tasks:
       - "MigrateToKeyring has no per-type triple loops; uses c.allCredentials() with writtenKeys tracking"
       - "Rollback in MigrateToKeyring still uses exact written keys (not coarse delete-all)"
       - "make test, make lint, make fmt-check all pass"
-    completed_at: null
+    completed_at: "2026-05-28T14:00:00Z"
 
   - id: task-011
     title: "Replace DeleteKeyringEntries string dispatch with per-type deleteFromKeyring methods"
