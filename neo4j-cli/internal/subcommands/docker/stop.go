@@ -53,8 +53,8 @@ neo4j-cli docker stop dev --rw
 # Stop and block until the container has fully exited before returning
 neo4j-cli docker stop dev --wait --rw
 
-# Same as above using the deprecated --await alias
-neo4j-cli docker stop dev --await --rw`,
+# Stop a different managed container and wait for exit
+neo4j-cli docker stop staging --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]

@@ -34,7 +34,7 @@ tasks:
       `--wait --rw` variant against a differently-named container, matching the existing tone).
       Delete `TestCreate_Wait_AwaitAlias_StillWorks` (currently ~lines 826-860) from
       `neo4j-cli/internal/subcommands/docker/create_test.go`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -43,7 +43,7 @@ tasks:
       - "TestCreate_Wait_AwaitAlias_StillWorks is removed from create_test.go"
       - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
       - "go test ./neo4j-cli/internal/subcommands/agentcontext/... passes (Example-count gate)"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-003
     title: "Drop --await sentence from CONTRIBUTING.md §3.5"

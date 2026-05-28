@@ -823,42 +823,6 @@ func TestCreate_Wait_Timeout_ReturnsErrorAndLeavesContainerRunning(t *testing.T)
 	assert.Empty(t, fake.RemoveForceCalls, "timeout must not remove the container")
 }
 
-func TestCreate_Wait_AwaitAlias_StillWorks(t *testing.T) {
-	// The flags.RegisterWait helper also registers the deprecated --await
-	// alias (CLI-87). Make sure passing --await reaches the same code path
-	// so users with stale muscle memory don't silently miss the readiness
-	// probe. The alias prints a cobra deprecation notice to stderr; we
-	// only assert behavioural equivalence here.
-	var calls int32
-	withCreateWaitProbe(t, func(_ context.Context, _, _, _ string, _ time.Duration) error {
-		atomic.AddInt32(&calls, 1)
-		return nil
-	})
-
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	fake := newFakeDockerClient()
-	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
-	t.Cleanup(func() { clientFactory = origFactory })
-
-	stubListenerFactory(t)
-
-	cmd := NewCmd(cfg)
-	flags.RegisterOutputFlag(cmd, cfg)
-	cmd.SetOut(bytes.NewBuffer(nil))
-	cmd.SetErr(bytes.NewBuffer(nil))
-	cmd.SetArgs([]string{"create", "--name", "dev", "--await"})
-
-	require.NoError(t, cmd.Execute())
-	assert.Equal(t, int32(1), atomic.LoadInt32(&calls))
-}
-
 func TestCreate_NoWait_DoesNotInvokeBoltProbe(t *testing.T) {
 	// Without --wait, the readiness probe must never run — create.go is
 	// strictly fire-and-forget.

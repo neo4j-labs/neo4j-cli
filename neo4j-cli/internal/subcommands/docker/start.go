@@ -70,10 +70,7 @@ neo4j-cli docker start dev --rw
 neo4j-cli docker start dev --wait --rw
 
 # Wait for a container started with --no-store-credential (TCP fallback)
-neo4j-cli docker start dev --wait --rw
-
-# Same as above using the deprecated --await alias
-neo4j-cli docker start dev --await --rw`,
+neo4j-cli docker start dev --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]

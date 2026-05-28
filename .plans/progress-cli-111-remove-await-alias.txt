@@ -5,3 +5,10 @@ Dropped --await binding from common/flags and aura delegator + pruned wait_test.
 - neo4j-cli/aura/internal/flags/wait_test.go: reduced to two table rows (neither + --wait); dropped deprecationMsg, wantDeprecated, stderr capture; HidesAliasFromHelp retained.
 Gates: go build OK; go test ./common/flags/... ./neo4j-cli/aura/internal/flags/... OK; make fmt-check OK; make lint OK.
 Note: full `make test` fails on TestCreate_Wait_AwaitAlias_StillWorks — that test is deleted in task-002 (expected).
+
+## 2026-05-28 task-002
+Stripped --await from docker start/stop Examples and deleted TestCreate_Wait_AwaitAlias_StillWorks.
+- docker/start.go: removed trailing --await example pair; existing TCP-fallback line retained for the 3rd invocation.
+- docker/stop.go: removed --await example pair; added "staging --wait --rw" as the 3rd invocation to stay ≥3.
+- docker/create_test.go: deleted TestCreate_Wait_AwaitAlias_StillWorks (lines 826-860).
+Gates: make fmt-check OK; make lint OK; docker + agentcontext tests pass; TestGenerator_RoundTrip fails as expected (bundle regen is task-004).
