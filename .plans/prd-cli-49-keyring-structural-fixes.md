@@ -60,6 +60,8 @@ The keyring credential storage implementation (`common/clicfg/credentials/`) is 
   - `saveWithKeyring`: one loop over `c.allCredentials()` for `writeToKeyring(defaultKeyring, nil)`, one loop to save fields + zero via `saveSensitiveFields()`/`zeroSensitiveFields()`, one call to `saveToJSON()`, one loop to restore via `restoreSensitiveFields()`.
   - `MigrateToKeyring`: one loop over `c.allCredentials()` that calls `validateForMigration()` then `writeToKeyring(defaultKeyring, &writtenKeys)` per credential; rollback iterates `writtenKeys` (exact key tracking preserved); one subsequent loop to zero via `zeroSensitiveFields()`.
 
+- **REQ-F-011**: Replace `Credentials.DeleteKeyringEntries(credType, name string) error` with per-credential-type `deleteFromKeyring(provider KeyringProvider, name string) error` methods on each of `*AuraCredentials`, `*DbmsCredentials`, and `*EmbedCredentials`. Each method encapsulates the full set of keyring keys for that type (e.g., `AuraCredentials.deleteFromKeyring` deletes `client-secret` and `access-token`; `DbmsCredentials.deleteFromKeyring` deletes `password`; `EmbedCredentials.deleteFromKeyring` deletes `api-key`). Deletions are best-effort: `ErrNotFound` is silently ignored; any other error is returned (joined for multi-field types). The typed `deleteFromKeyring` methods on the `*XCredentials` plural types take `name` as a parameter (the credential was already removed from the slice by `Remove`, so it cannot be looked up). `RemoveAura`, `RemoveDbms`, and `RemoveEmbed` in `credentials.go` call the per-type `deleteFromKeyring` method directly; `DeleteKeyringEntries` is removed. All key-name knowledge for deletion is co-located with the credential type, consistent with `writeToKeyring`, `loadFromKeyring`, and `migrateFromKeyring`.
+
 ### Non-Functional Requirements
 
 - **REQ-NF-001**: `make test`, `make lint`, and `make fmt-check` must all pass after the refactor.
@@ -104,6 +106,10 @@ The keyring credential storage implementation (`common/clicfg/credentials/`) is 
 - [ ] `MigrateToInsecure` sets `c.storageMode = StorageModeInsecure` before saving; `config/set.go`'s post-migration `SetStorageMode` call for the insecure path is removed.
 - [ ] All call sites pass `cmd.ErrOrStderr()` (cobra commands) or `os.Stderr` (initialization) to `SetStorageMode`.
 - [ ] `make test`, `make lint`, `make fmt-check` pass.
+- [ ] `Credentials.DeleteKeyringEntries` function is removed from `credentials.go`.
+- [ ] `AuraCredentials`, `DbmsCredentials`, and `EmbedCredentials` each have a `deleteFromKeyring(provider KeyringProvider, name string) error` method encapsulating all keyring keys for that type.
+- [ ] `RemoveAura`, `RemoveDbms`, and `RemoveEmbed` call the per-type `deleteFromKeyring` methods directly; no string-based type discriminator is passed.
+- [ ] All field-name knowledge for keyring deletion lives in the per-type files (`aura.go`, `dbms.go`, `embed.go`).
 
 ## Out of Scope
 

@@ -1,7 +1,7 @@
 feature: cli-49-keyring-structural-fixes
 prd: ./prd-cli-49-keyring-structural-fixes.md
 created_at: 2026-05-28T00:00:00Z
-updated_at: 2026-05-28T12:30:00Z
+updated_at: 2026-05-28T13:00:00Z
 
 tasks:
   - id: task-001
@@ -186,12 +186,38 @@ tasks:
       single iterations over c.allCredentials(). MigrateToKeyring passes &writtenKeys to
       writeToKeyring for exact rollback tracking. saveWithKeyring passes nil. Run make test,
       make fmt-check, and make lint as final gates.
-    status: pending
+    status: in_progress
     dependencies:
       - task-009
     acceptance_criteria:
       - "saveWithKeyring has no per-type triple loops; uses c.allCredentials() for all three phases"
       - "MigrateToKeyring has no per-type triple loops; uses c.allCredentials() with writtenKeys tracking"
       - "Rollback in MigrateToKeyring still uses exact written keys (not coarse delete-all)"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: null
+
+  - id: task-011
+    title: "Replace DeleteKeyringEntries string dispatch with per-type deleteFromKeyring methods"
+    description: |
+      Remove Credentials.DeleteKeyringEntries(credType, name string) error from credentials.go.
+      Add deleteFromKeyring(provider KeyringProvider, name string) error to *AuraCredentials,
+      *DbmsCredentials, and *EmbedCredentials in their respective type files (aura.go, dbms.go,
+      embed.go). Each method encapsulates all key-name knowledge for that type: AuraCredentials
+      deletes client-secret and access-token (joining errors); DbmsCredentials deletes password;
+      EmbedCredentials deletes api-key. ErrNotFound is silently ignored; other errors are returned.
+      Update RemoveAura, RemoveDbms, and RemoveEmbed in credentials.go to call the per-type method
+      directly, eliminating the string type discriminator. Add tests for deleteFromKeyring on each
+      type (ErrNotFound ignored, non-ErrNotFound errors surfaced). Run make test, make lint,
+      make fmt-check as final gates.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "DeleteKeyringEntries is removed from credentials.go"
+      - "AuraCredentials, DbmsCredentials, and EmbedCredentials each have deleteFromKeyring(provider KeyringProvider, name string) error"
+      - "Each deleteFromKeyring method handles ErrNotFound silently and returns other errors"
+      - "RemoveAura, RemoveDbms, RemoveEmbed call per-type deleteFromKeyring directly with no string type discriminator"
+      - "All key-name knowledge for deletion lives in aura.go, dbms.go, embed.go respectively"
+      - "Tests cover ErrNotFound-ignored and non-ErrNotFound-error paths for each type"
       - "make test, make lint, make fmt-check all pass"
     completed_at: null
