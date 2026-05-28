@@ -85,6 +85,9 @@ func (c *Catalog) Load(filesystem afero.Fs) error {
 	if jerr := json.Unmarshal(data, &pj); jerr != nil {
 		return fmt.Errorf("catalog: parse plugin.json: %w", jerr)
 	}
+	if !ValidSkillName(pj.Version) {
+		return fmt.Errorf("catalog: cached plugin.json has unsafe version %q", pj.Version)
+	}
 
 	c.Version = pj.Version
 	c.Skills = skillEntriesFromPluginJSON(pj.Skills)

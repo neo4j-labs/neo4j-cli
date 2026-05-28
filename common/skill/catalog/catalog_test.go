@@ -67,6 +67,14 @@ func TestLoad_Errors(t *testing.T) {
 				_ = afero.WriteFile(fs, filepath.Join(root, "plugin.json"), []byte("not-json"), 0600)
 			},
 		},
+		{
+			name:      "unsafe version in cached plugin.json",
+			cacheRoot: filepath.Join("cache", "neo4j-cli", "skill-catalog"),
+			setup: func(fs afero.Fs, root string) {
+				_ = fs.MkdirAll(root, 0755)
+				_ = afero.WriteFile(fs, filepath.Join(root, "plugin.json"), []byte(`{"version":"..","skills":[]}`), 0600)
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
