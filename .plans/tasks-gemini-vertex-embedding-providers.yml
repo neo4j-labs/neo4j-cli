@@ -767,7 +767,7 @@ tasks:
 
       No new tests; this is doc content picked up by the existing
       round-trip gate.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`additions.md` embed-config tip names `GEMINI_API_KEY` / `GOOGLE_API_KEY` in the per-provider env chain"
@@ -777,5 +777,4 @@ tasks:
       - "`TestGenerator_RoundTrip` passes"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
-    status: completed
     completed_at: 2026-05-28T17:30:00Z
