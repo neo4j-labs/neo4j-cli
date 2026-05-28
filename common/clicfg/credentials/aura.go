@@ -5,6 +5,9 @@ package credentials
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -171,4 +174,97 @@ func (credential *AuraCredential) HasValidAccessToken() bool {
 	}
 
 	return true
+}
+
+func (c *AuraCredential) zeroSensitiveFields() {
+	c.ClientSecret = ""
+	c.AccessToken = ""
+}
+
+// writeToKeyring writes non-empty sensitive fields to the keyring.
+func (c *AuraCredential) writeToKeyring(provider KeyringProvider) error {
+	if c.ClientSecret != "" {
+		if err := provider.Set(ServiceName, KeyringKey("aura", c.Name, "client-secret"), c.ClientSecret); err != nil {
+			return fmt.Errorf("keyring set aura/%s/client-secret: %w", c.Name, err)
+		}
+	}
+	if c.AccessToken != "" {
+		if err := provider.Set(ServiceName, KeyringKey("aura", c.Name, "access-token"), c.AccessToken); err != nil {
+			return fmt.Errorf("keyring set aura/%s/access-token: %w", c.Name, err)
+		}
+	}
+	return nil
+}
+
+// loadFromKeyring populates sensitive fields from the keyring (startup/SetStorageMode path).
+// ClientSecret: ErrNotFound + JSON value present → auto-migrate to keyring (returns migrated=true);
+// ErrNotFound + no JSON value → warn to warnW.
+// AccessToken: optional; ErrNotFound is fine; auto-migrate if JSON value present.
+// Returns true if at least one field was successfully written to the keyring during auto-migration.
+func (c *AuraCredential) loadFromKeyring(provider KeyringProvider, warnW io.Writer) (migrated bool) {
+	secret, err := provider.Get(ServiceName, KeyringKey("aura", c.Name, "client-secret"))
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			return false
+		}
+		if c.ClientSecret == "" {
+			fmt.Fprintf(warnW, "Warning: keyring entry missing for credential %q (aura client-secret); run `credential aura-client remove %s` and re-add it\n", c.Name, c.Name) //nolint:errcheck
+		} else if setErr := provider.Set(ServiceName, KeyringKey("aura", c.Name, "client-secret"), c.ClientSecret); setErr == nil {
+			migrated = true
+		}
+	} else {
+		c.ClientSecret = secret
+	}
+
+	token, err := provider.Get(ServiceName, KeyringKey("aura", c.Name, "access-token"))
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			return migrated
+		}
+		if c.AccessToken != "" {
+			if setErr := provider.Set(ServiceName, KeyringKey("aura", c.Name, "access-token"), c.AccessToken); setErr == nil {
+				migrated = true
+			}
+		}
+	} else {
+		c.AccessToken = token
+	}
+
+	return migrated
+}
+
+// migrateFromKeyring reads sensitive fields from the keyring (MigrateToInsecure path).
+// ClientSecret is required: ErrNotFound + in-memory non-empty → no-op (REQ-F-018);
+// ErrNotFound + empty → clierr.UsageError.
+// AccessToken is optional: ErrNotFound silently skips.
+// Successfully populated fields are appended to filled so the caller can zero them on failure
+// or delete keyring entries on success.
+func (c *AuraCredential) migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error {
+	secret, err := provider.Get(ServiceName, KeyringKey("aura", c.Name, "client-secret"))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			if c.ClientSecret != "" {
+				return nil
+			}
+			return clierr.NewUsageError(
+				"cannot migrate credential %q: aura client-secret not found in keyring; run `credential aura-client remove %s` and re-add it",
+				c.Name, c.Name,
+			)
+		}
+		return fmt.Errorf("keyring get aura/%s/client-secret: %w", c.Name, err)
+	}
+	c.ClientSecret = secret
+	*filled = append(*filled, migratedField{ptr: &c.ClientSecret, key: KeyringKey("aura", c.Name, "client-secret")})
+
+	token, err := provider.Get(ServiceName, KeyringKey("aura", c.Name, "access-token"))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("keyring get aura/%s/access-token: %w", c.Name, err)
+	}
+	c.AccessToken = token
+	*filled = append(*filled, migratedField{ptr: &c.AccessToken, key: KeyringKey("aura", c.Name, "access-token")})
+
+	return nil
 }

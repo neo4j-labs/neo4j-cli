@@ -1,0 +1,3 @@
+## TASK-003 — 2026-05-28T00:00:00Z
+Added unexported keyring methods (writeToKeyring, loadFromKeyring, migrateFromKeyring, zeroSensitiveFields) to AuraCredential, DbmsCredential, and EmbedCredential; defined shared migratedField type in keyring.go; added white-box unit tests in three new *_keyring_test.go files covering all methods with mock KeyringProvider.
+Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/keyring.go, +common/clicfg/credentials/aura_keyring_test.go, +common/clicfg/credentials/dbms_keyring_test.go, +common/clicfg/credentials/embed_keyring_test.go

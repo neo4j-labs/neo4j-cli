@@ -47,7 +47,7 @@ tasks:
       their respective fields. Each method encapsulates all sensitive fields for that type.
       The KeyringProvider is passed in (not accessed via the package-level defaultKeyring) so
       tests can inject mocks. zeroSensitiveFields() is also added to each type.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "AuraCredentials has writeToKeyring, loadFromKeyring (warn-and-continue), migrateFromKeyring (strict), and zeroSensitiveFields methods"
@@ -55,7 +55,7 @@ tasks:
       - "EmbedCredentials has the equivalent methods for the api-key field"
       - "Each method is tested in the corresponding *_test.go file with a mock KeyringProvider"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-05-28T00:00:00Z"
 
   - id: task-004
     title: "Replace triple-iteration loops in credentials.go with per-type method calls"

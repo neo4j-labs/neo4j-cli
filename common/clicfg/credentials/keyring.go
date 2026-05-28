@@ -55,6 +55,14 @@ func KeyringKey(credType, name, field string) string {
 	return fmt.Sprintf("%s/%s/%s", credType, name, field)
 }
 
+// migratedField records an in-memory field that was populated from the keyring
+// during MigrateToInsecure so the caller can zero fields on failure or delete
+// keyring entries on success.
+type migratedField struct {
+	ptr *string
+	key string
+}
+
 // probeKey is the sentinel user-key used by ProbeKeyringAvailability to test
 // whether the OS keyring daemon is reachable without touching real credentials.
 const probeKey = "__neo4j-cli-probe__"
