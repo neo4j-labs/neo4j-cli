@@ -433,6 +433,7 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) {
 func writeCredToKeyring(cred keyringCredential, provider KeyringProvider, written *[]string) error {
 	for _, f := range cred.sensitiveFields() {
 		if *f.ptr == "" {
+			_ = provider.Delete(ServiceName, f.key) // purge stale entry; ignore ErrNotFound
 			continue
 		}
 		if err := provider.Set(ServiceName, f.key, *f.ptr); err != nil {
@@ -496,6 +497,8 @@ func loadCredFromKeyring(cred keyringCredential, provider KeyringProvider, warnW
 		if *f.ptr != "" {
 			if setErr := provider.Set(ServiceName, f.key, *f.ptr); setErr == nil {
 				migrated = true
+			} else {
+				fmt.Fprintf(warnW, "Warning: could not auto-migrate %s to keyring: %v; plaintext copy remains in credentials file\n", f.key, setErr) //nolint:errcheck
 			}
 		} else if f.required {
 			fmt.Fprintf(warnW, "Warning: keyring entry missing for credential (see key %s); remove and re-add the credential\n", f.key) //nolint:errcheck

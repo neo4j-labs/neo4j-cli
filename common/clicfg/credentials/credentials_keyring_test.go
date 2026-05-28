@@ -198,6 +198,26 @@ func TestSetStorageMode_KeyringMode_AutoMigration_Success(t *testing.T) {
 		"credentials.json must be scrubbed after successful auto-migration")
 }
 
+// TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails_Warns verifies
+// that when the keyring.Set call during auto-migration fails, a warning is
+// written to warnW so the user knows their plaintext copy remains on disk.
+func TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails_Warns(t *testing.T) {
+	alwaysFailSet := &failAfterNProvider{inner: newMockKeyringProvider(), failAfter: 0}
+	credentials.SetKeyringProviderForTest(t, alwaysFailSet)
+
+	fs, err := testfs.GetTestFs("{}", `{"dbms":{"credentials":[{"name":"local","username":"neo4j","password":"json-pass","database-name":"neo4j","uri":"bolt://localhost:7687"}]}}`)
+	require.NoError(t, err)
+
+	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
+	var warnBuf bytes.Buffer
+	creds.SetStorageMode(credentials.StorageModeKeyring, &warnBuf)
+
+	assert.Contains(t, warnBuf.String(), "Warning: could not auto-migrate",
+		"failed auto-migration must warn the user")
+	assert.Contains(t, warnBuf.String(), "plaintext copy remains in credentials file",
+		"warning must mention that plaintext copy remains")
+}
+
 // TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails verifies that
 // when the keyring.Set call during auto-migration fails, SetStorageMode still
 // completes (in-memory value available), the JSON is NOT scrubbed, and no error
@@ -357,6 +377,37 @@ func TestSave_KeyringMode_InMemoryValuesPreserved(t *testing.T) {
 	// In-memory value must still be set
 	assert.Equal(t, "s3cr3t", creds.Aura.Credentials[0].ClientSecret,
 		"in-memory client secret must remain after keyring save")
+}
+
+// TestSave_KeyringMode_ClearedOptionalField_DeletedFromKeyring verifies that when
+// an optional sensitive field (e.g. AccessToken) is cleared to "" and a save is
+// triggered, the stale keyring entry is deleted rather than silently skipped —
+// preventing the revoked token from being reloaded by the next process start.
+func TestSave_KeyringMode_ClearedOptionalField_DeletedFromKeyring(t *testing.T) {
+	mock := newMockKeyringProvider()
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"), "s3cr3t"))
+	require.NoError(t, mock.Set(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"), "old-token"))
+
+	creds, _ := newKeyringTestCredentials(t, mock,
+		`{"aura":{"credentials":[{"name":"prod","client-id":"id1","client-secret":"","access-token":"","token-expiry":0}]}}`)
+
+	// pre-condition: access-token is in keyring (loaded by SetStorageMode)
+	val, err := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"))
+	require.NoError(t, err)
+	assert.Equal(t, "old-token", val)
+
+	// ClearAccessToken zeroes the field and triggers saveWithKeyring
+	_, clearErr := creds.Aura.ClearAccessToken(creds.Aura.Credentials[0])
+	require.NoError(t, clearErr)
+
+	// The keyring entry must have been deleted
+	_, getErr := mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "access-token"))
+	assert.ErrorIs(t, getErr, credentials.ErrNotFound, "cleared access-token must be deleted from keyring")
+
+	// The client-secret must be unaffected
+	val, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
+	require.NoError(t, err)
+	assert.Equal(t, "s3cr3t", val, "client-secret must remain in keyring after access-token clear")
 }
 
 // TestSave_InsecureMode_WritesAllFields verifies that in insecure mode the
