@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: Credentials stored in plaintext JSON are silently used and automatically migrated to the OS keyring when credential-storage is set to keyring, preventing hard errors from out-of-sync state.
+time: 2026-05-22T15:42:08.097905+01:00

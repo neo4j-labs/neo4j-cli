@@ -64,10 +64,14 @@ func (h *dbmsTestHelper) setCredentialsValue(key string, value interface{}) {
 }
 
 func (h *dbmsTestHelper) executeCommand(command string) error {
+	return h.executeCommandWithConfig(command, "{}")
+}
+
+func (h *dbmsTestHelper) executeCommandWithConfig(command string, configJSON string) error {
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
-	fs, err := testfs.GetTestFs("{}", h.credentials)
+	fs, err := testfs.GetTestFs(configJSON, h.credentials)
 	assert.Nil(h.t, err)
 	h.fs = fs
 

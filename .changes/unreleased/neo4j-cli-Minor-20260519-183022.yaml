@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Credentials are now stored securely in the OS keyring by default (macOS Keychain, Windows Credential Store, Linux Secret Service). Existing credentials remain in plaintext until you run `neo4j-cli config set credential-storage keyring`. To keep plaintext storage, no action is required.
+time: 2026-05-19T18:30:22.949503+01:00

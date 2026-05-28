@@ -5,6 +5,7 @@ package config
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/spf13/cobra"
 )
 
@@ -52,10 +53,43 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				}
 				return nil
 			default:
+				// When changing credential-storage, migrate secrets before
+				// persisting the new config value. Migration must succeed before
+				// the config key is written; on failure the config is unchanged.
+				//
+				// For the keyring target we always run MigrateToKeyring()
+				// regardless of the current mode (repair pass): if any
+				// secrets are still resident in credentials.json (e.g. from a
+				// partial previous migration), they will be moved to the keyring
+				// and scrubbed. This is idempotent — credentials already in the
+				// keyring are read back by load() and written back unchanged.
+				// MigrateToKeyring sets storageMode = StorageModeKeyring itself.
+				//
+				// For the insecure target we only run MigrateToInsecure() when
+				// the mode actually changes to avoid spurious keyring reads.
+				// MigrateToInsecure sets storageMode = StorageModeInsecure itself.
+				if bareKey == "credential-storage" {
+					currentMode := cfg.Credentials.StorageMode()
+					if value == credentials.StorageModeKeyring {
+						// Always run the repair/migration pass for keyring target.
+						if migrateErr := cfg.Credentials.MigrateToKeyring(); migrateErr != nil {
+							cmd.SilenceUsage = true
+							return migrateErr
+						}
+					} else if value == credentials.StorageModeInsecure && currentMode != value {
+						// Only migrate to insecure when actually switching modes.
+						if migrateErr := cfg.Credentials.MigrateToInsecure(); migrateErr != nil {
+							cmd.SilenceUsage = true
+							return migrateErr
+						}
+					}
+				}
+
 				if err := cfg.Global.Set(bareKey, value); err != nil {
 					cmd.SilenceUsage = true
 					return err
 				}
+
 				return nil
 			}
 		},

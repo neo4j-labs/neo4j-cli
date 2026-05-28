@@ -17,7 +17,7 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 )
 
-func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (string, error) {
+func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (string, error) {
 	if credential.HasValidAccessToken() {
 		return credential.AccessToken, nil
 	}
@@ -73,6 +73,8 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config) (strin
 		panic(clierr.NewFatalError("can't retrieve authentication token. %w", err))
 	}
 
-	cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn)
+	if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
+		fmt.Fprintf(warnW, "Warning: failed to persist access token to keyring: %v\n", saveErr) //nolint:errcheck
+	}
 	return grant.AccessToken, err
 }

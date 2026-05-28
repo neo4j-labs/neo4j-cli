@@ -213,7 +213,7 @@ neo4j-cli credential aura-client remove old-tenant --rw --yes --force`,
 			if err := confirm.Require(cmd, args[0]); err != nil {
 				return err
 			}
-			return cfg.Credentials.Aura.Remove(args[0])
+			return cfg.Credentials.RemoveAura(args[0], cmd.ErrOrStderr())
 		},
 	}
 

@@ -31,7 +31,7 @@ neo4j-cli credential embed remove hf-bge --rw --yes --force`,
 			if err := confirm.Require(cmd, args[0]); err != nil {
 				return err
 			}
-			return cfg.Credentials.Embed.Remove(args[0])
+			return cfg.Credentials.RemoveEmbed(args[0], cmd.ErrOrStderr())
 		},
 	}
 

@@ -30,7 +30,7 @@ neo4j-cli credential dbms remove prod --rw --yes --force`,
 			if err := confirm.Require(cmd, args[0]); err != nil {
 				return err
 			}
-			return cfg.Credentials.Dbms.Remove(args[0])
+			return cfg.Credentials.RemoveDbms(args[0], cmd.ErrOrStderr())
 		},
 	}
 

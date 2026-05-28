@@ -1,0 +1,582 @@
+feature: cli-49-keyring-structural-fixes
+prd: ./prd-cli-49-keyring-structural-fixes.md
+created_at: 2026-05-28T00:00:00Z
+updated_at: 2026-05-28T18:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Extract saveToJSON() private method on Credentials"
+    description: |
+      Extract the insecure JSON-write path from save() into a private saveToJSON() method
+      on Credentials. The method contains the json.Marshal + fileutils.WriteFile logic currently
+      in save()'s else branch. save() calls saveToJSON() for the insecure path; saveWithKeyring
+      and MigrateToInsecure will also call it in later tasks. No behavioural change; all
+      existing tests must pass unchanged.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "saveToJSON() method exists on Credentials and contains the json.Marshal + fileutils.WriteFile path"
+      - "save() calls saveToJSON() for the insecure branch; saveWithKeyring() is unchanged for now"
+      - "make test passes with no changes to test files"
+    completed_at: "2026-05-28T10:00:00Z"
+
+  - id: task-002
+    title: "Fix GlobalConfig.CredentialStorage() default to StorageModeInsecure"
+    description: |
+      Change GlobalConfig.CredentialStorage() in common/clicfg/clicfg.go to return
+      StorageModeInsecure (not "keyring") when credential-storage is absent from viper.
+      Add a comment explaining that the actual first-run default decision lives in
+      initCredentialStorageDefault; CredentialStorage() is only the persisted-value accessor.
+      This aligns the method's documented default with the NewCredentials() boot default.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "CredentialStorage() returns StorageModeInsecure when viper has no credential-storage key"
+      - "A comment on the method explains it is a read accessor; first-run default logic lives in initCredentialStorageDefault"
+      - "make test passes; no test expectations change"
+    completed_at: "2026-05-28T10:00:00Z"
+
+  - id: task-003
+    title: "Extract per-type keyring methods on AuraCredentials, DbmsCredentials, EmbedCredentials"
+    description: |
+      Add unexported keyring methods to each credential type in their respective files.
+      AuraCredentials gets writeToKeyring(provider KeyringProvider) error,
+      loadFromKeyring(provider KeyringProvider, warnW io.Writer) error (warn-and-continue semantics
+      for startup), and migrateFromKeyring(provider KeyringProvider) error (strict/error semantics
+      for explicit migration). DbmsCredentials and EmbedCredentials get equivalent methods for
+      their respective fields. Each method encapsulates all sensitive fields for that type.
+      The KeyringProvider is passed in (not accessed via the package-level defaultKeyring) so
+      tests can inject mocks. zeroSensitiveFields() is also added to each type.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "AuraCredentials has writeToKeyring, loadFromKeyring (warn-and-continue), migrateFromKeyring (strict), and zeroSensitiveFields methods"
+      - "DbmsCredentials has the equivalent methods for the password field"
+      - "EmbedCredentials has the equivalent methods for the api-key field"
+      - "Each method is tested in the corresponding *_test.go file with a mock KeyringProvider"
+      - "make test passes"
+    completed_at: "2026-05-28T00:00:00Z"
+
+  - id: task-004
+    title: "Replace triple-iteration loops in credentials.go with per-type method calls"
+    description: |
+      Replace all five groups of three for _, cred := range c.{Aura,Dbms,Embed}.Credentials
+      loops in credentials.go with calls to the per-type methods from task-003. After this change
+      each function's iteration body is three calls (one per type). The MigrateToKeyring rollback
+      logic (written/rollback/setKey) stays in credentials.go since it is cross-type. The
+      loadSensitiveFieldsFromKeyring and saveWithKeyring functions still call the per-type
+      methods but may retain their outer structure until tasks 005/006/007.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "No group of three consecutive for _, cred := range c.{Aura,Dbms,Embed}.Credentials loops remains in credentials.go"
+      - "saveWithKeyring, MigrateToKeyring, MigrateToInsecure, and loadSensitiveFieldsFromKeyring each delegate to per-type methods"
+      - "make test passes with no changes to test expectations"
+    completed_at: "2026-05-28T10:30:00Z"
+
+  - id: task-005
+    title: "Replace saveWithKeyring snapshot boilerplate with zero-restore pattern"
+    description: |
+      Remove the three scrubbed-snapshot struct constructions (auraSnap, dbmsSnap, embedSnap)
+      from saveWithKeyring. Replace with: save sensitive field values to locals, call each
+      type's zeroSensitiveFields(), call saveToJSON(), then restore the saved values.
+      This collapses ~30 lines to ~10 lines and eliminates the per-type snapshot variables.
+      Restoration on panic is acceptable to omit (consistent with current marshal-panic behaviour).
+    status: completed
+    dependencies:
+      - task-001
+      - task-004
+    acceptance_criteria:
+      - "saveWithKeyring contains no auraSnap, dbmsSnap, or embedSnap variables"
+      - "saveWithKeyring calls saveToJSON() instead of directly marshalling scrubbed copies"
+      - "Sensitive in-memory fields are restored to their original values after saveToJSON() returns"
+      - "make test passes; credentials written to keyring are still persisted correctly"
+    completed_at: "2026-05-28T10:45:00Z"
+
+  - id: task-006
+    title: "Fix MigrateToInsecure: use saveToJSON() + own storageMode; simplify config/set.go"
+    description: |
+      In MigrateToInsecure, replace the prevMode/c.storageMode temporary mutation with a direct
+      call to saveToJSON(). Before calling saveToJSON(), set c.storageMode = StorageModeInsecure
+      so the function owns its own mode transition. Remove the doc comment that previously
+      delegated this responsibility to callers. In config/set.go, remove the credentialStorageModeChanged
+      flag and the post-migration SetStorageMode call for the MigrateToInsecure path, since
+      MigrateToInsecure now handles it. Keep the SetStorageMode call after MigrateToKeyring.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "MigrateToInsecure contains no prevMode variable or temporary storageMode mutation"
+      - "MigrateToInsecure sets c.storageMode = StorageModeInsecure before calling saveToJSON()"
+      - "config/set.go has no post-migration SetStorageMode call for the insecure path"
+      - "credentialStorageModeChanged flag is removed or simplified to cover only the keyring path"
+      - "make test passes; migrating to insecure still writes plaintext to credentials.json"
+    completed_at: "2026-05-28T11:30:00Z"
+
+  - id: task-007
+    title: "Thread io.Writer through SetStorageMode and loadSensitiveFieldsFromKeyring; update all call sites and tests"
+    description: |
+      Change SetStorageMode(mode string) error to SetStorageMode(mode string, warnW io.Writer) error
+      and loadSensitiveFieldsFromKeyring() error to loadSensitiveFieldsFromKeyring(warnW io.Writer) error.
+      Replace all fmt.Fprintf(os.Stderr, ...) calls in loadSensitiveFieldsFromKeyring with writes
+      to warnW. Update all call sites: NewConfig (clicfg.go) passes os.Stderr; initCredentialStorageDefault
+      (app.go) passes its existing stderr io.Writer param; config/set.go passes cmd.ErrOrStderr().
+      Update all test call sites to pass &bytes.Buffer{}; update warning-path tests to assert
+      against the buffer contents rather than captured os.Stderr.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "SetStorageMode and loadSensitiveFieldsFromKeyring both accept an io.Writer parameter"
+      - "No os.Stderr reference remains in credentials.go"
+      - "NewConfig passes os.Stderr; initCredentialStorageDefault passes its stderr param; config/set.go passes cmd.ErrOrStderr()"
+      - "All test call sites pass &bytes.Buffer{}; warning-path tests assert buffer contents"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: "2026-05-28T12:00:00Z"
+
+  - id: task-008
+    title: "Final gates: make test, make lint, make fmt-check"
+    description: |
+      Run the full test suite, linter, and format check to confirm all changes are clean.
+      Fix any remaining lint warnings or format drift introduced by the refactor. Verify the
+      credentials_keyring_test.go test file covers the key structural invariants (no snapshot
+      variables, saveToJSON called from both save paths, MigrateToInsecure sets its own mode).
+    status: completed
+    dependencies:
+      - task-002
+      - task-007
+    acceptance_criteria:
+      - "make test passes with no skipped or failing tests"
+      - "make lint passes with no new warnings"
+      - "make fmt-check passes with no files needing reformatting"
+    completed_at: "2026-05-28T12:00:00Z"
+
+  - id: task-009
+    title: "Define keyringCredential interface and add new per-type methods"
+    description: |
+      Define an unexported keyringCredential interface in keyring.go with seven methods:
+      writeToKeyring(provider KeyringProvider, written *[]string) error,
+      loadFromKeyring(provider KeyringProvider, warnW io.Writer) bool,
+      migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error,
+      validateForMigration() error, zeroSensitiveFields(), saveSensitiveFields() []string,
+      and restoreSensitiveFields([]string). Update the existing writeToKeyring signature on all
+      three concrete types to add the *[]string parameter. Add saveSensitiveFields,
+      restoreSensitiveFields, and validateForMigration to each concrete type. Add compile-time
+      interface assertions. Add allCredentials() []keyringCredential on Credentials.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "keyringCredential interface defined in keyring.go with all seven methods"
+      - "writeToKeyring on all three types has signature (provider KeyringProvider, written *[]string) error"
+      - "saveSensitiveFields, restoreSensitiveFields, validateForMigration added to all three types"
+      - "Compile-time var _ keyringCredential assertions exist for all three concrete types"
+      - "allCredentials() []keyringCredential exists on Credentials; returns Aura+Dbms+Embed in order"
+      - "make test passes (existing callers of writeToKeyring updated to pass nil where not tracking)"
+    completed_at: "2026-05-28T13:00:00Z"
+
+  - id: task-010
+    title: "Rewrite saveWithKeyring and MigrateToKeyring using allCredentials() iterator; final gates"
+    description: |
+      Replace the remaining per-type triple loops in saveWithKeyring (write phase and
+      save/zero/restore phase) and MigrateToKeyring (validate+write loop and zero loop) with
+      single iterations over c.allCredentials(). MigrateToKeyring passes &writtenKeys to
+      writeToKeyring for exact rollback tracking. saveWithKeyring passes nil. Run make test,
+      make fmt-check, and make lint as final gates.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "saveWithKeyring has no per-type triple loops; uses c.allCredentials() for all three phases"
+      - "MigrateToKeyring has no per-type triple loops; uses c.allCredentials() with writtenKeys tracking"
+      - "Rollback in MigrateToKeyring still uses exact written keys (not coarse delete-all)"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: "2026-05-28T14:00:00Z"
+
+  - id: task-011
+    title: "Replace DeleteKeyringEntries string dispatch with per-type deleteFromKeyring methods"
+    description: |
+      Remove Credentials.DeleteKeyringEntries(credType, name string) error from credentials.go.
+      Add deleteFromKeyring(provider KeyringProvider, name string) error to *AuraCredentials,
+      *DbmsCredentials, and *EmbedCredentials in their respective type files (aura.go, dbms.go,
+      embed.go). Each method encapsulates all key-name knowledge for that type: AuraCredentials
+      deletes client-secret and access-token (joining errors); DbmsCredentials deletes password;
+      EmbedCredentials deletes api-key. ErrNotFound is silently ignored; other errors are returned.
+      Update RemoveAura, RemoveDbms, and RemoveEmbed in credentials.go to call the per-type method
+      directly, eliminating the string type discriminator. Add tests for deleteFromKeyring on each
+      type (ErrNotFound ignored, non-ErrNotFound errors surfaced). Run make test, make lint,
+      make fmt-check as final gates.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "DeleteKeyringEntries is removed from credentials.go"
+      - "AuraCredentials, DbmsCredentials, and EmbedCredentials each have deleteFromKeyring(provider KeyringProvider, name string) error"
+      - "Each deleteFromKeyring method handles ErrNotFound silently and returns other errors"
+      - "RemoveAura, RemoveDbms, RemoveEmbed call per-type deleteFromKeyring directly with no string type discriminator"
+      - "All key-name knowledge for deletion lives in aura.go, dbms.go, embed.go respectively"
+      - "Tests cover ErrNotFound-ignored and non-ErrNotFound-error paths for each type"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: "2026-05-28T14:30:00Z"
+
+  - id: task-012
+    title: "Remove dead error return from saveToJSON()"
+    description: |
+      saveToJSON() always panics on failure (json.Marshal panics on marshal error;
+      fileutils.WriteFile panics on write error) and unconditionally returns nil. The error
+      return type is never meaningful and creates two code smells: a dead unreachable
+      if-err block in MigrateToInsecure, and a //nolint:errcheck suppression in
+      saveWithKeyring. Remove the error return type entirely: change the signature to
+      func (c *Credentials) saveToJSON(). Update all call sites: save() calls saveToJSON()
+      and returns nil for the insecure path; saveWithKeyring() calls saveToJSON() with no
+      assignment; MigrateToInsecure() calls saveToJSON() directly (removing the dead
+      if-err block). Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    source: review
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "saveToJSON() has no error return value"
+      - "save() calls saveToJSON() for the insecure branch and returns nil"
+      - "saveWithKeyring() calls saveToJSON() with no assignment and no nolint comment"
+      - "MigrateToInsecure() calls saveToJSON() directly with no if-err check"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: "2026-05-28T15:30:00Z"
+
+  - id: task-013
+    title: "Move deleteFromKeyring to item types and add to keyringCredential interface"
+    description: |
+      Currently deleteFromKeyring is on collection types (*AuraCredentials, *DbmsCredentials,
+      *EmbedCredentials) and takes a name string parameter because the item was already removed
+      from the slice. All other keyring methods (writeToKeyring, loadFromKeyring, etc.) are on
+      item types and accessible via the keyringCredential interface. This asymmetry means deletion
+      is not part of the uniform interface.
+      Refactor RemoveAura, RemoveDbms, and RemoveEmbed in credentials.go to use a Get-before-Remove
+      pattern: lookup the item pointer before calling Remove(), then call deleteFromKeyring on
+      the item pointer (which knows its own name). Move deleteFromKeyring from the collection types
+      (*AuraCredentials, *DbmsCredentials, *EmbedCredentials) to the item types (*AuraCredential,
+      *DbmsCredential, *EmbedCredential) with signature deleteFromKeyring(provider KeyringProvider) error.
+      Add deleteFromKeyring(provider KeyringProvider) error to the keyringCredential interface.
+      Update compile-time assertions. Update tests to call the new item-type methods.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    source: review
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "deleteFromKeyring(provider KeyringProvider) error exists on *AuraCredential, *DbmsCredential, *EmbedCredential (item types)"
+      - "deleteFromKeyring is removed from *AuraCredentials, *DbmsCredentials, *EmbedCredentials (collection types)"
+      - "keyringCredential interface includes deleteFromKeyring(provider KeyringProvider) error"
+      - "RemoveAura, RemoveDbms, RemoveEmbed use Get-before-Remove and call the item-type deleteFromKeyring"
+      - "Compile-time interface assertions still pass"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: "2026-05-28T16:00:00Z"
+
+  - id: task-014
+    title: "Make MigrateToKeyring own its storageMode transition; simplify set.go"
+    description: |
+      MigrateToInsecure() sets c.storageMode = StorageModeInsecure as an internal side effect.
+      MigrateToKeyring() does not — it leaves storageMode unchanged and expects the caller to call
+      SetStorageMode() after persisting the config key. This asymmetry forces set.go to have two
+      separate credential-storage if-blocks: one for migration (both directions) and a second one
+      only for the keyring direction to call SetStorageMode. Any future maintainer reading the code
+      must understand this hidden coupling to avoid double-setting or missing the mode update.
+
+      Fix: at the end of MigrateToKeyring(), after zeroSensitiveFields() and save() succeed, set
+      c.storageMode = StorageModeKeyring directly (mirroring MigrateToInsecure). In set.go, remove
+      the second if-block that conditionally calls cfg.Credentials.SetStorageMode for the keyring
+      path; the migration method now owns the transition for both directions. The doc comment on
+      MigrateToKeyring that says "This method must be called while storageMode is still
+      StorageModeInsecure" and "The caller should call SetStorageMode after persisting the config
+      key" must be removed or corrected — the precondition is already wrong (the repair pass calls
+      MigrateToKeyring when storageMode is already keyring and it works correctly because fields are
+      zeroed before save() is called).
+
+      Note on save() dispatch: MigrateToKeyring zeroes all sensitive fields before calling save(). If
+      storageMode is insecure at that point, save() calls saveToJSON() (correct, scrubs JSON). If
+      storageMode is already keyring (repair pass), save() calls saveWithKeyring(), which finds all
+      fields zeroed and writes no keyring entries, then scrubs JSON — also correct. Setting
+      c.storageMode = StorageModeKeyring AFTER save() avoids any dispatch ambiguity and is the
+      cleanest placement.
+    status: completed
+    completed_at: "2026-05-28T17:00:00Z"
+    source: review
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "MigrateToKeyring() sets c.storageMode = StorageModeKeyring after save() returns nil"
+      - "The doc comment on MigrateToKeyring no longer says 'must be called while storageMode is insecure' or 'caller should call SetStorageMode'"
+      - "set.go has no post-migration if-block that calls cfg.Credentials.SetStorageMode for the keyring path"
+      - "set.go's credential-storage handling is a single symmetric block: migrate then persist config (SetStorageMode call removed)"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-015
+    title: "Remove remaining misleading storageMode comment from MigrateToKeyring"
+    description: |
+      After task-014, MigrateToKeyring() will set c.storageMode = StorageModeKeyring itself. Any
+      remaining caller-contract language in the doc comment (e.g. references to the caller being
+      responsible for mode transitions, or the SetStorageMode call) should be scrubbed to avoid
+      confusing future readers. This is a documentation-only cleanup pass on credentials.go focused
+      on MigrateToKeyring and any adjacent doc comments that referenced the old storageMode
+      precondition.
+    status: completed
+    completed_at: "2026-05-28T17:00:00Z"
+    source: review
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "MigrateToKeyring's doc comment contains no references to storageMode preconditions or caller-managed mode transitions"
+      - "No other comment in credentials.go or set.go references the old 'caller calls SetStorageMode after MigrateToKeyring' pattern"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-016
+    title: "Replace 6 keyringCredential interface methods with sensitiveFields() for generic implementations"
+    description: |
+      The keyringCredential interface currently has 8 methods. Five of them (zeroSensitiveFields,
+      saveSensitiveFields, restoreSensitiveFields, validateForMigration, and to a large extent
+      writeToKeyring and loadFromKeyring) exist solely to service the generic loops in
+      saveWithKeyring, MigrateToKeyring, and loadSensitiveFieldsFromKeyring. These methods are
+      implementation-detail helpers for a single caller leaking into the interface. The per-type
+      code (aura.go, dbms.go, embed.go) each implement them separately with positional slice
+      indexing and identical structural logic.
+
+      Code-judo move: add a sensitiveField struct to keyring.go:
+        type sensitiveField struct {
+            ptr      *string  // pointer into the credential struct field
+            key      string   // full keyring key string (e.g. "aura/prod/client-secret")
+            required bool     // true: missing → hard error; false: missing → silent skip
+        }
+      Replace the five per-type methods with a single sensitiveFields() []sensitiveField method on
+      each credential type (AuraCredential, DbmsCredential, EmbedCredential). Implement
+      zeroSensitiveFields, validateForMigration, the keyring-write loop, the keyring-read loop
+      (loadFromKeyring/migrateFromKeyring), and the save/zero/restore dance generically in
+      credentials.go using the sensitiveFields() slice. The keyringCredential interface shrinks to
+      two methods: sensitiveFields() []sensitiveField and deleteFromKeyring(provider KeyringProvider)
+      error. Remove the five replaced methods from all three concrete types. Update compile-time
+      assertions. Run make test, make fmt-check, make lint as final gates.
+
+      Per-type sensitiveFields() implementations:
+        AuraCredential: [{&c.ClientSecret, "aura/<name>/client-secret", true},
+                         {&c.AccessToken,  "aura/<name>/access-token",  false}]
+        DbmsCredential: [{&c.Password, "dbms/<name>/password", true}]
+        EmbedCredential:[{&c.APIKey,   "embed/<name>/api-key", false}]
+    status: completed
+    completed_at: "2026-05-28T17:30:00Z"
+    source: review
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "sensitiveField struct defined in keyring.go with ptr *string, key string, required bool"
+      - "sensitiveFields() []sensitiveField method exists on *AuraCredential, *DbmsCredential, *EmbedCredential"
+      - "zeroSensitiveFields, saveSensitiveFields, restoreSensitiveFields, validateForMigration removed from all three concrete types"
+      - "keyringCredential interface has exactly two methods: sensitiveFields() []sensitiveField and deleteFromKeyring(provider KeyringProvider) error"
+      - "saveWithKeyring, MigrateToKeyring, loadSensitiveFieldsFromKeyring, MigrateToInsecure all use generic sensitiveFields() loops"
+      - "Compile-time interface assertions still pass for all three types"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-017
+    title: "Extract removeAndCleanKeyring helper; deduplicate RemoveAura/Dbms/Embed"
+    description: |
+      RemoveAura, RemoveDbms, and RemoveEmbed in credentials.go are line-for-line copies of the same
+      three-step pattern: Get the credential item, call the type-specific Remove, then (in keyring mode)
+      call cred.deleteFromKeyring and write any error as a warning to warnW.
+
+      Add a private method on Credentials:
+        func (c *Credentials) removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error
+
+      The method calls remove(); if that succeeds and storageMode == StorageModeKeyring, it calls
+      cred.deleteFromKeyring(defaultKeyring) and writes any non-nil error as a warning to warnW. No
+      error is returned for keyring cleanup failures.
+
+      Rewrite each Remove* method to: Get the item, return the Get error if any, then delegate to
+      c.removeAndCleanKeyring(cred, func() error { return c.Xxx.Remove(name) }, warnW).
+
+      No behaviour changes — the three methods must exhibit identical observable behaviour after the
+      refactor. Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T18:00:00Z"
+    source: review
+    dependencies:
+      - task-016
+    acceptance_criteria:
+      - "removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error method exists on Credentials"
+      - "RemoveAura, RemoveDbms, and RemoveEmbed each call c.removeAndCleanKeyring with no inline storageMode check or deleteFromKeyring call"
+      - "No storageMode == StorageModeKeyring check and no deleteFromKeyring call appear in the bodies of RemoveAura/RemoveDbms/RemoveEmbed"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-018
+    title: "Warn on non-ErrNotFound errors in loadCredFromKeyring"
+    description: |
+      In loadCredFromKeyring (credentials.go, the startup/SetStorageMode path), when a keyring read
+      returns an error that is not ErrNotFound, the function currently silently stops processing
+      remaining sensitive fields and returns migrated=false with no output. The warnW parameter is
+      threaded through this call chain for exactly this purpose but goes unused on this path.
+
+      Fix: before the early return on a non-ErrNotFound error, write a warning to warnW:
+        fmt.Fprintf(warnW, "Warning: keyring read failed for %s: %v\n", f.key, err) //nolint:errcheck
+        return migrated
+
+      This surfaces unexpected keyring I/O failures (daemon crash, permission denied) immediately
+      rather than letting the user encounter confusing downstream auth errors.
+
+      Add a test in the appropriate keyring test file asserting that when the mock keyring returns a
+      non-ErrNotFound error for a field, the warning appears in the bytes.Buffer passed as warnW.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T18:30:00Z"
+    source: review
+    dependencies:
+      - task-017
+    acceptance_criteria:
+      - "loadCredFromKeyring writes 'Warning: keyring read failed for <key>: <err>' to warnW before returning on non-ErrNotFound errors"
+      - "A test asserts the warning appears in the warnW buffer when the keyring returns an unexpected error"
+      - "ErrNotFound paths (missing field, auto-migrate) are unaffected"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-019
+    title: "Remove PRD requirement IDs from production comments"
+    description: |
+      credentials.go contains REQ-F-016, REQ-F-019, and REQ-F-018 in comments.
+      neo4j-cli/aura/internal/subcommands/config/set.go contains REQ-F-017 in a comment.
+      These are planning artefacts — there is no matching document in the repo a future reader
+      can locate. Replace each tag with prose that captures the observable behaviour the comment
+      is meant to describe. For example:
+        - credentials.go REQ-F-016/REQ-F-019 area: "If ErrNotFound but the JSON holds a value
+          (pre-migration state): use the JSON value silently and attempt auto-migration to the
+          keyring."
+        - set.go REQ-F-017: "If any secrets are still resident in credentials.json (e.g. from a
+          partial earlier migration), they will be moved to the keyring and scrubbed. This is
+          idempotent."
+      Preserve the factual content; only remove the REQ-F-xxx identifiers.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T19:00:00Z"
+    source: review
+    dependencies:
+      - task-018
+    acceptance_criteria:
+      - "No REQ-F-xxx identifier appears in any comment in credentials.go or config/set.go"
+      - "Replaced comments accurately describe the observable behaviour they document"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-020
+    title: "Remove stale task ID and stale function name from comments"
+    description: |
+      Two comments reference artefacts that no longer exist:
+      1. common/clicfg/clicfg.go line 113 area: references 'Task-009'. Rewrite as plain
+         English: "The key is absent on first run (backwards-compatible default). Once written,
+         subsequent invocations see the explicit value and take this branch."
+      2. common/clicfg/credentials/credentials.go: a comment refers to 'tryAutoMigrate' which
+         was removed when loadCredFromKeyring was introduced. Replace 'by tryAutoMigrate' with
+         'by loadCredFromKeyring'.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T19:15:00Z"
+    source: review
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "clicfg.go contains no reference to 'Task-009'"
+      - "credentials.go contains no reference to 'tryAutoMigrate'"
+      - "Both replacement comments accurately describe the current code behaviour"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-021
+    title: "Make loadSensitiveFieldsFromKeyring void; remove dead error path"
+    description: |
+      loadSensitiveFieldsFromKeyring(warnW io.Writer) unconditionally returns nil. Its doc
+      comment claims 'Non-ErrNotFound errors are returned as-is' but this is false: since
+      task-018, loadCredFromKeyring warns to warnW on non-ErrNotFound errors and returns
+      migrated (not an error), so the error never propagates. The error return type, the
+      error check in SetStorageMode, and the panic branch in NewConfig are all unreachable.
+
+      Fix:
+        - Change the function signature to loadSensitiveFieldsFromKeyring(warnW io.Writer)
+          (no return value).
+        - In SetStorageMode, change the call to a plain statement with no if-err check.
+        - In NewConfig, remove the if-err block that panics on loadSensitiveFieldsFromKeyring
+          failure (or if NewConfig no longer calls it directly, remove any equivalent dead
+          panic branch from the remaining call site).
+        - Remove the contradicting doc comment line "Non-ErrNotFound errors are returned as-is."
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T19:30:00Z"
+    source: review
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - "loadSensitiveFieldsFromKeyring has no return value"
+      - "SetStorageMode calls loadSensitiveFieldsFromKeyring as a statement with no if-err check"
+      - "No panic branch for loadSensitiveFieldsFromKeyring remains in any call site"
+      - "The doc comment no longer claims non-ErrNotFound errors are returned"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-022
+    title: "Remove stale caller-contract sentences from MigrateToKeyring and MigrateToInsecure"
+    description: |
+      credentials.go contains two doc sentences (around lines 261-262 and 330) ending with
+      'The caller is responsible for persisting the "credential-storage" config key.' Task-015
+      was supposed to eliminate this kind of language, but these sentences survived. The actual
+      caller contract (that set.go must call cfg.Global.Set) is clearly visible in set.go; the
+      doc comment adds no insight and implies a hidden obligation not expressed in the type
+      system. Remove both sentences. Tighten surrounding doc if it becomes orphaned.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T19:45:00Z"
+    source: review
+    dependencies:
+      - task-021
+    acceptance_criteria:
+      - "Neither MigrateToKeyring nor MigrateToInsecure doc comments contain 'caller is responsible for persisting'"
+      - "No equivalent caller-obligation language remains in their doc comments"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-023
+    title: "Simplify dead error check after c.save() in MigrateToKeyring"
+    description: |
+      In MigrateToKeyring, after zeroing all sensitive fields, the function calls c.save() and
+      checks its error return. At this point all fields are zeroed, so save() dispatches to
+      either saveToJSON() (which panics on error, never returns one) or saveWithKeyring() (whose
+      loop skips all empty fields and returns nil unconditionally). The error check is dead in
+      both paths.
+
+      Two acceptable remedies:
+        a. Simplify to a bare c.save() call with a comment explaining why no error is possible,
+           plus a //nolint:errcheck if the linter requires it.
+        b. If save() can be replaced with saveToJSON() directly (since mode is still insecure
+           during migration), prefer the more direct call.
+      Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T20:00:00Z"
+    source: review
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - "The dead if-err block after c.save() in MigrateToKeyring is removed or replaced with a documented intent"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-024
+    title: "Thread warnW through getToken in token.go; remove direct os.Stderr write"
+    description: |
+      neo4j-cli/aura/internal/api/token.go writes a keyring-failure warning directly to
+      os.Stderr. All other keyring-failure warnings in this feature thread an io.Writer (warnW)
+      explicitly. This direct write is inconsistent.
+
+      Fix: add an io.Writer parameter to getToken (and its call sites) and pass the writer
+      through so the warning goes to warnW instead of os.Stderr. Call sites in the command
+      layer already have access to cmd.ErrOrStderr(). If the signature change propagates to
+      an exported function in the api package, add the io.Writer at the end of the parameter
+      list to minimise diff. Run make test, make fmt-check, make lint as final gates.
+    status: completed
+    completed_at: "2026-05-28T20:30:00Z"
+    source: review
+    dependencies:
+      - task-023
+    acceptance_criteria:
+      - "getToken accepts an io.Writer parameter and writes the keyring-failure warning to it"
+      - "No direct os.Stderr write remains in token.go for the keyring-failure warning"
+      - "All call sites pass cmd.ErrOrStderr() or equivalent"
+      - "make test, make fmt-check, make lint all pass"

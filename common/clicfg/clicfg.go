@@ -93,7 +93,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		panic(err)
 	}
 
-	credentials := credentials.NewCredentials(fs, ConfigPrefix)
+	creds := credentials.NewCredentials(fs, ConfigPrefix)
 
 	logger := slog.Default()
 
@@ -105,7 +105,15 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage"},
+	}
+
+	// Wire the storage mode only when credential-storage is explicitly set in
+	// config. When absent the credentials default to insecure mode (backwards
+	// compatible). initCredentialStorageDefault writes the key on first run;
+	// subsequent invocations see an explicit value and reach this branch.
+	if Viper.IsSet("credential-storage") {
+		creds.SetStorageMode(globalConfig.CredentialStorage(), os.Stderr)
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-workspace"}
@@ -129,7 +137,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 			fs:         fs,
 			configPath: fullConfigPath,
 		},
-		Credentials: credentials,
+		Credentials: creds,
 		Events:      events,
 		scope:       scope,
 	}
@@ -426,6 +434,12 @@ func (config *GlobalConfig) Set(key string, value string) error {
 		}
 	}
 
+	if key == "credential-storage" {
+		if value != credentials.StorageModeKeyring && value != credentials.StorageModeInsecure {
+			return clierr.NewUsageError("invalid value for 'credential-storage': %s (valid values: %s, %s)", value, credentials.StorageModeKeyring, credentials.StorageModeInsecure)
+		}
+	}
+
 	data := fileutils.ReadFileSafe(config.fs, config.configPath)
 
 	updated, err := sjson.Set(string(data), key, value)
@@ -434,11 +448,35 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	}
 
 	fileutils.WriteFile(config.fs, config.configPath, []byte(updated))
+
+	// Sync the new value into viper's in-memory store so callers that call
+	// IsSet or GetString in the same process reflect the written value immediately.
+	config.viper.Set(key, value)
 	return nil
 }
 
 func (config *GlobalConfig) Format() string {
 	return config.viper.GetString("format")
+}
+
+// CredentialStorage is a read accessor for the persisted credential-storage
+// value. It returns StorageModeInsecure when the key is absent from config,
+// matching the NewCredentials() boot default. First-run default logic (which
+// may choose "keyring" on capable platforms) lives in initCredentialStorageDefault
+// in neo4j-cli/app/app.go and writes the chosen value before this is called.
+func (config *GlobalConfig) CredentialStorage() string {
+	if v := config.viper.GetString("credential-storage"); v != "" {
+		return v
+	}
+	return credentials.StorageModeInsecure
+}
+
+// CredentialStorageIsSet reports whether "credential-storage" has been
+// explicitly written to config.json *or set in-memory* in this process.
+// When false, the first-run default detection logic in PersistentPreRunE
+// should write the appropriate default.
+func (config *GlobalConfig) CredentialStorageIsSet() bool {
+	return config.viper.IsSet("credential-storage")
 }
 
 func (config *GlobalConfig) BindFormat(flag *pflag.Flag) {

@@ -51,13 +51,17 @@ func (h *neo4jTestHelper) setConfigValue(key string, value interface{}) {
 }
 
 func (h *neo4jTestHelper) executeCommand(command string) {
+	h.executeCommandWithCredentials(command, `{}`)
+}
+
+func (h *neo4jTestHelper) executeCommandWithCredentials(command string, credentialsJSON string) {
 	h.out = bytes.NewBufferString("")
 	h.err = bytes.NewBufferString("")
 
 	args, err := shlex.Split(command)
 	assert.Nil(h.t, err)
 
-	fs, err := testfs.GetTestFs(h.cfg, `{}`)
+	fs, err := testfs.GetTestFs(h.cfg, credentialsJSON)
 	assert.Nil(h.t, err)
 	h.fs = fs
 
@@ -93,6 +97,18 @@ func (h *neo4jTestHelper) assertErr(expected string) {
 
 func (h *neo4jTestHelper) assertConfigValue(key string, expected string) {
 	file, err := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "config.json"))
+	assert.Nil(h.t, err)
+	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
+
+	raw, err := io.ReadAll(file)
+	assert.Nil(h.t, err)
+
+	actual := gjson.GetBytes(raw, key).String()
+	assert.Equal(h.t, expected, actual)
+}
+
+func (h *neo4jTestHelper) assertCredentialsValue(key string, expected string) {
+	file, err := h.fs.Open(filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
 	assert.Nil(h.t, err)
 	defer file.Close() //nolint:errcheck // in-memory FS close error is not actionable in a defer
 

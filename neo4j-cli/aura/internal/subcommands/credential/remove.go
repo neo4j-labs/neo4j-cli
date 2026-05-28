@@ -33,7 +33,7 @@ neo4j-cli aura credential remove my-creds --rw --yes --force && neo4j-cli aura c
 			if err := confirm.Require(cmd, credName); err != nil {
 				return err
 			}
-			return cfg.Credentials.Aura.Remove(credName)
+			return cfg.Credentials.RemoveAura(credName, cmd.ErrOrStderr())
 		},
 	}
 

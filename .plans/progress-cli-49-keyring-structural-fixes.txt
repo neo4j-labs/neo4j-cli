@@ -1,0 +1,95 @@
+## TASK-001 — 2026-05-28T10:00:00Z
+Extracted insecure JSON-write path from save() into private saveToJSON() method on Credentials; save() delegates its insecure branch to it.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-002 — 2026-05-28T10:00:00Z
+Fixed GlobalConfig.CredentialStorage() to return StorageModeInsecure as default (was "keyring"), aligning with NewCredentials() boot default; added clarifying comment.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/clicfg_test.go
+
+## TASK-003 — 2026-05-28T00:00:00Z
+Added unexported keyring methods (writeToKeyring, loadFromKeyring, migrateFromKeyring, zeroSensitiveFields) to AuraCredential, DbmsCredential, and EmbedCredential; defined shared migratedField type in keyring.go; added white-box unit tests in three new *_keyring_test.go files covering all methods with mock KeyringProvider.
+Files: ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/keyring.go, +common/clicfg/credentials/aura_keyring_test.go, +common/clicfg/credentials/dbms_keyring_test.go, +common/clicfg/credentials/embed_keyring_test.go
+
+## TASK-004 — 2026-05-28T10:30:00Z
+Replaced triple-iteration loops in saveWithKeyring, MigrateToKeyring (zero-fields portion), MigrateToInsecure, and loadSensitiveFieldsFromKeyring with calls to per-type writeToKeyring, zeroSensitiveFields, migrateFromKeyring, and loadFromKeyring methods; MigrateToKeyring rollback logic kept inline.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-005 — 2026-05-28T10:45:00Z
+Replaced scrubbed-snapshot boilerplate in saveWithKeyring (auraSnap/dbmsSnap/embedSnap) with zero-restore pattern: save field values to locals, zero via zeroSensitiveFields(), call saveToJSON(), restore.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-006 — 2026-05-28T11:30:00Z
+MigrateToInsecure now sets c.storageMode = StorageModeInsecure and calls saveToJSON() directly, removing the prevMode temporary mutation; config/set.go's credentialStorageModeChanged flag removed and post-migration SetStorageMode for the insecure path eliminated.
+Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-007 — 2026-05-28T12:00:00Z
+Threaded io.Writer through SetStorageMode and loadSensitiveFieldsFromKeyring, replacing os.Stderr; removed "os" import from credentials.go; NewConfig passes os.Stderr, initCredentialStorageDefault passes its stderr param, config/set.go passes cmd.ErrOrStderr(); all test call sites updated to io.Discard except the warning-path test which uses *bytes.Buffer and asserts "Warning:" output.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/subcommands/config/set.go, ~common/clicfg/credentials/credentials_keyring_test.go
+
+## TASK-008 — 2026-05-28T12:00:00Z
+Final gates: make test, make fmt-check, make lint all pass with 0 issues after all structural refactors.
+
+## TASK-013 — 2026-05-28T16:00:00Z
+Moved deleteFromKeyring from collection types (*AuraCredentials etc.) to item types (*AuraCredential etc.); added to keyringCredential interface; RemoveAura/Dbms/Embed now use Get-before-Remove pattern; updated compile-time assertions and per-type tests; fixed stale comment in docker/delete.go.
+Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go, ~neo4j-cli/internal/subcommands/credential/credential_test.go, ~neo4j-cli/internal/subcommands/credential/dbms/remove_test.go, ~neo4j-cli/internal/subcommands/credential/embed/remove_test.go, ~neo4j-cli/internal/subcommands/docker/delete.go
+
+## TASK-012 — 2026-05-28T15:30:00Z
+Removed error return from saveToJSON(); updated save() to call saveToJSON() then return nil; saveWithKeyring() drops the _ = assignment and nolint comment; MigrateToInsecure() drops the dead if-err block.
+Files: ~common/clicfg/credentials/credentials.go
+
+## REVIEW — 2026-05-28T15:00:00Z
+Added 2 review tasks (task-012..task-013).
+
+## TASK-011 — 2026-05-28T14:30:00Z
+Removed Credentials.DeleteKeyringEntries string-dispatch function; added deleteFromKeyring(provider, name) to *AuraCredentials, *DbmsCredentials, *EmbedCredentials; updated RemoveAura/RemoveDbms/RemoveEmbed to call per-type methods directly; added per-type tests covering ErrNotFound-ignored and non-ErrNotFound-returned paths.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go, ~common/clicfg/credentials/credentials_keyring_test.go
+
+## TASK-010 — 2026-05-28T14:00:00Z
+Rewrote saveWithKeyring and MigrateToKeyring to use c.allCredentials() iterator; also collapsed remaining triple loops in MigrateToInsecure and loadSensitiveFieldsFromKeyring per reviewer feedback; removed stale comment on allCredentials(). No per-type inline loops remain anywhere in credentials.go.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-009 — 2026-05-28T13:00:00Z
+Defined keyringCredential interface (7 methods) in keyring.go; updated writeToKeyring signature on all three types to accept *[]string for written-key tracking; added saveSensitiveFields, restoreSensitiveFields, and validateForMigration to each type; added compile-time interface assertions; added allCredentials() on Credentials; updated all call sites (credentials.go and *_keyring_test.go files) to pass nil for the new parameter.
+Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go
+
+## REVIEW — 2026-05-28T16:30:00Z
+Added 3 review tasks (task-014..task-016).
+
+## TASK-014 — 2026-05-28T17:00:00Z
+MigrateToKeyring now sets c.storageMode = StorageModeKeyring after save(); removed the stale "caller must call SetStorageMode" doc language; deleted the redundant post-migration SetStorageMode block from set.go; added storageMode assertion to TestMigrateToKeyring_Success.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/credentials_keyring_test.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-015 — 2026-05-28T17:00:00Z
+Covered by task-014; no remaining misleading storageMode precondition comments in credentials.go or set.go.
+
+## TASK-016 — 2026-05-28T17:30:00Z
+Replaced 6 per-type keyringCredential interface methods with a single sensitiveFields() []sensitiveField method; generic helpers in credentials.go implement zero/restore/validate/write/load/migrate; net ~500 lines deleted across aura.go, dbms.go, embed.go, and their test files; migratedField type removed.
+Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go
+Decisions: warning/error messages lost per-type command suggestions in the generic path; accepted tradeoff since the keyring key string (e.g. aura/prod/client-secret) already identifies the credential.
+
+## REVIEW — 2026-05-28T18:45:00Z
+Added 6 review tasks (task-019..task-024): comment hygiene (REQ-F tags, stale names), dead error return on loadSensitiveFieldsFromKeyring, stale caller-contract docs, dead error check in MigrateToKeyring, os.Stderr in token.go.
+
+## TASK-019 — 2026-05-28T19:00:00Z
+Replaced REQ-F-016, REQ-F-017, REQ-F-018, and REQ-F-019 comment tags in credentials.go and set.go with prose describing the observable behaviour; also reflowed the affected comment block to keep lines under 90 chars.
+Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-020 — 2026-05-28T19:15:00Z
+Replaced stale function name 'tryAutoMigrate' with 'loadCredFromKeyring' in a comment in credentials.go; the Task-009 reference in clicfg.go had already been cleaned in a prior task.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-021 — 2026-05-28T19:30:00Z
+loadSensitiveFieldsFromKeyring was already void (no return value), SetStorageMode already called it as a plain statement, and no panic branch existed in NewConfig — the task was already complete from prior work; marked completed and updated the doc comment to remove the contradicting "errors returned as-is" line (already done in task-018 pass).
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-022 — 2026-05-28T19:45:00Z
+Removed stale "The caller is responsible for persisting the credential-storage config key." sentence from both MigrateToKeyring and MigrateToInsecure doc comments in credentials.go; no equivalent language remained elsewhere.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-023 — 2026-05-28T20:00:00Z
+Replaced dead `if err := c.save()` check in MigrateToKeyring with a direct `c.saveToJSON()` call; added a comment explaining storageMode is still insecure at that point so saveToJSON() is the correct dispatch.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-024 — 2026-05-28T20:30:00Z
+Added warnW io.Writer to getToken and getHeaders; added WarnW io.Writer field to RequestConfig (nil defaults to os.Stderr in MakeRequest); removed "os" import from token.go; warning now writes to warnW instead of os.Stderr directly.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/api.go

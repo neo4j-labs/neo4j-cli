@@ -5,6 +5,8 @@ package credentials
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -13,7 +15,7 @@ import (
 type AuraCredentials struct {
 	DefaultCredential string            `json:"default-credential"`
 	Credentials       []*AuraCredential `json:"credentials"`
-	onUpdate          func()
+	onUpdate          func() error
 }
 
 func (c *AuraCredentials) Printable() PrintableAuraCredentials {
@@ -33,10 +35,9 @@ func (c *AuraCredentials) Add(name string, clientId string, clientSecret string)
 
 	c.Credentials = append(c.Credentials, &AuraCredential{Name: name, ClientId: clientId, ClientSecret: clientSecret})
 	if len(c.Credentials) == 1 {
-		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
+		c.SetDefault(name) //nolint:errcheck // not-found error impossible here; any keyring error surfaces in the c.onUpdate() call below
 	}
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) Remove(name string) error {
@@ -58,8 +59,7 @@ func (c *AuraCredentials) Remove(name string) error {
 	}
 
 	c.Credentials = append(c.Credentials[:indexToRemove], c.Credentials[indexToRemove+1:]...)
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) SetDefault(name string) error {
@@ -68,8 +68,7 @@ func (c *AuraCredentials) SetDefault(name string) error {
 	}
 
 	c.DefaultCredential = name
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *AuraCredentials) GetDefault() (*AuraCredential, error) {
@@ -88,7 +87,7 @@ func (c *AuraCredentials) Get(name string) (*AuraCredential, error) {
 	return nil, clierr.NewUsageError("could not find credential with name %s", name)
 }
 
-func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken string, expiresInSeconds int64) *AuraCredential {
+func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken string, expiresInSeconds int64) (*AuraCredential, error) {
 	credential, err := c.Get(cred.Name)
 	if err != nil {
 		panic(err)
@@ -99,8 +98,7 @@ func (c *AuraCredentials) UpdateAccessToken(cred *AuraCredential, accessToken st
 
 	credential.TokenExpiry = now + (expiresInSeconds-expireToleranceSeconds)*1000
 	credential.AccessToken = accessToken
-	c.onUpdate()
-	return credential
+	return credential, c.onUpdate()
 }
 
 func (c *AuraCredentials) ClearAccessToken(cred *AuraCredential) (*AuraCredential, error) {
@@ -111,7 +109,9 @@ func (c *AuraCredentials) ClearAccessToken(cred *AuraCredential) (*AuraCredentia
 
 	credential.TokenExpiry = 0
 	credential.AccessToken = ""
-	c.onUpdate()
+	if err := c.onUpdate(); err != nil {
+		return nil, err
+	}
 	return credential, nil
 }
 
@@ -161,6 +161,19 @@ type AuraCredential struct {
 	TokenExpiry  int64  `json:"token-expiry"`
 }
 
+// deleteFromKeyring removes all keyring entries for this Aura credential.
+// ErrNotFound is silently ignored; other errors are joined and returned.
+func (c *AuraCredential) deleteFromKeyring(provider KeyringProvider) error {
+	deleteOne := func(field string) error {
+		err := provider.Delete(ServiceName, KeyringKey("aura", c.Name, field))
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("keyring delete aura/%s/%s: %w", c.Name, field, err)
+		}
+		return nil
+	}
+	return errors.Join(deleteOne("client-secret"), deleteOne("access-token"))
+}
+
 func (credential *AuraCredential) HasValidAccessToken() bool {
 	now := time.Now().UnixMilli()
 
@@ -173,4 +186,11 @@ func (credential *AuraCredential) HasValidAccessToken() bool {
 	}
 
 	return true
+}
+
+func (c *AuraCredential) sensitiveFields() []sensitiveField {
+	return []sensitiveField{
+		{ptr: &c.ClientSecret, key: KeyringKey("aura", c.Name, "client-secret"), required: true},
+		{ptr: &c.AccessToken, key: KeyringKey("aura", c.Name, "access-token"), required: false},
+	}
 }

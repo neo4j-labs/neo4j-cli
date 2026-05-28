@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// missingCredentialErrorPrefix mirrors credentials.DbmsCredentials.Remove's
-// "could not find credential with name <n> to remove" wording. The leaf
-// swallows that exact shape per REQ-F-050 (missing credential during delete
-// is not an error) while still surfacing any other failure verbatim.
+// missingCredentialErrorPrefix mirrors credentials.DbmsCredentials.Get's
+// "could not find credential with name" wording. The leaf swallows that exact
+// shape per REQ-F-050 (missing credential during delete is not an error) while
+// still surfacing any other failure verbatim.
 const missingCredentialErrorPrefix = "could not find credential with name"
 
 // newDeleteCmd builds the `neo4j-cli docker delete <name>` leaf (REQ-F-050..F-054).
@@ -87,8 +87,8 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 			// credential just wasn't stored (e.g. --no-store-credential at
 			// create time, or it was already removed manually). Any other
 			// failure shape is surfaced verbatim.
-			if cfg.Credentials != nil && cfg.Credentials.Dbms != nil {
-				if err := cfg.Credentials.Dbms.Remove(name); err != nil {
+			if cfg.Credentials != nil {
+				if err := cfg.Credentials.RemoveDbms(name, cmd.ErrOrStderr()); err != nil {
 					if !strings.HasPrefix(err.Error(), missingCredentialErrorPrefix) {
 						return err
 					}

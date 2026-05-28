@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -42,6 +43,9 @@ type RequestConfig struct {
 	Method      string
 	PostBody    map[string]any
 	QueryParams map[string]string
+	// WarnW receives keyring-failure warnings produced during token acquisition.
+	// If nil, warnings are written to os.Stderr.
+	WarnW io.Writer
 }
 
 func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
@@ -49,6 +53,11 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	var method = config.Method
 	if method == "" {
 		panic(fmt.Sprintf("method not set in requests %s", path))
+	}
+
+	warnW := config.WarnW
+	if warnW == nil {
+		warnW = os.Stderr
 	}
 
 	body := createBody(config.PostBody)
@@ -88,7 +97,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		}
 	}
 
-	req.Header, err = getHeaders(credential, cfg)
+	req.Header, err = getHeaders(credential, cfg, warnW)
 	if err != nil {
 		return responseBody, 0, err
 	}

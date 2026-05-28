@@ -5,6 +5,8 @@ package credentials
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/neo4j/cli/common/clierr"
 )
@@ -12,7 +14,7 @@ import (
 type EmbedCredentials struct {
 	DefaultCredential string             `json:"default-credential"`
 	Credentials       []*EmbedCredential `json:"credentials"`
-	onUpdate          func()
+	onUpdate          func() error
 }
 
 func (c *EmbedCredentials) Printable() PrintableEmbedCredentials {
@@ -38,10 +40,9 @@ func (c *EmbedCredentials) Add(name, provider, model, baseURL, apiKey string, di
 		Dimensions: dimensions,
 	})
 	if len(c.Credentials) == 1 {
-		c.SetDefault(name) //nolint:errcheck // credential was just appended, so it always exists; error is impossible here
+		c.SetDefault(name) //nolint:errcheck // not-found error impossible here; any keyring error surfaces in the c.onUpdate() call below
 	}
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *EmbedCredentials) Remove(name string) error {
@@ -63,8 +64,7 @@ func (c *EmbedCredentials) Remove(name string) error {
 	}
 
 	c.Credentials = append(c.Credentials[:indexToRemove], c.Credentials[indexToRemove+1:]...)
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *EmbedCredentials) SetDefault(name string) error {
@@ -73,8 +73,7 @@ func (c *EmbedCredentials) SetDefault(name string) error {
 	}
 
 	c.DefaultCredential = name
-	c.onUpdate()
-	return nil
+	return c.onUpdate()
 }
 
 func (c *EmbedCredentials) GetDefault() (*EmbedCredential, error) {
@@ -144,4 +143,20 @@ type EmbedCredential struct {
 	BaseURL    string `json:"base-url"`
 	Dimensions int    `json:"dimensions"`
 	APIKey     string `json:"api-key"`
+}
+
+// deleteFromKeyring removes the keyring entry for this Embed credential.
+// ErrNotFound is silently ignored; other errors are returned.
+func (c *EmbedCredential) deleteFromKeyring(provider KeyringProvider) error {
+	err := provider.Delete(ServiceName, KeyringKey("embed", c.Name, "api-key"))
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return fmt.Errorf("keyring delete embed/%s/api-key: %w", c.Name, err)
+	}
+	return nil
+}
+
+func (c *EmbedCredential) sensitiveFields() []sensitiveField {
+	return []sensitiveField{
+		{ptr: &c.APIKey, key: KeyringKey("embed", c.Name, "api-key"), required: false},
+	}
 }
