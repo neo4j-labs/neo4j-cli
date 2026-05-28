@@ -40,3 +40,6 @@ Smoke checks (all pass):
 - 4d `docker stop dev --await --rw` → exit 2, stderr `Error: unknown flag: --await`.
 - 4e `aura instance create --help` → stdout contains `--wait`, contains 0 occurrences of `await`.
 Grep sweep: production-source `--await` references = 0 across common/, neo4j-cli/, CONTRIBUTING.md, README.md, AGENTS.md. Only remaining `--await` literal in repo source is the negative regression in `neo4j-cli/aura/internal/flags/wait_test.go:61` (`assert.NotContains(t, usage, "--await")`) — expected.
+
+## REVIEW — 2026-05-28T12:00:00Z
+Added 2 review tasks (task-007..task-008). Investigation revealed TestAllLeafCommands_HaveExamples enforces only non-empty + flush-left first line — the "≥3 invocations" in AGENTS.md is convention, not gate. task-008 drops docker stop/start example padding and relaxes the doc convention to ≥2.

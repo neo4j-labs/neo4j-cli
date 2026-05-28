@@ -111,3 +111,73 @@ tasks:
       - "bin/neo4j-cli docker start dev --await --rw and stop dev --await --rw both exit with 'Error: unknown flag: --await'"
       - "bin/neo4j-cli aura instance create --help shows --wait and does NOT show --await"
     completed_at: 2026-05-28T11:00:00Z
+
+  - id: task-007
+    source: review
+    title: "Rename TestRegisterWait_HidesAliasFromHelp to reflect post-removal intent"
+    description: |
+      Hone review finding: `neo4j-cli/aura/internal/flags/wait_test.go:54` defines
+      `TestRegisterWait_HidesAliasFromHelp`. Pre-removal this name was accurate — the
+      test asserted that cobra's `MarkDeprecated` machinery hid the alias from `--help`.
+      Post-removal there is no alias at all, and the test is now a regression guard
+      asserting that the alias does NOT get re-registered. The test still does the
+      right thing; its NAME is wrong and will confuse future readers ("hides what from
+      where? there's no alias here"). Rename to something that reflects the
+      post-removal intent — e.g. `TestRegisterWait_DoesNotRegisterAwaitAlias` or
+      `TestRegisterWait_AwaitNotRegistered`. Keep the test body unchanged: both the
+      positive `--wait` assertion and the negative `--await` regression assertion stay
+      as-is.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "neo4j-cli/aura/internal/flags/wait_test.go no longer contains the function name 'TestRegisterWait_HidesAliasFromHelp'"
+      - "A replacement test exists whose name reflects regression-guard intent (e.g. ends in 'DoesNotRegisterAwaitAlias' or 'AwaitNotRegistered')"
+      - "Test body unchanged: both Contains(--wait) and NotContains(--await) assertions remain"
+      - "go test ./neo4j-cli/aura/internal/flags/... passes"
+    completed_at: null
+
+  - id: task-008
+    source: review
+    title: "Drop docker Example padding/duplication; relax AGENTS.md convention to >=2"
+    description: |
+      Hone review surfaced two related issues in the docker subtree's Example blocks,
+      and the user authorised lowering the AGENTS.md "≥3 invocations" convention to
+      "≥2 invocations" if that helps. Investigation of
+      `neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go:226`
+      (`TestAllLeafCommands_HaveExamples`) confirmed the test only enforces non-empty
+      + flush-left first line — there is NO test-enforced count threshold. The "≥3"
+      in AGENTS.md line 245 is a documented convention only.
+
+      Three coordinated edits:
+
+      1. `neo4j-cli/internal/subcommands/docker/stop.go` — remove the third Example
+         invocation added in task-002 (`# Stop a different managed container and wait
+         for exit\nneo4j-cli docker stop staging --wait --rw`). It exists only to
+         satisfy the (non-existent) ≥3 gate and adds no semantic value — it's the
+         same command with a different container name. Result: docker stop returns to
+         two meaningful invocations.
+
+      2. `neo4j-cli/internal/subcommands/docker/start.go` — remove the third Example
+         block (`# Wait for a container started with --no-store-credential (TCP
+         fallback)\nneo4j-cli docker start dev --wait --rw`). The command string is
+         identical to the second invocation; the comment claims a behaviour that
+         requires `--no-store-credential` at create-time, which isn't visible on the
+         command line and is misleading. Result: docker start returns to two
+         meaningful invocations (basic + --wait).
+
+      3. `AGENTS.md` line 245 — change "(≥3 invocations, ..." to "(≥2 invocations, ..."
+         so the documented convention matches what the test actually requires (non-
+         empty) and what the user authorised.
+
+      Regenerate the neo4j-cli skill bundle via `go generate
+      ./neo4j-cli/internal/skill/...` — the docker.md reference page will lose the
+      two dropped invocation blocks.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "docker/stop.go Example contains exactly two invocations (no 'staging --wait --rw' line)"
+      - "docker/start.go Example contains exactly two invocations (no 'TCP fallback' comment, no duplicate '--wait --rw' line)"
+      - "AGENTS.md line ~245 reads '(≥2 invocations, ...' (not ≥3)"
+      - "neo4j-cli/internal/skill/bundle/references/docker.md docker start + stop sections show two invocations each"
+      - "make fmt-check && make lint && make test && make generate-check all green"
+    completed_at: null
