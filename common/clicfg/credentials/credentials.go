@@ -359,11 +359,16 @@ func (c *Credentials) MigrateToInsecure() error {
 	return nil
 }
 
-// removeAndCleanKeyring calls remove() and, if in keyring mode, deletes cred's
-// keyring entries. Keyring cleanup failures are written as warnings to warnW
-// and do not fail the overall removal.
-func (c *Credentials) removeAndCleanKeyring(cred keyringCredential, remove func() error, warnW io.Writer) error {
-	if err := remove(); err != nil {
+// removeCredential looks up the named credential via get, removes it via
+// remove (which triggers the onUpdate JSON write), and — in keyring mode —
+// deletes its keyring entries. Keyring cleanup failures are written as
+// warnings to warnW and do not fail the removal.
+func (c *Credentials) removeCredential(get func(string) (keyringCredential, error), remove func(string) error, name string, warnW io.Writer) error {
+	cred, err := get(name)
+	if err != nil {
+		return err
+	}
+	if err := remove(name); err != nil {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
@@ -374,37 +379,16 @@ func (c *Credentials) removeAndCleanKeyring(cred keyringCredential, remove func(
 	return nil
 }
 
-// RemoveAura removes an Aura credential by name and, in keyring mode, deletes
-// its keyring entries. Keyring cleanup failures are written as warnings to
-// warnW and do not fail the removal.
 func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
-	cred, err := c.Aura.Get(name)
-	if err != nil {
-		return err
-	}
-	return c.removeAndCleanKeyring(cred, func() error { return c.Aura.Remove(name) }, warnW)
+	return c.removeCredential(func(n string) (keyringCredential, error) { return c.Aura.Get(n) }, c.Aura.Remove, name, warnW)
 }
 
-// RemoveDbms removes a Dbms credential by name and, in keyring mode, deletes
-// its keyring entries. Keyring cleanup failures are written as warnings to
-// warnW and do not fail the removal.
 func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
-	cred, err := c.Dbms.Get(name)
-	if err != nil {
-		return err
-	}
-	return c.removeAndCleanKeyring(cred, func() error { return c.Dbms.Remove(name) }, warnW)
+	return c.removeCredential(func(n string) (keyringCredential, error) { return c.Dbms.Get(n) }, c.Dbms.Remove, name, warnW)
 }
 
-// RemoveEmbed removes an Embed credential by name and, in keyring mode, deletes
-// its keyring entries. Keyring cleanup failures are written as warnings to
-// warnW and do not fail the removal.
 func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
-	cred, err := c.Embed.Get(name)
-	if err != nil {
-		return err
-	}
-	return c.removeAndCleanKeyring(cred, func() error { return c.Embed.Remove(name) }, warnW)
+	return c.removeCredential(func(n string) (keyringCredential, error) { return c.Embed.Get(n) }, c.Embed.Remove, name, warnW)
 }
 
 // loadSensitiveFieldsFromKeyring populates in-memory sensitive fields from the
