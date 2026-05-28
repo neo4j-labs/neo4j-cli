@@ -4,14 +4,11 @@
 package embed
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
-	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -71,9 +68,6 @@ func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32
 	if base == "" {
 		base = defaultHuggingFaceBaseURL
 	}
-	if err := urlcheck.ValidateRemoteURL(base); err != nil {
-		return nil, fmt.Errorf("huggingface: base url rejected: %w", err)
-	}
 
 	// Serverless mode: append {model}/pipeline/feature-extraction to the base
 	// URL. Dedicated mode: post to the base URL verbatim (the dedicated
@@ -84,48 +78,18 @@ func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32
 	}
 
 	body := huggingFaceEmbedRequest{Inputs: text}
-	payload, err := json.Marshal(body)
+
+	headers := map[string]string{
+		"Authorization": "Bearer " + p.cfg.APIKey,
+	}
+	raw, err := doJSONRequest(ctx, p.client, ProviderHuggingFace, http.MethodPost, url, body, headers, p.cfg.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("huggingface: marshal request: %w", err)
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("huggingface: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+p.cfg.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if p.cfg.UserAgent != "" {
-		req.Header.Set("User-Agent", p.cfg.UserAgent)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("huggingface: request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read up to 4KiB of the body for the error message — enough to
-		// surface a JSON error envelope without spamming the terminal on
-		// massive non-JSON HTML pages from misconfigured proxies. The
-		// Authorization header lives on the request, never the response,
-		// so echoing the body is safe.
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("huggingface: HTTP %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
-	}
-
-	// Read the body once so we can attempt both response shapes without
-	// re-issuing the request. Tolerate [[floats]] (serverless) and [floats]
-	// (dedicated) — a single decode pass picks the right shape based on the
-	// first non-whitespace byte that follows the outer `[`.
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("huggingface: read response: %w", err)
-	}
-
-	// Try the nested shape first: most embedding models return [[floats]].
+	// Tolerate [[floats]] (serverless) and [floats] (dedicated) — a single
+	// decode pass picks the right shape based on the first non-whitespace
+	// byte that follows the outer `[`.
 	var nested [][]float32
 	if err := json.Unmarshal(raw, &nested); err == nil {
 		if len(nested) == 0 || len(nested[0]) == 0 {
@@ -134,7 +98,6 @@ func (p *huggingFaceProvider) Embed(ctx context.Context, text string) ([]float32
 		return nested[0], nil
 	}
 
-	// Fall back to the flat shape: [floats] (some dedicated endpoints).
 	var flat []float32
 	if err := json.Unmarshal(raw, &flat); err == nil {
 		if len(flat) == 0 {

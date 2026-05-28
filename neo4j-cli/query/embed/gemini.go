@@ -8,11 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 
-	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -86,9 +84,6 @@ func (p *geminiProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if base == "" {
 		base = defaultGeminiBaseURL
 	}
-	if err := urlcheck.ValidateRemoteURL(base); err != nil {
-		return nil, fmt.Errorf("gemini: base url rejected: %w", err)
-	}
 
 	body := geminiEmbedRequest{
 		Content:  geminiContent{Parts: []geminiPart{{Text: text}}},
@@ -98,41 +93,18 @@ func (p *geminiProvider) Embed(ctx context.Context, text string) ([]float32, err
 		d := p.cfg.Dimensions
 		body.OutputDimensionality = &d
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("gemini: marshal request: %w", err)
-	}
 
 	url := base + "/models/" + p.cfg.Model + ":embedContent"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	headers := map[string]string{
+		"x-goog-api-key": p.cfg.APIKey,
+	}
+	raw, err := doJSONRequest(ctx, p.client, ProviderGemini, http.MethodPost, url, body, headers, p.cfg.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: build request: %w", err)
-	}
-	req.Header.Set("x-goog-api-key", p.cfg.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if p.cfg.UserAgent != "" {
-		req.Header.Set("User-Agent", p.cfg.UserAgent)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("gemini: request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read up to 4KiB of the body for the error message — enough to
-		// surface a JSON error envelope without spamming the terminal on
-		// massive non-JSON HTML pages from misconfigured proxies. The
-		// x-goog-api-key header lives on the request, never the response,
-		// so echoing the body is safe.
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("gemini: HTTP %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return nil, err
 	}
 
 	var decoded geminiEmbedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&decoded); err != nil {
 		return nil, fmt.Errorf("gemini: decode response: %w", err)
 	}
 	if len(decoded.Embedding.Values) == 0 {

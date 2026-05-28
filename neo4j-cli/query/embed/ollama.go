@@ -8,10 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-
-	"github.com/neo4j/cli/common/clicfg/urlcheck"
 )
 
 // defaultOllamaBaseURL is the conventional local Ollama endpoint. Resolve does
@@ -62,47 +59,19 @@ func (p *ollamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if base == "" {
 		base = defaultOllamaBaseURL
 	}
-	if err := urlcheck.ValidateRemoteURL(base); err != nil {
-		return nil, fmt.Errorf("ollama: base url rejected: %w", err)
-	}
 
 	body := ollamaEmbedRequest{
 		Model: p.cfg.Model,
 		Input: text,
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: marshal request: %w", err)
-	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/embed", bytes.NewReader(payload))
+	raw, err := doJSONRequest(ctx, p.client, ProviderOllama, http.MethodPost, base+"/api/embed", body, nil, p.cfg.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("ollama: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if p.cfg.UserAgent != "" {
-		req.Header.Set("User-Agent", p.cfg.UserAgent)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ollama: request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read up to 4KiB of the body for the error message — enough to
-		// surface a JSON error envelope without spamming the terminal on
-		// massive non-JSON HTML pages from misconfigured proxies. Ollama
-		// requests carry no Authorization header, so echoing the body is
-		// safe.
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("ollama: HTTP %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return nil, err
 	}
 
 	var decoded ollamaEmbedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&decoded); err != nil {
 		return nil, fmt.Errorf("ollama: decode response: %w", err)
 	}
 	if len(decoded.Embeddings) == 0 || len(decoded.Embeddings[0]) == 0 {

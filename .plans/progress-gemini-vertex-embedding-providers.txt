@@ -43,3 +43,8 @@ Added 2 review tasks (task-010..task-011).
 ## TASK-010 — 2026-05-28T12:42:14Z
 Fixed gemini/vertex examples in credential embed add to use `gemini-embedding-001 --dimensions 3072` (matches DI graph default; PRD acceptance model). Regenerated skill bundle.
 Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/skill/bundle/references/credential.md
+
+## TASK-011 — 2026-05-28T12:49:52Z
+Extracted doJSONRequest helper centralising urlcheck + marshal + request build + headers + dispatch + status check + 4KiB snippet + body read for all 5 embed providers. Each Embed now only handles auth check, URL build, request struct, and decode/post-process. Net -152 lines across 5 providers.
+Files: +neo4j-cli/query/embed/httpjson.go, ~neo4j-cli/query/embed/openai.go, ~neo4j-cli/query/embed/ollama.go, ~neo4j-cli/query/embed/huggingface.go, ~neo4j-cli/query/embed/gemini.go, ~neo4j-cli/query/embed/vertex.go
+Decisions: Helper returns raw response bytes (not a decode target) so huggingface's dual-shape decode stays in-file and the helper carries no per-provider knowledge. URL-rejection error text drifts from "base url rejected" to "url rejected" for 4 of 5 providers (no test depends on "base"); 4KiB-on-non-2xx wording stays byte-identical.

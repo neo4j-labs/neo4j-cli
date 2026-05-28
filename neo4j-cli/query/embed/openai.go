@@ -8,10 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
-	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -71,9 +69,6 @@ func (p *openAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if base == "" {
 		base = defaultOpenAIBaseURL
 	}
-	if err := urlcheck.ValidateRemoteURL(base); err != nil {
-		return nil, fmt.Errorf("openai: base url rejected: %w", err)
-	}
 
 	body := openAIEmbedRequest{
 		Model: p.cfg.Model,
@@ -83,40 +78,17 @@ func (p *openAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 		d := p.cfg.Dimensions
 		body.Dimensions = &d
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("openai: marshal request: %w", err)
-	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/embeddings", bytes.NewReader(payload))
+	headers := map[string]string{
+		"Authorization": "Bearer " + p.cfg.APIKey,
+	}
+	raw, err := doJSONRequest(ctx, p.client, ProviderOpenAI, http.MethodPost, base+"/embeddings", body, headers, p.cfg.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("openai: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+p.cfg.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if p.cfg.UserAgent != "" {
-		req.Header.Set("User-Agent", p.cfg.UserAgent)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("openai: request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read up to 4KiB of the body for the error message — enough to
-		// surface a JSON error envelope without spamming the terminal on
-		// massive non-JSON HTML pages from misconfigured proxies. The
-		// Authorization header lives on the request, never the response,
-		// so echoing the body is safe.
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("openai: HTTP %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return nil, err
 	}
 
 	var decoded openAIEmbedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&decoded); err != nil {
 		return nil, fmt.Errorf("openai: decode response: %w", err)
 	}
 	if len(decoded.Data) == 0 || len(decoded.Data[0].Embedding) == 0 {

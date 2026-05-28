@@ -318,7 +318,7 @@ tasks:
       Don't change file ownership of the per-provider structs — each
       provider keeps its own request/response struct definitions in its
       own file.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -331,4 +331,4 @@ tasks:
       - "Auth header values (Authorization Bearer / x-goog-api-key) still never appear in any error message"
       - "`urlcheck.ValidateRemoteURL` still runs before the request is built so SSRF tests stay green"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T12:49:52Z

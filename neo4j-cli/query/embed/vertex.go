@@ -8,14 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	"github.com/neo4j/cli/common/clicfg/urlcheck"
 	"github.com/neo4j/cli/common/clierr"
 )
 
@@ -127,9 +125,6 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 		"/locations/" + p.cfg.VertexLocation +
 		"/publishers/google/models/" + p.cfg.Model +
 		":predict"
-	if err := urlcheck.ValidateRemoteURL(url); err != nil {
-		return nil, fmt.Errorf("vertex: url rejected: %w", err)
-	}
 
 	body := vertexEmbedRequest{
 		Instances: []vertexInstance{{Content: text, TaskType: "RETRIEVAL_QUERY"}},
@@ -137,40 +132,17 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if p.cfg.Dimensions > 0 {
 		body.Parameters = &vertexParameters{OutputDimensionality: p.cfg.Dimensions}
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("vertex: marshal request: %w", err)
-	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	headers := map[string]string{
+		"Authorization": "Bearer " + tok.AccessToken,
+	}
+	raw, err := doJSONRequest(ctx, p.client, ProviderVertex, http.MethodPost, url, body, headers, p.cfg.UserAgent)
 	if err != nil {
-		return nil, fmt.Errorf("vertex: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if p.cfg.UserAgent != "" {
-		req.Header.Set("User-Agent", p.cfg.UserAgent)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("vertex: request failed: %w", err)
-	}
-	defer resp.Body.Close() //nolint:errcheck // response body close error is not actionable
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Read up to 4KiB of the body for the error message — enough to
-		// surface a JSON error envelope without spamming the terminal on
-		// massive non-JSON HTML pages from misconfigured proxies. The
-		// Authorization header lives on the request, never the response,
-		// so echoing the body is safe.
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("vertex: HTTP %d: %s", resp.StatusCode, bytes.TrimSpace(snippet))
+		return nil, err
 	}
 
 	var decoded vertexEmbedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&decoded); err != nil {
 		return nil, fmt.Errorf("vertex: decode response: %w", err)
 	}
 	if len(decoded.Predictions) == 0 || len(decoded.Predictions[0].Embeddings.Values) == 0 {
