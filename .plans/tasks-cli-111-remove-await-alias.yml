@@ -172,7 +172,7 @@ tasks:
       Regenerate the neo4j-cli skill bundle via `go generate
       ./neo4j-cli/internal/skill/...` — the docker.md reference page will lose the
       two dropped invocation blocks.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "docker/stop.go Example contains exactly two invocations (no 'staging --wait --rw' line)"
@@ -180,4 +180,4 @@ tasks:
       - "AGENTS.md line ~245 reads '(≥2 invocations, ...' (not ≥3)"
       - "neo4j-cli/internal/skill/bundle/references/docker.md docker start + stop sections show two invocations each"
       - "make fmt-check && make lint && make test && make generate-check all green"
-    completed_at: null
+    completed_at: 2026-05-28T13:00:00Z

@@ -47,3 +47,11 @@ Added 2 review tasks (task-007..task-008). Investigation revealed TestAllLeafCom
 ## 2026-05-28 task-007
 Renamed TestRegisterWait_HidesAliasFromHelp → TestRegisterWait_DoesNotRegisterAwaitAlias in neo4j-cli/aura/internal/flags/wait_test.go:54. Body unchanged (both Contains(--wait) + NotContains(--await) assertions intact). New name reflects post-removal regression-guard intent.
 Gates: make fmt-check OK; make lint OK (0 issues); make test OK.
+
+## 2026-05-28 task-008
+Dropped docker Example padding and relaxed AGENTS.md convention to ≥2.
+- docker/stop.go: removed 3rd Example invocation (staging --wait --rw); now two invocations (basic + --wait).
+- docker/start.go: removed misleading TCP-fallback Example block (duplicate command string, --no-store-credential is a create-time flag invisible on start CLI); now two invocations.
+- AGENTS.md line 245: "(≥3 invocations" → "(≥2 invocations". TestAllLeafCommands_HaveExamples enforces only non-empty + flush-left first line, so doc convention now matches actual gate + user preference.
+- Bundle regen: only neo4j-cli/internal/skill/bundle/references/docker.md changed — two invocation blocks dropped under docker start + stop.
+Gates: make fmt-check OK; make lint OK (0 issues); make test OK; make generate-check noise limited to the hone in_progress YAML flip + this task's committed work product (expected per AGENTS.md).
