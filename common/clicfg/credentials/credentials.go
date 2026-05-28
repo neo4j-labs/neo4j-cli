@@ -91,7 +91,7 @@ func (c *Credentials) HasAnyCredentials() bool {
 func (c *Credentials) SetStorageMode(mode string, warnW io.Writer) error {
 	c.storageMode = mode
 	if mode == StorageModeKeyring {
-		return c.loadSensitiveFieldsFromKeyring(warnW)
+		c.loadSensitiveFieldsFromKeyring(warnW)
 	}
 	return nil
 }
@@ -425,9 +425,10 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 //     stderr and the field is left empty; the command continues (error only
 //     surfaces if the credential is actually used).
 //
-// Non-ErrNotFound errors are returned as-is.
-// save() is called at the end only when at least one field was auto-migrated.
-func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
+// Non-ErrNotFound keyring errors are written as warnings to warnW; they do not
+// abort the load. save() is called at the end only when at least one field was
+// auto-migrated.
+func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) {
 	// anyMigrated tracks whether at least one JSON-resident secret was
 	// successfully pushed to the keyring so we only call save() when needed.
 	// save() (→ saveWithKeyring) will write in-memory values to keyring
@@ -447,8 +448,6 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
 	if anyMigrated {
 		_ = c.save() //nolint:errcheck // best-effort JSON scrub; error is non-fatal here
 	}
-
-	return nil
 }
 
 // writeCredToKeyring writes non-empty sensitive fields to the keyring.
