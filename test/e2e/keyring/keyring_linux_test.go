@@ -8,6 +8,7 @@ package keyring_test
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -142,6 +143,32 @@ func requireDaemon(t *testing.T) {
 	}
 }
 
+// findKeyringPassword retrieves the password for service/account from the
+// libsecret keyring daemon via secret-tool. Fatals if the entry is not found.
+// Only valid inside a dbus-run-session with a keyring daemon running.
+func findKeyringPassword(t *testing.T, service, account string) string {
+	t.Helper()
+	out, err := exec.Command(
+		"secret-tool", "lookup",
+		"service", service,
+		"username", account,
+	).Output()
+	require.NoError(t, err, "expected keyring entry service=%s account=%s to exist", service, account)
+	return strings.TrimRight(string(out), "\n")
+}
+
+// requireKeyringAbsent asserts that the given service/account entry does NOT
+// exist in the libsecret keyring daemon.
+func requireKeyringAbsent(t *testing.T, service, account string) {
+	t.Helper()
+	_, err := exec.Command(
+		"secret-tool", "lookup",
+		"service", service,
+		"username", account,
+	).Output()
+	require.Error(t, err, "expected keyring entry service=%s account=%s to be absent", service, account)
+}
+
 // TestKeyring_WithDaemon_CredentialAddDoesNotStoreSecretInJSON verifies that
 // when credential-storage is keyring and a keyring daemon is available, adding
 // a dbms credential does not store the password in credentials.json.
@@ -179,6 +206,8 @@ func TestKeyring_WithDaemon_CredentialAddDoesNotStoreSecretInJSON(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "topsecret",
 		"password must not be stored in credentials.json in keyring mode")
+	assert.Equal(t, "topsecret", findKeyringPassword(t, "neo4j-cli", "dbms/smoketest/password"),
+		"password must be stored in the keyring in keyring mode")
 }
 
 // TestKeyring_WithDaemon_ForwardMigration verifies that switching from insecure
@@ -210,6 +239,8 @@ func TestKeyring_WithDaemon_ForwardMigration(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), "migratesecret",
 		"password must be removed from credentials.json after migration to keyring")
+	assert.Equal(t, "migratesecret", findKeyringPassword(t, "neo4j-cli", "dbms/localdb/password"),
+		"password must be stored in the keyring after migration to keyring")
 
 	// config.json must now say keyring.
 	cfg := readConfigJSON(t, home)
@@ -240,6 +271,8 @@ func TestKeyring_WithDaemon_ReverseMigration(t *testing.T) {
 		env,
 	)
 	require.Equal(t, 0, exitCode, "forward migration must succeed; stderr=%s", stderr)
+	assert.Equal(t, "reversesecret", findKeyringPassword(t, "neo4j-cli", "dbms/localdb/password"),
+		"password must be stored in the keyring after forward migration")
 
 	// Step 3: migrate back to insecure.
 	exitCode, _, stderr = runCLI(t, bin,
@@ -255,6 +288,7 @@ func TestKeyring_WithDaemon_ReverseMigration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "reversesecret",
 		"password must be restored to credentials.json after reverse migration")
+	requireKeyringAbsent(t, "neo4j-cli", "dbms/localdb/password")
 
 	// config.json must say insecure.
 	cfg := readConfigJSON(t, home)
@@ -295,6 +329,8 @@ func TestKeyring_WithDaemon_RemoveCleansKeyring(t *testing.T) {
 		env,
 	)
 	require.Equal(t, 0, exitCode, "credential dbms add must succeed; stderr=%s", stderr)
+	assert.Equal(t, "removesecret", findKeyringPassword(t, "neo4j-cli", "dbms/toremove/password"),
+		"password must be stored in the keyring after add in keyring mode")
 
 	// Remove the credential.
 	exitCode, _, stderr = runCLI(t, bin,
@@ -311,6 +347,7 @@ func TestKeyring_WithDaemon_RemoveCleansKeyring(t *testing.T) {
 	require.True(t, ok, "credentials.json must have a dbms section")
 	dbmsCreds, _ := dbms["credentials"].([]interface{})
 	assert.Empty(t, dbmsCreds, "dbms credentials list must be empty after remove")
+	requireKeyringAbsent(t, "neo4j-cli", "dbms/toremove/password")
 
 	// Perform a reverse migration to insecure as an indirect probe that the
 	// keyring entry is also gone. If an entry existed for "toremove", it would
