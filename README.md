@@ -173,7 +173,50 @@ neo4j-cli aura agent invoke <agent-id> --input "hello" --rw
 neo4j-cli aura agent invoke <agent-id> --input "hello" --format json --rw
 ```
 
-## Local Neo4j (Docker)
+## Local Neo4j
+
+Two ways to run Neo4j locally from the CLI: drive a [Neo4j Desktop 2](https://neo4j.com/download/) install via its local relate API, or shell out to `docker`.
+
+### Neo4j Desktop
+
+`neo4j-cli desktop` manages a local Neo4j Desktop 2 install via its relate API on `http://localhost:<port>/fastify/api` (Desktop must be running). Manage DBMSes, plugins, and saved remote connections from the terminal. Desktop owns the credential lifecycle — DBMS passwords live in Desktop's safeStorage, not in `credentials.json`.
+
+```bash
+# Install Neo4j Desktop 2 itself (already-installed detection runs first)
+neo4j-cli desktop install --rw
+
+# Diagnose a local Desktop install end-to-end
+neo4j-cli desktop doctor
+
+# Composed view: local DBMSes + saved remote connections
+neo4j-cli desktop list --format table
+```
+
+Local DBMSes — create, lifecycle, and plugins (Desktop 2 runs one DBMS at a time on port 7687; `create` / `start` refuse when another is running, pass `--force` to stop the conflicting one first):
+
+```bash
+# Create a DBMS at Desktop's highest-known stable enterprise version
+neo4j-cli desktop dbms create --name dev --password '<pw>' --wait --rw
+
+# Lifecycle
+neo4j-cli desktop dbms start <id> --wait --rw
+neo4j-cli desktop dbms stop <id> --wait --rw
+neo4j-cli desktop dbms delete <id> --force --rw
+
+# Plugins
+neo4j-cli desktop dbms plugin available <id>
+neo4j-cli desktop dbms plugin install <id> --plugin apoc --rw
+```
+
+Saved remote connections (Aura, self-hosted, …) — `query` selects them via `--credential desktop-connection:<uuid>`, or `--credential desktop` for the single running local DBMS:
+
+```bash
+neo4j-cli desktop connection create --name aura-prod --uri neo4j+s://abc.databases.neo4j.io --username neo4j --password '<pw>' --rw
+neo4j-cli desktop connection list
+neo4j-cli query --credential desktop-connection:<uuid> 'RETURN 1'
+```
+
+### Docker
 
 `neo4j-cli docker` runs Neo4j locally by shelling out to the host `docker` CLI. Managed containers carry the `org.neo4j.cli.managed=true` label — Docker is the source of truth, no separate state file is maintained. Requires Docker Desktop (or the `docker` CLI) on `PATH`.
 
@@ -181,7 +224,7 @@ If you use podman instead of docker, you can alias it (`alias docker=podman` in 
 
 Defaults: enterprise edition with the evaluation license (`NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`); pass `--accept-license` to upgrade to the commercial license (`=yes`). Use `--edition community` for the community image. Host ports default to 7474 (HTTP) and 7687 (Bolt); override with `--http-port` / `--bolt-port`. When the requested pair is taken, both ports are auto-incremented by the same offset until a free pair is found. If `--name` collides with an existing container or stored `dbms` credential, an auto-suffix (`<name>-1`, `<name>-2`, …) is chosen and logged to stderr.
 
-### Persistent flow (stored credential)
+#### Persistent flow (stored credential)
 
 ```bash
 # Create a managed container; a 16-byte password is generated and stored as a dbms credential
@@ -204,7 +247,7 @@ neo4j-cli docker delete dev --force --rw
 
 Heads up: the generated password is part of the standard `create` output. Redirects (`> file`) and pipes (`| tee`, `| jq`) will capture it. Pass `--password <s>` to choose the password yourself, `--no-print-password` to keep the stored credential but suppress the password from stdout (recover later with `neo4j-cli credential dbms get <name>`), or `--no-store-credential` if you want neither a stored credential nor the rendered password.
 
-### Persisting data across container deletes
+#### Persisting data across container deletes
 
 By default the Neo4j data, logs, and import dirs live in the container layer and are lost on `docker delete`. Bind-mount a host directory with `--data-dir`, `--logs-dir`, or `--import-dir` to keep them:
 
@@ -217,7 +260,7 @@ neo4j-cli docker create --name dev --data-dir ~/neo4j-dev/data --rw  # reuses th
 
 `--logs-dir` and `--import-dir` mount `/logs` and `/import` similarly. Each flag is optional and independent; combine any subset. Paths support `~` (HOME) and environment-variable expansion, and missing directories are created at mode 0o755. All three flags are incompatible with `--ephemeral` (which is, by definition, disposable). Note: the Neo4j container's entrypoint adjusts ownership of the mounted directories at startup; expect them to show up under the container's neo4j UID on the host after first start.
 
-### Ephemeral flow (env-file into `query --env`)
+#### Ephemeral flow (env-file into `query --env`)
 
 ```bash
 # Throwaway container (`docker run --rm`); no credential persisted; env-file written for query --env
