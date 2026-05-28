@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync"
 
 	"golang.org/x/oauth2"
@@ -16,6 +17,42 @@ import (
 
 	"github.com/neo4j/cli/common/clierr"
 )
+
+// vertexLocationPattern matches a GCP region name (e.g. us-central1,
+// europe-west1, northamerica-northeast2). Single source of truth for both
+// credential-add-time validation and Embed-time validation — must stay
+// strict enough to reject any value that could escape the
+// `{location}-aiplatform.googleapis.com` host suffix during URL composition
+// (see SSRF/token-exfil notes in CLI-193 review).
+var vertexLocationPattern = regexp.MustCompile(`^[a-z]+(-[a-z0-9]+)+$`)
+
+// vertexProjectPattern matches a GCP project ID (6-30 chars, starts with a
+// letter, ends alphanumeric, lower-case letters / digits / hyphens only).
+var vertexProjectPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
+
+// ValidateVertexLocation rejects values that do not match a GCP region
+// shape. Returns a clierr.UsageError naming --vertex-location with a sample
+// of the expected format when the input is invalid.
+func ValidateVertexLocation(location string) error {
+	if !vertexLocationPattern.MatchString(location) {
+		return clierr.NewUsageError(
+			"invalid --vertex-location %q: must be a GCP region like us-central1 (lower-case letters and digits, hyphen-separated)",
+			location)
+	}
+	return nil
+}
+
+// ValidateVertexProject rejects values that do not match the GCP project ID
+// shape. Returns a clierr.UsageError naming --vertex-project with a sample
+// of the expected format when the input is invalid.
+func ValidateVertexProject(project string) error {
+	if !vertexProjectPattern.MatchString(project) {
+		return clierr.NewUsageError(
+			"invalid --vertex-project %q: must be a GCP project ID like my-project-123 (6-30 chars, starts with a letter, ends alphanumeric)",
+			project)
+	}
+	return nil
+}
 
 // vertexScope is the OAuth2 scope required to call the Vertex AI predict
 // endpoint.
@@ -105,6 +142,12 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if p.cfg.VertexLocation == "" {
 		return nil, clierr.NewUsageError(
 			"missing vertex location: set --vertex-location or store one with `neo4j-cli credential embed add --vertex-project <project> --vertex-location <location>`")
+	}
+	if err := ValidateVertexProject(p.cfg.VertexProject); err != nil {
+		return nil, err
+	}
+	if err := ValidateVertexLocation(p.cfg.VertexLocation); err != nil {
+		return nil, err
 	}
 
 	ts, err := p.tokenSource(ctx)

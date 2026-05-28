@@ -392,7 +392,7 @@ tasks:
       the flag (`--vertex-location` / `--vertex-project`), include a
       sample of the expected format ("e.g. us-central1" / "must be a
       GCP project ID like my-project-123").
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Compiled regex constants for GCP region + project ID patterns exist as a single source of truth used by both `add.go` and `vertex.go`"
@@ -406,7 +406,7 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
       - "`make generate-check` passes (no new bundle drift)"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T13:06:41Z
 
   - id: task-013
     title: "Cap happy-path response body read in doJSONRequest (DoS hardening)"

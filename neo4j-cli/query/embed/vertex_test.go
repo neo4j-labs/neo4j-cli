@@ -78,6 +78,149 @@ func TestVertex_Embed_MissingLocation(t *testing.T) {
 	assert.Equal(t, 2, ce.Code, "missing vertex location is a usage error")
 }
 
+func TestVertex_Embed_RejectsInvalidLocation(t *testing.T) {
+	cases := []struct {
+		name string
+		loc  string
+	}{
+		{"hash bypass via fragment", "evil.com#"},
+		{"port path bypass", "evil.com:8080/x"},
+		{"userinfo bypass with @", "@attacker.com"},
+		{"dotted hostname", "x.attacker.com"},
+		{"uppercase rejected", "US-central1"},
+		{"empty segment rejected", "us-"},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("validation must reject before HTTP dispatch")
+	}))
+	defer srv.Close()
+
+	withTokenSource(t, staticTokenSource("tok-test"), nil)
+	withURLHostPrefix(t, srv.URL)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newVertexProvider(Config{
+				Provider:       ProviderVertex,
+				Model:          "gemini-embedding-001",
+				VertexProject:  "my-project",
+				VertexLocation: tc.loc,
+			})
+			_, err := p.Embed(context.Background(), "hello")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--vertex-location")
+			assert.Contains(t, err.Error(), tc.loc, "error must reference the offending value")
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 2, ce.Code, "invalid location is a usage error")
+		})
+	}
+}
+
+func TestVertex_Embed_AcceptsRealGCPRegions(t *testing.T) {
+	regions := []string{
+		"us-central1",
+		"us-east1",
+		"europe-west1",
+		"northamerica-northeast2",
+		"asia-southeast1",
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"predictions":[{"embeddings":{"values":[0.1]}}]}`))
+	}))
+	defer srv.Close()
+
+	withTokenSource(t, staticTokenSource("tok-test"), nil)
+	withURLHostPrefix(t, srv.URL)
+
+	for _, region := range regions {
+		t.Run(region, func(t *testing.T) {
+			p := newVertexProvider(Config{
+				Provider:       ProviderVertex,
+				Model:          "gemini-embedding-001",
+				VertexProject:  "my-project",
+				VertexLocation: region,
+			})
+			got, err := p.Embed(context.Background(), "hello")
+			require.NoError(t, err)
+			assert.Equal(t, []float32{0.1}, got)
+		})
+	}
+}
+
+func TestVertex_Embed_RejectsInvalidProject(t *testing.T) {
+	cases := []struct {
+		name    string
+		project string
+	}{
+		{"too short", "abc"},
+		{"trailing hyphen", "my-project-"},
+		{"starts with digit", "1my-project"},
+		{"uppercase", "MyProject1"},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("validation must reject before HTTP dispatch")
+	}))
+	defer srv.Close()
+
+	withTokenSource(t, staticTokenSource("tok-test"), nil)
+	withURLHostPrefix(t, srv.URL)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newVertexProvider(Config{
+				Provider:       ProviderVertex,
+				Model:          "gemini-embedding-001",
+				VertexProject:  tc.project,
+				VertexLocation: "us-central1",
+			})
+			_, err := p.Embed(context.Background(), "hello")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--vertex-project")
+			assert.Contains(t, err.Error(), tc.project, "error must reference the offending value")
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 2, ce.Code, "invalid project is a usage error")
+		})
+	}
+}
+
+func TestVertex_Embed_AcceptsRealGCPProjects(t *testing.T) {
+	projects := []string{
+		"my-project",
+		"my-gcp-project",
+		"project-123-abc",
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"predictions":[{"embeddings":{"values":[0.1]}}]}`))
+	}))
+	defer srv.Close()
+
+	withTokenSource(t, staticTokenSource("tok-test"), nil)
+	withURLHostPrefix(t, srv.URL)
+
+	for _, project := range projects {
+		t.Run(project, func(t *testing.T) {
+			p := newVertexProvider(Config{
+				Provider:       ProviderVertex,
+				Model:          "gemini-embedding-001",
+				VertexProject:  project,
+				VertexLocation: "us-central1",
+			})
+			_, err := p.Embed(context.Background(), "hello")
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestVertex_Embed_MissingADC(t *testing.T) {
 	withTokenSource(t, nil, errors.New("could not find default credentials"))
 
@@ -217,7 +360,7 @@ func TestVertex_Embed_EmptyPredictions(t *testing.T) {
 	p := newVertexProvider(Config{
 		Provider:       ProviderVertex,
 		Model:          "m",
-		VertexProject:  "p",
+		VertexProject:  "my-project",
 		VertexLocation: "us-central1",
 	})
 	_, err := p.Embed(context.Background(), "hello")
@@ -238,7 +381,7 @@ func TestVertex_Embed_MalformedBody(t *testing.T) {
 	p := newVertexProvider(Config{
 		Provider:       ProviderVertex,
 		Model:          "m",
-		VertexProject:  "p",
+		VertexProject:  "my-project",
 		VertexLocation: "us-central1",
 	})
 	_, err := p.Embed(context.Background(), "hello")

@@ -6,6 +6,7 @@ package embed
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	embedrt "github.com/neo4j/cli/neo4j-cli/query/embed"
 	"github.com/spf13/cobra"
 )
 
@@ -67,6 +68,12 @@ neo4j-cli credential embed add --name vertex-default --provider vertex --model g
 			if provider == "vertex" {
 				if vertexProject == "" || vertexLocation == "" {
 					return clierr.NewUsageError("--provider=vertex requires both --vertex-project and --vertex-location")
+				}
+				if err := embedrt.ValidateVertexProject(vertexProject); err != nil {
+					return err
+				}
+				if err := embedrt.ValidateVertexLocation(vertexLocation); err != nil {
+					return err
 				}
 			} else if vertexProject != "" || vertexLocation != "" {
 				return clierr.NewUsageError("--vertex-* flags only apply when --provider=vertex")

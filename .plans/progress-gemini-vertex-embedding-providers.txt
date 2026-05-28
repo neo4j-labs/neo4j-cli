@@ -51,3 +51,8 @@ Decisions: Helper returns raw response bytes (not a decode target) so huggingfac
 
 ## REVIEW — 2026-05-28T15:30:00Z
 Added 3 review tasks (task-012..task-014) from golang-security audit: H1 SSRF/token exfil via VertexLocation, M1 unbounded happy-path body, M2 sensitive-param URL leak in errors.
+
+## TASK-012 — 2026-05-28T13:06:41Z
+Closed H1 SSRF/token-exfil. Added strict GCP region + project-ID regex validators in vertex.go (ValidateVertexLocation / ValidateVertexProject) used by both vertex.Embed (before URL build) and credential embed add (before storing) — single source of truth. Tests assert no HTTP dispatch occurs when validation rejects (handler t.Fatal); cover all four attack strings and five real regions plus equivalent project-ID coverage.
+Files: ~neo4j-cli/query/embed/vertex.go, ~neo4j-cli/query/embed/vertex_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
+Decisions: Exported validators live in the runtime embed package (vertex.go), imported by credential/embed/add.go as `embedrt` to avoid the package-name collision. Two existing vertex tests using project="p" updated to "my-project" so they pass the new validator without losing coverage.
