@@ -778,3 +778,74 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
     completed_at: 2026-05-28T17:30:00Z
+
+  - id: task-019
+    title: "url.PathEscape Model in gemini and vertex URL construction (path injection fix)"
+    description: |
+      Inline PR review comment from `claude[bot]` on PR #186 flagged a
+      Low-severity path injection in the gemini and vertex providers:
+
+      > `p.cfg.Model` is concatenated directly into the URL path
+      > without encoding. A model name containing `..` silently
+      > changes which endpoint is called on the same API host — e.g.
+      > `../admin` normalises to `/admin:embedContent` — and a `?` in
+      > the name (`m?key=x`) drops the `:embedContent` suffix into a
+      > query value, producing the wrong API call.
+      > `urlcheck.ValidateRemoteURL` only checks scheme+host, not
+      > the path, so neither shape is caught.
+
+      Affected lines:
+      - `neo4j-cli/query/embed/gemini.go:97` →
+        `url := base + "/models/" + p.cfg.Model + ":embedContent"`
+      - `neo4j-cli/query/embed/vertex.go:169` →
+        `... "/publishers/google/models/" + p.cfg.Model + ":predict"`
+
+      Threat model: Model is user-controlled (flag, env, .env, or
+      stored credential). The user shoots their own foot — but defense
+      in depth says the provider shouldn't construct a
+      wrong-host-but-correct-looking URL from a stored value. A
+      planted credential with `--embed-model 'm?key=ATTACKER_KEY'`
+      would alter the request shape silently.
+
+      Fix: wrap `p.cfg.Model` in `url.PathEscape(...)` at both call
+      sites. `url.PathEscape` encodes `/` → `%2F`, `?` → `%3F`, `#`
+      → `%23`, so:
+      - `../admin` → `..%2Fadmin` — a literal path segment, doesn't
+        traverse.
+      - `m?key=x` → `m%3Fkey%3Dx` — `?` encoded, can't start a query
+        string.
+      - `m#frag` → `m%23frag` — `#` encoded, can't start a fragment.
+
+      The literal `:embedContent` / `:predict` suffixes stay OUTSIDE
+      the `PathEscape` call so the `:` colons remain literal in the
+      URL path (per Google's API convention these are method
+      indicators, not segment separators).
+
+      Tests (add to existing `gemini_test.go` and `vertex_test.go`):
+
+      1. Model = `../admin` — assert the captured request URL path
+         contains `models/..%2Fadmin:embedContent` (gemini) /
+         `models/..%2Fadmin:predict` (vertex), NOT `/admin`.
+      2. Model = `m?key=x` — assert the captured request URL path
+         contains `models/m%3Fkey%3Dx:embedContent` /
+         `models/m%3Fkey%3Dx:predict`, NOT a request whose RawQuery
+         contains `key=x`.
+
+      The existing httptest harness records the inbound request URL
+      via `r.URL.Path` and `r.URL.RawQuery` — inspect those in the
+      handler.
+
+      Two table rows per provider is sufficient; this is a narrow
+      defense-in-depth fix.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`gemini.go` Embed wraps `p.cfg.Model` in `url.PathEscape` when building the request URL"
+      - "`vertex.go` Embed wraps `p.cfg.Model` in `url.PathEscape` when building the request URL"
+      - "`gemini_test.go` covers Model = `../admin` and Model = `m?key=x`, asserting the captured path is escaped and the upstream endpoint is unchanged"
+      - "`vertex_test.go` covers the same two attack values"
+      - "Existing happy-path tests still pass unmodified (legitimate model names like `gemini-embedding-001` contain no characters that PathEscape touches)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` still passes (no bundle drift expected — this is a code-internal change)"
+    source: review
+    completed_at: null

@@ -90,3 +90,6 @@ Files: ~README.md
 ## TASK-018 — 2026-05-28T17:30:00Z
 Rewrote the embed-config tip in additions.md to cover the gemini env chain (GEMINI_API_KEY then GOOGLE_API_KEY) and a dedicated vertex sentence noting ADC auth, no `--api-key`, and stored-cred-only `--vertex-project` / `--vertex-location`. Regenerated bundle.
 Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
+
+## REVIEW — 2026-05-28T18:00:00Z
+Added 1 review task (task-019): url.PathEscape Model in gemini and vertex URL construction (claude[bot] inline review on PR #186).
