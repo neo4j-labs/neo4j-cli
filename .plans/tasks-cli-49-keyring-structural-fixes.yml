@@ -1,7 +1,7 @@
 feature: cli-49-keyring-structural-fixes
 prd: ./prd-cli-49-keyring-structural-fixes.md
 created_at: 2026-05-28T00:00:00Z
-updated_at: 2026-05-28T00:00:00Z
+updated_at: 2026-05-28T12:30:00Z
 
 tasks:
   - id: task-001
@@ -153,3 +153,45 @@ tasks:
       - "make lint passes with no new warnings"
       - "make fmt-check passes with no files needing reformatting"
     completed_at: "2026-05-28T12:00:00Z"
+
+  - id: task-009
+    title: "Define keyringCredential interface and add new per-type methods"
+    description: |
+      Define an unexported keyringCredential interface in keyring.go with seven methods:
+      writeToKeyring(provider KeyringProvider, written *[]string) error,
+      loadFromKeyring(provider KeyringProvider, warnW io.Writer) bool,
+      migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error,
+      validateForMigration() error, zeroSensitiveFields(), saveSensitiveFields() []string,
+      and restoreSensitiveFields([]string). Update the existing writeToKeyring signature on all
+      three concrete types to add the *[]string parameter. Add saveSensitiveFields,
+      restoreSensitiveFields, and validateForMigration to each concrete type. Add compile-time
+      interface assertions. Add allCredentials() []keyringCredential on Credentials.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "keyringCredential interface defined in keyring.go with all seven methods"
+      - "writeToKeyring on all three types has signature (provider KeyringProvider, written *[]string) error"
+      - "saveSensitiveFields, restoreSensitiveFields, validateForMigration added to all three types"
+      - "Compile-time var _ keyringCredential assertions exist for all three concrete types"
+      - "allCredentials() []keyringCredential exists on Credentials; returns Aura+Dbms+Embed in order"
+      - "make test passes (existing callers of writeToKeyring updated to pass nil where not tracking)"
+    completed_at: null
+
+  - id: task-010
+    title: "Rewrite saveWithKeyring and MigrateToKeyring using allCredentials() iterator; final gates"
+    description: |
+      Replace the remaining per-type triple loops in saveWithKeyring (write phase and
+      save/zero/restore phase) and MigrateToKeyring (validate+write loop and zero loop) with
+      single iterations over c.allCredentials(). MigrateToKeyring passes &writtenKeys to
+      writeToKeyring for exact rollback tracking. saveWithKeyring passes nil. Run make test,
+      make fmt-check, and make lint as final gates.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "saveWithKeyring has no per-type triple loops; uses c.allCredentials() for all three phases"
+      - "MigrateToKeyring has no per-type triple loops; uses c.allCredentials() with writtenKeys tracking"
+      - "Rollback in MigrateToKeyring still uses exact written keys (not coarse delete-all)"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: null
