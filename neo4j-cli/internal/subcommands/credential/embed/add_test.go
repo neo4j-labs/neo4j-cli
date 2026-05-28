@@ -83,6 +83,38 @@ func TestEmbedCredentialAdd(t *testing.T) {
 			wantCredentials: `[{"name":"hf","provider":"huggingface","model":"intfloat/e5-mistral-7b-instruct","base-url":"","dimensions":0,"api-key":"hf_secret"}]`,
 			wantDefaultCred: "hf",
 		},
+		{
+			name:            "gemini provider is accepted",
+			initialCreds:    []map[string]interface{}{},
+			command:         "add --name gemini-default --provider gemini --model text-embedding-004 --api-key AIza-secret",
+			wantCredentials: `[{"name":"gemini-default","provider":"gemini","model":"text-embedding-004","base-url":"","dimensions":0,"api-key":"AIza-secret"}]`,
+			wantDefaultCred: "gemini-default",
+		},
+		{
+			name:            "vertex provider with project and location is accepted",
+			initialCreds:    []map[string]interface{}{},
+			command:         "add --name vertex-default --provider vertex --model text-embedding-004 --vertex-project my-gcp-project --vertex-location us-central1",
+			wantCredentials: `[{"name":"vertex-default","provider":"vertex","model":"text-embedding-004","base-url":"","dimensions":0,"api-key":"","vertex-project":"my-gcp-project","vertex-location":"us-central1"}]`,
+			wantDefaultCred: "vertex-default",
+		},
+		{
+			name:         "vertex without --vertex-project returns usage error",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model text-embedding-004 --vertex-location us-central1",
+			wantErr:      "--provider=vertex requires both --vertex-project and --vertex-location",
+		},
+		{
+			name:         "vertex without --vertex-location returns usage error",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model text-embedding-004 --vertex-project my-gcp-project",
+			wantErr:      "--provider=vertex requires both --vertex-project and --vertex-location",
+		},
+		{
+			name:         "openai with stray --vertex-project is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name x --provider openai --model text-embedding-3-small --api-key sk-... --vertex-project my-gcp-project",
+			wantErr:      "--vertex-* flags only apply when --provider=vertex",
+		},
 	}
 
 	for _, tc := range tests {

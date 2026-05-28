@@ -192,7 +192,7 @@ tasks:
       with rows for: gemini happy path, vertex happy path, vertex missing
       project, vertex missing location, openai with stray --vertex-*
       rejected.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -204,7 +204,7 @@ tasks:
       - "`Add` is called with the new trailing args"
       - "`add_test.go` covers the five listed cases"
       - "`make test`, `make fmt-check`, `make lint` pass"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-008
     title: "Regenerate the skill bundle"

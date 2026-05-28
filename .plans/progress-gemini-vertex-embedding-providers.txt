@@ -24,3 +24,7 @@ Decisions: Inlined a small l2Normalize helper (unexported) in gemini.go rather t
 ## TASK-006 — 2026-05-28T00:00:00Z
 Added vertexProvider with ADC OAuth2 auth (lazy via sync.Once), location-derived URL ignoring cfg.BaseURL, task_type snake_case body, omitempty parameters when Dimensions==0, no L2-normalization, 4KiB body snippet on non-2xx. Wired `case ProviderVertex` into New. Two package-level test seams: findDefaultTokenSource (oauth2.TokenSource stub) and vertexURLHostPrefix (httptest redirect). Test suite covers missing project/location, missing ADC, happy path, dimensions overlay, non-2xx (no token leak), empty predictions, malformed JSON, default URL, BaseURL-ignored, New factory. Folded vertexScope + findDefaultTokenSource from the task-001 placeholder into vertex.go and deleted vertex_deps.go.
 Files: +neo4j-cli/query/embed/vertex.go, +neo4j-cli/query/embed/vertex_test.go, ~neo4j-cli/query/embed/embed.go, -neo4j-cli/query/embed/vertex_deps.go
+
+## TASK-007 — 2026-05-28T00:00:00Z
+Extended `credential embed add` with gemini + vertex in validProviders, two new flags (`--vertex-project`, `--vertex-location`), cross-flag validation (vertex requires both; non-vertex rejects strays), updated Long/Example, passes new args into EmbedCredentials.Add. Added 5 new table-driven test cases. Skill bundle is now drifted (expected; task-008 regenerates).
+Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
