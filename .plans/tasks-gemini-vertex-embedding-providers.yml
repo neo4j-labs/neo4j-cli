@@ -1,0 +1,249 @@
+feature: gemini-vertex-embedding-providers
+prd: ./prd-gemini-vertex-embedding-providers.md
+created_at: 2026-05-28T00:00:00Z
+updated_at: 2026-05-28T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add golang.org/x/oauth2 as a direct module dependency"
+    description: |
+      Add `golang.org/x/oauth2` to `go.mod` as a direct dependency so the
+      vertex provider can call `google.FindDefaultCredentials`. Run
+      `go mod tidy` and review the resulting `go.sum` diff to confirm new
+      transitive deps stay contained to oauth2 + ADC helpers (notably
+      `cloud.google.com/go/compute/metadata`). If the diff balloons beyond
+      that, raise it before continuing — vertex scope may need a rethink.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`go.mod` contains a direct `require golang.org/x/oauth2 ...` entry"
+      - "`go mod tidy` runs clean with no further diff"
+      - "`go.sum` diff is limited to oauth2 + small ADC-related transitive deps"
+      - "`make test` still passes (no other code changes yet)"
+    completed_at: null
+
+  - id: task-002
+    title: "Extend EmbedCredential schema with VertexProject and VertexLocation"
+    description: |
+      Add `VertexProject string` and `VertexLocation string` fields to
+      `EmbedCredential` in `common/clicfg/credentials/embed.go` with JSON
+      tags `"vertex-project,omitempty"` and `"vertex-location,omitempty"`.
+      Extend `EmbedCredentials.Add` with two trailing `vertexProject,
+      vertexLocation string` parameters and update all call sites. Update
+      `PrintableEmbedCredentials.AsArray` so the new keys appear in the
+      per-row map only when non-empty (keeps non-vertex tables narrow).
+      Update `embed_test.go` with cases that cover add+list for vertex
+      credentials and confirm empty fields are omitted for other providers.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`EmbedCredential` has the two new omitempty string fields"
+      - "`EmbedCredentials.Add` signature ends with `vertexProject, vertexLocation string`"
+      - "All `Add(...)` call sites in the repo compile with the new signature"
+      - "`PrintableEmbedCredentials.AsArray` omits vertex-* keys when empty and includes them when set"
+      - "`embed_test.go` has new cases verifying the above"
+      - "`make test` passes"
+    completed_at: null
+
+  - id: task-003
+    title: "Add gemini/vertex provider constants, env consts, Config fields, Resolve plumbing"
+    description: |
+      In `neo4j-cli/query/embed/embed.go` add provider constants
+      `ProviderGemini = "gemini"` and `ProviderVertex = "vertex"`, and env
+      constants `envGeminiKey = "GEMINI_API_KEY"` and
+      `envGoogleKey = "GOOGLE_API_KEY"`. Add two new fields to `Config`:
+      `VertexProject string` and `VertexLocation string`. In `Resolve`,
+      copy `base.VertexProject` / `base.VertexLocation` from the stored
+      credential into `Config` alongside the existing field copy. Do NOT
+      touch the `New` switch yet — the new providers should fall through to
+      the existing "invalid embed provider" default until tasks 005/006
+      wire them up. Update the default-case error message to also list
+      `gemini` and `vertex` in the "must be one of" copy (so the wiring is
+      ready when the cases are added).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`ProviderGemini` and `ProviderVertex` constants exist with the expected values"
+      - "`envGeminiKey` and `envGoogleKey` constants exist"
+      - "`Config` has `VertexProject` and `VertexLocation` string fields"
+      - "`Resolve` copies the two new fields from the base stored credential"
+      - "`New` default-case error message lists `gemini` and `vertex`"
+      - "`make test` and `make fmt-check` pass"
+    completed_at: null
+
+  - id: task-004
+    title: "Extend resolveAPIKey for the gemini env chain"
+    description: |
+      Update `resolveAPIKey` in `neo4j-cli/query/embed/embed.go` so that
+      when `provider == ProviderGemini` it layers `GEMINI_API_KEY` then
+      `GOOGLE_API_KEY` within each precedence stage (`.env`, OS env),
+      mirroring the existing openai/huggingface pattern. Also update
+      `osEnvSnapshot` to read both new env vars so `t.Setenv` in tests
+      picks them up. Add table-driven cases to the existing
+      `resolveAPIKey` tests (or wherever they live) covering: env order
+      `GEMINI_API_KEY` beats `GOOGLE_API_KEY` beats `NEO4J_EMBED_API_KEY`
+      beats stored, `.env` < OS env, stored alone, and the no-env case.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`resolveAPIKey` honours `GEMINI_API_KEY` → `GOOGLE_API_KEY` → `NEO4J_EMBED_API_KEY` → stored for the gemini provider"
+      - "`osEnvSnapshot` returns both new env vars"
+      - "New test cases cover the layered precedence and `.env` vs OS env"
+      - "`vertex` does not participate in `resolveAPIKey` (no test asserting it does)"
+      - "`make test` passes"
+    completed_at: null
+
+  - id: task-005
+    title: "Implement the gemini embedding provider"
+    description: |
+      Create `neo4j-cli/query/embed/gemini.go` mirroring `openai.go` in
+      shape: unexported `geminiProvider` struct (`cfg Config`,
+      `*http.Client`), `newGeminiProvider(cfg) *geminiProvider`, and
+      `Embed(ctx, text) ([]float32, error)`. Default base URL is
+      `https://generativelanguage.googleapis.com/v1beta`; URL pattern is
+      `{base}/models/{model}:embedContent`. Auth header is
+      `x-goog-api-key`. Request body shape per REQ-F-024. Always send
+      `taskType: "RETRIEVAL_QUERY"`. Response decode reads
+      `{embedding:{values:[...]}}`. When `cfg.Dimensions > 0 &&
+      cfg.Dimensions != 3072`, L2-normalize the returned vector
+      unconditionally before returning. Missing API key returns
+      `clierr.NewAuthError` listing `GEMINI_API_KEY`, `GOOGLE_API_KEY`,
+      `NEO4J_EMBED_API_KEY`, and the `credential embed add` path. Validate
+      base URL via `urlcheck.ValidateRemoteURL`. Non-2xx returns a wrapped
+      `gemini: HTTP <code>: <snippet>` error reading up to 4 KiB of body.
+      Add the `case ProviderGemini: return newGeminiProvider(cfg), nil`
+      branch to `New` in `embed.go`. Create `gemini_test.go` with
+      `httptest.NewServer` table-driven cases (happy path, dimensions
+      omitted when 0, missing key, non-2xx, normalization triggers when
+      dims != 3072).
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`gemini.go` exists with `geminiProvider`, `newGeminiProvider`, and `Embed`"
+      - "URL, header, and request body match REQ-F-022/023/024"
+      - "`taskType` is always `RETRIEVAL_QUERY`"
+      - "Response is decoded from `{embedding:{values:[...]}}`"
+      - "L2-normalization fires only when `Dimensions > 0 && Dimensions != 3072`"
+      - "Missing API key returns `clierr.AuthError` listing the env chain"
+      - "Non-2xx returns a wrapped error with up-to-4KiB body snippet and no key leakage"
+      - "`New` has a `case ProviderGemini` that returns `newGeminiProvider(cfg)`"
+      - "`gemini_test.go` exercises the listed cases via `httptest`"
+      - "License header present; `make test`, `make fmt-check`, `make lint`, `make license-check` pass"
+    completed_at: null
+
+  - id: task-006
+    title: "Implement the vertex embedding provider"
+    description: |
+      Create `neo4j-cli/query/embed/vertex.go` for the Vertex AI provider.
+      Validation in `Embed` (not `newVertexProvider`) returns
+      `clierr.NewUsageError` for empty `VertexProject` or `VertexLocation`,
+      naming the corresponding flags and `credential embed add`. URL:
+      `https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict`.
+      `cfg.BaseURL` is intentionally ignored. Request body shape per
+      REQ-F-043 (note `task_type` snake_case here, `parameters` omitted
+      when `Dimensions == 0`). Auth via `oauth2.TokenSource` from
+      `google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")`,
+      initialised lazily on first `Embed`. ADC failure returns
+      `clierr.NewAuthError` mentioning
+      `gcloud auth application-default login` and
+      `GOOGLE_APPLICATION_CREDENTIALS`. Add two package-level test seams:
+      one to override the token source, one to override the URL host
+      prefix (default builds the canonical URL). Response decode reads
+      `{predictions:[{embeddings:{values:[...]}}]}`. Do NOT normalize
+      output. Add the `case ProviderVertex: return newVertexProvider(cfg),
+      nil` branch to `New`. Create `vertex_test.go` with `httptest` +
+      stubbed token source covering: missing project, missing location,
+      missing ADC, happy path, dim-overlay sent in `parameters`, non-2xx,
+      no token in error messages.
+    status: pending
+    dependencies:
+      - task-001
+      - task-003
+    acceptance_criteria:
+      - "`vertex.go` exists with `vertexProvider`, `newVertexProvider`, and `Embed`"
+      - "Empty project or location yields `clierr.UsageError`"
+      - "URL is built from project/location and ignores `cfg.BaseURL`"
+      - "Request body uses `task_type` snake_case; `parameters` is omitted when `Dimensions == 0`"
+      - "Token source is lazy; ADC failure returns `clierr.AuthError` with the documented copy"
+      - "Token source and URL host prefix are overridable via package-level test seams"
+      - "Response decoded from `{predictions:[{embeddings:{values:[...]}}]}`"
+      - "No L2-normalization on the response"
+      - "`New` has a `case ProviderVertex` that returns `newVertexProvider(cfg)`"
+      - "`vertex_test.go` covers the listed cases without touching real ADC"
+      - "License header present; full test/lint/fmt/license gates pass"
+    completed_at: null
+
+  - id: task-007
+    title: "Extend `credential embed add` with vertex flags and provider entries"
+    description: |
+      In `neo4j-cli/internal/subcommands/credential/embed/add.go`, append
+      `"gemini"` and `"vertex"` to `validProviders`. Register two new
+      string flags `--vertex-project` and `--vertex-location` (both
+      defaulting to empty). Before calling `EmbedCredentials.Add`, enforce
+      two cross-flag rules: (1) when `--provider vertex`, both `--vertex-*`
+      flags must be non-empty (otherwise `clierr.NewUsageError`); (2) when
+      `--provider` is anything other than `vertex`, neither `--vertex-*`
+      flag may be set (also `clierr.NewUsageError`, copy: "--vertex-* flags
+      only apply when --provider=vertex"). Pass the two new values into
+      `EmbedCredentials.Add`. Update `add_test.go` (or its equivalent)
+      with rows for: gemini happy path, vertex happy path, vertex missing
+      project, vertex missing location, openai with stray --vertex-*
+      rejected.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`validProviders` includes `gemini` and `vertex`"
+      - "`--vertex-project` and `--vertex-location` flags exist on `credential embed add`"
+      - "Missing vertex-* on `--provider vertex` returns a usage error naming both flags"
+      - "Stray vertex-* on a non-vertex provider returns a usage error"
+      - "`Add` is called with the new trailing args"
+      - "`add_test.go` covers the five listed cases"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: null
+
+  - id: task-008
+    title: "Regenerate the skill bundle"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to refresh the skill
+      bundle after the cobra surface changes from tasks 002–007. Expected
+      diff: `references/credential.md` picks up the new flags and provider
+      list; other files only change if help text bled through. Commit the
+      bundle diff alongside the source. Verify `make generate-check`
+      passes (it runs `go generate ./...` then `git diff --exit-code` — a
+      passing run means no further drift).
+    status: pending
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` produces a non-empty diff"
+      - "Diff includes `references/credential.md` with the new flags + providers"
+      - "Bundle changes are committed alongside the source"
+      - "`make generate-check` passes (no further drift)"
+      - "`TestGenerator_RoundTrip` passes"
+    completed_at: null
+
+  - id: task-009
+    title: "Add changie changelog entry"
+    description: |
+      Add a `Minor` changie entry for the new providers:
+      `changie new --projects neo4j-cli --kind Minor --body "Added Gemini
+      and Vertex AI embedding providers."`. If changie is not installed
+      locally, hand-author the YAML at
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`
+      with `project: neo4j-cli`, `kind: Minor`, single-quoted `body`, and
+      RFC3339 `time` (per AGENTS.md).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A `neo4j-cli-Minor-*.yaml` file exists in `.changes/unreleased/`"
+      - "The body reads exactly `Added Gemini and Vertex AI embedding providers.`"
+      - "`project: neo4j-cli` and `kind: Minor` are set"
+      - "`time:` is an RFC3339 timestamp"
+    completed_at: null
