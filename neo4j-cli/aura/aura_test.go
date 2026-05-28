@@ -39,7 +39,7 @@ func TestNewCmdDoesNotRegisterRwFlag(t *testing.T) {
 	assert.Nil(t, cmd.PersistentFlags().Lookup("rw"))
 }
 
-func TestStandaloneAura_TenantCommandRemoved(t *testing.T) {
+func TestNewStandaloneCmd_RejectsRemovedTenantCommand(t *testing.T) {
 	fs, err := testfs.GetDefaultTestFs()
 	require.NoError(t, err)
 
