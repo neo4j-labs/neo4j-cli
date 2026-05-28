@@ -144,7 +144,7 @@ tasks:
       Fix any remaining lint warnings or format drift introduced by the refactor. Verify the
       credentials_keyring_test.go test file covers the key structural invariants (no snapshot
       variables, saveToJSON called from both save paths, MigrateToInsecure sets its own mode).
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-007
@@ -152,4 +152,4 @@ tasks:
       - "make test passes with no skipped or failing tests"
       - "make lint passes with no new warnings"
       - "make fmt-check passes with no files needing reformatting"
-    completed_at: null
+    completed_at: "2026-05-28T12:00:00Z"
