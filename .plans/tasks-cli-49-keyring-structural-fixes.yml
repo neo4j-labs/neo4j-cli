@@ -1,0 +1,155 @@
+feature: cli-49-keyring-structural-fixes
+prd: ./prd-cli-49-keyring-structural-fixes.md
+created_at: 2026-05-28T00:00:00Z
+updated_at: 2026-05-28T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Extract saveToJSON() private method on Credentials"
+    description: |
+      Extract the insecure JSON-write path from save() into a private saveToJSON() method
+      on Credentials. The method contains the json.Marshal + fileutils.WriteFile logic currently
+      in save()'s else branch. save() calls saveToJSON() for the insecure path; saveWithKeyring
+      and MigrateToInsecure will also call it in later tasks. No behavioural change; all
+      existing tests must pass unchanged.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "saveToJSON() method exists on Credentials and contains the json.Marshal + fileutils.WriteFile path"
+      - "save() calls saveToJSON() for the insecure branch; saveWithKeyring() is unchanged for now"
+      - "make test passes with no changes to test files"
+    completed_at: null
+
+  - id: task-002
+    title: "Fix GlobalConfig.CredentialStorage() default to StorageModeInsecure"
+    description: |
+      Change GlobalConfig.CredentialStorage() in common/clicfg/clicfg.go to return
+      StorageModeInsecure (not "keyring") when credential-storage is absent from viper.
+      Add a comment explaining that the actual first-run default decision lives in
+      initCredentialStorageDefault; CredentialStorage() is only the persisted-value accessor.
+      This aligns the method's documented default with the NewCredentials() boot default.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "CredentialStorage() returns StorageModeInsecure when viper has no credential-storage key"
+      - "A comment on the method explains it is a read accessor; first-run default logic lives in initCredentialStorageDefault"
+      - "make test passes; no test expectations change"
+    completed_at: null
+
+  - id: task-003
+    title: "Extract per-type keyring methods on AuraCredentials, DbmsCredentials, EmbedCredentials"
+    description: |
+      Add unexported keyring methods to each credential type in their respective files.
+      AuraCredentials gets writeToKeyring(provider KeyringProvider) error,
+      loadFromKeyring(provider KeyringProvider, warnW io.Writer) error (warn-and-continue semantics
+      for startup), and migrateFromKeyring(provider KeyringProvider) error (strict/error semantics
+      for explicit migration). DbmsCredentials and EmbedCredentials get equivalent methods for
+      their respective fields. Each method encapsulates all sensitive fields for that type.
+      The KeyringProvider is passed in (not accessed via the package-level defaultKeyring) so
+      tests can inject mocks. zeroSensitiveFields() is also added to each type.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "AuraCredentials has writeToKeyring, loadFromKeyring (warn-and-continue), migrateFromKeyring (strict), and zeroSensitiveFields methods"
+      - "DbmsCredentials has the equivalent methods for the password field"
+      - "EmbedCredentials has the equivalent methods for the api-key field"
+      - "Each method is tested in the corresponding *_test.go file with a mock KeyringProvider"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-004
+    title: "Replace triple-iteration loops in credentials.go with per-type method calls"
+    description: |
+      Replace all five groups of three for _, cred := range c.{Aura,Dbms,Embed}.Credentials
+      loops in credentials.go with calls to the per-type methods from task-003. After this change
+      each function's iteration body is three calls (one per type). The MigrateToKeyring rollback
+      logic (written/rollback/setKey) stays in credentials.go since it is cross-type. The
+      loadSensitiveFieldsFromKeyring and saveWithKeyring functions still call the per-type
+      methods but may retain their outer structure until tasks 005/006/007.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "No group of three consecutive for _, cred := range c.{Aura,Dbms,Embed}.Credentials loops remains in credentials.go"
+      - "saveWithKeyring, MigrateToKeyring, MigrateToInsecure, and loadSensitiveFieldsFromKeyring each delegate to per-type methods"
+      - "make test passes with no changes to test expectations"
+    completed_at: null
+
+  - id: task-005
+    title: "Replace saveWithKeyring snapshot boilerplate with zero-restore pattern"
+    description: |
+      Remove the three scrubbed-snapshot struct constructions (auraSnap, dbmsSnap, embedSnap)
+      from saveWithKeyring. Replace with: save sensitive field values to locals, call each
+      type's zeroSensitiveFields(), call saveToJSON(), then restore the saved values.
+      This collapses ~30 lines to ~10 lines and eliminates the per-type snapshot variables.
+      Restoration on panic is acceptable to omit (consistent with current marshal-panic behaviour).
+    status: pending
+    dependencies:
+      - task-001
+      - task-004
+    acceptance_criteria:
+      - "saveWithKeyring contains no auraSnap, dbmsSnap, or embedSnap variables"
+      - "saveWithKeyring calls saveToJSON() instead of directly marshalling scrubbed copies"
+      - "Sensitive in-memory fields are restored to their original values after saveToJSON() returns"
+      - "make test passes; credentials written to keyring are still persisted correctly"
+    completed_at: null
+
+  - id: task-006
+    title: "Fix MigrateToInsecure: use saveToJSON() + own storageMode; simplify config/set.go"
+    description: |
+      In MigrateToInsecure, replace the prevMode/c.storageMode temporary mutation with a direct
+      call to saveToJSON(). Before calling saveToJSON(), set c.storageMode = StorageModeInsecure
+      so the function owns its own mode transition. Remove the doc comment that previously
+      delegated this responsibility to callers. In config/set.go, remove the credentialStorageModeChanged
+      flag and the post-migration SetStorageMode call for the MigrateToInsecure path, since
+      MigrateToInsecure now handles it. Keep the SetStorageMode call after MigrateToKeyring.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "MigrateToInsecure contains no prevMode variable or temporary storageMode mutation"
+      - "MigrateToInsecure sets c.storageMode = StorageModeInsecure before calling saveToJSON()"
+      - "config/set.go has no post-migration SetStorageMode call for the insecure path"
+      - "credentialStorageModeChanged flag is removed or simplified to cover only the keyring path"
+      - "make test passes; migrating to insecure still writes plaintext to credentials.json"
+    completed_at: null
+
+  - id: task-007
+    title: "Thread io.Writer through SetStorageMode and loadSensitiveFieldsFromKeyring; update all call sites and tests"
+    description: |
+      Change SetStorageMode(mode string) error to SetStorageMode(mode string, warnW io.Writer) error
+      and loadSensitiveFieldsFromKeyring() error to loadSensitiveFieldsFromKeyring(warnW io.Writer) error.
+      Replace all fmt.Fprintf(os.Stderr, ...) calls in loadSensitiveFieldsFromKeyring with writes
+      to warnW. Update all call sites: NewConfig (clicfg.go) passes os.Stderr; initCredentialStorageDefault
+      (app.go) passes its existing stderr io.Writer param; config/set.go passes cmd.ErrOrStderr().
+      Update all test call sites to pass &bytes.Buffer{}; update warning-path tests to assert
+      against the buffer contents rather than captured os.Stderr.
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "SetStorageMode and loadSensitiveFieldsFromKeyring both accept an io.Writer parameter"
+      - "No os.Stderr reference remains in credentials.go"
+      - "NewConfig passes os.Stderr; initCredentialStorageDefault passes its stderr param; config/set.go passes cmd.ErrOrStderr()"
+      - "All test call sites pass &bytes.Buffer{}; warning-path tests assert buffer contents"
+      - "make test, make lint, make fmt-check all pass"
+    completed_at: null
+
+  - id: task-008
+    title: "Final gates: make test, make lint, make fmt-check"
+    description: |
+      Run the full test suite, linter, and format check to confirm all changes are clean.
+      Fix any remaining lint warnings or format drift introduced by the refactor. Verify the
+      credentials_keyring_test.go test file covers the key structural invariants (no snapshot
+      variables, saveToJSON called from both save paths, MigrateToInsecure sets its own mode).
+    status: pending
+    dependencies:
+      - task-002
+      - task-007
+    acceptance_criteria:
+      - "make test passes with no skipped or failing tests"
+      - "make lint passes with no new warnings"
+      - "make fmt-check passes with no files needing reformatting"
+    completed_at: null
