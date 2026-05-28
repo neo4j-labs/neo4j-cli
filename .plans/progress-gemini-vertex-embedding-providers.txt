@@ -60,3 +60,8 @@ Decisions: Exported validators live in the runtime embed package (vertex.go), im
 ## TASK-013 — 2026-05-28T13:25:00Z
 Closed M1 unbounded happy-path body. Wrapped `io.ReadAll(resp.Body)` in doJSONRequest with `io.LimitReader(resp.Body, maxResponseBodyBytes)` (10 MiB const). Hardens all 5 providers at once. Added httpjson_test.go with oversize-server and under-cap cases.
 Files: ~neo4j-cli/query/embed/httpjson.go, +neo4j-cli/query/embed/httpjson_test.go
+
+## TASK-014 — 2026-05-28T13:45:00Z
+Closed M2 sensitive-param URL leak. Added redactSensitiveURLParams + sensitiveQueryParamRE (case-insensitive `key|api_key|access_token|token` matcher) in httpjson.go; applied at both `request failed:` and `build request:` wrap sites. Tests cover all four param names + case variants, multi-param URLs, fragment+special-char values, nil passthrough, live network-error redaction via httptest, and chain-flatten invariant.
+Files: ~neo4j-cli/query/embed/httpjson.go, ~neo4j-cli/query/embed/httpjson_test.go
+Decisions: Redaction flattens the error chain (errors.New on the redacted string) so the regex applies to the final Error() output regardless of how net/http formatted the URL — robustness over chain-unwrap. The build-request wrap-site live-path is effectively unreachable when urlcheck.ValidateRemoteURL already passes; covered via a shape-based unit test rather than coupling to net/http internals.

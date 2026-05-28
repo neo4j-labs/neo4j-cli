@@ -494,7 +494,7 @@ tasks:
         mid-read to force a network error, assert the resulting
         error message contains `REDACTED` and NOT the original key
         value.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     acceptance_criteria:
@@ -505,4 +505,4 @@ tasks:
       - "Existing provider tests still pass unmodified"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T13:45:00Z
