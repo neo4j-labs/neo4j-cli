@@ -2,3 +2,7 @@
 Promoted golang.org/x/oauth2 to a direct dep ahead of the vertex provider. Added a small placeholder file in neo4j-cli/query/embed/ that imports oauth2/google so `go mod tidy` keeps the require direct; helpers will be wired in by task-006.
 Files: ~go.mod, ~go.sum, +neo4j-cli/query/embed/vertex_deps.go
 Decisions: go mod tidy strips truly-unused modules, so a tiny `//nolint:unused`-tagged stub (vertexScope + findDefaultTokenSource) keeps oauth2 direct until task-006 lands; transitive footprint stayed at oauth2 + cloud.google.com/go/compute/metadata as predicted.
+
+## TASK-002 — 2026-05-28T00:00:00Z
+Added VertexProject/VertexLocation omitempty fields to EmbedCredential; extended EmbedCredentials.Add with two trailing string params; updated the sole production call site (credential/embed/add.go pass-through with empty strings) and all test call sites. PrintableEmbedCredentials.AsArray now adds vertex-* keys only when non-empty.
+Files: ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/embed_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go

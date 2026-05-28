@@ -34,7 +34,7 @@ tasks:
       per-row map only when non-empty (keeps non-vertex tables narrow).
       Update `embed_test.go` with cases that cover add+list for vertex
       credentials and confirm empty fields are omitted for other providers.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`EmbedCredential` has the two new omitempty string fields"
@@ -43,7 +43,7 @@ tasks:
       - "`PrintableEmbedCredentials.AsArray` omits vertex-* keys when empty and includes them when set"
       - "`embed_test.go` has new cases verifying the above"
       - "`make test` passes"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-003
     title: "Add gemini/vertex provider constants, env consts, Config fields, Resolve plumbing"

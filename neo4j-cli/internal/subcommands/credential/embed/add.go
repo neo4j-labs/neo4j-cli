@@ -53,7 +53,7 @@ neo4j-cli credential embed add --name hf-bge --provider huggingface --model BAAI
 			if !isValidProvider(provider) {
 				return clierr.NewUsageError("invalid --provider %q: must be one of %v", provider, validProviders)
 			}
-			return cfg.Credentials.Embed.Add(name, provider, model, baseURL, apiKey, dimensions)
+			return cfg.Credentials.Embed.Add(name, provider, model, baseURL, apiKey, dimensions, "", "")
 		},
 	}
 

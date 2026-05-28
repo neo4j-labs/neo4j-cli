@@ -24,7 +24,7 @@ func (c *EmbedCredentials) Printable() PrintableEmbedCredentials {
 	}
 }
 
-func (c *EmbedCredentials) Add(name, provider, model, baseURL, apiKey string, dimensions int) error {
+func (c *EmbedCredentials) Add(name, provider, model, baseURL, apiKey string, dimensions int, vertexProject, vertexLocation string) error {
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)
@@ -32,12 +32,14 @@ func (c *EmbedCredentials) Add(name, provider, model, baseURL, apiKey string, di
 	}
 
 	c.Credentials = append(c.Credentials, &EmbedCredential{
-		Name:       name,
-		Provider:   provider,
-		Model:      model,
-		BaseURL:    baseURL,
-		APIKey:     apiKey,
-		Dimensions: dimensions,
+		Name:           name,
+		Provider:       provider,
+		Model:          model,
+		BaseURL:        baseURL,
+		APIKey:         apiKey,
+		Dimensions:     dimensions,
+		VertexProject:  vertexProject,
+		VertexLocation: vertexLocation,
 	})
 	if len(c.Credentials) == 1 {
 		c.SetDefault(name) //nolint:errcheck // not-found error impossible here; any keyring error surfaces in the c.onUpdate() call below
@@ -118,7 +120,7 @@ type PrintableEmbedCredentials struct {
 func (d PrintableEmbedCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
-		result[i] = map[string]any{
+		row := map[string]any{
 			"name":       cred.Name,
 			"provider":   cred.Provider,
 			"model":      cred.Model,
@@ -126,6 +128,13 @@ func (d PrintableEmbedCredentials) AsArray() []map[string]any {
 			"dimensions": cred.Dimensions,
 			"default":    cred.Name == d.defaultCredential,
 		}
+		if cred.VertexProject != "" {
+			row["vertex-project"] = cred.VertexProject
+		}
+		if cred.VertexLocation != "" {
+			row["vertex-location"] = cred.VertexLocation
+		}
+		result[i] = row
 	}
 	return result
 }
@@ -137,12 +146,14 @@ func (d PrintableEmbedCredentials) MarshalJSON() ([]byte, error) {
 }
 
 type EmbedCredential struct {
-	Name       string `json:"name"`
-	Provider   string `json:"provider"`
-	Model      string `json:"model"`
-	BaseURL    string `json:"base-url"`
-	Dimensions int    `json:"dimensions"`
-	APIKey     string `json:"api-key"`
+	Name           string `json:"name"`
+	Provider       string `json:"provider"`
+	Model          string `json:"model"`
+	BaseURL        string `json:"base-url"`
+	Dimensions     int    `json:"dimensions"`
+	APIKey         string `json:"api-key"`
+	VertexProject  string `json:"vertex-project,omitempty"`
+	VertexLocation string `json:"vertex-location,omitempty"`
 }
 
 // deleteFromKeyring removes the keyring entry for this Embed credential.

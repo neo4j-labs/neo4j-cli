@@ -26,17 +26,21 @@ func newTestEmbedCredentials(t *testing.T, credentialsJSON string) (*credentials
 
 func TestEmbedCredentials_Add(t *testing.T) {
 	tests := []struct {
-		name          string
-		initialJSON   string
-		addName       string
-		addProvider   string
-		addModel      string
-		addBaseURL    string
-		addAPIKey     string
-		addDimensions int
-		wantErr       string
-		wantDefault   string
-		wantCredCount int
+		name           string
+		initialJSON    string
+		addName        string
+		addProvider    string
+		addModel       string
+		addBaseURL     string
+		addAPIKey      string
+		addDimensions  int
+		addVertexProj  string
+		addVertexLoc   string
+		wantErr        string
+		wantDefault    string
+		wantCredCount  int
+		wantVertexProj string
+		wantVertexLoc  string
 	}{
 		{
 			name:          "add first credential sets it as default",
@@ -77,12 +81,29 @@ func TestEmbedCredentials_Add(t *testing.T) {
 			wantDefault:   "local",
 			wantCredCount: 1,
 		},
+		{
+			name:           "add vertex credential stores project and location",
+			initialJSON:    `{"aura":{"credentials":[]}}`,
+			addName:        "vertex-default",
+			addProvider:    "vertex",
+			addModel:       "text-embedding-005",
+			addBaseURL:     "",
+			addAPIKey:      "",
+			addDimensions:  0,
+			addVertexProj:  "my-gcp-project",
+			addVertexLoc:   "us-central1",
+			wantErr:        "",
+			wantDefault:    "vertex-default",
+			wantCredCount:  1,
+			wantVertexProj: "my-gcp-project",
+			wantVertexLoc:  "us-central1",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			creds, _ := newTestEmbedCredentials(t, tc.initialJSON)
-			err := creds.Embed.Add(tc.addName, tc.addProvider, tc.addModel, tc.addBaseURL, tc.addAPIKey, tc.addDimensions)
+			err := creds.Embed.Add(tc.addName, tc.addProvider, tc.addModel, tc.addBaseURL, tc.addAPIKey, tc.addDimensions, tc.addVertexProj, tc.addVertexLoc)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -91,6 +112,12 @@ func TestEmbedCredentials_Add(t *testing.T) {
 			}
 			assert.Equal(t, tc.wantDefault, creds.Embed.DefaultCredential)
 			assert.Len(t, creds.Embed.Credentials, tc.wantCredCount)
+			if tc.wantVertexProj != "" || tc.wantVertexLoc != "" {
+				cred, getErr := creds.Embed.Get(tc.addName)
+				require.NoError(t, getErr)
+				assert.Equal(t, tc.wantVertexProj, cred.VertexProject)
+				assert.Equal(t, tc.wantVertexLoc, cred.VertexLocation)
+			}
 		})
 	}
 }
@@ -293,7 +320,7 @@ func TestEmbedCredentials_Persist(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.Embed.Add("openai-default", "openai", "text-embedding-3-small", "https://api.openai.com/v1", "sk-secret", 1536))
+	require.NoError(t, creds.Embed.Add("openai-default", "openai", "text-embedding-3-small", "https://api.openai.com/v1", "sk-secret", 1536, "", ""))
 
 	// Reload credentials from the same FS to verify persistence
 	creds2 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
@@ -311,7 +338,7 @@ func TestEmbedCredentials_PersistAfterLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.Embed.Add("second", "ollama", "nomic-embed-text", "http://localhost:11434", "", 0))
+	require.NoError(t, creds.Embed.Add("second", "ollama", "nomic-embed-text", "http://localhost:11434", "", 0, "", ""))
 
 	creds2 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
 	require.Len(t, creds2.Embed.Credentials, 2)
@@ -335,10 +362,26 @@ func TestPrintableEmbedCredentials_AsArray(t *testing.T) {
 	// api-key must not appear in output
 	_, hasAPIKey := rows[0]["api-key"]
 	assert.False(t, hasAPIKey, "api-key must not appear in AsArray output")
+	// vertex-* keys must be omitted when empty
+	_, hasVertexProj := rows[0]["vertex-project"]
+	assert.False(t, hasVertexProj, "vertex-project must be omitted when empty")
+	_, hasVertexLoc := rows[0]["vertex-location"]
+	assert.False(t, hasVertexLoc, "vertex-location must be omitted when empty")
 
 	// Second credential is not the default
 	assert.Equal(t, "second", rows[1]["name"])
 	assert.Equal(t, false, rows[1]["default"])
+}
+
+func TestPrintableEmbedCredentials_AsArray_VertexFieldsIncluded(t *testing.T) {
+	creds, _ := newTestEmbedCredentials(t, `{"aura":{"credentials":[]},"embed":{"default-credential":"vx","credentials":[{"name":"vx","provider":"vertex","model":"text-embedding-005","base-url":"","dimensions":0,"api-key":"","vertex-project":"my-gcp-project","vertex-location":"us-central1"}]}}`)
+
+	printable := creds.Embed.Printable()
+	rows := printable.AsArray()
+
+	require.Len(t, rows, 1)
+	assert.Equal(t, "my-gcp-project", rows[0]["vertex-project"])
+	assert.Equal(t, "us-central1", rows[0]["vertex-location"])
 }
 
 func TestPrintableEmbedCredentials_MarshalJSON(t *testing.T) {
@@ -366,7 +409,7 @@ func TestEmbedCredentials_OnDiskRoundTripPreservesAPIKey(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.Embed.Add("openai-default", "openai", "text-embedding-3-small", "https://api.openai.com/v1", "sk-secret", 1536))
+	require.NoError(t, creds.Embed.Add("openai-default", "openai", "text-embedding-3-small", "https://api.openai.com/v1", "sk-secret", 1536, "", ""))
 
 	// Read credentials.json directly off the test FS and verify api-key is present.
 	data, err := afero.ReadFile(fs, filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", "credentials.json"))
