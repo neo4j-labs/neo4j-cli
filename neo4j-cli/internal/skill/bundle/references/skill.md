@@ -95,7 +95,7 @@ neo4j-cli skill install --format json --rw
 
 List skills × agents and per-row install state
 
-Lists one row per (skill × agent) combining the embedded self-skill (always first) with every curated catalog skill from the cached plugin.json. Columns: skill, source, agent, detected, installed, installed_version, available_version, status. Auto-refreshes the catalog cache on 24h staleness when network is available; otherwise shows cached content. On a cold cache only self-skill rows are listed and a hint is printed to stderr pointing at `skill refresh`. Use --refresh to force a network fetch.
+Lists the embedded self-skill and curated catalog skills from the cached plugin.json. Default table/toon output is a compact two-section view: an 11-row self-skill matrix (columns: agent, detected, installed, installed_version, available_version, status) followed by an aggregated catalog section (columns: skill, available_version, status, installed_in). --format json keeps the flat per-(skill × agent) array shape for back-compat with script consumers. Auto-refreshes the catalog cache on 24h staleness when network is available; otherwise shows cached content. On a cold cache only the self-skill section renders and a hint is printed to stderr pointing at `skill refresh`. Use --refresh to force a network fetch.
 
 Usage: `neo4j-cli skill list [flags]`
 
@@ -111,7 +111,7 @@ Examples:
 # List skills × agents (table)
 neo4j-cli skill list
 
-# List as JSON (machine-readable)
+# List as JSON (machine-readable, flat per-(skill × agent) array)
 neo4j-cli skill list --format json
 
 # List in toon format

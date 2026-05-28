@@ -84,7 +84,6 @@ tasks:
 
       No new flag. No change to BuildInventory, InventoryRow,
       statusFor, or check.go. No new abstraction in common/output/.
-    status: pending
     dependencies:
       - task-001
     acceptance_criteria:
@@ -95,4 +94,5 @@ tasks:
       - "list_test.go table/toon assertions updated for the new shape; cold-cache and warn-on-network-failure assertions still pass"
       - "Skill bundle regenerated (`go generate ./neo4j-cli/internal/skill/...`); `make generate-check` clean on the committed tree"
       - "make test / make fmt-check / make lint / make license-check all clean"
-    completed_at: null
+    status: completed
+    completed_at: 2026-05-28T08:45:00Z

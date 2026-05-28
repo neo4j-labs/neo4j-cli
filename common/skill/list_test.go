@@ -18,7 +18,7 @@ import (
 
 // expectedRowCount returns the number of (skill × agent) rows for `n`
 // catalog skills plus the always-present self row, across the full AGENTS
-// catalog.
+// catalog. JSON output still emits one row per (skill × agent).
 func expectedRowCount(catalogSkills int) int {
 	return (1 + catalogSkills) * len(skill.AGENTS)
 }
@@ -173,7 +173,7 @@ func TestListCmd_WarmCache_NetworkFailure_Warns(t *testing.T) {
 	assert.Len(t, rows, expectedRowCount(1), "warm cache fallback must still list catalog rows")
 }
 
-func TestListCmd_TableContainsAllColumns(t *testing.T) {
+func TestListCmd_Table_TwoSectionShape(t *testing.T) {
 	cs := newCatalogServer(t)
 	withCatalogSeams(t, cs.doer())
 
@@ -183,17 +183,83 @@ func TestListCmd_TableContainsAllColumns(t *testing.T) {
 	f.resetBuffers()
 
 	require.NoError(t, f.exec(t, "list"))
-	lower := strings.ToLower(f.stdout.String())
-	for _, col := range []string{"skill", "source", "agent", "detected", "installed", "installed_version", "available_version", "status"} {
-		assert.Contains(t, lower, col, "table header must include %q", col)
+	out := f.stdout.String()
+
+	assert.Contains(t, out, "Self-skill:", "table must include self-skill heading")
+	assert.Contains(t, out, "Catalog:", "table must include catalog heading")
+
+	// Self section: agent + per-agent install state columns; no skill/source.
+	lower := strings.ToLower(out)
+	for _, col := range []string{"agent", "detected", "installed", "installed_version", "available_version", "status"} {
+		assert.Contains(t, lower, col, "table self section must include %q", col)
 	}
-	assert.Contains(t, f.stdout.String(), testSkillName)
-	assert.Contains(t, f.stdout.String(), "neo4j-cypher-skill")
-	assert.Contains(t, f.stdout.String(), "embedded")
-	assert.Contains(t, f.stdout.String(), "catalog")
+	// Catalog section: skill + aggregated columns; installed_in is new.
+	for _, col := range []string{"skill", "installed_in"} {
+		assert.Contains(t, lower, col, "table catalog section must include %q", col)
+	}
+
+	assert.Contains(t, out, "neo4j-cypher-skill", "catalog skill must render")
 }
 
-func TestListCmd_ToonContainsAllColumns(t *testing.T) {
+func TestListCmd_Table_InstalledInFormatting(t *testing.T) {
+	cs := newCatalogServer(t)
+	withCatalogSeams(t, cs.doer())
+
+	// Seed three catalog skills with different install patterns.
+	f := newFixture(t, "/home/alice", "table", "claude-code", "cursor", "codex",
+		"windsurf", "copilot", "antigravity", "gemini-cli", "cline", "pi", "opencode", "junie")
+	seedCatalogCache(t, f.fs, "1.0.0", "skill-zero", "skill-some", "skill-all")
+
+	// skill-some: installed on claude-code + codex.
+	for _, name := range []string{"claude-code", "codex"} {
+		a := skill.FindAgent(name)
+		sp, _ := a.SkillsPath()
+		dir := filepath.Join(sp, "skill-some")
+		require.NoError(t, f.fs.MkdirAll(dir, 0755))
+		body := "---\nname: skill-some\nversion: 1.0.0\n---\n# some\n"
+		require.NoError(t, afero.WriteFile(f.fs, filepath.Join(dir, "SKILL.md"), []byte(body), 0600))
+	}
+	// skill-all: installed on every agent in AGENTS.
+	for i := range skill.AGENTS {
+		a := &skill.AGENTS[i]
+		sp, _ := a.SkillsPath()
+		dir := filepath.Join(sp, "skill-all")
+		require.NoError(t, f.fs.MkdirAll(dir, 0755))
+		body := "---\nname: skill-all\nversion: 1.0.0\n---\n# all\n"
+		require.NoError(t, afero.WriteFile(f.fs, filepath.Join(dir, "SKILL.md"), []byte(body), 0600))
+	}
+	// skill-zero: not installed anywhere.
+
+	require.NoError(t, f.exec(t, "list"))
+	out := f.stdout.String()
+
+	// Pull the catalog section so we don't match the self-skill row.
+	idx := strings.Index(out, "Catalog:")
+	require.NotEqual(t, -1, idx, "catalog section must be present")
+	catalog := out[idx:]
+
+	assert.Contains(t, catalog, "skill-zero", "zero-installed catalog skill must render")
+	assert.Contains(t, catalog, "not-installed", "zero-installed status must render")
+	assert.Contains(t, catalog, "—", "zero-installed catalog skill must render '—'")
+
+	assert.Contains(t, catalog, "skill-some", "partial catalog skill must render")
+	assert.Contains(t, catalog, "partial", "partial status must render")
+	assert.Contains(t, catalog, "2/11 (claude-code, codex)",
+		"partial install must render 'N/11 (a, b)' in AGENTS order")
+
+	assert.Contains(t, catalog, "skill-all", "fully installed catalog skill must render")
+	assert.Contains(t, catalog, "11/11", "fully installed must render '11/11' without parenthetical")
+	// Sanity: parenthetical must not appear on the all-installed row.
+	skillAllLineIdx := strings.Index(catalog, "skill-all")
+	require.NotEqual(t, -1, skillAllLineIdx)
+	lineEnd := strings.Index(catalog[skillAllLineIdx:], "\n")
+	require.NotEqual(t, -1, lineEnd)
+	skillAllLine := catalog[skillAllLineIdx : skillAllLineIdx+lineEnd]
+	assert.NotContains(t, skillAllLine, "(",
+		"fully installed row must omit parenthetical")
+}
+
+func TestListCmd_Toon_TwoSectionShape(t *testing.T) {
 	cs := newCatalogServer(t)
 	withCatalogSeams(t, cs.doer())
 
@@ -202,9 +268,33 @@ func TestListCmd_ToonContainsAllColumns(t *testing.T) {
 
 	require.NoError(t, f.exec(t, "list"))
 	out := f.stdout.String()
-	for _, col := range []string{"skill", "source", "agent", "detected", "installed", "installed_version", "available_version", "status"} {
-		assert.Contains(t, out, col, "toon must include %q key", col)
+
+	assert.Contains(t, out, "Self-skill:", "toon must include self-skill heading")
+	assert.Contains(t, out, "Catalog:", "toon must include catalog heading")
+
+	// Self section keys.
+	for _, col := range []string{"agent", "detected", "installed", "installed_version", "available_version", "status"} {
+		assert.Contains(t, out, col, "toon self section must include %q key", col)
 	}
+	// Catalog section keys.
+	for _, col := range []string{"skill", "installed_in"} {
+		assert.Contains(t, out, col, "toon catalog section must include %q key", col)
+	}
+}
+
+func TestListCmd_Table_ColdCache_OnlySelfSection(t *testing.T) {
+	cs := newCatalogServer(t)
+	cs.failPlugin = true
+	withCatalogSeams(t, cs.doer())
+
+	f := newFixture(t, "/home/alice", "table", "claude-code")
+
+	require.NoError(t, f.exec(t, "list"))
+	out := f.stdout.String()
+
+	assert.Contains(t, out, "Self-skill:", "cold cache must still render self section")
+	assert.NotContains(t, out, "Catalog:", "cold cache must omit catalog section")
+	assert.Contains(t, f.stderr.String(), "skill refresh", "cold cache hint must still fire")
 }
 
 // findFirstRow returns the first row matching (skill, agent) or nil.
