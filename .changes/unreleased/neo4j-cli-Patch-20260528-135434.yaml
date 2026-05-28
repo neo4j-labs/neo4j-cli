@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: Add OPTIONAL MATCH, vector and full-text search to the query skill's Virtual Graph forbidden-construct list
-time: 2026-05-28T13:54:34.905527+02:00

@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Added Gemini and Vertex AI embedding providers.
-time: 2026-05-28T14:28:21.118389+02:00
