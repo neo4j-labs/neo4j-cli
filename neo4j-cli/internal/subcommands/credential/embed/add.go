@@ -55,10 +55,10 @@ neo4j-cli credential embed add --name ollama-nomic --provider ollama --model nom
 neo4j-cli credential embed add --name hf-bge --provider huggingface --model BAAI/bge-small-en-v1.5 --api-key hf_... --dimensions 384 --rw
 
 # Add a Gemini embed credential (api-key can also come from GEMINI_API_KEY)
-neo4j-cli credential embed add --name gemini-default --provider gemini --model text-embedding-004 --api-key AIza... --rw
+neo4j-cli credential embed add --name gemini-default --provider gemini --model gemini-embedding-001 --dimensions 3072 --api-key AIza... --rw
 
 # Add a Vertex AI embed credential (uses Application Default Credentials)
-neo4j-cli credential embed add --name vertex-default --provider vertex --model text-embedding-004 --vertex-project my-gcp-project --vertex-location us-central1 --rw`,
+neo4j-cli credential embed add --name vertex-default --provider vertex --model gemini-embedding-001 --dimensions 3072 --vertex-project my-gcp-project --vertex-location us-central1 --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !isValidProvider(provider) {

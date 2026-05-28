@@ -267,7 +267,7 @@ tasks:
       skill bundle via `go generate ./neo4j-cli/internal/skill/...` so
       `references/credential.md` matches. `TestGenerator_RoundTrip` is
       the gate.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Both Gemini and Vertex examples in `add.go` use `--model gemini-embedding-001 --dimensions 3072`"
@@ -275,7 +275,7 @@ tasks:
       - "`make test` passes (round-trip gate green)"
       - "`make fmt-check` and `make lint` pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T12:42:14Z
 
   - id: task-011
     title: "Extract doJSONRequest helper; refactor all 5 embed providers"

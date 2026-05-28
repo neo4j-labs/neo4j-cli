@@ -39,3 +39,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260528-142821.yaml
 
 ## REVIEW — 2026-05-28T15:00:00Z
 Added 2 review tasks (task-010..task-011).
+
+## TASK-010 — 2026-05-28T12:42:14Z
+Fixed gemini/vertex examples in credential embed add to use `gemini-embedding-001 --dimensions 3072` (matches DI graph default; PRD acceptance model). Regenerated skill bundle.
+Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/skill/bundle/references/credential.md
