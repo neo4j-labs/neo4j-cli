@@ -175,18 +175,6 @@ func TestResolveAndValidateOrgProject_ProjectFromFlag(t *testing.T) {
 	assert.Equal(t, testProjectID, gotProject)
 }
 
-func TestResolveAndValidateOrgProject_ProjectFromDeprecatedTenantIDFlag(t *testing.T) {
-	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
-	cfg := buildTestConfig(t, srv.URL, "")
-
-	cmd := newTestCmd(t, []string{"--organization-id", testOrgID, "--tenant-id", testProjectID})
-
-	gotOrg, gotProject, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
-	require.NoError(t, err)
-	assert.Equal(t, testOrgID, gotOrg)
-	assert.Equal(t, testProjectID, gotProject)
-}
-
 func TestResolveAndValidateOrgProject_ProjectFromWorkspaceConfig(t *testing.T) {
 	srv := buildTestServer(t, listProjectsPath, http.StatusOK, listProjectsSuccessBody)
 	extraCfg := fmt.Sprintf(`, "default-workspace": "%s/%s"`, testOrgID, testProjectID)
@@ -263,22 +251,6 @@ func TestResolveAndValidateOrgProject_TableDrivenResolutionOrder(t *testing.T) {
 			name:         "flags take precedence over workspace config",
 			args:         []string{"--organization-id", testOrgID, "--project-id", testProjectID},
 			extraCfg:     `, "default-workspace": "other-org/other-proj"`,
-			serverStatus: http.StatusOK,
-			serverBody:   listProjectsSuccessBody,
-			wantOrg:      testOrgID,
-			wantProject:  testProjectID,
-		},
-		{
-			name:         "project-id flag takes precedence over tenant-id flag",
-			args:         []string{"--organization-id", testOrgID, "--project-id", testProjectID, "--tenant-id", "ignored-tenant"},
-			serverStatus: http.StatusOK,
-			serverBody:   listProjectsSuccessBody,
-			wantOrg:      testOrgID,
-			wantProject:  testProjectID,
-		},
-		{
-			name:         "project from tenant-id when project-id absent",
-			args:         []string{"--organization-id", testOrgID, "--tenant-id", testProjectID},
 			serverStatus: http.StatusOK,
 			serverBody:   listProjectsSuccessBody,
 			wantOrg:      testOrgID,

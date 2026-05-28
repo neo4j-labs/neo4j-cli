@@ -19,10 +19,9 @@ import (
 //
 //   - Organization ID: (1) --organization-id flag; (2) org portion of
 //     aura.default-workspace; (3) error.
-//   - Project ID: (1) --project-id flag; (2) deprecated --tenant-id flag;
-//     (3) project portion of aura.default-workspace; (4) if
-//     aura.default-tenant is set but aura.default-workspace is not, return a
-//     migration message; (5) error.
+//   - Project ID: (1) --project-id flag; (2) project portion of
+//     aura.default-workspace; (3) if aura.default-tenant is set but
+//     aura.default-workspace is not, return a migration message; (4) error.
 //
 // After resolving both IDs it calls GET /organizations/{orgID}/projects
 // (v2beta1) and returns an error when the resolved projectID is not found in
@@ -63,8 +62,6 @@ func resolveIDs(cmd *cobra.Command, cfg *clicfg.Config) (orgID, projectID string
 	// Resolve project ID.
 	if flagVal, _ := cmd.Flags().GetString(flags.ProjectIDFlag); flagVal != "" {
 		projectID = flagVal
-	} else if tenantVal, _ := cmd.Flags().GetString(flags.TenantIDFlag); tenantVal != "" {
-		projectID = tenantVal
 	} else if defaultProject != "" {
 		projectID = defaultProject
 	} else {
