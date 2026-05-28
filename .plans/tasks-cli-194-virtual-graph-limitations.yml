@@ -14,14 +14,14 @@ tasks:
       search (not supported in any form)". Preserve existing ordering, indentation,
       and style of the surrounding bullets. Do NOT regenerate the bundle in this
       task — the round-trip gate is verified in a later task.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "neo4j-cli/internal/skill/query-additions.md has two new bullets appended to the Forbidden list"
       - "First new bullet is exactly: - `OPTIONAL MATCH`"
       - "Second new bullet is exactly: - Vector search and full-text search (not supported in any form)"
       - "No other lines in the file are changed"
-    completed_at: null
+    completed_at: 2026-05-28T11:55:00Z
 
   - id: task-002
     title: "Regenerate skill bundle so committed copy matches source"

@@ -153,6 +153,8 @@ Forbidden on Virtual Graphs (today):
 - Subquery expressions (`EXISTS { ... }`, `COUNT { ... }`, `COLLECT { ... }`)
 - All writes: `CREATE`, `MERGE`, `SET`, `INSERT`, `DELETE`, `REMOVE`, `DROP`, `ALTER`, `START`, `STOP`, `GRANT`, `REVOKE`
 - `apoc.*` procedures
+- `OPTIONAL MATCH`
+- Vector search and full-text search (not supported in any form)
 
 Stick to `MATCH … WHERE … RETURN` plus literal pattern matching:
 
