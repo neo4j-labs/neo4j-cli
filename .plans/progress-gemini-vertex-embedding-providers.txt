@@ -93,3 +93,7 @@ Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/
 
 ## REVIEW — 2026-05-28T18:00:00Z
 Added 1 review task (task-019): url.PathEscape Model in gemini and vertex URL construction (claude[bot] inline review on PR #186).
+
+## TASK-019 — 2026-05-28T18:30:00Z
+Wrapped p.cfg.Model in url.PathEscape at both gemini and vertex URL build sites; renamed local `url` var to `reqURL` to avoid shadowing the net/url package. Added two table-driven cases per provider covering `../admin` and `m?key=x` model values, asserting EscapedPath stays under `/models/` and RawQuery stays empty.
+Files: ~neo4j-cli/query/embed/gemini.go, ~neo4j-cli/query/embed/vertex.go, ~neo4j-cli/query/embed/gemini_test.go, ~neo4j-cli/query/embed/vertex_test.go

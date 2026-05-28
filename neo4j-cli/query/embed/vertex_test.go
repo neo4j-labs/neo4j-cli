@@ -430,6 +430,56 @@ func TestVertex_Embed_BaseURLIgnored(t *testing.T) {
 	assert.Contains(t, captured.req.URL.String(), "us-central1-aiplatform.googleapis.com")
 }
 
+func TestVertex_Embed_EscapesModelInPath(t *testing.T) {
+	cases := []struct {
+		name         string
+		model        string
+		wantPath     string
+		wantRawQuery string
+	}{
+		{
+			name:         "path traversal segment is encoded",
+			model:        "../admin",
+			wantPath:     "/v1/projects/my-project/locations/us-central1/publishers/google/models/..%2Fadmin:predict",
+			wantRawQuery: "",
+		},
+		{
+			name:         "query indicator does not start a query string",
+			model:        "m?key=x",
+			wantPath:     "/v1/projects/my-project/locations/us-central1/publishers/google/models/m%3Fkey=x:predict",
+			wantRawQuery: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotPath, gotRawQuery string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.EscapedPath()
+				gotRawQuery = r.URL.RawQuery
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"predictions":[{"embeddings":{"values":[0.1]}}]}`))
+			}))
+			defer srv.Close()
+
+			withTokenSource(t, staticTokenSource("tok-test"), nil)
+			withURLHostPrefix(t, srv.URL)
+
+			p := newVertexProvider(Config{
+				Provider:       ProviderVertex,
+				Model:          tc.model,
+				VertexProject:  "my-project",
+				VertexLocation: "us-central1",
+			})
+			_, err := p.Embed(context.Background(), "hello")
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantPath, gotPath)
+			assert.Equal(t, tc.wantRawQuery, gotRawQuery)
+			assert.NotContains(t, gotRawQuery, "key=x")
+		})
+	}
+}
+
 func TestVertex_New_ReturnsVertexProvider(t *testing.T) {
 	p, err := New(Config{Provider: ProviderVertex, Model: "gemini-embedding-001"})
 	require.NoError(t, err)

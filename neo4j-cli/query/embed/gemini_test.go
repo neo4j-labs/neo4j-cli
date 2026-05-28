@@ -267,6 +267,53 @@ func TestGemini_Embed_DefaultBaseURL(t *testing.T) {
 		captured.req.URL.String())
 }
 
+func TestGemini_Embed_EscapesModelInPath(t *testing.T) {
+	cases := []struct {
+		name         string
+		model        string
+		wantPath     string
+		wantRawQuery string
+	}{
+		{
+			name:         "path traversal segment is encoded",
+			model:        "../admin",
+			wantPath:     "/models/..%2Fadmin:embedContent",
+			wantRawQuery: "",
+		},
+		{
+			name:         "query indicator does not start a query string",
+			model:        "m?key=x",
+			wantPath:     "/models/m%3Fkey=x:embedContent",
+			wantRawQuery: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotPath, gotRawQuery string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.EscapedPath()
+				gotRawQuery = r.URL.RawQuery
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"embedding":{"values":[0.1]}}`))
+			}))
+			defer srv.Close()
+
+			p := newGeminiProvider(Config{
+				Provider: ProviderGemini,
+				Model:    tc.model,
+				BaseURL:  srv.URL,
+				APIKey:   "gk-test",
+			})
+			_, err := p.Embed(context.Background(), "hello")
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantPath, gotPath)
+			assert.Equal(t, tc.wantRawQuery, gotRawQuery)
+			assert.NotContains(t, gotRawQuery, "key=x")
+		})
+	}
+}
+
 func TestGemini_New_ReturnsGeminiProvider(t *testing.T) {
 	p, err := New(Config{Provider: ProviderGemini, Model: "gemini-embedding-001"})
 	require.NoError(t, err)

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sync"
 
@@ -166,10 +167,10 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 			err)
 	}
 
-	url := vertexURLHostPrefix(p.cfg.VertexLocation) +
+	reqURL := vertexURLHostPrefix(p.cfg.VertexLocation) +
 		"/v1/projects/" + p.cfg.VertexProject +
 		"/locations/" + p.cfg.VertexLocation +
-		"/publishers/google/models/" + p.cfg.Model +
+		"/publishers/google/models/" + url.PathEscape(p.cfg.Model) +
 		":predict"
 
 	body := vertexEmbedRequest{
@@ -182,7 +183,7 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 	headers := map[string]string{
 		"Authorization": "Bearer " + tok.AccessToken,
 	}
-	raw, err := doJSONRequest(ctx, p.client, ProviderVertex, http.MethodPost, url, body, headers, p.cfg.UserAgent)
+	raw, err := doJSONRequest(ctx, p.client, ProviderVertex, http.MethodPost, reqURL, body, headers, p.cfg.UserAgent)
 	if err != nil {
 		return nil, err
 	}

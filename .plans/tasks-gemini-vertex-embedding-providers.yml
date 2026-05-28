@@ -780,6 +780,7 @@ tasks:
     completed_at: 2026-05-28T17:30:00Z
 
   - id: task-019
+    status: completed
     title: "url.PathEscape Model in gemini and vertex URL construction (path injection fix)"
     description: |
       Inline PR review comment from `claude[bot]` on PR #186 flagged a
@@ -837,7 +838,6 @@ tasks:
 
       Two table rows per provider is sufficient; this is a narrow
       defense-in-depth fix.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "`gemini.go` Embed wraps `p.cfg.Model` in `url.PathEscape` when building the request URL"
@@ -848,4 +848,4 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
       - "`make generate-check` still passes (no bundle drift expected — this is a code-internal change)"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T18:30:00Z

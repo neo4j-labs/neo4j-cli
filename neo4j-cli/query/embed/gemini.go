@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 
 	"github.com/neo4j/cli/common/clierr"
 )
@@ -94,11 +95,11 @@ func (p *geminiProvider) Embed(ctx context.Context, text string) ([]float32, err
 		body.OutputDimensionality = &d
 	}
 
-	url := base + "/models/" + p.cfg.Model + ":embedContent"
+	reqURL := base + "/models/" + url.PathEscape(p.cfg.Model) + ":embedContent"
 	headers := map[string]string{
 		"x-goog-api-key": p.cfg.APIKey,
 	}
-	raw, err := doJSONRequest(ctx, p.client, ProviderGemini, http.MethodPost, url, body, headers, p.cfg.UserAgent)
+	raw, err := doJSONRequest(ctx, p.client, ProviderGemini, http.MethodPost, reqURL, body, headers, p.cfg.UserAgent)
 	if err != nil {
 		return nil, err
 	}
