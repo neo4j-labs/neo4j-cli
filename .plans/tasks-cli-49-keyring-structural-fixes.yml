@@ -166,7 +166,7 @@ tasks:
       three concrete types to add the *[]string parameter. Add saveSensitiveFields,
       restoreSensitiveFields, and validateForMigration to each concrete type. Add compile-time
       interface assertions. Add allCredentials() []keyringCredential on Credentials.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -176,7 +176,7 @@ tasks:
       - "Compile-time var _ keyringCredential assertions exist for all three concrete types"
       - "allCredentials() []keyringCredential exists on Credentials; returns Aura+Dbms+Embed in order"
       - "make test passes (existing callers of writeToKeyring updated to pass nil where not tracking)"
-    completed_at: null
+    completed_at: "2026-05-28T13:00:00Z"
 
   - id: task-010
     title: "Rewrite saveWithKeyring and MigrateToKeyring using allCredentials() iterator; final gates"

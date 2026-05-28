@@ -21,7 +21,7 @@ func TestEmbedCredential_ZeroSensitiveFields(t *testing.T) {
 func TestEmbedCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &EmbedCredential{Name: "openai", APIKey: "sk-key"}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	v, err := mock.Get(ServiceName, KeyringKey("embed", "openai", "api-key"))
 	require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestEmbedCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 func TestEmbedCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &EmbedCredential{Name: "openai", APIKey: ""}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	_, err := mock.Get(ServiceName, KeyringKey("embed", "openai", "api-key"))
 	assert.ErrorIs(t, err, ErrNotFound, "empty APIKey must not be written to keyring")
@@ -39,9 +39,17 @@ func TestEmbedCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 
 func TestEmbedCredential_WriteToKeyring_SetError(t *testing.T) {
 	c := &EmbedCredential{Name: "openai", APIKey: "sk-key"}
-	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()})
+	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring set embed/openai/api-key")
+}
+
+func TestEmbedCredential_WriteToKeyring_TracksWritten(t *testing.T) {
+	mock := newInternalMock()
+	c := &EmbedCredential{Name: "openai", APIKey: "sk-key"}
+	var written []string
+	require.NoError(t, c.writeToKeyring(mock, &written))
+	assert.Equal(t, []string{KeyringKey("embed", "openai", "api-key")}, written)
 }
 
 func TestEmbedCredential_LoadFromKeyring_LoadsFromKeyring(t *testing.T) {

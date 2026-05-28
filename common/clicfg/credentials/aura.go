@@ -182,16 +182,44 @@ func (c *AuraCredential) zeroSensitiveFields() {
 }
 
 // writeToKeyring writes non-empty sensitive fields to the keyring.
-func (c *AuraCredential) writeToKeyring(provider KeyringProvider) error {
+// If written is non-nil, each successfully written key is appended to it.
+func (c *AuraCredential) writeToKeyring(provider KeyringProvider, written *[]string) error {
 	if c.ClientSecret != "" {
-		if err := provider.Set(ServiceName, KeyringKey("aura", c.Name, "client-secret"), c.ClientSecret); err != nil {
+		key := KeyringKey("aura", c.Name, "client-secret")
+		if err := provider.Set(ServiceName, key, c.ClientSecret); err != nil {
 			return fmt.Errorf("keyring set aura/%s/client-secret: %w", c.Name, err)
+		}
+		if written != nil {
+			*written = append(*written, key)
 		}
 	}
 	if c.AccessToken != "" {
-		if err := provider.Set(ServiceName, KeyringKey("aura", c.Name, "access-token"), c.AccessToken); err != nil {
+		key := KeyringKey("aura", c.Name, "access-token")
+		if err := provider.Set(ServiceName, key, c.AccessToken); err != nil {
 			return fmt.Errorf("keyring set aura/%s/access-token: %w", c.Name, err)
 		}
+		if written != nil {
+			*written = append(*written, key)
+		}
+	}
+	return nil
+}
+
+func (c *AuraCredential) saveSensitiveFields() []string {
+	return []string{c.ClientSecret, c.AccessToken}
+}
+
+func (c *AuraCredential) restoreSensitiveFields(fields []string) {
+	c.ClientSecret = fields[0]
+	c.AccessToken = fields[1]
+}
+
+func (c *AuraCredential) validateForMigration() error {
+	if c.ClientSecret == "" {
+		return clierr.NewUsageError(
+			"cannot migrate credential %q: aura client-secret is empty; run `credential aura-client remove %s` and re-add it",
+			c.Name, c.Name,
+		)
 	}
 	return nil
 }

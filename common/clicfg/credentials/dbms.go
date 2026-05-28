@@ -169,11 +169,34 @@ func (c *DbmsCredential) zeroSensitiveFields() {
 }
 
 // writeToKeyring writes the non-empty Password to the keyring.
-func (c *DbmsCredential) writeToKeyring(provider KeyringProvider) error {
+// If written is non-nil, each successfully written key is appended to it.
+func (c *DbmsCredential) writeToKeyring(provider KeyringProvider, written *[]string) error {
 	if c.Password != "" {
-		if err := provider.Set(ServiceName, KeyringKey("dbms", c.Name, "password"), c.Password); err != nil {
+		key := KeyringKey("dbms", c.Name, "password")
+		if err := provider.Set(ServiceName, key, c.Password); err != nil {
 			return fmt.Errorf("keyring set dbms/%s/password: %w", c.Name, err)
 		}
+		if written != nil {
+			*written = append(*written, key)
+		}
+	}
+	return nil
+}
+
+func (c *DbmsCredential) saveSensitiveFields() []string {
+	return []string{c.Password}
+}
+
+func (c *DbmsCredential) restoreSensitiveFields(fields []string) {
+	c.Password = fields[0]
+}
+
+func (c *DbmsCredential) validateForMigration() error {
+	if c.Password == "" {
+		return clierr.NewUsageError(
+			"cannot migrate credential %q: dbms password is empty; run `credential dbms remove %s` and re-add it",
+			c.Name, c.Name,
+		)
 	}
 	return nil
 }

@@ -12,6 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Compile-time checks: all three concrete types must satisfy keyringCredential.
+var _ keyringCredential = (*AuraCredential)(nil)
+var _ keyringCredential = (*DbmsCredential)(nil)
+var _ keyringCredential = (*EmbedCredential)(nil)
+
 // internalMock is a simple in-memory KeyringProvider for internal (white-box) tests.
 type internalMock struct {
 	store map[string]map[string]string
@@ -75,7 +80,7 @@ func TestAuraCredential_ZeroSensitiveFields(t *testing.T) {
 func TestAuraCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &AuraCredential{Name: "prod", ClientSecret: "s3cr3t", AccessToken: "tok"}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	v, err := mock.Get(ServiceName, KeyringKey("aura", "prod", "client-secret"))
 	require.NoError(t, err)
@@ -89,7 +94,7 @@ func TestAuraCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 func TestAuraCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &AuraCredential{Name: "prod", ClientSecret: "s3cr3t", AccessToken: ""}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	_, err := mock.Get(ServiceName, KeyringKey("aura", "prod", "access-token"))
 	assert.ErrorIs(t, err, ErrNotFound, "empty AccessToken must not be written to keyring")
@@ -97,9 +102,20 @@ func TestAuraCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 
 func TestAuraCredential_WriteToKeyring_SetError(t *testing.T) {
 	c := &AuraCredential{Name: "prod", ClientSecret: "s3cr3t"}
-	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()})
+	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring set aura/prod/client-secret")
+}
+
+func TestAuraCredential_WriteToKeyring_TracksWritten(t *testing.T) {
+	mock := newInternalMock()
+	c := &AuraCredential{Name: "prod", ClientSecret: "s3cr3t", AccessToken: "tok"}
+	var written []string
+	require.NoError(t, c.writeToKeyring(mock, &written))
+	assert.Equal(t, []string{
+		KeyringKey("aura", "prod", "client-secret"),
+		KeyringKey("aura", "prod", "access-token"),
+	}, written)
 }
 
 func TestAuraCredential_LoadFromKeyring_LoadsFromKeyring(t *testing.T) {

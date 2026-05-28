@@ -58,6 +58,23 @@ func NewCredentials(fs afero.Fs, configPrefix string) *Credentials {
 	return &c
 }
 
+// allCredentials returns all credentials across Aura, Dbms, and Embed in that
+// order, as the keyringCredential interface. This is used by credential-agnostic
+// loops in saveWithKeyring, MigrateToKeyring, and related functions.
+func (c *Credentials) allCredentials() []keyringCredential { //nolint:unused // consumed in task-010
+	result := make([]keyringCredential, 0, len(c.Aura.Credentials)+len(c.Dbms.Credentials)+len(c.Embed.Credentials))
+	for _, cred := range c.Aura.Credentials {
+		result = append(result, cred)
+	}
+	for _, cred := range c.Dbms.Credentials {
+		result = append(result, cred)
+	}
+	for _, cred := range c.Embed.Credentials {
+		result = append(result, cred)
+	}
+	return result
+}
+
 // HasAnyCredentials reports whether at least one credential exists across all
 // three credential types (Aura, Dbms, Embed). This is used by the first-run
 // default-detection logic to choose between insecure (existing user) and
@@ -204,17 +221,17 @@ func (c *Credentials) saveToJSON() error {
 func (c *Credentials) saveWithKeyring() error {
 	// Write sensitive fields to keyring before zeroing them in the JSON file.
 	for _, cred := range c.Aura.Credentials {
-		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
 			return err
 		}
 	}
 	for _, cred := range c.Dbms.Credentials {
-		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
 			return err
 		}
 	}
 	for _, cred := range c.Embed.Credentials {
-		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
 			return err
 		}
 	}

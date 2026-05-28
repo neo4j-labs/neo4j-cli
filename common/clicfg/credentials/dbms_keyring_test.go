@@ -21,7 +21,7 @@ func TestDbmsCredential_ZeroSensitiveFields(t *testing.T) {
 func TestDbmsCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &DbmsCredential{Name: "local", Password: "p4ss"}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	v, err := mock.Get(ServiceName, KeyringKey("dbms", "local", "password"))
 	require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestDbmsCredential_WriteToKeyring_WritesNonEmpty(t *testing.T) {
 func TestDbmsCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 	mock := newInternalMock()
 	c := &DbmsCredential{Name: "local", Password: ""}
-	require.NoError(t, c.writeToKeyring(mock))
+	require.NoError(t, c.writeToKeyring(mock, nil))
 
 	_, err := mock.Get(ServiceName, KeyringKey("dbms", "local", "password"))
 	assert.ErrorIs(t, err, ErrNotFound, "empty Password must not be written to keyring")
@@ -39,9 +39,17 @@ func TestDbmsCredential_WriteToKeyring_SkipsEmpty(t *testing.T) {
 
 func TestDbmsCredential_WriteToKeyring_SetError(t *testing.T) {
 	c := &DbmsCredential{Name: "local", Password: "p4ss"}
-	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()})
+	err := c.writeToKeyring(&errSetProvider{inner: newInternalMock()}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring set dbms/local/password")
+}
+
+func TestDbmsCredential_WriteToKeyring_TracksWritten(t *testing.T) {
+	mock := newInternalMock()
+	c := &DbmsCredential{Name: "local", Password: "p4ss"}
+	var written []string
+	require.NoError(t, c.writeToKeyring(mock, &written))
+	assert.Equal(t, []string{KeyringKey("dbms", "local", "password")}, written)
 }
 
 func TestDbmsCredential_LoadFromKeyring_LoadsFromKeyring(t *testing.T) {

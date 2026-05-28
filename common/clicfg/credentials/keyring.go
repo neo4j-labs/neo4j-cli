@@ -6,6 +6,7 @@ package credentials
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	gokeyring "github.com/zalando/go-keyring"
 )
@@ -53,6 +54,20 @@ var ErrNotFound = gokeyring.ErrNotFound
 // across credential types and names.
 func KeyringKey(credType, name, field string) string {
 	return fmt.Sprintf("%s/%s/%s", credType, name, field)
+}
+
+// keyringCredential is the common interface satisfied by AuraCredential,
+// DbmsCredential, and EmbedCredential. It allows credential-agnostic loops in
+// saveWithKeyring, MigrateToKeyring, MigrateToInsecure, and
+// loadSensitiveFieldsFromKeyring.
+type keyringCredential interface {
+	writeToKeyring(provider KeyringProvider, written *[]string) error
+	loadFromKeyring(provider KeyringProvider, warnW io.Writer) (migrated bool)
+	migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error
+	validateForMigration() error
+	zeroSensitiveFields()
+	saveSensitiveFields() []string
+	restoreSensitiveFields(fields []string)
 }
 
 // migratedField records an in-memory field that was populated from the keyring
