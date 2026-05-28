@@ -234,7 +234,7 @@ tasks:
       and returns nil for the insecure path; saveWithKeyring() calls saveToJSON() with no
       assignment; MigrateToInsecure() calls saveToJSON() directly (removing the dead
       if-err block). Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-011
@@ -244,7 +244,7 @@ tasks:
       - "saveWithKeyring() calls saveToJSON() with no assignment and no nolint comment"
       - "MigrateToInsecure() calls saveToJSON() directly with no if-err check"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: "2026-05-28T15:30:00Z"
 
   - id: task-013
     title: "Move deleteFromKeyring to item types and add to keyringCredential interface"

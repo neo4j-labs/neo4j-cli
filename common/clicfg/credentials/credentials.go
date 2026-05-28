@@ -193,10 +193,11 @@ func (c *Credentials) save() error {
 	if c.storageMode == StorageModeKeyring {
 		return c.saveWithKeyring()
 	}
-	return c.saveToJSON()
+	c.saveToJSON()
+	return nil
 }
 
-func (c *Credentials) saveToJSON() error {
+func (c *Credentials) saveToJSON() {
 	data, err := json.Marshal(CredentialsFile{
 		Aura:  c.Aura,
 		Dbms:  c.Dbms,
@@ -206,7 +207,6 @@ func (c *Credentials) saveToJSON() error {
 		panic(err)
 	}
 	fileutils.WriteFile(c.fs, c.filePath, data)
-	return nil
 }
 
 // saveWithKeyring writes sensitive fields to the OS keyring and zeroes them
@@ -231,7 +231,7 @@ func (c *Credentials) saveWithKeyring() error {
 		saved[i] = cred.saveSensitiveFields()
 		cred.zeroSensitiveFields()
 	}
-	_ = c.saveToJSON() //nolint:errcheck // saveToJSON always returns nil; panics on marshal/write error
+	c.saveToJSON()
 	for i, cred := range all {
 		cred.restoreSensitiveFields(saved[i])
 	}
@@ -354,9 +354,7 @@ func (c *Credentials) MigrateToInsecure() error {
 
 	// Phase 2: persist secrets to JSON and own the mode transition.
 	c.storageMode = StorageModeInsecure
-	if err := c.saveToJSON(); err != nil {
-		return err
-	}
+	c.saveToJSON()
 
 	// Phase 3: delete keyring entries for all fields we successfully read
 	// (best-effort — errors are ignored).

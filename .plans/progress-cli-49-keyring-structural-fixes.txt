@@ -29,6 +29,10 @@ Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo
 ## TASK-008 — 2026-05-28T12:00:00Z
 Final gates: make test, make fmt-check, make lint all pass with 0 issues after all structural refactors.
 
+## TASK-012 — 2026-05-28T15:30:00Z
+Removed error return from saveToJSON(); updated save() to call saveToJSON() then return nil; saveWithKeyring() drops the _ = assignment and nolint comment; MigrateToInsecure() drops the dead if-err block.
+Files: ~common/clicfg/credentials/credentials.go
+
 ## REVIEW — 2026-05-28T15:00:00Z
 Added 2 review tasks (task-012..task-013).
 
