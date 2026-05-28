@@ -128,7 +128,7 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 	if cfg.Credentials.HasAnyCredentials() {
 		// Existing user upgrading: default to insecure to preserve behaviour.
 		if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
-			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure)
+			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
 			_, _ = fmt.Fprintln(stderr, "Notice: your Neo4j CLI credentials are stored in plaintext.")
 			_, _ = fmt.Fprintln(stderr, "To migrate them to the OS keyring, run:")
 			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
@@ -140,11 +140,11 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 			_, _ = fmt.Fprintf(stderr, "Warning: OS keyring is unavailable (%v); defaulting to plaintext credential storage.\n", probeErr)
 			_, _ = fmt.Fprintln(stderr, credentials.KeyringSetupHint())
 			if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
-				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure)
+				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
 			}
 		} else {
 			if err := cfg.Global.Set("credential-storage", credentials.StorageModeKeyring); err == nil {
-				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring)
+				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring, stderr)
 			}
 		}
 	}

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -74,11 +73,11 @@ func (c *Credentials) HasAnyCredentials() bool {
 // from clicfg.NewConfig after the storage mode is resolved from config.
 // In insecure mode sensitive fields are already loaded from JSON during
 // NewCredentials, so reloading is a no-op. In keyring mode this populates
-// sensitive fields from the OS keyring.
-func (c *Credentials) SetStorageMode(mode string) error {
+// sensitive fields from the OS keyring. Warning messages are written to warnW.
+func (c *Credentials) SetStorageMode(mode string, warnW io.Writer) error {
 	c.storageMode = mode
 	if mode == StorageModeKeyring {
-		return c.loadSensitiveFieldsFromKeyring()
+		return c.loadSensitiveFieldsFromKeyring(warnW)
 	}
 	return nil
 }
@@ -549,7 +548,7 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 //
 // Non-ErrNotFound errors are returned as-is.
 // save() is called at the end only when at least one field was auto-migrated.
-func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
+func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
 	// anyMigrated tracks whether at least one JSON-resident secret was
 	// successfully pushed to the keyring so we only call save() when needed.
 	// save() (→ saveWithKeyring) will write in-memory values to keyring
@@ -557,17 +556,17 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 	anyMigrated := false
 
 	for _, cred := range c.Aura.Credentials {
-		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
+		if cred.loadFromKeyring(defaultKeyring, warnW) {
 			anyMigrated = true
 		}
 	}
 	for _, cred := range c.Dbms.Credentials {
-		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
+		if cred.loadFromKeyring(defaultKeyring, warnW) {
 			anyMigrated = true
 		}
 	}
 	for _, cred := range c.Embed.Credentials {
-		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
+		if cred.loadFromKeyring(defaultKeyring, warnW) {
 			anyMigrated = true
 		}
 	}

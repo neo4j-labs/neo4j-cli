@@ -93,7 +93,7 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				// so subsequent saves in this process use the keyring path.
 				if bareKey == "credential-storage" && value == credentials.StorageModeKeyring {
 					if cfg.Credentials.StorageMode() != credentials.StorageModeKeyring {
-						if err := cfg.Credentials.SetStorageMode(value); err != nil {
+						if err := cfg.Credentials.SetStorageMode(value, cmd.ErrOrStderr()); err != nil {
 							cmd.SilenceUsage = true
 							return err
 						}

@@ -124,7 +124,7 @@ tasks:
       (app.go) passes its existing stderr io.Writer param; config/set.go passes cmd.ErrOrStderr().
       Update all test call sites to pass &bytes.Buffer{}; update warning-path tests to assert
       against the buffer contents rather than captured os.Stderr.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -135,7 +135,7 @@ tasks:
       - "NewConfig passes os.Stderr; initCredentialStorageDefault passes its stderr param; config/set.go passes cmd.ErrOrStderr()"
       - "All test call sites pass &bytes.Buffer{}; warning-path tests assert buffer contents"
       - "make test, make lint, make fmt-check all pass"
-    completed_at: null
+    completed_at: "2026-05-28T12:00:00Z"
 
   - id: task-008
     title: "Final gates: make test, make lint, make fmt-check"

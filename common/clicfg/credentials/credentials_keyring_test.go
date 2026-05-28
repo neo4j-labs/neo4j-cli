@@ -4,8 +4,10 @@
 package credentials_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -30,7 +32,7 @@ func newKeyringTestCredentials(t *testing.T, mock *mockKeyringProvider, credenti
 	fs, err := testfs.GetTestFs("{}", credentialsJSON)
 	require.NoError(t, err)
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 	return creds, fs
 }
 
@@ -54,7 +56,7 @@ func TestSetStorageMode_InsecureIsNoOp(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeInsecure))
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeInsecure, io.Discard))
 
 	// Mock must not have been touched
 	_, err = mock.Get(credentials.ServiceName, credentials.KeyringKey("aura", "prod", "client-secret"))
@@ -115,9 +117,11 @@ func TestSetStorageMode_KeyringMode_MissingRequired_Warn(t *testing.T) {
 			require.NoError(t, err)
 
 			creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-			err = creds.SetStorageMode(credentials.StorageModeKeyring)
+			var warnBuf bytes.Buffer
+			err = creds.SetStorageMode(credentials.StorageModeKeyring, &warnBuf)
 			require.NoError(t, err, "missing required field must warn but not error")
 			assert.Equal(t, "", tc.checkEmptyFn(creds), "field must remain empty when missing from both keyring and JSON")
+			assert.Contains(t, warnBuf.String(), "Warning:", "missing required field must write a warning")
 		})
 	}
 }
@@ -134,7 +138,7 @@ func TestSetStorageMode_KeyringMode_PreMigrationFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	err = creds.SetStorageMode(credentials.StorageModeKeyring)
+	err = creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard)
 	require.NoError(t, err, "pre-migration fallback must not error")
 	assert.Equal(t, "json-secret", creds.Aura.Credentials[0].ClientSecret,
 		"JSON value must be used when keyring has no entry")
@@ -154,7 +158,7 @@ func TestSetStorageMode_KeyringMode_AutoMigration_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 
 	// In-memory value must still be populated
 	assert.Equal(t, "json-pass", creds.Dbms.Credentials[0].Password,
@@ -188,7 +192,7 @@ func TestSetStorageMode_KeyringMode_AutoMigration_KeyringSetFails(t *testing.T) 
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
 	// SetStorageMode must succeed despite the keyring.Set failure
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring),
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard),
 		"SetStorageMode must succeed even when auto-migration keyring.Set fails")
 
 	// In-memory value must still be populated (JSON fallback used)
@@ -302,7 +306,7 @@ func TestSave_KeyringMode_SensitiveFieldsRoutedToKeyring(t *testing.T) {
 			require.NoError(t, err)
 
 			creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-			require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+			require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 			require.NoError(t, tc.addCred(creds))
 
 			data := readCredentialsJSON(t, fs)
@@ -326,7 +330,7 @@ func TestSave_KeyringMode_InMemoryValuesPreserved(t *testing.T) {
 	require.NoError(t, err)
 
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 	require.NoError(t, creds.Aura.Add("prod", "id1", "s3cr3t"))
 
 	// In-memory value must still be set
@@ -360,7 +364,7 @@ func TestSave_KeyringMode_KeyringSetError_ReturnsError(t *testing.T) {
 	creds := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
 	// SetStorageMode loads from keyring (Get only, no Set); zero credentials → no
 	// keyring reads, so the failing Set provider doesn't matter here.
-	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 
 	before := readCredentialsJSON(t, fs)
 
@@ -384,7 +388,7 @@ func TestKeyringMode_LoadReload(t *testing.T) {
 
 	// First instance: add credential in keyring mode
 	creds1 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds1.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds1.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 	require.NoError(t, creds1.Aura.Add("prod", "id1", "s3cr3t"))
 
 	// Verify JSON is scrubbed
@@ -403,7 +407,7 @@ func TestKeyringMode_LoadReload(t *testing.T) {
 
 	// Second instance: load same FS — should get secret from keyring
 	creds2 := credentials.NewCredentials(fs, clicfg.ConfigPrefix)
-	require.NoError(t, creds2.SetStorageMode(credentials.StorageModeKeyring))
+	require.NoError(t, creds2.SetStorageMode(credentials.StorageModeKeyring, io.Discard))
 	require.Len(t, creds2.Aura.Credentials, 1)
 	assert.Equal(t, "s3cr3t", creds2.Aura.Credentials[0].ClientSecret,
 		"reloaded credential must have secret from keyring")

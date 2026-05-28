@@ -113,7 +113,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	// compatible). Task-009 writes the key on first run; subsequent invocations
 	// see an explicit value and reach this branch.
 	if Viper.IsSet("credential-storage") {
-		if err := creds.SetStorageMode(globalConfig.CredentialStorage()); err != nil {
+		if err := creds.SetStorageMode(globalConfig.CredentialStorage(), os.Stderr); err != nil {
 			panic(err)
 		}
 	}

@@ -21,3 +21,7 @@ Files: ~common/clicfg/credentials/credentials.go
 ## TASK-006 — 2026-05-28T11:30:00Z
 MigrateToInsecure now sets c.storageMode = StorageModeInsecure and calls saveToJSON() directly, removing the prevMode temporary mutation; config/set.go's credentialStorageModeChanged flag removed and post-migration SetStorageMode for the insecure path eliminated.
 Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-007 — 2026-05-28T12:00:00Z
+Threaded io.Writer through SetStorageMode and loadSensitiveFieldsFromKeyring, replacing os.Stderr; removed "os" import from credentials.go; NewConfig passes os.Stderr, initCredentialStorageDefault passes its stderr param, config/set.go passes cmd.ErrOrStderr(); all test call sites updated to io.Discard except the warning-path test which uses *bytes.Buffer and asserts "Warning:" output.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/subcommands/config/set.go, ~common/clicfg/credentials/credentials_keyring_test.go
