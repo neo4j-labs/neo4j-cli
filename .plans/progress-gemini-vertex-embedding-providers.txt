@@ -28,3 +28,7 @@ Files: +neo4j-cli/query/embed/vertex.go, +neo4j-cli/query/embed/vertex_test.go, 
 ## TASK-007 — 2026-05-28T00:00:00Z
 Extended `credential embed add` with gemini + vertex in validProviders, two new flags (`--vertex-project`, `--vertex-location`), cross-flag validation (vertex requires both; non-vertex rejects strays), updated Long/Example, passes new args into EmbedCredentials.Add. Added 5 new table-driven test cases. Skill bundle is now drifted (expected; task-008 regenerates).
 Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
+
+## TASK-008 — 2026-05-28T00:00:00Z
+Regenerated skill bundle via `go generate ./neo4j-cli/internal/skill/...`; only `references/credential.md` drifted (new providers in `--provider` list, two new `--vertex-*` flag rows, gemini + vertex Example invocations). All gates green.
+Files: ~neo4j-cli/internal/skill/bundle/references/credential.md

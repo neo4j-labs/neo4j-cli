@@ -216,7 +216,7 @@ tasks:
       bundle diff alongside the source. Verify `make generate-check`
       passes (it runs `go generate ./...` then `git diff --exit-code` — a
       passing run means no further drift).
-    status: pending
+    status: completed
     dependencies:
       - task-005
       - task-006
@@ -227,7 +227,7 @@ tasks:
       - "Bundle changes are committed alongside the source"
       - "`make generate-check` passes (no further drift)"
       - "`TestGenerator_RoundTrip` passes"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-009
     title: "Add changie changelog entry"
