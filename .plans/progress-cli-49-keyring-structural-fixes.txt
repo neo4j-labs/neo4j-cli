@@ -66,3 +66,6 @@ Covered by task-014; no remaining misleading storageMode precondition comments i
 Replaced 6 per-type keyringCredential interface methods with a single sensitiveFields() []sensitiveField method; generic helpers in credentials.go implement zero/restore/validate/write/load/migrate; net ~500 lines deleted across aura.go, dbms.go, embed.go, and their test files; migratedField type removed.
 Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go
 Decisions: warning/error messages lost per-type command suggestions in the generic path; accepted tradeoff since the keyring key string (e.g. aura/prod/client-secret) already identifies the credential.
+
+## REVIEW — 2026-05-28T18:45:00Z
+Added 6 review tasks (task-019..task-024): comment hygiene (REQ-F tags, stale names), dead error return on loadSensitiveFieldsFromKeyring, stale caller-contract docs, dead error check in MigrateToKeyring, os.Stderr in token.go.

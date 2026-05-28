@@ -435,3 +435,142 @@ tasks:
       - "A test asserts the warning appears in the warnW buffer when the keyring returns an unexpected error"
       - "ErrNotFound paths (missing field, auto-migrate) are unaffected"
       - "make test, make fmt-check, make lint all pass"
+
+  - id: task-019
+    title: "Remove PRD requirement IDs from production comments"
+    description: |
+      credentials.go contains REQ-F-016, REQ-F-019, and REQ-F-018 in comments.
+      neo4j-cli/aura/internal/subcommands/config/set.go contains REQ-F-017 in a comment.
+      These are planning artefacts — there is no matching document in the repo a future reader
+      can locate. Replace each tag with prose that captures the observable behaviour the comment
+      is meant to describe. For example:
+        - credentials.go REQ-F-016/REQ-F-019 area: "If ErrNotFound but the JSON holds a value
+          (pre-migration state): use the JSON value silently and attempt auto-migration to the
+          keyring."
+        - set.go REQ-F-017: "If any secrets are still resident in credentials.json (e.g. from a
+          partial earlier migration), they will be moved to the keyring and scrubbed. This is
+          idempotent."
+      Preserve the factual content; only remove the REQ-F-xxx identifiers.
+      Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-018
+    acceptance_criteria:
+      - "No REQ-F-xxx identifier appears in any comment in credentials.go or config/set.go"
+      - "Replaced comments accurately describe the observable behaviour they document"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-020
+    title: "Remove stale task ID and stale function name from comments"
+    description: |
+      Two comments reference artefacts that no longer exist:
+      1. common/clicfg/clicfg.go line 113 area: references 'Task-009'. Rewrite as plain
+         English: "The key is absent on first run (backwards-compatible default). Once written,
+         subsequent invocations see the explicit value and take this branch."
+      2. common/clicfg/credentials/credentials.go: a comment refers to 'tryAutoMigrate' which
+         was removed when loadCredFromKeyring was introduced. Replace 'by tryAutoMigrate' with
+         'by loadCredFromKeyring'.
+      Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-019
+    acceptance_criteria:
+      - "clicfg.go contains no reference to 'Task-009'"
+      - "credentials.go contains no reference to 'tryAutoMigrate'"
+      - "Both replacement comments accurately describe the current code behaviour"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-021
+    title: "Make loadSensitiveFieldsFromKeyring void; remove dead error path"
+    description: |
+      loadSensitiveFieldsFromKeyring(warnW io.Writer) unconditionally returns nil. Its doc
+      comment claims 'Non-ErrNotFound errors are returned as-is' but this is false: since
+      task-018, loadCredFromKeyring warns to warnW on non-ErrNotFound errors and returns
+      migrated (not an error), so the error never propagates. The error return type, the
+      error check in SetStorageMode, and the panic branch in NewConfig are all unreachable.
+
+      Fix:
+        - Change the function signature to loadSensitiveFieldsFromKeyring(warnW io.Writer)
+          (no return value).
+        - In SetStorageMode, change the call to a plain statement with no if-err check.
+        - In NewConfig, remove the if-err block that panics on loadSensitiveFieldsFromKeyring
+          failure (or if NewConfig no longer calls it directly, remove any equivalent dead
+          panic branch from the remaining call site).
+        - Remove the contradicting doc comment line "Non-ErrNotFound errors are returned as-is."
+      Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-020
+    acceptance_criteria:
+      - "loadSensitiveFieldsFromKeyring has no return value"
+      - "SetStorageMode calls loadSensitiveFieldsFromKeyring as a statement with no if-err check"
+      - "No panic branch for loadSensitiveFieldsFromKeyring remains in any call site"
+      - "The doc comment no longer claims non-ErrNotFound errors are returned"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-022
+    title: "Remove stale caller-contract sentences from MigrateToKeyring and MigrateToInsecure"
+    description: |
+      credentials.go contains two doc sentences (around lines 261-262 and 330) ending with
+      'The caller is responsible for persisting the "credential-storage" config key.' Task-015
+      was supposed to eliminate this kind of language, but these sentences survived. The actual
+      caller contract (that set.go must call cfg.Global.Set) is clearly visible in set.go; the
+      doc comment adds no insight and implies a hidden obligation not expressed in the type
+      system. Remove both sentences. Tighten surrounding doc if it becomes orphaned.
+      Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-021
+    acceptance_criteria:
+      - "Neither MigrateToKeyring nor MigrateToInsecure doc comments contain 'caller is responsible for persisting'"
+      - "No equivalent caller-obligation language remains in their doc comments"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-023
+    title: "Simplify dead error check after c.save() in MigrateToKeyring"
+    description: |
+      In MigrateToKeyring, after zeroing all sensitive fields, the function calls c.save() and
+      checks its error return. At this point all fields are zeroed, so save() dispatches to
+      either saveToJSON() (which panics on error, never returns one) or saveWithKeyring() (whose
+      loop skips all empty fields and returns nil unconditionally). The error check is dead in
+      both paths.
+
+      Two acceptable remedies:
+        a. Simplify to a bare c.save() call with a comment explaining why no error is possible,
+           plus a //nolint:errcheck if the linter requires it.
+        b. If save() can be replaced with saveToJSON() directly (since mode is still insecure
+           during migration), prefer the more direct call.
+      Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - "The dead if-err block after c.save() in MigrateToKeyring is removed or replaced with a documented intent"
+      - "make test, make fmt-check, make lint all pass"
+
+  - id: task-024
+    title: "Thread warnW through getToken in token.go; remove direct os.Stderr write"
+    description: |
+      neo4j-cli/aura/internal/api/token.go writes a keyring-failure warning directly to
+      os.Stderr. All other keyring-failure warnings in this feature thread an io.Writer (warnW)
+      explicitly. This direct write is inconsistent.
+
+      Fix: add an io.Writer parameter to getToken (and its call sites) and pass the writer
+      through so the warning goes to warnW instead of os.Stderr. Call sites in the command
+      layer already have access to cmd.ErrOrStderr(). If the signature change propagates to
+      an exported function in the api package, add the io.Writer at the end of the parameter
+      list to minimise diff. Run make test, make fmt-check, make lint as final gates.
+    status: pending
+    source: review
+    dependencies:
+      - task-023
+    acceptance_criteria:
+      - "getToken accepts an io.Writer parameter and writes the keyring-failure warning to it"
+      - "No direct os.Stderr write remains in token.go for the keyring-failure warning"
+      - "All call sites pass cmd.ErrOrStderr() or equivalent"
+      - "make test, make fmt-check, make lint all pass"
