@@ -23,3 +23,8 @@ Regenerated neo4j-cli skill bundle.
 - ran go generate ./neo4j-cli/internal/skill/...
 - bundle diff: only neo4j-cli/internal/skill/bundle/references/docker.md changed — two --await example blocks removed; "docker stop staging --wait --rw" added (from task-002 source edit).
 Gates: make fmt-check OK; make lint OK; make test OK (TestGenerator_RoundTrip now green); make generate-check noise limited to the hone in_progress YAML flip + the bundle work product (expected per AGENTS.md).
+
+## 2026-05-28 task-005
+Added Minor changelog entry for --await alias removal.
+- changie new --projects neo4j-cli --kind Minor --body "Removed deprecated --await alias; --wait is now the only spelling (CLI-111)." → .changes/unreleased/neo4j-cli-Minor-20260528-104616.yaml.
+Gates: make fmt-check OK; make lint OK; make test OK; make generate-check noise limited to hone in_progress YAML flip (no Go/bundle drift, expected).

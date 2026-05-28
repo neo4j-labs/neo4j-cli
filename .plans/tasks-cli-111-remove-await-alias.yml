@@ -83,12 +83,12 @@ tasks:
       If changie is not installed locally, hand-author the YAML at
       `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` with fields
       `project: neo4j-cli / kind: Minor / body: '<as above>' / time: <RFC3339>`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A new .changes/unreleased/neo4j-cli-Minor-*.yaml file exists with project=neo4j-cli, kind=Minor"
       - "Body mentions removal of --await and references CLI-111"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-006
     title: "Final gates + manual CLI smoke verification"
