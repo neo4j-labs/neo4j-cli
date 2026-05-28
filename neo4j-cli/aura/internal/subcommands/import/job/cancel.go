@@ -64,7 +64,7 @@ neo4j-cli aura import job cancel 00000000-0000-0000-0000-000000000000 --rw --org
 		},
 	}
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
 
 	return cmd
 }

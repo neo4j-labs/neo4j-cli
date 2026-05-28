@@ -83,7 +83,7 @@ neo4j-cli aura deployment token delete --deployment-id 00000000-0000-0000-0000-0
 	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "(required) Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "(required) Project ID")
 	cmd.Flags().StringVar(&deploymentId, deploymentIdFlag, "", "(required) Deployment ID")
 
 	err := cmd.MarkFlagRequired(deploymentIdFlag)

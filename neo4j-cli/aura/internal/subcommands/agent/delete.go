@@ -78,7 +78,7 @@ neo4j-cli aura agent delete 00000000-0000-0000-0000-000000000000 --rw --yes --fo
 	confirm.Register(cmd)
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project ID")
 
 	return cmd
 }

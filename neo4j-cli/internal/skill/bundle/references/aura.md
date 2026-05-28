@@ -83,7 +83,7 @@ Flags:
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | Optional system prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -116,7 +116,7 @@ Flags:
 |------|------|---------|-------------|
 | `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 | `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
@@ -145,7 +145,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 
 Examples:
 
@@ -174,7 +174,7 @@ Flags:
 |------|------|---------|-------------|
 | `--input` | string | - | (required) Input message to send to the agent |
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 
 Examples:
 
@@ -202,7 +202,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 
 Examples:
 
@@ -236,7 +236,7 @@ Flags:
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | (required) Agent name |
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | (required) Tools configuration as a JSON array |
 
@@ -272,7 +272,7 @@ Flags:
 | `--is-private` | bool | false | Whether the agent is private |
 | `--name` | string | - | Agent name |
 | `--organization-id` | string | - | Organization ID |
-| `--project-id` | string | - | Project/tenant ID |
+| `--project-id` | string | - | Project ID |
 | `--system-prompt` | string | - | System prompt for the agent |
 | `--tools` | string | - | Tools configuration as a JSON array |
 

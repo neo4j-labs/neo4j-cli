@@ -81,7 +81,7 @@ neo4j-cli aura deployment server database list --deployment-id 00000000-0000-000
 		},
 	}
 	cmd.Flags().StringVarP(&organizationId, organizationIdFlag, "o", "", "(required) Organization ID")
-	cmd.Flags().StringVarP(&projectId, projectIdFlag, "p", "", "(required) Project/tenant ID")
+	cmd.Flags().StringVarP(&projectId, projectIdFlag, "p", "", "(required) Project ID")
 	cmd.Flags().StringVarP(&deploymentId, deploymentIdFlag, "d", "", "(required) Deployment ID")
 	cmd.Flags().StringVarP(&serverId, serverIdFlag, "s", "", "(required) Server ID")
 

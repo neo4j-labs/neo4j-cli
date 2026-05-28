@@ -104,7 +104,7 @@ neo4j-cli aura agent replace 00000000-0000-0000-0000-000000000000 --name my-agen
 	}
 
 	cmd.Flags().StringVar(&organizationId, organizationIdFlag, "", "Organization ID")
-	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project/tenant ID")
+	cmd.Flags().StringVar(&projectId, projectIdFlag, "", "Project ID")
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Agent name")
 	cmd.Flags().StringVar(&description, descriptionFlag, "", "(required) Agent description")
 	cmd.Flags().StringVar(&dbid, dbidFlag, "", "(required) Aura database instance ID the agent connects to")
