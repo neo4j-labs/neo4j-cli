@@ -1,0 +1,163 @@
+feature: cli-126-remove-deprecated-aura
+prd: ./prd-cli-126-remove-deprecated-aura.md
+created_at: 2026-05-28T11:00:00Z
+updated_at: 2026-05-28T11:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Remove `aura tenant` command tree and unregister from aura.go"
+    description: |
+      Delete the entire `neo4j-cli/aura/internal/subcommands/tenant/` directory
+      (parent `tenant.go`, leaves `get.go`/`list.go`, and the colocated
+      `get_test.go`/`list_test.go`). In `neo4j-cli/aura/aura.go` drop the
+      `tenant` import and the `cmd.AddCommand(tenant.NewCmd(cfg))` call.
+      After this task, `bin/neo4j-cli aura tenant list` must exit with cobra's
+      "unknown command" error (exit code 2) — no deprecation warning is printed.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`neo4j-cli/aura/internal/subcommands/tenant/` directory no longer exists on disk."
+      - "`git grep -n 'tenant.NewCmd'` returns no matches in the working tree."
+      - "`neo4j-cli/aura/aura.go` no longer imports `.../subcommands/tenant`."
+      - "`go build ./...` succeeds with no unused-import errors."
+      - "`make test` passes (focused or full)."
+    completed_at: null
+
+  - id: task-002
+    title: "Remove `--tenant-id` flag from orgproject.go and resolve.go"
+    description: |
+      In `neo4j-cli/aura/internal/flags/orgproject.go`, delete the
+      `TenantIDFlag` const, the `RegisterOrgProjectFlags` body lines that
+      register the flag and call `MarkDeprecated` (including the `panic(err)`),
+      and update the function doc comment to drop the "plus the deprecated
+      --tenant-id alias" sentence. In
+      `neo4j-cli/aura/internal/subcommands/utils/resolve.go`, remove the
+      `else if tenantVal, _ := cmd.Flags().GetString(flags.TenantIDFlag); ...`
+      fallback in `resolveIDs` and renumber the doc comment on
+      `ResolveAndValidateOrgProject` (drop the "(2) deprecated --tenant-id flag"
+      step). Also delete the now-broken tests:
+      `TestRegisterOrgProjectFlags_DeprecatedTenantID` and
+      `TestRegisterOrgProjectFlags_HidesTenantIDFromHelp` in
+      `orgproject_test.go`, and
+      `TestResolveAndValidateOrgProject_ProjectFromDeprecatedTenantIDFlag` in
+      `resolve_test.go`. Keep
+      `TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet` —
+      it tests the `default-tenant` config key, not the deprecated flag.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`git grep -n 'TenantIDFlag'` returns no matches."
+      - "`git grep -n '\"tenant-id\"'` returns no matches in `.go` source files."
+      - "`TestRegisterOrgProjectFlags_OrgID` and `_ProjectID` still pass; the deprecated-flag tests are removed."
+      - "`TestResolveAndValidateOrgProject_MigrationErrorWhenDefaultTenantSet` still passes."
+      - "`bin/neo4j-cli aura instance list --tenant-id foo` exits with code 2 and stderr contains `unknown flag: --tenant-id`."
+      - "`make test` passes."
+    completed_at: null
+
+  - id: task-003
+    title: "Add regression test locking the removal"
+    description: |
+      Add a regression assertion that catches accidental re-introduction of
+      either deprecated surface. In `orgproject_test.go`, add a small test
+      that constructs a cobra command, calls `RegisterOrgProjectFlags`, and
+      asserts `cmd.PersistentFlags().Lookup("tenant-id")` returns `nil`
+      (flag not registered). Additionally, add a parse-time test (either in
+      the same file via a separate test, or in a new `aura_test.go` under
+      `neo4j-cli/aura/`) that builds the Aura command tree via
+      `aura.NewStandaloneCmd(cfg)`, sets args to `["tenant", "list"]`, runs
+      `Execute()`, and asserts the returned error contains `unknown command`.
+      Use existing testutils for command-tree construction if a helper
+      already exists; otherwise wire the minimal `clicfg.Config` inline.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "A new test asserts `cmd.PersistentFlags().Lookup(\"tenant-id\") == nil` after `RegisterOrgProjectFlags`."
+      - "A new test exercises the full Aura command tree and asserts cobra reports `unknown command` for `aura tenant list`."
+      - "Both new tests pass under `go test ./neo4j-cli/aura/...`."
+      - "Tests use string literal `\"tenant-id\"` (not the removed `flags.TenantIDFlag` const) so they keep working after the removal."
+    completed_at: null
+
+  - id: task-004
+    title: "Update CONTRIBUTING.md no-arguments-between-commands example"
+    description: |
+      Update the "No arguments between commands" example in `CONTRIBUTING.md`
+      (currently around lines 167–168) so it no longer uses the deprecated
+      `aura tenant` / `--tenant-id` surface. Replace with the same rule
+      illustrated using `project` / `--project-id`:
+      ❌ `neo4j-cli aura project <project-id> instance get <id>`
+      ✅ `neo4j-cli aura instance get <id> --project-id <project-id>`
+      The rule wording above the example must remain identical.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`CONTRIBUTING.md` no longer contains the literal strings `aura tenant` or `--tenant-id` in the no-arguments-between-commands example."
+      - "The replacement example uses `aura project <project-id>` (❌) and `aura instance get <id> --project-id <project-id>` (✅)."
+      - "The surrounding `- No arguments between commands` bullet wording is unchanged."
+    completed_at: null
+
+  - id: task-005
+    title: "Regenerate skill bundle after command-tree and flag removal"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...`
+      and commit the resulting diff. Verify that
+      `neo4j-cli/internal/skill/bundle/references/aura.md` and `SKILL.md`
+      lose any `tenant get`, `tenant list`, or `--tenant-id` references. No
+      new bundle files should appear — only stale text should be pruned.
+      `make generate-check` must pass on the resulting tree.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/... ./neo4j-cli/aura/internal/skill/...` produces a bundle diff, all committed."
+      - "`grep -E 'tenant (get|list)|--tenant-id' neo4j-cli/internal/skill/bundle/references/aura.md neo4j-cli/internal/skill/bundle/SKILL.md` returns no matches."
+      - "`make generate-check` passes (no further `go generate` drift)."
+      - "`TestGenerator_RoundTrip` passes."
+    completed_at: null
+
+  - id: task-006
+    title: "Add changelog entry for the removal"
+    description: |
+      Add a Minor-kind changelog entry under `.changes/unreleased/` via:
+      `changie new --projects neo4j-cli --kind Minor --body "Remove deprecated 'aura tenant list/get' commands and '--tenant-id' flag (deprecated in v1.4.0). Use 'aura project list', 'aura organization get', and '--project-id' instead."`
+      If `changie` is unavailable locally, hand-author the YAML at
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml` with
+      `project: neo4j-cli`, `kind: Minor`, `body: '...'`, and an RFC3339
+      `time:`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A new `neo4j-cli-Minor-*.yaml` file exists under `.changes/unreleased/`."
+      - "The body names both removals and points at `aura project list`, `aura organization get`, and `--project-id`."
+      - "`project: neo4j-cli` and `kind: Minor` fields are present."
+      - "`make test` and `make lint` pass with the new file in place."
+    completed_at: null
+
+  - id: task-007
+    title: "Run final gates and confirm acceptance criteria"
+    description: |
+      Run `make test`, `make fmt-check`, `make lint`, `make license-check`,
+      and `make generate-check` on the integrated branch. Build the binary
+      via `make build` and execute the four manual smoke checks from the
+      PRD: `aura tenant list` (expect exit 2, "unknown command"),
+      `aura instance list --tenant-id foo` (expect exit 2, "unknown flag"),
+      `aura instance list --help` (no `--tenant-id` in output), and
+      `aura --help` (no `tenant` subcommand). Any failure aborts the task
+      until fixed.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass on a clean tree."
+      - "`bin/neo4j-cli aura tenant list` exits with code 2 and stderr contains `unknown command`."
+      - "`bin/neo4j-cli aura instance list --tenant-id foo` exits with code 2 and stderr contains `unknown flag: --tenant-id`."
+      - "`bin/neo4j-cli aura instance list --help` output contains neither `--tenant-id` nor any tenant-related text."
+      - "`bin/neo4j-cli aura --help` output does not list `tenant` as a subcommand."
+    completed_at: null
