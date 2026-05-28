@@ -1,0 +1,99 @@
+## TASK-001 — 2026-05-28T00:00:00Z
+Promoted golang.org/x/oauth2 to a direct dep ahead of the vertex provider. Added a small placeholder file in neo4j-cli/query/embed/ that imports oauth2/google so `go mod tidy` keeps the require direct; helpers will be wired in by task-006.
+Files: ~go.mod, ~go.sum, +neo4j-cli/query/embed/vertex_deps.go
+Decisions: go mod tidy strips truly-unused modules, so a tiny `//nolint:unused`-tagged stub (vertexScope + findDefaultTokenSource) keeps oauth2 direct until task-006 lands; transitive footprint stayed at oauth2 + cloud.google.com/go/compute/metadata as predicted.
+
+## TASK-002 — 2026-05-28T00:00:00Z
+Added VertexProject/VertexLocation omitempty fields to EmbedCredential; extended EmbedCredentials.Add with two trailing string params; updated the sole production call site (credential/embed/add.go pass-through with empty strings) and all test call sites. PrintableEmbedCredentials.AsArray now adds vertex-* keys only when non-empty.
+Files: ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/embed_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go
+
+## TASK-003 — 2026-05-28T00:00:00Z
+Added ProviderGemini/ProviderVertex + envGeminiKey/envGoogleKey constants, VertexProject/VertexLocation Config fields, Resolve copy from stored cred, and extended New default-case "must be one of" message. New providers still fall through to the default until tasks 005/006 land.
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+Decisions: envGoogleKey is unused this commit (wired in task-004); kept it co-located with envGeminiKey for grep-locality.
+
+## TASK-004 — 2026-05-28T00:00:00Z
+Extended resolveAPIKey with a ProviderGemini case (GOOGLE_API_KEY then GEMINI_API_KEY within each stage, so gemini-specific wins). Added both new vars to osEnvSnapshot and clearEmbedEnv. Added 7 table-driven cases covering stored-only, no-env, OS env precedence ladder, `.env` vs OS env, and dotenv-only ordering. Vertex deliberately omitted (ADC, not API key).
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+
+## TASK-005 — 2026-05-28T00:00:00Z
+Added geminiProvider with x-goog-api-key auth, {base}/models/{model}:embedContent URL, taskType RETRIEVAL_QUERY, optional outputDimensionality, L2-normalization when Dimensions > 0 && != 3072 (zero-vec passthrough), and 4KiB body snippet on non-2xx. Wired `case ProviderGemini` into New. Test suite covers happy path, dims-omitted, dims-native (no normalize), dims-other (normalize math), zero-vector, missing key, non-2xx (no key leak), empty values, malformed JSON, blocked-URL SSRF, default base URL, and New factory.
+Files: +neo4j-cli/query/embed/gemini.go, +neo4j-cli/query/embed/gemini_test.go, ~neo4j-cli/query/embed/embed.go
+Decisions: Inlined a small l2Normalize helper (unexported) in gemini.go rather than a shared math package — it's the only call site and the function is six lines. Native-dim guard set to 3072 to match REQ-F-027.
+
+## TASK-006 — 2026-05-28T00:00:00Z
+Added vertexProvider with ADC OAuth2 auth (lazy via sync.Once), location-derived URL ignoring cfg.BaseURL, task_type snake_case body, omitempty parameters when Dimensions==0, no L2-normalization, 4KiB body snippet on non-2xx. Wired `case ProviderVertex` into New. Two package-level test seams: findDefaultTokenSource (oauth2.TokenSource stub) and vertexURLHostPrefix (httptest redirect). Test suite covers missing project/location, missing ADC, happy path, dimensions overlay, non-2xx (no token leak), empty predictions, malformed JSON, default URL, BaseURL-ignored, New factory. Folded vertexScope + findDefaultTokenSource from the task-001 placeholder into vertex.go and deleted vertex_deps.go.
+Files: +neo4j-cli/query/embed/vertex.go, +neo4j-cli/query/embed/vertex_test.go, ~neo4j-cli/query/embed/embed.go, -neo4j-cli/query/embed/vertex_deps.go
+
+## TASK-007 — 2026-05-28T00:00:00Z
+Extended `credential embed add` with gemini + vertex in validProviders, two new flags (`--vertex-project`, `--vertex-location`), cross-flag validation (vertex requires both; non-vertex rejects strays), updated Long/Example, passes new args into EmbedCredentials.Add. Added 5 new table-driven test cases. Skill bundle is now drifted (expected; task-008 regenerates).
+Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
+
+## TASK-008 — 2026-05-28T00:00:00Z
+Regenerated skill bundle via `go generate ./neo4j-cli/internal/skill/...`; only `references/credential.md` drifted (new providers in `--provider` list, two new `--vertex-*` flag rows, gemini + vertex Example invocations). All gates green.
+Files: ~neo4j-cli/internal/skill/bundle/references/credential.md
+
+## TASK-009 — 2026-05-28T14:28:21Z
+Added Minor changie entry for the new Gemini + Vertex AI embedding providers via `changie new`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260528-142821.yaml
+
+## REVIEW — 2026-05-28T15:00:00Z
+Added 2 review tasks (task-010..task-011).
+
+## TASK-010 — 2026-05-28T12:42:14Z
+Fixed gemini/vertex examples in credential embed add to use `gemini-embedding-001 --dimensions 3072` (matches DI graph default; PRD acceptance model). Regenerated skill bundle.
+Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/skill/bundle/references/credential.md
+
+## TASK-011 — 2026-05-28T12:49:52Z
+Extracted doJSONRequest helper centralising urlcheck + marshal + request build + headers + dispatch + status check + 4KiB snippet + body read for all 5 embed providers. Each Embed now only handles auth check, URL build, request struct, and decode/post-process. Net -152 lines across 5 providers.
+Files: +neo4j-cli/query/embed/httpjson.go, ~neo4j-cli/query/embed/openai.go, ~neo4j-cli/query/embed/ollama.go, ~neo4j-cli/query/embed/huggingface.go, ~neo4j-cli/query/embed/gemini.go, ~neo4j-cli/query/embed/vertex.go
+Decisions: Helper returns raw response bytes (not a decode target) so huggingface's dual-shape decode stays in-file and the helper carries no per-provider knowledge. URL-rejection error text drifts from "base url rejected" to "url rejected" for 4 of 5 providers (no test depends on "base"); 4KiB-on-non-2xx wording stays byte-identical.
+
+## REVIEW — 2026-05-28T15:30:00Z
+Added 3 review tasks (task-012..task-014) from golang-security audit: H1 SSRF/token exfil via VertexLocation, M1 unbounded happy-path body, M2 sensitive-param URL leak in errors.
+
+## TASK-012 — 2026-05-28T13:06:41Z
+Closed H1 SSRF/token-exfil. Added strict GCP region + project-ID regex validators in vertex.go (ValidateVertexLocation / ValidateVertexProject) used by both vertex.Embed (before URL build) and credential embed add (before storing) — single source of truth. Tests assert no HTTP dispatch occurs when validation rejects (handler t.Fatal); cover all four attack strings and five real regions plus equivalent project-ID coverage.
+Files: ~neo4j-cli/query/embed/vertex.go, ~neo4j-cli/query/embed/vertex_test.go, ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/internal/subcommands/credential/embed/add_test.go
+Decisions: Exported validators live in the runtime embed package (vertex.go), imported by credential/embed/add.go as `embedrt` to avoid the package-name collision. Two existing vertex tests using project="p" updated to "my-project" so they pass the new validator without losing coverage.
+
+## TASK-013 — 2026-05-28T13:25:00Z
+Closed M1 unbounded happy-path body. Wrapped `io.ReadAll(resp.Body)` in doJSONRequest with `io.LimitReader(resp.Body, maxResponseBodyBytes)` (10 MiB const). Hardens all 5 providers at once. Added httpjson_test.go with oversize-server and under-cap cases.
+Files: ~neo4j-cli/query/embed/httpjson.go, +neo4j-cli/query/embed/httpjson_test.go
+
+## TASK-014 — 2026-05-28T13:45:00Z
+Closed M2 sensitive-param URL leak. Added redactSensitiveURLParams + sensitiveQueryParamRE (case-insensitive `key|api_key|access_token|token` matcher) in httpjson.go; applied at both `request failed:` and `build request:` wrap sites. Tests cover all four param names + case variants, multi-param URLs, fragment+special-char values, nil passthrough, live network-error redaction via httptest, and chain-flatten invariant.
+Files: ~neo4j-cli/query/embed/httpjson.go, ~neo4j-cli/query/embed/httpjson_test.go
+Decisions: Redaction flattens the error chain (errors.New on the redacted string) so the regex applies to the final Error() output regardless of how net/http formatted the URL — robustness over chain-unwrap. The build-request wrap-site live-path is effectively unreachable when urlcheck.ValidateRemoteURL already passes; covered via a shape-based unit test rather than coupling to net/http internals.
+
+## REVIEW — 2026-05-28T16:00:00Z
+Added 1 review task (task-015): collapse redundant empty checks in vertexProvider.Embed since validators reject empty strings.
+
+## TASK-015 — 2026-05-28T16:15:00Z
+Folded empty-string handling into ValidateVertexLocation / ValidateVertexProject (missing-style usage error before pattern check); deleted the four `if p.cfg.Vertex... == ""` blocks at the top of vertexProvider.Embed. Existing missing-X tests pass unmodified — new validator messages keep the same key substrings (`vertex project` / `vertex location` / `--vertex-X` / `credential embed add`).
+Files: ~neo4j-cli/query/embed/vertex.go
+
+## REVIEW — 2026-05-28T16:30:00Z
+Added 1 review task (task-016): update stale provider lists in parent help text, --embed-provider flag, README, .agents/query.md.
+
+## TASK-016 — 2026-05-28T16:45:00Z
+Updated 5 stale provider lists to include gemini+vertex: credential/embed parent Long, query --embed-provider flag usage, README.md providers line + provider-defaults paragraph (added Gemini base URL + Vertex location-derived URL/ADC note), and .agents/query.md error-message quote. Regenerated skill bundle (references/credential.md, references/query.md drifted as expected).
+Files: ~neo4j-cli/internal/subcommands/credential/embed/embed.go, ~neo4j-cli/query/query.go, ~README.md, ~.agents/query.md, ~neo4j-cli/internal/skill/bundle/references/credential.md, ~neo4j-cli/internal/skill/bundle/references/query.md
+
+## REVIEW — 2026-05-28T17:00:00Z
+Added 2 review tasks (task-017..task-018): document gemini env chain + vertex ADC in README API-key section and SKILL.md embed-config tip.
+
+## TASK-017 — 2026-05-28T17:15:00Z
+Extended README API-key table row with GEMINI_API_KEY + GOOGLE_API_KEY; rewrote precedence prose to spell out gemini's per-provider env chain and added a dedicated Vertex sentence noting ADC auth (gcloud / GOOGLE_APPLICATION_CREDENTIALS) sits outside the API-key precedence.
+Files: ~README.md
+
+## TASK-018 — 2026-05-28T17:30:00Z
+Rewrote the embed-config tip in additions.md to cover the gemini env chain (GEMINI_API_KEY then GOOGLE_API_KEY) and a dedicated vertex sentence noting ADC auth, no `--api-key`, and stored-cred-only `--vertex-project` / `--vertex-location`. Regenerated bundle.
+Files: ~neo4j-cli/internal/skill/additions.md, ~neo4j-cli/internal/skill/bundle/SKILL.md
+
+## REVIEW — 2026-05-28T18:00:00Z
+Added 1 review task (task-019): url.PathEscape Model in gemini and vertex URL construction (claude[bot] inline review on PR #186).
+
+## TASK-019 — 2026-05-28T18:30:00Z
+Wrapped p.cfg.Model in url.PathEscape at both gemini and vertex URL build sites; renamed local `url` var to `reqURL` to avoid shadowing the net/url package. Added two table-driven cases per provider covering `../admin` and `m?key=x` model values, asserting EscapedPath stays under `/models/` and RawQuery stays empty.
+Files: ~neo4j-cli/query/embed/gemini.go, ~neo4j-cli/query/embed/vertex.go, ~neo4j-cli/query/embed/gemini_test.go, ~neo4j-cli/query/embed/vertex_test.go

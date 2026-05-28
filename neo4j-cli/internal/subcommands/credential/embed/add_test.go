@@ -83,6 +83,81 @@ func TestEmbedCredentialAdd(t *testing.T) {
 			wantCredentials: `[{"name":"hf","provider":"huggingface","model":"intfloat/e5-mistral-7b-instruct","base-url":"","dimensions":0,"api-key":"hf_secret"}]`,
 			wantDefaultCred: "hf",
 		},
+		{
+			name:            "gemini provider is accepted",
+			initialCreds:    []map[string]interface{}{},
+			command:         "add --name gemini-default --provider gemini --model text-embedding-004 --api-key AIza-secret",
+			wantCredentials: `[{"name":"gemini-default","provider":"gemini","model":"text-embedding-004","base-url":"","dimensions":0,"api-key":"AIza-secret"}]`,
+			wantDefaultCred: "gemini-default",
+		},
+		{
+			name:            "vertex provider with project and location is accepted",
+			initialCreds:    []map[string]interface{}{},
+			command:         "add --name vertex-default --provider vertex --model text-embedding-004 --vertex-project my-gcp-project --vertex-location us-central1",
+			wantCredentials: `[{"name":"vertex-default","provider":"vertex","model":"text-embedding-004","base-url":"","dimensions":0,"api-key":"","vertex-project":"my-gcp-project","vertex-location":"us-central1"}]`,
+			wantDefaultCred: "vertex-default",
+		},
+		{
+			name:         "vertex without --vertex-project returns usage error",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model text-embedding-004 --vertex-location us-central1",
+			wantErr:      "--provider=vertex requires both --vertex-project and --vertex-location",
+		},
+		{
+			name:         "vertex without --vertex-location returns usage error",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model text-embedding-004 --vertex-project my-gcp-project",
+			wantErr:      "--provider=vertex requires both --vertex-project and --vertex-location",
+		},
+		{
+			name:         "openai with stray --vertex-project is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name x --provider openai --model text-embedding-3-small --api-key sk-... --vertex-project my-gcp-project",
+			wantErr:      "--vertex-* flags only apply when --provider=vertex",
+		},
+		{
+			name:         "vertex with malformed --vertex-location (fragment bypass) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project my-gcp-project --vertex-location evil.com#",
+			wantErr:      `invalid --vertex-location "evil.com#"`,
+		},
+		{
+			name:         "vertex with malformed --vertex-location (port bypass) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project my-gcp-project --vertex-location evil.com:8080/x",
+			wantErr:      `invalid --vertex-location "evil.com:8080/x"`,
+		},
+		{
+			name:         "vertex with malformed --vertex-location (userinfo) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project my-gcp-project --vertex-location @attacker.com",
+			wantErr:      `invalid --vertex-location "@attacker.com"`,
+		},
+		{
+			name:         "vertex with malformed --vertex-location (dotted hostname) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project my-gcp-project --vertex-location x.attacker.com",
+			wantErr:      `invalid --vertex-location "x.attacker.com"`,
+		},
+		{
+			name:         "vertex with malformed --vertex-project (too short) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project abc --vertex-location us-central1",
+			wantErr:      `invalid --vertex-project "abc"`,
+		},
+		{
+			name:         "vertex with malformed --vertex-project (uppercase) is rejected before storing",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name vertex-x --provider vertex --model gemini-embedding-001 --vertex-project MyProject1 --vertex-location us-central1",
+			wantErr:      `invalid --vertex-project "MyProject1"`,
+		},
+		{
+			name:            "vertex accepts europe-west1 region",
+			initialCreds:    []map[string]interface{}{},
+			command:         "add --name vertex-eu --provider vertex --model gemini-embedding-001 --vertex-project my-gcp-project --vertex-location europe-west1",
+			wantCredentials: `[{"name":"vertex-eu","provider":"vertex","model":"gemini-embedding-001","base-url":"","dimensions":0,"api-key":"","vertex-project":"my-gcp-project","vertex-location":"europe-west1"}]`,
+			wantDefaultCred: "vertex-eu",
+		},
 	}
 
 	for _, tc := range tests {

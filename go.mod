@@ -23,12 +23,14 @@ require (
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/mod v0.27.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.44.0
 	golang.org/x/term v0.29.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect

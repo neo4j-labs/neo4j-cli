@@ -331,7 +331,7 @@ func TestSave_KeyringMode_SensitiveFieldsRoutedToKeyring(t *testing.T) {
 		{
 			name: "embed api-key",
 			addCred: func(creds *credentials.Credentials) error {
-				return creds.Embed.Add("openai", "openai", "text-embedding-ada-002", "", "sk-key123", 1536)
+				return creds.Embed.Add("openai", "openai", "text-embedding-ada-002", "", "sk-key123", 1536, "", "")
 			},
 			secretValue: "sk-key123",
 			keyringKey:  credentials.KeyringKey("embed", "openai", "api-key"),

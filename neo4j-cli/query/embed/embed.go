@@ -39,12 +39,14 @@ type Provider interface {
 // does NOT validate (so the standalone :embed leaf can produce a clean usage
 // error path); validation lives in New.
 type Config struct {
-	Provider   string
-	Model      string
-	BaseURL    string
-	APIKey     string
-	Dimensions int
-	UserAgent  string
+	Provider       string
+	Model          string
+	BaseURL        string
+	APIKey         string
+	Dimensions     int
+	UserAgent      string
+	VertexProject  string
+	VertexLocation string
 }
 
 // Provider name constants shared by the cobra flag-validator (see credential
@@ -53,6 +55,8 @@ const (
 	ProviderOpenAI      = "openai"
 	ProviderOllama      = "ollama"
 	ProviderHuggingFace = "huggingface"
+	ProviderGemini      = "gemini"
+	ProviderVertex      = "vertex"
 )
 
 // Environment variable names. Keep these grouped here so a single grep across
@@ -65,6 +69,8 @@ const (
 	envEmbedAPIKey     = "NEO4J_EMBED_API_KEY"
 	envOpenAIKey       = "OPENAI_API_KEY"
 	envHFToken         = "HF_TOKEN"
+	envGeminiKey       = "GEMINI_API_KEY"
+	envGoogleKey       = "GOOGLE_API_KEY"
 )
 
 // providerFactory is the test seam for producer-side substitution. Production
@@ -171,6 +177,8 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 		out.BaseURL = base.BaseURL
 		out.Dimensions = base.Dimensions
 		out.APIKey = base.APIKey
+		out.VertexProject = base.VertexProject
+		out.VertexLocation = base.VertexLocation
 	}
 
 	// 2. .env walk-up (overrides stored cred, loses to env / flags).
@@ -239,10 +247,12 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	return out, nil
 }
 
-// resolveAPIKey applies provider-specific API key resolution. Both OpenAI and
-// HuggingFace honour a provider-specific env, then the generic embed env;
-// Ollama is left untouched (no API key required). Returns the highest-
-// precedence non-empty value, falling back to storedKey.
+// resolveAPIKey applies provider-specific API key resolution. OpenAI,
+// HuggingFace, and Gemini honour a provider-specific env, then the generic
+// embed env; Ollama and Vertex are left untouched (Ollama needs no API key,
+// Vertex authenticates via ADC). For Gemini, GEMINI_API_KEY beats
+// GOOGLE_API_KEY beats NEO4J_EMBED_API_KEY beats stored within each stage.
+// Returns the highest-precedence non-empty value, falling back to storedKey.
 func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string {
 	out := storedKey
 
@@ -264,6 +274,15 @@ func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string 
 			if v := stage[envHFToken]; v != "" {
 				out = v
 			}
+		case ProviderGemini:
+			// GOOGLE_API_KEY first, then GEMINI_API_KEY so the
+			// gemini-specific var wins inside this stage.
+			if v := stage[envGoogleKey]; v != "" {
+				out = v
+			}
+			if v := stage[envGeminiKey]; v != "" {
+				out = v
+			}
 		}
 	}
 	return out
@@ -277,6 +296,8 @@ func osEnvSnapshot() map[string]string {
 		envEmbedAPIKey: os.Getenv(envEmbedAPIKey),
 		envOpenAIKey:   os.Getenv(envOpenAIKey),
 		envHFToken:     os.Getenv(envHFToken),
+		envGeminiKey:   os.Getenv(envGeminiKey),
+		envGoogleKey:   os.Getenv(envGoogleKey),
 	}
 }
 
@@ -350,10 +371,14 @@ func New(cfg Config) (Provider, error) {
 		return newOllamaProvider(cfg), nil
 	case ProviderHuggingFace:
 		return newHuggingFaceProvider(cfg), nil
+	case ProviderGemini:
+		return newGeminiProvider(cfg), nil
+	case ProviderVertex:
+		return newVertexProvider(cfg), nil
 	default:
 		return nil, clierr.NewUsageError(
-			"invalid embed provider %q: must be one of %s, %s, %s",
-			cfg.Provider, ProviderOpenAI, ProviderOllama, ProviderHuggingFace)
+			"invalid embed provider %q: must be one of %s, %s, %s, %s, %s",
+			cfg.Provider, ProviderOpenAI, ProviderOllama, ProviderHuggingFace, ProviderGemini, ProviderVertex)
 	}
 }
 

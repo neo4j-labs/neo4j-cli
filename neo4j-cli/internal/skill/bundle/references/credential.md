@@ -273,7 +273,7 @@ neo4j-cli credential dbms use prod --rw
 
 Manage and view embed credential values
 
-Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). `query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. Supported providers: openai, ollama, huggingface.
+Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). `query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. Supported providers: openai, ollama, huggingface, gemini, vertex.
 
 Usage: `neo4j-cli credential embed`
 
@@ -281,7 +281,7 @@ Usage: `neo4j-cli credential embed`
 
 Adds an embed credential
 
-Add an embedding-provider credential. Provider must be one of openai, ollama, huggingface. `--api-key` is optional for ollama (no auth required) and may be omitted for openai/huggingface if you intend to provide it via env var (`OPENAI_API_KEY` / `HF_TOKEN` / `NEO4J_EMBED_API_KEY`). The first credential added becomes the default; switch later with `credential embed use <name>`.
+Add an embedding-provider credential. Provider must be one of openai, ollama, huggingface, gemini, vertex. `--api-key` is optional for ollama (no auth required) and may be omitted for openai/huggingface/gemini if you intend to provide it via env var (`OPENAI_API_KEY` / `HF_TOKEN` / `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `NEO4J_EMBED_API_KEY`). Vertex uses Application Default Credentials (no `--api-key`) and requires `--vertex-project` and `--vertex-location`. The first credential added becomes the default; switch later with `credential embed use <name>`.
 
 Usage: `neo4j-cli credential embed add [flags]`
 
@@ -294,7 +294,9 @@ Flags:
 | `--dimensions` | int | 0 | Embedding dimensions (provider-specific; 0 means provider default) |
 | `--model` | string | - | (required) Model |
 | `--name` | string | - | (required) Name |
-| `--provider` | string | - | (required) Provider (one of: openai, ollama, huggingface) |
+| `--provider` | string | - | (required) Provider (one of: openai, ollama, huggingface, gemini, vertex) |
+| `--vertex-location` | string | - | GCP region for Vertex AI (required when --provider=vertex) |
+| `--vertex-project` | string | - | GCP project ID (required when --provider=vertex) |
 
 Examples:
 
@@ -307,6 +309,12 @@ neo4j-cli credential embed add --name ollama-nomic --provider ollama --model nom
 
 # Add a HuggingFace embed credential with explicit dimensions
 neo4j-cli credential embed add --name hf-bge --provider huggingface --model BAAI/bge-small-en-v1.5 --api-key hf_... --dimensions 384 --rw
+
+# Add a Gemini embed credential (api-key can also come from GEMINI_API_KEY)
+neo4j-cli credential embed add --name gemini-default --provider gemini --model gemini-embedding-001 --dimensions 3072 --api-key AIza... --rw
+
+# Add a Vertex AI embed credential (uses Application Default Credentials)
+neo4j-cli credential embed add --name vertex-default --provider vertex --model gemini-embedding-001 --dimensions 3072 --vertex-project my-gcp-project --vertex-location us-central1 --rw
 ```
 
 ### neo4j-cli credential embed list

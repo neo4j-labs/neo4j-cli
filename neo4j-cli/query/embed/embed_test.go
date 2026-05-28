@@ -59,6 +59,8 @@ func clearEmbedEnv(t *testing.T) {
 	t.Setenv(envEmbedAPIKey, "")
 	t.Setenv(envOpenAIKey, "")
 	t.Setenv(envHFToken, "")
+	t.Setenv(envGeminiKey, "")
+	t.Setenv(envGoogleKey, "")
 }
 
 // withDotenvCwd writes a .env file into the supplied filesystem at <tmp>/.env
@@ -297,6 +299,57 @@ func TestResolveAPIKey_OpenAIPrecedence(t *testing.T) {
 			osEnv:    map[string]string{envOpenAIKey: "env-openai", envEmbedAPIKey: "env-generic"},
 			want:     "env-generic",
 		},
+		{
+			name:     "gemini stored only",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			want:     "stored-gemini",
+		},
+		{
+			name:     "gemini no env, no stored",
+			provider: ProviderGemini,
+			want:     "",
+		},
+		{
+			name:     "gemini OS env GEMINI_API_KEY beats GOOGLE_API_KEY beats generic beats stored",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv: map[string]string{
+				envEmbedAPIKey: "env-generic",
+				envGoogleKey:   "env-google",
+				envGeminiKey:   "env-gemini",
+			},
+			want: "env-gemini",
+		},
+		{
+			name:     "gemini OS env GOOGLE_API_KEY wins when GEMINI_API_KEY unset",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envEmbedAPIKey: "env-generic", envGoogleKey: "env-google"},
+			want:     "env-google",
+		},
+		{
+			name:     "gemini OS env NEO4J_EMBED_API_KEY wins when no gemini-specific env",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envEmbedAPIKey: "env-generic"},
+			want:     "env-generic",
+		},
+		{
+			name:     "gemini OS env GEMINI_API_KEY beats every dotenv entry",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envGeminiKey: "env-gemini"},
+			dotenv:   map[string]string{envEmbedAPIKey: "dotenv-generic", envGoogleKey: "dotenv-google", envGeminiKey: "dotenv-gemini"},
+			want:     "env-gemini",
+		},
+		{
+			name:     "gemini dotenv GEMINI_API_KEY beats dotenv GOOGLE_API_KEY beats dotenv generic beats stored",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			dotenv:   map[string]string{envEmbedAPIKey: "dotenv-generic", envGoogleKey: "dotenv-google", envGeminiKey: "dotenv-gemini"},
+			want:     "dotenv-gemini",
+		},
 	}
 
 	for _, tc := range tests {
@@ -361,6 +414,27 @@ func TestNew_InvalidProvider(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid embed provider")
 	assert.Contains(t, err.Error(), "bogus")
+	assert.Contains(t, err.Error(), ProviderGemini)
+	assert.Contains(t, err.Error(), ProviderVertex)
+}
+
+func TestResolve_StoredCred_CopiesVertexFields(t *testing.T) {
+	clearEmbedEnv(t)
+	t.Chdir(t.TempDir())
+
+	creds := `{"embed":{"default-credential":"v","credentials":[` +
+		`{"name":"v","provider":"vertex","model":"text-embedding-005",` +
+		`"base-url":"","dimensions":0,"api-key":"",` +
+		`"vertex-project":"my-project","vertex-location":"us-central1"}` +
+		`]}}`
+	cfg := newTestCfg(t, creds)
+	cmd := newTestCmd(t)
+
+	got, err := Resolve(cmd, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "vertex", got.Provider)
+	assert.Equal(t, "my-project", got.VertexProject)
+	assert.Equal(t, "us-central1", got.VertexLocation)
 }
 
 func TestProviderFactorySeam(t *testing.T) {
