@@ -5,7 +5,6 @@ package credentials
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -368,46 +367,6 @@ func (c *Credentials) MigrateToInsecure() error {
 	return nil
 }
 
-// DeleteKeyringEntries removes all keyring entries associated with a credential
-// identified by credType ("aura", "dbms", or "embed") and name. It is called
-// by the credential remove commands after the credential has been removed from
-// the JSON file. Deletions are best-effort: ErrNotFound is silently ignored
-// (the entry may already be absent). Any other error is returned as a warning
-// but does not block the caller.
-//
-// Sensitive field mapping:
-//
-//	aura:  client-secret (required), access-token (optional)
-//	dbms:  password (required)
-//	embed: api-key (optional)
-func (c *Credentials) DeleteKeyringEntries(credType, name string) error {
-	deleteOne := func(field string) error {
-		err := defaultKeyring.Delete(ServiceName, KeyringKey(credType, name, field))
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return fmt.Errorf("keyring delete %s/%s/%s: %w", credType, name, field, err)
-		}
-		return nil
-	}
-
-	switch credType {
-	case "aura":
-		var errs []error
-		if err := deleteOne("client-secret"); err != nil {
-			errs = append(errs, err)
-		}
-		if err := deleteOne("access-token"); err != nil {
-			errs = append(errs, err)
-		}
-		return errors.Join(errs...)
-	case "dbms":
-		return deleteOne("password")
-	case "embed":
-		return deleteOne("api-key")
-	default:
-		return fmt.Errorf("unknown credential type %q", credType)
-	}
-}
-
 // RemoveAura removes an Aura credential by name and, in keyring mode, deletes
 // its keyring entries. Keyring cleanup failures are written as warnings to
 // warnW and do not fail the removal.
@@ -416,7 +375,7 @@ func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.DeleteKeyringEntries("aura", name); err != nil {
+		if err := c.Aura.deleteFromKeyring(defaultKeyring, name); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}
@@ -431,7 +390,7 @@ func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.DeleteKeyringEntries("dbms", name); err != nil {
+		if err := c.Dbms.deleteFromKeyring(defaultKeyring, name); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}
@@ -446,7 +405,7 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.DeleteKeyringEntries("embed", name); err != nil {
+		if err := c.Embed.deleteFromKeyring(defaultKeyring, name); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}

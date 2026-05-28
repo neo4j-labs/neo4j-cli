@@ -67,6 +67,13 @@ func (e *errGetProvider) Get(_, _ string) (string, error) { return "", errors.Ne
 func (e *errGetProvider) Set(_, _, _ string) error        { return nil }
 func (e *errGetProvider) Delete(_, _ string) error        { return nil }
 
+// errDeleteProvider always fails Delete with a non-ErrNotFound error.
+type errDeleteProvider struct{ inner *internalMock }
+
+func (e *errDeleteProvider) Get(s, u string) (string, error) { return e.inner.Get(s, u) }
+func (e *errDeleteProvider) Set(s, u, p string) error        { return e.inner.Set(s, u, p) }
+func (e *errDeleteProvider) Delete(_, _ string) error        { return errors.New("delete failed") }
+
 // --- AuraCredential tests ---
 
 func TestAuraCredential_ZeroSensitiveFields(t *testing.T) {
@@ -224,4 +231,67 @@ func TestAuraCredential_MigrateFromKeyring_GetError_ReturnsError(t *testing.T) {
 	err := c.migrateFromKeyring(&errGetProvider{}, &filled)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring get aura/prod/client-secret")
+}
+
+// --- AuraCredentials.deleteFromKeyring tests ---
+
+func TestAuraCredentials_DeleteFromKeyring_DeletesEntries(t *testing.T) {
+	mock := newInternalMock()
+	require.NoError(t, mock.Set(ServiceName, KeyringKey("aura", "prod", "client-secret"), "s3cr3t"))
+	require.NoError(t, mock.Set(ServiceName, KeyringKey("aura", "prod", "access-token"), "tok"))
+
+	c := &AuraCredentials{Credentials: []*AuraCredential{{Name: "prod"}}}
+	require.NoError(t, c.deleteFromKeyring(mock, "prod"))
+
+	_, err := mock.Get(ServiceName, KeyringKey("aura", "prod", "client-secret"))
+	assert.ErrorIs(t, err, ErrNotFound, "client-secret must be deleted")
+	_, err = mock.Get(ServiceName, KeyringKey("aura", "prod", "access-token"))
+	assert.ErrorIs(t, err, ErrNotFound, "access-token must be deleted")
+}
+
+func TestAuraCredentials_DeleteFromKeyring_ErrNotFound_Ignored(t *testing.T) {
+	mock := newInternalMock()
+	c := &AuraCredentials{}
+	require.NoError(t, c.deleteFromKeyring(mock, "prod"), "ErrNotFound must be silently ignored")
+}
+
+func TestAuraCredentials_DeleteFromKeyring_NonNotFoundError_Returned(t *testing.T) {
+	c := &AuraCredentials{}
+	err := c.deleteFromKeyring(&errDeleteProvider{inner: newInternalMock()}, "prod")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keyring delete aura/prod/client-secret")
+}
+
+func TestAuraCredentials_DeleteFromKeyring_PartialFailure_BothAttempted(t *testing.T) {
+	mock := newInternalMock()
+	require.NoError(t, mock.Set(ServiceName, KeyringKey("aura", "prod", "access-token"), "tok"))
+
+	// Only client-secret deletion fails; access-token deletion should still be attempted.
+	failClientSecret := &failOneDeleteProvider{
+		inner:   mock,
+		failKey: KeyringKey("aura", "prod", "client-secret"),
+	}
+
+	c := &AuraCredentials{}
+	err := c.deleteFromKeyring(failClientSecret, "prod")
+	require.Error(t, err, "client-secret failure must be reported")
+
+	// access-token must have been deleted despite the client-secret failure
+	_, getErr := mock.Get(ServiceName, KeyringKey("aura", "prod", "access-token"))
+	assert.ErrorIs(t, getErr, ErrNotFound, "access-token must be deleted even when client-secret deletion fails")
+}
+
+// failOneDeleteProvider wraps internalMock and fails Delete for a specific key.
+type failOneDeleteProvider struct {
+	inner   *internalMock
+	failKey string
+}
+
+func (f *failOneDeleteProvider) Get(s, u string) (string, error) { return f.inner.Get(s, u) }
+func (f *failOneDeleteProvider) Set(s, u, p string) error        { return f.inner.Set(s, u, p) }
+func (f *failOneDeleteProvider) Delete(s, u string) error {
+	if u == f.failKey {
+		return errors.New("delete failed")
+	}
+	return f.inner.Delete(s, u)
 }

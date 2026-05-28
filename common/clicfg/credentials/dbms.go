@@ -164,6 +164,16 @@ type DbmsCredential struct {
 	EmbedCredential string `json:"embed-credential,omitempty"`
 }
 
+// deleteFromKeyring removes the keyring entry for the named Dbms credential.
+// ErrNotFound is silently ignored; other errors are returned.
+func (c *DbmsCredentials) deleteFromKeyring(provider KeyringProvider, name string) error {
+	err := provider.Delete(ServiceName, KeyringKey("dbms", name, "password"))
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return fmt.Errorf("keyring delete dbms/%s/password: %w", name, err)
+	}
+	return nil
+}
+
 func (c *DbmsCredential) zeroSensitiveFields() {
 	c.Password = ""
 }

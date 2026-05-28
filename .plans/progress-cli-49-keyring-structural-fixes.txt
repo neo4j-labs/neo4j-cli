@@ -29,6 +29,10 @@ Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo
 ## TASK-008 — 2026-05-28T12:00:00Z
 Final gates: make test, make fmt-check, make lint all pass with 0 issues after all structural refactors.
 
+## TASK-011 — 2026-05-28T14:30:00Z
+Removed Credentials.DeleteKeyringEntries string-dispatch function; added deleteFromKeyring(provider, name) to *AuraCredentials, *DbmsCredentials, *EmbedCredentials; updated RemoveAura/RemoveDbms/RemoveEmbed to call per-type methods directly; added per-type tests covering ErrNotFound-ignored and non-ErrNotFound-returned paths.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go, ~common/clicfg/credentials/credentials_keyring_test.go
+
 ## TASK-010 — 2026-05-28T14:00:00Z
 Rewrote saveWithKeyring and MigrateToKeyring to use c.allCredentials() iterator; also collapsed remaining triple loops in MigrateToInsecure and loadSensitiveFieldsFromKeyring per reviewer feedback; removed stale comment on allCredentials(). No per-type inline loops remain anywhere in credentials.go.
 Files: ~common/clicfg/credentials/credentials.go

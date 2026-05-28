@@ -209,7 +209,7 @@ tasks:
       directly, eliminating the string type discriminator. Add tests for deleteFromKeyring on each
       type (ErrNotFound ignored, non-ErrNotFound errors surfaced). Run make test, make lint,
       make fmt-check as final gates.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -220,4 +220,4 @@ tasks:
       - "All key-name knowledge for deletion lives in aura.go, dbms.go, embed.go respectively"
       - "Tests cover ErrNotFound-ignored and non-ErrNotFound-error paths for each type"
       - "make test, make lint, make fmt-check all pass"
-    completed_at: null
+    completed_at: "2026-05-28T14:30:00Z"

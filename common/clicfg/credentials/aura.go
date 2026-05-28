@@ -162,6 +162,19 @@ type AuraCredential struct {
 	TokenExpiry  int64  `json:"token-expiry"`
 }
 
+// deleteFromKeyring removes all keyring entries for the named Aura credential.
+// ErrNotFound is silently ignored; other errors are joined and returned.
+func (c *AuraCredentials) deleteFromKeyring(provider KeyringProvider, name string) error {
+	deleteOne := func(field string) error {
+		err := provider.Delete(ServiceName, KeyringKey("aura", name, field))
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("keyring delete aura/%s/%s: %w", name, field, err)
+		}
+		return nil
+	}
+	return errors.Join(deleteOne("client-secret"), deleteOne("access-token"))
+}
+
 func (credential *AuraCredential) HasValidAccessToken() bool {
 	now := time.Now().UnixMilli()
 
