@@ -443,7 +443,7 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) {
 
 	// Persist the scrubbed JSON only if at least one field was auto-migrated.
 	// saveWithKeyring() writes in-memory values to keyring (idempotent since
-	// they were already set by tryAutoMigrate) and produces a scrubbed JSON
+	// they were already set by loadCredFromKeyring) and produces a scrubbed JSON
 	// snapshot, removing the plaintext secrets from credentials.json.
 	if anyMigrated {
 		_ = c.save() //nolint:errcheck // best-effort JSON scrub; error is non-fatal here

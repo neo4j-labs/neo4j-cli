@@ -473,7 +473,8 @@ tasks:
          was removed when loadCredFromKeyring was introduced. Replace 'by tryAutoMigrate' with
          'by loadCredFromKeyring'.
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T19:15:00Z"
     source: review
     dependencies:
       - task-019

@@ -73,3 +73,7 @@ Added 6 review tasks (task-019..task-024): comment hygiene (REQ-F tags, stale na
 ## TASK-019 — 2026-05-28T19:00:00Z
 Replaced REQ-F-016, REQ-F-017, REQ-F-018, and REQ-F-019 comment tags in credentials.go and set.go with prose describing the observable behaviour; also reflowed the affected comment block to keep lines under 90 chars.
 Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-020 — 2026-05-28T19:15:00Z
+Replaced stale function name 'tryAutoMigrate' with 'loadCredFromKeyring' in a comment in credentials.go; the Task-009 reference in clicfg.go had already been cleaned in a prior task.
+Files: ~common/clicfg/credentials/credentials.go
