@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/neo4j/cli/common/clierr"
 )
@@ -156,69 +155,8 @@ func (c *EmbedCredential) deleteFromKeyring(provider KeyringProvider) error {
 	return nil
 }
 
-func (c *EmbedCredential) zeroSensitiveFields() {
-	c.APIKey = ""
-}
-
-// writeToKeyring writes the non-empty APIKey to the keyring.
-// If written is non-nil, each successfully written key is appended to it.
-func (c *EmbedCredential) writeToKeyring(provider KeyringProvider, written *[]string) error {
-	if c.APIKey != "" {
-		key := KeyringKey("embed", c.Name, "api-key")
-		if err := provider.Set(ServiceName, key, c.APIKey); err != nil {
-			return fmt.Errorf("keyring set embed/%s/api-key: %w", c.Name, err)
-		}
-		if written != nil {
-			*written = append(*written, key)
-		}
+func (c *EmbedCredential) sensitiveFields() []sensitiveField {
+	return []sensitiveField{
+		{ptr: &c.APIKey, key: KeyringKey("embed", c.Name, "api-key"), required: false},
 	}
-	return nil
-}
-
-func (c *EmbedCredential) saveSensitiveFields() []string {
-	return []string{c.APIKey}
-}
-
-func (c *EmbedCredential) restoreSensitiveFields(fields []string) {
-	c.APIKey = fields[0]
-}
-
-func (c *EmbedCredential) validateForMigration() error {
-	return nil
-}
-
-// loadFromKeyring populates the APIKey from the keyring (startup/SetStorageMode path).
-// APIKey is optional: ErrNotFound is fine; auto-migrate to keyring if JSON value present.
-// Returns true if the field was successfully written to the keyring during auto-migration.
-func (c *EmbedCredential) loadFromKeyring(provider KeyringProvider, _ io.Writer) (migrated bool) {
-	key, err := provider.Get(ServiceName, KeyringKey("embed", c.Name, "api-key"))
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			return false
-		}
-		if c.APIKey != "" {
-			if setErr := provider.Set(ServiceName, KeyringKey("embed", c.Name, "api-key"), c.APIKey); setErr == nil {
-				migrated = true
-			}
-		}
-	} else {
-		c.APIKey = key
-	}
-	return migrated
-}
-
-// migrateFromKeyring reads the APIKey from the keyring (MigrateToInsecure path).
-// APIKey is optional: ErrNotFound silently skips.
-// Successfully populated fields are appended to filled so the caller can delete keyring entries on success.
-func (c *EmbedCredential) migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error {
-	key, err := provider.Get(ServiceName, KeyringKey("embed", c.Name, "api-key"))
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil
-		}
-		return fmt.Errorf("keyring get embed/%s/api-key: %w", c.Name, err)
-	}
-	c.APIKey = key
-	*filled = append(*filled, migratedField{ptr: &c.APIKey, key: KeyringKey("embed", c.Name, "api-key")})
-	return nil
 }

@@ -5,6 +5,7 @@ package credentials
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -218,7 +219,7 @@ func (c *Credentials) saveWithKeyring() error {
 	all := c.allCredentials()
 
 	for _, cred := range all {
-		if err := cred.writeToKeyring(defaultKeyring, nil); err != nil {
+		if err := writeCredToKeyring(cred, defaultKeyring, nil); err != nil {
 			return err
 		}
 	}
@@ -228,12 +229,12 @@ func (c *Credentials) saveWithKeyring() error {
 	// return path requires the restore — it is unconditional.
 	saved := make([][]string, len(all))
 	for i, cred := range all {
-		saved[i] = cred.saveSensitiveFields()
-		cred.zeroSensitiveFields()
+		saved[i] = saveCredSensitiveFields(cred)
+		zeroCredSensitiveFields(cred)
 	}
 	c.saveToJSON()
 	for i, cred := range all {
-		cred.restoreSensitiveFields(saved[i])
+		restoreCredSensitiveFields(cred, saved[i])
 	}
 	return nil
 }
@@ -282,14 +283,14 @@ func (c *Credentials) MigrateToKeyring() error {
 
 	// Validate all credentials before writing any keyring entries.
 	for _, cred := range all {
-		if err := cred.validateForMigration(); err != nil {
+		if err := validateCredForMigration(cred); err != nil {
 			return err
 		}
 	}
 
 	// Write sensitive fields to the keyring, tracking each written key for rollback.
 	for _, cred := range all {
-		if err := cred.writeToKeyring(defaultKeyring, &writtenKeys); err != nil {
+		if err := writeCredToKeyring(cred, defaultKeyring, &writtenKeys); err != nil {
 			rollback()
 			return err
 		}
@@ -297,7 +298,7 @@ func (c *Credentials) MigrateToKeyring() error {
 
 	// Zero sensitive in-memory fields and persist scrubbed JSON.
 	for _, cred := range all {
-		cred.zeroSensitiveFields()
+		zeroCredSensitiveFields(cred)
 	}
 	if err := c.save(); err != nil {
 		return err
@@ -334,16 +335,16 @@ func (c *Credentials) MigrateToInsecure() error {
 
 	// Track which in-memory fields we have populated so we can zero them on
 	// failure or delete keyring entries on success.
-	var filled []migratedField
+	var filled []sensitiveField
 
 	zero := func() {
-		for _, p := range filled {
-			*p.ptr = ""
+		for _, f := range filled {
+			*f.ptr = ""
 		}
 	}
 
 	for _, cred := range c.allCredentials() {
-		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
+		if err := migrateCredFromKeyring(cred, defaultKeyring, &filled); err != nil {
 			zero()
 			return err
 		}
@@ -355,8 +356,8 @@ func (c *Credentials) MigrateToInsecure() error {
 
 	// Phase 3: delete keyring entries for all fields we successfully read
 	// (best-effort — errors are ignored).
-	for _, p := range filled {
-		_ = defaultKeyring.Delete(ServiceName, p.key)
+	for _, f := range filled {
+		_ = defaultKeyring.Delete(ServiceName, f.key)
 	}
 
 	return nil
@@ -443,7 +444,7 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
 	anyMigrated := false
 
 	for _, cred := range c.allCredentials() {
-		if cred.loadFromKeyring(defaultKeyring, warnW) {
+		if loadCredFromKeyring(cred, defaultKeyring, warnW) {
 			anyMigrated = true
 		}
 	}
@@ -456,5 +457,105 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring(warnW io.Writer) error {
 		_ = c.save() //nolint:errcheck // best-effort JSON scrub; error is non-fatal here
 	}
 
+	return nil
+}
+
+// writeCredToKeyring writes non-empty sensitive fields to the keyring.
+// If written is non-nil, each successfully written key is appended to it.
+func writeCredToKeyring(cred keyringCredential, provider KeyringProvider, written *[]string) error {
+	for _, f := range cred.sensitiveFields() {
+		if *f.ptr == "" {
+			continue
+		}
+		if err := provider.Set(ServiceName, f.key, *f.ptr); err != nil {
+			return fmt.Errorf("keyring set %s: %w", f.key, err)
+		}
+		if written != nil {
+			*written = append(*written, f.key)
+		}
+	}
+	return nil
+}
+
+func zeroCredSensitiveFields(cred keyringCredential) {
+	for _, f := range cred.sensitiveFields() {
+		*f.ptr = ""
+	}
+}
+
+func saveCredSensitiveFields(cred keyringCredential) []string {
+	fields := cred.sensitiveFields()
+	vals := make([]string, len(fields))
+	for i, f := range fields {
+		vals[i] = *f.ptr
+	}
+	return vals
+}
+
+func restoreCredSensitiveFields(cred keyringCredential, vals []string) {
+	for i, f := range cred.sensitiveFields() {
+		*f.ptr = vals[i]
+	}
+}
+
+func validateCredForMigration(cred keyringCredential) error {
+	for _, f := range cred.sensitiveFields() {
+		if f.required && *f.ptr == "" {
+			return clierr.NewUsageError(
+				"cannot migrate credential: %s is empty; remove and re-add the credential",
+				f.key,
+			)
+		}
+	}
+	return nil
+}
+
+// loadCredFromKeyring populates sensitive fields from the keyring (startup/SetStorageMode path).
+// For each field: if found, overwrite in-memory. If ErrNotFound + in-memory non-empty, auto-migrate
+// to keyring (returns migrated=true on success). If ErrNotFound + required + empty, warn to warnW.
+// On any non-ErrNotFound error, stop processing further fields and return migrated as-is.
+func loadCredFromKeyring(cred keyringCredential, provider KeyringProvider, warnW io.Writer) (migrated bool) {
+	for _, f := range cred.sensitiveFields() {
+		val, err := provider.Get(ServiceName, f.key)
+		if err == nil {
+			*f.ptr = val
+			continue
+		}
+		if !errors.Is(err, ErrNotFound) {
+			return migrated
+		}
+		if *f.ptr != "" {
+			if setErr := provider.Set(ServiceName, f.key, *f.ptr); setErr == nil {
+				migrated = true
+			}
+		} else if f.required {
+			fmt.Fprintf(warnW, "Warning: keyring entry missing for credential (see key %s); remove and re-add the credential\n", f.key) //nolint:errcheck
+		}
+	}
+	return migrated
+}
+
+// migrateCredFromKeyring reads sensitive fields from the keyring (MigrateToInsecure path).
+// Required fields: ErrNotFound + in-memory non-empty → no-op (REQ-F-018); ErrNotFound + empty → error.
+// Optional fields: ErrNotFound silently skips.
+// Successfully populated fields are appended to filled for cleanup on success or failure.
+func migrateCredFromKeyring(cred keyringCredential, provider KeyringProvider, filled *[]sensitiveField) error {
+	for _, f := range cred.sensitiveFields() {
+		val, err := provider.Get(ServiceName, f.key)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return fmt.Errorf("keyring get %s: %w", f.key, err)
+			}
+			if f.required && *f.ptr == "" {
+				return clierr.NewUsageError(
+					"cannot migrate credential: %s not found in keyring; remove and re-add the credential",
+					f.key,
+				)
+			}
+			continue
+		}
+		*f.ptr = val
+		*filled = append(*filled, f)
+	}
 	return nil
 }

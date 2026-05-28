@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/neo4j/cli/common/clierr"
@@ -174,83 +173,8 @@ func (c *DbmsCredential) deleteFromKeyring(provider KeyringProvider) error {
 	return nil
 }
 
-func (c *DbmsCredential) zeroSensitiveFields() {
-	c.Password = ""
-}
-
-// writeToKeyring writes the non-empty Password to the keyring.
-// If written is non-nil, each successfully written key is appended to it.
-func (c *DbmsCredential) writeToKeyring(provider KeyringProvider, written *[]string) error {
-	if c.Password != "" {
-		key := KeyringKey("dbms", c.Name, "password")
-		if err := provider.Set(ServiceName, key, c.Password); err != nil {
-			return fmt.Errorf("keyring set dbms/%s/password: %w", c.Name, err)
-		}
-		if written != nil {
-			*written = append(*written, key)
-		}
+func (c *DbmsCredential) sensitiveFields() []sensitiveField {
+	return []sensitiveField{
+		{ptr: &c.Password, key: KeyringKey("dbms", c.Name, "password"), required: true},
 	}
-	return nil
-}
-
-func (c *DbmsCredential) saveSensitiveFields() []string {
-	return []string{c.Password}
-}
-
-func (c *DbmsCredential) restoreSensitiveFields(fields []string) {
-	c.Password = fields[0]
-}
-
-func (c *DbmsCredential) validateForMigration() error {
-	if c.Password == "" {
-		return clierr.NewUsageError(
-			"cannot migrate credential %q: dbms password is empty; run `credential dbms remove %s` and re-add it",
-			c.Name, c.Name,
-		)
-	}
-	return nil
-}
-
-// loadFromKeyring populates the Password from the keyring (startup/SetStorageMode path).
-// ErrNotFound + JSON value present → auto-migrate to keyring (returns migrated=true);
-// ErrNotFound + no JSON value → warn to warnW.
-// Returns true if the field was successfully written to the keyring during auto-migration.
-func (c *DbmsCredential) loadFromKeyring(provider KeyringProvider, warnW io.Writer) (migrated bool) {
-	pwd, err := provider.Get(ServiceName, KeyringKey("dbms", c.Name, "password"))
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			return false
-		}
-		if c.Password == "" {
-			fmt.Fprintf(warnW, "Warning: keyring entry missing for credential %q (dbms password); run `credential dbms remove %s` and re-add it\n", c.Name, c.Name) //nolint:errcheck
-		} else if setErr := provider.Set(ServiceName, KeyringKey("dbms", c.Name, "password"), c.Password); setErr == nil {
-			migrated = true
-		}
-	} else {
-		c.Password = pwd
-	}
-	return migrated
-}
-
-// migrateFromKeyring reads the Password from the keyring (MigrateToInsecure path).
-// ErrNotFound + in-memory non-empty → no-op (REQ-F-018); ErrNotFound + empty → clierr.UsageError.
-// Successfully populated fields are appended to filled so the caller can zero them on failure
-// or delete keyring entries on success.
-func (c *DbmsCredential) migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error {
-	pwd, err := provider.Get(ServiceName, KeyringKey("dbms", c.Name, "password"))
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			if c.Password != "" {
-				return nil
-			}
-			return clierr.NewUsageError(
-				"cannot migrate credential %q: dbms password not found in keyring; run `credential dbms remove %s` and re-add it",
-				c.Name, c.Name,
-			)
-		}
-		return fmt.Errorf("keyring get dbms/%s/password: %w", c.Name, err)
-	}
-	c.Password = pwd
-	*filled = append(*filled, migratedField{ptr: &c.Password, key: KeyringKey("dbms", c.Name, "password")})
-	return nil
 }

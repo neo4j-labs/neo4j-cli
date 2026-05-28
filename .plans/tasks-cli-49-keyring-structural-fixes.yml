@@ -363,7 +363,8 @@ tasks:
                          {&c.AccessToken,  "aura/<name>/access-token",  false}]
         DbmsCredential: [{&c.Password, "dbms/<name>/password", true}]
         EmbedCredential:[{&c.APIKey,   "embed/<name>/api-key", false}]
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T17:30:00Z"
     source: review
     dependencies:
       - task-015

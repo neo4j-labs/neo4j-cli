@@ -6,7 +6,6 @@ package credentials
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	gokeyring "github.com/zalando/go-keyring"
 )
@@ -56,27 +55,22 @@ func KeyringKey(credType, name, field string) string {
 	return fmt.Sprintf("%s/%s/%s", credType, name, field)
 }
 
+// sensitiveField describes one sensitive string field within a credential struct.
+// ptr is a pointer into the live struct field; key is the full keyring user-key;
+// required=true means a missing value is an error, false means silently skip.
+type sensitiveField struct {
+	ptr      *string
+	key      string
+	required bool
+}
+
 // keyringCredential is the common interface satisfied by AuraCredential,
 // DbmsCredential, and EmbedCredential. It allows credential-agnostic loops in
 // saveWithKeyring, MigrateToKeyring, MigrateToInsecure, and
 // loadSensitiveFieldsFromKeyring.
 type keyringCredential interface {
-	writeToKeyring(provider KeyringProvider, written *[]string) error
-	loadFromKeyring(provider KeyringProvider, warnW io.Writer) (migrated bool)
-	migrateFromKeyring(provider KeyringProvider, filled *[]migratedField) error
-	validateForMigration() error
-	zeroSensitiveFields()
-	saveSensitiveFields() []string
-	restoreSensitiveFields(fields []string)
+	sensitiveFields() []sensitiveField
 	deleteFromKeyring(provider KeyringProvider) error
-}
-
-// migratedField records an in-memory field that was populated from the keyring
-// during MigrateToInsecure so the caller can zero fields on failure or delete
-// keyring entries on success.
-type migratedField struct {
-	ptr *string
-	key string
 }
 
 // probeKey is the sentinel user-key used by ProbeKeyringAvailability to test
