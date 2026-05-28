@@ -572,3 +572,79 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
     completed_at: 2026-05-28T16:15:00Z
+
+  - id: task-016
+    title: "Update stale provider lists in help text and docs (gemini + vertex coverage)"
+    description: |
+      Audit of the live binary (`bin/neo4j-cli credential embed -h`,
+      `bin/neo4j-cli query -h`) revealed that five surfaces still list
+      only the old three providers (openai/ollama/huggingface) and do
+      not mention `gemini` / `vertex`. The `credential embed add` leaf
+      was updated correctly by task-007 (so the leaf help is fine), but
+      the parent command, the `query --embed-provider` flag
+      description, and the README + .agents docs were left stale. The
+      result: an agent reading the parent help text would conclude only
+      three providers exist.
+
+      Surfaces to fix:
+
+      1. `neo4j-cli/internal/subcommands/credential/embed/embed.go:17`
+         — the parent `credential embed` cmd's Long string ends with
+         "Supported providers: openai, ollama, huggingface." Change to
+         "Supported providers: openai, ollama, huggingface, gemini,
+         vertex."
+
+      2. `neo4j-cli/query/query.go:76` — the `--embed-provider`
+         persistent-flag usage is currently
+         `"Embedding provider: openai | ollama | huggingface [env: NEO4J_EMBED_PROVIDER]"`.
+         Change to
+         `"Embedding provider: openai | ollama | huggingface | gemini | vertex [env: NEO4J_EMBED_PROVIDER]"`.
+
+      3. `README.md:84` — line currently reads "Supported providers:
+         `openai`, `ollama`, `huggingface`." Add `gemini` and `vertex`
+         to the list.
+
+      4. `README.md:304` — Provider defaults currently lists OpenAI,
+         Ollama, HuggingFace base URLs only. Extend with: Gemini base
+         URL `https://generativelanguage.googleapis.com/v1beta` (used
+         at `{base}/models/{model}:embedContent`); Vertex uses a
+         location-derived URL (no `--embed-base-url` knob — set
+         `--vertex-project` / `--vertex-location` instead) and
+         authenticates via Application Default Credentials.
+
+      5. `.agents/query.md:40` — internal doc quotes the stale error
+         message verbatim: "unknown provider returns 'invalid embed
+         provider %q: must be one of openai, ollama, huggingface'".
+         The actual error message in `embed.go`'s `New` default branch
+         now reads "must be one of openai, ollama, huggingface, gemini,
+         vertex". Update the quote.
+
+      After the source edits, regenerate the skill bundle (`go
+      generate ./neo4j-cli/internal/skill/...`) — the parent embed.go
+      Long and the `--embed-provider` flag description both flow into
+      `references/credential.md`, `references/query.md`, and SKILL.md.
+      `TestGenerator_RoundTrip` is the gate.
+
+      Verification commands:
+      - `make build && bin/neo4j-cli credential embed -h` — must show
+        all five providers in the description.
+      - `bin/neo4j-cli query -h | grep embed-provider` — must show
+        all five providers.
+      - `bin/neo4j-cli credential embed add -h` — already correct;
+        confirm unchanged.
+
+      No new tests needed (these are doc / help-text edits picked up
+      by the existing round-trip gate).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Parent `credential embed` cmd Long string lists all five providers"
+      - "`--embed-provider` persistent-flag usage on `query` lists all five providers"
+      - "README.md line 84 lists all five providers"
+      - "README.md provider defaults section documents Gemini base URL and Vertex location-derived URL + ADC auth"
+      - ".agents/query.md error-message quote includes gemini and vertex"
+      - "Skill bundle regenerated; `TestGenerator_RoundTrip` passes"
+      - "`bin/neo4j-cli credential embed -h` and `bin/neo4j-cli query -h` live output reflects all five providers"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
+    source: review
+    completed_at: null
