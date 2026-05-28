@@ -371,6 +371,8 @@ func New(cfg Config) (Provider, error) {
 		return newOllamaProvider(cfg), nil
 	case ProviderHuggingFace:
 		return newHuggingFaceProvider(cfg), nil
+	case ProviderGemini:
+		return newGeminiProvider(cfg), nil
 	default:
 		return nil, clierr.NewUsageError(
 			"invalid embed provider %q: must be one of %s, %s, %s, %s, %s",

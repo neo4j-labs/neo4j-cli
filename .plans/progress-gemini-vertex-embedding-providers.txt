@@ -15,3 +15,8 @@ Decisions: envGoogleKey is unused this commit (wired in task-004); kept it co-lo
 ## TASK-004 — 2026-05-28T00:00:00Z
 Extended resolveAPIKey with a ProviderGemini case (GOOGLE_API_KEY then GEMINI_API_KEY within each stage, so gemini-specific wins). Added both new vars to osEnvSnapshot and clearEmbedEnv. Added 7 table-driven cases covering stored-only, no-env, OS env precedence ladder, `.env` vs OS env, and dotenv-only ordering. Vertex deliberately omitted (ADC, not API key).
 Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
+
+## TASK-005 — 2026-05-28T00:00:00Z
+Added geminiProvider with x-goog-api-key auth, {base}/models/{model}:embedContent URL, taskType RETRIEVAL_QUERY, optional outputDimensionality, L2-normalization when Dimensions > 0 && != 3072 (zero-vec passthrough), and 4KiB body snippet on non-2xx. Wired `case ProviderGemini` into New. Test suite covers happy path, dims-omitted, dims-native (no normalize), dims-other (normalize math), zero-vector, missing key, non-2xx (no key leak), empty values, malformed JSON, blocked-URL SSRF, default base URL, and New factory.
+Files: +neo4j-cli/query/embed/gemini.go, +neo4j-cli/query/embed/gemini_test.go, ~neo4j-cli/query/embed/embed.go
+Decisions: Inlined a small l2Normalize helper (unexported) in gemini.go rather than a shared math package — it's the only call site and the function is six lines. Native-dim guard set to 3072 to match REQ-F-027.

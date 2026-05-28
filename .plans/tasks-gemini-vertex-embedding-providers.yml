@@ -118,7 +118,7 @@ tasks:
       `httptest.NewServer` table-driven cases (happy path, dimensions
       omitted when 0, missing key, non-2xx, normalization triggers when
       dims != 3072).
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -132,7 +132,7 @@ tasks:
       - "`New` has a `case ProviderGemini` that returns `newGeminiProvider(cfg)`"
       - "`gemini_test.go` exercises the listed cases via `httptest`"
       - "License header present; `make test`, `make fmt-check`, `make lint`, `make license-check` pass"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-006
     title: "Implement the vertex embedding provider"
