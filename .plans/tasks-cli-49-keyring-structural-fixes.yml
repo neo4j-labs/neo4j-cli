@@ -66,14 +66,14 @@ tasks:
       logic (written/rollback/setKey) stays in credentials.go since it is cross-type. The
       loadSensitiveFieldsFromKeyring and saveWithKeyring functions still call the per-type
       methods but may retain their outer structure until tasks 005/006/007.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "No group of three consecutive for _, cred := range c.{Aura,Dbms,Embed}.Credentials loops remains in credentials.go"
       - "saveWithKeyring, MigrateToKeyring, MigrateToInsecure, and loadSensitiveFieldsFromKeyring each delegate to per-type methods"
       - "make test passes with no changes to test expectations"
-    completed_at: null
+    completed_at: "2026-05-28T10:30:00Z"
 
   - id: task-005
     title: "Replace saveWithKeyring snapshot boilerplate with zero-restore pattern"

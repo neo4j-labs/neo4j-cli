@@ -205,29 +205,18 @@ func (c *Credentials) saveToJSON() error {
 func (c *Credentials) saveWithKeyring() error {
 	// Write sensitive fields to keyring before zeroing them in the JSON snapshot.
 	for _, cred := range c.Aura.Credentials {
-		if cred.ClientSecret != "" {
-			if err := defaultKeyring.Set(ServiceName, KeyringKey("aura", cred.Name, "client-secret"), cred.ClientSecret); err != nil {
-				return fmt.Errorf("keyring set aura/%s/client-secret: %w", cred.Name, err)
-			}
-		}
-		if cred.AccessToken != "" {
-			if err := defaultKeyring.Set(ServiceName, KeyringKey("aura", cred.Name, "access-token"), cred.AccessToken); err != nil {
-				return fmt.Errorf("keyring set aura/%s/access-token: %w", cred.Name, err)
-			}
+		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+			return err
 		}
 	}
 	for _, cred := range c.Dbms.Credentials {
-		if cred.Password != "" {
-			if err := defaultKeyring.Set(ServiceName, KeyringKey("dbms", cred.Name, "password"), cred.Password); err != nil {
-				return fmt.Errorf("keyring set dbms/%s/password: %w", cred.Name, err)
-			}
+		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+			return err
 		}
 	}
 	for _, cred := range c.Embed.Credentials {
-		if cred.APIKey != "" {
-			if err := defaultKeyring.Set(ServiceName, KeyringKey("embed", cred.Name, "api-key"), cred.APIKey); err != nil {
-				return fmt.Errorf("keyring set embed/%s/api-key: %w", cred.Name, err)
-			}
+		if err := cred.writeToKeyring(defaultKeyring); err != nil {
+			return err
 		}
 	}
 
@@ -378,14 +367,13 @@ func (c *Credentials) MigrateToKeyring() error {
 
 	// Zero sensitive in-memory fields and persist scrubbed JSON.
 	for _, cred := range c.Aura.Credentials {
-		cred.ClientSecret = ""
-		cred.AccessToken = ""
+		cred.zeroSensitiveFields()
 	}
 	for _, cred := range c.Dbms.Credentials {
-		cred.Password = ""
+		cred.zeroSensitiveFields()
 	}
 	for _, cred := range c.Embed.Credentials {
-		cred.APIKey = ""
+		cred.zeroSensitiveFields()
 	}
 	if err := c.save(); err != nil {
 		return err
@@ -424,12 +412,8 @@ func (c *Credentials) MigrateToInsecure() error {
 	// non-ErrNotFound error, abort immediately.
 
 	// Track which in-memory fields we have populated so we can zero them on
-	// failure.
-	type populated struct {
-		ptr   *string
-		field string
-	}
-	var filled []populated
+	// failure or delete keyring entries on success.
+	var filled []migratedField
 
 	zero := func() {
 		for _, p := range filled {
@@ -437,65 +421,26 @@ func (c *Credentials) MigrateToInsecure() error {
 		}
 	}
 
-	getRequired := func(ptr *string, credType, credName, field string) error {
-		val, err := defaultKeyring.Get(ServiceName, KeyringKey(credType, credName, field))
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				// REQ-F-018: if the in-memory value is already non-empty (populated
-				// via the REQ-F-016 JSON fallback during load), the secret is already
-				// in JSON — treat as a no-op (no keyring entry to delete either).
-				if *ptr != "" {
-					return nil
-				}
-				zero()
-				return clierr.NewUsageError(
-					"cannot migrate credential %q: %s %s not found in keyring; run `credential %s remove %s` and re-add it",
-					credName, credType, field, credType, credName,
-				)
-			}
-			zero()
-			return fmt.Errorf("keyring get %s/%s/%s: %w", credType, credName, field, err)
-		}
-		*ptr = val
-		filled = append(filled, populated{ptr: ptr, field: KeyringKey(credType, credName, field)})
-		return nil
-	}
-
-	getOptional := func(ptr *string, credType, credName, field string) error {
-		val, err := defaultKeyring.Get(ServiceName, KeyringKey(credType, credName, field))
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				// Silently skip — write empty value to JSON
-				return nil
-			}
-			zero()
-			return fmt.Errorf("keyring get %s/%s/%s: %w", credType, credName, field, err)
-		}
-		*ptr = val
-		filled = append(filled, populated{ptr: ptr, field: KeyringKey(credType, credName, field)})
-		return nil
-	}
-
 	// --- Aura credentials ---
 	for _, cred := range c.Aura.Credentials {
-		if err := getRequired(&cred.ClientSecret, "aura", cred.Name, "client-secret"); err != nil {
-			return err
-		}
-		if err := getOptional(&cred.AccessToken, "aura", cred.Name, "access-token"); err != nil {
+		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
+			zero()
 			return err
 		}
 	}
 
 	// --- Dbms credentials ---
 	for _, cred := range c.Dbms.Credentials {
-		if err := getRequired(&cred.Password, "dbms", cred.Name, "password"); err != nil {
+		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
+			zero()
 			return err
 		}
 	}
 
 	// --- Embed credentials ---
 	for _, cred := range c.Embed.Credentials {
-		if err := getOptional(&cred.APIKey, "embed", cred.Name, "api-key"); err != nil {
+		if err := cred.migrateFromKeyring(defaultKeyring, &filled); err != nil {
+			zero()
 			return err
 		}
 	}
@@ -511,7 +456,7 @@ func (c *Credentials) MigrateToInsecure() error {
 	// Phase 3: delete keyring entries for all fields we successfully read
 	// (best-effort — errors are ignored).
 	for _, p := range filled {
-		_ = defaultKeyring.Delete(ServiceName, p.field)
+		_ = defaultKeyring.Delete(ServiceName, p.key)
 	}
 
 	return nil
@@ -625,79 +570,19 @@ func (c *Credentials) loadSensitiveFieldsFromKeyring() error {
 	// (idempotent) and produce a scrubbed JSON snapshot.
 	anyMigrated := false
 
-	// tryAutoMigrate attempts to push a JSON-resident value into the keyring.
-	// On success it sets anyMigrated so save() is called at the end to scrub
-	// the JSON. The in-memory field is intentionally kept populated so the
-	// current command can use the secret. Failures are silently ignored
-	// (retry on next command); the JSON value continues to serve as fallback.
-	tryAutoMigrate := func(val, credType, credName, field string) {
-		if val == "" {
-			return
-		}
-		if setErr := defaultKeyring.Set(ServiceName, KeyringKey(credType, credName, field), val); setErr == nil {
+	for _, cred := range c.Aura.Credentials {
+		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
 			anyMigrated = true
 		}
-		// keyring.Set failure → skip scrub this run; JSON fallback remains active
 	}
-
-	for _, cred := range c.Aura.Credentials {
-		secret, err := defaultKeyring.Get(ServiceName, KeyringKey("aura", cred.Name, "client-secret"))
-		if err != nil {
-			if !errors.Is(err, ErrNotFound) {
-				return fmt.Errorf("keyring get aura/%s/client-secret: %w", cred.Name, err)
-			}
-			// ErrNotFound: fall back to JSON value if present, warn if not
-			if cred.ClientSecret == "" {
-				fmt.Fprintf(os.Stderr, "Warning: keyring entry missing for credential %q (aura client-secret); run `credential aura-client remove %s` and re-add it\n", cred.Name, cred.Name)
-			}
-			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
-			// tryAutoMigrate is a no-op when val is "".
-			tryAutoMigrate(cred.ClientSecret, "aura", cred.Name, "client-secret")
-		} else {
-			cred.ClientSecret = secret
-		}
-
-		token, err := defaultKeyring.Get(ServiceName, KeyringKey("aura", cred.Name, "access-token"))
-		if err != nil {
-			if !errors.Is(err, ErrNotFound) {
-				return fmt.Errorf("keyring get aura/%s/access-token: %w", cred.Name, err)
-			}
-			// AccessToken is optional — ErrNotFound is fine; keep JSON value if any
-			// Still attempt auto-migration if the JSON value is present (REQ-F-019)
-			tryAutoMigrate(cred.AccessToken, "aura", cred.Name, "access-token")
-		} else {
-			cred.AccessToken = token
-		}
-	}
-
 	for _, cred := range c.Dbms.Credentials {
-		pwd, err := defaultKeyring.Get(ServiceName, KeyringKey("dbms", cred.Name, "password"))
-		if err != nil {
-			if !errors.Is(err, ErrNotFound) {
-				return fmt.Errorf("keyring get dbms/%s/password: %w", cred.Name, err)
-			}
-			if cred.Password == "" {
-				fmt.Fprintf(os.Stderr, "Warning: keyring entry missing for credential %q (dbms password); run `credential dbms remove %s` and re-add it\n", cred.Name, cred.Name)
-			}
-			// JSON fallback (REQ-F-016) — auto-migrate to keyring (REQ-F-019)
-			// tryAutoMigrate is a no-op when val is "".
-			tryAutoMigrate(cred.Password, "dbms", cred.Name, "password")
-		} else {
-			cred.Password = pwd
+		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
+			anyMigrated = true
 		}
 	}
-
 	for _, cred := range c.Embed.Credentials {
-		key, err := defaultKeyring.Get(ServiceName, KeyringKey("embed", cred.Name, "api-key"))
-		if err != nil {
-			if !errors.Is(err, ErrNotFound) {
-				return fmt.Errorf("keyring get embed/%s/api-key: %w", cred.Name, err)
-			}
-			// APIKey is optional — ErrNotFound is fine; keep JSON value if any
-			// Still attempt auto-migration if the JSON value is present (REQ-F-019)
-			tryAutoMigrate(cred.APIKey, "embed", cred.Name, "api-key")
-		} else {
-			cred.APIKey = key
+		if cred.loadFromKeyring(defaultKeyring, os.Stderr) {
+			anyMigrated = true
 		}
 	}
 
