@@ -77,9 +77,7 @@ func (c *Credentials) allCredentials() []keyringCredential {
 // default-detection logic to choose between insecure (existing user) and
 // keyring (fresh install) as the initial storage mode.
 func (c *Credentials) HasAnyCredentials() bool {
-	return len(c.Aura.Credentials) > 0 ||
-		len(c.Dbms.Credentials) > 0 ||
-		len(c.Embed.Credentials) > 0
+	return len(c.allCredentials()) > 0
 }
 
 // SetStorageMode sets the credential storage mode and reloads sensitive fields.
