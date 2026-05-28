@@ -84,7 +84,7 @@ tasks:
       `resolveAPIKey` tests (or wherever they live) covering: env order
       `GEMINI_API_KEY` beats `GOOGLE_API_KEY` beats `NEO4J_EMBED_API_KEY`
       beats stored, `.env` < OS env, stored alone, and the no-env case.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -93,7 +93,7 @@ tasks:
       - "New test cases cover the layered precedence and `.env` vs OS env"
       - "`vertex` does not participate in `resolveAPIKey` (no test asserting it does)"
       - "`make test` passes"
-    completed_at: null
+    completed_at: 2026-05-28T00:00:00Z
 
   - id: task-005
     title: "Implement the gemini embedding provider"

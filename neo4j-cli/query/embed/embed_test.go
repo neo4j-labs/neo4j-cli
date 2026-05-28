@@ -59,6 +59,8 @@ func clearEmbedEnv(t *testing.T) {
 	t.Setenv(envEmbedAPIKey, "")
 	t.Setenv(envOpenAIKey, "")
 	t.Setenv(envHFToken, "")
+	t.Setenv(envGeminiKey, "")
+	t.Setenv(envGoogleKey, "")
 }
 
 // withDotenvCwd writes a .env file into the supplied filesystem at <tmp>/.env
@@ -296,6 +298,57 @@ func TestResolveAPIKey_OpenAIPrecedence(t *testing.T) {
 			stored:   "",
 			osEnv:    map[string]string{envOpenAIKey: "env-openai", envEmbedAPIKey: "env-generic"},
 			want:     "env-generic",
+		},
+		{
+			name:     "gemini stored only",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			want:     "stored-gemini",
+		},
+		{
+			name:     "gemini no env, no stored",
+			provider: ProviderGemini,
+			want:     "",
+		},
+		{
+			name:     "gemini OS env GEMINI_API_KEY beats GOOGLE_API_KEY beats generic beats stored",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv: map[string]string{
+				envEmbedAPIKey: "env-generic",
+				envGoogleKey:   "env-google",
+				envGeminiKey:   "env-gemini",
+			},
+			want: "env-gemini",
+		},
+		{
+			name:     "gemini OS env GOOGLE_API_KEY wins when GEMINI_API_KEY unset",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envEmbedAPIKey: "env-generic", envGoogleKey: "env-google"},
+			want:     "env-google",
+		},
+		{
+			name:     "gemini OS env NEO4J_EMBED_API_KEY wins when no gemini-specific env",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envEmbedAPIKey: "env-generic"},
+			want:     "env-generic",
+		},
+		{
+			name:     "gemini OS env GEMINI_API_KEY beats every dotenv entry",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			osEnv:    map[string]string{envGeminiKey: "env-gemini"},
+			dotenv:   map[string]string{envEmbedAPIKey: "dotenv-generic", envGoogleKey: "dotenv-google", envGeminiKey: "dotenv-gemini"},
+			want:     "env-gemini",
+		},
+		{
+			name:     "gemini dotenv GEMINI_API_KEY beats dotenv GOOGLE_API_KEY beats dotenv generic beats stored",
+			provider: ProviderGemini,
+			stored:   "stored-gemini",
+			dotenv:   map[string]string{envEmbedAPIKey: "dotenv-generic", envGoogleKey: "dotenv-google", envGeminiKey: "dotenv-gemini"},
+			want:     "dotenv-gemini",
 		},
 	}
 

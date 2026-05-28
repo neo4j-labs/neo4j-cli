@@ -11,3 +11,7 @@ Files: ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/embed_tes
 Added ProviderGemini/ProviderVertex + envGeminiKey/envGoogleKey constants, VertexProject/VertexLocation Config fields, Resolve copy from stored cred, and extended New default-case "must be one of" message. New providers still fall through to the default until tasks 005/006 land.
 Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go
 Decisions: envGoogleKey is unused this commit (wired in task-004); kept it co-located with envGeminiKey for grep-locality.
+
+## TASK-004 — 2026-05-28T00:00:00Z
+Extended resolveAPIKey with a ProviderGemini case (GOOGLE_API_KEY then GEMINI_API_KEY within each stage, so gemini-specific wins). Added both new vars to osEnvSnapshot and clearEmbedEnv. Added 7 table-driven cases covering stored-only, no-env, OS env precedence ladder, `.env` vs OS env, and dotenv-only ordering. Vertex deliberately omitted (ADC, not API key).
+Files: ~neo4j-cli/query/embed/embed.go, ~neo4j-cli/query/embed/embed_test.go

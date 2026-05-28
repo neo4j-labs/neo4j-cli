@@ -247,10 +247,12 @@ func Resolve(cmd *cobra.Command, cfg *clicfg.Config) (Config, error) {
 	return out, nil
 }
 
-// resolveAPIKey applies provider-specific API key resolution. Both OpenAI and
-// HuggingFace honour a provider-specific env, then the generic embed env;
-// Ollama is left untouched (no API key required). Returns the highest-
-// precedence non-empty value, falling back to storedKey.
+// resolveAPIKey applies provider-specific API key resolution. OpenAI,
+// HuggingFace, and Gemini honour a provider-specific env, then the generic
+// embed env; Ollama and Vertex are left untouched (Ollama needs no API key,
+// Vertex authenticates via ADC). For Gemini, GEMINI_API_KEY beats
+// GOOGLE_API_KEY beats NEO4J_EMBED_API_KEY beats stored within each stage.
+// Returns the highest-precedence non-empty value, falling back to storedKey.
 func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string {
 	out := storedKey
 
@@ -272,6 +274,15 @@ func resolveAPIKey(provider, storedKey string, dotenv map[string]string) string 
 			if v := stage[envHFToken]; v != "" {
 				out = v
 			}
+		case ProviderGemini:
+			// GOOGLE_API_KEY first, then GEMINI_API_KEY so the
+			// gemini-specific var wins inside this stage.
+			if v := stage[envGoogleKey]; v != "" {
+				out = v
+			}
+			if v := stage[envGeminiKey]; v != "" {
+				out = v
+			}
 		}
 	}
 	return out
@@ -285,6 +296,8 @@ func osEnvSnapshot() map[string]string {
 		envEmbedAPIKey: os.Getenv(envEmbedAPIKey),
 		envOpenAIKey:   os.Getenv(envOpenAIKey),
 		envHFToken:     os.Getenv(envHFToken),
+		envGeminiKey:   os.Getenv(envGeminiKey),
+		envGoogleKey:   os.Getenv(envGoogleKey),
 	}
 }
 
