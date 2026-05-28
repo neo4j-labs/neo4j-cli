@@ -255,14 +255,10 @@ func (c *Credentials) saveWithKeyring() error {
 //
 // Any keyring.Set() failure triggers a full rollback.
 //
-// On full success: sensitive fields are zeroed in the in-memory structs and
-// save() is called to scrub them from credentials.json.
-//
-// The caller is responsible for persisting the "credential-storage" config key.
-// This method must be called while storageMode is still StorageModeInsecure so
-// that the final save() writes the scrubbed (zeroed) values to JSON rather than
-// dispatching to saveWithKeyring(). The caller should call SetStorageMode after
-// persisting the config key.
+// On full success: sensitive fields are zeroed in the in-memory structs,
+// save() is called to scrub them from credentials.json, and storageMode is
+// set to StorageModeKeyring. The caller is responsible for persisting the
+// "credential-storage" config key.
 func (c *Credentials) MigrateToKeyring() error {
 	// Probe keyring availability before writing any entries.
 	if err := ProbeKeyringAvailability(); err != nil {
@@ -307,6 +303,7 @@ func (c *Credentials) MigrateToKeyring() error {
 		return err
 	}
 
+	c.storageMode = StorageModeKeyring
 	return nil
 }
 

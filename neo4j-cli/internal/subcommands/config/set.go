@@ -63,6 +63,7 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				// partial previous migration), they will be moved to the keyring
 				// and scrubbed. This is idempotent — credentials already in the
 				// keyring are read back by load() and written back unchanged.
+				// MigrateToKeyring sets storageMode = StorageModeKeyring itself.
 				//
 				// For the insecure target we only run MigrateToInsecure() when
 				// the mode actually changes to avoid spurious keyring reads.
@@ -87,17 +88,6 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				if err := cfg.Global.Set(bareKey, value); err != nil {
 					cmd.SilenceUsage = true
 					return err
-				}
-
-				// For keyring mode: update in-process mode after persisting config
-				// so subsequent saves in this process use the keyring path.
-				if bareKey == "credential-storage" && value == credentials.StorageModeKeyring {
-					if cfg.Credentials.StorageMode() != credentials.StorageModeKeyring {
-						if err := cfg.Credentials.SetStorageMode(value, cmd.ErrOrStderr()); err != nil {
-							cmd.SilenceUsage = true
-							return err
-						}
-					}
 				}
 
 				return nil

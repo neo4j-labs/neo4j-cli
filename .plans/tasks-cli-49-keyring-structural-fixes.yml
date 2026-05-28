@@ -301,7 +301,8 @@ tasks:
       fields zeroed and writes no keyring entries, then scrubs JSON — also correct. Setting
       c.storageMode = StorageModeKeyring AFTER save() avoids any dispatch ambiguity and is the
       cleanest placement.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T17:00:00Z"
     source: review
     dependencies:
       - task-013
@@ -321,7 +322,8 @@ tasks:
       confusing future readers. This is a documentation-only cleanup pass on credentials.go focused
       on MigrateToKeyring and any adjacent doc comments that referenced the old storageMode
       precondition.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T17:00:00Z"
     source: review
     dependencies:
       - task-014

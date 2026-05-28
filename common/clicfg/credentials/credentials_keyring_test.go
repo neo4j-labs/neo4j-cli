@@ -472,6 +472,9 @@ func TestMigrateToKeyring_Success(t *testing.T) {
 	assert.Equal(t, "", creds.Dbms.Credentials[0].Password, "in-memory Password must be zeroed")
 	assert.Equal(t, "", creds.Embed.Credentials[0].APIKey, "in-memory APIKey must be zeroed")
 
+	// storageMode must be keyring after MigrateToKeyring (owned internally, no SetStorageMode call needed)
+	assert.Equal(t, credentials.StorageModeKeyring, creds.StorageMode(), "storageMode must be keyring after MigrateToKeyring")
+
 	// credentials.json must not contain any sensitive values
 	data := readCredentialsJSON(t, fs)
 	var jsonFile struct {

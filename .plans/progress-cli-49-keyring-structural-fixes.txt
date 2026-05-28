@@ -54,3 +54,10 @@ Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go
 
 ## REVIEW — 2026-05-28T16:30:00Z
 Added 3 review tasks (task-014..task-016).
+
+## TASK-014 — 2026-05-28T17:00:00Z
+MigrateToKeyring now sets c.storageMode = StorageModeKeyring after save(); removed the stale "caller must call SetStorageMode" doc language; deleted the redundant post-migration SetStorageMode block from set.go; added storageMode assertion to TestMigrateToKeyring_Success.
+Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/credentials_keyring_test.go, ~neo4j-cli/internal/subcommands/config/set.go
+
+## TASK-015 — 2026-05-28T17:00:00Z
+Covered by task-014; no remaining misleading storageMode precondition comments in credentials.go or set.go.
