@@ -32,3 +32,7 @@ Files: ~neo4j-cli/internal/subcommands/credential/embed/add.go, ~neo4j-cli/inter
 ## TASK-008 — 2026-05-28T00:00:00Z
 Regenerated skill bundle via `go generate ./neo4j-cli/internal/skill/...`; only `references/credential.md` drifted (new providers in `--provider` list, two new `--vertex-*` flag rows, gemini + vertex Example invocations). All gates green.
 Files: ~neo4j-cli/internal/skill/bundle/references/credential.md
+
+## TASK-009 — 2026-05-28T14:28:21Z
+Added Minor changie entry for the new Gemini + Vertex AI embedding providers via `changie new`.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260528-142821.yaml

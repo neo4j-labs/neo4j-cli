@@ -239,11 +239,11 @@ tasks:
       `.changes/unreleased/neo4j-cli-Minor-<YYYYMMDD>-<HHMMSS>.yaml`
       with `project: neo4j-cli`, `kind: Minor`, single-quoted `body`, and
       RFC3339 `time` (per AGENTS.md).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A `neo4j-cli-Minor-*.yaml` file exists in `.changes/unreleased/`"
       - "The body reads exactly `Added Gemini and Vertex AI embedding providers.`"
       - "`project: neo4j-cli` and `kind: Minor` are set"
       - "`time:` is an RFC3339 timestamp"
-    completed_at: null
+    completed_at: 2026-05-28T14:28:21Z
