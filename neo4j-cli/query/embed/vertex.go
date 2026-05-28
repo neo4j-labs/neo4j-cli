@@ -30,10 +30,16 @@ var vertexLocationPattern = regexp.MustCompile(`^[a-z]+(-[a-z0-9]+)+$`)
 // letter, ends alphanumeric, lower-case letters / digits / hyphens only).
 var vertexProjectPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
 
-// ValidateVertexLocation rejects values that do not match a GCP region
-// shape. Returns a clierr.UsageError naming --vertex-location with a sample
-// of the expected format when the input is invalid.
+// ValidateVertexLocation rejects empty or malformed GCP region values.
+// Empty input yields a missing-style usage error pointing at the recovery
+// command; non-empty values that don't match a GCP region shape yield an
+// invalid-format usage error. Single source of truth for both
+// credential-add-time validation and Embed-time validation.
 func ValidateVertexLocation(location string) error {
+	if location == "" {
+		return clierr.NewUsageError(
+			"missing --vertex-location: set vertex location with `neo4j-cli credential embed add --vertex-project <project> --vertex-location <location>`")
+	}
 	if !vertexLocationPattern.MatchString(location) {
 		return clierr.NewUsageError(
 			"invalid --vertex-location %q: must be a GCP region like us-central1 (lower-case letters and digits, hyphen-separated)",
@@ -42,10 +48,15 @@ func ValidateVertexLocation(location string) error {
 	return nil
 }
 
-// ValidateVertexProject rejects values that do not match the GCP project ID
-// shape. Returns a clierr.UsageError naming --vertex-project with a sample
-// of the expected format when the input is invalid.
+// ValidateVertexProject rejects empty or malformed GCP project ID values.
+// Empty input yields a missing-style usage error pointing at the recovery
+// command; non-empty values that don't match the GCP project ID shape
+// yield an invalid-format usage error.
 func ValidateVertexProject(project string) error {
+	if project == "" {
+		return clierr.NewUsageError(
+			"missing --vertex-project: set vertex project with `neo4j-cli credential embed add --vertex-project <project> --vertex-location <location>`")
+	}
 	if !vertexProjectPattern.MatchString(project) {
 		return clierr.NewUsageError(
 			"invalid --vertex-project %q: must be a GCP project ID like my-project-123 (6-30 chars, starts with a letter, ends alphanumeric)",
@@ -135,14 +146,6 @@ type vertexEmbedResponse struct {
 // token is fetched lazily from Application Default Credentials; the token
 // value never appears in any error text.
 func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, error) {
-	if p.cfg.VertexProject == "" {
-		return nil, clierr.NewUsageError(
-			"missing vertex project: set --vertex-project or store one with `neo4j-cli credential embed add --vertex-project <project> --vertex-location <location>`")
-	}
-	if p.cfg.VertexLocation == "" {
-		return nil, clierr.NewUsageError(
-			"missing vertex location: set --vertex-location or store one with `neo4j-cli credential embed add --vertex-project <project> --vertex-location <location>`")
-	}
 	if err := ValidateVertexProject(p.cfg.VertexProject); err != nil {
 		return nil, err
 	}

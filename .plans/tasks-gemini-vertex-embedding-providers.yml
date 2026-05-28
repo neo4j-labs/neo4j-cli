@@ -561,7 +561,7 @@ tasks:
       the validator's new missing-style message. Run them and confirm
       they pass. Add no new tests — this is purely a refactor that
       preserves UX.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`ValidateVertexLocation` and `ValidateVertexProject` each branch on empty input and emit a missing-style usage error before the pattern check"
@@ -571,4 +571,4 @@ tasks:
       - "All other tests pass unmodified"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T16:15:00Z

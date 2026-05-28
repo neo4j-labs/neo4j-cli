@@ -68,3 +68,7 @@ Decisions: Redaction flattens the error chain (errors.New on the redacted string
 
 ## REVIEW — 2026-05-28T16:00:00Z
 Added 1 review task (task-015): collapse redundant empty checks in vertexProvider.Embed since validators reject empty strings.
+
+## TASK-015 — 2026-05-28T16:15:00Z
+Folded empty-string handling into ValidateVertexLocation / ValidateVertexProject (missing-style usage error before pattern check); deleted the four `if p.cfg.Vertex... == ""` blocks at the top of vertexProvider.Embed. Existing missing-X tests pass unmodified — new validator messages keep the same key substrings (`vertex project` / `vertex location` / `--vertex-X` / `credential embed add`).
+Files: ~neo4j-cli/query/embed/vertex.go
