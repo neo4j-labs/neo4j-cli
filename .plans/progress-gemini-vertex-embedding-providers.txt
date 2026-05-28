@@ -75,3 +75,7 @@ Files: ~neo4j-cli/query/embed/vertex.go
 
 ## REVIEW — 2026-05-28T16:30:00Z
 Added 1 review task (task-016): update stale provider lists in parent help text, --embed-provider flag, README, .agents/query.md.
+
+## TASK-016 — 2026-05-28T16:45:00Z
+Updated 5 stale provider lists to include gemini+vertex: credential/embed parent Long, query --embed-provider flag usage, README.md providers line + provider-defaults paragraph (added Gemini base URL + Vertex location-derived URL/ADC note), and .agents/query.md error-message quote. Regenerated skill bundle (references/credential.md, references/query.md drifted as expected).
+Files: ~neo4j-cli/internal/subcommands/credential/embed/embed.go, ~neo4j-cli/query/query.go, ~README.md, ~.agents/query.md, ~neo4j-cli/internal/skill/bundle/references/credential.md, ~neo4j-cli/internal/skill/bundle/references/query.md

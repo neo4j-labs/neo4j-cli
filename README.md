@@ -81,7 +81,7 @@ neo4j-cli credential dbms set-embed prod                  # clear the link
 neo4j-cli credential dbms remove prod
 ```
 
-`credential embed` — Embedding-provider credentials (provider, model, base URL, dimensions, optional API key). Consumed by `query --param NAME:embed=...` and `query :embed`. Supported providers: `openai`, `ollama`, `huggingface`.
+`credential embed` — Embedding-provider credentials (provider, model, base URL, dimensions, optional API key). Consumed by `query --param NAME:embed=...` and `query :embed`. Supported providers: `openai`, `ollama`, `huggingface`, `gemini`, `vertex`.
 
 ```bash
 neo4j-cli credential embed add --name openai-shared --provider openai --model text-embedding-3-small --api-key '<key>'
@@ -344,7 +344,7 @@ API-key precedence (highest first): per-provider OS env (`OPENAI_API_KEY` / `HF_
 
 `--embed-credential <name>` selects a stored embed credential explicitly; without it the resolver falls back to the embed credential linked from the resolved dbms credential (via `credential dbms add --embed-credential` or `credential dbms set-embed`), then to `credential embed`'s default. So one `--credential <name>` can drive both DB connection and embedding when the dbms credential carries an embed link.
 
-Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://localhost:11434`, HuggingFace `https://router.huggingface.co/hf-inference/models` (serverless mode). Setting `--embed-base-url` switches HuggingFace to dedicated-endpoint mode.
+Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://localhost:11434`, HuggingFace `https://router.huggingface.co/hf-inference/models` (serverless mode). Setting `--embed-base-url` switches HuggingFace to dedicated-endpoint mode. Gemini base URL `https://generativelanguage.googleapis.com/v1beta` (called as `{base}/models/{model}:embedContent`). Vertex AI builds the URL from `--vertex-project` and `--vertex-location` (no `--embed-base-url` knob) and authenticates via Application Default Credentials (`gcloud auth application-default login` or `GOOGLE_APPLICATION_CREDENTIALS`).
 
 ## Write operations
 

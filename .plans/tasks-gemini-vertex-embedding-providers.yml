@@ -574,6 +574,7 @@ tasks:
     completed_at: 2026-05-28T16:15:00Z
 
   - id: task-016
+    status: completed
     title: "Update stale provider lists in help text and docs (gemini + vertex coverage)"
     description: |
       Audit of the live binary (`bin/neo4j-cli credential embed -h`,
@@ -635,7 +636,6 @@ tasks:
 
       No new tests needed (these are doc / help-text edits picked up
       by the existing round-trip gate).
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "Parent `credential embed` cmd Long string lists all five providers"
@@ -647,4 +647,4 @@ tasks:
       - "`bin/neo4j-cli credential embed -h` and `bin/neo4j-cli query -h` live output reflects all five providers"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-05-28T16:45:00Z

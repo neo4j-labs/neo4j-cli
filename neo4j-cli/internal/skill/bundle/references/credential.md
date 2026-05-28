@@ -273,7 +273,7 @@ neo4j-cli credential dbms use prod --rw
 
 Manage and view embed credential values
 
-Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). `query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. Supported providers: openai, ollama, huggingface.
+Manage stored embedding-provider credentials (provider, model, base URL, dimensions, optional API key). `query --param NAME:embed=<text>` and `query :embed [text]` consume the resolved embed credential when no `--embed-*` flag or `NEO4J_EMBED_*` env var overrides it. Supported providers: openai, ollama, huggingface, gemini, vertex.
 
 Usage: `neo4j-cli credential embed`
 
