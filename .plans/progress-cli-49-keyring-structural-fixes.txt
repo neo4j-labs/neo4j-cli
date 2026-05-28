@@ -85,3 +85,11 @@ Files: ~common/clicfg/credentials/credentials.go
 ## TASK-022 — 2026-05-28T19:45:00Z
 Removed stale "The caller is responsible for persisting the credential-storage config key." sentence from both MigrateToKeyring and MigrateToInsecure doc comments in credentials.go; no equivalent language remained elsewhere.
 Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-023 — 2026-05-28T20:00:00Z
+Replaced dead `if err := c.save()` check in MigrateToKeyring with a direct `c.saveToJSON()` call; added a comment explaining storageMode is still insecure at that point so saveToJSON() is the correct dispatch.
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-024 — 2026-05-28T20:30:00Z
+Added warnW io.Writer to getToken and getHeaders; added WarnW io.Writer field to RequestConfig (nil defaults to os.Stderr in MakeRequest); removed "os" import from token.go; warning now writes to warnW instead of os.Stderr directly.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/api/api.go

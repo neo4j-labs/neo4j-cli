@@ -296,12 +296,11 @@ func (c *Credentials) MigrateToKeyring() error {
 	}
 
 	// Zero sensitive in-memory fields and persist scrubbed JSON.
+	// storageMode is still StorageModeInsecure here, so saveToJSON() is called directly.
 	for _, cred := range all {
 		zeroCredSensitiveFields(cred)
 	}
-	if err := c.save(); err != nil {
-		return err
-	}
+	c.saveToJSON()
 
 	c.storageMode = StorageModeKeyring
 	return nil

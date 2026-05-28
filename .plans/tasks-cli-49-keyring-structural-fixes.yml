@@ -549,7 +549,8 @@ tasks:
         b. If save() can be replaced with saveToJSON() directly (since mode is still insecure
            during migration), prefer the more direct call.
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T20:00:00Z"
     source: review
     dependencies:
       - task-022
@@ -569,7 +570,8 @@ tasks:
       layer already have access to cmd.ErrOrStderr(). If the signature change propagates to
       an exported function in the api package, add the io.Writer at the end of the parameter
       list to minimise diff. Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T20:30:00Z"
     source: review
     dependencies:
       - task-023
