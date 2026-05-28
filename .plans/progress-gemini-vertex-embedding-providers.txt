@@ -65,3 +65,6 @@ Files: ~neo4j-cli/query/embed/httpjson.go, +neo4j-cli/query/embed/httpjson_test.
 Closed M2 sensitive-param URL leak. Added redactSensitiveURLParams + sensitiveQueryParamRE (case-insensitive `key|api_key|access_token|token` matcher) in httpjson.go; applied at both `request failed:` and `build request:` wrap sites. Tests cover all four param names + case variants, multi-param URLs, fragment+special-char values, nil passthrough, live network-error redaction via httptest, and chain-flatten invariant.
 Files: ~neo4j-cli/query/embed/httpjson.go, ~neo4j-cli/query/embed/httpjson_test.go
 Decisions: Redaction flattens the error chain (errors.New on the redacted string) so the regex applies to the final Error() output regardless of how net/http formatted the URL — robustness over chain-unwrap. The build-request wrap-site live-path is effectively unreachable when urlcheck.ValidateRemoteURL already passes; covered via a shape-based unit test rather than coupling to net/http internals.
+
+## REVIEW — 2026-05-28T16:00:00Z
+Added 1 review task (task-015): collapse redundant empty checks in vertexProvider.Embed since validators reject empty strings.

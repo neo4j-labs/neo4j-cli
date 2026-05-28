@@ -506,3 +506,69 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
     source: review
     completed_at: 2026-05-28T13:45:00Z
+
+  - id: task-015
+    title: "Collapse redundant empty checks in vertexProvider.Embed (code-judo)"
+    description: |
+      Review found that the empty-string checks at the top of
+      `neo4j-cli/query/embed/vertex.go` `Embed` (around lines 138-145)
+      are dead code in the presence of the regex validators introduced
+      by task-012. The validators reject any string that doesn't match:
+      - VertexLocation: `^[a-z]+(-[a-z0-9]+)+$`
+      - VertexProject: `^[a-z][a-z0-9-]{4,28}[a-z0-9]$`
+      Neither pattern matches the empty string, so the explicit `if
+      p.cfg.VertexProject == ""` and `if p.cfg.VertexLocation == ""`
+      blocks are unreachable in any case the validator wouldn't already
+      catch. Eight redundant lines + one concept (empty vs invalid) that
+      future readers have to mentally diff against the validator.
+
+      The keep-argument was that the empty-case error message points at
+      the recovery command (`neo4j-cli credential embed add
+      --vertex-project <project> --vertex-location <location>`) which
+      the invalid-case ("must be a GCP project ID like ...") doesn't.
+      Solve that inside the validator instead: branch on empty up-top
+      and emit a missing-style message, then fall through to the
+      pattern check. Single source of truth, one concept.
+
+      Suggested shape (apply to both validators):
+
+      ```go
+      func ValidateVertexLocation(location string) error {
+          if location == "" {
+              return clierr.NewUsageError(
+                  "missing --vertex-location: set one with `neo4j-cli credential embed add --vertex-location <region>`")
+          }
+          if !vertexLocationPattern.MatchString(location) {
+              return clierr.NewUsageError(...) // existing invalid-format message
+          }
+          return nil
+      }
+      ```
+
+      Then delete the four `if p.cfg.Vertex... == ""` lines in `Embed`.
+      Net diff: -8 lines in vertex.go's Embed, +6 lines across the two
+      validators, plus a clearer mental model.
+
+      Important: DO NOT touch the add.go cross-flag check (`if
+      vertexProject == "" || vertexLocation == ""` returning "requires
+      both"). That message is more pointed than two separate per-field
+      "missing X" errors when the user forgot both flags at once, and
+      add.go isn't the duplicated-defense-in-depth layer — vertex.go is.
+
+      Tests: the existing `TestVertex_Embed_MissingProject` /
+      `TestVertex_Embed_MissingLocation` cases (or whatever names they
+      have) will need their error-message assertions updated to match
+      the validator's new missing-style message. Run them and confirm
+      they pass. Add no new tests — this is purely a refactor that
+      preserves UX.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`ValidateVertexLocation` and `ValidateVertexProject` each branch on empty input and emit a missing-style usage error before the pattern check"
+      - "The four `if p.cfg.Vertex... == \"\"` blocks at the top of `vertexProvider.Embed` are deleted"
+      - "Existing `TestVertex_Embed_MissingProject` / `TestVertex_Embed_MissingLocation` tests pass (with their assertions updated to the new message if needed)"
+      - "No change to add.go's cross-flag `requires both` check"
+      - "All other tests pass unmodified"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: null
