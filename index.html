@@ -1153,9 +1153,10 @@
       <!-- Step 2: always CLI -->
       <div class="step">
         <div class="step-num">2</div>
-        <h3>Install the skill</h3>
-        <p>Teaches Claude Code, Codex, Cursor, and all others how to drive the CLI. <a href="#examples" data-activate-tab="skill" class="step-link">↓</a></p>
+        <h3>Install skills</h3>
+        <p>Teach your agents the CLI API — or install the full <a href="https://github.com/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener" class="step-link">neo4j-skills</a> catalog covering Cypher, GDS, GraphRAG and more. <a href="#examples" data-activate-tab="skill" class="step-link">↓</a></p>
         <div class="step-cmd" data-copy="neo4j-cli skill install --rw"><span class="prompt">$</span><span> neo4j-cli skill install <span class="flag">--rw</span></span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
+        <div class="step-cmd" data-copy="neo4j-cli skill install --all --rw"><span class="prompt">$</span><span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span></span><span class="copy-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span></div>
       </div>
 
       <!-- Step 3: Get a database (cloud/local toggle) -->
@@ -1505,38 +1506,42 @@
       <!-- skill -->
       <div class="example-pane" data-pane="skill">
         <div class="example-header">
-          <span class="desc">Teach your AI agents the full CLI API in one command</span>
+          <span class="desc">Install the neo4j-cli skill — or the full neo4j-skills catalog (Cypher, GDS, GraphRAG &amp; more)</span>
           <button class="copy-mini" data-copy-pane="skill">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             copy
           </button>
         </div>
 <pre><span class="agentic-line"><span class="agentic-comment">&gt; Install the neo4j skill for all my agents, then verify it's up to date everywhere</span><span class="agentic-loading">→ loading skill neo4j-cli</span></span>
+<span class="comment"># self-skill only (CLI commands, Aura, query, :schema)</span>
 <span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>
 
 <span class="info">▸</span> detecting installed agents…
 <span class="ok">✓</span> claude-code     installed (v1.3.0)
 <span class="ok">✓</span> cursor          installed (v1.3.0)
 <span class="ok">✓</span> windsurf        installed (v1.3.0)
-<span class="info">○</span> copilot         not detected — skipped
 <span class="info">○</span> gemini-cli      not detected — skipped
-<span class="info">○</span> codex           not detected — skipped
 
-<span class="info">▸</span> agents now know: aura, query, :schema, env resolution, JSON envelope
+<span class="comment"># full catalog — Cypher, GDS, GraphRAG, modeling, drivers, import, …</span>
+<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span>
 
-<span class="comment"># check for version drift across all agents</span>
+<span class="info">▸</span> fetching catalog from neo4j-contrib/neo4j-skills…
+<span class="ok">✓</span> neo4j-cli           installed (v1.3.0)
+<span class="ok">✓</span> neo4j-cypher-skill  installed (v1.1.0)
+<span class="ok">✓</span> neo4j-gds-skill     installed (v1.0.2)
+<span class="ok">✓</span> neo4j-graphrag-skill installed (v1.0.1)
+<span class="ok">✓</span> neo4j-modeling-skill installed (v1.0.0)
+<span class="comment">  … and 12 more</span>
+
+<span class="comment"># or install one catalog skill by name</span>
+<span class="prompt">$</span> neo4j-cli skill install neo4j-cypher-skill <span class="flag">--rw</span>
+
+<span class="comment"># check for version drift and update stragglers</span>
 <span class="prompt">$</span> neo4j-cli skill check
-
-<span class="ok">✓</span> claude-code     v1.3.0  up to date
-<span class="ok">✓</span> cursor          v1.3.0  up to date
 <span class="info">!</span> windsurf        v1.2.0  <span class="flag">outdated</span> — run: neo4j-cli skill install --agent windsurf --rw
-
-<span class="comment"># update the outdated one</span>
 <span class="prompt">$</span> neo4j-cli skill install <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>
 
-<span class="ok">✓</span> windsurf        updated to v1.3.0
-
-<span class="agentic-line"><span class="agentic-result">All 3 detected agents (claude-code, cursor, windsurf) are now on v1.3.0.</span></span></pre>
+<span class="agentic-line"><span class="agentic-result">All detected agents updated. Agents now have access to the full neo4j-skills catalog.</span></span></pre>
       </div>
 
       <!-- embed -->
@@ -1929,18 +1934,19 @@
           <span class="desc">Agent Skills</span>
         </div>
         <div class="ref-body">
-          <p>Installs the embedded skill bundle (SKILL.md + per-subcommand references) into each detected agent's skill directory so agents know the full CLI API without guessing.</p>
-          <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>                       <span class="comment"># self-skill into all detected agents</span>
-<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--agent</span> claude-code <span class="flag">--rw</span>    <span class="comment"># scope to one agent (positional agent is an error)</span>
-<span class="prompt">$</span> neo4j-cli skill install neo4j-cypher-skill <span class="flag">--rw</span>     <span class="comment"># a curated catalog skill by name</span>
-<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span>                 <span class="comment"># self-skill + every catalog skill</span>
-<span class="prompt">$</span> neo4j-cli skill refresh <span class="flag">--rw</span>                       <span class="comment"># force a catalog re-download</span>
-<span class="prompt">$</span> neo4j-cli skill list                              <span class="comment"># skills × agents install state</span>
-<span class="prompt">$</span> neo4j-cli skill check                             <span class="comment"># version drift vs running binary</span>
-<span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># idempotent; positional is a skill name</span></pre>
-          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.</p>
-          <p>Catalog skills come from <a href="https://github.com/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener">neo4j-contrib/neo4j-skills</a>; pass <code>--refresh</code> on <code>install</code>/<code>list</code>/<code>check</code> to fetch the latest catalog before running.</p>
-          <p>Installed skill bundles are refreshed automatically in the background whenever the binary version changes (after <code>neo4j-cli update</code>, a Homebrew/npm/pipx upgrade, or any other in-place swap). Opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>. The bundle covers Aura, Bolt queries, schema introspection, embeddings, credentials, and the write gate — everything agents need to drive the CLI correctly.</p>
+          <p class="ref-sub"><span class="keyword">Self-skill</span> — installs the embedded CLI skill bundle (SKILL.md + per-subcommand refs) into all detected agents:</p>
+          <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--rw</span>                       <span class="comment"># all detected agents</span>
+<span class="prompt">$</span> neo4j-cli skill install <span class="flag">--agent</span> claude-code <span class="flag">--rw</span>    <span class="comment"># scope to one agent</span></pre>
+          <p class="ref-sub"><span class="keyword">neo4j-skills catalog</span> — curated skills for Cypher, GDS, GraphRAG, modeling, drivers, import and more, sourced from <a href="https://github.com/neo4j-contrib/neo4j-skills" target="_blank" rel="noopener">neo4j-contrib/neo4j-skills</a>:</p>
+          <pre><span class="prompt">$</span> neo4j-cli skill install <span class="flag">--all</span> <span class="flag">--rw</span>                 <span class="comment"># self-skill + full catalog</span>
+<span class="prompt">$</span> neo4j-cli skill install neo4j-cypher-skill <span class="flag">--rw</span>     <span class="comment"># one catalog skill by name</span>
+<span class="prompt">$</span> neo4j-cli skill install neo4j-cypher-skill <span class="flag">--refresh</span> <span class="flag">--rw</span>  <span class="comment"># force catalog re-fetch first</span></pre>
+          <p class="ref-sub"><span class="keyword">Manage</span>:</p>
+          <pre><span class="prompt">$</span> neo4j-cli skill list                                 <span class="comment"># skills × agents matrix</span>
+<span class="prompt">$</span> neo4j-cli skill check                                <span class="comment"># version drift vs running binary</span>
+<span class="prompt">$</span> neo4j-cli skill remove neo4j-cypher-skill <span class="flag">--rw</span>      <span class="comment"># remove a catalog skill</span>
+<span class="prompt">$</span> neo4j-cli skill remove self <span class="flag">--agent</span> windsurf <span class="flag">--rw</span>   <span class="comment"># remove self-skill from one agent</span></pre>
+          <p>Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie. Self-skill bundles refresh automatically on binary version change; opt out with <code>neo4j-cli config set skill-auto-refresh false --rw</code>.</p>
         </div>
       </div>
       <!-- END:docs:skills -->
