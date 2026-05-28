@@ -161,3 +161,102 @@ tasks:
       - "`bin/neo4j-cli aura instance list --help` output contains neither `--tenant-id` nor any tenant-related text."
       - "`bin/neo4j-cli aura --help` output does not list `tenant` as a subcommand."
     completed_at: 2026-05-28T11:45:00Z
+
+  - id: task-008
+    title: "Fix misplaced docstring above TestStandaloneAura_TenantCommandRemoved"
+    description: |
+      In `neo4j-cli/aura/aura_test.go` lines 42–44, the docstring that originally
+      documented `TestNewStandaloneCmdFlagErrorFuncWrapsAsUsageError` is now
+      orphaned above `TestStandaloneAura_TenantCommandRemoved` (task-003 inserted
+      the new test between the docstring and its real target). The comment now
+      actively misdescribes the function it precedes — it says "wraps as
+      *clierr.CLIError with exit code 2" while the test below it asserts
+      "unknown command". Pick the cleanest fix: either delete the orphaned
+      docstring outright (it doesn't add anything `go doc` doesn't already
+      convey from the function name) or move it back above
+      `TestNewStandaloneCmdFlagErrorFuncWrapsAsUsageError` so it documents the
+      function it was written for. Deletion is the cheaper option and aligns
+      with the project's default-no-comments convention; move only if the
+      comment captures a non-obvious gotcha worth keeping (it doesn't — it just
+      restates the test name).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "`aura_test.go` no longer has a docstring whose content describes a different test than the one immediately below it."
+      - "`make test` passes; nothing else in `aura_test.go` changed."
+    completed_at: null
+
+  - id: task-009
+    title: "Sweep `\"Project/tenant ID\"` flag descriptions in agent/deployment/import subtrees"
+    description: |
+      About 20 leaf commands across `neo4j-cli/aura/internal/subcommands/agent/`,
+      `.../deployment/` (including its `database/`, `server/`, `server/database/`,
+      `token/` subtrees), and `.../import/job/` register their per-leaf
+      `--project-id` flag with the description string `"Project/tenant ID"`
+      (some prefixed with `(required) `). After CLI-126's deletion of the
+      `tenant` command and `--tenant-id` flag, the user-facing `--help` text in
+      these subtrees still teaches users the old vocabulary, which undercuts
+      the feature's intent. Replace `"Project/tenant ID"` with `"Project ID"`
+      and `"(required) Project/tenant ID"` with `"(required) Project ID"` across
+      all matching `.go` source files. After the source change, run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle (the
+      same descriptions appear in `bundle/references/aura.md`). Confirm via
+      `grep` that no source `.go` file outside `.plans/archive/` still contains
+      the literal `"Project/tenant ID"`.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "`git grep -nE 'Project/tenant ID' -- '*.go'` returns no matches."
+      - "Bundle regenerated; `grep -n 'Project/tenant ID' neo4j-cli/internal/skill/bundle/references/aura.md` returns no matches."
+      - "`make test`, `make fmt-check`, `make lint`, `make generate-check` all pass."
+      - "`bin/neo4j-cli aura agent list --help` shows `--project-id string   Project ID` (no `tenant` text)."
+
+    completed_at: null
+
+  - id: task-010
+    title: "Clarify changelog body re: tenant get → project get nuance"
+    description: |
+      The changelog entry at `.changes/unreleased/neo4j-cli-Minor-20260528-112749.yaml`
+      currently reads: "Use 'aura project list', 'aura organization get', and
+      '--project-id' instead." That phrasing aligns with the historical CLI-99
+      deprecation message but misses the nuance we discovered during this
+      feature: `aura tenant get` actually hit the `/tenants/{id}` v1 endpoint
+      (configuration-list payload), which is the same endpoint `aura project
+      get` calls today. `aura organization get` hits a different endpoint
+      (`/organizations/{orgID}` v2) and returns only `{id, name}`. The in-code
+      prose in `instance/create.go` correctly directs configuration-list users
+      at `'project get'`, so the changelog should too. Update the body to name
+      `project get` as the replacement (drop or supplement `organization get`).
+      One reasonable wording: "Use 'aura project list', 'aura project get'
+      (configuration details) or 'aura organization get' (org metadata), and
+      '--project-id' instead." Keep the body single-line to match changie's
+      output convention.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "`.changes/unreleased/neo4j-cli-Minor-20260528-112749.yaml` body names `project get` as the (primary) replacement for `tenant get`."
+      - "Body remains single-line; YAML still parses (no schema regressions)."
+      - "`make test` passes."
+    completed_at: null
+
+  - id: task-011
+    title: "Rename TestStandaloneAura_TenantCommandRemoved to match file convention"
+    description: |
+      `neo4j-cli/aura/aura_test.go` mixes naming conventions: the sibling tests
+      use `TestNewStandaloneCmd...` / `TestNewCmd...` prefixes, while
+      `TestStandaloneAura_TenantCommandRemoved` (added by task-003) uses an
+      underscore separator and a different word order. Rename it to
+      `TestNewStandaloneCmd_RejectsRemovedTenantCommand` (or similar — preserve
+      the meaning, drop the underscore-after-prefix, follow the sibling style).
+      Pure rename; no semantic change.
+    status: pending
+    dependencies:
+      - task-008
+    source: review
+    acceptance_criteria:
+      - "Renamed test function follows the `TestNewStandaloneCmd...` prefix style used by `aura_test.go` siblings."
+      - "`make test` passes (function still runs and asserts the same behaviour)."
+    completed_at: null

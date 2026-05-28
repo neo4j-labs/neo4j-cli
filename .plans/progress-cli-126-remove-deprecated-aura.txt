@@ -28,3 +28,6 @@ Decisions: Original task-005 scope was bundle-only; the parallel worker correctl
 ## TASK-007 — 2026-05-28T11:45:00Z
 Final-gates verification. All make targets green; all four smoke assertions pass (unknown command, unknown flag, no --tenant-id in --help, no tenant subcommand in --help).
 Files: (verification only — no source changes)
+
+## REVIEW — 2026-05-28T12:05:00Z
+Added 4 review tasks (task-008..task-011).
