@@ -30,7 +30,7 @@ tasks:
       neo4j-cli/internal/skill/bundle/query-additions.md from the updated source.
       The generator (neo4j-cli/internal/skill/gen/main.go) copies the source
       verbatim into the bundle. Stage both source and bundle together.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "`rg \"OPTIONAL MATCH\" neo4j-cli/internal/skill/` returns hits in both source and bundle"
       - "`rg \"full-text search\" neo4j-cli/internal/skill/` returns hits in both source and bundle"
       - "No other generated files have drifted (git diff scoped to the two query-additions.md paths)"
-    completed_at: null
+    completed_at: 2026-05-28T12:00:00Z
 
   - id: task-003
     title: "Add changie Patch entry for the prompt update"

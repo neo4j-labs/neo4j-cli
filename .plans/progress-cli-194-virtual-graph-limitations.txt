@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-28T11:55:00Z
 Added `OPTIONAL MATCH` and vector/full-text search bullets to the Virtual Graph Forbidden list in the query skill source.
 Files: ~neo4j-cli/internal/skill/query-additions.md
+
+## TASK-002 — 2026-05-28T12:00:00Z
+Regenerated skill bundle so the committed copy of query-additions.md matches source.
+Files: ~neo4j-cli/internal/skill/bundle/query-additions.md
