@@ -5,7 +5,10 @@ package skill
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
+
+	"github.com/spf13/afero"
 
 	"github.com/neo4j/cli/common/clierr"
 )
@@ -32,4 +35,75 @@ func agentNames() []string {
 		names = append(names, AGENTS[i].Name)
 	}
 	return names
+}
+
+// isAgentName reports whether name matches a known agent in AGENTS
+// (case-insensitive). Used by the hard-break guard so a user typing
+// `skill install claude-code` (the old positional shape) gets a clear
+// pointer to `--agent claude-code` instead of a generic "unknown skill"
+// error.
+func isAgentName(name string) bool {
+	return FindAgent(name) != nil
+}
+
+// didYouMeanAgentErr returns the hard-break usage error mandated by
+// REQ-F-012 when a `<skill-name>` positional matches a known agent name
+// instead of a real skill. The lowercased canonical form is suggested so
+// the user can copy-paste the fix.
+func didYouMeanAgentErr(name string) error {
+	a := FindAgent(name)
+	canonical := strings.ToLower(name)
+	if a != nil {
+		canonical = a.Name
+	}
+	return clierr.NewUsageError("unknown skill: %s; did you mean '--agent %s'?", name, canonical)
+}
+
+// unknownSkillErr is the generic non-agent-collision branch of the
+// positional-skill validator. Catalog wiring in later tasks may wrap
+// this with a refresh hint; for now it's a plain usage error.
+func unknownSkillErr(name string) error {
+	return clierr.NewUsageError("unknown skill: %s", name)
+}
+
+// mustNotCombineAllAndPositional rejects the simultaneous use of `--all`
+// and a `[skill-name]` positional, shared by install + remove so the
+// wording stays in one place.
+func mustNotCombineAllAndPositional(allFlag bool, skillArg string) error {
+	if allFlag && skillArg != "" {
+		return clierr.NewUsageError("--all cannot be combined with a [skill-name] positional")
+	}
+	return nil
+}
+
+// readInstalledSkill reads the per-agent install state for `skillName`
+// from `filesystem`. Returns whether SKILL.md exists and the parsed
+// frontmatter `version:` (empty string when missing or unparseable).
+// Shared by installer.List + BuildInventory.
+func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bool, string) {
+	sp, ok := agent.SkillsPath()
+	if !ok {
+		return false, ""
+	}
+	skillFile := filepath.Join(sp, skillName, "SKILL.md")
+	exists, _ := afero.Exists(filesystem, skillFile)
+	if !exists {
+		return false, ""
+	}
+	data, err := afero.ReadFile(filesystem, skillFile)
+	if err != nil {
+		return true, ""
+	}
+	return true, parseVersion(data)
+}
+
+// agentDetected reports whether `agent`'s DetectDir exists on `filesystem`.
+// Shared by installer.List + BuildInventory.
+func agentDetected(filesystem afero.Fs, agent *Agent) bool {
+	dp, ok := agent.DetectPath()
+	if !ok {
+		return false
+	}
+	exists, _ := afero.DirExists(filesystem, dp)
+	return exists
 }

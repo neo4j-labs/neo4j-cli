@@ -64,7 +64,7 @@ func TestInstallE2E(t *testing.T) {
 	require.NoError(t, memFs.MkdirAll(detectDir, 0755))
 
 	const version = "v9.9.9-test"
-	targets, err := commonskill.Install(memFs, binskill.Bundle, "neo4j-cli", version, "claude-code")
+	targets, err := commonskill.Install(memFs, commonskill.Source{FS: binskill.Bundle, Version: version}, "neo4j-cli", "claude-code")
 	require.NoError(t, err)
 	require.Len(t, targets, 1)
 	assert.Equal(t, "claude-code", targets[0].Name)

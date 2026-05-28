@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/neo4j/cli/common/skill/catalog"
 	"github.com/spf13/afero"
 )
 
@@ -26,16 +27,27 @@ var ErrUnknownAgent = errors.New("skill: unknown agent")
 // known agent but its DetectDir is missing on the host filesystem.
 var ErrAgentNotDetected = errors.New("skill: agent not detected on host")
 
+// Source describes the on-disk bundle that Install will copy into each
+// target agent. FS is rooted at the bundle (`SKILL.md` + `references/*` at
+// the top level); Version is injected into the SKILL.md frontmatter
+// `version:` line. An empty Version leaves frontmatter unchanged so unit
+// tests can assert the upstream value is preserved.
+type Source struct {
+	FS      fs.FS
+	Version string
+}
+
 // versionLineRe matches the frontmatter `version:` line in an installed
 // SKILL.md. Tolerates leading whitespace and arbitrary trailing whitespace
 // after the value.
 var versionLineRe = regexp.MustCompile(`(?m)^[ \t]*version:[ \t]*([^\r\n]*?)[ \t]*$`)
 
-// versionPlaceholder mirrors render.versionPlaceholder. Duplicated here to
-// avoid an import cycle (render imports nothing from skill).
-const versionPlaceholder = "{{VERSION}}"
+// frontmatterRe matches the leading YAML frontmatter block of a SKILL.md
+// body. Captures the inner body so injection can replace or append the
+// `version:` line within it.
+var frontmatterRe = regexp.MustCompile(`(?s)\A---\r?\n(.*?)\r?\n---(\r?\n|\z)`)
 
-// AgentInstall describes the per-agent state surfaced by List / Check.
+// AgentInstall describes the per-agent state surfaced by List.
 type AgentInstall struct {
 	Agent            *Agent
 	Detected         bool   // DetectDir exists on disk
@@ -43,20 +55,9 @@ type AgentInstall struct {
 	InstalledVersion string // value of the `version:` frontmatter line, "" if not installed or unparseable
 }
 
-// CheckRow is a per-agent row produced by Check. Status is "ok", "drift",
-// or "unknown-version". Check returns rows only for installed agents — an
-// uninstalled agent is silently omitted.
-type CheckRow struct {
-	Agent            *Agent
-	InstalledVersion string
-	CurrentVersion   string
-	Status           string
-}
-
-// Install copies `bundle` into each target agent's skills directory under
-// `<skillsDir>/<skillName>/`. The {{VERSION}} placeholder in SKILL.md is
-// substituted with `version` before writing; references are copied
-// verbatim.
+// Install copies `src.FS` into each target agent's skills directory under
+// `<skillsDir>/<skillName>/`. The SKILL.md frontmatter `version:` line is
+// rewritten (or inserted) to `src.Version`; references are copied verbatim.
 //
 // agentFilter semantics:
 //   - "" — install to every detected agent. Returns ErrNoAgentsDetected
@@ -65,11 +66,14 @@ type CheckRow struct {
 //     ErrUnknownAgent; known-but-undetected returns ErrAgentNotDetected.
 //
 // Returns the list of agents the bundle was written to (in catalog order).
-func Install(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*Agent, error) {
+func Install(filesystem afero.Fs, src Source, skillName, agentFilter string) ([]*Agent, error) {
 	if skillName == "" {
 		return nil, errors.New("skill: empty skill name")
 	}
-	if bundle == nil {
+	if !catalog.ValidSkillName(skillName) {
+		return nil, fmt.Errorf("skill: invalid skill name %q", skillName)
+	}
+	if src.FS == nil {
 		return nil, errors.New("skill: nil bundle FS")
 	}
 
@@ -89,7 +93,7 @@ func Install(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter 
 		if rerr := RemoveDir(filesystem, dst); rerr != nil {
 			return nil, fmt.Errorf("skill: cleaning %s: %w", dst, rerr)
 		}
-		if cerr := copyBundleWithVersion(filesystem, dst, bundle, version); cerr != nil {
+		if cerr := copyBundleWithVersion(filesystem, dst, src); cerr != nil {
 			return nil, fmt.Errorf("skill: writing %s: %w", dst, cerr)
 		}
 	}
@@ -146,64 +150,11 @@ func List(filesystem afero.Fs, skillName string) ([]AgentInstall, error) {
 	out := make([]AgentInstall, 0, len(AGENTS))
 	for i := range AGENTS {
 		row := AgentInstall{Agent: &AGENTS[i]}
-
-		dp, ok := AGENTS[i].DetectPath()
-		if ok {
-			exists, _ := afero.DirExists(filesystem, dp)
-			row.Detected = exists
-		}
-
-		sp, ok := AGENTS[i].SkillsPath()
-		if ok {
-			skillFile := filepath.Join(sp, skillName, "SKILL.md")
-			if exists, _ := afero.Exists(filesystem, skillFile); exists {
-				row.Installed = true
-				if data, err := afero.ReadFile(filesystem, skillFile); err == nil {
-					row.InstalledVersion = parseVersion(data)
-				}
-			}
-		}
-
+		row.Detected = agentDetected(filesystem, &AGENTS[i])
+		row.Installed, row.InstalledVersion = readInstalledSkill(filesystem, &AGENTS[i], skillName)
 		out = append(out, row)
 	}
 	return out, nil
-}
-
-// Check parses each installed SKILL.md frontmatter `version:` and compares
-// to currentVersion. Returns one row per *installed* agent and a drift
-// bool that is true when at least one row's Status != "ok".
-//
-// Status values: "ok" (matches), "drift" (mismatch), "unknown-version"
-// (frontmatter missing/unparseable).
-func Check(filesystem afero.Fs, skillName, currentVersion string) ([]CheckRow, bool, error) {
-	rows, err := List(filesystem, skillName)
-	if err != nil {
-		return nil, false, err
-	}
-
-	var out []CheckRow
-	drift := false
-	for _, r := range rows {
-		if !r.Installed {
-			continue
-		}
-		status := "ok"
-		switch {
-		case r.InstalledVersion == "":
-			status = "unknown-version"
-			drift = true
-		case r.InstalledVersion != currentVersion:
-			status = "drift"
-			drift = true
-		}
-		out = append(out, CheckRow{
-			Agent:            r.Agent,
-			InstalledVersion: r.InstalledVersion,
-			CurrentVersion:   currentVersion,
-			Status:           status,
-		})
-	}
-	return out, drift, nil
 }
 
 // resolveTargets is the install-time agent filter. Mirrors Remove's logic
@@ -232,27 +183,26 @@ func resolveTargets(filesystem afero.Fs, agentFilter string) ([]*Agent, error) {
 	return []*Agent{a}, nil
 }
 
-// copyBundleWithVersion is CopyBundle plus a single-file substitution: the
-// SKILL.md file at the bundle root has its {{VERSION}} placeholder replaced
-// with the runtime version before writing. Other files (references/*.md)
-// are copied verbatim.
-func copyBundleWithVersion(dst afero.Fs, dstDir string, bundle fs.FS, version string) error {
+// copyBundleWithVersion copies src.FS into dstDir, rewriting the SKILL.md
+// frontmatter `version:` line to src.Version (or inserting one when
+// upstream has none). References (references/*.md) are copied verbatim.
+func copyBundleWithVersion(dst afero.Fs, dstDir string, src Source) error {
 	if dstDir == "" {
 		return errors.New("skill: empty destination dir")
 	}
-	return fs.WalkDir(bundle, ".", func(p string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(src.FS, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
 			return nil
 		}
-		data, rerr := fs.ReadFile(bundle, p)
+		data, rerr := fs.ReadFile(src.FS, p)
 		if rerr != nil {
 			return rerr
 		}
 		if p == "SKILL.md" {
-			data = substituteVersion(data, version)
+			data = injectVersion(data, src.Version)
 		}
 		destPath := filepath.Join(dstDir, filepath.FromSlash(p))
 		if mkerr := dst.MkdirAll(filepath.Dir(destPath), 0755); mkerr != nil {
@@ -262,14 +212,41 @@ func copyBundleWithVersion(dst afero.Fs, dstDir string, bundle fs.FS, version st
 	})
 }
 
-// substituteVersion replaces every occurrence of {{VERSION}} in `data`
-// with `version`. Used only on SKILL.md. An empty version is a no-op so
-// tests can verify the placeholder survives when no version is supplied.
-func substituteVersion(data []byte, version string) []byte {
+// injectVersion rewrites the SKILL.md frontmatter `version:` line to the
+// supplied value, or inserts one immediately before the closing `---`
+// fence when absent. An empty `version` is a no-op so tests can verify
+// upstream content survives when no version is supplied. If `data` has no
+// frontmatter block, it is returned unchanged.
+func injectVersion(data []byte, version string) []byte {
 	if version == "" {
 		return data
 	}
-	return []byte(strings.ReplaceAll(string(data), versionPlaceholder, version))
+	m := frontmatterRe.FindSubmatchIndex(data)
+	if m == nil {
+		return data
+	}
+	innerStart, innerEnd := m[2], m[3]
+	inner := string(data[innerStart:innerEnd])
+
+	newLine := "version: " + version
+	var newInner string
+	if versionLineRe.MatchString(inner) {
+		newInner = versionLineRe.ReplaceAllLiteralString(inner, newLine)
+	} else {
+		trimmed := strings.TrimRight(inner, "\r\n")
+		if trimmed == "" {
+			newInner = newLine
+		} else {
+			newInner = trimmed + "\n" + newLine
+		}
+	}
+
+	var out strings.Builder
+	out.Grow(len(data) + len(newLine))
+	out.Write(data[:innerStart])
+	out.WriteString(newInner)
+	out.Write(data[innerEnd:])
+	return []byte(out.String())
 }
 
 // parseVersion extracts the frontmatter `version:` value from a SKILL.md

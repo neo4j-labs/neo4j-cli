@@ -212,7 +212,9 @@ func TestAgentContext_HelpExamples(t *testing.T) {
 
 // TestAllLeafCommands_HaveExamples covers REQ-F-001, REQ-F-012, REQ-F-015:
 // every visible, runnable cobra command reachable from app.NewCmd(cfg) carries
-// a non-empty Example: field whose first line is flush-left.
+// a non-empty Example: field whose first line is flush-left AND contains at
+// least three invocations (AGENTS.md "Cobra Help / Skill Bundle Rendering
+// Notes" — ≥3 invocations per leaf, each preceded by a `# comment` line).
 //
 // Filtering mirrors common/skill/render.visibleSubcommands — Hidden commands
 // and the cobra-injected `help` / `completion` subtrees are skipped, so the
@@ -241,6 +243,12 @@ func TestAllLeafCommands_HaveExamples(t *testing.T) {
 				"command %q must have a non-empty Example: field (REQ-F-001 / REQ-F-015)", path)
 			assert.False(t, strings.HasPrefix(firstLine, "  "),
 				"command %q Example first line must be flush-left (no leading two-space indent); got %q", path, firstLine)
+			assert.GreaterOrEqual(t, countExampleInvocations(c.Example), 3,
+				"command %q Example must contain at least three invocations (each preceded by a `# comment` line per AGENTS.md); got Example=%q", path, c.Example)
+			if c.Annotations["write"] != "true" {
+				assert.True(t, strings.Contains(c.Example, "--format json"),
+					"read command %q Example must contain at least one `--format json` invocation (AGENTS.md read-cmd gate); got Example=%q", path, c.Example)
+			}
 		}
 		for _, sub := range c.Commands() {
 			if sub.Hidden {
@@ -266,4 +274,18 @@ func TestAllLeafCommands_HaveExamples(t *testing.T) {
 		}
 		walk(sub, root.Name()+" "+name)
 	}
+}
+
+// countExampleInvocations counts the number of `# comment` headers in a
+// cobra Example block. AGENTS.md requires each invocation to be preceded by
+// a `# comment` line with a blank-line separator, so the comment count
+// equals the invocation count.
+func countExampleInvocations(example string) int {
+	n := 0
+	for _, line := range strings.Split(example, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "# ") {
+			n++
+		}
+	}
+	return n
 }

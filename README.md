@@ -36,17 +36,24 @@ Installed agent skill bundles are refreshed automatically after a successful swa
 
 ## Agent skills
 
-`neo4j-cli` ships an embedded skill bundle (`SKILL.md` + per-subcommand references) that teaches AI coding agents how to drive the CLI. `skill install` drops it into each detected agent's skill directory; pass an agent name to target one.
+`neo4j-cli` installs either the embedded self-skill (`SKILL.md` + per-subcommand references that teach AI coding agents how to drive the CLI) or any skill from the curated catalog at [`github.com/neo4j-contrib/neo4j-skills`](https://github.com/neo4j-contrib/neo4j-skills) (Cypher, modeling, drivers, GraphRAG, GDS, Aura, …). The self-skill is addressable as `self` (canonical) or by the binary name `neo4j-cli` (alias). Passing an agent name as the positional is a hard error — use `--agent <name>` instead.
 
 Supported agents: Claude Code, Cursor, Windsurf, Copilot, Antigravity, Gemini CLI, Cline, Codex, Pi, OpenCode, Junie.
 
 ```bash
-neo4j-cli skill install                  # all detected agents
-neo4j-cli skill install claude-code      # one agent
-neo4j-cli skill list                     # per-agent install state
-neo4j-cli skill check                    # version drift vs running binary
-neo4j-cli skill remove [agent]           # idempotent
+neo4j-cli skill install                              # self-skill into every detected agent
+neo4j-cli skill install neo4j-cypher-skill           # one catalog skill into every detected agent
+neo4j-cli skill install --all                        # self-skill + every catalog skill
+neo4j-cli skill install --agent claude-code          # scope any install to one agent
+neo4j-cli skill install neo4j-cypher-skill --refresh # force catalog fetch first
+neo4j-cli skill list                                 # per-(skill × agent) state
+neo4j-cli skill check                                # drift vs source (self + catalog)
+neo4j-cli skill remove neo4j-cypher-skill            # remove one skill
+neo4j-cli skill remove --all                         # remove every catalog skill (self preserved)
+neo4j-cli skill refresh                              # force a catalog fetch
 ```
+
+The catalog is cached under `os.UserCacheDir()/neo4j-cli/skill-catalog/` with a 24h TTL; `install` / `list` / `check` auto-refresh when stale, and fall back to the cached copy on network failure with a stderr warning.
 
 Using a multi-agent orchestrator like [Conductor](https://www.conductor.build)? It reuses the underlying agents' skill directories (e.g. Claude Code, Codex), so `skill install` with no argument covers every detected agent in one go, and `skill check` surfaces any version drift between them.
 

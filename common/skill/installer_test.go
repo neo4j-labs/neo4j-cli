@@ -59,7 +59,7 @@ func TestInstallNoAgentsDetected(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	memFs := afero.NewMemMapFs()
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.0.0", "")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.0.0"}, skillNameForTests, "")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrNoAgentsDetected)
 }
@@ -67,7 +67,7 @@ func TestInstallNoAgentsDetected(t *testing.T) {
 func TestInstallAllDetected(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
 
-	got, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.2.3", "")
+	got, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.2.3"}, skillNameForTests, "")
 	require.NoError(t, err)
 	require.Len(t, got, 2)
 
@@ -81,21 +81,21 @@ func TestInstallAllDetected(t *testing.T) {
 		skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
 		data, err := afero.ReadFile(memFs, skillFile)
 		require.NoError(t, err, "SKILL.md missing for %s at %s", agentName, skillFile)
-		assert.Contains(t, string(data), "version: 1.2.3", "{{VERSION}} not substituted in %s SKILL.md", agentName)
-		assert.NotContains(t, string(data), versionPlaceholder, "placeholder should be replaced for %s", agentName)
+		assert.Contains(t, string(data), "version: 1.2.3", "version not injected in %s SKILL.md", agentName)
+		assert.NotContains(t, string(data), "{{VERSION}}", "placeholder should be replaced for %s", agentName)
 
 		refFile := filepath.Join(sp, skillNameForTests, "references", "aura.md")
 		refData, err := afero.ReadFile(memFs, refFile)
 		require.NoError(t, err, "references/aura.md missing for %s", agentName)
-		// References must NOT be substituted — only SKILL.md.
-		assert.Contains(t, string(refData), "{{VERSION}} stays here", "references should not be substituted")
+		// References must NOT be touched — only SKILL.md.
+		assert.Contains(t, string(refData), "{{VERSION}} stays here", "references should not be modified")
 	}
 }
 
 func TestInstallSingleAgentByName(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
 
-	got, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "9.9.9", "Claude-Code")
+	got, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "9.9.9"}, skillNameForTests, "Claude-Code")
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, "claude-code", got[0].Name)
@@ -110,7 +110,7 @@ func TestInstallSingleAgentByName(t *testing.T) {
 func TestInstallUnknownAgent(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
 
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1", "vscode")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, skillNameForTests, "vscode")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrUnknownAgent)
 }
@@ -120,7 +120,7 @@ func TestInstallSingleAgentNotDetected(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	memFs := afero.NewMemMapFs() // no agent dirs created
 
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1", "claude-code")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, skillNameForTests, "claude-code")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrAgentNotDetected)
 }
@@ -135,7 +135,7 @@ func TestInstallOverwritesExisting(t *testing.T) {
 	require.NoError(t, memFs.MkdirAll(filepath.Dir(stale), 0755))
 	require.NoError(t, afero.WriteFile(memFs, stale, []byte("stale"), 0600))
 
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "2", "claude-code")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "2"}, skillNameForTests, "claude-code")
 	require.NoError(t, err)
 
 	// Stale ref must be gone — Install cleans before copying.
@@ -150,19 +150,48 @@ func TestInstallOverwritesExisting(t *testing.T) {
 
 func TestInstallEmptySkillName(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, fixtureInstallerBundle(), "", "1", "claude-code")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, "", "claude-code")
 	require.Error(t, err)
+}
+
+// TestInstallRejectsInvalidSkillName is the defense-in-depth gate against
+// a compromised upstream catalog leaking path-traversal names past the
+// validator in catalog.skillEntriesFromPluginJSON. Without this gate
+// filepath.Join(skillsRoot, "..") cleans to skillsRoot's parent and
+// RemoveDir would wipe out the agent's whole skills/config dir.
+func TestInstallRejectsInvalidSkillName(t *testing.T) {
+	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
+	bad := []string{"..", ".", "/", "foo/..", "./..", "  ..  ", ".git", "a/b/c", "foo\\bar"}
+	for _, name := range bad {
+		t.Run(name, func(t *testing.T) {
+			a := FindAgent("claude-code")
+			sp, _ := a.SkillsPath()
+			parent := filepath.Dir(sp)
+			// Seed a sibling so we can prove RemoveDir didn't escape.
+			sentinel := filepath.Join(parent, "sentinel.txt")
+			require.NoError(t, afero.WriteFile(memFs, sentinel, []byte("keep"), 0600))
+
+			_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, name, "claude-code")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid skill name")
+
+			// Parent directory and sentinel must still exist — Install must
+			// reject before any FS mutation.
+			exists, _ := afero.Exists(memFs, sentinel)
+			assert.True(t, exists, "Install must not touch FS when skill name is invalid")
+		})
+	}
 }
 
 func TestInstallNilBundle(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, nil, skillNameForTests, "1", "claude-code")
+	_, err := Install(memFs, Source{Version: "1"}, skillNameForTests, "claude-code")
 	require.Error(t, err)
 }
 
 func TestRemoveAllDetected(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1", "")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1"}, skillNameForTests, "")
 	require.NoError(t, err)
 
 	got, err := Remove(memFs, skillNameForTests, "")
@@ -206,7 +235,7 @@ func TestList(t *testing.T) {
 	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code", "cursor")
 
 	// Install only into claude-code, leaving cursor detected-but-uninstalled.
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.7.0", "claude-code")
+	_, err := Install(memFs, Source{FS: fixtureInstallerBundle(), Version: "1.7.0"}, skillNameForTests, "claude-code")
 	require.NoError(t, err)
 
 	rows, err := List(memFs, skillNameForTests)
@@ -241,59 +270,6 @@ func TestList(t *testing.T) {
 	assert.False(t, w.Installed)
 }
 
-func TestCheckNoDrift(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "1.0.0", "claude-code")
-	require.NoError(t, err)
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.False(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "ok", rows[0].Status)
-	assert.Equal(t, "1.0.0", rows[0].InstalledVersion)
-	assert.Equal(t, "1.0.0", rows[0].CurrentVersion)
-}
-
-func TestCheckDrift(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	_, err := Install(memFs, fixtureInstallerBundle(), skillNameForTests, "0.9.0", "claude-code")
-	require.NoError(t, err)
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.True(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "drift", rows[0].Status)
-	assert.Equal(t, "0.9.0", rows[0].InstalledVersion)
-}
-
-func TestCheckMissing(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	// Nothing installed.
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.False(t, drift)
-	assert.Empty(t, rows, "Check returns rows only for installed agents")
-}
-
-func TestCheckUnknownVersion(t *testing.T) {
-	memFs := setupHomeWithAgents(t, "/home/alice", "claude-code")
-	a := FindAgent("claude-code")
-	sp, _ := a.SkillsPath()
-	skillFile := filepath.Join(sp, skillNameForTests, "SKILL.md")
-	require.NoError(t, memFs.MkdirAll(filepath.Dir(skillFile), 0755))
-	require.NoError(t, afero.WriteFile(memFs, skillFile, []byte("no frontmatter here\n"), 0600))
-
-	rows, drift, err := Check(memFs, skillNameForTests, "1.0.0")
-	require.NoError(t, err)
-	assert.True(t, drift)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "unknown-version", rows[0].Status)
-	assert.Equal(t, "", rows[0].InstalledVersion)
-}
-
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name string
@@ -315,21 +291,59 @@ func TestParseVersion(t *testing.T) {
 	}
 }
 
-func TestSubstituteVersion(t *testing.T) {
+func TestInjectVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      string
 		version string
 		want    string
 	}{
-		{"replaces placeholder", "version: {{VERSION}}\n", "1.0.0", "version: 1.0.0\n"},
-		{"empty version is no-op", "version: {{VERSION}}\n", "", "version: {{VERSION}}\n"},
-		{"replaces multiple occurrences", "{{VERSION}} and {{VERSION}}", "1", "1 and 1"},
-		{"no placeholder unchanged", "no placeholder here", "1.0.0", "no placeholder here"},
+		{
+			name:    "overwrites existing version line",
+			in:      "---\nname: x\nversion: 0.0.1\n---\n\nbody\n",
+			version: "1.2.3",
+			want:    "---\nname: x\nversion: 1.2.3\n---\n\nbody\n",
+		},
+		{
+			name:    "overwrites placeholder version line",
+			in:      "---\nname: x\nversion: {{VERSION}}\n---\n",
+			version: "9.9.9",
+			want:    "---\nname: x\nversion: 9.9.9\n---\n",
+		},
+		{
+			name:    "inserts when absent",
+			in:      "---\nname: x\ndescription: y\n---\n\nbody\n",
+			version: "1.0.0",
+			want:    "---\nname: x\ndescription: y\nversion: 1.0.0\n---\n\nbody\n",
+		},
+		{
+			name:    "empty version is no-op",
+			in:      "---\nversion: 1.0.0\n---\n",
+			version: "",
+			want:    "---\nversion: 1.0.0\n---\n",
+		},
+		{
+			name:    "no frontmatter unchanged",
+			in:      "no frontmatter here",
+			version: "1.0.0",
+			want:    "no frontmatter here",
+		},
+		{
+			name:    "preserves CRLF frontmatter line endings",
+			in:      "---\r\nname: x\r\nversion: 0.1\r\n---\r\nbody\r\n",
+			version: "2.0",
+			want:    "---\r\nname: x\r\nversion: 2.0\r\n---\r\nbody\r\n",
+		},
+		{
+			name:    "treats $1 as literal (no regexp backreference expansion)",
+			in:      "---\nname: x\nversion: 0.0.1\n---\n",
+			version: "$1",
+			want:    "---\nname: x\nversion: $1\n---\n",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := substituteVersion([]byte(tc.in), tc.version)
+			got := injectVersion([]byte(tc.in), tc.version)
 			assert.Equal(t, tc.want, string(got))
 		})
 	}

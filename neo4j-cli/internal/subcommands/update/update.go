@@ -33,6 +33,7 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/output"
 	commonskill "github.com/neo4j/cli/common/skill"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -65,7 +66,9 @@ var (
 	// installSkillFn refreshes a single agent's bundle. Production uses
 	// common/skill.Install with a one-agent filter; tests swap to assert
 	// per-agent invocation order and simulate refresh failures.
-	installSkillFn = commonskill.Install
+	installSkillFn = func(filesystem afero.Fs, bundle fs.FS, skillName, version, agentFilter string) ([]*commonskill.Agent, error) {
+		return commonskill.Install(filesystem, commonskill.Source{FS: bundle, Version: version}, skillName, agentFilter)
+	}
 )
 
 // NewCmd returns the `update` cobra command. It is mounted as a top-level
