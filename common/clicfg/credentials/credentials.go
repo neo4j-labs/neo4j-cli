@@ -87,13 +87,13 @@ func (c *Credentials) HasAnyCredentials() bool {
 // from clicfg.NewConfig after the storage mode is resolved from config.
 // In insecure mode sensitive fields are already loaded from JSON during
 // NewCredentials, so reloading is a no-op. In keyring mode this populates
-// sensitive fields from the OS keyring. Warning messages are written to warnW.
-func (c *Credentials) SetStorageMode(mode string, warnW io.Writer) error {
+// sensitive fields from the OS keyring. Non-ErrNotFound keyring errors are
+// written as warnings to warnW and do not abort the load.
+func (c *Credentials) SetStorageMode(mode string, warnW io.Writer) {
 	c.storageMode = mode
 	if mode == StorageModeKeyring {
 		c.loadSensitiveFieldsFromKeyring(warnW)
 	}
-	return nil
 }
 
 // StorageMode returns the current storage mode.
@@ -258,8 +258,7 @@ func (c *Credentials) saveWithKeyring() error {
 //
 // On full success: sensitive fields are zeroed in the in-memory structs,
 // save() is called to scrub them from credentials.json, and storageMode is
-// set to StorageModeKeyring. The caller is responsible for persisting the
-// "credential-storage" config key.
+// set to StorageModeKeyring.
 func (c *Credentials) MigrateToKeyring() error {
 	// Probe keyring availability before writing any entries.
 	if err := ProbeKeyringAvailability(); err != nil {
@@ -326,8 +325,6 @@ func (c *Credentials) MigrateToKeyring() error {
 // On full success: storageMode is set to StorageModeInsecure, saveToJSON() is
 // called to persist the secrets to JSON, then keyring.Delete() is called for
 // all non-empty entries (best-effort: errors are ignored).
-//
-// The caller is responsible for persisting the "credential-storage" config key.
 func (c *Credentials) MigrateToInsecure() error {
 	// Phase 1: read all sensitive fields from the keyring into in-memory structs.
 	// If any required field is missing (ErrNotFound) or any Get returns a

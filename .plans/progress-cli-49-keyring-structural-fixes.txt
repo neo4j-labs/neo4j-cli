@@ -77,3 +77,11 @@ Files: ~common/clicfg/credentials/credentials.go, ~neo4j-cli/internal/subcommand
 ## TASK-020 — 2026-05-28T19:15:00Z
 Replaced stale function name 'tryAutoMigrate' with 'loadCredFromKeyring' in a comment in credentials.go; the Task-009 reference in clicfg.go had already been cleaned in a prior task.
 Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-021 — 2026-05-28T19:30:00Z
+loadSensitiveFieldsFromKeyring was already void (no return value), SetStorageMode already called it as a plain statement, and no panic branch existed in NewConfig — the task was already complete from prior work; marked completed and updated the doc comment to remove the contradicting "errors returned as-is" line (already done in task-018 pass).
+Files: ~common/clicfg/credentials/credentials.go
+
+## TASK-022 — 2026-05-28T19:45:00Z
+Removed stale "The caller is responsible for persisting the credential-storage config key." sentence from both MigrateToKeyring and MigrateToInsecure doc comments in credentials.go; no equivalent language remained elsewhere.
+Files: ~common/clicfg/credentials/credentials.go

@@ -113,9 +113,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 	// compatible). initCredentialStorageDefault writes the key on first run;
 	// subsequent invocations see an explicit value and reach this branch.
 	if Viper.IsSet("credential-storage") {
-		if err := creds.SetStorageMode(globalConfig.CredentialStorage(), os.Stderr); err != nil {
-			panic(err)
-		}
+		creds.SetStorageMode(globalConfig.CredentialStorage(), os.Stderr)
 	}
 
 	validAuraConfigKeys := []string{"auth-url", "base-url", "default-workspace"}

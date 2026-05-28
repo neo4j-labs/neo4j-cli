@@ -118,8 +118,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 // After writing the default, the in-memory storage mode on cfg.Credentials is
 // updated so the current invocation uses the correct mode.
 //
-// Errors from GlobalConfig.Set or Credentials.SetStorageMode are swallowed
-// (the function is best-effort advisory); the command itself is not blocked.
+// Errors from GlobalConfig.Set are swallowed (the function is best-effort
+// advisory); the command itself is not blocked.
 func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 	if cfg.Global.CredentialStorageIsSet() {
 		return
@@ -128,7 +128,7 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 	if cfg.Credentials.HasAnyCredentials() {
 		// Existing user upgrading: default to insecure to preserve behaviour.
 		if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
-			_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
+			cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
 			_, _ = fmt.Fprintln(stderr, "Notice: your Neo4j CLI credentials are stored in plaintext.")
 			_, _ = fmt.Fprintln(stderr, "To migrate them to the OS keyring, run:")
 			_, _ = fmt.Fprintln(stderr, "  neo4j-cli config set credential-storage keyring --rw")
@@ -140,11 +140,11 @@ func initCredentialStorageDefault(cfg *clicfg.Config, stderr io.Writer) {
 			_, _ = fmt.Fprintf(stderr, "Warning: OS keyring is unavailable (%v); defaulting to plaintext credential storage.\n", probeErr)
 			_, _ = fmt.Fprintln(stderr, credentials.KeyringSetupHint())
 			if err := cfg.Global.Set("credential-storage", credentials.StorageModeInsecure); err == nil {
-				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
+				cfg.Credentials.SetStorageMode(credentials.StorageModeInsecure, stderr)
 			}
 		} else {
 			if err := cfg.Global.Set("credential-storage", credentials.StorageModeKeyring); err == nil {
-				_ = cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring, stderr)
+				cfg.Credentials.SetStorageMode(credentials.StorageModeKeyring, stderr)
 			}
 		}
 	}

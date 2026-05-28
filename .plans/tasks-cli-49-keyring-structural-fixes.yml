@@ -502,7 +502,8 @@ tasks:
           panic branch from the remaining call site).
         - Remove the contradicting doc comment line "Non-ErrNotFound errors are returned as-is."
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T19:30:00Z"
     source: review
     dependencies:
       - task-020
@@ -523,7 +524,8 @@ tasks:
       doc comment adds no insight and implies a hidden obligation not expressed in the type
       system. Remove both sentences. Tighten surrounding doc if it becomes orphaned.
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T19:45:00Z"
     source: review
     dependencies:
       - task-021
