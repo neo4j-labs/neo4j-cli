@@ -12,13 +12,13 @@ tasks:
       in save()'s else branch. save() calls saveToJSON() for the insecure path; saveWithKeyring
       and MigrateToInsecure will also call it in later tasks. No behavioural change; all
       existing tests must pass unchanged.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "saveToJSON() method exists on Credentials and contains the json.Marshal + fileutils.WriteFile path"
       - "save() calls saveToJSON() for the insecure branch; saveWithKeyring() is unchanged for now"
       - "make test passes with no changes to test files"
-    completed_at: null
+    completed_at: "2026-05-28T10:00:00Z"
 
   - id: task-002
     title: "Fix GlobalConfig.CredentialStorage() default to StorageModeInsecure"
@@ -28,13 +28,13 @@ tasks:
       Add a comment explaining that the actual first-run default decision lives in
       initCredentialStorageDefault; CredentialStorage() is only the persisted-value accessor.
       This aligns the method's documented default with the NewCredentials() boot default.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CredentialStorage() returns StorageModeInsecure when viper has no credential-storage key"
       - "A comment on the method explains it is a read accessor; first-run default logic lives in initCredentialStorageDefault"
       - "make test passes; no test expectations change"
-    completed_at: null
+    completed_at: "2026-05-28T10:00:00Z"
 
   - id: task-003
     title: "Extract per-type keyring methods on AuraCredentials, DbmsCredentials, EmbedCredentials"
