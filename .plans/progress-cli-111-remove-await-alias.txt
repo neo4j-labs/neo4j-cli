@@ -28,3 +28,15 @@ Gates: make fmt-check OK; make lint OK; make test OK (TestGenerator_RoundTrip no
 Added Minor changelog entry for --await alias removal.
 - changie new --projects neo4j-cli --kind Minor --body "Removed deprecated --await alias; --wait is now the only spelling (CLI-111)." → .changes/unreleased/neo4j-cli-Minor-20260528-104616.yaml.
 Gates: make fmt-check OK; make lint OK; make test OK; make generate-check noise limited to hone in_progress YAML flip (no Go/bundle drift, expected).
+
+## 2026-05-28 task-006
+Final gates + manual CLI smoke verification.
+Gates: make fmt-check OK; make lint OK (0 issues); make test OK (no FAILures); make license-check OK; make generate-check noise limited to hone in_progress YAML flip (no Go/bundle drift, expected per AGENTS.md).
+Build: make build → bin/neo4j-cli (14.7M).
+Smoke checks (all pass):
+- 4a `aura instance create --type free-db --await --name x --tenant-id t --rw` → exit 2, stderr `Error: unknown flag: --await`.
+- 4b `aura instance create --type free-db --wait --name x --tenant-id t --rw` → exit 3, no `unknown flag`; reaches project-lookup logic and fails on dev-env credential/project — acceptable.
+- 4c `docker start dev --await --rw` → exit 2, stderr `Error: unknown flag: --await`.
+- 4d `docker stop dev --await --rw` → exit 2, stderr `Error: unknown flag: --await`.
+- 4e `aura instance create --help` → stdout contains `--wait`, contains 0 occurrences of `await`.
+Grep sweep: production-source `--await` references = 0 across common/, neo4j-cli/, CONTRIBUTING.md, README.md, AGENTS.md. Only remaining `--await` literal in repo source is the negative regression in `neo4j-cli/aura/internal/flags/wait_test.go:61` (`assert.NotContains(t, usage, "--await")`) — expected.

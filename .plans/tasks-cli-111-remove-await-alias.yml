@@ -97,7 +97,7 @@ tasks:
       Build the binary with `make build` and exercise the four manual smoke checks: `aura instance create --await` →
       unknown-flag error; `aura instance create --wait` → reaches API call; `docker start dev --await --rw` and
       `docker stop dev --await --rw` → unknown-flag errors; `aura instance create --help` shows `--wait` and not `--await`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -110,4 +110,4 @@ tasks:
       - "bin/neo4j-cli aura instance create --wait ... reaches the API call (credential/API failure in dev env is acceptable)"
       - "bin/neo4j-cli docker start dev --await --rw and stop dev --await --rw both exit with 'Error: unknown flag: --await'"
       - "bin/neo4j-cli aura instance create --help shows --wait and does NOT show --await"
-    completed_at: null
+    completed_at: 2026-05-28T11:00:00Z
