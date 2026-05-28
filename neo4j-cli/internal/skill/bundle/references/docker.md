@@ -160,12 +160,6 @@ neo4j-cli docker start dev --rw
 
 # Start and block until Bolt accepts sessions before returning
 neo4j-cli docker start dev --wait --rw
-
-# Wait for a container started with --no-store-credential (TCP fallback)
-neo4j-cli docker start dev --wait --rw
-
-# Same as above using the deprecated --await alias
-neo4j-cli docker start dev --await --rw
 ```
 
 ## neo4j-cli docker stop
@@ -190,8 +184,5 @@ neo4j-cli docker stop dev --rw
 
 # Stop and block until the container has fully exited before returning
 neo4j-cli docker stop dev --wait --rw
-
-# Same as above using the deprecated --await alias
-neo4j-cli docker stop dev --await --rw
 ```
 

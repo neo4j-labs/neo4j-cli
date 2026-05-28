@@ -51,10 +51,7 @@ func newStopCmd(cfg *clicfg.Config) *cobra.Command {
 neo4j-cli docker stop dev --rw
 
 # Stop and block until the container has fully exited before returning
-neo4j-cli docker stop dev --wait --rw
-
-# Same as above using the deprecated --await alias
-neo4j-cli docker stop dev --await --rw`,
+neo4j-cli docker stop dev --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]

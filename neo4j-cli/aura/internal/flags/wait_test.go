@@ -15,37 +15,20 @@ import (
 )
 
 func TestRegisterWait(t *testing.T) {
-	const deprecationMsg = "Flag --await has been deprecated, use --wait instead"
-
 	tests := []struct {
-		name           string
-		args           []string
-		wantWait       bool
-		wantDeprecated bool
+		name     string
+		args     []string
+		wantWait bool
 	}{
 		{
-			name:           "neither flag",
-			args:           []string{},
-			wantWait:       false,
-			wantDeprecated: false,
+			name:     "neither flag",
+			args:     []string{},
+			wantWait: false,
 		},
 		{
-			name:           "wait flag sets bool with no deprecation",
-			args:           []string{"--wait"},
-			wantWait:       true,
-			wantDeprecated: false,
-		},
-		{
-			name:           "await alias sets bool and prints deprecation",
-			args:           []string{"--await"},
-			wantWait:       true,
-			wantDeprecated: true,
-		},
-		{
-			name:           "both flags set bool and print deprecation",
-			args:           []string{"--wait", "--await"},
-			wantWait:       true,
-			wantDeprecated: true,
+			name:     "wait flag sets bool",
+			args:     []string{"--wait"},
+			wantWait: true,
 		},
 	}
 
@@ -58,26 +41,17 @@ func TestRegisterWait(t *testing.T) {
 			}
 			flags.RegisterWait(cmd, &wait, "Waits until operation completes.")
 
-			// pflag writes deprecation warnings via the FlagSet's own output, which
-			// defaults to os.Stderr. Capture it explicitly.
-			var stderr bytes.Buffer
-			cmd.Flags().SetOutput(&stderr)
 			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&stderr)
+			cmd.SetErr(&bytes.Buffer{})
 			cmd.SetArgs(tc.args)
 
 			require.NoError(t, cmd.Execute())
 			assert.Equal(t, tc.wantWait, wait)
-			if tc.wantDeprecated {
-				assert.Contains(t, stderr.String(), deprecationMsg)
-			} else {
-				assert.NotContains(t, stderr.String(), deprecationMsg)
-			}
 		})
 	}
 }
 
-func TestRegisterWait_HidesAliasFromHelp(t *testing.T) {
+func TestRegisterWait_DoesNotRegisterAwaitAlias(t *testing.T) {
 	var wait bool
 	cmd := &cobra.Command{Use: "test"}
 	flags.RegisterWait(cmd, &wait, "Waits until operation completes.")

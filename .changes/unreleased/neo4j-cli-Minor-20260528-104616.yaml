@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Removed deprecated --await alias; --wait is now the only spelling (CLI-111).
+time: 2026-05-28T10:46:16.855429+02:00
