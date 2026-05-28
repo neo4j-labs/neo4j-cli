@@ -17,8 +17,20 @@ const (
 	statusNotInstalled   = "not-installed"
 	statusDrift          = "drift"
 	statusUnknownVersion = "unknown-version"
+	statusPartial        = "partial"
 	statusOk             = "ok"
 )
+
+// catalogSummary is the per-skill aggregated view consumed by the catalog
+// section renderer. Status follows the worst-wins fold (see
+// aggregateCatalog).
+type catalogSummary struct {
+	Skill            string
+	AvailableVersion string
+	Status           string
+	InstalledCount   int
+	InstalledAgents  []string
+}
 
 // InventoryRow is the shared per-(skill × agent) record that powers both
 // `skill list` (renders all rows) and `skill check` (filters to installed
@@ -101,4 +113,48 @@ func boolStr(b bool) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// aggregateCatalog folds per-agent rows for a single catalog skill into one
+// summary. Skill and AvailableVersion are taken from the first row (all
+// rows for one skill share these). InstalledAgents preserves input order
+// (which is AGENTS catalog order by BuildInventory's construction).
+//
+// Priority: drift > unknown-version > partial > installed > not-installed.
+func aggregateCatalog(rows []InventoryRow) catalogSummary {
+	if len(rows) == 0 {
+		return catalogSummary{Status: statusNotInstalled}
+	}
+	summary := catalogSummary{
+		Skill:            rows[0].Skill,
+		AvailableVersion: rows[0].AvailableVersion,
+	}
+	hasDrift := false
+	hasUnknown := false
+	for _, r := range rows {
+		if !r.Installed {
+			continue
+		}
+		summary.InstalledCount++
+		summary.InstalledAgents = append(summary.InstalledAgents, r.Agent.Name)
+		switch r.Status {
+		case statusDrift:
+			hasDrift = true
+		case statusUnknownVersion:
+			hasUnknown = true
+		}
+	}
+	switch {
+	case hasDrift:
+		summary.Status = statusDrift
+	case hasUnknown:
+		summary.Status = statusUnknownVersion
+	case summary.InstalledCount == 0:
+		summary.Status = statusNotInstalled
+	case summary.InstalledCount < len(rows):
+		summary.Status = statusPartial
+	default:
+		summary.Status = statusInstalled
+	}
+	return summary
 }

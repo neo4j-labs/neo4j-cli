@@ -38,7 +38,7 @@ tasks:
       single drift among installed copies, drift+unknown-version mix
       (drift wins), unknown-version+partial mix (unknown-version wins),
       ordering of InstalledAgents matches AGENTS iteration order.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "aggregateCatalog is a pure function in common/skill/inventory.go (no FS, no cfg, no cobra)"
@@ -46,7 +46,7 @@ tasks:
       - "InstalledAgents preserves AGENTS catalog iteration order"
       - "Edge cases covered: empty input, single-row, all-installed, zero-installed, mixed-priority"
       - "make test / make fmt-check / make lint all clean"
-    completed_at: null
+    completed_at: 2026-05-28T06:35:46Z
 
   - id: task-002
     title: "Two-section render in list leaf; update tests + regenerate bundle"
