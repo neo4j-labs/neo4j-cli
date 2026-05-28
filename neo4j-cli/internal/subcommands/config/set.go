@@ -58,7 +58,7 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				// the config key is written; on failure the config is unchanged.
 				//
 				// For the keyring target we always run MigrateToKeyring()
-				// regardless of the current mode (REQ-F-017 repair pass): if any
+				// regardless of the current mode (repair pass): if any
 				// secrets are still resident in credentials.json (e.g. from a
 				// partial previous migration), they will be moved to the keyring
 				// and scrubbed. This is idempotent — credentials already in the

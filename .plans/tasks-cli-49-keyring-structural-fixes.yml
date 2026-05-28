@@ -452,7 +452,8 @@ tasks:
           idempotent."
       Preserve the factual content; only remove the REQ-F-xxx identifiers.
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
+    completed_at: "2026-05-28T19:00:00Z"
     source: review
     dependencies:
       - task-018

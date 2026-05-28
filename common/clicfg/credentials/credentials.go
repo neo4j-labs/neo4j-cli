@@ -415,12 +415,12 @@ func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
 // OS keyring. It is called by SetStorageMode when switching to keyring mode.
 // For each sensitive field:
 //   - If found in keyring, the in-memory value is overwritten.
-//   - If ErrNotFound but the JSON still holds a value (REQ-F-016, pre-migration
-//     state): the JSON value is used silently and an auto-migration is attempted
-//     (REQ-F-019): keyring.Set() is called with the JSON value. On success the
-//     field is zeroed in the JSON struct (to be persisted by save() after all
-//     fields are processed). On failure the scrub is silently skipped for this
-//     invocation; retry happens automatically on the next command.
+//   - If ErrNotFound but the JSON still holds a value (pre-migration state, where the
+//     secret was not yet moved to the keyring): the JSON value is used silently and
+//     an auto-migration is attempted: keyring.Set() is called with the JSON value.
+//     On success the field is zeroed in the JSON struct (to be persisted by
+//     save() after all fields are processed). On failure the scrub is silently
+//     skipped for this invocation; retry happens automatically on the next command.
 //   - If ErrNotFound and JSON value is also absent, a warning is written to
 //     stderr and the field is left empty; the command continues (error only
 //     surfaces if the credential is actually used).
@@ -527,7 +527,7 @@ func loadCredFromKeyring(cred keyringCredential, provider KeyringProvider, warnW
 }
 
 // migrateCredFromKeyring reads sensitive fields from the keyring (MigrateToInsecure path).
-// Required fields: ErrNotFound + in-memory non-empty → no-op (REQ-F-018); ErrNotFound + empty → error.
+// Required fields: ErrNotFound + in-memory non-empty → no-op (value already present, skip); ErrNotFound + empty → error.
 // Optional fields: ErrNotFound silently skips.
 // Successfully populated fields are appended to filled for cleanup on success or failure.
 func migrateCredFromKeyring(cred keyringCredential, provider KeyringProvider, filled *[]sensitiveField) error {
