@@ -289,7 +289,7 @@ func TestCredentialRemoveAuraClient(t *testing.T) {
 			name:         "missing credential returns an error",
 			initialCreds: []map[string]string{},
 			command:      "aura-client remove --rw --yes --force nonexistent",
-			wantErr:      "Error: could not find credential with name nonexistent to remove",
+			wantErr:      "Error: could not find credential with name nonexistent",
 		},
 	}
 

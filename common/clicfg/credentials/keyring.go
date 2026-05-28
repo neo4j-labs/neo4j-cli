@@ -68,6 +68,7 @@ type keyringCredential interface {
 	zeroSensitiveFields()
 	saveSensitiveFields() []string
 	restoreSensitiveFields(fields []string)
+	deleteFromKeyring(provider KeyringProvider) error
 }
 
 // migratedField records an in-memory field that was populated from the keyring

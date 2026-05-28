@@ -29,6 +29,10 @@ Files: ~common/clicfg/credentials/credentials.go, ~common/clicfg/clicfg.go, ~neo
 ## TASK-008 — 2026-05-28T12:00:00Z
 Final gates: make test, make fmt-check, make lint all pass with 0 issues after all structural refactors.
 
+## TASK-013 — 2026-05-28T16:00:00Z
+Moved deleteFromKeyring from collection types (*AuraCredentials etc.) to item types (*AuraCredential etc.); added to keyringCredential interface; RemoveAura/Dbms/Embed now use Get-before-Remove pattern; updated compile-time assertions and per-type tests; fixed stale comment in docker/delete.go.
+Files: ~common/clicfg/credentials/keyring.go, ~common/clicfg/credentials/aura.go, ~common/clicfg/credentials/dbms.go, ~common/clicfg/credentials/embed.go, ~common/clicfg/credentials/credentials.go, ~common/clicfg/credentials/aura_keyring_test.go, ~common/clicfg/credentials/dbms_keyring_test.go, ~common/clicfg/credentials/embed_keyring_test.go, ~neo4j-cli/internal/subcommands/credential/credential_test.go, ~neo4j-cli/internal/subcommands/credential/dbms/remove_test.go, ~neo4j-cli/internal/subcommands/credential/embed/remove_test.go, ~neo4j-cli/internal/subcommands/docker/delete.go
+
 ## TASK-012 — 2026-05-28T15:30:00Z
 Removed error return from saveToJSON(); updated save() to call saveToJSON() then return nil; saveWithKeyring() drops the _ = assignment and nolint comment; MigrateToInsecure() drops the dead if-err block.
 Files: ~common/clicfg/credentials/credentials.go

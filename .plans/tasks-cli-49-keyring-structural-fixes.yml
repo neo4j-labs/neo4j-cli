@@ -262,7 +262,7 @@ tasks:
       Add deleteFromKeyring(provider KeyringProvider) error to the keyringCredential interface.
       Update compile-time assertions. Update tests to call the new item-type methods.
       Run make test, make fmt-check, make lint as final gates.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-012
@@ -273,4 +273,4 @@ tasks:
       - "RemoveAura, RemoveDbms, RemoveEmbed use Get-before-Remove and call the item-type deleteFromKeyring"
       - "Compile-time interface assertions still pass"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: "2026-05-28T16:00:00Z"

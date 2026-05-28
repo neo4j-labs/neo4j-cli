@@ -369,11 +369,15 @@ func (c *Credentials) MigrateToInsecure() error {
 // its keyring entries. Keyring cleanup failures are written as warnings to
 // warnW and do not fail the removal.
 func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
+	cred, err := c.Aura.Get(name)
+	if err != nil {
+		return err
+	}
 	if err := c.Aura.Remove(name); err != nil {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.Aura.deleteFromKeyring(defaultKeyring, name); err != nil {
+		if err := cred.deleteFromKeyring(defaultKeyring); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}
@@ -384,11 +388,15 @@ func (c *Credentials) RemoveAura(name string, warnW io.Writer) error {
 // its keyring entries. Keyring cleanup failures are written as warnings to
 // warnW and do not fail the removal.
 func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
+	cred, err := c.Dbms.Get(name)
+	if err != nil {
+		return err
+	}
 	if err := c.Dbms.Remove(name); err != nil {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.Dbms.deleteFromKeyring(defaultKeyring, name); err != nil {
+		if err := cred.deleteFromKeyring(defaultKeyring); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}
@@ -399,11 +407,15 @@ func (c *Credentials) RemoveDbms(name string, warnW io.Writer) error {
 // its keyring entries. Keyring cleanup failures are written as warnings to
 // warnW and do not fail the removal.
 func (c *Credentials) RemoveEmbed(name string, warnW io.Writer) error {
+	cred, err := c.Embed.Get(name)
+	if err != nil {
+		return err
+	}
 	if err := c.Embed.Remove(name); err != nil {
 		return err
 	}
 	if c.storageMode == StorageModeKeyring {
-		if err := c.Embed.deleteFromKeyring(defaultKeyring, name); err != nil {
+		if err := cred.deleteFromKeyring(defaultKeyring); err != nil {
 			fmt.Fprintf(warnW, "Warning: %v\n", err) //nolint:errcheck
 		}
 	}

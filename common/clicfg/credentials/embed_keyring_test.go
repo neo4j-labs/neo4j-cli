@@ -117,28 +117,28 @@ func TestEmbedCredential_MigrateFromKeyring_GetError_ReturnsError(t *testing.T) 
 	assert.Contains(t, err.Error(), "keyring get embed/openai/api-key")
 }
 
-// --- EmbedCredentials.deleteFromKeyring tests ---
+// --- EmbedCredential.deleteFromKeyring tests ---
 
-func TestEmbedCredentials_DeleteFromKeyring_DeletesEntry(t *testing.T) {
+func TestEmbedCredential_DeleteFromKeyring_DeletesEntry(t *testing.T) {
 	mock := newInternalMock()
 	require.NoError(t, mock.Set(ServiceName, KeyringKey("embed", "openai", "api-key"), "sk-key"))
 
-	c := &EmbedCredentials{Credentials: []*EmbedCredential{{Name: "openai"}}}
-	require.NoError(t, c.deleteFromKeyring(mock, "openai"))
+	c := &EmbedCredential{Name: "openai"}
+	require.NoError(t, c.deleteFromKeyring(mock))
 
 	_, err := mock.Get(ServiceName, KeyringKey("embed", "openai", "api-key"))
 	assert.ErrorIs(t, err, ErrNotFound, "api-key must be deleted")
 }
 
-func TestEmbedCredentials_DeleteFromKeyring_ErrNotFound_Ignored(t *testing.T) {
+func TestEmbedCredential_DeleteFromKeyring_ErrNotFound_Ignored(t *testing.T) {
 	mock := newInternalMock()
-	c := &EmbedCredentials{}
-	require.NoError(t, c.deleteFromKeyring(mock, "openai"), "ErrNotFound must be silently ignored")
+	c := &EmbedCredential{Name: "openai"}
+	require.NoError(t, c.deleteFromKeyring(mock), "ErrNotFound must be silently ignored")
 }
 
-func TestEmbedCredentials_DeleteFromKeyring_NonNotFoundError_Returned(t *testing.T) {
-	c := &EmbedCredentials{}
-	err := c.deleteFromKeyring(&errDeleteProvider{inner: newInternalMock()}, "openai")
+func TestEmbedCredential_DeleteFromKeyring_NonNotFoundError_Returned(t *testing.T) {
+	c := &EmbedCredential{Name: "openai"}
+	err := c.deleteFromKeyring(&errDeleteProvider{inner: newInternalMock()})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring delete embed/openai/api-key")
 }

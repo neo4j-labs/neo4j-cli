@@ -55,7 +55,7 @@ func TestEmbedCredentialRemove(t *testing.T) {
 			},
 			initialDefault: "first",
 			command:        "remove nonexistent --yes --force",
-			wantErr:        "could not find credential with name nonexistent to remove",
+			wantErr:        "could not find credential with name nonexistent",
 		},
 	}
 

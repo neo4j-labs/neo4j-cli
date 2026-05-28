@@ -126,28 +126,28 @@ func TestDbmsCredential_MigrateFromKeyring_GetError_ReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "keyring get dbms/local/password")
 }
 
-// --- DbmsCredentials.deleteFromKeyring tests ---
+// --- DbmsCredential.deleteFromKeyring tests ---
 
-func TestDbmsCredentials_DeleteFromKeyring_DeletesEntry(t *testing.T) {
+func TestDbmsCredential_DeleteFromKeyring_DeletesEntry(t *testing.T) {
 	mock := newInternalMock()
 	require.NoError(t, mock.Set(ServiceName, KeyringKey("dbms", "local", "password"), "p4ss"))
 
-	c := &DbmsCredentials{Credentials: []*DbmsCredential{{Name: "local"}}}
-	require.NoError(t, c.deleteFromKeyring(mock, "local"))
+	c := &DbmsCredential{Name: "local"}
+	require.NoError(t, c.deleteFromKeyring(mock))
 
 	_, err := mock.Get(ServiceName, KeyringKey("dbms", "local", "password"))
 	assert.ErrorIs(t, err, ErrNotFound, "password must be deleted")
 }
 
-func TestDbmsCredentials_DeleteFromKeyring_ErrNotFound_Ignored(t *testing.T) {
+func TestDbmsCredential_DeleteFromKeyring_ErrNotFound_Ignored(t *testing.T) {
 	mock := newInternalMock()
-	c := &DbmsCredentials{}
-	require.NoError(t, c.deleteFromKeyring(mock, "local"), "ErrNotFound must be silently ignored")
+	c := &DbmsCredential{Name: "local"}
+	require.NoError(t, c.deleteFromKeyring(mock), "ErrNotFound must be silently ignored")
 }
 
-func TestDbmsCredentials_DeleteFromKeyring_NonNotFoundError_Returned(t *testing.T) {
-	c := &DbmsCredentials{}
-	err := c.deleteFromKeyring(&errDeleteProvider{inner: newInternalMock()}, "local")
+func TestDbmsCredential_DeleteFromKeyring_NonNotFoundError_Returned(t *testing.T) {
+	c := &DbmsCredential{Name: "local"}
+	err := c.deleteFromKeyring(&errDeleteProvider{inner: newInternalMock()})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyring delete dbms/local/password")
 }

@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// missingCredentialErrorPrefix mirrors credentials.DbmsCredentials.Remove's
-// "could not find credential with name <n> to remove" wording. The leaf
-// swallows that exact shape per REQ-F-050 (missing credential during delete
-// is not an error) while still surfacing any other failure verbatim.
+// missingCredentialErrorPrefix mirrors credentials.DbmsCredentials.Get's
+// "could not find credential with name" wording. The leaf swallows that exact
+// shape per REQ-F-050 (missing credential during delete is not an error) while
+// still surfacing any other failure verbatim.
 const missingCredentialErrorPrefix = "could not find credential with name"
 
 // newDeleteCmd builds the `neo4j-cli docker delete <name>` leaf (REQ-F-050..F-054).

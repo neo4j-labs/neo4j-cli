@@ -146,12 +146,12 @@ type EmbedCredential struct {
 	APIKey     string `json:"api-key"`
 }
 
-// deleteFromKeyring removes the keyring entry for the named Embed credential.
+// deleteFromKeyring removes the keyring entry for this Embed credential.
 // ErrNotFound is silently ignored; other errors are returned.
-func (c *EmbedCredentials) deleteFromKeyring(provider KeyringProvider, name string) error {
-	err := provider.Delete(ServiceName, KeyringKey("embed", name, "api-key"))
+func (c *EmbedCredential) deleteFromKeyring(provider KeyringProvider) error {
+	err := provider.Delete(ServiceName, KeyringKey("embed", c.Name, "api-key"))
 	if err != nil && !errors.Is(err, ErrNotFound) {
-		return fmt.Errorf("keyring delete embed/%s/api-key: %w", name, err)
+		return fmt.Errorf("keyring delete embed/%s/api-key: %w", c.Name, err)
 	}
 	return nil
 }
