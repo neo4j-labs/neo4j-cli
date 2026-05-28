@@ -52,6 +52,14 @@ func TestRegisterOrgProjectFlags_OrgID(t *testing.T) {
 	}
 }
 
+func TestRegisterOrgProjectFlags_NoTenantIDFlag(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	flags.RegisterOrgProjectFlags(cmd)
+
+	f := cmd.PersistentFlags().Lookup("tenant-id")
+	assert.Nil(t, f, "--tenant-id must not be registered after CLI-126 removal")
+}
+
 func TestRegisterOrgProjectFlags_ProjectID(t *testing.T) {
 	tests := []struct {
 		name        string

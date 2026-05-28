@@ -6,6 +6,7 @@ package aura
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -41,6 +42,21 @@ func TestNewCmdDoesNotRegisterRwFlag(t *testing.T) {
 // TestNewStandaloneCmdFlagErrorFuncWrapsAsUsageError asserts cobra's
 // flag-parse errors on the standalone aura root and its subcommands are
 // wrapped into *clierr.CLIError with exit code 2.
+func TestStandaloneAura_TenantCommandRemoved(t *testing.T) {
+	fs, err := testfs.GetDefaultTestFs()
+	require.NoError(t, err)
+
+	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
+	cmd := NewStandaloneCmd(cfg)
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"tenant", "list"})
+
+	execErr := cmd.Execute()
+	require.Error(t, execErr)
+	assert.Contains(t, strings.ToLower(execErr.Error()), "unknown command")
+}
+
 func TestNewStandaloneCmdFlagErrorFuncWrapsAsUsageError(t *testing.T) {
 	testCases := []struct {
 		name string
