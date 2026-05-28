@@ -648,3 +648,133 @@ tasks:
       - "`make test`, `make fmt-check`, `make lint`, `make license-check`, `make generate-check` all pass"
     source: review
     completed_at: 2026-05-28T16:45:00Z
+
+  - id: task-017
+    title: "Document gemini env chain + vertex ADC in README API-key section"
+    description: |
+      `README.md:298-300` describes API-key configuration but only
+      references the legacy env vars. Specifically:
+
+      Line 298 (the API-key table row):
+      ```
+      | API key | (none — see below) | `NEO4J_EMBED_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN` |
+      ```
+      Missing: `GEMINI_API_KEY`, `GOOGLE_API_KEY`. Also doesn't note
+      that vertex doesn't take an API key at all (uses ADC).
+
+      Line 300 (the precedence prose):
+      ```
+      API-key precedence (highest first): per-provider OS env
+      (`OPENAI_API_KEY` / `HF_TOKEN`) → generic OS env
+      (`NEO4J_EMBED_API_KEY`) → per-provider `.env` value → generic
+      `.env` value → stored credential `api-key`. Ollama needs no
+      API key.
+      ```
+      Missing: the gemini-specific chain (`GEMINI_API_KEY` →
+      `GOOGLE_API_KEY` → `NEO4J_EMBED_API_KEY` → stored). Also missing
+      a sentence on Vertex: it does NOT participate in the API-key
+      precedence — it authenticates via Application Default
+      Credentials (`gcloud auth application-default login` or a
+      service-account JSON via `GOOGLE_APPLICATION_CREDENTIALS`).
+
+      A user or agent reading this section today and trying to set up
+      Gemini via env-var would not see `GEMINI_API_KEY` documented.
+
+      Fix:
+
+      1. Extend the API-key table row's "Env var" cell to include
+         `GEMINI_API_KEY` and `GOOGLE_API_KEY`. Suggested wording:
+         ```
+         | API key | (none — see below) | `NEO4J_EMBED_API_KEY`,
+         `OPENAI_API_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`,
+         `GOOGLE_API_KEY` |
+         ```
+
+      2. Rewrite the precedence prose so it explicitly covers gemini
+         and notes vertex's ADC path. Suggested:
+         ```
+         API-key precedence (highest first): per-provider OS env
+         (`OPENAI_API_KEY` for openai; `HF_TOKEN` for huggingface;
+         `GEMINI_API_KEY` then `GOOGLE_API_KEY` for gemini) →
+         generic OS env (`NEO4J_EMBED_API_KEY`) → per-provider `.env`
+         value → generic `.env` value → stored credential `api-key`.
+         Ollama needs no API key. Vertex AI does not use an API key
+         at all — it authenticates via Application Default
+         Credentials (`gcloud auth application-default login` or
+         `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-
+         account JSON), so the API-key precedence rules above do not
+         apply when `--embed-provider vertex`.
+         ```
+
+      Match the existing tone and concision. This is the
+      authoritative reference for env-var setup; agents and humans
+      both look at this section first.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "README's API-key table row lists `GEMINI_API_KEY` and `GOOGLE_API_KEY` alongside the existing env vars"
+      - "README's precedence prose explicitly names the gemini env chain"
+      - "README's precedence prose says vertex authenticates via ADC and does not use API-key precedence"
+      - "No skill-bundle regeneration needed (README is not part of the bundle)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: null
+
+  - id: task-018
+    title: "Update SKILL.md embed-config tip to cover gemini env chain + vertex ADC"
+    description: |
+      The single most-read tip in the skill bundle about embedding
+      setup is at `neo4j-cli/internal/skill/additions.md:17` (which
+      flows into `bundle/SKILL.md:52` via `go generate`). Current
+      content:
+
+      ```
+      Embedding config (`--embed-provider`, `--embed-model`,
+      `--embed-base-url`, `--embed-dimensions`) resolves with the
+      same precedence as connection config: flag > OS env
+      (`NEO4J_EMBED_*`) > `.env` walk-up > stored embed credential.
+      API keys layer per provider: `OPENAI_API_KEY` / `HF_TOKEN`
+      (per-provider) beats `NEO4J_EMBED_API_KEY` (generic) beats the
+      stored credential. Ollama needs no API key.
+      ```
+
+      Two gaps for an agent picking this tip up:
+      - No mention of `GEMINI_API_KEY` / `GOOGLE_API_KEY` for gemini
+      - No mention of vertex's ADC auth path, the required
+        `--vertex-project` / `--vertex-location` flags, or that
+        vertex skips the API-key chain entirely.
+
+      Fix: rewrite the second sentence onward to cover all five
+      providers. Suggested shape (keep the bullet a single tight
+      paragraph — these tips are deliberately dense):
+
+      ```
+      API keys layer per provider: `OPENAI_API_KEY` (openai),
+      `HF_TOKEN` (huggingface), `GEMINI_API_KEY` then
+      `GOOGLE_API_KEY` (gemini) — all beating `NEO4J_EMBED_API_KEY`
+      (generic) and the stored credential's `api-key`. Ollama needs
+      no API key. Vertex AI uses Application Default Credentials
+      (`gcloud auth application-default login` or
+      `GOOGLE_APPLICATION_CREDENTIALS`), takes no `--api-key`, and
+      requires `--vertex-project` + `--vertex-location` (stored on
+      the credential — no per-query flag override).
+      ```
+
+      After the edit, regenerate the skill bundle with
+      `go generate ./neo4j-cli/internal/skill/...`. The tip flows
+      into `bundle/SKILL.md` automatically. `TestGenerator_RoundTrip`
+      is the gate.
+
+      No new tests; this is doc content picked up by the existing
+      round-trip gate.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`additions.md` embed-config tip names `GEMINI_API_KEY` / `GOOGLE_API_KEY` in the per-provider env chain"
+      - "Tip explicitly states vertex uses ADC and skips the API-key chain"
+      - "Tip mentions `--vertex-project` + `--vertex-location` are stored-cred-only"
+      - "Skill bundle regenerated; `bundle/SKILL.md` reflects the new tip"
+      - "`TestGenerator_RoundTrip` passes"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all pass"
+    source: review
+    completed_at: null
