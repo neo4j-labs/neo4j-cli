@@ -82,46 +82,96 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 	defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 
+	statements := splitStatements(cypher)
+
 	rwFlag := cmd.Flag("rw")
 	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
-	if !allowWrite {
-		if err := rejectWriteCypher(cmd, c, cypher, params); err != nil {
+
+	atomicFlag := cmd.Flag("atomic")
+	atomic := atomicFlag != nil && atomicFlag.Value.String() == "true"
+
+	truncOver, _ := cmd.Flags().GetInt("truncate-arrays-over")
+	maxRows, _ := cmd.Flags().GetInt("max-rows")
+	multi := len(statements) > 1
+
+	var results []renderResult
+
+	if atomic {
+		// Run the write-guard preflight over every statement first (read-only,
+		// outside the transaction) so a write statement is blocked before any
+		// batch transaction is opened.
+		if !allowWrite {
+			for _, stmt := range statements {
+				if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+					return err
+				}
+			}
+		}
+		batch, err := runStatementsWithMode(cmd.Context(), c, statements, params, !allowWrite)
+		if err != nil {
 			return err
+		}
+		for i, res := range batch {
+			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
+		}
+	} else {
+		for i, stmt := range statements {
+			if !allowWrite {
+				if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+					return err
+				}
+			}
+
+			// When --rw is set the user has opted in to writing, so run inside
+			// ExecuteWrite. When --rw is unset the preflight already classified
+			// the statement as read-only, so run inside ExecuteRead.
+			var res *queryResult
+			if allowWrite {
+				res, err = runStatementWrite(cmd.Context(), c, stmt, params)
+			} else {
+				res, err = runStatement(cmd.Context(), c, stmt, params)
+			}
+			if err != nil {
+				return err
+			}
+			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
 		}
 	}
 
-	// When --rw is set the user has opted in to writing, so run inside
-	// ExecuteWrite. When --rw is unset the preflight already classified the
-	// statement as read-only, so run inside ExecuteRead.
-	var res *queryResult
-	if allowWrite {
-		res, err = runStatementWrite(cmd.Context(), c, cypher, params)
-	} else {
-		res, err = runStatement(cmd.Context(), c, cypher, params)
-	}
-	if err != nil {
-		return err
-	}
+	renderResults(cmd, cfg, results)
+	return nil
+}
 
-	truncOver, _ := cmd.Flags().GetInt("truncate-arrays-over")
+// truncateResult applies array and row truncation to a single statement's
+// result and emits the corresponding stderr warnings, returning the
+// renderResult ready for output. When multi is true (more than one statement
+// ran) each warning is prefixed with "statement N: " (1-based index); a single
+// statement keeps the unprefixed wording byte-identical to today.
+func truncateResult(cmd *cobra.Command, res *queryResult, truncOver, maxRows int, multi bool, index int) renderResult {
 	values, arraysTruncated := truncateValues(res.Rows, truncOver)
-
-	maxRows, _ := cmd.Flags().GetInt("max-rows")
 	values, truncated := capRows(values, maxRows)
+
+	prefix := ""
+	if multi {
+		prefix = fmt.Sprintf("statement %d: ", index)
+	}
 	if truncated {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"warning: truncated to %d rows (use --max-rows 0 for unlimited)\n",
-			len(values))
+			"%swarning: truncated to %d rows (use --max-rows 0 for unlimited)\n",
+			prefix, len(values))
 	}
 	if arraysTruncated > 0 && truncOver > 0 {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"warning: truncated %d arrays larger than %d items (use --truncate-arrays-over 0 to disable)\n",
-			arraysTruncated, truncOver)
+			"%swarning: truncated %d arrays larger than %d items (use --truncate-arrays-over 0 to disable)\n",
+			prefix, arraysTruncated, truncOver)
 	}
 
-	rows := rowsFromValues(res.Columns, values)
-	renderRows(cmd, cfg, res.Columns, rows, truncated, arraysTruncated)
-	return nil
+	return renderResult{
+		columns:         res.Columns,
+		rows:            rowsFromValues(res.Columns, values),
+		truncated:       truncated,
+		arraysTruncated: arraysTruncated,
+	}
 }
 
 // resolveCypher returns the Cypher statement from the positional arg or, if

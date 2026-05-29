@@ -71,6 +71,7 @@ neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format jso
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().StringP("credential", "c", "", "Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list')")
+	cmd.PersistentFlags().Bool("atomic", false, "Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast)")
 
 	cmd.PersistentFlags().String("embed-credential", "", "Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list')")
 	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface | gemini | vertex [env: NEO4J_EMBED_PROVIDER]")

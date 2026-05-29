@@ -77,7 +77,7 @@ tasks:
       when !--rw then executes the whole batch via runStatementsWithMode. Apply
       per-statement truncation, prefix warnings with "statement N:" only when >1
       statement ran, and render via renderResults.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -89,7 +89,7 @@ tasks:
       - "--atomic runs all statements through the single-transaction batch path; --param/:embed resolved once and shared"
       - "Single statement (with/without trailing ;) output unchanged; truncation warnings prefixed 'statement N:' only when >1 statement"
       - "run_test.go covers default multi, fail-fast, non-rw write block, --rw multi, --atomic happy path/error, and single-statement-with-trailing-; cases"
-    completed_at: null
+    completed_at: 2026-05-29T11:20:00Z
 
   - id: task-005
     title: 'Update help text, README, additions.md and regenerate skill bundle'

@@ -71,6 +71,208 @@ func (h *runHarness) execute(t *testing.T, args ...string) error {
 	return cmd.Execute()
 }
 
+// TestRunQuery_MultiStatement_DefaultReadsOrderedJSONArray verifies the default
+// (non-atomic) multi-statement path: two read statements execute in source
+// order through the per-statement seam (each preceded by its EXPLAIN
+// preflight), all calls route through ExecuteRead, and the JSON output is an
+// array of result envelopes in order.
+func TestRunQuery_MultiStatement_DefaultReadsOrderedJSONArray(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS a"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 1 AS a"] = makeQueryResponse([]string{"a"}, [][]any{{int64(1)}})
+	r.resp["EXPLAIN RETURN 2 AS b"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 2 AS b"] = makeQueryResponse([]string{"b"}, [][]any{{int64(2)}})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"RETURN 1 AS a;\nRETURN 2 AS b",
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"EXPLAIN RETURN 1 AS a", "RETURN 1 AS a",
+		"EXPLAIN RETURN 2 AS b", "RETURN 2 AS b",
+	}, r.calls)
+	assert.True(t, r.readOnlyCalls["RETURN 1 AS a"])
+	assert.True(t, r.readOnlyCalls["RETURN 2 AS b"])
+
+	var got []decodedResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got), "multi-statement output must be a JSON array")
+	require.Len(t, got, 2)
+	assert.Equal(t, []string{"a"}, got[0].Columns)
+	assert.Equal(t, []string{"b"}, got[1].Columns)
+}
+
+// TestRunQuery_MultiStatement_DefaultFailFast verifies that when the second
+// statement errors, the first statement has already executed and the error is
+// returned (fail-fast) — the third statement never runs.
+func TestRunQuery_MultiStatement_DefaultFailFast(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS a"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 1 AS a"] = makeQueryResponse([]string{"a"}, [][]any{{int64(1)}})
+	r.resp["EXPLAIN RETURN 2 AS b"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.respErr["RETURN 2 AS b"] = errors.New("Neo.ClientError.Statement.SyntaxError: boom")
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"RETURN 1 AS a;\nRETURN 2 AS b;\nRETURN 3 AS c",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
+	// First statement executed; failing statement reached; third never ran.
+	assert.Equal(t, []string{
+		"EXPLAIN RETURN 1 AS a", "RETURN 1 AS a",
+		"EXPLAIN RETURN 2 AS b", "RETURN 2 AS b",
+	}, r.calls)
+	assert.NotContains(t, r.calls, "RETURN 3 AS c")
+}
+
+// TestRunQuery_MultiStatement_WriteWithoutRwBlocked verifies that without --rw a
+// write statement among the batch is blocked via the per-statement EXPLAIN
+// preflight with the existing --rw usage error.
+func TestRunQuery_MultiStatement_WriteWithoutRwBlocked(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS a"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 1 AS a"] = makeQueryResponse([]string{"a"}, [][]any{{int64(1)}})
+	r.resp["EXPLAIN CREATE (n)"] = makeExplainResponse(neo4j.QueryTypeReadWrite)
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"RETURN 1 AS a;\nCREATE (n)",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this command writes; pass --rw to allow it")
+}
+
+// TestRunQuery_MultiStatement_RwWritesExecuteWritePerStatement verifies that
+// with --rw each statement skips preflight and routes through ExecuteWrite, in
+// order.
+func TestRunQuery_MultiStatement_RwWritesExecuteWritePerStatement(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["CREATE (a)"] = makeQueryResponse([]string{}, [][]any{})
+	r.resp["CREATE (b)"] = makeQueryResponse([]string{}, [][]any{})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--rw",
+		"CREATE (a);\nCREATE (b)",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"CREATE (a)", "CREATE (b)"}, r.calls)
+	assert.False(t, r.readOnlyCalls["CREATE (a)"])
+	assert.False(t, r.readOnlyCalls["CREATE (b)"])
+}
+
+// TestRunQuery_Atomic_HappyPath verifies the --atomic path runs the whole batch
+// through the single-transaction seam (one invocation returning N responses →
+// N rendered envelopes).
+func TestRunQuery_Atomic_HappyPath(t *testing.T) {
+	var (
+		gotStatements []string
+		gotReadOnly   bool
+		batchCalls    int
+	)
+	withRunStatementsSeam(t, func(_ context.Context, _ *conn, statements []string, _ map[string]any, readOnly bool) ([]*queryResponse, error) {
+		batchCalls++
+		gotStatements = statements
+		gotReadOnly = readOnly
+		return []*queryResponse{
+			makeQueryResponse([]string{"a"}, [][]any{{int64(1)}}),
+			makeQueryResponse([]string{"b"}, [][]any{{int64(2)}}),
+		}, nil
+	})
+	// EXPLAIN preflight (non-rw) routes through the single-statement seam.
+	origFn := runStatementResponseFn
+	t.Cleanup(func() { runStatementResponseFn = origFn })
+	runStatementResponseFn = func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+		return makeExplainResponse(neo4j.QueryTypeReadOnly), nil
+	}
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--atomic",
+		"RETURN 1 AS a;\nRETURN 2 AS b",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 1, batchCalls, "atomic path must invoke the batch seam exactly once")
+	assert.Equal(t, []string{"RETURN 1 AS a", "RETURN 2 AS b"}, gotStatements)
+	assert.True(t, gotReadOnly, "non-rw atomic batch must run read-only")
+
+	var got []decodedResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
+	require.Len(t, got, 2)
+	assert.Equal(t, []string{"a"}, got[0].Columns)
+	assert.Equal(t, []string{"b"}, got[1].Columns)
+}
+
+// TestRunQuery_Atomic_ErrorSurfaces verifies an error from the atomic batch
+// surfaces and the batch seam is invoked exactly once (the transaction
+// rolls back driver-side; we can only assert the single invocation here).
+func TestRunQuery_Atomic_ErrorSurfaces(t *testing.T) {
+	batchCalls := 0
+	withRunStatementsSeam(t, func(_ context.Context, _ *conn, _ []string, _ map[string]any, _ bool) ([]*queryResponse, error) {
+		batchCalls++
+		return nil, errors.New("Neo.ClientError.Statement.SyntaxError: atomic boom")
+	})
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--rw",
+		"--atomic",
+		"CREATE (a);\nCREATE (b)",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "atomic boom")
+	assert.Equal(t, 1, batchCalls, "batch seam must be invoked exactly once")
+}
+
+// TestRunQuery_SingleStatement_TrailingSemicolonParity verifies a single
+// statement with a trailing semicolon renders identically to the same statement
+// without one — output stays a single JSON object (not an array).
+func TestRunQuery_SingleStatement_TrailingSemicolonParity(t *testing.T) {
+	run := func(t *testing.T, cypher string) string {
+		t.Helper()
+		r := newSeamRouter()
+		r.resp["EXPLAIN RETURN 42 AS n"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+		r.resp["RETURN 42 AS n"] = makeQueryResponse([]string{"n"}, [][]any{{int64(42)}})
+		r.install(t)
+
+		h := newRunHarness(t, "json")
+		err := h.execute(t,
+			"--uri=neo4j://example:7687",
+			"--password=pw",
+			cypher,
+		)
+		require.NoError(t, err)
+		return h.stdout.String()
+	}
+
+	withSemi := run(t, "RETURN 42 AS n;")
+	withoutSemi := run(t, "RETURN 42 AS n")
+	assert.Equal(t, withoutSemi, withSemi, "trailing ; must not change single-statement output")
+
+	// Confirm it's a single object, not an array.
+	var obj decodedResult
+	require.NoError(t, json.Unmarshal([]byte(withSemi), &obj))
+	assert.Equal(t, []string{"n"}, obj.Columns)
+}
+
 // seamRouter is a tiny statement-router used to swap the runStatementResponseFn
 // seam during tests. Each entry maps an exact statement string → response or
 // error. Tests can append cypher to the calls slice for ordering assertions

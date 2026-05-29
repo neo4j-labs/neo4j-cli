@@ -10,3 +10,8 @@ Files: +neo4j-cli/query/connect_batch_test.go, ~neo4j-cli/query/connect.go, ~.pl
 ## TASK-003 — 2026-05-29T10:40:00Z
 Added commonoutput.PrintBodyMaps (json array / stacked tables / toon array, reusing ResolveOutput/printTable; printToon refactored over a slice-capable printToonValue) and query.renderResults (len==1 -> existing PrintBodyMap byte-identical path, len>1 -> PrintBodyMaps with per-result columns). Not yet wired into runQuery (task-004).
 Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query/output.go, ~neo4j-cli/query/output_test.go, ~.plans tasks+progress
+
+## TASK-004 — 2026-05-29T11:20:00Z
+Registered persistent --atomic flag on query cmd and refactored runQuery to split the resolved cypher via splitStatements, keeping one-time setup (params/embeds/conn/password/openDriver) once, then branching: default mode loops per-statement (per-stmt EXPLAIN preflight when !--rw, fail-fast) while --atomic runs the preflight loop first then the whole batch via runStatementsWithMode. Truncation/warnings extracted to truncateResult, prefixing "statement N: " only when >1 statement ran; render via renderResults.
+Files: ~neo4j-cli/query/run.go, ~neo4j-cli/query/query.go, ~neo4j-cli/query/run_test.go, ~neo4j-cli/internal/skill/bundle/references/query.md, ~.plans tasks+progress
+Decisions: regenerated skill bundle (only the --atomic flag row in references/query.md changed) to keep make test green per task guidance — Long/Example untouched, that remains task-005.
