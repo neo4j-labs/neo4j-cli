@@ -9,3 +9,7 @@ Files: -neo4j-cli/aura/internal/subcommands/import/import.go, -neo4j-cli/aura/in
 ## TASK-003 — 2026-05-29T00:10:00Z
 Deleted deployment subcommand directory tree (deployment.go, create/delete/get/list + tests, database/, server/, server/database/, token/ subdirs).
 Files: -neo4j-cli/aura/internal/subcommands/deployment/ (entire tree, ~25 files)
+
+## TASK-004 — 2026-05-29T00:20:00Z
+All quality gates pass: go generate produced no bundle drift, make test green, make fmt-check clean, make lint clean.
+Files: ~.plans/tasks-cli-163-remove-import-deployment-commands.yml

@@ -60,7 +60,7 @@ tasks:
       diff to tracked bundle files (import/deployment were never in the bundle since
       the beta flag is off during generation). Then run the final gates: `make test`,
       `make fmt-check`, and `make lint` — all must pass cleanly.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -69,4 +69,4 @@ tasks:
       - "`make test` passes with no failures"
       - "`make fmt-check` passes with no output"
       - "`make lint` passes with no errors"
-    completed_at: null
+    completed_at: 2026-05-29T00:20:00Z
