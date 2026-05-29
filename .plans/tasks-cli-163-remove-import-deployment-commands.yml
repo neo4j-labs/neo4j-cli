@@ -29,7 +29,7 @@ tasks:
       which contains import.go and the job/ subdirectory (job.go, create.go, get.go,
       cancel.go, and their _test.go counterparts). aura.go must already be cleaned up
       (task-001) so no package references remain.
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -45,13 +45,13 @@ tasks:
       their tests, and the database/, server/, server/database/, and token/
       subdirectories. aura.go must already be cleaned up (task-001) so no package
       references remain.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "neo4j-cli/aura/internal/subcommands/deployment/ does not exist"
       - "`go build ./...` succeeds after deletion"
-    completed_at: null
+    completed_at: 2026-05-29T00:10:00Z
 
   - id: task-004
     title: "Verify skill bundle and run quality gates"

@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-05-29T00:00:00Z
 Removed import and deployment package imports and AddCommand registrations from aura.go; beta-flag block now contains only dataapi.
 Files: ~neo4j-cli/aura/aura.go
+
+## TASK-003 — 2026-05-29T00:10:00Z
+Deleted deployment subcommand directory tree (deployment.go, create/delete/get/list + tests, database/, server/, server/database/, token/ subdirs).
+Files: -neo4j-cli/aura/internal/subcommands/deployment/ (entire tree, ~25 files)
