@@ -130,3 +130,69 @@ tasks:
       - "make generate-check clean against a committed tree (no bundle drift)"
       - "Manual live-DB verification steps documented/executed: multi-read JSON array, stacked table/toon, --atomic rollback vs default persistence, single-statement parity"
     completed_at: 2026-05-29T09:31:37Z
+
+  - id: task-007
+    title: 'Collapse single-statement Bolt impl into batch-of-one'
+    description: |
+      BLOCKER from /hone:review. runStatementsResponseImpl (connect.go ~689-731)
+      duplicates runStatementResponseImpl (~560-601) almost line-for-line: the
+      entire record->envelope construction (tx.Run -> Collect -> Consume ->
+      resp.Data.Fields from records[0].Keys -> per-row coerceDriverValue loop ->
+      empty-records keys fallback -> resp.QueryType = summary.QueryType()) is
+      copy-pasted, plus the surrounding session-open + ExecuteRead/ExecuteWrite +
+      type-assertion scaffolding. That is ~40 lines of identical Bolt-execution
+      logic (~65 with scaffolding); the doc comment even admits "reusing
+      coerceDriverValue, identical to the single-statement impl". The code-judo
+      move: the single-statement path IS a batch of one. Reimplement
+      runStatementResponseImpl as a thin delegate that calls
+      runStatementsResponseImpl(ctx, c, []string{statement}, params, readOnly) and
+      returns resps[0], deleting the entire single-statement impl body (session
+      open, the work closure, read/write dispatch, type assertion). Delegate to
+      the IMPL (runStatementsResponseImpl), NOT the categorizing wrapper
+      runStatementsResponse, so error categorization still happens exactly once at
+      the existing runStatementResponse boundary (no double-wrap). Both seams
+      (runStatementResponseFn, runStatementsResponseFn) stay independent so all
+      existing unit tests keep working unchanged. batch-of-one always yields len 1
+      on success so resps[0] cannot panic, and QueryType is set per-statement so
+      the EXPLAIN preflight (rejectWriteCypher) still reads it correctly. Drop the
+      now-redundant "identical to the single-statement impl" remark from the batch
+      doc comment since there is only one impl afterwards.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "runStatementResponseImpl no longer contains its own session/work/dispatch body; it delegates to runStatementsResponseImpl([]string{statement}) and returns element 0"
+      - "Delegation targets the impl, not runStatementsResponse, so categorizeBoltError runs exactly once at the runStatementResponse boundary (no double categorization)"
+      - "No behaviour change: EXPLAIN preflight still classifies via QueryType; single-statement output unchanged; both seam vars remain and existing tests pass unmodified"
+      - "~40+ lines of duplicated Bolt-execution logic removed; stale 'identical to the single-statement impl' comment dropped"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: null
+
+  - id: task-008
+    title: 'Extract preflightAll to dedupe the write-guard loop in runQuery'
+    description: |
+      Minor finding from /hone:review. In run.go runQuery (~99-139) the !allowWrite
+      EXPLAIN write-guard is written twice: the atomic branch hoists a
+      `for stmt { rejectWriteCypher }` loop before opening the batch transaction,
+      and the default branch interleaves the same rejectWriteCypher call per
+      statement inside its execution loop. Extract a small helper
+      preflightAll(cmd, c, statements, params) error that runs rejectWriteCypher
+      over all statements and returns the first error, and call it from the atomic
+      branch. Keep the default branch's interleaved per-statement preflight as-is
+      if interleaving with execution is intentional for fail-fast ordering, OR use
+      the helper in both branches if behaviour is identical — choose whichever
+      keeps the two orchestrations honest without changing observable behaviour
+      (preflight still blocks a write statement with the existing
+      "this command writes; pass --rw to allow it" usage error before any write
+      executes).
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "A preflightAll helper exists and removes the duplicated !allowWrite write-guard loop"
+      - "Non---rw write statements are still blocked with the existing --rw usage error before any write executes, in both atomic and default modes"
+      - "No observable behaviour change; existing run_test.go cases pass unmodified"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: null

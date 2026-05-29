@@ -36,3 +36,6 @@ THIS IS INVALID'` -> whole tx rolls back (verify count == 0), error surfaces.
 ## TASK-006 — 2026-05-29T09:31:37Z
 Added changie Minor changelog entry (multi-statement + --atomic); all gates (test/fmt-check/lint/license-check) clean and generate-check shows no bundle drift; updated PRD acceptance checkboxes and documented live-DB manual verification steps.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260529-113013.yaml, ~prd, ~tasks, ~progress
+
+## REVIEW — 2026-05-29T09:40:13Z
+Added 2 review tasks (task-007..task-008).
