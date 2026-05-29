@@ -15,3 +15,8 @@ Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query
 Registered persistent --atomic flag on query cmd and refactored runQuery to split the resolved cypher via splitStatements, keeping one-time setup (params/embeds/conn/password/openDriver) once, then branching: default mode loops per-statement (per-stmt EXPLAIN preflight when !--rw, fail-fast) while --atomic runs the preflight loop first then the whole batch via runStatementsWithMode. Truncation/warnings extracted to truncateResult, prefixing "statement N: " only when >1 statement ran; render via renderResults.
 Files: ~neo4j-cli/query/run.go, ~neo4j-cli/query/query.go, ~neo4j-cli/query/run_test.go, ~neo4j-cli/internal/skill/bundle/references/query.md, ~.plans tasks+progress
 Decisions: regenerated skill bundle (only the --atomic flag row in references/query.md changed) to keep make test green per task guidance — Long/Example untouched, that remains task-005.
+
+## TASK-005 — 2026-05-29T12:05:00Z
+Documented multi-statement support: query Long/Example, README "Multiple statements" section, query-additions.md + additions.md gotcha; regenerated skill bundle.
+Files: ~7 mod (query.go, README.md, additions.md, query-additions.md, bundle/SKILL.md, bundle/query-additions.md, bundle/references/query.md)
+Decisions: substantive query guidance went in query-additions.md (dedicated query doc) plus a one-line additions.md gotcha.

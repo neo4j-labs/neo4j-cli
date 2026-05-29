@@ -61,6 +61,24 @@ neo4j-cli query --param name=Alice --param age=30 \
 
 Always pass `--format toon` on read commands — TOON is ~40% smaller than JSON for the same data, so it's the agent-friendly default. Switch to `--format json` only when piping into a JSON-aware tool.
 
+## Multiple statements
+
+Pass several statements in one string — they're split on a `;` at the **end of a line** (a mid-line `;` is kept verbatim; the terminating `;` is stripped):
+
+```bash
+neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people;
+MATCH (m:Movie) RETURN count(m) AS movies" --format toon
+```
+
+By default each statement runs in its own transaction, in order, **failing fast** on the first error. Pass `--atomic` to run them all in one transaction that **rolls back** if any statement fails:
+
+```bash
+neo4j-cli query "CREATE (:Person {name:'Alice'});
+CREATE (:Person {name:'Bob'})" --rw --atomic
+```
+
+When more than one statement runs, `--format json` emits a JSON **array** of result envelopes (one per statement, in order), while `--format table`/`toon` print **stacked blocks**. A single statement renders exactly as one statement does today.
+
 ## Handling user requests
 
 - **User supplies a Cypher query as `$ARGUMENTS`** — run it directly. Do NOT fetch schema first.

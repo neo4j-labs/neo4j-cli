@@ -102,7 +102,7 @@ tasks:
       query section. Run go generate ./neo4j-cli/internal/skill/... and commit
       the regenerated neo4j-cli/internal/skill/bundle/** so TestGenerator_RoundTrip
       passes.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -110,7 +110,7 @@ tasks:
       - "README query section and additions.md (where it documents query) describe multi-statement splitting, --atomic, and multi-result output"
       - "go generate ./neo4j-cli/internal/skill/... run and regenerated bundle committed"
       - "TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
-    completed_at: null
+    completed_at: 2026-05-29T12:05:00Z
 
   - id: task-006
     title: 'Add changelog entry and pass all final gates'

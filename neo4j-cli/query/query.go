@@ -28,6 +28,13 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
 			"The sibling `query :embed [text]` leaf computes a vector standalone " +
 			"without opening a Bolt connection. " +
+			"Multiple statements may be passed in a single string: they are split on " +
+			"a `;` at the end of a line (a mid-line `;` is kept verbatim; the " +
+			"terminating `;` is stripped). By default each statement runs in its own " +
+			"transaction, in order, failing fast on the first error; pass `--atomic` " +
+			"to run them all in one transaction that rolls back if any statement " +
+			"fails. Multiple result sets render as a JSON array with `--format json` " +
+			"or as stacked blocks with `--format table`/`toon`. " +
 			"Write operations require `--rw`; without `--rw`, an EXPLAIN preflight " +
 			"runs first and statements classified as writes are blocked.",
 		Example: `# Introspect the schema before writing Cypher (always do this first)
@@ -55,7 +62,13 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop-connection:f4e2
 neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 
 # Write Cypher requires --rw (opt-in)
-neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json`,
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
+
+# Run multiple read statements in one call (split on ; at end of line); results render as a JSON array
+neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people; MATCH (m:Movie) RETURN count(m) AS movies" --format json
+
+# Run multiple write statements atomically — all in one transaction, rolled back if any fails
+neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bob\"})" --rw --atomic --format json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)
