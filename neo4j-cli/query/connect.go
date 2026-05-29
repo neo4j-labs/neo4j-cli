@@ -540,84 +540,18 @@ func runStatementResponse(ctx context.Context, c *conn, statement string, params
 	return resp, nil
 }
 
-// runStatementResponseImpl is the real Bolt-backed implementation. Opens a
-// session targeted at c.database, runs the statement inside a managed
-// transaction (ExecuteRead when readOnly is true, ExecuteWrite otherwise),
-// collects all records, and pulls summary.QueryType() (used by the --rw
-// classifier on EXPLAIN preflight runs) onto the response. The session is
-// closed via defer; the driver retains pooling.
+// runStatementResponseImpl is the single-statement Bolt-backed implementation,
+// expressed as a batch-of-one over runStatementsResponseImpl. Delegating to the
+// impl (not the categorizing runStatementsResponse wrapper) keeps error
+// categorization at the single runStatementResponse boundary — no double-wrap.
+// A successful batch-of-one always yields exactly one envelope, so resps[0] is
+// safe.
 func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
-	if c == nil {
-		return nil, errors.New("query: nil connection")
-	}
-	if c.driver == nil {
-		return nil, errors.New("query: connection driver not opened (call openDriver first)")
-	}
-
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
-	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
-
-	work := func(tx neo4j.ManagedTransaction) (any, error) {
-		result, err := tx.Run(ctx, statement, params)
-		if err != nil {
-			return nil, err
-		}
-
-		records, err := result.Collect(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		summary, err := result.Consume(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		resp := &queryResponse{}
-		if len(records) > 0 {
-			resp.Data.Fields = append([]string(nil), records[0].Keys...)
-			resp.Data.Values = make([][]any, 0, len(records))
-			for _, rec := range records {
-				row := make([]any, len(rec.Values))
-				for i, v := range rec.Values {
-					row[i] = coerceDriverValue(v)
-				}
-				resp.Data.Values = append(resp.Data.Values, row)
-			}
-		} else {
-			// Even with zero rows the result keys are available via the result
-			// metadata so downstream renderers see the column header. Fall back
-			// to an empty (but non-nil) slice when nothing came back.
-			keys, _ := result.Keys()
-			resp.Data.Fields = append([]string(nil), keys...)
-			resp.Data.Values = [][]any{}
-		}
-
-		if summary != nil {
-			resp.QueryType = summary.QueryType()
-		}
-
-		return resp, nil
-	}
-
-	var (
-		out any
-		err error
-	)
-	if readOnly {
-		out, err = session.ExecuteRead(ctx, work)
-	} else {
-		out, err = session.ExecuteWrite(ctx, work)
-	}
+	resps, err := runStatementsResponseImpl(ctx, c, []string{statement}, params, readOnly)
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		return nil, err
 	}
-
-	resp, ok := out.(*queryResponse)
-	if !ok || resp == nil {
-		return nil, errors.New("query: unexpected nil response from managed transaction")
-	}
-	return resp, nil
+	return resps[0], nil
 }
 
 // runStatement executes a Cypher statement and returns the tabular result.
@@ -671,8 +605,7 @@ func runStatementsResponse(ctx context.Context, c *conn, statements []string, pa
 // ONE session targeted at c.database and runs ONE managed transaction
 // (ExecuteRead when readOnly is true, ExecuteWrite otherwise) whose work
 // callback loops tx.Run → Collect → Consume per statement, appending a
-// *queryResponse each (reusing coerceDriverValue, identical to the
-// single-statement impl). Any error returned from the callback aborts the
+// *queryResponse each (reusing coerceDriverValue). Any error returned from the callback aborts the
 // transaction, so the driver rolls it back automatically. The session is closed
 // via defer; the driver retains pooling.
 func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {

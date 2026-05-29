@@ -157,7 +157,7 @@ tasks:
       the EXPLAIN preflight (rejectWriteCypher) still reads it correctly. Drop the
       now-redundant "identical to the single-statement impl" remark from the batch
       doc comment since there is only one impl afterwards.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -167,7 +167,7 @@ tasks:
       - "~40+ lines of duplicated Bolt-execution logic removed; stale 'identical to the single-statement impl' comment dropped"
       - "make test, make fmt-check, make lint all clean"
     source: review
-    completed_at: null
+    completed_at: 2026-05-29T13:05:00Z
 
   - id: task-008
     title: 'Extract preflightAll to dedupe the write-guard loop in runQuery'
