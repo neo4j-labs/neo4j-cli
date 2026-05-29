@@ -14,7 +14,7 @@ tasks:
       that handles CRLF, strips the terminating ";", TrimSpaces each statement,
       and drops empty fragments. Non-empty input always yields at least one
       statement.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "splitStatements splits on ; at end of line only; a mid-line ; is not a split point"
@@ -22,7 +22,7 @@ tasks:
       - "Empty/whitespace-only fragments dropped; non-empty input yields >=1 statement; CRLF handled like LF"
       - "Table-driven tests in split_test.go cover: single, two/three statements, trailing ;, mid-line ;, blank lines, CRLF, whitespace-only fragments"
       - "New file (if any) carries the Neo4j copyright header"
-    completed_at: null
+    completed_at: 2026-05-29T09:30:00Z
 
   - id: task-002
     title: 'Add single-transaction batch execution path in connect.go'

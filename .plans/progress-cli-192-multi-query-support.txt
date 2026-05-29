@@ -1,0 +1,4 @@
+## TASK-001 — 2026-05-29T09:30:00Z
+Added splitStatements (line-walk) splitting Cypher on line-end semicolons only; strips terminating ;, trims, drops empties, handles CRLF. Table-driven tests cover single/multi/trailing-;/mid-line-;/blank-lines/CRLF/whitespace fragments.
+Files: +neo4j-cli/query/split.go, +neo4j-cli/query/split_test.go, ~.plans tasks
+Decisions: mid-line ; (incl. inside string literals ending a line) splits per PRD documented rule — no lexer.
