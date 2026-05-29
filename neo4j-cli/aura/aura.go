@@ -5,9 +5,7 @@ package aura
 
 import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/config"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/deployment"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphanalytics"
-	_import "github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/import"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -40,8 +38,6 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(agent.NewCmd(cfg))
 	if cfg.Flags.Enabled("flag.aura-beta") {
 		cmd.AddCommand(dataapi.NewCmd(cfg))
-		cmd.AddCommand(_import.NewCmd(cfg))
-		cmd.AddCommand(deployment.NewCmd(cfg))
 	}
 
 	return cmd
