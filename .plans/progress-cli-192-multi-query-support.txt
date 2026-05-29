@@ -2,3 +2,7 @@
 Added splitStatements (line-walk) splitting Cypher on line-end semicolons only; strips terminating ;, trims, drops empties, handles CRLF. Table-driven tests cover single/multi/trailing-;/mid-line-;/blank-lines/CRLF/whitespace fragments.
 Files: +neo4j-cli/query/split.go, +neo4j-cli/query/split_test.go, ~.plans tasks
 Decisions: mid-line ; (incl. inside string literals ending a line) splits per PRD documented rule — no lexer.
+
+## TASK-002 — 2026-05-29T10:05:00Z
+Added batch single-transaction execution path in connect.go: runStatementsResponseFn seam + runStatementsResponse dispatcher (categorizeBoltError at boundary) + runStatementsResponseImpl (one session, one ExecuteRead/ExecuteWrite looping tx.Run->Collect->Consume per statement) + runStatementsWithMode unwrapper. Tests cover ordering, read/write routing, and error-surfacing (client+transient).
+Files: +neo4j-cli/query/connect_batch_test.go, ~neo4j-cli/query/connect.go, ~.plans tasks

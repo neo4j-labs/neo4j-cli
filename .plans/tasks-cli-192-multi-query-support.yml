@@ -35,7 +35,7 @@ tasks:
       ExecuteRead/ExecuteWrite whose work callback loops tx.Run -> Collect ->
       Consume per statement (reusing coerceDriverValue); any error aborts so the
       managed transaction rolls back automatically.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "runStatementsResponse/runStatementsResponseImpl/runStatementsWithMode added, mirroring the single-statement helpers"
@@ -43,7 +43,7 @@ tasks:
       - "Errors are categorised once via categorizeBoltError at the dispatch boundary"
       - "runStatementsResponseFn package var exists as a test seam"
       - "Unit tests assert batch ordering and that an error from one statement surfaces (rollback is driver-side)"
-    completed_at: null
+    completed_at: 2026-05-29T10:05:00Z
 
   - id: task-003
     title: 'Add multi-result rendering (PrintBodyMaps + renderResults)'
