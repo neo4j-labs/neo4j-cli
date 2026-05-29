@@ -55,7 +55,7 @@ tasks:
       blocks. Add renderResults(cmd, cfg, results []renderResult) to
       neo4j-cli/query/output.go: len==1 uses the existing PrintBodyMap path
       (byte-identical to today), len>1 delegates to PrintBodyMaps.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "PrintBodyMaps renders json as an array of envelopes, toon as the array form, table as stacked blocks separated by a blank line"
@@ -63,7 +63,7 @@ tasks:
       - "renderResults len>1 delegates to PrintBodyMaps with per-result columns"
       - "Tests in common/output/output_test.go and neo4j-cli/query/output_test.go cover json/table/toon for multiple results"
       - "make fmt-check and make lint clean for touched files"
-    completed_at: null
+    completed_at: 2026-05-29T10:40:00Z
 
   - id: task-004
     title: 'Register --atomic flag and refactor runQuery for multi-statement'

@@ -92,6 +92,25 @@ func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows [
 	commonoutput.PrintBodyMap(cmd, cfg, result, columns)
 }
 
+// renderResults writes one or more query results to cmd's stdout. A single
+// result takes the existing PrintBodyMap path so its output is byte-identical
+// to the single-statement case; multiple results delegate to PrintBodyMaps,
+// which emits a JSON array, stacked tables, or the TOON array form depending on
+// the resolved format. Each result carries its own column ordering.
+func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if len(results) == 1 {
+		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
+		return
+	}
+	items := make([]commonoutput.ResponseData, len(results))
+	fields := make([][]string, len(results))
+	for i, r := range results {
+		items[i] = r
+		fields[i] = r.columns
+	}
+	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
+}
+
 // rowsFromValues converts the API's positional values (one []any per row, in
 // column order) into {column: value} maps preserving the column ordering. If
 // a row has fewer values than columns, missing positions are filled with nil;

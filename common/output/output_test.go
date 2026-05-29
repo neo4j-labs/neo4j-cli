@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -102,6 +103,61 @@ func TestPrintBodyMap_ToonContainsTopLevelKeys(t *testing.T) {
 
 	// "data" is the top-level key emitted by simpleData.MarshalJSON.
 	assert.Contains(t, toonOut, "data", "toon output should contain the top-level key 'data'")
+}
+
+func TestPrintBodyMaps_JSONArray(t *testing.T) {
+	cmd, cfg, stdout := newOutputCmd(t, "json")
+	items := []ResponseData{
+		simpleData{rows: []map[string]any{{"id": "1"}}},
+		simpleData{rows: []map[string]any{{"id": "2"}}},
+	}
+	fields := [][]string{{"id"}, {"id"}}
+	PrintBodyMaps(cmd, cfg, items, fields)
+
+	out := stdout.String()
+	var decoded []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &decoded),
+		"output must be a JSON array, got: %s", out)
+	require.Len(t, decoded, 2)
+	// simpleData.MarshalJSON wraps rows under "data".
+	assert.Contains(t, out, `"data"`)
+}
+
+func TestPrintBodyMaps_TableStacked(t *testing.T) {
+	cmd, cfg, stdout := newOutputCmd(t, "table")
+	items := []ResponseData{
+		simpleData{rows: []map[string]any{{"id": "alpha"}}},
+		simpleData{rows: []map[string]any{{"id": "beta"}}},
+	}
+	fields := [][]string{{"id"}, {"id"}}
+	PrintBodyMaps(cmd, cfg, items, fields)
+
+	out := stdout.String()
+	assert.Contains(t, out, "alpha")
+	assert.Contains(t, out, "beta")
+	// Stacked blocks: a blank line separates the two rendered tables.
+	assert.Contains(t, out, "\n\n", "table blocks must be separated by a blank line")
+	// First block precedes second.
+	assert.Less(t, strings.Index(out, "alpha"), strings.Index(out, "beta"))
+	// Not a JSON array.
+	var v any
+	assert.Error(t, json.Unmarshal([]byte(out), &v))
+}
+
+func TestPrintBodyMaps_Toon(t *testing.T) {
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	items := []ResponseData{
+		simpleData{rows: []map[string]any{{"id": "1"}}},
+		simpleData{rows: []map[string]any{{"id": "2"}}},
+	}
+	fields := [][]string{{"id"}, {"id"}}
+	PrintBodyMaps(cmd, cfg, items, fields)
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	// TOON output is not valid JSON.
+	var v any
+	assert.Error(t, json.Unmarshal([]byte(out), &v))
 }
 
 func TestStripControl(t *testing.T) {

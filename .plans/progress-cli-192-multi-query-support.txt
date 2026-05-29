@@ -6,3 +6,7 @@ Decisions: mid-line ; (incl. inside string literals ending a line) splits per PR
 ## TASK-002 — 2026-05-29T10:05:00Z
 Added batch single-transaction execution path in connect.go: runStatementsResponseFn seam + runStatementsResponse dispatcher (categorizeBoltError at boundary) + runStatementsResponseImpl (one session, one ExecuteRead/ExecuteWrite looping tx.Run->Collect->Consume per statement) + runStatementsWithMode unwrapper. Tests cover ordering, read/write routing, and error-surfacing (client+transient).
 Files: +neo4j-cli/query/connect_batch_test.go, ~neo4j-cli/query/connect.go, ~.plans tasks
+
+## TASK-003 — 2026-05-29T10:40:00Z
+Added commonoutput.PrintBodyMaps (json array / stacked tables / toon array, reusing ResolveOutput/printTable; printToon refactored over a slice-capable printToonValue) and query.renderResults (len==1 -> existing PrintBodyMap byte-identical path, len>1 -> PrintBodyMaps with per-result columns). Not yet wired into runQuery (task-004).
+Files: ~common/output/output.go, ~common/output/output_test.go, ~neo4j-cli/query/output.go, ~neo4j-cli/query/output_test.go, ~.plans tasks+progress
