@@ -71,25 +71,25 @@ tasks:
     description: |
       Create a changelog entry using changie to document that Data API commands are now available
       to all users without enabling the beta flag. Use kind `Patch` and project `neo4j-cli`.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
       - "A YAML file exists under `.changes/unreleased/` with `project: neo4j-cli` and `kind: Patch`"
       - "The `body` field mentions that Data API commands no longer require the beta flag"
       - "`make license-check` and `make test` still pass after the entry is added"
-    completed_at: null
+    completed_at: "2026-05-29T13:15:04Z"
 
   - id: task-006
     title: "Run final quality gates"
     description: |
       Execute `make test`, `make fmt-check`, and `make lint` to confirm all quality gates pass
       after all changes. This is the final verification step before the branch is ready for review.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - "`make test` exits 0 with no failing tests"
       - "`make fmt-check` exits 0 (no files need gofmt)"
       - "`make lint` exits 0 (no lint errors)"
-    completed_at: null
+    completed_at: "2026-05-29T13:15:04Z"
