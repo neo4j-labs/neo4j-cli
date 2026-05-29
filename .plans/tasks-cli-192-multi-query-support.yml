@@ -194,5 +194,6 @@ tasks:
       - "Non---rw write statements are still blocked with the existing --rw usage error before any write executes, in both atomic and default modes"
       - "No observable behaviour change; existing run_test.go cases pass unmodified"
       - "make test, make fmt-check, make lint all clean"
+    status: completed
     source: review
-    completed_at: null
+    completed_at: 2026-05-29T14:10:00Z

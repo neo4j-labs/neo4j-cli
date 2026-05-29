@@ -44,3 +44,7 @@ Added 2 review tasks (task-007..task-008).
 Collapsed runStatementResponseImpl into a thin batch-of-one delegate over runStatementsResponseImpl; deleted ~65 lines of duplicated session/work/dispatch logic. Both seam vars kept independent; existing query tests pass unmodified (471).
 Files: ~neo4j-cli/query/connect.go, ~.plans tasks+progress
 Decisions: delegate to the impl not the categorizing wrapper, so categorizeBoltError still runs exactly once at the runStatementResponse boundary. nil-conn/nil-driver guards now sourced from the batch impl (same errors).
+
+## TASK-008 — 2026-05-29T14:10:00Z
+Extracted preflightAll helper to dedupe the !allowWrite write-guard loop; atomic branch now calls it. Default branch kept interleaved per-statement preflight (with WHY comment) to preserve fail-fast ordering across separate transactions.
+Files: ~neo4j-cli/query/run.go, ~.plans tasks+progress

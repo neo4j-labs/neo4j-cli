@@ -101,10 +101,8 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		// outside the transaction) so a write statement is blocked before any
 		// batch transaction is opened.
 		if !allowWrite {
-			for _, stmt := range statements {
-				if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
-					return err
-				}
+			if err := preflightAll(cmd, c, statements, params); err != nil {
+				return err
 			}
 		}
 		batch, err := runStatementsWithMode(cmd.Context(), c, statements, params, !allowWrite)
@@ -115,6 +113,9 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
 		}
 	} else {
+		// Default mode keeps preflight interleaved with execution (not hoisted via
+		// preflightAll) so statement N executes before statement N+1 is classified,
+		// preserving fail-fast ordering across separate transactions.
 		for i, stmt := range statements {
 			if !allowWrite {
 				if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
@@ -213,6 +214,17 @@ func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[st
 	}
 	if resp.QueryType != neo4j.QueryTypeReadOnly {
 		return clierr.NewUsageError("this command writes; pass --rw to allow it")
+	}
+	return nil
+}
+
+// preflightAll runs the rejectWriteCypher write-guard over every statement and
+// returns the first error, blocking a write statement before any execution.
+func preflightAll(cmd *cobra.Command, c *conn, statements []string, params map[string]any) error {
+	for _, stmt := range statements {
+		if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+			return err
+		}
 	}
 	return nil
 }
