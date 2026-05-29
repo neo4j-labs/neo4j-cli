@@ -29,13 +29,13 @@ tasks:
       which contains import.go and the job/ subdirectory (job.go, create.go, get.go,
       cancel.go, and their _test.go counterparts). aura.go must already be cleaned up
       (task-001) so no package references remain.
-    status: in_progress
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "neo4j-cli/aura/internal/subcommands/import/ does not exist"
       - "`go build ./...` succeeds after deletion"
-    completed_at: null
+    completed_at: 2026-05-29T00:10:00Z
 
   - id: task-003
     title: "Delete the deployment subcommand directory"
