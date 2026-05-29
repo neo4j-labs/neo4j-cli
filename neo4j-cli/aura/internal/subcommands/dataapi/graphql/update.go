@@ -86,6 +86,7 @@ neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-de
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				Method:   http.MethodPatch,
 				PostBody: body,
+				Version:  api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

@@ -1,0 +1,16 @@
+## TASK-001 — 2026-05-29T00:00:00Z
+Moved dataapi command registration outside the beta flag gate in aura.go.
+Files: ~neo4j-cli/aura/aura.go
+
+## TASK-002 — 2026-05-29T00:00:00Z
+Updated flag.aura-beta Gates description to remove dataapi from the listed gated subcommands.
+Files: ~common/clicfg/flags.go
+
+## TASK-003 — 2026-05-29T00:00:00Z
+Removed all SetConfigValue("flag.aura-beta", true) overrides from dataapi test files; added AuraApiVersionBeta1 constant and PollWithVersion so dataapi commands always use the v1beta5 path without relying on the flag.
+Files: ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/poll.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/*.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/authprovider/*.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/corspolicy/allowedorigin/*.go
+Decisions: AuraApiVersionBeta1 constant needed because ungated commands must always reach v1beta5 regardless of flag state; PollWithVersion extracted to pass version through the poll loop.
+
+## TASK-004 — 2026-05-29T00:00:00Z
+Skill bundle regenerated; data-api commands now appear unconditionally in references/aura.md.
+Files: ~neo4j-cli/internal/skill/bundle/references/aura.md

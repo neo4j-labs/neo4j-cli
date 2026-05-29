@@ -15,8 +15,6 @@ func TestGetAuthProvider(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	authProviderId := "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f"
@@ -50,8 +48,6 @@ func TestGetAuthProvider(t *testing.T) {
 func TestGetAuthProviderWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"

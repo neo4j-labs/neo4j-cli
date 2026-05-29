@@ -82,6 +82,7 @@ neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --da
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPost,
+				Version:  api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

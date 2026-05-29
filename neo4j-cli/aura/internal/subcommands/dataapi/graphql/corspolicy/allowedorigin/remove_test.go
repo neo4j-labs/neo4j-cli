@@ -16,8 +16,6 @@ func TestRemoveAllowedOriginFlagsValidation(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	tests := map[string]struct {
 		executedCommand string
 		expectedError   string
@@ -74,8 +72,6 @@ func TestRemoveAllowedOriginWithRemainingOrigins(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
@@ -110,8 +106,6 @@ func TestRemoveAllowedOriginWithNoExistingOrigins(t *testing.T) {
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
@@ -149,8 +143,6 @@ func TestRemoveAllowedOriginLastAllowedOrigin(t *testing.T) {
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
@@ -195,8 +187,6 @@ func TestRemoveAllowedOriginWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
@@ -236,8 +226,6 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
@@ -279,7 +267,6 @@ func TestRemoveAllowedOriginConfirmGate(t *testing.T) {
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
-			helper.SetConfigValue("flag.aura-beta", true)
 			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 			mock.AddResponse(http.StatusAccepted, mockPatchResponse)
 			helper.SetStdin(stdin)

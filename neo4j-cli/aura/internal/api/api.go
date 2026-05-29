@@ -34,8 +34,9 @@ type Grant struct {
 type AuraApiVersion string
 
 const (
-	AuraApiVersion1 AuraApiVersion = "1"
-	AuraApiVersion2 AuraApiVersion = "2"
+	AuraApiVersion1     AuraApiVersion = "1"
+	AuraApiVersion2     AuraApiVersion = "2"
+	AuraApiVersionBeta1 AuraApiVersion = "beta1"
 )
 
 type RequestConfig struct {
@@ -128,14 +129,14 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 }
 
 func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
-	betaEnabled := cfg.Flags.Enabled("flag.aura-beta")
-
 	switch version {
 	case AuraApiVersion1:
-		if betaEnabled {
+		if cfg.Flags.Enabled("flag.aura-beta") {
 			return cfg.Aura.BetaPathV1()
 		}
 		return "v1"
+	case AuraApiVersionBeta1:
+		return cfg.Aura.BetaPathV1()
 	case AuraApiVersion2:
 		return cfg.Aura.BetaPathV2()
 	default:

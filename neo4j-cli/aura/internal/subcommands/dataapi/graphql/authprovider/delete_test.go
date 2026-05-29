@@ -16,8 +16,6 @@ func TestDeleteAuthProvider(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	authProviderId := "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f"
@@ -52,8 +50,6 @@ func TestDeleteAuthProviderWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	authProviderId := "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f"
@@ -86,7 +82,6 @@ func TestDeleteAuthProviderConfirmGate(t *testing.T) {
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
-			helper.SetConfigValue("flag.aura-beta", true)
 			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId), http.StatusAccepted, `{"data": {"id": "`+authProviderId+`"}}`)
 			helper.SetStdin(stdin)
 			err := helper.ExecuteCommandE(args)

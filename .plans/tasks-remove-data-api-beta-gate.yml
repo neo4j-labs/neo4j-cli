@@ -10,13 +10,13 @@ tasks:
       In `neo4j-cli/aura/aura.go`, move `cmd.AddCommand(dataapi.NewCmd(cfg))` to be called
       unconditionally before the `if cfg.Flags.Enabled("flag.aura-beta")` block. The remaining
       two commands (`_import` and `deployment`) stay inside the conditional unchanged.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`cmd.AddCommand(dataapi.NewCmd(cfg))` appears before and outside the beta flag conditional"
       - "`cmd.AddCommand(_import.NewCmd(cfg))` and `cmd.AddCommand(deployment.NewCmd(cfg))` remain inside `if cfg.Flags.Enabled(\"flag.aura-beta\")`"
       - "The file compiles without errors (`make build` succeeds)"
-    completed_at: null
+    completed_at: "2026-05-29T00:00:00Z"
 
   - id: task-002
     title: "Update flag.aura-beta Gates description in flags.go"
@@ -24,14 +24,14 @@ tasks:
       In `common/clicfg/flags.go`, update the `Gates` field of the `flag.aura-beta` registry
       entry to remove `dataapi` from the list. The new value should describe only the remaining
       gated commands: `import` and `deployment`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "The `Gates` field reads `\"aura {import, deployment} subcommands; v1beta5 API path\"` (or equivalent without dataapi)"
       - "`dataapi` no longer appears in the `flag.aura-beta` registry entry"
       - "The file compiles without errors"
-    completed_at: null
+    completed_at: "2026-05-29T00:00:00Z"
 
   - id: task-003
     title: "Remove beta flag overrides from dataapi tests"
@@ -40,14 +40,14 @@ tasks:
       shared aura test helpers) for `SetForTest("flag.aura-beta", true)` calls that exist solely
       to make data-api commands accessible. Remove those overrides. If any override tests
       beta-specific behaviour rather than just unlocking the command, keep it with a comment.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "No `SetForTest(\"flag.aura-beta\", true)` calls remain in dataapi test files unless they test beta-specific behaviour"
       - "`make test` passes after the cleanup"
       - "No data-api test panics or skips due to missing command registration"
-    completed_at: null
+    completed_at: "2026-05-29T00:00:00Z"
 
   - id: task-004
     title: "Regenerate skill bundle after command tree change"
@@ -55,7 +55,7 @@ tasks:
       Run `go generate ./neo4j-cli/internal/skill/...` to refresh the embedded skill bundle in
       `neo4j-cli/internal/skill/bundle/`. This is required whenever the cobra command tree
       structure changes so that `TestGenerator_RoundTrip` does not fail.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -64,7 +64,7 @@ tasks:
       - "`go generate ./neo4j-cli/internal/skill/...` exits 0"
       - "`TestGenerator_RoundTrip` passes as part of `make test`"
       - "The regenerated bundle files are committed alongside the source changes"
-    completed_at: null
+    completed_at: "2026-05-29T00:00:00Z"
 
   - id: task-005
     title: "Add Patch changelog entry for Data API GA availability"

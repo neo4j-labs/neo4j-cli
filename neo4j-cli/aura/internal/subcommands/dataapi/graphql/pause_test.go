@@ -15,8 +15,6 @@ func TestPauseGraphQLDataApi(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/pause", instanceId, dataApiId), http.StatusAccepted, `{
@@ -46,8 +44,6 @@ func TestPauseGraphQLDataApi(t *testing.T) {
 func TestPauseGraphQLDataApiWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
