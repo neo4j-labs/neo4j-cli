@@ -199,25 +199,27 @@ resolution and TTY auto-detection stay centralised.
 
 ## Acceptance Criteria
 
-- [ ] `splitStatements` splits on `;` at line end only, strips terminating `;`,
+- [x] `splitStatements` splits on `;` at line end only, strips terminating `;`,
       drops empties, handles CRLF, and is covered by table-driven tests.
-- [ ] Default multi-statement: statements execute in order, fail-fast on first
+- [x] Default multi-statement: statements execute in order, fail-fast on first
       error, each in its own transaction.
-- [ ] Non-`--rw` multi-statement blocks a write statement with the existing
+- [x] Non-`--rw` multi-statement blocks a write statement with the existing
       `--rw` usage error via per-statement EXPLAIN preflight.
-- [ ] `--atomic` runs all statements in one transaction; an error surfaces and (on
+- [x] `--atomic` runs all statements in one transaction; an error surfaces and (on
       a live DB) rolls back all statements; allowed both with and without `--rw`.
-- [ ] `--format json` with >1 statement emits a JSON array of result envelopes;
+      (Live-DB rollback to be confirmed via the manual verification steps in the
+      progress file.)
+- [x] `--format json` with >1 statement emits a JSON array of result envelopes;
       `--format table` emits stacked blocks separated by a blank line; `--format
       toon` emits the array form.
-- [ ] Single statement (with or without trailing `;`) produces output identical to
+- [x] Single statement (with or without trailing `;`) produces output identical to
       today.
-- [ ] Per-statement truncation warnings prefixed `statement N:` only when >1
+- [x] Per-statement truncation warnings prefixed `statement N:` only when >1
       statement ran.
-- [ ] `--param`/`:embed` resolved once and shared across statements.
-- [ ] `--atomic` flag registered with help text; `Long`/`Example` updated; skill
+- [x] `--param`/`:embed` resolved once and shared across statements.
+- [x] `--atomic` flag registered with help text; `Long`/`Example` updated; skill
       bundle regenerated and committed.
-- [ ] `make test`, `make fmt-check`, `make lint`, `make license-check`, and
+- [x] `make test`, `make fmt-check`, `make lint`, `make license-check`, and
       `make generate-check` all clean.
 
 ## Out of Scope

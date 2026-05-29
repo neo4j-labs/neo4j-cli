@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'query: accept multiple statements separated by ; at line end; --atomic runs them in a single transaction'
+time: 2026-05-29T11:30:13.807506+02:00

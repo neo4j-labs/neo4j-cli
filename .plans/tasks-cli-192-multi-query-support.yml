@@ -120,7 +120,7 @@ tasks:
       it is clean. Document the live-DB manual verification steps from the PRD
       (JSON array for multi reads, stacked table/toon, --atomic rollback vs
       default persistence, single-statement parity).
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -129,4 +129,4 @@ tasks:
       - "make test, make fmt-check, make lint, make license-check all clean"
       - "make generate-check clean against a committed tree (no bundle drift)"
       - "Manual live-DB verification steps documented/executed: multi-read JSON array, stacked table/toon, --atomic rollback vs default persistence, single-statement parity"
-    completed_at: null
+    completed_at: 2026-05-29T09:31:37Z

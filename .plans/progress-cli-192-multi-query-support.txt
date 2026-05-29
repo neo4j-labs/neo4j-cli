@@ -20,3 +20,19 @@ Decisions: regenerated skill bundle (only the --atomic flag row in references/qu
 Documented multi-statement support: query Long/Example, README "Multiple statements" section, query-additions.md + additions.md gotcha; regenerated skill bundle.
 Files: ~7 mod (query.go, README.md, additions.md, query-additions.md, bundle/SKILL.md, bundle/query-additions.md, bundle/references/query.md)
 Decisions: substantive query guidance went in query-additions.md (dedicated query doc) plus a one-line additions.md gotcha.
+
+## Manual verification (live DB)
+Requires a live Neo4j (e.g. `make run-neo4j` or `neo4j-cli docker create`); NOT run in CI/here.
+1. Multi-read JSON array: `neo4j-cli query 'RETURN 1 AS a;
+RETURN 2 AS b' --format json` -> expect a JSON array of two result envelopes in order.
+2. Stacked table/toon: same two-statement read with `--format table` -> two table blocks separated by a blank line; `--format toon` -> array form.
+3. --atomic rollback vs default persistence on a failing 2nd write:
+   - Default: `neo4j-cli query --rw 'CREATE (:A);
+THIS IS INVALID' ` -> first CREATE persists (verify `MATCH (:A) RETURN count(*)` > 0), error surfaces.
+   - Atomic: clear, then `neo4j-cli query --rw --atomic 'CREATE (:A);
+THIS IS INVALID'` -> whole tx rolls back (verify count == 0), error surfaces.
+4. Single-statement parity: `neo4j-cli query 'RETURN 1 AS a'` and `... 'RETURN 1 AS a;'` -> output byte-identical to pre-feature single-statement output (single JSON object / single table), no `statement N:` prefixes.
+
+## TASK-006 — 2026-05-29T09:31:37Z
+Added changie Minor changelog entry (multi-statement + --atomic); all gates (test/fmt-check/lint/license-check) clean and generate-check shows no bundle drift; updated PRD acceptance checkboxes and documented live-DB manual verification steps.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260529-113013.yaml, ~prd, ~tasks, ~progress
