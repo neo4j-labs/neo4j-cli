@@ -14,13 +14,13 @@ tasks:
       Inside the if-block, remove `cmd.AddCommand(_import.NewCmd(cfg))` and
       `cmd.AddCommand(deployment.NewCmd(cfg))` so only `dataapi.NewCmd(cfg)` remains.
       This must happen before the directories are deleted to avoid a broken build state.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "aura.go contains no reference to the import or deployment packages"
       - "The flag.aura-beta block contains exactly one AddCommand call: dataapi.NewCmd(cfg)"
       - "`go build ./neo4j-cli/aura/...` succeeds (packages still exist on disk at this point)"
-    completed_at: null
+    completed_at: 2026-05-29T00:00:00Z
 
   - id: task-002
     title: "Delete the import subcommand directory"
