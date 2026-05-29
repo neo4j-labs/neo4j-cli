@@ -101,6 +101,54 @@ func TestBolt_Smoke(t *testing.T) {
 				"unexpected QueryType for cypher %q", tc.cypher)
 		})
 	}
+
+	// The batch path (runStatementsResponseImpl) is the real single-session,
+	// single-managed-transaction implementation that --atomic uses. Unit tests
+	// stub it via the seam, so these subtests are the only coverage that the
+	// transaction actually spans all statements and rolls back as a unit.
+
+	t.Run("batch returns one result set per statement in order", func(t *testing.T) {
+		results, err := runStatementsWithMode(ctx, c, []string{"RETURN 1 AS a", "RETURN 2 AS b"}, nil, true)
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		assert.Equal(t, []string{"a"}, results[0].Columns)
+		require.Len(t, results[0].Rows, 1)
+		assert.Equal(t, int64(1), results[0].Rows[0][0])
+		assert.Equal(t, []string{"b"}, results[1].Columns)
+		require.Len(t, results[1].Rows, 1)
+		assert.Equal(t, int64(2), results[1].Rows[0][0])
+	})
+
+	t.Run("atomic batch rolls back earlier writes when a later statement fails", func(t *testing.T) {
+		_, err := runStatementsWithMode(ctx, c,
+			[]string{"CREATE (:RollbackProbe)", "RETURN this_is_not_a_valid_variable"}, nil, false)
+		require.Error(t, err, "an invalid second statement must fail the batch")
+
+		check, err := runStatementsWithMode(ctx, c,
+			[]string{"MATCH (n:RollbackProbe) RETURN count(n) AS c"}, nil, true)
+		require.NoError(t, err)
+		require.Len(t, check, 1)
+		require.Len(t, check[0].Rows, 1)
+		assert.Equal(t, int64(0), check[0].Rows[0][0],
+			"the CREATE in a failed atomic batch must be rolled back")
+	})
+
+	t.Run("atomic batch commits all writes on success", func(t *testing.T) {
+		t.Cleanup(func() {
+			_, _ = runStatementsWithMode(ctx, c, []string{"MATCH (n:CommitProbe) DETACH DELETE n"}, nil, false)
+		})
+		_, err := runStatementsWithMode(ctx, c,
+			[]string{"CREATE (:CommitProbe {n: 1})", "CREATE (:CommitProbe {n: 2})"}, nil, false)
+		require.NoError(t, err)
+
+		check, err := runStatementsWithMode(ctx, c,
+			[]string{"MATCH (n:CommitProbe) RETURN count(n) AS c"}, nil, true)
+		require.NoError(t, err)
+		require.Len(t, check, 1)
+		require.Len(t, check[0].Rows, 1)
+		assert.Equal(t, int64(2), check[0].Rows[0][0],
+			"both CREATEs in a successful atomic batch must commit")
+	})
 }
 
 // freeBoltPort allocates and immediately releases a TCP port on 127.0.0.1.
