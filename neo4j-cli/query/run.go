@@ -172,6 +172,7 @@ func truncateResult(cmd *cobra.Command, res *queryResult, truncOver, maxRows int
 		rows:            rowsFromValues(res.Columns, values),
 		truncated:       truncated,
 		arraysTruncated: arraysTruncated,
+		stats:           res.Stats,
 	}
 }
 

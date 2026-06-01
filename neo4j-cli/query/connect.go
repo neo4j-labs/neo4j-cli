@@ -57,6 +57,49 @@ type conn struct {
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
+	Stats   *writeStats
+}
+
+// writeStats is a driver-free snapshot of the mutation counters reported by a
+// statement's ResultSummary. It is nil for pure reads (statsFromCounters returns
+// nil when the counters report no updates) so read output stays unchanged.
+type writeStats struct {
+	NodesCreated         int
+	NodesDeleted         int
+	RelationshipsCreated int
+	RelationshipsDeleted int
+	PropertiesSet        int
+	LabelsAdded          int
+	LabelsRemoved        int
+	IndexesAdded         int
+	IndexesRemoved       int
+	ConstraintsAdded     int
+	ConstraintsRemoved   int
+	SystemUpdates        int
+}
+
+// statsFromCounters copies a driver Counters into the driver-free writeStats,
+// returning nil when the statement made no updates (a pure read) so callers can
+// nil-check to decide whether to render a stats line at all. A nil counters
+// argument also yields nil.
+func statsFromCounters(c neo4j.Counters) *writeStats {
+	if c == nil || !c.ContainsUpdates() {
+		return nil
+	}
+	return &writeStats{
+		NodesCreated:         c.NodesCreated(),
+		NodesDeleted:         c.NodesDeleted(),
+		RelationshipsCreated: c.RelationshipsCreated(),
+		RelationshipsDeleted: c.RelationshipsDeleted(),
+		PropertiesSet:        c.PropertiesSet(),
+		LabelsAdded:          c.LabelsAdded(),
+		LabelsRemoved:        c.LabelsRemoved(),
+		IndexesAdded:         c.IndexesAdded(),
+		IndexesRemoved:       c.IndexesRemoved(),
+		ConstraintsAdded:     c.ConstraintsAdded(),
+		ConstraintsRemoved:   c.ConstraintsRemoved(),
+		SystemUpdates:        c.SystemUpdates(),
+	}
 }
 
 // queryResponse is the structured envelope around a Cypher response. Backed
@@ -73,6 +116,7 @@ type queryResponse struct {
 	}
 	Bookmarks []string
 	QueryType neo4j.QueryType
+	Counters  neo4j.Counters
 }
 
 // stderrLogger is an in-package adapter implementing the neo4j/log.Logger
@@ -578,6 +622,7 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 	return &queryResult{
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
+		Stats:   statsFromCounters(parsed.Counters),
 	}, nil
 }
 
@@ -656,6 +701,7 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 
 			if summary != nil {
 				resp.QueryType = summary.QueryType()
+				resp.Counters = summary.Counters()
 			}
 
 			responses = append(responses, resp)
@@ -697,6 +743,7 @@ func runStatementsWithMode(ctx context.Context, c *conn, statements []string, pa
 		results = append(results, &queryResult{
 			Columns: p.Data.Fields,
 			Rows:    p.Data.Values,
+			Stats:   statsFromCounters(p.Counters),
 		})
 	}
 	return results, nil

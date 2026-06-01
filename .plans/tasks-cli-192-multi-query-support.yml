@@ -222,7 +222,7 @@ tasks:
       nil when stats==nil || !ContainsUpdates — omitempty on a nil pointer keeps the
       existing {columns,rows,truncated,arrays_truncated} read envelope byte-identical.
       Keep stats out of cobra help text so no skill-bundle regeneration is needed.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "runStatementsResponseImpl captures summary.Counters() into queryResponse; single-statement path inherits it via delegation"
@@ -231,6 +231,7 @@ tasks:
       - "Tests cover statsFromCounters (nil-safe), formatStatsLine wording, write vs read seam responses (fakeCounters helper)"
       - "make test, make fmt-check, make lint all clean"
     source: review
+    completed_at: 2026-06-01T07:05:00Z
 
   - id: task-010
     title: 'Skip comment-only statements in splitStatements'

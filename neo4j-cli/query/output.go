@@ -6,6 +6,7 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,26 @@ type renderResult struct {
 	rows            []map[string]any
 	truncated       bool
 	arraysTruncated int
+	stats           *writeStats
+}
+
+// jsonStats is the JSON projection of writeStats. Only non-zero counters are
+// emitted (omitempty) so a statement that, say, only created nodes does not
+// carry a wall of zeros. It appears in renderResult JSON solely when the
+// statement mutated state, keeping the read envelope byte-identical.
+type jsonStats struct {
+	NodesCreated         int `json:"nodes_created,omitempty"`
+	NodesDeleted         int `json:"nodes_deleted,omitempty"`
+	RelationshipsCreated int `json:"relationships_created,omitempty"`
+	RelationshipsDeleted int `json:"relationships_deleted,omitempty"`
+	PropertiesSet        int `json:"properties_set,omitempty"`
+	LabelsAdded          int `json:"labels_added,omitempty"`
+	LabelsRemoved        int `json:"labels_removed,omitempty"`
+	IndexesAdded         int `json:"indexes_added,omitempty"`
+	IndexesRemoved       int `json:"indexes_removed,omitempty"`
+	ConstraintsAdded     int `json:"constraints_added,omitempty"`
+	ConstraintsRemoved   int `json:"constraints_removed,omitempty"`
+	SystemUpdates        int `json:"system_updates,omitempty"`
 }
 
 // AsArray implements commonoutput.ResponseData. Each row is returned as a
@@ -65,16 +86,35 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 	if rows == nil {
 		rows = []map[string]any{}
 	}
+	var stats *jsonStats
+	if r.stats != nil {
+		stats = &jsonStats{
+			NodesCreated:         r.stats.NodesCreated,
+			NodesDeleted:         r.stats.NodesDeleted,
+			RelationshipsCreated: r.stats.RelationshipsCreated,
+			RelationshipsDeleted: r.stats.RelationshipsDeleted,
+			PropertiesSet:        r.stats.PropertiesSet,
+			LabelsAdded:          r.stats.LabelsAdded,
+			LabelsRemoved:        r.stats.LabelsRemoved,
+			IndexesAdded:         r.stats.IndexesAdded,
+			IndexesRemoved:       r.stats.IndexesRemoved,
+			ConstraintsAdded:     r.stats.ConstraintsAdded,
+			ConstraintsRemoved:   r.stats.ConstraintsRemoved,
+			SystemUpdates:        r.stats.SystemUpdates,
+		}
+	}
 	return json.Marshal(struct {
 		Columns         []string         `json:"columns"`
 		Rows            []map[string]any `json:"rows"`
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
+		Stats           *jsonStats       `json:"stats,omitempty"`
 	}{
 		Columns:         cols,
 		Rows:            rows,
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
+		Stats:           stats,
 	})
 }
 
@@ -100,6 +140,7 @@ func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows [
 func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
 	if len(results) == 1 {
 		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
+		renderStatsLines(cmd, cfg, results)
 		return
 	}
 	items := make([]commonoutput.ResponseData, len(results))
@@ -109,6 +150,61 @@ func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResul
 		fields[i] = r.columns
 	}
 	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
+	renderStatsLines(cmd, cfg, results)
+}
+
+// renderStatsLines writes a per-statement write-summary line to stdout, but only
+// in table mode — JSON/TOON carry the stats inside the envelope instead. A
+// result with no mutations (nil stats) produces no line, so reads stay
+// byte-identical. With more than one statement each line is prefixed
+// "statement N: " to match truncateResult's warning convention.
+func renderStatsLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
+		return
+	}
+	multi := len(results) > 1
+	for i, r := range results {
+		if r.stats == nil {
+			continue
+		}
+		prefix := ""
+		if multi {
+			prefix = fmt.Sprintf("statement %d: ", i+1)
+		}
+		cmd.Println(prefix + formatStatsLine(r.stats))
+	}
+}
+
+// formatStatsLine renders a write-summary as a comma-separated list of only the
+// non-zero counters (cypher-shell style), e.g.
+// "2 nodes created, 1 relationship created, 5 properties set". A writeStats is
+// only ever non-nil when at least one counter is set, so the slice is never
+// empty.
+func formatStatsLine(s *writeStats) string {
+	parts := make([]string, 0, 12)
+	add := func(n int, singular, plural string) {
+		if n == 0 {
+			return
+		}
+		noun := plural
+		if n == 1 {
+			noun = singular
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", n, noun))
+	}
+	add(s.NodesCreated, "node created", "nodes created")
+	add(s.NodesDeleted, "node deleted", "nodes deleted")
+	add(s.RelationshipsCreated, "relationship created", "relationships created")
+	add(s.RelationshipsDeleted, "relationship deleted", "relationships deleted")
+	add(s.PropertiesSet, "property set", "properties set")
+	add(s.LabelsAdded, "label added", "labels added")
+	add(s.LabelsRemoved, "label removed", "labels removed")
+	add(s.IndexesAdded, "index added", "indexes added")
+	add(s.IndexesRemoved, "index removed", "indexes removed")
+	add(s.ConstraintsAdded, "constraint added", "constraints added")
+	add(s.ConstraintsRemoved, "constraint removed", "constraints removed")
+	add(s.SystemUpdates, "system update", "system updates")
+	return strings.Join(parts, ", ")
 }
 
 // rowsFromValues converts the API's positional values (one []any per row, in
