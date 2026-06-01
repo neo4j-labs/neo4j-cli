@@ -61,7 +61,7 @@ tasks:
       port-scan fallback (localhost), pinned + mDNS-confirm (127.0.0.1), pinned + silent
       (localhost), and ctx-cancelled. Prefer table-driven cases. Must pass on ubuntu,
       windows, and macos runners without network access.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -69,7 +69,7 @@ tasks:
       - "Origin assertions verify 127.0.0.1 for mDNS/dns-sd paths and localhost for port-scan path"
       - "go test ./neo4j-cli/internal/desktopclient/... passes and is hermetic (no network dependency)"
       - "Tests follow the existing SetXxxFnForTest restore pattern with t.Cleanup/defer"
-    completed_at: null
+    completed_at: 2026-06-01T10:05:00Z
 
   - id: task-004
     title: 'Migrate the five ProbePort callers to Discover'

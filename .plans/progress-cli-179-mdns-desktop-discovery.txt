@@ -7,3 +7,8 @@ Decisions: silenced hashicorp/mdns's log.Default() output via an io.Discard logg
 Added Discover orchestrator + DiscoverViaMDNS / discoverPinned / mdnsOrigin to discovery.go and wired the NEO4J_CLI_DESKTOP_E2E_MDNS_PORT seam. mDNS/dns-sd paths yield 127.0.0.1 origins (auth-coupled), legacy port scan keeps localhost; ErrNoDesktop only after the tier-3 scan misses.
 Files: ~neo4j-cli/internal/desktopclient/discovery.go, ~neo4j-cli/internal/desktopclient/seams_e2e.go
 Decisions: Discover's e2ePortOverride branch reuses origin() (localhost) to mirror ProbePort exactly; discoverPinned only adopts the 127.0.0.1 origin when an mDNS/dns-sd responder confirms the exact pinned port.
+
+## TASK-003 — 2026-06-01T10:05:00Z
+Added hermetic seam-driven tests for Discover/DiscoverViaMDNS/discoverPinned covering mDNS hit, dns-sd hit (darwin), non-darwin dns-sd skip, port-scan fallback, all-miss ErrNoDesktop, pinned confirm (127.0.0.1), pinned silent (localhost), pinned different-port, and cancelled-ctx prompt return. All via SetMDNS/DNSSD/GOOS/HTTPClient seams + the existing pinProbeTo roundtripper helper; no real multicast/dns-sd/network.
+Files: +discovery_mdns_test.go
+Decisions: cancelled-ctx test stubs mDNS/dns-sd seams to honour ctx.Err() so Discover falls through to the port scan, whose ctx.Err() check returns the cancellation; asserts return within 2s via a goroutine+timeout instead of relying on real timeouts.
