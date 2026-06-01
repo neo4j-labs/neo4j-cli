@@ -95,6 +95,61 @@ func TestSplitStatements(t *testing.T) {
 			input: ";",
 			want:  nil,
 		},
+		{
+			name:  "full-line line comment dropped",
+			input: "//CREATE CONSTRAINT movie_title IF NOT EXISTS;\nRETURN 1",
+			want:  []string{"RETURN 1"},
+		},
+		{
+			name:  "line comment between statements dropped",
+			input: "RETURN 1;\n// a comment\nRETURN 2",
+			want:  []string{"RETURN 1", "RETURN 2"},
+		},
+		{
+			name:  "trailing line comment after cypher stripped",
+			input: "RETURN 1 // trailing\n;\nRETURN 2",
+			want:  []string{"RETURN 1", "RETURN 2"},
+		},
+		{
+			name:  "single-line block comment dropped",
+			input: "/* just a comment */;\nRETURN 1",
+			want:  []string{"RETURN 1"},
+		},
+		{
+			name:  "multi-line block comment dropped",
+			input: "/* line one\nline two */\nRETURN 1",
+			want:  []string{"RETURN 1"},
+		},
+		{
+			name:  "trailing block comment after cypher stripped",
+			input: "RETURN 1 /* note */;\nRETURN 2",
+			want:  []string{"RETURN 1", "RETURN 2"},
+		},
+		{
+			name:  "slash-slash inside single-quoted literal preserved",
+			input: "RETURN 'http://example.com'",
+			want:  []string{"RETURN 'http://example.com'"},
+		},
+		{
+			name:  "slash-slash inside double-quoted literal preserved",
+			input: "RETURN \"a // b\"",
+			want:  []string{"RETURN \"a // b\""},
+		},
+		{
+			name:  "block-comment markers inside backtick literal preserved",
+			input: "MATCH (n:`/* label */`) RETURN n",
+			want:  []string{"MATCH (n:`/* label */`) RETURN n"},
+		},
+		{
+			name:  "escaped quote inside literal does not end it",
+			input: "RETURN 'it\\'s // not a comment'",
+			want:  []string{"RETURN 'it\\'s // not a comment'"},
+		},
+		{
+			name:  "comment-only multi-line input yields nothing",
+			input: "// one\n/* two\nthree */",
+			want:  nil,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, splitStatements(tc.input))

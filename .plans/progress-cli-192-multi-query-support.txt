@@ -55,3 +55,7 @@ Added 4 review tasks (task-009..task-012).
 ## TASK-009 — 2026-06-01T07:05:00Z
 Surfaced per-statement write stats from ResultSummary.Counters: queryResponse now captures summary.Counters(); driver-free writeStats + nil-safe statsFromCounters; queryResult.Stats threaded through both single (delegated) and batch paths into renderResult. Table mode prints a non-zero-counters-only line per write statement (multi prefixed "statement N: "); JSON adds an omitempty "stats" object only when ContainsUpdates, keeping the read envelope byte-identical.
 Files: ~3 mod (connect.go, output.go, run.go), +1 new (stats_test.go)
+
+## TASK-010 — 2026-06-01T07:40:00Z
+Added stripComments single-pass rune scanner (string/backtick-literal aware, // and /* */ stripping) to split.go, wired into both flush points of splitStatements so comment-only fragments drop and trailing comments are removed. Extended split_test.go.
+Files: ~2 mod (split.go, split_test.go)

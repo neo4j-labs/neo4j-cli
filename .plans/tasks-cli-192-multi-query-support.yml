@@ -251,7 +251,7 @@ tasks:
       // comment after real cypher is also removed). Keep the end-of-line ';' split
       decision comment/string-unaware (matches the documented contract) and note this
       limitation in the doc comment.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A statement that is only // or /* */ comments (single- or multi-line) is dropped, not sent to Neo4j"
@@ -260,6 +260,7 @@ tasks:
       - "split_test.go table extended: full-line //, // between statements, trailing //, single/multi-line /* */, comment markers inside string/backtick literals"
       - "make test, make fmt-check, make lint all clean"
     source: review
+    completed_at: 2026-06-01T07:40:00Z
 
   - id: task-011
     title: 'Add --continue-on-error flag (non-atomic only)'
