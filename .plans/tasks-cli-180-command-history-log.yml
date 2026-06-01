@@ -374,3 +374,35 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-01T17:30:00Z
+
+  - id: task-015
+    title: 'Fix RedactArgs leak when --uri/--param precedes a secret flag with no value'
+    description: |
+      Security-review (CI on PR #195) flagged a Low-severity redaction gap in
+      common/clievents/redact.go RedactArgs space-form handler (~line 90). When a value-taking sensitive
+      flag is given with NO value and is immediately followed by a secret flag — e.g.
+      `--uri --password hunter2` or `--param --password hunter2` — the space-form branch consumes the
+      following `--password` token as the uri/param "value". Because redactByFlag for uri/param returns a
+      non-URL / non-key=value token UNCHANGED, the `--password` token is emitted verbatim AND consumed
+      (i++), so the real secret value two tokens later (`hunter2`) is then emitted as a positional and
+      LEAKS. Root cause: the space-form branch always consumes args[i+1] as the value even when args[i+1]
+      is itself a flag. Fix: only consume the next token as the flag's value when it is NOT itself
+      flag-looking — EXCEPT keep the current unconditional consume-and-redact for GENERIC secret flags
+      (isSecretFlag), since those replace the next token with *** regardless and skipping them would
+      regress redaction of secret values that legitimately start with '-'. Concretely guard consumption
+      with `if i+1 < len(args) && (isSecretFlag(name) || !looksLikeFlag(args[i+1]))` where
+      looksLikeFlag(s) = strings.HasPrefix(s, "-") && s != "-". Result: uri/param do not swallow a
+      following secret flag (so `--uri --password hunter2` leaves `--uri` valueless and the loop then
+      redacts `--password ***`), while `--password <secret>` (including a secret starting with '-') stays
+      fully redacted.
+    status: pending
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "RedactArgs(`--uri --password hunter2`) yields `--uri --password ***` with no hunter2 leak"
+      - "RedactArgs(`--param --password hunter2`) yields `--param --password ***` with no hunter2 leak"
+      - "Generic secret flags still redact unconditionally, including a value starting with '-' (e.g. --password -dashysecret -> --password ***)"
+      - "Existing redact cases (--uri neo4j://u:pw@h userinfo, --password secret, --param token=...) still pass"
+      - "New regression tests added in redact_test.go; make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null

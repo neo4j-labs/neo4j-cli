@@ -75,3 +75,6 @@ Files: ~common/clievents/redact.go
 ## TASK-014 — 2026-06-01T17:30:00Z
 Deleted the shipped common/agent/export_test_seam.go (SetSeamsForTest) so no test-only mutator ships in prod. agent tests its Invoker()/Detect() matrix via its own same-package _test.go (already set the unexported getenv/stdinIsTerminal seams directly). clievents and history each gained a local `var invokerFn = agent.Invoker` seam (Emit/Record call it) overridden via a same-package pinInvoker helper in their _test.go. All agent/clievents/history tests green under CLAUDECODE; make test/fmt-check/lint pass.
 Files: -common/agent/export_test_seam.go, ~common/clievents/clievents.go, ~common/clievents/clievents_test.go, ~neo4j-cli/internal/subcommands/history/store.go, ~neo4j-cli/internal/subcommands/history/store_test.go, ~AGENTS.md
+
+## REVIEW — 2026-06-01T18:00:00Z
+Added 1 review task (task-015): fix RedactArgs leak when --uri/--param precedes a valueless secret flag (CI security-review finding on PR #195).
