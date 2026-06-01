@@ -364,7 +364,13 @@ neo4j-cli history clear --force
 
 `history list` prints the human form `[time] <command> {invoker:...}` by default; `--format json|table|toon` emits the structured entries and `--limit N` caps how many are shown (0 = all).
 
-Privacy: history is stored **locally only** and never transmitted. Secret flag values (e.g. `--password`) are redacted to `***`, **but `neo4j-cli query` Cypher bodies are stored verbatim** — anything you embed inline in a query is written to the log. Disable recording with `neo4j-cli config set history-enabled false --rw`, and cap retained entries with `neo4j-cli config set history-limit <n> --rw` (default `1000`; `0` disables recording).
+### Privacy
+
+History recording is **on by default**. Known secret flags are redacted to `***` — `--password`/`-p`, `--client-secret`, `--api-key`, `--instance-password`, the `user:pass@` userinfo in `--uri`, and `--param` values under a secret-looking key (e.g. `token`, `secret`). Disable recording with `neo4j-cli config set history-enabled false --rw`, and cap retained entries with `neo4j-cli config set history-limit <n> --rw` (default `1000`; `0` disables recording).
+
+**However, the `neo4j-cli query` positional Cypher body and `--param` values are stored largely UNREDACTED** (a deliberate decision to keep history useful). They can contain inline secrets — e.g. `CREATE USER ... SET PASSWORD '...'`, connection strings, or PII — and a secret under an innocuous param key (or embedded directly in Cypher text) is **not** redacted.
+
+Because the history is designed to be read by agents and may be sent to an LLM for distillation or reporting, that flow transmits the recorded commands **off-machine**. Avoid embedding secrets in Cypher, `--param`, or `--uri`; prefer the `--password` TTY prompt or the `NEO4J_PASSWORD` environment variable.
 
 ## Write operations
 

@@ -46,3 +46,7 @@ Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
 ## TASK-009 — 2026-06-01T14:00:00Z
 Closed the MEDIUM secret leak for query bind parameters: RedactArgs now scrubs the value of a secret-named `--param` (space + equals-on-flag forms) while preserving the key, matching the base key (pre-`:embed`, pre-`=`) case-insensitively against a conservative secret substring list; non-secret/malformed params pass through unchanged. New table-driven cases verified to fail without the fix (3 secret-param cases leaked the value).
 Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+
+## TASK-010 — 2026-06-01T09:35:27Z
+Rewrote README "Command history" Privacy subsection: lists redacted secret flags (incl. -p/--uri userinfo/secret-named --param per task-008/009), states query Cypher body + --param values are stored largely UNREDACTED (inline secrets/PII), and warns the agent-distillation flow transmits history off-machine — recommend --password prompt or NEO4J_PASSWORD env. README only; no cobra Long/skill text changed so no bundle regen. Gates green.
+Files: ~README.md

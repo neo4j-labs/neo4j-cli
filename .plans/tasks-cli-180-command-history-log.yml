@@ -236,7 +236,7 @@ tasks:
       additions/description reference history, mirror the warning and run
       `go generate ./neo4j-cli/internal/skill/...` so the bundle stays in sync (TestGenerator_RoundTrip).
       No behavioural code change in this task — docs + any required bundle regen only.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -245,4 +245,4 @@ tasks:
       - "Skill bundle regenerated if any embedded text changed (clean go generate diff)"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T09:35:27Z
