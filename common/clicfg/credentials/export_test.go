@@ -24,3 +24,14 @@ func SetKeyringProviderForTest(t *testing.T, p KeyringProvider) {
 	defaultKeyring = p
 	t.Cleanup(func() { defaultKeyring = prev })
 }
+
+// SetGetenvForTest replaces the package-level getenv seam for the duration of
+// the test. Restores the previous value via t.Cleanup. Use this to inject
+// environment-variable values for env-mode credential synthesis without
+// mutating the real process environment.
+func SetGetenvForTest(t *testing.T, fn func(string) string) {
+	t.Helper()
+	prev := getenv
+	getenv = fn
+	t.Cleanup(func() { getenv = prev })
+}

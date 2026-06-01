@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -20,11 +21,21 @@ import (
 // backup file is deterministic.
 var nowUnix = func() int64 { return time.Now().Unix() }
 
+// getenv reads environment variables for env-mode credential synthesis. It is a
+// package-level seam so tests can inject values via SetGetenvForTest without
+// mutating the process environment.
+var getenv = os.Getenv
+
 // StorageModeInsecure stores sensitive fields as plaintext in credentials.json.
 const StorageModeInsecure = "insecure"
 
 // StorageModeKeyring stores sensitive fields in the OS keyring.
 const StorageModeKeyring = "keyring"
+
+// StorageModeEnv sources sensitive fields from environment variables at runtime
+// and never persists them to disk or the OS keyring. Credentials are ephemeral
+// per process; save() is a no-op in this mode.
+const StorageModeEnv = "env"
 
 type CredentialsFile struct {
 	Aura  *AuraCredentials  `json:"aura"`
@@ -189,6 +200,10 @@ func (c *Credentials) backupCorruptFile(data []byte) (string, error) {
 }
 
 func (c *Credentials) save() error {
+	if c.storageMode == StorageModeEnv {
+		// Env-mode credentials are ephemeral; never write to disk or keyring.
+		return nil
+	}
 	if c.storageMode == StorageModeKeyring {
 		return c.saveWithKeyring()
 	}
