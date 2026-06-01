@@ -34,3 +34,8 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260601-110645.yaml
 
 ## REVIEW — 2026-06-01T09:25:45Z
 Added 1 review task (task-008).
+
+## TASK-008 — 2026-06-01T09:28:48Z
+Extracted advertisedPort(ctx) (multicast then darwin-only dns-sd) and folded the dns-sd tier into DiscoverViaMDNS. Discover's unpinned path collapsed to "DiscoverViaMDNS else ProbePort"; discoverPinned now uses advertisedPort, dropping its duplicated darwin dns-sd block. Behavior-preserving: tier order, origins (mDNS->127.0.0.1, scan->localhost), and both e2e short-circuits unchanged.
+Files: ~discovery.go, ~discovery_mdns_test.go, ~desktop/doctor_checks_test.go
+Decisions: added SetDNSSDLookupFnForTest stubs to the two darwin checkMDNS miss tests — DiscoverViaMDNS now reaches dns-sd on darwin, so without the stub those tests would shell out to real dns-sd on darwin CI. Added direct advertisedPort tests + a DiscoverViaMDNS dns-sd-on-darwin case.

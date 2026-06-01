@@ -220,10 +220,13 @@ func TestDiscover_Pinned(t *testing.T) {
 	})
 }
 
-// TestDiscoverViaMDNS covers the multicast tier in isolation.
+// TestDiscoverViaMDNS covers the mDNS tier (multicast + the darwin dns-sd
+// fallback) in isolation.
 func TestDiscoverViaMDNS(t *testing.T) {
-	t.Run("hit yields 127.0.0.1 origin", func(t *testing.T) {
+	t.Run("multicast hit yields 127.0.0.1 origin", func(t *testing.T) {
+		stubGOOS(t, "darwin")
 		stubMDNS(t, 49700, true)
+		stubDNSSD(t, 0, false)
 		got, err := DiscoverViaMDNS(context.Background())
 		if err != nil {
 			t.Fatalf("DiscoverViaMDNS: %v", err)
@@ -236,11 +239,69 @@ func TestDiscoverViaMDNS(t *testing.T) {
 		}
 	})
 
-	t.Run("miss returns ErrNoDesktop", func(t *testing.T) {
+	t.Run("multicast miss + dns-sd hit on darwin", func(t *testing.T) {
+		stubGOOS(t, "darwin")
 		stubMDNS(t, 0, false)
+		stubDNSSD(t, 49800, true)
+		got, err := DiscoverViaMDNS(context.Background())
+		if err != nil {
+			t.Fatalf("DiscoverViaMDNS: %v", err)
+		}
+		if got.Port != 49800 {
+			t.Fatalf("got.Port = %d, want 49800", got.Port)
+		}
+		if got.Origin != "http://127.0.0.1:49800" {
+			t.Fatalf("got.Origin = %q", got.Origin)
+		}
+	})
+
+	t.Run("miss returns ErrNoDesktop", func(t *testing.T) {
+		stubGOOS(t, "darwin")
+		stubMDNS(t, 0, false)
+		stubDNSSD(t, 0, false)
 		_, err := DiscoverViaMDNS(context.Background())
 		if !errors.Is(err, ErrNoDesktop) {
 			t.Fatalf("err = %v, want ErrNoDesktop", err)
+		}
+	})
+}
+
+// TestAdvertisedPort exercises the extracted helper directly: multicast wins
+// first, dns-sd is consulted only on darwin, and non-darwin skips it entirely.
+func TestAdvertisedPort(t *testing.T) {
+	t.Run("multicast hit short-circuits dns-sd", func(t *testing.T) {
+		stubGOOS(t, "darwin")
+		stubMDNS(t, 49500, true)
+		t.Cleanup(SetDNSSDLookupFnForTest(func(_ context.Context) (int, bool) {
+			t.Fatalf("dnssdLookupFn must not be consulted after a multicast hit")
+			return 0, false
+		}))
+		port, ok := advertisedPort(context.Background())
+		if !ok || port != 49500 {
+			t.Fatalf("advertisedPort = (%d, %v), want (49500, true)", port, ok)
+		}
+	})
+
+	t.Run("multicast miss falls to dns-sd on darwin", func(t *testing.T) {
+		stubGOOS(t, "darwin")
+		stubMDNS(t, 0, false)
+		stubDNSSD(t, 49600, true)
+		port, ok := advertisedPort(context.Background())
+		if !ok || port != 49600 {
+			t.Fatalf("advertisedPort = (%d, %v), want (49600, true)", port, ok)
+		}
+	})
+
+	t.Run("non-darwin never consults dns-sd", func(t *testing.T) {
+		stubGOOS(t, "linux")
+		stubMDNS(t, 0, false)
+		t.Cleanup(SetDNSSDLookupFnForTest(func(_ context.Context) (int, bool) {
+			t.Fatalf("dnssdLookupFn must not be consulted on non-darwin")
+			return 0, false
+		}))
+		port, ok := advertisedPort(context.Background())
+		if ok || port != 0 {
+			t.Fatalf("advertisedPort = (%d, %v), want (0, false)", port, ok)
 		}
 	})
 }

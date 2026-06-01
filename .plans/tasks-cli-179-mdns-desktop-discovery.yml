@@ -169,7 +169,7 @@ tasks:
       hermetic — advertisedPort goes through the existing mdnsBrowseFn/dnssdLookupFn/goosFn
       seams; update/extend discovery_mdns_test.go as needed (and confirm doctor tests still
       stub the seams so checkMDNS never shells out to real dns-sd).
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-002
@@ -179,4 +179,4 @@ tasks:
       - "Tier order, origins (mDNS->127.0.0.1, port-scan->localhost), and e2e short-circuits are unchanged; existing discovery tests still pass without behavioral edits"
       - "doctor mdns_discovery still non-gating and tests remain hermetic (no real multicast/dns-sd)"
       - "make build, make test, make fmt-check, make lint, make license-check, make generate-check all pass"
-    completed_at: null
+    completed_at: 2026-06-01T09:28:48Z

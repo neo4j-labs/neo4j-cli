@@ -602,6 +602,7 @@ func TestDoctor_CheckMDNS_Miss_NonDarwin(t *testing.T) {
 // Local Network permission + --port remediation hint.
 func TestDoctor_CheckMDNS_Miss_Darwin(t *testing.T) {
 	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetDNSSDLookupFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
 	t.Cleanup(desktopclient.SetGOOSFnForTest(func() string { return "darwin" }))
 	t.Cleanup(desktop.SetDoctorGoosFnForTest(func() string { return "darwin" }))
 
@@ -620,6 +621,7 @@ func TestDoctor_CheckMDNS_Miss_Darwin(t *testing.T) {
 func TestDoctor_CheckMDNS_NeverFails(t *testing.T) {
 	for _, goos := range []string{"darwin", "linux", "windows"} {
 		t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+		t.Cleanup(desktopclient.SetDNSSDLookupFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
 		t.Cleanup(desktopclient.SetGOOSFnForTest(func() string { return goos }))
 		t.Cleanup(desktop.SetDoctorGoosFnForTest(func() string { return goos }))
 

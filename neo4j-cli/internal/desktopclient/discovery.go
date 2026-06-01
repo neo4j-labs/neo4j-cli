@@ -266,6 +266,18 @@ func mdnsOrigin(port int) string {
 	return fmt.Sprintf("http://127.0.0.1:%d", port)
 }
 
+// advertisedPort returns the port Desktop advertises over mDNS — in-process
+// multicast first, then the macOS dns-sd fallback. (0,false) when none answers.
+func advertisedPort(ctx context.Context) (int, bool) {
+	if port, ok := mdnsBrowseFn(ctx); ok {
+		return port, true
+	}
+	if goosFn() == "darwin" {
+		return dnssdLookupFn(ctx)
+	}
+	return 0, false
+}
+
 // Discover is the high-level entry point that resolves a running Desktop relate
 // API. When pinned is non-zero it confirms that exact port; otherwise it tries,
 // in order: (1) in-process mDNS multicast, (2) the macOS dns-sd fallback, and
@@ -278,27 +290,20 @@ func Discover(ctx context.Context, pinned int) (ProbeResult, error) {
 	if pinned != 0 {
 		return discoverPinned(ctx, pinned)
 	}
-
 	if res, err := DiscoverViaMDNS(ctx); err == nil {
 		return res, nil
 	}
-
-	if goosFn() == "darwin" {
-		if port, ok := dnssdLookupFn(ctx); ok {
-			return ProbeResult{Port: port, Origin: mdnsOrigin(port)}, nil
-		}
-	}
-
 	return ProbePort(ctx, 0)
 }
 
-// DiscoverViaMDNS resolves the relate API via in-process mDNS multicast,
-// yielding a 127.0.0.1 origin. Returns ErrNoDesktop when no responder answers.
+// DiscoverViaMDNS resolves the relate API via mDNS — in-process multicast then
+// the macOS dns-sd fallback — yielding a 127.0.0.1 origin. Returns ErrNoDesktop
+// when no responder answers.
 func DiscoverViaMDNS(ctx context.Context) (ProbeResult, error) {
 	if e2eMDNSPortOverride != 0 {
 		return ProbeResult{Port: e2eMDNSPortOverride, Origin: mdnsOrigin(e2eMDNSPortOverride)}, nil
 	}
-	if port, ok := mdnsBrowseFn(ctx); ok {
+	if port, ok := advertisedPort(ctx); ok {
 		return ProbeResult{Port: port, Origin: mdnsOrigin(port)}, nil
 	}
 	return ProbeResult{}, ErrNoDesktop
@@ -309,13 +314,8 @@ func DiscoverViaMDNS(ctx context.Context) (ProbeResult, error) {
 // 127.0.0.1 origin; otherwise we fall back to the HTTP port probe, which yields
 // the localhost origin an old Desktop signs with.
 func discoverPinned(ctx context.Context, pinned int) (ProbeResult, error) {
-	if port, ok := mdnsBrowseFn(ctx); ok && port == pinned {
+	if port, ok := advertisedPort(ctx); ok && port == pinned {
 		return ProbeResult{Port: pinned, Origin: mdnsOrigin(pinned)}, nil
-	}
-	if goosFn() == "darwin" {
-		if port, ok := dnssdLookupFn(ctx); ok && port == pinned {
-			return ProbeResult{Port: pinned, Origin: mdnsOrigin(pinned)}, nil
-		}
 	}
 	return ProbePort(ctx, pinned)
 }
