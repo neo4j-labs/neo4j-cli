@@ -15,3 +15,6 @@ Decisions: unauthorized check placed BEFORE generic Neo.ClientError fallback in 
 ## TASK-004 — 2026-06-01T11:02:00Z
 Added a single user-facing Minor changelog entry via changie covering the corrected bug-report URL, installer issues-URL signpost, and the new Bolt auth/connection + embed API-key error suggestions. All gates green: test, fmt-check, lint, bats; generate-check shows no skill-bundle drift (only the .plans status flip + new changelog file).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260601-105039.yaml
+
+## REVIEW — 2026-06-01T11:30:00Z
+Added 2 review tasks (task-005..task-006).
