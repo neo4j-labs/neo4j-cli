@@ -115,14 +115,14 @@ tasks:
       and add a flush-left Example field (>=2 --rw invocations, one --from-docker
       and one --from-desktop, comment + blank-line separated). Run
       `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
       - "deploy leaf is registered under the instance command tree"
       - "Example field satisfies TestAllLeafCommands_HaveExamples (>=2 --rw invocations, flush-left, comments)"
       - "go generate leaves no diff and TestGenerator_RoundTrip passes"
-    completed_at: null
+    completed_at: 2026-06-01T14:35:00Z
 
   - id: task-007
     title: 'Extend e2e desktop fixture with upload + tasks routes'

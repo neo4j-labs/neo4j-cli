@@ -24,6 +24,7 @@
 - [neo4j-cli aura instance](#neo4j-cli-aura-instance)
 - [neo4j-cli aura instance create](#neo4j-cli-aura-instance-create)
 - [neo4j-cli aura instance delete](#neo4j-cli-aura-instance-delete)
+- [neo4j-cli aura instance deploy](#neo4j-cli-aura-instance-deploy)
 - [neo4j-cli aura instance get](#neo4j-cli-aura-instance-get)
 - [neo4j-cli aura instance list](#neo4j-cli-aura-instance-list)
 - [neo4j-cli aura instance overwrite](#neo4j-cli-aura-instance-overwrite)
@@ -662,6 +663,49 @@ neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-000
 
 # Delete and pipe the response status through jq
 neo4j-cli aura instance delete 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json | jq -r '.data.status'
+```
+
+### neo4j-cli aura instance deploy
+
+Creates a new Aura instance and clones a local database into it
+
+This subcommand creates a new Aura instance and clones a local Neo4j database into it.
+
+The source database can come from a local Neo4j Docker container managed by 'neo4j-cli docker' (--from-docker) or from a DBMS managed by a local Neo4j Desktop 2 install (--from-desktop). Exactly one source must be specified.
+
+A new Aura instance is provisioned using the same flags as 'instance create', then the named --database (default "neo4j") is dumped from the source and uploaded into the new instance, overwriting its contents. The "system" database cannot be cloned.
+
+The command waits for the instance to be ready and for the data load to finish before returning. On success the structured output reports the instance connection details plus deploy_status=succeeded. If the data load fails after the instance was created, the instance is left in place (it is not deleted), deploy_status=failed is reported, and the instance id is printed so you can retry or delete it manually.
+
+Usage: `neo4j-cli aura instance deploy [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cloud-provider` | cloud-provider | - | The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp". |
+| `--credential-name` | string | - | The name to use when storing the credentials locally. Defaults to <instance-id>-default. |
+| `--database` | string | neo4j | The name of the source database to clone. The system database cannot be cloned. |
+| `--desktop-port` | int | 0 | Pin the Neo4j Desktop 2 relate API to a specific port instead of probing 44222..44232 (used only with --from-desktop). |
+| `--from-desktop` | string | - | ID of a DBMS managed by a local Neo4j Desktop 2 install to clone the database from. |
+| `--from-docker` | string | - | Name of a local Neo4j Docker container (managed by `neo4j-cli docker`) to clone the database from. |
+| `--memory` | memory | - | The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes. |
+| `--name` | string | - | The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01). |
+| `--no-credential-print` | bool | false | Omit the password from the command output. |
+| `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
+| `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project. |
+| `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
+| `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
+| `--version` | string | 5 | The Neo4j version of the instance. |
+
+Examples:
+
+```
+# Deploy a local Docker container's neo4j database into a new free-db Aura instance
+neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Deploy a Neo4j Desktop 2 DBMS database into a new professional-db instance on AWS
+neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
 ```
 
 ### neo4j-cli aura instance get

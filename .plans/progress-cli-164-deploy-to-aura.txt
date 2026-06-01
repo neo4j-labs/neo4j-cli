@@ -22,3 +22,7 @@ Decisions: createAndStoreInstance returns a nil instance map (nil error) for any
 Added Exec(ctx, name, args) to dockerClient interface and execClient (shells `docker exec <name> <args...>` via c.run, trims stdout; non-zero exit reuses the shared redacted clierr.UsageError path). Added recording Exec to fakeDockerClient (ExecCalls []ExecCall{Name, Args} + ExecFn override). Unit tests drive the real execClient against a POSIX shell stub docker binary on PATH.
 Files: neo4j-cli/internal/subcommands/docker/client.go (M), client_test.go (M), helpers_test.go (M)
 Decisions: Tested via real stub-docker-on-PATH rather than only the fake, so argv shaping + redaction in the production execClient path are covered; the two Exec tests skip on Windows (Unix-shell stub).
+
+## TASK-006 — 2026-06-01T14:35:00Z
+Registered the deploy leaf in instance.go (cmd.AddCommand(NewDeployCmd(cfg)) after NewCreateCmd) and added a flush-left Example to NewDeployCmd: two --rw invocations (one --from-docker free-db, one --from-desktop professional-db on AWS), each preceded by a # comment and blank-line separated. Ran `go generate ./neo4j-cli/internal/skill/...` which refreshed references/aura.md with the new `instance deploy` surface. Gates: make test (incl. TestGenerator_RoundTrip + TestAllLeafCommands_HaveExamples), make fmt-check, make lint all green; bundle diff limited to references/aura.md.
+Files: M neo4j-cli/aura/internal/subcommands/instance/instance.go, M neo4j-cli/aura/internal/subcommands/instance/deploy.go, M neo4j-cli/internal/skill/bundle/references/aura.md

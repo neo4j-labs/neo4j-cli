@@ -128,6 +128,11 @@ func NewDeployCmd(cfg *clicfg.Config) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Use:         "deploy",
 		Short:       "Creates a new Aura instance and clones a local database into it",
+		Example: `# Deploy a local Docker container's neo4j database into a new free-db Aura instance
+neo4j-cli aura instance deploy --rw --from-docker my-local-neo4j --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Deploy a Neo4j Desktop 2 DBMS database into a new professional-db instance on AWS
+neo4j-cli aura instance deploy --rw --from-desktop dbms-1234 --database movies --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111`,
 		Long: `This subcommand creates a new Aura instance and clones a local Neo4j database into it.
 
 The source database can come from a local Neo4j Docker container managed by 'neo4j-cli docker' (--from-docker) or from a DBMS managed by a local Neo4j Desktop 2 install (--from-desktop). Exactly one source must be specified.
