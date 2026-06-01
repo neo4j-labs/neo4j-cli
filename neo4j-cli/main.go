@@ -30,7 +30,7 @@ func recoverPanic(w io.Writer, args []string, r any) {
 	if err, ok := r.(error); ok {
 		fmt.Fprintf(w, "%s\n", err.Error()) //nolint:errcheck // best-effort write before re-panic
 	}
-	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli\n\n", clievents.RedactArgs(args)) //nolint:errcheck // best-effort write before re-panic
+	fmt.Fprintf(w, "Unexpected error running CLI with args %s, please report an issue in %s\n\n", clievents.RedactArgs(args), clierr.IssuesURL) //nolint:errcheck // best-effort write before re-panic
 }
 
 // exitCodeFor maps an error returned by cmd.Execute to a process exit code.
