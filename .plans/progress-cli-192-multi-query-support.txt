@@ -67,3 +67,6 @@ Files: ~5 mod (query.go, run.go, output.go, run_test.go, output_test.go), ~1 mod
 ## TASK-012 — 2026-06-01T09:05:00Z
 Added schemaTxError remediation in categorizeBoltError for Neo.ClientError.Transaction.ForbiddenDueToTransactionType (typed + plain-text), routing to a validation error (exit 6) with a "re-run without --atomic" suggestion; ordinary SyntaxError stays suggestion-free.
 Files: ~2 (errors.go, errors_test.go)
+
+## REVIEW — 2026-06-01T07:09:48Z
+Added 2 review tasks (task-013..task-014).

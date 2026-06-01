@@ -326,3 +326,48 @@ tasks:
       - "errors_test.go covers both detection variants and the regression case"
       - "make test, make fmt-check, make lint all clean"
     source: review
+
+  - id: task-013
+    title: 'Collapse jsonStats into writeStats to delete the parallel struct + copy'
+    description: |
+      /hone:review finding (priority 2/4, missed simplification). output.go declares
+      jsonStats as a second 12-field struct identical to writeStats (connect.go) except
+      for json tags, then renderResult.MarshalJSON hand-copies all 12 fields one-by-one
+      from writeStats into jsonStats. That is the same data shape enumerated twice plus
+      a mechanical ~12-line copy block — roughly 36 lines of boilerplate that will drift
+      the moment a counter is added. writeStats is package-internal, so there is no
+      reason it cannot carry the serialization tags itself. Put the snake_case
+      `json:"...,omitempty"` tags directly on writeStats (connect.go), delete the
+      jsonStats type and the entire field-for-field copy block in MarshalJSON, and
+      marshal r.stats directly via a `Stats *writeStats `json:"stats,omitempty"`` field
+      on the anonymous output struct. Output must stay byte-identical: omitempty on the
+      nil pointer still drops the `stats` key for reads, and per-field omitempty still
+      drops zero counters for writes. formatStatsLine legitimately stays separate (it is
+      display strings with singular/plural nouns, not the same shape) — do NOT try to
+      merge that in.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "jsonStats type is deleted; writeStats carries the snake_case omitempty json tags; MarshalJSON marshals r.stats directly with no field-by-field copy block"
+      - "JSON output is byte-identical: reads omit the 'stats' key, writes emit only non-zero counters under 'stats', error placeholders still carry 'error'"
+      - "Existing output_test.go / stats_test.go regression locks pass unchanged (read envelope stays {columns,rows,truncated,arrays_truncated})"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+
+  - id: task-014
+    title: 'Move const forbiddenTxTypeCode out from between doc comment and func'
+    description: |
+      /hone:review nit (priority 7, legibility). In errors.go the const
+      forbiddenTxTypeCode was inserted AFTER the categorizeBoltError doc-comment block
+      but BEFORE the func, so the multi-paragraph doc comment now visually documents the
+      const and categorizeBoltError is left with no adjacent doc. Move the const so the
+      doc comment sits directly above the func it describes — either place the const
+      above the doc comment, or group it with the other package-level error constants if
+      one exists. Pure code-movement; no behaviour change.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "The categorizeBoltError doc comment is immediately adjacent to (directly above) the func, with no const wedged between them"
+      - "No behaviour change; errors_test.go and all gates pass unchanged"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
