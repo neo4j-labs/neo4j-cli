@@ -145,3 +145,38 @@ tasks:
       - "Exactly one Minor changie entry exists under .changes/unreleased/ for this change"
       - "make build, make test, make fmt-check, make lint, and make license-check all pass"
     completed_at: 2026-06-01T09:12:00Z
+
+  - id: task-008
+    title: 'Extract advertisedPort helper; fold dns-sd into DiscoverViaMDNS'
+    description: |
+      Review finding (blocking): the two-tier advertisement lookup (in-process mDNS
+      multicast -> macOS dns-sd fallback) in neo4j-cli/internal/desktopclient/discovery.go
+      is spread across Discover, DiscoverViaMDNS, and discoverPinned in a way that
+      duplicates a branch and creates an asymmetry. DiscoverViaMDNS does multicast ONLY
+      (no dns-sd tier), so Discover bolts the darwin dns-sd tier on separately as tier-2,
+      and discoverPinned re-implements the same multicast + darwin-dns-sd sequence again
+      (with a `== pinned` guard) while calling mdnsBrowseFn directly — bypassing
+      DiscoverViaMDNS, which is why the e2eMDNSPortOverride seam doesn't reach the pinned
+      path. Fix: extract a single `advertisedPort(ctx) (int, bool)` helper that does
+      multicast then (on darwin) dns-sd, and let DiscoverViaMDNS own ALL of mDNS by calling
+      it (after the e2eMDNSPortOverride short-circuit). Then Discover's unpinned path
+      collapses to "DiscoverViaMDNS else ProbePort(ctx,0)", and discoverPinned becomes
+      "advertisedPort; if ok && port==pinned -> mdnsOrigin else ProbePort(ctx,pinned)".
+      Behavior must stay identical (same tier order, same origins, same e2e short-circuits).
+      Bonus correctness win this delivers: doctor's checkMDNS calls DiscoverViaMDNS, so
+      folding dns-sd in makes `desktop doctor`'s mdns_discovery row reflect the same path
+      production uses on macOS (today it only reports the multicast result). Tests stay
+      hermetic — advertisedPort goes through the existing mdnsBrowseFn/dnssdLookupFn/goosFn
+      seams; update/extend discovery_mdns_test.go as needed (and confirm doctor tests still
+      stub the seams so checkMDNS never shells out to real dns-sd).
+    status: pending
+    source: review
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "A single advertisedPort(ctx) (int, bool) helper performs multicast then (darwin only) dns-sd; the darwin dns-sd branch is no longer duplicated"
+      - "DiscoverViaMDNS calls advertisedPort (after its e2eMDNSPortOverride short-circuit); Discover unpinned path is 'DiscoverViaMDNS else ProbePort'; discoverPinned uses advertisedPort"
+      - "Tier order, origins (mDNS->127.0.0.1, port-scan->localhost), and e2e short-circuits are unchanged; existing discovery tests still pass without behavioral edits"
+      - "doctor mdns_discovery still non-gating and tests remain hermetic (no real multicast/dns-sd)"
+      - "make build, make test, make fmt-check, make lint, make license-check, make generate-check all pass"
+    completed_at: null

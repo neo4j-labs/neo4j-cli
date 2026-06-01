@@ -31,3 +31,6 @@ Decisions: stubbed the checkMDNS seam (default INFO) in pinSeams and every rende
 ## TASK-007 — 2026-06-01T09:12:00Z
 Ran go generate ./neo4j-cli/internal/skill/... — no bundle drift (task-006 already regenerated desktop.md). Added one changie Minor entry describing mDNS/DNS-SD desktop discovery with the 44222..44232 port-scan fallback and the macOS dns-sd tier / --port caveat. All gates green: build, test, fmt-check, lint (0 issues), license-check. generate-check's only diff is the tasks YAML status flip (no internal/skill/bundle/** drift).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260601-110645.yaml
+
+## REVIEW — 2026-06-01T09:25:45Z
+Added 1 review task (task-008).
