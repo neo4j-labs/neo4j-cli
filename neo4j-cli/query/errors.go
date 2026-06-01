@@ -12,6 +12,8 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 )
 
+const forbiddenTxTypeCode = "Neo.ClientError.Transaction.ForbiddenDueToTransactionType"
+
 // categorizeBoltError wraps a Bolt-driver error into a typed *CLIError so the
 // top-level main can map it to a process exit code via errors.As. Cypher
 // ClientError-class failures (Neo.ClientError.*) surface as validation errors
@@ -29,8 +31,6 @@ import (
 // concrete *neo4j.Neo4jError type (real driver path), then by string-prefix
 // match on the error message (tests inject plain `errors.New("Neo.ClientError…")`
 // without constructing a real Neo4jError). A nil error is returned unchanged.
-const forbiddenTxTypeCode = "Neo.ClientError.Transaction.ForbiddenDueToTransactionType"
-
 func categorizeBoltError(err error) error {
 	if err == nil {
 		return nil

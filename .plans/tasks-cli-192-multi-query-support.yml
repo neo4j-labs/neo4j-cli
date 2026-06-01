@@ -365,10 +365,11 @@ tasks:
       doc comment sits directly above the func it describes — either place the const
       above the doc comment, or group it with the other package-level error constants if
       one exists. Pure code-movement; no behaviour change.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "The categorizeBoltError doc comment is immediately adjacent to (directly above) the func, with no const wedged between them"
       - "No behaviour change; errors_test.go and all gates pass unchanged"
       - "make test, make fmt-check, make lint all clean"
     source: review
+    completed_at: 2026-06-01T10:45:00Z
