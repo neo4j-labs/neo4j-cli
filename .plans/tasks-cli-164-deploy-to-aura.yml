@@ -148,7 +148,7 @@ tasks:
       `changie new --projects neo4j-cli --kind Minor --body "..."` (or hand-author
       the YAML per repo convention). Run make test, make fmt-check, make lint,
       make license-check, and generate-check as the final completion gates.
-    status: pending
+    status: completed
     dependencies:
       - task-006
       - task-007
@@ -156,4 +156,4 @@ tasks:
       - "A Minor changelog entry for the deploy command exists under .changes/unreleased/"
       - "make test, make fmt-check, make lint, and make license-check all pass"
       - "go generate leaves no diff (generate-check clean)"
-    completed_at: null
+    completed_at: 2026-06-01T15:45:00Z
