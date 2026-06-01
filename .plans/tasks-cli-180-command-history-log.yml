@@ -58,7 +58,7 @@ tasks:
       command (best-effort). NOTE: some aura subtrees override PersistentPreRunE; app.go sets
       cobra.EnableTraverseRunHooks=true so the root hook still fires for them — verify the
       history hook actually fires for a nested aura subcommand.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -67,7 +67,7 @@ tasks:
       - "history, help, and __complete* commands are not recorded"
       - "Existing PersistentPreRunE behaviour (format/RW/versioncheck/skill-refresh) is preserved"
       - "A failing history write does not abort the underlying command"
-    completed_at: null
+    completed_at: 2026-06-01T00:00:00Z
 
   - id: task-004
     title: 'Add `neo4j-cli history` command tree (list + clear)'

@@ -27,6 +27,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/history"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/update"
 	"github.com/neo4j/cli/neo4j-cli/internal/versioncheck"
 	"github.com/neo4j/cli/neo4j-cli/query"
@@ -76,6 +77,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			return err
 		}
 		initCredentialStorageDefault(cfg, cmd.ErrOrStderr())
+		if shouldRecordHistory(cmd) {
+			history.Record(cfg, cmd.CommandPath())
+		}
 		versioncheck.MaybeHint(cmd, cfg, Version)
 		versioncheck.Schedule(cmd.Context(), cfg, Version)
 		skillrefresh.MaybeRefresh(cmd.Context(), cmd, cfg, binskill.Bundle, "neo4j-cli")
@@ -101,6 +105,21 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	quip.Hook(cmd)
 
 	return cmd
+}
+
+// shouldRecordHistory reports whether the resolved command should be appended
+// to the local history log. It excludes the `history` subtree (so reading or
+// clearing history doesn't pollute it), the built-in `help` command, and
+// cobra's hidden shell-completion commands (`__complete`, `__completeNoDesc`).
+// The decision walks the command's ancestry rather than matching os.Args.
+func shouldRecordHistory(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		switch c.Name() {
+		case "history", "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+			return false
+		}
+	}
+	return true
 }
 
 // initCredentialStorageDefault runs on every invocation before any RunE
