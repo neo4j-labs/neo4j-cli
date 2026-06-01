@@ -37,7 +37,7 @@ tasks:
       (e.g. fileutils.WriteFileErr wrapping the existing writeFileAtomic) and have Record
       swallow/ignore write errors so a bad history write can never crash a command. Nil-guard
       cfg.Credentials.Aura before reading the default-credential name (it may be nil pre-load).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - "Trimming keeps the last history-limit entries; disabled or limit 0 writes nothing"
       - "History file is created at the config-prefix path with mode 0600"
       - "Load tolerates and skips corrupt lines; tests use testfs (never real FS)"
-    completed_at: null
+    completed_at: 2026-06-01T00:00:00Z
 
   - id: task-003
     title: 'Wire history recording into root PersistentPreRunE hook'

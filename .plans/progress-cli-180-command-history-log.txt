@@ -2,3 +2,8 @@
 Added GlobalScope config keys history-enabled (bool, default true) + history-limit (int, default 1000, 0 disables) with HistoryEnabled()/HistoryLimit() accessors, Set validation, and ValidConfigKeys registration so they surface via config get/set/list.
 Files: +1 new (common/clicfg/history_test.go), ~3 mod (clicfg.go, list_test.go, standalone_config_test.go)
 Decisions: keys sort alphabetically between format and skill-auto-refresh — updated both GlobalScope and AuraScope config-list snapshot tests.
+
+## TASK-002 — 2026-06-01T00:00:00Z
+Created history store package: Entry struct (RFC3339 UTC time, command, invoker, version, workspace/credential omitempty), path() helper, and best-effort Record/Load/Clear over cfg.Aura.Fs(). Record redacts via clievents.RedactArgs, detects invoker via a test-seam'd term.IsTerminal(stdin), honors history-enabled/limit, trims to last N, writes mode 0600 without panicking; Load skips corrupt lines.
+Files: +neo4j-cli/internal/subcommands/history/store.go, +neo4j-cli/internal/subcommands/history/store_test.go, ~common/clicfg/fileutils/fileutils.go
+Decisions: Added fileutils.WriteFileErr (error-returning wrapper around writeFileAtomic) so Record can swallow write errors instead of panicking like WriteFile.

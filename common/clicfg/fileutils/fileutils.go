@@ -57,6 +57,13 @@ func WriteFile(fs afero.Fs, path string, data []byte) {
 	}
 }
 
+// WriteFileErr is the error-returning variant of WriteFile. It performs the
+// same atomic write at mode 0600 but returns the error instead of panicking,
+// for callers that must remain best-effort (e.g. history logging).
+func WriteFileErr(fs afero.Fs, path string, data []byte) error {
+	return writeFileAtomic(fs, path, data)
+}
+
 func writeFileAtomic(fs afero.Fs, path string, data []byte) error {
 	if err := fs.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err

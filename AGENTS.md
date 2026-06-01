@@ -212,6 +212,10 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for maintainer-
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
 - If `make lint` reports issues whose paths point to a non-existent worktree (e.g. `.claude/worktrees/agent-…`) the cache is stale; run `golangci-lint cache clean` once and re-run — issues evaporate when the source path no longer exists.
 
+## fileutils Notes
+
+- `fileutils.WriteFile` PANICS on error; `fileutils.WriteFileErr` is the error-returning twin (same atomic 0600 write). Use `WriteFileErr` in best-effort paths that must never crash the command (e.g. history logging).
+
 ## Credentials Storage Notes
 
 See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of `onUpdate` callbacks, sensitive-field omission, omitempty-vs-printable patterns, cross-type validation order, and test fixture seeding for the `Aura` / `Dbms` / `Embed` credential types.
