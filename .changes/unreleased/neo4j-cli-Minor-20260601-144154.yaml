@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'desktop: add `neo4j-cli desktop dbms upgrade <id>` to upgrade a Desktop-managed DBMS to a newer Neo4j version, with --plugin-upgrade-mode (all|none|upgradable, default upgradable), --version (auto-picks the latest stable enterprise version when omitted), --no-migrate, --backup, and --force.'
+time: 2026-06-01T14:41:54.219345+02:00

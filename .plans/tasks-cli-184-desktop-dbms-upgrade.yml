@@ -93,7 +93,7 @@ tasks:
     description: |
       Add a single changie Minor entry describing the new command, then run the
       full gate suite to confirm the feature is complete.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-004
@@ -102,4 +102,4 @@ tasks:
       - "One changie entry (kind Minor) under .changes/unreleased/ describes neo4j-cli desktop dbms upgrade with --plugin-upgrade-mode"
       - "make test passes (including TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples)"
       - "make fmt-check, make lint, and make license-check all pass"
-    completed_at: null
+    completed_at: 2026-06-01T14:45:00Z

@@ -19,3 +19,7 @@ Files: +neo4j-cli/internal/subcommands/desktop/dbms/upgrade_test.go
 ## TASK-005 — 2026-06-01T15:00:00Z
 Verified skill bundle is current: bundle was already regenerated in task-003 when the upgrade leaf was mounted, so `go generate ./neo4j-cli/internal/skill/...` produced no drift. TestGenerator_RoundTrip and all gates pass.
 Files: none (verification only)
+
+## TASK-006 — 2026-06-01T14:45:00Z
+Added single changie Minor entry for `neo4j-cli desktop dbms upgrade`; all four gates green (make test, fmt-check, lint, license-check). Feature complete (all six tasks done).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260601-144154.yaml
