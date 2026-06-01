@@ -113,6 +113,39 @@ type DbmsPlugin struct {
 	PendingRestart bool   `json:"pendingRestart"`
 }
 
+// UploadSource is the `source` half of the `POST /dbmss/:id/databases/upload`
+// body — the local database to dump and ship to the Aura target.
+type UploadSource struct {
+	DatabaseName string `json:"databaseName"`
+}
+
+// UploadTarget is the `target` half of the upload body — the Aura instance the
+// dump is restored into. `Overwrite` maps to relate's `overwrite-destination`.
+type UploadTarget struct {
+	URI       string `json:"uri"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Overwrite bool   `json:"overwrite"`
+}
+
+// TaskStatus mirrors the `status` object on a relate task. Exactly one of the
+// three booleans is true once a task settles; while in flight `IsLoading` is
+// true and the other two are false.
+type TaskStatus struct {
+	IsLoading bool `json:"isLoading"`
+	IsSuccess bool `json:"isSuccess"`
+	IsError   bool `json:"isError"`
+}
+
+// Task mirrors one entry in the `GET /tasks` response. A `db:upload` task is
+// tagged with both the literal `"db:upload"` and the source DBMS id, which is
+// how WaitForUploadTask locates the right task among concurrent operations.
+type Task struct {
+	ID     string     `json:"id"`
+	Tags   []string   `json:"tags"`
+	Status TaskStatus `json:"status"`
+}
+
 // EnvJSON is the metadata file Desktop drops in EnvConfigDir(). We only read
 // it; nothing in the CLI mutates these files. Optional fields are
 // `omitempty` so a missing `relateDataPath` or `httpOrigin` does not crash

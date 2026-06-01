@@ -73,14 +73,14 @@ tasks:
       new Task type (id, tags []string, status{isLoading,isSuccess,isError});
       and WaitForUploadTask(ctx, client, dbmsID) that polls for the db:upload +
       dbmsID task and returns on isSuccess/isError.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "UploadDatabase, ListTasks, Task, UploadSource/UploadTarget types added with copyright headers"
       - "UploadDatabase request body and auth headers (X-Client-Id/X-API-Token) match the Desktop 2 contract"
       - "WaitForUploadTask filters tasks by tags containing both db:upload and the dbmsID and returns on success/error"
       - "Unit tests use the newAuthedServer pattern to assert request shape and polling termination"
-    completed_at: null
+    completed_at: 2026-06-01T13:14:36Z
 
   - id: task-005
     title: 'Implement aura instance deploy leaf (orchestration + output)'
