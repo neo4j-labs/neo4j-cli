@@ -24,3 +24,7 @@ Files: ~README.md, +.changes/unreleased/neo4j-cli-Minor-20260601-105129.yaml
 
 ## REVIEW — 2026-06-01T09:00:00Z
 Added 2 review tasks (task-006..task-007).
+
+## TASK-006 — 2026-06-01T11:00:00Z
+Dropped the unused 2nd param from history.Record: signature now Record(cfg *clicfg.Config). app.go call site no longer computes cmd.CommandPath(); os.Args remains the redaction source so recorded command string is unchanged. Updated 7 test call sites.
+Files: ~neo4j-cli/internal/subcommands/history/store.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/subcommands/history/store_test.go

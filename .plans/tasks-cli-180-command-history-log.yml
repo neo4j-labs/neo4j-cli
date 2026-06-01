@@ -121,7 +121,7 @@ tasks:
       `Record(cfg *clicfg.Config)`. os.Args remains the source of truth for the full redacted
       invocation (including flags, which CommandPath() can't reconstruct anyway). Update the call
       site to `history.Record(cfg)` and any tests/usages that pass the second arg.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -130,7 +130,7 @@ tasks:
       - "Recorded command string is unchanged (neo4j-cli + redacted os.Args[1:])"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T11:00:00Z
 
   - id: task-007
     title: 'Remove redundant historyRows.MarshalJSON'

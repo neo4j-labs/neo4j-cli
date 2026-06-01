@@ -58,7 +58,7 @@ func invoker() string {
 // best-effort: it short-circuits when history is disabled or the limit is 0,
 // and every error (read, marshal, write) is swallowed so a bad history write
 // can never crash or abort the underlying command.
-func Record(cfg *clicfg.Config, _ string) {
+func Record(cfg *clicfg.Config) {
 	if cfg == nil || cfg.Global == nil {
 		return
 	}

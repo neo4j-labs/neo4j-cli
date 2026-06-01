@@ -40,7 +40,7 @@ func TestRecord_AppendsRedactedEntry(t *testing.T) {
 	withArgs(t, []string{"neo4j-cli", "credential", "add", "--password", "supersecret"})
 	withInvoker(t, true)
 
-	Record(cfg, "credential add")
+	Record(cfg)
 
 	entries, err := Load(cfg)
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestRecord_InvokerResolution(t *testing.T) {
 			withArgs(t, []string{"neo4j-cli", "instance", "list"})
 			withInvoker(t, tc.tty)
 
-			Record(cfg, "instance list")
+			Record(cfg)
 
 			entries, err := Load(cfg)
 			require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestRecord_TrimsToLimitKeepingLast(t *testing.T) {
 
 	for _, n := range []string{"a", "b", "c", "d", "e"} {
 		withArgs(t, []string{"neo4j-cli", n})
-		Record(cfg, n)
+		Record(cfg)
 	}
 
 	entries, err := Load(cfg)
@@ -106,7 +106,7 @@ func TestRecord_DisabledOrZeroLimitWritesNothing(t *testing.T) {
 			withArgs(t, []string{"neo4j-cli", "instance", "list"})
 			withInvoker(t, false)
 
-			Record(cfg, "instance list")
+			Record(cfg)
 
 			entries, err := Load(cfg)
 			require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestRecord_WritesFileMode0600(t *testing.T) {
 	withArgs(t, []string{"neo4j-cli", "instance", "list"})
 	withInvoker(t, false)
 
-	Record(cfg, "instance list")
+	Record(cfg)
 
 	info, err := cfg.Aura.Fs().Stat(path())
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestRecord_CapturesCredentialAndWorkspace(t *testing.T) {
 	withArgs(t, []string{"neo4j-cli", "instance", "list"})
 	withInvoker(t, false)
 
-	Record(cfg, "instance list")
+	Record(cfg)
 
 	entries, err := Load(cfg)
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestClear_EmptiesFile(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json"}`, "{}")
 	withArgs(t, []string{"neo4j-cli", "instance", "list"})
 	withInvoker(t, false)
-	Record(cfg, "instance list")
+	Record(cfg)
 
 	require.NoError(t, Clear(cfg))
 

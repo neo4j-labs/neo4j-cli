@@ -78,7 +78,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		}
 		initCredentialStorageDefault(cfg, cmd.ErrOrStderr())
 		if shouldRecordHistory(cmd) {
-			history.Record(cfg, cmd.CommandPath())
+			history.Record(cfg)
 		}
 		versioncheck.MaybeHint(cmd, cfg, Version)
 		versioncheck.Schedule(cmd.Context(), cfg, Version)
