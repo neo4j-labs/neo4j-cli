@@ -30,10 +30,13 @@ tasks:
       functions operating on cfg.Aura.Fs(). Record reuses clievents.RedactArgs for the
       command string, detects invoker via a test-seam'd term.IsTerminal(stdin), reads
       metadata from cfg (Version, Aura.DefaultWorkspace, Credentials.Aura.DefaultCredential
-      name), then does read-all -> append -> trim-to-history-limit -> atomic
-      fileutils.WriteFile at mode 0600. Honors history-enabled / history-limit (no-op when
-      disabled or limit 0). Load skips unparseable lines. Best-effort: write failures are
-      non-fatal.
+      name), then does read-all -> append -> trim-to-history-limit -> atomic write at
+      mode 0600. Honors history-enabled / history-limit (no-op when disabled or limit 0).
+      Load skips unparseable lines. CRITICAL: must be best-effort / non-fatal — do NOT use
+      fileutils.WriteFile (it panics on error). Add an exported error-returning variant
+      (e.g. fileutils.WriteFileErr wrapping the existing writeFileAtomic) and have Record
+      swallow/ignore write errors so a bad history write can never crash a command. Nil-guard
+      cfg.Credentials.Aura before reading the default-credential name (it may be nil pre-load).
     status: pending
     dependencies:
       - task-001
@@ -52,12 +55,15 @@ tasks:
       to call history.Record(cfg, cmd) for every command, composed alongside the existing
       version-check / skill-refresh steps. Skip recording for the history subtree, help,
       and cobra completion (__complete*) commands. Recording must never crash or block the
-      command (best-effort).
+      command (best-effort). NOTE: some aura subtrees override PersistentPreRunE; app.go sets
+      cobra.EnableTraverseRunHooks=true so the root hook still fires for them — verify the
+      history hook actually fires for a nested aura subcommand.
     status: pending
     dependencies:
       - task-002
     acceptance_criteria:
-      - "Every non-excluded command produces a history entry after execution path is entered"
+      - "Every non-excluded command records a history entry before its leaf RunE runs (pre-run)"
+      - "Recording fires even for aura subcommands that define their own PersistentPreRunE"
       - "history, help, and __complete* commands are not recorded"
       - "Existing PersistentPreRunE behaviour (format/RW/versioncheck/skill-refresh) is preserved"
       - "A failing history write does not abort the underlying command"
