@@ -23,3 +23,6 @@ Files: none (verification only)
 ## TASK-006 — 2026-06-01T14:45:00Z
 Added single changie Minor entry for `neo4j-cli desktop dbms upgrade`; all four gates green (make test, fmt-check, lint, license-check). Feature complete (all six tasks done).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260601-144154.yaml
+
+## REVIEW — 2026-06-01T12:47:59Z
+Added 2 review tasks (task-007..task-008).

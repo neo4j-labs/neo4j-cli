@@ -103,3 +103,41 @@ tasks:
       - "make test passes (including TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples)"
       - "make fmt-check, make lint, and make license-check all pass"
     completed_at: 2026-06-01T14:45:00Z
+
+  - id: task-007
+    title: 'Rename dbmsCreateResult/dbmsCreateFields to a generic DbmsInfo-row name'
+    description: |
+      Review nit: dbmsCreateResult and dbmsCreateFields (defined in create.go)
+      are now shared by both the create and upgrade leaves — they're really a
+      generic "DbmsInfo row" render shape, not create-specific. The create-
+      prefixed name is slightly misleading now that upgrade.go renders through
+      it too. Rename them to a neutral name (e.g. dbmsInfoResult /
+      dbmsInfoFields) and update both call sites (create.go and upgrade.go).
+      Behavior must not change — this is a pure rename for clarity.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "dbmsCreateResult and dbmsCreateFields are renamed to neutral DbmsInfo-row names (e.g. dbmsInfoResult / dbmsInfoFields) in create.go"
+      - "All references updated (create.go and upgrade.go); no symbol named dbmsCreateResult/dbmsCreateFields remains"
+      - "No behavior change; make test, make fmt-check, and make lint all pass"
+    completed_at: null
+
+  - id: task-008
+    title: 'Promote ptr[T any] helper from upgrade.go to helpers.go'
+    description: |
+      Review nit: the generic ptr[T any] helper lives at the bottom of
+      upgrade.go. It's a legitimate idiom (you can't take the address of an
+      expression like !noMigrate directly) and there is no canonical equivalent
+      elsewhere. Move it to the dbms package's helpers.go so it sits with the
+      other shared package-level helpers and is discoverable for future callers.
+      Keep its doc comment. Pure move — no behavior change.
+    status: pending
+    dependencies:
+      - task-007
+    source: review
+    acceptance_criteria:
+      - "ptr[T any] is defined in helpers.go (not upgrade.go), with its doc comment retained"
+      - "upgrade.go no longer defines ptr but still uses it; package builds"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: null
