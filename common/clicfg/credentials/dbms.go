@@ -37,6 +37,9 @@ func (c *DbmsCredentials) Add(name, username, password, databaseName, uri string
 			"credential name %q is reserved — 'query --credential desktop' and 'query --credential desktop-connection:<uuid>' resolve against the running Neo4j Desktop 2 instance, not the persisted store. Pick a different name.",
 			name)
 	}
+	if name == envCredentialName {
+		return errReservedEnvName(name)
+	}
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)

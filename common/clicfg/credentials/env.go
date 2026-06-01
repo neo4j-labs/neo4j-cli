@@ -7,11 +7,22 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/neo4j/cli/common/clierr"
 )
 
 // envCredentialName is the reserved name used for the ephemeral credential
 // synthesized in env mode for each credential type.
 const envCredentialName = "env"
+
+// errReservedEnvName is returned by the Add path of each credential type when a
+// user tries to create a credential named "env", which is reserved for the
+// ephemeral credential synthesized from environment variables in env mode.
+func errReservedEnvName(name string) error {
+	return clierr.NewUsageError(
+		"credential name %q is reserved — it is used for the ephemeral credential synthesized from environment variables in 'credential-storage: env' mode. Pick a different name.",
+		name)
+}
 
 const (
 	envAuraClientID     = "NEO4J_AURA_CLIENT_ID"

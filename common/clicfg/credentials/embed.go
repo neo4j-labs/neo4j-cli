@@ -25,6 +25,9 @@ func (c *EmbedCredentials) Printable() PrintableEmbedCredentials {
 }
 
 func (c *EmbedCredentials) Add(name, provider, model, baseURL, apiKey string, dimensions int, vertexProject, vertexLocation string) error {
+	if name == envCredentialName {
+		return errReservedEnvName(name)
+	}
 	for _, credential := range c.Credentials {
 		if credential.Name == name {
 			return clierr.NewUsageError("already have credential with name %s", name)

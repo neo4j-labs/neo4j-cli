@@ -26,6 +26,9 @@ func (c *AuraCredentials) Printable() PrintableAuraCredentials {
 }
 
 func (c *AuraCredentials) Add(name string, clientId string, clientSecret string) error {
+	if name == envCredentialName {
+		return errReservedEnvName(name)
+	}
 	auraCredentials := c.Credentials
 	for _, credential := range auraCredentials {
 		if credential.Name == name {
