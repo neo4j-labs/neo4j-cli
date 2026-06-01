@@ -6,3 +6,8 @@ Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopc
 Added the `desktop dbms upgrade <id>` leaf (newUpgradeCmd) with --version auto-pick, --plugin-upgrade-mode validation/mapping, --no-migrate/--backup/--force, running-target refuse-or-force-stop, UpgradeDbms call, and stopped-DBMS start hint. Reuses dbmsCreateResult/dbmsCreateFields for rendering.
 Files: +neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go
 Decisions: Not yet mounted (task-003), so newUpgradeCmd/pluginUpgradeModeWire/ptr carry //nolint:unused; remove those directives once dbms.go wires the leaf.
+
+## TASK-003 — 2026-06-01T13:40:00Z
+Mounted the upgrade leaf in dbms.go (AddCommand), added 'upgrade' to parent Long lifecycle + --rw lists, and removed the three temporary //nolint:unused directives now that the symbols are referenced.
+Files: ~neo4j-cli/internal/subcommands/desktop/dbms/dbms.go, ~neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go, ~neo4j-cli/internal/skill/bundle/references/desktop.md
+Decisions: Ran go generate now (task-005) so make test stays green — the new leaf changed the cobra tree, regenerating references/desktop.md; task-005 becomes a no-drift verification.

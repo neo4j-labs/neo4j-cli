@@ -46,14 +46,14 @@ tasks:
       Wire the new leaf into the dbms command tree and refresh the parent
       command help text so upgrade is discoverable and its --rw requirement is
       documented.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "dbms.go calls cmd.AddCommand(newUpgradeCmd(cfg))"
       - "Parent Short/Long list 'upgrade' among the dbms lifecycle commands and note upgrade requires --rw"
       - "neo4j-cli desktop dbms upgrade --help renders the command with all flags"
-    completed_at: null
+    completed_at: 2026-06-01T13:40:00Z
 
   - id: task-004
     title: 'Add table-driven tests for the upgrade leaf'

@@ -16,15 +16,12 @@ import (
 
 // pluginUpgradeModeWire maps the lowercase user-facing values to the uppercase
 // wire enum Desktop expects. The keys double as the validation allow-list.
-//
-//nolint:unused // mounted by dbms.go in the next task; referenced once wired.
 var pluginUpgradeModeWire = map[string]string{
 	"all":        "ALL",
 	"none":       "NONE",
 	"upgradable": "UPGRADABLE",
 }
 
-//nolint:unused // mounted by dbms.go in the next task; referenced once wired.
 func newUpgradeCmd(cfg *clicfg.Config) *cobra.Command {
 	var (
 		version           string
@@ -151,6 +148,4 @@ neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw`,
 }
 
 // ptr returns a pointer to v; used to set the optional *bool upgrade options.
-//
-//nolint:unused // used by newUpgradeCmd, mounted by dbms.go in the next task.
 func ptr[T any](v T) *T { return &v }
