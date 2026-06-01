@@ -31,3 +31,7 @@ Files: ~neo4j-cli/internal/subcommands/history/store.go, ~neo4j-cli/app/app.go, 
 
 ## TASK-007 — 2026-06-01 (reverted to pending)
 Cannot remove historyRows.MarshalJSON without changing json/toon output: MarshalJSON delegates to AsArray (map keys sorted alphabetically, time via RFC3339-truncated), whereas default []Entry struct marshaling emits keys in declaration order and time as RFC3339Nano. So the method is NOT redundant — it normalises shape. Output-unchanged criterion fails; left pending per task instructions.
+
+## TASK-007 — 2026-06-01T09:08:21Z
+Reframed per review: KEEP historyRows.MarshalJSON (load-bearing) and lock its normalization invariant. Added a WHY comment on MarshalJSON and two regression tests pinning (a) alphabetical key order, (b) whole-second RFC3339 time from a sub-second input, (c) empty→`[]` not `null`. Verified the normalization test genuinely fails if MarshalJSON is removed. make test/fmt-check/lint green.
+Files: ~neo4j-cli/internal/subcommands/history/list.go, ~neo4j-cli/internal/subcommands/history/list_test.go

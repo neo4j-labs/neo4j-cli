@@ -105,3 +105,43 @@ func TestList_EmptyHistory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "[]")
 }
+
+// TestList_JSONNormalization locks the historyRows.MarshalJSON invariant: json
+// output normalizes key order (alphabetical) and truncates the timestamp to a
+// whole-second RFC3339 form. This test FAILS if MarshalJSON is removed, because
+// default []Entry marshaling emits keys in struct-declaration order (time first)
+// and formats time as RFC3339Nano (keeping the .123456789 fraction).
+func TestList_JSONNormalization(t *testing.T) {
+	cfg := newTestConfigFmt(t, "json")
+	// Sub-second timestamp: MarshalJSON must truncate the fraction.
+	at := time.Date(2026, 6, 1, 12, 0, 5, 123456789, time.UTC)
+	e := Entry{Time: at, Command: "neo4j-cli instance list", Invoker: "human", Version: "v1"}
+	seedEntries(t, cfg, []Entry{e})
+
+	out, err := runCmd(t, newListCmd(cfg))
+	require.NoError(t, err)
+
+	// (a) Alphabetical key order: command < invoker < time < version.
+	iCommand := strings.Index(out, `"command"`)
+	iInvoker := strings.Index(out, `"invoker"`)
+	iTime := strings.Index(out, `"time"`)
+	iVersion := strings.Index(out, `"version"`)
+	require.True(t, iCommand >= 0 && iInvoker >= 0 && iTime >= 0 && iVersion >= 0, "all keys present: %s", out)
+	assert.Less(t, iCommand, iInvoker, "command before invoker")
+	assert.Less(t, iInvoker, iTime, "invoker before time")
+	assert.Less(t, iTime, iVersion, "time before version")
+
+	// (b) Whole-second RFC3339, no fractional part.
+	assert.Contains(t, out, `"time": "2026-06-01T12:00:05Z"`)
+	assert.NotContains(t, out, ".123", "time must not contain sub-second fraction")
+}
+
+// TestList_JSONEmptyIsArray pins the empty case to `[]` (not `null`).
+func TestList_JSONEmptyIsArray(t *testing.T) {
+	cfg := newTestConfigFmt(t, "json")
+
+	out, err := runCmd(t, newListCmd(cfg))
+	require.NoError(t, err)
+	assert.Contains(t, out, "[]")
+	assert.NotContains(t, out, "null")
+}

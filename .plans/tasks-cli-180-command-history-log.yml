@@ -149,7 +149,7 @@ tasks:
       case renders as `[]` not `null`. Use testfs (never real FS). A one-line code comment on
       MarshalJSON explaining WHY it exists (normalizes key order + truncates sub-second) is
       warranted here as a genuine gotcha.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -159,4 +159,4 @@ tasks:
       - "The new test FAILS if MarshalJSON is removed (i.e. it genuinely locks the invariant)"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T09:08:21Z

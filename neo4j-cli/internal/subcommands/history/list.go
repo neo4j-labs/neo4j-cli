@@ -106,6 +106,13 @@ func (r historyRows) AsArray() []map[string]any {
 	return out
 }
 
+// MarshalJSON delegates to AsArray so the json/toon output is NORMALIZED, not a
+// straight dump of []Entry. AsArray emits map keys alphabetically (command,
+// invoker, time, version, [credential, workspace]) instead of struct-declaration
+// order, and formats Time as whole-second RFC3339 instead of time.Time's default
+// RFC3339Nano. Removing this method would silently change key order and re-introduce
+// sub-second fractions, diverging from the table view. Keep it (locked by tests in
+// list_test.go).
 func (r historyRows) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.AsArray())
 }
