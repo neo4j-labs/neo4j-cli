@@ -74,10 +74,17 @@ func SetDNSSDLookupFnForTest(fn func(ctx context.Context) (port int, ok bool)) f
 }
 
 // browseDesktopMDNS queries `_neo4j-desktop-2._tcp.local` over multicast and
-// returns the port of the first responder. Only the SRV port is taken; the SRV
-// target / A / TXT host is ignored because the server always binds 127.0.0.1
-// and the auth layer forces that origin. Any error, no responder, or a deadline
-// yields (0, false) so the caller can fall through to the next tier.
+// returns the port of the first responder. Only the SRV port is used for
+// connecting — the advertised host (SRV target / A / TXT) is discarded because
+// the server always binds 127.0.0.1 and the auth layer forces that origin. Note
+// the mdns library only delivers an entry once it has an address (A/AAAA) AND a
+// TXT record in addition to the SRV port, so Desktop must advertise all three
+// (it does). Any error, no responder, or a deadline yields (0, false) so the
+// caller can fall through to the next tier.
+//
+// QueryContext's own loop only unblocks on params.Timeout (cancelling ctx just
+// closes its sockets), so we run it in a goroutine and return the moment the
+// first entry lands rather than paying the full timeout on every hit.
 func browseDesktopMDNS(ctx context.Context) (port int, ok bool) {
 	ctx, cancel := context.WithTimeout(ctx, mdnsBrowseTimeout)
 	defer cancel()
@@ -85,35 +92,38 @@ func browseDesktopMDNS(ctx context.Context) (port int, ok bool) {
 	entries := make(chan *mdns.ServiceEntry, 4)
 	params := mdns.DefaultParams(MDNSServiceType)
 	params.Domain = strings.TrimSuffix(mdnsDomain, ".")
+	params.Timeout = mdnsBrowseTimeout
 	params.Entries = entries
 	// Silence the library's stderr logging — its socket-bind warnings (common
 	// on macOS when the Local Network grant is missing) are not actionable for
 	// the user and would otherwise leak into CLI output.
 	params.Logger = log.New(io.Discard, "", 0)
 
-	resultCh := make(chan int, 1)
+	done := make(chan struct{})
 	go func() {
-		for entry := range entries {
-			if entry != nil && entry.Port > 0 {
-				select {
-				case resultCh <- entry.Port:
-				default:
-				}
-				return
-			}
-		}
+		defer close(done)
+		_ = mdns.QueryContext(ctx, params)
 	}()
 
-	if err := mdns.QueryContext(ctx, params); err != nil {
-		return 0, false
-	}
-	close(entries)
-
-	select {
-	case p := <-resultCh:
-		return p, true
-	default:
-		return 0, false
+	for {
+		select {
+		case entry := <-entries:
+			if entry != nil && entry.Port > 0 {
+				return entry.Port, true
+			}
+		case <-done:
+			// QueryContext finished — drain a buffered late entry, if any.
+			select {
+			case entry := <-entries:
+				if entry != nil && entry.Port > 0 {
+					return entry.Port, true
+				}
+			default:
+			}
+			return 0, false
+		case <-ctx.Done():
+			return 0, false
+		}
 	}
 }
 
