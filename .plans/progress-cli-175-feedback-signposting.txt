@@ -2,3 +2,7 @@
 Added exported clierr.IssuesURL const and routed all 12 report-an-issue literals in response.go plus utils.go and main.go through it as a %s format arg. repoSlug untouched.
 Files: +common/clierr/error.go, ~neo4j-cli/aura/internal/api/response.go, ~neo4j-cli/aura/internal/subcommands/dataapi/graphql/corspolicy/allowedorigin/utils.go, ~neo4j-cli/main.go
 Decisions: line-483 site is a plain string append (not a format string), wrapped with fmt.Sprintf to use the %s arg consistently.
+
+## TASK-002 — 2026-06-01T09:20:00Z
+Added "Questions or found a bug? <issues URL>" signpost to install-neo4j-cli.sh (info(), after PATH check) and .ps1 (Write-Step), plus a bats case asserting the URL prints. Moved the .ps1 line to after the skill-install switch so the signpost lands last in both installers.
+Files: ~distribution/installation-scripts/install-neo4j-cli.sh, ~distribution/installation-scripts/install-neo4j-cli.ps1, ~distribution/installation-scripts/tests/install-neo4j-cli.bats

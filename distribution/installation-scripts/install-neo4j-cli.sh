@@ -222,3 +222,6 @@ case ":${PATH}:" in
     esac
     ;;
 esac
+
+echo ""
+info "Questions or found a bug? https://github.com/neo4j-labs/neo4j-cli/issues"

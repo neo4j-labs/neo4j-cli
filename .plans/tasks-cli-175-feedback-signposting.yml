@@ -30,14 +30,14 @@ tasks:
       the existing info() helper) and install-neo4j-cli.ps1 (after the final Write-Ok, using
       Write-Step, preserving CRLF). Add a bats test asserting the install output contains
       neo4j-labs/neo4j-cli/issues, reusing the existing full-run stub harness.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "install-neo4j-cli.sh prints 'Questions or found a bug? https://github.com/neo4j-labs/neo4j-cli/issues' via info() after the PATH check"
       - "install-neo4j-cli.ps1 prints the equivalent line via Write-Step after the Done! message, with CRLF line endings preserved"
       - "A new bats case in tests/install-neo4j-cli.bats asserts output contains neo4j-labs/neo4j-cli/issues"
       - "bats distribution/installation-scripts/tests/ passes; shellcheck on the .bats file is clean"
-    completed_at: null
+    completed_at: 2026-06-01T09:20:00Z
 
   - id: task-003
     title: 'Bounded error-suggestion sweep: bolt auth, bolt unavailable, embed API key'
