@@ -275,3 +275,37 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-01T10:03:31Z
+
+  - id: task-012
+    title: 'Emit human/agent invoker as a property on Mixpanel/analytics events'
+    description: |
+      Feature request: the command-history feature classifies the caller as "human" or "agent" in
+      neo4j-cli/internal/subcommands/history/store.go invoker() (agent.Detect() || !stdinIsTerminal()),
+      but the analytics events emitted in common/clievents/clievents.go (Emit -> COMMAND/AURA/QUERY/
+      SKILL/HELP/STARTUP TrackEvents) do NOT carry this signal. Each emitted Mixpanel event should
+      record whether it was executed by a human or an agent. CONSTRAINT: common/clievents and
+      common/analytics live under common/ and CANNOT import neo4j-cli/internal/* (Go internal-package
+      rule, per AGENTS.md), so the classifier cannot come from the history package. CLEAN fix: extract
+      the canonical human/agent classifier into common/agent (which already houses agent.Detect and is
+      importable by both common/clievents and the history package). Add `func Invoker() string`
+      returning "agent" when Detect() is true OR stdin is not a TTY, else "human", with an overridable
+      stdin-TTY seam mirroring the existing getenv seam so tests can drive the matrix. Then:
+      (1) refactor history.invoker() to delegate to agent.Invoker() so there is a SINGLE source of
+      truth and history + telemetry never diverge (preserve/relocate the history test seams; existing
+      history tests must still pass, including under CLAUDECODE); and (2) add an "invoker" property
+      (json tag "invoker") to the clievents event property structs (commandEventProperties,
+      queryEventProperties, helpEventProperties, startupEventProperties — at minimum COMMAND/AURA/
+      QUERY/SKILL; include HELP/STARTUP for completeness), populated from agent.Invoker() inside Emit,
+      so Mixpanel receives invoker=human|agent on every event. Telemetry is opt-in/off-by-default so
+      this adds no new privacy exposure, and invoker is not PII.
+    status: pending
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "common/agent exposes Invoker() returning agent when Detect() OR not-a-TTY, else human, with an overridable stdin-TTY seam"
+      - "history.invoker() delegates to the shared common/agent classifier (single source of truth); existing history tests pass under CLAUDECODE"
+      - "clievents Emit sets an invoker (json: invoker) property = agent.Invoker() on COMMAND/AURA/QUERY/SKILL (and HELP/STARTUP) events"
+      - "Table-driven tests: agent.Invoker() across the Detect x TTY matrix; clievents Emit sets invoker on the event via the fake analytics service"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
