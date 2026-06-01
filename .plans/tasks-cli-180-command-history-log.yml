@@ -264,7 +264,7 @@ tasks:
       (force it false) so existing TTY-driven cases still expect "human" — NOTE the test process itself
       runs under CLAUDECODE, so without stubbing detectAgent the "human" cases would flip; add explicit
       table cases asserting detectAgent()=true yields "agent" even when the TTY check returns true.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -274,4 +274,4 @@ tasks:
       - "A test asserts detectAgent()=true yields agent even when stdinIsTerminal()=true"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T10:03:31Z

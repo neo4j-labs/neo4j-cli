@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clievents"
@@ -46,12 +47,19 @@ var stdinIsTerminal = func() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
-// invoker resolves "human" when stdin is a TTY and "agent" otherwise.
+// detectAgent is the test seam for agent-harness detection. Production calls
+// agent.Detect (the same env-var detector that gates --rw in common/flags);
+// tests override the var.
+var detectAgent = agent.Detect
+
+// invoker resolves "agent" when running under a known agent harness or when
+// stdin is not a TTY, and "human" only for an interactive terminal with no
+// harness env var.
 func invoker() string {
-	if stdinIsTerminal() {
-		return "human"
+	if detectAgent() || !stdinIsTerminal() {
+		return "agent"
 	}
-	return "agent"
+	return "human"
 }
 
 // Record appends a redacted history entry for the current invocation. It is

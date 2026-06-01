@@ -30,9 +30,14 @@ func withArgs(t *testing.T, args []string) {
 
 func withInvoker(t *testing.T, tty bool) {
 	t.Helper()
-	orig := stdinIsTerminal
+	origTTY := stdinIsTerminal
+	origAgent := detectAgent
 	stdinIsTerminal = func() bool { return tty }
-	t.Cleanup(func() { stdinIsTerminal = orig })
+	detectAgent = func() bool { return false }
+	t.Cleanup(func() {
+		stdinIsTerminal = origTTY
+		detectAgent = origAgent
+	})
 }
 
 func TestRecord_AppendsRedactedEntry(t *testing.T) {
@@ -74,6 +79,27 @@ func TestRecord_InvokerResolution(t *testing.T) {
 			assert.Equal(t, tc.want, entries[0].Invoker)
 		})
 	}
+}
+
+func TestRecord_AgentHarnessWinsOverTTY(t *testing.T) {
+	cfg := newTestConfig(t, `{"format":"json"}`, "{}")
+	withArgs(t, []string{"neo4j-cli", "instance", "list"})
+
+	origTTY := stdinIsTerminal
+	origAgent := detectAgent
+	stdinIsTerminal = func() bool { return true }
+	detectAgent = func() bool { return true }
+	t.Cleanup(func() {
+		stdinIsTerminal = origTTY
+		detectAgent = origAgent
+	})
+
+	Record(cfg)
+
+	entries, err := Load(cfg)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "agent", entries[0].Invoker)
 }
 
 func TestRecord_TrimsToLimitKeepingLast(t *testing.T) {
