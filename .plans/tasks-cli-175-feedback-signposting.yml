@@ -1,0 +1,77 @@
+feature: cli-175-feedback-signposting
+prd: ./prd-cli-175-feedback-signposting.md
+created_at: 2026-06-01T08:36:24Z
+updated_at: 2026-06-01T08:36:24Z
+
+tasks:
+  - id: task-001
+    title: 'Add clierr.IssuesURL constant and fix all report-an-issue URLs'
+    description: |
+      Add an exported constant IssuesURL = "https://github.com/neo4j-labs/neo4j-cli/issues"
+      to common/clierr/error.go, with a comment noting github.com/neo4j/cli is only the Go
+      module path. Replace every hardcoded "report an issue in https://github.com/neo4j…"
+      literal across the codebase with clierr.IssuesURL passed as a %s format arg (not
+      concatenated). Leave repoSlug in update/release.go unchanged.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "clierr.IssuesURL constant exists in common/clierr/error.go with explanatory comment"
+      - "All 12 report-an-issue literals in neo4j-cli/aura/internal/api/response.go use clierr.IssuesURL via a %s arg"
+      - "graphql/corspolicy/allowedorigin/utils.go:43 and neo4j-cli/main.go:33 use clierr.IssuesURL"
+      - "grep for github.com/neo4j/cli\" in *.go finds only legitimate import paths, no user-facing report-an-issue literal"
+      - "repoSlug in update/release.go is unchanged; go build and existing tests pass"
+    completed_at: null
+
+  - id: task-002
+    title: 'Add feedback/issues signpost to installer output (sh + ps1) with bats test'
+    description: |
+      Append a one-line feedback/issues signpost to the post-install output of both
+      distribution/installation-scripts/install-neo4j-cli.sh (after the PATH check, using
+      the existing info() helper) and install-neo4j-cli.ps1 (after the final Write-Ok, using
+      Write-Step, preserving CRLF). Add a bats test asserting the install output contains
+      neo4j-labs/neo4j-cli/issues, reusing the existing full-run stub harness.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "install-neo4j-cli.sh prints 'Questions or found a bug? https://github.com/neo4j-labs/neo4j-cli/issues' via info() after the PATH check"
+      - "install-neo4j-cli.ps1 prints the equivalent line via Write-Step after the Done! message, with CRLF line endings preserved"
+      - "A new bats case in tests/install-neo4j-cli.bats asserts output contains neo4j-labs/neo4j-cli/issues"
+      - "bats distribution/installation-scripts/tests/ passes; shellcheck on the .bats file is clean"
+    completed_at: null
+
+  - id: task-003
+    title: 'Bounded error-suggestion sweep: bolt auth, bolt unavailable, embed API key'
+    description: |
+      Add one-line actionable .WithSuggestion() hints to three high-traffic error paths,
+      reusing the existing pattern. (1) In query/errors.go categorizeBoltError, detect
+      Neo.ClientError.Security.Unauthorized and return a validation error suggesting
+      'neo4j-cli credential dbms add' / checking --credential. (2) Add a suggestion to the
+      transport/ServiceUnavailable (upstream) path to verify the URI / that Neo4j is running.
+      (3) Add a 'neo4j-cli credential embed add' suggestion to the NewAuthError sites in
+      query/embed/{openai,gemini,huggingface,vertex}.go. Preserve error chains via %w.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Bolt Neo.ClientError.Security.Unauthorized errors carry a suggestion naming 'neo4j-cli credential dbms add'; detected via both Neo4jError and string-prefix paths"
+      - "Bolt connection-refused / ServiceUnavailable errors carry a suggestion to verify the URI / that Neo4j is running"
+      - "Embed missing-API-key auth errors in all four providers suggest 'neo4j-cli credential embed add'"
+      - "Each suggestion is a single imperative line; underlying errors remain reachable via errors.As/%w"
+      - "Colocated table-driven tests assert .Suggestion is set for the new branches"
+    completed_at: null
+
+  - id: task-004
+    title: 'Add changelog entry and run final gates'
+    description: |
+      Add a user-facing changelog entry via changie (kind Minor) covering the corrected
+      bug-report URL, installer signpost, and clearer errors. Run the full gate suite and
+      confirm no skill-bundle regeneration is required (no cobra help/command-tree changes).
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "A changie entry (kind Minor) is added under .changes/unreleased/ describing the user-facing change"
+      - "make test, make fmt-check, and make lint all pass"
+      - "make generate-check shows no skill-bundle drift attributable to these changes"
+    completed_at: null
