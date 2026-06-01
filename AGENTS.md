@@ -179,6 +179,10 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Invoker Classification Notes
+
+- `common/agent.Invoker()` is the single human/agent classifier (`Detect() || !stdin-TTY`) reused by command history (`history.Record`) and telemetry (`clievents.Emit` stamps an `invoker` property on every event). Don't add a second classifier — both surfaces must stay consistent. The `agent` package tests `Invoker()`/`Detect()` via a same-package `_test.go` that sets the unexported `getenv`/`stdinIsTerminal` seams directly (no shipped test mutator). Each consumer owns a local `var invokerFn = agent.Invoker` seam (see `clievents.go`, `history/store.go`) overridden in its own `_test.go` — mirror that pattern rather than reaching into agent's internals from another package.
+
 ## Feature Flag Notes
 
 See [`.agents/feature-flags.md`](.agents/feature-flags.md) — naming (`flag.<area>-<feature>`), default-false lifecycle, override surface (config + env), registry shape, and the `aura.beta-enabled` → `flag.aura-beta` migration.
@@ -212,9 +216,15 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for maintainer-
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
 - If `make lint` reports issues whose paths point to a non-existent worktree (e.g. `.claude/worktrees/agent-…`) the cache is stale; run `golangci-lint cache clean` once and re-run — issues evaporate when the source path no longer exists.
 
+## fileutils Notes
+
+- `fileutils.WriteFile` PANICS on error; `fileutils.WriteFileErr` is the error-returning twin (same atomic 0600 write). Use `WriteFileErr` in best-effort paths that must never crash the command (e.g. history logging).
+
 ## Credentials Storage Notes
 
 See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of `onUpdate` callbacks, sensitive-field omission, omitempty-vs-printable patterns, cross-type validation order, and test fixture seeding for the `Aura` / `Dbms` / `Embed` credential types.
+
+`common/clievents/RedactArgs` is the single source of truth for secret scrubbing (feeds telemetry, panic/error messages, AND on-disk command history). It scrubs the `secretFlags` allow-list (incl. the `-p` query password shorthand) AND `--uri` userinfo passwords (`user:pw@host` → `user:***@host`, host/scheme preserved). Add new secret-bearing flags there, not at call sites.
 
 ## query Subsystem Notes
 

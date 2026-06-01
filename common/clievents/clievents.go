@@ -6,20 +6,27 @@ package clievents
 import (
 	"strings"
 
+	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/analytics"
 	"github.com/spf13/pflag"
 )
+
+// invokerFn is the overridable seam for human/agent classification so tests can
+// drive it deterministically without mutating real process state.
+var invokerFn = agent.Invoker
 
 // commandEventProperties carries the command-specific fields
 type commandEventProperties struct {
 	Command string `json:"command"`
 	Success bool   `json:"success"`
+	Invoker string `json:"invoker"`
 }
 
 // helpEventProperties carries properties for HELP events.
 // Command is omitted when help is invoked with no command (e.g. bare --help).
 type helpEventProperties struct {
 	Command string `json:"command,omitempty"`
+	Invoker string `json:"invoker"`
 }
 
 // queryEventProperties carries properties for QUERY events.
@@ -29,10 +36,12 @@ type queryEventProperties struct {
 	Command string `json:"command"`
 	Success bool   `json:"success"`
 	IsAura  bool   `json:"is_aura"`
+	Invoker string `json:"invoker"`
 }
 
 type startupEventProperties struct {
 	Command string `json:"command,omitempty"`
+	Invoker string `json:"invoker"`
 }
 
 // Emit inspects args to determine which analytics event to fire.
@@ -48,10 +57,13 @@ func Emit(events analytics.Service, args []string, state bool) {
 
 	_ = flags.Parse(args)
 
+	// inv classifies the caller as human or agent — recorded on every event.
+	inv := invokerFn()
+
 	// No command name present — bare invocation or top-level --help.
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
 		events.EmitEvent("HELP", analytics.TrackEvent{
-			Properties: helpEventProperties{},
+			Properties: helpEventProperties{Invoker: inv},
 		})
 		return
 	}
@@ -61,7 +73,7 @@ func Emit(events analytics.Service, args []string, state bool) {
 	// --help with a known command — record the command name but not the flags.
 	if help {
 		events.EmitEvent("HELP", analytics.TrackEvent{
-			Properties: helpEventProperties{Command: commandName},
+			Properties: helpEventProperties{Command: commandName, Invoker: inv},
 		})
 		return
 	}
@@ -69,14 +81,14 @@ func Emit(events analytics.Service, args []string, state bool) {
 	switch commandName {
 	case "startup":
 		events.EmitEvent("STARTUP", analytics.TrackEvent{
-			Properties: startupEventProperties{Command: "startup"},
+			Properties: startupEventProperties{Command: "startup", Invoker: inv},
 		})
 	case "aura":
 		// Aura commands generally contain no PII, but defensively redact
 		// secret-bearing flag values (e.g. --client-secret on credential add).
 		cliCommand := RedactArgs(args)
 		events.EmitEvent("AURA", analytics.TrackEvent{
-			Properties: commandEventProperties{Command: cliCommand, Success: state},
+			Properties: commandEventProperties{Command: cliCommand, Success: state, Invoker: inv},
 		})
 
 	case "query":
@@ -87,6 +99,7 @@ func Emit(events analytics.Service, args []string, state bool) {
 				Command: commandName,
 				Success: state,
 				IsAura:  analytics.IsAuraURI(uri),
+				Invoker: inv,
 			},
 		})
 
@@ -95,13 +108,13 @@ func Emit(events analytics.Service, args []string, state bool) {
 		// secret-flag list stays a single source of truth.
 		cliCommand := RedactArgs(args)
 		events.EmitEvent("SKILL", analytics.TrackEvent{
-			Properties: commandEventProperties{Command: cliCommand, Success: state},
+			Properties: commandEventProperties{Command: cliCommand, Success: state, Invoker: inv},
 		})
 
 	default:
 		cliCommand := RedactArgs(args)
 		events.EmitEvent("COMMAND", analytics.TrackEvent{
-			Properties: commandEventProperties{Command: cliCommand, Success: state},
+			Properties: commandEventProperties{Command: cliCommand, Success: state, Invoker: inv},
 		})
 	}
 }

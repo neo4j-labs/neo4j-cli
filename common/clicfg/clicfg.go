@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/neo4j/cli/common/analytics"
@@ -105,7 +106,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage", "history-enabled", "history-limit"},
 	}
 
 	// Wire the storage mode only when credential-storage is explicitly set in
@@ -234,6 +235,8 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("format", "default")
 	Viper.SetDefault("telemetry", true)
 	Viper.SetDefault("skill-auto-refresh", true)
+	Viper.SetDefault("history-enabled", true)
+	Viper.SetDefault("history-limit", 1000)
 
 	// Feature-flag defaults are intentionally NOT seeded into viper:
 	// viper.IsSet returns true whenever a default is registered, which
@@ -440,6 +443,19 @@ func (config *GlobalConfig) Set(key string, value string) error {
 		}
 	}
 
+	if key == "history-enabled" {
+		if value != "true" && value != "false" {
+			return clierr.NewUsageError("invalid value for 'history-enabled': %s (valid values: true, false)", value)
+		}
+	}
+
+	if key == "history-limit" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return clierr.NewUsageError("invalid value for 'history-limit': %s (must be a non-negative integer)", value)
+		}
+	}
+
 	data := fileutils.ReadFileSafe(config.fs, config.configPath)
 
 	updated, err := sjson.Set(string(data), key, value)
@@ -457,6 +473,17 @@ func (config *GlobalConfig) Set(key string, value string) error {
 
 func (config *GlobalConfig) Format() string {
 	return config.viper.GetString("format")
+}
+
+// HistoryEnabled reports whether command-history logging is enabled. Defaults to true.
+func (config *GlobalConfig) HistoryEnabled() bool {
+	return config.viper.GetBool("history-enabled")
+}
+
+// HistoryLimit returns the maximum number of history entries to retain. Defaults
+// to 1000; a value of 0 disables history retention.
+func (config *GlobalConfig) HistoryLimit() int {
+	return config.viper.GetInt("history-limit")
 }
 
 // CredentialStorage is a read accessor for the persisted credential-storage

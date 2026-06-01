@@ -183,6 +183,8 @@ func TestStandaloneConfigList(t *testing.T) {
 	"credential-storage": null,
 	"default-workspace": null,
 	"format": "json",
+	"history-enabled": true,
+	"history-limit": 1000,
 	"skill-auto-refresh": true,
 	"telemetry": true
 }`, clicfg.DefaultAuraAuthUrl, clicfg.DefaultAuraBaseUrl),

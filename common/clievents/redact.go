@@ -3,15 +3,23 @@
 
 package clievents
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // secretFlags is the canonical list of flag names whose values must never be
 // echoed in telemetry, panic templates, or error output. The list is matched
 // against both the long form (--flag) and the defensive single-dash form
 // (-flag), and both space-separated (--flag value) and equals-separated
 // (--flag=value) shapes.
+//
+// "p" is the `query` password shorthand (StringP("password","p")); it is the
+// only -p in the tree, so including it here fails closed — over-redaction in a
+// redaction context is acceptable.
 var secretFlags = []string{
 	"password",
+	"p",
 	"client-secret",
 	"api-key",
 	"instance-password",
@@ -19,6 +27,25 @@ var secretFlags = []string{
 
 // redactedPlaceholder is what the secret value is replaced with in output.
 const redactedPlaceholder = "***"
+
+// secretParamKeyParts are case-insensitive substrings that mark a `--param`
+// bind-parameter key as secret-bearing. A query parameter can legitimately
+// carry a token/password/api-key, so when the key matches we scrub only the
+// value and keep the key visible. The list is intentionally conservative to
+// avoid over-redacting common non-secret params (e.g. `limit`, `name`).
+var secretParamKeyParts = []string{
+	"password",
+	"passwd",
+	"pwd",
+	"secret",
+	"token",
+	"apikey",
+	"api-key",
+	"api_key",
+	"access-key",
+	"accesskey",
+	"key",
+}
 
 // RedactArgs renders an argv slice as a single space-separated string with
 // the values of secret-bearing flags replaced by ***. It handles three argv
@@ -32,6 +59,13 @@ const redactedPlaceholder = "***"
 // no value to scrub. Positional arguments and non-secret flags are emitted
 // unchanged.
 //
+// For `--param key=value` (and `-param`, both shapes), a best-effort heuristic
+// scrubs only the value when the base key (the part before any `:embed`
+// modifier and the first `=`) looks secret-bearing — see secretParamKeyParts.
+// Non-secret params (e.g. `--param limit=10`) pass through unchanged so the
+// history stays useful. This is a name-based heuristic: a secret stored under
+// an innocuous key name (e.g. `--param x=sk-live-...`) is NOT caught.
+//
 // This helper is the single source of truth for "what flag is sensitive" in
 // the CLI; telemetry, panic templates, and error formatting all funnel
 // through it.
@@ -44,25 +78,117 @@ func RedactArgs(args []string) string {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		// --flag=value or -flag=value form.
-		if name, _, ok := splitFlagEq(arg); ok && isSecretFlag(name) {
-			out = append(out, dashPrefix(arg)+name+"="+redactedPlaceholder)
-			continue
+		// Equals form (--flag=value / -flag=value).
+		if name, value, ok := splitFlagEq(arg); ok {
+			if red, sensitive := redactByFlag(name, value); sensitive {
+				out = append(out, dashPrefix(arg)+name+"="+red)
+				continue
+			}
 		}
 
-		// --flag value or -flag value form.
-		if name, ok := flagName(arg); ok && isSecretFlag(name) {
-			out = append(out, arg)
-			if i+1 < len(args) {
-				out = append(out, redactedPlaceholder)
-				i++
+		// Space form (--flag value / -flag value); the value is the next token.
+		if name, ok := flagName(arg); ok {
+			if _, sensitive := redactByFlag(name, ""); sensitive {
+				out = append(out, arg)
+				// A value-taking flag with no value must not swallow a following
+				// flag: for uri/param a flag-looking next token is not a value, so
+				// leaving it unconsumed lets the loop redact it (e.g.
+				// `--uri --password hunter2` -> `--uri --password ***`). Generic
+				// secret flags still consume unconditionally — the next token
+				// becomes ***, so a secret value starting with '-' stays redacted.
+				if i+1 < len(args) && (isSecretFlag(name) || !looksLikeFlag(args[i+1])) {
+					red, _ := redactByFlag(name, args[i+1])
+					out = append(out, red)
+					i++
+				}
+				continue
 			}
-			continue
 		}
 
 		out = append(out, arg)
 	}
 	return strings.Join(out, " ")
+}
+
+// redactByFlag returns the scrubbed value for a known sensitive flag, and
+// whether the flag is sensitive at all. Precedence matches the prior branch
+// order: uri (userinfo) and param (key=value) before generic secret flags.
+func redactByFlag(name, value string) (string, bool) {
+	switch {
+	case isURIFlag(name):
+		return redactURIUserinfo(value), true
+	case isParamFlag(name):
+		return redactParamValue(value), true
+	case isSecretFlag(name):
+		return redactedPlaceholder, true
+	}
+	return value, false
+}
+
+// isURIFlag reports whether name (without leading dashes) is a connection-style
+// flag whose value may carry credentials in userinfo.
+func isURIFlag(name string) bool {
+	return name == "uri"
+}
+
+// isParamFlag reports whether name (without leading dashes) is the query
+// `--param` flag, whose values are bind parameters of the form key=value.
+func isParamFlag(name string) bool {
+	return name == "param"
+}
+
+// redactParamValue scrubs the value of a `--param key=value` token when the
+// base key looks secret-bearing, preserving the key (e.g. `token=***`). A
+// value without `=` (malformed) is returned unchanged. The base key is the
+// part before the first `=` with any `:embed`-style modifier stripped, so
+// `token:embed=...` matches on `token`.
+func redactParamValue(value string) string {
+	idx := strings.Index(value, "=")
+	if idx < 0 {
+		return value
+	}
+	key := value[:idx]
+	if modIdx := strings.Index(key, ":"); modIdx >= 0 {
+		key = key[:modIdx]
+	}
+	if !isSecretParamKey(key) {
+		return value
+	}
+	return value[:idx+1] + redactedPlaceholder
+}
+
+// isSecretParamKey reports whether a bind-parameter key (case-insensitive)
+// contains any secret-bearing substring.
+func isSecretParamKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, part := range secretParamKeyParts {
+		if strings.Contains(lower, part) {
+			return true
+		}
+	}
+	return false
+}
+
+// redactURIUserinfo rewrites a connection URI's userinfo password to *** while
+// preserving scheme, user, host, port, and path. Non-URL values, and URLs with
+// no embedded password, are returned unchanged.
+func redactURIUserinfo(value string) string {
+	u, err := url.Parse(value)
+	if err != nil || u.User == nil {
+		return value
+	}
+	if _, hasPassword := u.User.Password(); !hasPassword {
+		return value
+	}
+	u.User = url.UserPassword(u.User.Username(), redactedPlaceholder)
+	// url.UserPassword percent-encodes "*" to %2A; restore the readable form.
+	return strings.Replace(u.String(), "%2A%2A%2A", redactedPlaceholder, 1)
+}
+
+// looksLikeFlag reports whether s is a flag-looking token (starts with a dash
+// but is not the lone "-" stdin sentinel).
+func looksLikeFlag(s string) bool {
+	return strings.HasPrefix(s, "-") && s != "-"
 }
 
 // flagName returns the bare flag name (no dashes) if arg is a flag token of
