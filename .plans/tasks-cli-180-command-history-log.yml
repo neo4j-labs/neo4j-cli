@@ -309,3 +309,68 @@ tasks:
     source: review
     status: completed
     completed_at: 2026-06-01T15:00:00Z
+
+  - id: task-013
+    title: 'Collapse RedactArgs duplicated shape-branches into a flag-name dispatch'
+    description: |
+      Review finding (priority 2-3, structural): RedactArgs in common/clievents/redact.go now has SIX
+      near-identical branches — three flag categories (uri, param, secret) each repeating the same
+      `--flag=value` / `--flag value` shape-handling boilerplate. The diff grew from 2 branches to 6 by
+      copy-pasting the two-shape handling per category — repeated conditionals signalling a missing
+      model. The shape (= vs space) is ORTHOGONAL to the redaction strategy (strip-userinfo /
+      scrub-param-value / replace-wholesale). Refactor so shape-handling exists ONCE and dispatches the
+      value by flag name. Introduce a single helper, e.g.:
+        func redactByFlag(name, value string) (string, bool) {
+          switch {
+          case isURIFlag(name):    return redactURIUserinfo(value), true
+          case isParamFlag(name):  return redactParamValue(value), true
+          case isSecretFlag(name): return redactedPlaceholder, true
+          }
+          return value, false
+        }
+      Then the RedactArgs loop becomes TWO branches (equals form via splitFlagEq, space form via
+      flagName), each delegating to redactByFlag — 6 branches -> 2, precedence (uri/param before generic
+      secret) encoded once in the switch, and adding a future sensitive flag is a one-line case. Behavior
+      MUST be identical; the existing redact tests (incl. the task-008/009 -p, --uri userinfo, and
+      secret-named --param cases) are the regression guard and must stay green unchanged.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "RedactArgs handles the =-form and space-form once each, delegating value redaction to a single redactByFlag dispatch"
+      - "No category-specific branch duplication remains (the 6 near-identical branches are gone)"
+      - "All existing redact tests pass unchanged (behavior identical for -p, --uri userinfo, --param, generic secret flags)"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-014
+    title: 'Delete shipped export_test_seam.go; use same-package test seams'
+    description: |
+      Review finding (priority 4, boundary): common/agent/export_test_seam.go is a NON-_test.go file
+      exporting SetSeamsForTest, a runtime mutator of the package globals (getenv, stdinIsTerminal) that
+      compiles into the SHIPPED production binary purely so clievents_test and history_test (other
+      packages) can drive agent.Invoker() deterministically. That is test scaffolding leaking into prod
+      plus a public API that lets any caller globally override agent detection at runtime. The repo's own
+      idiom is a SAME-PACKAGE seam var owned by each consumer (see store.go stdinIsTerminal, quip.go
+      stderrIsTerminal, flags.go detectAgent). Apply it and delete the shipped file: (1) the agent
+      package tests its Invoker()/Detect() matrix via its OWN test file in package agent (same package →
+      set the unexported getenv/stdinIsTerminal seams directly; ships nothing); (2) clievents keeps a
+      local `var invokerFn = agent.Invoker` overridden by a same-package clievents test file, and Emit
+      calls invokerFn() — so clievents tests its own wiring without reaching into agent's internals;
+      (3) history does the same (local var invokerFn = agent.Invoker overridden in its own test file), or
+      if history already delegates cleanly, give it the same local seam so it needs no cross-package
+      control. Remove common/agent/export_test_seam.go and SetSeamsForTest entirely. All existing tests
+      (agent, clievents, history) must still pass, including under CLAUDECODE, and nothing test-only may
+      remain in a non-_test.go file.
+    status: pending
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "common/agent/export_test_seam.go and SetSeamsForTest are deleted; no test-only mutator remains in any non-_test.go file"
+      - "agent package tests drive Invoker()/Detect() via a same-package _test.go setting the unexported seams"
+      - "clievents and history use a local `var invokerFn = agent.Invoker` seam overridden in their own _test.go files; Emit/Record call invokerFn"
+      - "All agent, clievents, and history tests pass under CLAUDECODE"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
