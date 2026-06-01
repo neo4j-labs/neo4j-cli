@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-06-01T12:29:52Z
 Added UpgradeDbmsOptions type, dbmsUpgradeTimeout (30m), and Client.UpgradeDbms posting to /dbmss/:id/upgrade with only-set options keys.
 Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopclient/types.go
+
+## TASK-002 — 2026-06-01T13:05:00Z
+Added the `desktop dbms upgrade <id>` leaf (newUpgradeCmd) with --version auto-pick, --plugin-upgrade-mode validation/mapping, --no-migrate/--backup/--force, running-target refuse-or-force-stop, UpgradeDbms call, and stopped-DBMS start hint. Reuses dbmsCreateResult/dbmsCreateFields for rendering.
+Files: +neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go
+Decisions: Not yet mounted (task-003), so newUpgradeCmd/pluginUpgradeModeWire/ptr carry //nolint:unused; remove those directives once dbms.go wires the leaf.

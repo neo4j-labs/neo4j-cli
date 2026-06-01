@@ -29,7 +29,7 @@ tasks:
       auto-pick, plugin-upgrade-mode validation/mapping, running-target
       refuse/--force handling, the upgrade call, result rendering, and the
       stopped-DBMS start hint. Reuse existing dbms-package helpers.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "Fetches target via GetDbms; if status==started and !force returns a fatal error hinting to stop or pass --force; if status==started and force then StopDbms + pollUntilStatus(stopped) before upgrading"
       - "Calls client.UpgradeDbms with Migrate=&(!noMigrate), Backup=&backup, PluginUpgradeMode=<uppercased>; renders upgraded DbmsInfo via output.PrintBodyMap with {id,name,version,status,connectionUri} and prints a stderr 'DBMS is stopped; start with neo4j-cli desktop dbms start <id> --rw' hint"
       - "Flush-left Example: block with >=2 invocations, each with --rw and at least one with --format json"
-    completed_at: null
+    completed_at: 2026-06-01T13:05:00Z
 
   - id: task-003
     title: 'Mount upgrade leaf and update dbms parent help'
