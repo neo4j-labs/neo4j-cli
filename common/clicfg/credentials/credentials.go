@@ -92,16 +92,21 @@ func (c *Credentials) HasAnyCredentials() bool {
 }
 
 // SetStorageMode sets the credential storage mode and reloads sensitive fields.
-// mode must be either StorageModeInsecure or StorageModeKeyring. This is called
-// from clicfg.NewConfig after the storage mode is resolved from config.
-// In insecure mode sensitive fields are already loaded from JSON during
+// mode must be StorageModeInsecure, StorageModeKeyring, or StorageModeEnv. This
+// is called from clicfg.NewConfig after the storage mode is resolved from
+// config. In insecure mode sensitive fields are already loaded from JSON during
 // NewCredentials, so reloading is a no-op. In keyring mode this populates
-// sensitive fields from the OS keyring. Non-ErrNotFound keyring errors are
-// written as warnings to warnW and do not abort the load.
+// sensitive fields from the OS keyring; non-ErrNotFound keyring errors are
+// written as warnings to warnW and do not abort the load. In env mode it
+// synthesizes ephemeral credentials from environment variables; save() is a
+// no-op so nothing is persisted.
 func (c *Credentials) SetStorageMode(mode string, warnW io.Writer) {
 	c.storageMode = mode
-	if mode == StorageModeKeyring {
+	switch mode {
+	case StorageModeKeyring:
 		c.loadSensitiveFieldsFromKeyring(warnW)
+	case StorageModeEnv:
+		c.loadFromEnv(warnW)
 	}
 }
 
