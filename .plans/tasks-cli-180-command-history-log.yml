@@ -133,22 +133,30 @@ tasks:
     completed_at: 2026-06-01T11:00:00Z
 
   - id: task-007
-    title: 'Remove redundant historyRows.MarshalJSON'
+    title: 'Lock historyRows json/toon normalization invariant with a test'
     description: |
-      Review finding (optional): historyRows.MarshalJSON in neo4j-cli/internal/subcommands/history/list.go
-      duplicates what default struct-tag marshaling of []Entry already produces — matching keys,
-      RFC3339 time.Time, omitempty on workspace/credential. The only thing it buys over default
-      marshaling is empty->`[]`, but Load returns a non-nil []Entry{}, so the slice is already
-      non-nil and marshals to `[]`. Remove MarshalJSON and let the json path marshal the entries
-      directly. Keep AsArray() (required by the commonoutput.ResponseData interface for the
-      toon/table paths). Verify json and toon output for list is unchanged (including the empty case).
+      Review reconsidered: the original finding ("historyRows.MarshalJSON is redundant, remove it")
+      was WRONG. MarshalJSON delegates to AsArray() (map[string]any), which normalizes the json/toon
+      output in two ways that default []Entry struct-tag marshaling does NOT: (1) keys are emitted
+      alphabetically (command, invoker, time, version, [workspace, credential]) instead of struct
+      declaration order, and (2) time is formatted with RFC3339 (whole-second) instead of
+      time.Time's default RFC3339Nano. So MarshalJSON is load-bearing and must stay. The actual gap
+      is that this invariant is NOT locked by a test — existing list_test.go uses substring/Contains
+      assertions with whole-minute timestamps, so a future agent could delete MarshalJSON and
+      silently regress json/toon output. KEEP MarshalJSON; ADD a regression test that pins the
+      normalized output: feed an Entry with a SUB-SECOND timestamp and assert the json output has
+      (a) alphabetical key order, (b) RFC3339 time WITHOUT the fractional part, and (c) the empty
+      case renders as `[]` not `null`. Use testfs (never real FS). A one-line code comment on
+      MarshalJSON explaining WHY it exists (normalizes key order + truncates sub-second) is
+      warranted here as a genuine gotcha.
     status: pending
     dependencies:
       - task-004
     acceptance_criteria:
-      - "historyRows.MarshalJSON is removed; AsArray() remains"
-      - "history list --format json output is unchanged, including empty history rendering as []"
-      - "history list --format toon output is unchanged"
+      - "historyRows.MarshalJSON is retained (not removed)"
+      - "A test feeds a sub-second timestamp and asserts json key order is alphabetical AND time has no fractional part"
+      - "A test asserts empty history renders as [] (not null) in json output"
+      - "The new test FAILS if MarshalJSON is removed (i.e. it genuinely locks the invariant)"
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: null
