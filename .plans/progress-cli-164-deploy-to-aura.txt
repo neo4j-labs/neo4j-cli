@@ -35,3 +35,6 @@ Decisions: Tested via real stub-docker-on-PATH rather than only the fake, so arg
 ## TASK-006 — 2026-06-01T14:35:00Z
 Registered the deploy leaf in instance.go (cmd.AddCommand(NewDeployCmd(cfg)) after NewCreateCmd) and added a flush-left Example to NewDeployCmd: two --rw invocations (one --from-docker free-db, one --from-desktop professional-db on AWS), each preceded by a # comment and blank-line separated. Ran `go generate ./neo4j-cli/internal/skill/...` which refreshed references/aura.md with the new `instance deploy` surface. Gates: make test (incl. TestGenerator_RoundTrip + TestAllLeafCommands_HaveExamples), make fmt-check, make lint all green; bundle diff limited to references/aura.md.
 Files: M neo4j-cli/aura/internal/subcommands/instance/instance.go, M neo4j-cli/aura/internal/subcommands/instance/deploy.go, M neo4j-cli/internal/skill/bundle/references/aura.md
+
+## REVIEW — 2026-06-01T16:00:00Z
+Added 2 review tasks (task-009..task-010).

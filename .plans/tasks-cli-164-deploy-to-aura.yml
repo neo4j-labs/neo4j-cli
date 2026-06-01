@@ -157,3 +157,59 @@ tasks:
       - "make test, make fmt-check, make lint, and make license-check all pass"
       - "go generate leaves no diff (generate-check clean)"
     completed_at: 2026-06-01T15:45:00Z
+
+  - id: task-009
+    title: 'Extract duplicated create-leaf logic into create_core.go'
+    description: |
+      The review found that deploy.go re-copies three blocks from create.go
+      verbatim instead of sharing them, leaving ~70 lines of drift-prone
+      duplication that must be hand-synced. Task-001 extracted
+      buildCreateInstanceBody + createAndStoreInstance into create_core.go but
+      stopped there. The three still-duplicated blocks are: (1) the PreRunE
+      validation — create.go:74-113 vs deploy.go:148-182, ~35 identical lines
+      (free-db flag rules, version 4|5, the three credential-flag rules); the
+      only deltas are create's --graph-analytics-plugin check and deploy's
+      --database system check. (2) The auto-generate-default-name block —
+      create.go:122-139 vs deploy.go:194-210, identical (list /instances,
+      collect names, defaultInstanceName). (3) The output-rendering block —
+      create.go:154-172 vs deploy.go:301-319 (printDeployResult), identical
+      field slice + tenant_id->project_id rename + PrintBodyMap, deploy just
+      appends deploy_status. Finish the extraction into create_core.go so create
+      and deploy become genuine siblings over one core: add
+      validateInstanceFlags(...) (shared PreRunE body — create calls it then adds
+      the graph-analytics check; deploy runs its system-db check then calls it),
+      resolveInstanceName(cfg, name, projectID) (string, error) for the auto-name
+      lookup, and a shared result renderer (e.g. renderInstanceResult with extra
+      fields, or a helper returning the base field slice) so deploy just adds
+      deploy_status. Preserve exact behaviour and output for both leaves.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "The PreRunE validation, auto-name lookup, and output-rendering blocks live once in create_core.go and are called by both create.go and deploy.go"
+      - "deploy.go no longer contains copy-pasted copies of those three blocks"
+      - "Existing create and deploy tests pass unchanged (behaviour and output identical for both leaves)"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: null
+
+  - id: task-010
+    title: 'Quote/validate the database name in docker deploy admin Cypher'
+    description: |
+      The review flagged that docker/deploy.go builds the admin Cypher by string
+      concatenation — "STOP DATABASE "+database and "START DATABASE "+database
+      (deploy.go:75,83) — interpolating the user-supplied --database flag
+      directly into the statement. The blast radius is small (a local,
+      self-owned container, and "system" is already rejected upstream), but the
+      Cypher-injection seam should be closed: validate the database name against
+      a Neo4j identifier pattern before use, or quote it as a backtick-escaped
+      identifier, so a name like `neo4j; DROP ...` cannot inject. Keep the change
+      minimal and covered by a unit test.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The --database value is validated or safely quoted before being placed into STOP/START DATABASE statements"
+      - "A unit test covers rejection (or safe quoting) of an injection-style database name"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: null
