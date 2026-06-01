@@ -18,3 +18,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260601-105039.yaml
 
 ## REVIEW — 2026-06-01T11:30:00Z
 Added 2 review tasks (task-005..task-006).
+
+## TASK-005 — 2026-06-01T12:05:00Z
+Extracted private reportIssueFatal(statusCode) helper in response.go; collapsed the 9 verbatim-identical "unexpected error [status %d]...report an issue" NewFatalError sites to one-line panic/return calls. Output byte-identical. Left body-%s default, NewAuthError+WithSuggestion, and message-append sites untouched.
+Files: ~neo4j-cli/aura/internal/api/response.go

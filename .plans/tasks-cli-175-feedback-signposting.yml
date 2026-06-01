@@ -93,7 +93,7 @@ tasks:
       different type + WithSuggestion) and the plain message-append at ~line 483 are NOT
       part of the identical set — do not force them through the helper if it distorts them
       (the auth-error one keeps .WithSuggestion(authSuggestion)). Behavior must not change.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -101,7 +101,7 @@ tasks:
       - "All ~8 identical 'unexpected error [status %d]...report an issue' NewFatalError sites call the helper (via panic(...) or return ...)"
       - "Behaviour is unchanged: the rendered message text and exit code for each affected status code are identical to before"
       - "make test, make fmt-check, make lint pass"
-    completed_at: null
+    completed_at: 2026-06-01T12:05:00Z
 
   - id: task-006
     title: 'Trim redundant embed credential suggestions; const for vertex duplicate'
