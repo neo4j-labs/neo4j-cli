@@ -12,14 +12,14 @@ tasks:
       accessors cfg.Global.HistoryEnabled() and cfg.Global.HistoryLimit() mirroring
       existing Global accessors (e.g. Format). Ensure defaults are registered so the
       keys surface through `neo4j-cli config get/set/list` automatically.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "cfg.Global.HistoryEnabled() returns true by default and reflects config overrides"
       - "cfg.Global.HistoryLimit() returns 1000 by default and reflects config overrides"
       - "Both keys are settable/gettable via config set/get and appear in config list"
       - "Table-driven tests cover default + overridden values (using testfs, never real FS)"
-    completed_at: null
+    completed_at: 2026-06-01T00:00:00Z
 
   - id: task-002
     title: 'Create history store package (Entry, Record, Load, Clear, path)'

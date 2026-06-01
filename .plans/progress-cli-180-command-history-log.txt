@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-01T00:00:00Z
+Added GlobalScope config keys history-enabled (bool, default true) + history-limit (int, default 1000, 0 disables) with HistoryEnabled()/HistoryLimit() accessors, Set validation, and ValidConfigKeys registration so they surface via config get/set/list.
+Files: +1 new (common/clicfg/history_test.go), ~3 mod (clicfg.go, list_test.go, standalone_config_test.go)
+Decisions: keys sort alphabetically between format and skill-auto-refresh — updated both GlobalScope and AuraScope config-list snapshot tests.

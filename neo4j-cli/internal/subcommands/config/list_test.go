@@ -29,6 +29,8 @@ func TestConfigList(t *testing.T) {
 	"aura.default-workspace": null,
 	"credential-storage": null,
 	"format": "default",
+	"history-enabled": true,
+	"history-limit": 1000,
 	"skill-auto-refresh": true,
 	"telemetry": true
 }`,
@@ -45,6 +47,8 @@ func TestConfigList(t *testing.T) {
 	"aura.default-workspace": null,
 	"credential-storage": null,
 	"format": "json",
+	"history-enabled": true,
+	"history-limit": 1000,
 	"skill-auto-refresh": true,
 	"telemetry": true
 }`,
