@@ -252,6 +252,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - Live-docker smoke test: `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs a create→list→get→delete lifecycle against the host Docker daemon. NOT part of `make test`. Skips cleanly when `docker` is not on PATH (belt-and-braces — also gated by the `smoke` build tag).
 - Missing-`docker` error suggests `alias docker=podman` when podman is also detected on PATH; podman lookup goes through the `lookPathFn` package var seam in `client.go`.
 - `docker.NewDeployClient()` is the ONLY exported dockerClient constructor (the `dockerClient` interface + `execClient` stay unexported). Cross-package callers (e.g. aura `instance deploy`) get a client from it and pass it straight into `docker.PushToAura(...)` without naming the unexported type.
+- Secrets go via the docker process environment (`cmd.Env` + `docker exec -e NAME` passthrough form — NAME only, no =value), NEVER as argv values (argv is world-readable via `/proc/<pid>/cmdline`). `execClient.runEnv`/`ExecWithEnv` implement this; `ExecWithEnv` derives the `-e KEY` flags from the env entries and places them before the container name. `PushToAura` passes the Aura admin creds as `NEO4J_USERNAME`/`NEO4J_PASSWORD` env, not `--to-user`/`--to-password`.
 
 ## Cobra Help / Skill Bundle Rendering Notes
 

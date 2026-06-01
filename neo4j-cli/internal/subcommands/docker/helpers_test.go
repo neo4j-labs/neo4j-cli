@@ -36,11 +36,14 @@ type fakeDockerClient struct {
 	PsEntries  []PsEntry
 }
 
-// ExecCall records the arguments of a single fakeDockerClient.Exec invocation
-// so tests can assert both the target container name and the argv passed.
+// ExecCall records the arguments of a single fakeDockerClient.Exec /
+// ExecWithEnv invocation so tests can assert the target container name, the
+// argv passed, and (for ExecWithEnv) the env forwarded through the docker
+// process environment.
 type ExecCall struct {
 	Name string
 	Args []string
+	Env  []string
 }
 
 func newFakeDockerClient() *fakeDockerClient {
@@ -107,7 +110,15 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 }
 
 func (f *fakeDockerClient) Exec(ctx context.Context, name string, args []string) (string, error) {
-	f.ExecCalls = append(f.ExecCalls, ExecCall{Name: name, Args: append([]string(nil), args...)})
+	return f.ExecWithEnv(ctx, name, args, nil)
+}
+
+func (f *fakeDockerClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	f.ExecCalls = append(f.ExecCalls, ExecCall{
+		Name: name,
+		Args: append([]string(nil), args...),
+		Env:  append([]string(nil), env...),
+	})
 	if f.ExecFn != nil {
 		return f.ExecFn(ctx, name, args)
 	}

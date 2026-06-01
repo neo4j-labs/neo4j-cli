@@ -240,7 +240,6 @@ tasks:
       is never echoed in the error path (it isn't in args, so redactArgs already
       won't touch it — verify). This is the canonical-layer fix for the exported
       PushToAura entry point.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "The Aura password is supplied to neo4j-admin via the docker process environment (exec.Cmd.Env) and the `docker exec -e NEO4J_PASSWORD`/`-e NEO4J_USERNAME` passthrough flags, not as a --to-password/--to-user argv value"
@@ -248,7 +247,8 @@ tasks:
       - "A unit test asserts the password value never appears in the recorded docker argv and is provided via env, and that argv carries `-e NEO4J_PASSWORD` (name only)"
       - "make test, make fmt-check, and make lint are clean"
     source: review
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-01T14:16:17Z
 
   - id: task-012
     title: 'Pass NEO4J_AUTH to docker run via env passthrough, not argv'

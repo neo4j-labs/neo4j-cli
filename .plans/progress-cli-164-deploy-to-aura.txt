@@ -49,3 +49,8 @@ Files: create.go, create_core.go, deploy.go
 
 ## REVIEW — 2026-06-01T17:30:00Z
 Added 2 review tasks (task-011..task-012) — env-based secret passing for deploy + create.
+
+## TASK-011 — 2026-06-01T14:16:17Z
+Hardened the Aura upload so the admin password never lands in argv. Added ExecWithEnv(ctx, name, args, env) to the dockerClient interface + execClient + fakeDockerClient; execClient gained a runEnv(ctx, env, args...) variant that sets cmd.Env = append(os.Environ(), env...) and derives `-e KEY` passthrough flags (NAME only) placed before the container name (`docker exec -e NEO4J_USERNAME -e NEO4J_PASSWORD <name> neo4j-admin ...`). Exec is now ExecWithEnv with nil env. PushToAura's upload call dropped --to-user/--to-password from argv and passes NEO4J_USERNAME/NEO4J_PASSWORD via env. fakeDockerClient.ExecCall gained an Env field. Tests: happy-path asserts upload argv has no --to-* / secret and env carries the creds; new client_test ExecWithEnv test asserts argv layout `exec -e NAME ... <name> <args>` (names only, no value) against a stub docker; redaction test renamed to confirm secret can't leak via the (now secret-free) argv echo. make test / fmt-check / lint all green.
+Files: M neo4j-cli/internal/subcommands/docker/client.go, M client_test.go, M deploy.go, M deploy_test.go, M helpers_test.go
+Decisions: ExecWithEnv derives the `-e KEY` flags itself from the env entries, so the caller passes env once and flag-position correctness (OPTIONS before CONTAINER) is centralized; redactArgs needs no change since the secret is never in args.

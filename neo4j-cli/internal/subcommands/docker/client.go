@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -102,6 +103,13 @@ type dockerClient interface {
 	// Non-zero exit wraps docker's captured stderr (with AUTH/PASSWORD
 	// redacted) in a clierr.UsageError via the shared run path.
 	Exec(ctx context.Context, name string, args []string) (string, error)
+	// ExecWithEnv shells `docker exec -e KEY ... <name> <args...>`, forwarding
+	// each KEY=VALUE in env through the docker process environment (NOT argv)
+	// via the `-e KEY` passthrough form. This keeps secrets out of the host
+	// docker CLI argv and the in-container command argv (both world-readable
+	// via /proc/<pid>/cmdline), routing them through /proc/<pid>/environ
+	// instead. Exec is ExecWithEnv with nil env.
+	ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error)
 }
 
 // PsEntry is the subset of `docker ps --format '{{json .}}'` fields we use.
@@ -165,12 +173,24 @@ func (c *execClient) resolve() (string, error) {
 // wraps the captured stderr (REQ-F-061) in a clierr.UsageError so the user
 // sees Docker's own error verbatim.
 func (c *execClient) run(ctx context.Context, args ...string) (string, error) {
+	return c.runEnv(ctx, nil, args...)
+}
+
+// runEnv is the env-aware variant of run: when env is non-empty its KEY=VALUE
+// entries are appended to the docker process's exec.Cmd.Env (on top of the
+// inherited os.Environ()), so secret values travel through the docker CLI's
+// environment instead of its argv. Redaction on the error path is applied to
+// args only — env is never echoed.
+func (c *execClient) runEnv(ctx context.Context, env []string, args ...string) (string, error) {
 	path, err := c.resolve()
 	if err != nil {
 		return "", err
 	}
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, path, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -247,7 +267,26 @@ func (c *execClient) PsAll(ctx context.Context, filters []string) ([]PsEntry, er
 }
 
 func (c *execClient) Exec(ctx context.Context, name string, args []string) (string, error) {
-	out, err := c.run(ctx, append([]string{"exec", name}, args...)...)
+	return c.ExecWithEnv(ctx, name, args, nil)
+}
+
+// ExecWithEnv builds `docker exec [-e KEY ...] <name> <args...>`. Each
+// KEY=VALUE in env contributes one `-e KEY` passthrough option (NAME only, no
+// =value) placed BEFORE the container name (docker requires exec OPTIONS to
+// precede CONTAINER), while the full KEY=VALUE entries are set on the docker
+// process environment via runEnv so the values never appear in argv.
+func (c *execClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	dockerArgs := []string{"exec"}
+	for _, kv := range env {
+		key := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			key = kv[:i]
+		}
+		dockerArgs = append(dockerArgs, "-e", key)
+	}
+	dockerArgs = append(dockerArgs, name)
+	dockerArgs = append(dockerArgs, args...)
+	out, err := c.runEnv(ctx, env, dockerArgs...)
 	if err != nil {
 		return "", err
 	}

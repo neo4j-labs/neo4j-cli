@@ -67,16 +67,18 @@ var stopStartFn = stopStartDatabase
 // Order of operations:
 //  1. STOP DATABASE <database> so neo4j-admin can take a consistent dump.
 //  2. neo4j-admin database dump --to-path=<dumpPath>.
-//  3. neo4j-admin database upload --from-path=<dumpPath> --to-uri/--to-user/
-//     --to-password --overwrite-destination.
+//  3. neo4j-admin database upload --from-path=<dumpPath> --to-uri
+//     --overwrite-destination, with NEO4J_USERNAME/NEO4J_PASSWORD forwarded via
+//     the docker process environment (`docker exec -e NAME` passthrough).
 //  4. START DATABASE <database> (DEFERRED — always runs, even if dump/upload
 //     fails, to restore the source container's prior state).
 //  5. best-effort cleanup of the scratch dump dir (errors ignored).
 //
-// The Aura target password is passed to neo4j-admin via argv; on a non-zero
-// exit the docker Exec path runs the captured stderr through redactArgs/
-// redactString, which masks `--to-password=<v>` (the regex matches the
-// PASSWORD substring), so the secret never reaches stderr or logs.
+// The Aura target credentials are supplied to neo4j-admin via the docker
+// process environment (exec.Cmd.Env) and the `-e NEO4J_USERNAME`/
+// `-e NEO4J_PASSWORD` passthrough flags (NAME only, no =value), so the password
+// never appears in the host docker CLI argv, the in-container neo4j-admin argv,
+// or any redacted stderr echo.
 func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, containerName, database string, target AuraTarget) error {
 	if err := validateDatabaseName(database); err != nil {
 		return err
@@ -120,13 +122,21 @@ func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, co
 		return err
 	}
 
-	if _, err := client.Exec(ctx, containerName, []string{
+	// Pass the Aura admin credentials via the docker process environment and
+	// the `docker exec -e NAME` passthrough form rather than as
+	// --to-user/--to-password argv values. neo4j-admin database upload reads
+	// NEO4J_USERNAME/NEO4J_PASSWORD from the environment, so the secret never
+	// lands in the host docker CLI argv or the in-container neo4j-admin argv
+	// (both world-readable via /proc/<pid>/cmdline); it travels through
+	// /proc/<pid>/environ instead.
+	if _, err := client.ExecWithEnv(ctx, containerName, []string{
 		"neo4j-admin", "database", "upload", database,
 		"--from-path=" + dumpPath,
 		"--to-uri=" + target.URI,
-		"--to-user=" + target.Username,
-		"--to-password=" + target.Password,
 		"--overwrite-destination",
+	}, []string{
+		"NEO4J_USERNAME=" + target.Username,
+		"NEO4J_PASSWORD=" + target.Password,
 	}); err != nil {
 		return err
 	}

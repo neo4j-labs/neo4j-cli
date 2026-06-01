@@ -91,12 +91,20 @@ func TestPushToAura_HappyPath_Ordering(t *testing.T) {
 			"neo4j-admin", "database", "upload", "neo4j",
 			"--from-path=/tmp/neo4j-cli-deploy",
 			"--to-uri=neo4j+s://abc.databases.neo4j.io",
-			"--to-user=neo4j",
-			"--to-password=aurasecret",
 			"--overwrite-destination",
 		},
 		fake.ExecCalls[1].Args,
 	)
+	// The Aura credentials travel via the docker process environment, never argv.
+	assert.Equal(t,
+		[]string{"NEO4J_USERNAME=neo4j", "NEO4J_PASSWORD=aurasecret"},
+		fake.ExecCalls[1].Env,
+	)
+	for _, a := range fake.ExecCalls[1].Args {
+		assert.NotContains(t, a, "aurasecret", "Aura password must not appear in any docker argv element")
+		assert.NotContains(t, a, "--to-password", "argv must not carry --to-password")
+		assert.NotContains(t, a, "--to-user", "argv must not carry --to-user")
+	}
 	assert.Equal(t, []string{"rm", "-rf", "/tmp/neo4j-cli-deploy"}, fake.ExecCalls[2].Args)
 }
 
@@ -185,19 +193,19 @@ func TestPushToAura_InjectionDatabaseName_Rejected(t *testing.T) {
 	}
 }
 
-func TestPushToAura_TargetPasswordRedactedInError(t *testing.T) {
+func TestPushToAura_TargetPasswordAbsentFromArgvOnError(t *testing.T) {
 	cfg := newDeployTestCfg(t)
 	require.NoError(t, cfg.Credentials.Dbms.Add("dev", "neo4j", "srcpw", "neo4j", "neo4j://localhost:7687"))
 
 	stubStopStartFn(t, nil)
 
 	// Simulate the real execClient surfacing docker's argv-echoing stderr on a
-	// non-zero exit: build the same redacted message the run path would.
+	// non-zero exit. Because the secret now travels via env (not argv), the
+	// echoed argv cannot contain it at all — no redaction is even required.
 	const secret = "supersecret-aura-pw"
 	fake := newFakeDockerClient()
 	fake.ExecFn = func(_ context.Context, name string, args []string) (string, error) {
 		if len(args) >= 3 && args[2] == "upload" {
-			// Mirror execClient.run's redaction of the echoed argv.
 			return "", errors.New(redactString("docker exec " + name + " " + strings.Join(args, " ")))
 		}
 		return "", nil
@@ -209,6 +217,5 @@ func TestPushToAura_TargetPasswordRedactedInError(t *testing.T) {
 		Password: secret,
 	})
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), secret, "Aura target password must be redacted")
-	assert.Contains(t, err.Error(), "--to-password=<redacted>")
+	assert.NotContains(t, err.Error(), secret, "Aura target password must not leak via the upload argv echo")
 }

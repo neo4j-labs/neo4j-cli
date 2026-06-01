@@ -303,6 +303,40 @@ func TestExec_Success(t *testing.T) {
 	assert.Equal(t, wantArgv, string(raw), "argv must be `exec <name> <args...>`")
 }
 
+// TestExecWithEnv_PassesEnvNotArgv drives execClient.ExecWithEnv against a stub
+// docker binary and asserts (a) each env entry contributes a `-e NAME`
+// passthrough flag (name only) placed BEFORE the container name, (b) the secret
+// VALUE never appears in argv, and (c) the value is forwarded via the docker
+// process environment (the stub echoes it back from $NEO4J_PASSWORD).
+func TestExecWithEnv_PassesEnvNotArgv(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("docker stub is a POSIX shell script; skipped on Windows")
+	}
+	dir := t.TempDir()
+	argvFile := filepath.Join(dir, "argv.txt")
+	script := "#!/bin/sh\n" +
+		"for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + argvFile + "\"; done\n" +
+		"printf '%s' \"$NEO4J_PASSWORD\"\n" +
+		"exit 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0o755))
+	t.Setenv("PATH", dir)
+
+	ec := &execClient{}
+	out, err := ec.ExecWithEnv(context.Background(), "my-neo4j",
+		[]string{"neo4j-admin", "database", "upload", "neo4j"},
+		[]string{"NEO4J_USERNAME=neo4j", "NEO4J_PASSWORD=aurasecret"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "aurasecret", out, "env value must reach the docker process environment")
+
+	raw, readErr := os.ReadFile(argvFile)
+	require.NoError(t, readErr)
+	wantArgv := "exec\n-e\nNEO4J_USERNAME\n-e\nNEO4J_PASSWORD\nmy-neo4j\nneo4j-admin\ndatabase\nupload\nneo4j\n"
+	assert.Equal(t, wantArgv, string(raw),
+		"argv must be `exec -e NAME ... <name> <args...>` with NAMES only (no =value)")
+	assert.NotContains(t, string(raw), "aurasecret", "secret value must not appear in argv")
+}
+
 // TestExec_ErrorRedacted drives execClient.Exec against a stub docker binary
 // that exits non-zero and emits a PASSWORD-bearing stderr line. The returned
 // error must wrap docker's stderr verbatim except for the redacted secret, and
