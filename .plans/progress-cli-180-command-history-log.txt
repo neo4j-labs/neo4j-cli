@@ -35,3 +35,6 @@ Cannot remove historyRows.MarshalJSON without changing json/toon output: Marshal
 ## TASK-007 — 2026-06-01T09:08:21Z
 Reframed per review: KEEP historyRows.MarshalJSON (load-bearing) and lock its normalization invariant. Added a WHY comment on MarshalJSON and two regression tests pinning (a) alphabetical key order, (b) whole-second RFC3339 time from a sub-second input, (c) empty→`[]` not `null`. Verified the normalization test genuinely fails if MarshalJSON is removed. make test/fmt-check/lint green.
 Files: ~neo4j-cli/internal/subcommands/history/list.go, ~neo4j-cli/internal/subcommands/history/list_test.go
+
+## REVIEW — 2026-06-01T12:00:00Z
+Added 3 review tasks (task-008..task-010) from golang-security review: redact -p/--uri userinfo, redact secret-named --param, strengthen privacy docs.

@@ -160,3 +160,89 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-01T09:08:21Z
+
+  - id: task-008
+    title: 'Redact -p password shorthand and --uri userinfo in clievents.RedactArgs'
+    description: |
+      Security finding (HIGH): clievents.RedactArgs (common/clievents/redact.go) is the single
+      source of truth for secret scrubbing and now feeds the on-disk command history (default-on),
+      in addition to telemetry and panic/error messages. It uses a 4-name allow-list
+      (password, client-secret, api-key, instance-password) matched against the bare flag name, and
+      two secret-bearing inputs bypass it — confirmed empirically by recording into history.jsonl:
+      (1) the `query` password SHORTHAND `-p <pw>` (query.go:67 registers StringP("password","p"))
+      — RedactArgs strips dashes to "p", which is not in the list, so `-p SuperSecret123` is stored
+      verbatim; (2) `--uri` (query.go:65) accepts Bolt URIs that can embed credentials as
+      user:password@host userinfo, and the whole value is stored verbatim. Fix in the canonical
+      layer so all three sinks benefit: (a) add the "p" shorthand to secret coverage so `-p value`
+      and `-p=value` are redacted (over-redaction is acceptable in a redaction context — fail closed;
+      the only -p in the tree is the password shorthand); (b) add userinfo-aware redaction for
+      connection-style flags (uri): when the value parses as a URL with a populated password, rewrite
+      to user:***@host preserving scheme/host/port, otherwise leave non-URL values alone. Keep the
+      existing space-separated / equals shapes working. Add regression tests in the redact test file
+      covering `-p value`, `-p=value`, `--uri neo4j://u:pw@h:7687`, and `--uri=neo4j://u:pw@h` (assert
+      the password is gone and the host/scheme remain). Do NOT blanket-redact the whole URI (host is
+      useful and non-secret).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "RedactArgs scrubs `-p value` and `-p=value` (password shorthand) to ***"
+      - "RedactArgs rewrites --uri / --uri= values with embedded user:password@ to user:***@, preserving scheme/host/port"
+      - "Non-URL --uri values and credential-free URIs are left unchanged"
+      - "New table-driven tests in common/clievents cover both shapes for -p and --uri"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-009
+    title: 'Redact secret-named --param values in RedactArgs'
+    description: |
+      Security finding (MEDIUM): `query --param key=value` (query.go:70, StringArray) stores values
+      verbatim in history — confirmed: `--param token=sk-live-DEADBEEF` was recorded in full. A bind
+      parameter can legitimately carry a secret (token/password/api key). Extend clievents.RedactArgs
+      so that when a `--param` (or `-param`) value has the shape `key=value` (or the following token
+      in the space-separated form) and the key matches a secret-like pattern
+      (case-insensitive contains: password, passwd, pwd, secret, token, apikey, api-key, api_key,
+      access-key, accesskey, key — be reasonably conservative to avoid over-redacting common
+      non-secret params), redact only the value part, preserving the key (e.g. `--param token=***`).
+      Non-secret params (e.g. `--param limit=10`) must be left untouched so history stays useful. Add
+      table-driven tests covering a secret-named param (redacted), a non-secret param (untouched),
+      both `--param k=v` and `--param k=v` space form, and the `:embed` modifier shape
+      (`key:embed=<text>` — treat the base key before `:embed` for matching). This is a heuristic;
+      document the limitation in the redact.go doc comment.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "RedactArgs redacts the value of a secret-named --param (e.g. --param token=*** ), preserving the key"
+      - "Non-secret --param values (e.g. --param limit=10) are left unchanged"
+      - "Both --param key=value and space-separated forms are handled"
+      - "New table-driven tests cover secret + non-secret params"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-010
+    title: 'Strengthen history privacy docs (unredacted Cypher/params + agent exfiltration)'
+    description: |
+      Security finding (MEDIUM, docs): the README/skill privacy note must be explicit that the
+      `query` positional Cypher BODY and `--param` values are stored in history.jsonl UNREDACTED
+      (a deliberate product decision), so they can contain inline secrets (e.g. CREATE USER ... SET
+      PASSWORD '...'), connection strings, and PII; and that because the history is designed to be
+      read by agents and sent to an LLM for distillation/reporting, enabling that flow transmits the
+      recorded commands off-machine. Update README.md (the "Command history" section) to state this
+      plainly, remind users it is on by default and can be disabled via
+      `config set history-enabled false` and capped via history-limit, and recommend not embedding
+      secrets in Cypher/params/`--uri` (prefer --password prompt or env). If the skill bundle
+      additions/description reference history, mirror the warning and run
+      `go generate ./neo4j-cli/internal/skill/...` so the bundle stays in sync (TestGenerator_RoundTrip).
+      No behavioural code change in this task — docs + any required bundle regen only.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "README Command history section states Cypher bodies and --param values are stored unredacted"
+      - "README notes agent distillation transmits history off-machine, and how to disable/cap it"
+      - "Skill bundle regenerated if any embedded text changed (clean go generate diff)"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
