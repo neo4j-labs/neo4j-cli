@@ -18,6 +18,7 @@
 - [neo4j-cli desktop dbms plugin uninstall](#neo4j-cli-desktop-dbms-plugin-uninstall)
 - [neo4j-cli desktop dbms start](#neo4j-cli-desktop-dbms-start)
 - [neo4j-cli desktop dbms stop](#neo4j-cli-desktop-dbms-stop)
+- [neo4j-cli desktop dbms upgrade](#neo4j-cli-desktop-dbms-upgrade)
 - [neo4j-cli desktop doctor](#neo4j-cli-desktop-doctor)
 - [neo4j-cli desktop install](#neo4j-cli-desktop-install)
 - [neo4j-cli desktop list](#neo4j-cli-desktop-list)
@@ -157,7 +158,7 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 
 Manage local DBMSes under a Neo4j Desktop 2 install
 
-Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop. Write commands (`create`, `delete`, `start`, `stop`) require `--rw`. For a composed view of DBMSes plus saved remote connections see `neo4j-cli desktop list`.
+Manage local Neo4j DBMSes running under a Neo4j Desktop 2 install — list, create, delete, start, stop, upgrade. Write commands (`create`, `delete`, `start`, `stop`, `upgrade`) require `--rw`. For a composed view of DBMSes plus saved remote connections see `neo4j-cli desktop list`.
 
 Usage: `neo4j-cli desktop dbms`
 
@@ -415,6 +416,43 @@ neo4j-cli desktop dbms stop my-dbms-id --wait --rw
 
 # Stop a DBMS and emit the resolved DbmsInfo as JSON for scripting
 neo4j-cli desktop dbms stop my-dbms-id --wait --format json --rw
+```
+
+### neo4j-cli desktop dbms upgrade
+
+Upgrade a DBMS managed by the local Neo4j Desktop 2 install
+
+Upgrade a DBMS managed by the local Neo4j Desktop 2 install to a newer Neo4j version. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `--version` is optional: when omitted, the CLI queries Desktop's `GET /dbmss/versions` catalog and auto-picks the highest stable enterprise version (preferring already-cached entries on ties), emitting a stderr breadcrumb naming the picked version + origin. Desktop upgrades a DBMS only while it is stopped: the command refuses when the target is running unless `--force` is passed, in which case it stops the DBMS (polling until stopped) and then upgrades. `--plugin-upgrade-mode` controls how installed plugins are migrated (`all`, `none`, or `upgradable`); `--no-migrate` skips the store-format migration; `--backup` (default true) takes a backup before upgrading. The upgrade can take several minutes; the command blocks until Desktop reports it complete and leaves the DBMS stopped — start it again with `neo4j-cli desktop dbms start <id> --rw`.
+
+Usage: `neo4j-cli desktop dbms upgrade <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--backup` | bool | true | Take a backup of the DBMS before upgrading. |
+| `--force` | bool | false | Stop the DBMS first if it is running, then upgrade. Without --force, the command refuses when the DBMS is running. |
+| `--no-migrate` | bool | false | Skip the store-format migration step during the upgrade. |
+| `--plugin-upgrade-mode` | string | upgradable | How to migrate installed plugins during the upgrade: all, none, or upgradable. |
+| `--version` | string | - | Neo4j version to upgrade to (e.g. 2026.04.0 or 5.26.1). When omitted, picks the latest stable enterprise version Desktop knows about. |
+
+Examples:
+
+```
+# Upgrade a DBMS to the latest stable enterprise version Desktop knows about
+neo4j-cli desktop dbms upgrade my-dbms-id --rw
+
+# Upgrade a DBMS to a specific version
+neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --rw
+
+# Stop the DBMS first if it is running, then upgrade it
+neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --force --rw
+
+# Upgrade without a pre-upgrade backup and skip plugin migration
+neo4j-cli desktop dbms upgrade my-dbms-id --backup=false --plugin-upgrade-mode none --rw
+
+# Upgrade a DBMS and emit the upgraded DbmsInfo as JSON for scripting
+neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw
 ```
 
 ## neo4j-cli desktop doctor

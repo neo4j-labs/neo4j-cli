@@ -1,0 +1,143 @@
+feature: cli-184-desktop-dbms-upgrade
+prd: ./prd-cli-184-desktop-dbms-upgrade.md
+created_at: 2026-06-01T12:25:00Z
+updated_at: 2026-06-01T12:25:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add UpgradeDbms client method + options type + 30m timeout'
+    description: |
+      Extend the Desktop relate client to call POST /dbmss/:id/upgrade. Add a
+      UpgradeDbmsOptions type to desktopclient/types.go and an UpgradeDbms method
+      to desktopclient/client.go that builds the request body and decodes the
+      returned DbmsInfo. Introduce a dedicated dbmsUpgradeTimeout constant.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "desktopclient/types.go defines UpgradeDbmsOptions{ Backup *bool; Migrate *bool; PluginUpgradeMode string } with a doc comment"
+      - "client.go defines dbmsUpgradeTimeout = 30 * time.Minute alongside the existing timeout constants"
+      - "UpgradeDbms(ctx, id, version string, opts UpgradeDbmsOptions) (*DbmsInfo, error) POSTs to /dbmss/<url.PathEscape(id)>/upgrade via doWithTimeout with dbmsUpgradeTimeout"
+      - "Request body is {version, options?} where options only includes keys that are set (Backup/Migrate non-nil, PluginUpgradeMode non-empty); options omitted entirely when empty"
+      - "Reply is unmarshalled into *DbmsInfo; package builds with go build ./..."
+    completed_at: 2026-06-01T12:29:52Z
+
+  - id: task-002
+    title: 'Add desktop dbms upgrade leaf command (upgrade.go)'
+    description: |
+      Create neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go mirroring
+      create.go/start.go. Implement newUpgradeCmd(cfg) with the version
+      auto-pick, plugin-upgrade-mode validation/mapping, running-target
+      refuse/--force handling, the upgrade call, result rendering, and the
+      stopped-DBMS start hint. Reuse existing dbms-package helpers.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Use: 'upgrade <id>', Args: cobra.ExactArgs(1), Annotations write:true, copyright header present"
+      - "Flags: --version (optional, auto-pick latest stable enterprise via pickLatestStableEnterprise + ListDbmsVersions when empty, with stderr breadcrumb), --plugin-upgrade-mode (default 'upgradable'; accepts all|none|upgradable case-insensitively, maps to uppercase, usage error listing valid values otherwise), --no-migrate (bool), --backup (bool default true), --force (bool)"
+      - "Fetches target via GetDbms; if status==started and !force returns a fatal error hinting to stop or pass --force; if status==started and force then StopDbms + pollUntilStatus(stopped) before upgrading"
+      - "Calls client.UpgradeDbms with Migrate=&(!noMigrate), Backup=&backup, PluginUpgradeMode=<uppercased>; renders upgraded DbmsInfo via output.PrintBodyMap with {id,name,version,status,connectionUri} and prints a stderr 'DBMS is stopped; start with neo4j-cli desktop dbms start <id> --rw' hint"
+      - "Flush-left Example: block with >=2 invocations, each with --rw and at least one with --format json"
+    completed_at: 2026-06-01T13:05:00Z
+
+  - id: task-003
+    title: 'Mount upgrade leaf and update dbms parent help'
+    description: |
+      Wire the new leaf into the dbms command tree and refresh the parent
+      command help text so upgrade is discoverable and its --rw requirement is
+      documented.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "dbms.go calls cmd.AddCommand(newUpgradeCmd(cfg))"
+      - "Parent Short/Long list 'upgrade' among the dbms lifecycle commands and note upgrade requires --rw"
+      - "neo4j-cli desktop dbms upgrade --help renders the command with all flags"
+    completed_at: 2026-06-01T13:40:00Z
+
+  - id: task-004
+    title: 'Add table-driven tests for the upgrade leaf'
+    description: |
+      Create upgrade_test.go following the create_test.go/start_test.go pattern
+      using an httptest.Server, SetNewDesktopClientFnForTest, and the poll-sleep
+      seam. Cover the happy path, version auto-pick, running-target refuse/force,
+      plugin-mode mapping/validation, flag-to-body mapping, and JSON output.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "Stopped DBMS + explicit --version asserts the POST body (version, options.pluginUpgradeMode=UPGRADABLE, migrate, backup) and the rendered row"
+      - "--version omitted mocks GET /dbmss/versions and asserts auto-pick + breadcrumb + body version"
+      - "Running target without --force asserts a refusal error and that no upgrade POST is issued; with --force asserts Stop -> GET(stopped) -> upgrade sequence"
+      - "--plugin-upgrade-mode none/all uppercased in body; invalid value yields a usage error; --no-migrate and --backup=false reflected in body; --format json emits full DbmsInfo"
+      - "Tests use the in-memory test FS (no real-FS/credentials access) and pass with go test ./neo4j-cli/internal/subcommands/desktop/dbms/..."
+    completed_at: 2026-06-01T14:30:00Z
+
+  - id: task-005
+    title: 'Regenerate skill bundle for the new leaf'
+    description: |
+      Run go generate for the neo4j-cli skill template so the new upgrade leaf is
+      reflected in the generated reference docs, satisfying TestGenerator_RoundTrip.
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... has been run and the regenerated bundle files are committed alongside the source"
+      - "TestGenerator_RoundTrip passes"
+      - "git diff after a fresh go generate ./... shows no bundle drift"
+    completed_at: 2026-06-01T15:00:00Z
+
+  - id: task-006
+    title: 'Add changelog entry and run final gates'
+    description: |
+      Add a single changie Minor entry describing the new command, then run the
+      full gate suite to confirm the feature is complete.
+    status: completed
+    dependencies:
+      - task-002
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "One changie entry (kind Minor) under .changes/unreleased/ describes neo4j-cli desktop dbms upgrade with --plugin-upgrade-mode"
+      - "make test passes (including TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples)"
+      - "make fmt-check, make lint, and make license-check all pass"
+    completed_at: 2026-06-01T14:45:00Z
+
+  - id: task-007
+    title: 'Rename dbmsCreateResult/dbmsCreateFields to a generic DbmsInfo-row name'
+    description: |
+      Review nit: dbmsCreateResult and dbmsCreateFields (defined in create.go)
+      are now shared by both the create and upgrade leaves — they're really a
+      generic "DbmsInfo row" render shape, not create-specific. The create-
+      prefixed name is slightly misleading now that upgrade.go renders through
+      it too. Rename them to a neutral name (e.g. dbmsInfoResult /
+      dbmsInfoFields) and update both call sites (create.go and upgrade.go).
+      Behavior must not change — this is a pure rename for clarity.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "dbmsCreateResult and dbmsCreateFields are renamed to neutral DbmsInfo-row names (e.g. dbmsInfoResult / dbmsInfoFields) in create.go"
+      - "All references updated (create.go and upgrade.go); no symbol named dbmsCreateResult/dbmsCreateFields remains"
+      - "No behavior change; make test, make fmt-check, and make lint all pass"
+    completed_at: 2026-06-01T15:30:00Z
+
+  - id: task-008
+    title: 'Promote ptr[T any] helper from upgrade.go to helpers.go'
+    description: |
+      Review nit: the generic ptr[T any] helper lives at the bottom of
+      upgrade.go. It's a legitimate idiom (you can't take the address of an
+      expression like !noMigrate directly) and there is no canonical equivalent
+      elsewhere. Move it to the dbms package's helpers.go so it sits with the
+      other shared package-level helpers and is discoverable for future callers.
+      Keep its doc comment. Pure move — no behavior change.
+    status: completed
+    dependencies:
+      - task-007
+    source: review
+    acceptance_criteria:
+      - "ptr[T any] is defined in helpers.go (not upgrade.go), with its doc comment retained"
+      - "upgrade.go no longer defines ptr but still uses it; package builds"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: 2026-06-01T16:00:00Z
