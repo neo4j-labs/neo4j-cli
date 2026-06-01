@@ -11,7 +11,7 @@ tasks:
       UpgradeDbmsOptions type to desktopclient/types.go and an UpgradeDbms method
       to desktopclient/client.go that builds the request body and decodes the
       returned DbmsInfo. Introduce a dedicated dbmsUpgradeTimeout constant.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "desktopclient/types.go defines UpgradeDbmsOptions{ Backup *bool; Migrate *bool; PluginUpgradeMode string } with a doc comment"
@@ -19,7 +19,7 @@ tasks:
       - "UpgradeDbms(ctx, id, version string, opts UpgradeDbmsOptions) (*DbmsInfo, error) POSTs to /dbmss/<url.PathEscape(id)>/upgrade via doWithTimeout with dbmsUpgradeTimeout"
       - "Request body is {version, options?} where options only includes keys that are set (Backup/Migrate non-nil, PluginUpgradeMode non-empty); options omitted entirely when empty"
       - "Reply is unmarshalled into *DbmsInfo; package builds with go build ./..."
-    completed_at: null
+    completed_at: 2026-06-01T12:29:52Z
 
   - id: task-002
     title: 'Add desktop dbms upgrade leaf command (upgrade.go)'

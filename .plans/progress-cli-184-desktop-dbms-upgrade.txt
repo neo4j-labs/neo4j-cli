@@ -1,0 +1,3 @@
+## TASK-001 — 2026-06-01T12:29:52Z
+Added UpgradeDbmsOptions type, dbmsUpgradeTimeout (30m), and Client.UpgradeDbms posting to /dbmss/:id/upgrade with only-set options keys.
+Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopclient/types.go

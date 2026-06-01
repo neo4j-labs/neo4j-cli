@@ -38,6 +38,18 @@ type DbmsVersion struct {
 	Dist    string `json:"dist"`
 }
 
+// UpgradeDbmsOptions are the optional `options` keys on `POST
+// /dbmss/:id/upgrade`. Backup and Migrate are pointers so the client can
+// distinguish "caller didn't set this" (nil → omit, server default applies)
+// from an explicit `false`. PluginUpgradeMode is the uppercase wire enum
+// (`ALL` / `NONE` / `UPGRADABLE`); empty means omit (server defaults to
+// `UPGRADABLE`).
+type UpgradeDbmsOptions struct {
+	Backup            *bool
+	Migrate           *bool
+	PluginUpgradeMode string
+}
+
 // Credentials is the body returned by `GET /credentials/<key>` on the relate
 // API. A `null` body (legacy DBMS / safeStorage unavailable) is represented
 // by `(nil, nil)` from `GetCredentialsByKey` rather than this type's zero

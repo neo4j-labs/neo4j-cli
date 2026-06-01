@@ -41,6 +41,11 @@ const pluginWriteTimeout = 120 * time.Second
 // unpack + install + initial-password setup; minutes are normal on slow nets.
 const dbmsCreateTimeout = 10 * time.Minute
 
+// Extended budget for `POST /dbmss/:id/upgrade`: Desktop downloads + unpacks
+// the new version, runs config upgrade, optional data migration, and plugin
+// handling before the POST resolves — well beyond create on a large store.
+const dbmsUpgradeTimeout = 30 * time.Minute
+
 // HS256 JWT exp window; matches Desktop's default.
 const tokenLifetime = 7 * 24 * time.Hour
 
@@ -295,6 +300,38 @@ func (c *Client) CreateDbms(ctx context.Context, req CreateDbmsRequest) (*DbmsIn
 	var out DbmsInfo
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, clierr.NewFatalError("desktop: failed to decode created dbms: %s", err.Error())
+	}
+	return &out, nil
+}
+
+// UpgradeDbms posts `POST /dbmss/:id/upgrade` to upgrade a stopped DBMS to
+// `version`. Only the `options` keys actually set by the caller are sent —
+// `options` is omitted entirely when empty — so Desktop's server-side defaults
+// (`migrate=true`, `pluginUpgradeMode=UPGRADABLE`) apply for unset keys. The
+// POST resolves after the upgrade completes and returns the upgraded DbmsInfo
+// (left stopped). Uses the extended 30-minute timeout.
+func (c *Client) UpgradeDbms(ctx context.Context, id, version string, opts UpgradeDbmsOptions) (*DbmsInfo, error) {
+	payload := map[string]any{"version": version}
+	options := map[string]any{}
+	if opts.Backup != nil {
+		options["backup"] = *opts.Backup
+	}
+	if opts.Migrate != nil {
+		options["migrate"] = *opts.Migrate
+	}
+	if opts.PluginUpgradeMode != "" {
+		options["pluginUpgradeMode"] = opts.PluginUpgradeMode
+	}
+	if len(options) > 0 {
+		payload["options"] = options
+	}
+	body, err := c.doWithTimeout(ctx, http.MethodPost, "/dbmss/"+url.PathEscape(id)+"/upgrade", payload, dbmsUpgradeTimeout)
+	if err != nil {
+		return nil, err
+	}
+	var out DbmsInfo
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, clierr.NewFatalError("desktop: failed to decode upgraded dbms: %s", err.Error())
 	}
 	return &out, nil
 }
