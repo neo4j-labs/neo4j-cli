@@ -246,3 +246,32 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-01T09:35:27Z
+
+  - id: task-011
+    title: 'Use canonical agent.Detect for history invoker classification'
+    description: |
+      Review finding: history invoker() in neo4j-cli/internal/subcommands/history/store.go classifies
+      human vs agent using ONLY a bare stdin TTY check (term.IsTerminal on os.Stdin). The codebase
+      already has a canonical, env-var-driven agent-harness detector at common/agent/agent.go
+      (agent.Detect — recognizes CLAUDECODE, CODEX_SANDBOX, CURSOR_AGENT, GEMINI_CLI, REPL_ID, etc.,
+      sourced from unjs/std-env), and common/flags/flags.go already uses it (via a detectAgent seam)
+      to gate --rw auto-apply. The history feature should reuse this canonical detector so invoker
+      classification is consistent with the rest of the CLI and correctly tags agents that allocate a
+      pty (where stdin IS a TTY, so the current check wrongly returns "human"). Fix: in store.go add a
+      detectAgent test seam = agent.Detect (mirroring flags.go) and change invoker() to return "agent"
+      when detectAgent() is true OR stdin is not a TTY, and "human" only for an interactive terminal
+      with no harness env var. Update store_test.go: the withInvoker helper must also pin detectAgent
+      (force it false) so existing TTY-driven cases still expect "human" — NOTE the test process itself
+      runs under CLAUDECODE, so without stubbing detectAgent the "human" cases would flip; add explicit
+      table cases asserting detectAgent()=true yields "agent" even when the TTY check returns true.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "store.go invoker() returns agent when agent.Detect() is true OR stdin is not a TTY; human only for interactive terminal with no harness"
+      - "A detectAgent test seam (= agent.Detect) exists, mirroring common/flags/flags.go"
+      - "withInvoker test helper pins detectAgent false so existing human cases hold under CLAUDECODE"
+      - "A test asserts detectAgent()=true yields agent even when stdinIsTerminal()=true"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null

@@ -50,3 +50,6 @@ Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
 ## TASK-010 — 2026-06-01T09:35:27Z
 Rewrote README "Command history" Privacy subsection: lists redacted secret flags (incl. -p/--uri userinfo/secret-named --param per task-008/009), states query Cypher body + --param values are stored largely UNREDACTED (inline secrets/PII), and warns the agent-distillation flow transmits history off-machine — recommend --password prompt or NEO4J_PASSWORD env. README only; no cobra Long/skill text changed so no bundle regen. Gates green.
 Files: ~README.md
+
+## REVIEW — 2026-06-01T13:00:00Z
+Added 1 review task (task-011): use canonical agent.Detect for history invoker classification.
