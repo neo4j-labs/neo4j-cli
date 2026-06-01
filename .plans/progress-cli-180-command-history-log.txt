@@ -12,3 +12,8 @@ Decisions: Added fileutils.WriteFileErr (error-returning wrapper around writeFil
 Wired history.Record into the root PersistentPreRunE chain (after credential init, before versioncheck) gated by a new shouldRecordHistory(cmd) ancestry-walk that skips the history subtree, help, and cobra completion (__complete/__completeNoDesc). Best-effort/pre-run: Record swallows write errors and the chain still returns nil. Tests verify recording fires for a nested aura subcommand (workspace list) via EnableTraverseRunHooks and is skipped for help/completion.
 Files: ~neo4j-cli/app/app.go, +neo4j-cli/app/history_hook_test.go
 Decisions: Record's 2nd param is unused (uses os.Args internally) but the call passes cmd.CommandPath() per the call-site contract.
+
+## TASK-004 — 2026-06-01T09:30:00Z
+Added `neo4j-cli history` command tree (one-file-per-leaf): list (last 20 newest-first, --limit N, --format json|table|toon) + clear (--force or UsageError). Default/table view renders the human form `[time] <command> {invoker:..., workspace:..., credential:...}`; json/toon use the shared commonoutput.PrintBodyMap path via a historyRows ResponseData adapter. Registered history.NewCmd(cfg) in app.go next to config. Regenerated skill bundle (references/history.md + SKILL.md row).
+Files: +.../history/history.go, +.../history/list.go, +.../history/clear.go, +.../history/{list_test,clear_test,helpers_test}.go, ~neo4j-cli/app/app.go, +bundle/references/history.md, ~bundle/SKILL.md
+Decisions: --format inherited as a persistent flag from the root (no per-leaf registration); standalone leaf tests set format via config JSON rather than the --format flag. clear is annotated write:true so the Example gate skips the --format-json requirement.

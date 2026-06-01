@@ -80,7 +80,7 @@ tasks:
       [time] <command> {invoker:...} for the default view. `history clear` empties the file
       and requires --force (errors with guidance otherwise). Register history.NewCmd(cfg) in
       app.go next to config/update. Each leaf gets a flush-left Example with >=2 invocations.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -89,7 +89,7 @@ tasks:
       - "Command registered in app.go; tree follows one-file-per-leaf layout"
       - "TestAllLeafCommands_HaveExamples passes for the new leaves"
       - "Table-driven tests cover list rendering, --format variants, and clear (using testfs)"
-    completed_at: null
+    completed_at: 2026-06-01T09:30:00Z
 
   - id: task-005
     title: 'Regenerate skill bundle, docs, changelog, and run final gates'

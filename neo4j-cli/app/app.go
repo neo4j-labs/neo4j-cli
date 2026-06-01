@@ -91,6 +91,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(auraCmd)
 	cmd.AddCommand(credential.NewCredentialCmd(cfg))
 	cmd.AddCommand(config.NewCmd(cfg))
+	cmd.AddCommand(history.NewCmd(cfg))
 	cmd.AddCommand(desktop.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))
 	cmd.AddCommand(docker.NewCmd(cfg))
