@@ -26,3 +26,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260601-144154.yaml
 
 ## REVIEW — 2026-06-01T12:47:59Z
 Added 2 review tasks (task-007..task-008).
+
+## TASK-007 — 2026-06-01T15:30:00Z
+Pure rename of shared DbmsInfo-row render adapter: dbmsCreateResult->dbmsInfoResult, dbmsCreateFields->dbmsInfoFields (defined in create.go, used by create.go + upgrade.go). No behavior change; all gates green.
+Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go

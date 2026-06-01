@@ -131,7 +131,7 @@ neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw`,
 				return err
 			}
 
-			output.PrintBodyMap(cmd, cfg, dbmsCreateResult{Item: upgraded}, dbmsCreateFields)
+			output.PrintBodyMap(cmd, cfg, dbmsInfoResult{Item: upgraded}, dbmsInfoFields)
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 				"DBMS is stopped; start it with 'neo4j-cli desktop dbms start %s --rw'\n", id)
 			return nil

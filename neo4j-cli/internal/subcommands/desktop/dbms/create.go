@@ -21,7 +21,7 @@ import (
 	"golang.org/x/term"
 )
 
-var dbmsCreateFields = []string{"id", "name", "version", "status", "connectionUri"}
+var dbmsInfoFields = []string{"id", "name", "version", "status", "connectionUri"}
 
 // 1s cadence matches `docker.WaitForBolt`; 30s ceiling matches `docker create --wait`.
 const (
@@ -91,12 +91,12 @@ func promptCreatePassword(cmd *cobra.Command) (string, error) {
 	return pw, nil
 }
 
-// dbmsCreateResult adapts a `*DbmsInfo` to the output.ResponseData contract.
-type dbmsCreateResult struct {
+// dbmsInfoResult adapts a `*DbmsInfo` to the output.ResponseData contract.
+type dbmsInfoResult struct {
 	Item *desktopclient.DbmsInfo
 }
 
-func (r dbmsCreateResult) AsArray() []map[string]any {
+func (r dbmsInfoResult) AsArray() []map[string]any {
 	if r.Item == nil {
 		return nil
 	}
@@ -112,7 +112,7 @@ func (r dbmsCreateResult) AsArray() []map[string]any {
 }
 
 // MarshalJSON emits the full DbmsInfo so `--format json` matches `desktop dbms list`.
-func (r dbmsCreateResult) MarshalJSON() ([]byte, error) {
+func (r dbmsInfoResult) MarshalJSON() ([]byte, error) {
 	if r.Item == nil {
 		return []byte("null"), nil
 	}
@@ -237,7 +237,7 @@ neo4j-cli desktop dbms create --name my-dbms --version 5.21.0 --password superse
 				final = started
 			}
 
-			output.PrintBodyMap(cmd, cfg, dbmsCreateResult{Item: final}, dbmsCreateFields)
+			output.PrintBodyMap(cmd, cfg, dbmsInfoResult{Item: final}, dbmsInfoFields)
 			return nil
 		},
 	}

@@ -114,14 +114,14 @@ tasks:
       it too. Rename them to a neutral name (e.g. dbmsInfoResult /
       dbmsInfoFields) and update both call sites (create.go and upgrade.go).
       Behavior must not change — this is a pure rename for clarity.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "dbmsCreateResult and dbmsCreateFields are renamed to neutral DbmsInfo-row names (e.g. dbmsInfoResult / dbmsInfoFields) in create.go"
       - "All references updated (create.go and upgrade.go); no symbol named dbmsCreateResult/dbmsCreateFields remains"
       - "No behavior change; make test, make fmt-check, and make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-01T15:30:00Z
 
   - id: task-008
     title: 'Promote ptr[T any] helper from upgrade.go to helpers.go'
