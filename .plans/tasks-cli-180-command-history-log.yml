@@ -1,0 +1,105 @@
+feature: cli-180-command-history-log
+prd: ./prd-cli-180-command-history-log.md
+created_at: 2026-06-01T00:00:00Z
+updated_at: 2026-06-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add history-enabled / history-limit global config keys + accessors'
+    description: |
+      Add two GlobalScope config keys to common/clicfg/clicfg.go: history-enabled
+      (bool, default true) and history-limit (int, default 1000, 0 disables). Provide
+      accessors cfg.Global.HistoryEnabled() and cfg.Global.HistoryLimit() mirroring
+      existing Global accessors (e.g. Format). Ensure defaults are registered so the
+      keys surface through `neo4j-cli config get/set/list` automatically.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "cfg.Global.HistoryEnabled() returns true by default and reflects config overrides"
+      - "cfg.Global.HistoryLimit() returns 1000 by default and reflects config overrides"
+      - "Both keys are settable/gettable via config set/get and appear in config list"
+      - "Table-driven tests cover default + overridden values (using testfs, never real FS)"
+    completed_at: null
+
+  - id: task-002
+    title: 'Create history store package (Entry, Record, Load, Clear, path)'
+    description: |
+      Create neo4j-cli/internal/subcommands/history/store.go with the Entry struct
+      (time RFC3339 UTC, command, invoker, version, workspace omitempty, credential
+      omitempty), a path() helper using clicfg.ConfigPrefix, and Record/Load/Clear
+      functions operating on cfg.Aura.Fs(). Record reuses clievents.RedactArgs for the
+      command string, detects invoker via a test-seam'd term.IsTerminal(stdin), reads
+      metadata from cfg (Version, Aura.DefaultWorkspace, Credentials.Aura.DefaultCredential
+      name), then does read-all -> append -> trim-to-history-limit -> atomic
+      fileutils.WriteFile at mode 0600. Honors history-enabled / history-limit (no-op when
+      disabled or limit 0). Load skips unparseable lines. Best-effort: write failures are
+      non-fatal.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Record appends a JSONL entry with redacted command (--password etc. -> ***) and metadata"
+      - "Invoker resolves human under TTY and agent otherwise via the test seam"
+      - "Trimming keeps the last history-limit entries; disabled or limit 0 writes nothing"
+      - "History file is created at the config-prefix path with mode 0600"
+      - "Load tolerates and skips corrupt lines; tests use testfs (never real FS)"
+    completed_at: null
+
+  - id: task-003
+    title: 'Wire history recording into root PersistentPreRunE hook'
+    description: |
+      Extend the existing root PersistentPreRunE chain in neo4j-cli/app/app.go (~:74-83)
+      to call history.Record(cfg, cmd) for every command, composed alongside the existing
+      version-check / skill-refresh steps. Skip recording for the history subtree, help,
+      and cobra completion (__complete*) commands. Recording must never crash or block the
+      command (best-effort).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Every non-excluded command produces a history entry after execution path is entered"
+      - "history, help, and __complete* commands are not recorded"
+      - "Existing PersistentPreRunE behaviour (format/RW/versioncheck/skill-refresh) is preserved"
+      - "A failing history write does not abort the underlying command"
+    completed_at: null
+
+  - id: task-004
+    title: 'Add `neo4j-cli history` command tree (list + clear)'
+    description: |
+      Create the cobra command tree under neo4j-cli/internal/subcommands/history/ following
+      one-file-per-leaf: history.go (NewCmd parent, <=80 lines), list.go, clear.go, plus
+      colocated tests and helpers_test.go. `history list` reads the JSONL via the store,
+      prints the last 20 entries newest-first by default, supports --limit N and
+      --format json|table|toon (via RegisterOutputFlag), rendering the human form
+      [time] <command> {invoker:...} for the default view. `history clear` empties the file
+      and requires --force (errors with guidance otherwise). Register history.NewCmd(cfg) in
+      app.go next to config/update. Each leaf gets a flush-left Example with >=2 invocations.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "history list shows last 20 newest-first; --limit N and --format json|table|toon work"
+      - "history clear requires --force; with it the file is emptied, without it it errors"
+      - "Command registered in app.go; tree follows one-file-per-leaf layout"
+      - "TestAllLeafCommands_HaveExamples passes for the new leaves"
+      - "Table-driven tests cover list rendering, --format variants, and clear (using testfs)"
+    completed_at: null
+
+  - id: task-005
+    title: 'Regenerate skill bundle, docs, changelog, and run final gates'
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to refresh the skill bundle for the
+      new top-level history command (TestGenerator_RoundTrip gate). Update README.md with the
+      history command and a privacy note that commands are logged locally and query Cypher
+      bodies are stored verbatim. Add a user-facing changelog entry via
+      `changie new --projects neo4j-cli --kind Minor`. Run the full gate suite.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "go generate produces a clean diff and TestGenerator_RoundTrip passes"
+      - "README documents `neo4j-cli history` and the local-logging privacy note"
+      - "A Minor changelog entry exists under .changes/unreleased/"
+      - "make test, make fmt-check, and make lint all pass"
+    completed_at: null
