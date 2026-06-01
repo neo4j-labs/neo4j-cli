@@ -55,7 +55,7 @@ const maxResponseBodyBytes = 4 << 20
 // User-visible message for the "Desktop isn't there" case (probe miss,
 // connection-refused, EOF, reset). NOT used for deadline-exceeded so a slow
 // machine doesn't get told Desktop is missing when it's actually busy.
-const canonicalUnreachable = "Neo4j Desktop 2 doesn't appear to be running. Start Neo4j Desktop 2 from your applications menu, or pass --port if it's on a non-default port, or run 'neo4j-cli desktop doctor' to scan."
+const canonicalUnreachable = "Neo4j Desktop 2 doesn't appear to be running (tried mDNS discovery, then the 44222..44232 port scan). Start Neo4j Desktop 2 from your applications menu; if it's running on a non-default port, pass --port; on macOS, the Local Network permission may block mDNS, so pass --port or run 'neo4j-cli desktop doctor' to scan."
 
 // Shown when the request hit the CLI-side deadline. Distinguishes "took too
 // long" from "isn't there". `%s` receives the elapsed budget.
@@ -102,7 +102,7 @@ func SetNowFnForTest(fn func() time.Time) func() {
 // folded into the JWT signing key so all calls from this process share one
 // token.
 type Client struct {
-	origin   string // "http://localhost:<port>" — folded into the JWT key
+	origin   string // "http://localhost:<port>" (legacy port-scan / older Desktop) or "http://127.0.0.1:<port>" (mDNS-discovered / newer Desktop); folded into the JWT signing key, so it must match Desktop's environment.httpOrigin
 	salt     string // contents of <dataDir>/relate.secret.key
 	clientID string // fresh UUID v4 per Client; sent as X-Client-Id
 	token    string // signed once at construction; reused on every call

@@ -95,14 +95,14 @@ tasks:
       Network permission caveat, and the --port escape hatch (pair the caveat with a
       concrete remediation per repo convention). Update the Client.origin field comment to
       note it may be localhost or 127.0.0.1 depending on discovery path.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "canonicalUnreachable mentions mDNS, the macOS Local Network permission, and --port with actionable remediation"
       - "Client.origin field comment reflects the localhost-vs-127.0.0.1 distinction"
       - "Existing client tests asserting the unreachable string are updated and pass"
-    completed_at: null
+    completed_at: 2026-06-01T08:50:07Z
 
   - id: task-006
     title: 'Add non-gating mdns_discovery doctor check and refresh doctor strings'
