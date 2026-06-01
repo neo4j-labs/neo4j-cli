@@ -15,3 +15,7 @@ Decisions: Ran go generate now (task-005) so make test stays green — the new l
 ## TASK-004 — 2026-06-01T14:30:00Z
 Added table-driven upgrade_test.go mirroring create/start helpers: happy path (body+row), version auto-pick (breadcrumb+body), running refuse vs --force Stop->GET(stopped)->upgrade ordering, plugin-mode mapping+invalid usage error, --no-migrate/--backup=false body mapping, --format json full DbmsInfo, write annotation. All gates green (make test/fmt-check/lint).
 Files: +neo4j-cli/internal/subcommands/desktop/dbms/upgrade_test.go
+
+## TASK-005 — 2026-06-01T15:00:00Z
+Verified skill bundle is current: bundle was already regenerated in task-003 when the upgrade leaf was mounted, so `go generate ./neo4j-cli/internal/skill/...` produced no drift. TestGenerator_RoundTrip and all gates pass.
+Files: none (verification only)

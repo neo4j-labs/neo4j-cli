@@ -79,14 +79,14 @@ tasks:
     description: |
       Run go generate for the neo4j-cli skill template so the new upgrade leaf is
       reflected in the generated reference docs, satisfying TestGenerator_RoundTrip.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
       - "go generate ./neo4j-cli/internal/skill/... has been run and the regenerated bundle files are committed alongside the source"
       - "TestGenerator_RoundTrip passes"
       - "git diff after a fresh go generate ./... shows no bundle drift"
-    completed_at: null
+    completed_at: 2026-06-01T15:00:00Z
 
   - id: task-006
     title: 'Add changelog entry and run final gates'
