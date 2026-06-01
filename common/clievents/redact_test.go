@@ -111,6 +111,42 @@ func TestRedactArgs(t *testing.T) {
 			mustContain: []string{"--uri garbage"},
 		},
 		{
+			name:        "secret-named param space form redacted",
+			args:        []string{"query", "MATCH (n) RETURN n", "--param", "token=" + secret},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param token=***"},
+		},
+		{
+			name:        "secret-named param equals-on-flag form redacted",
+			args:        []string{"query", "--param=password=" + secret},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param=password=***"},
+		},
+		{
+			name:        "secret-named param embed modifier redacted",
+			args:        []string{"query", "--param", "apiKey:embed=" + secret},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param apiKey:embed=***"},
+		},
+		{
+			name:        "non-secret param limit unchanged",
+			args:        []string{"query", "--param", "limit=10", "--format", "json"},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param limit=10", "--format json"},
+		},
+		{
+			name:        "non-secret param name unchanged",
+			args:        []string{"query", "--param", "name=bob"},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param name=bob"},
+		},
+		{
+			name:        "malformed param without equals unchanged",
+			args:        []string{"query", "--param", "token"},
+			flagNames:   []string{"--param"},
+			mustContain: []string{"--param token"},
+		},
+		{
 			name:        "empty args",
 			args:        []string{},
 			mustContain: []string{},

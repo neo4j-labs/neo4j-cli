@@ -209,7 +209,7 @@ tasks:
       both `--param k=v` and `--param k=v` space form, and the `:embed` modifier shape
       (`key:embed=<text>` — treat the base key before `:embed` for matching). This is a heuristic;
       document the limitation in the redact.go doc comment.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -219,7 +219,7 @@ tasks:
       - "New table-driven tests cover secret + non-secret params"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T14:00:00Z
 
   - id: task-010
     title: 'Strengthen history privacy docs (unredacted Cypher/params + agent exfiltration)'

@@ -28,6 +28,25 @@ var secretFlags = []string{
 // redactedPlaceholder is what the secret value is replaced with in output.
 const redactedPlaceholder = "***"
 
+// secretParamKeyParts are case-insensitive substrings that mark a `--param`
+// bind-parameter key as secret-bearing. A query parameter can legitimately
+// carry a token/password/api-key, so when the key matches we scrub only the
+// value and keep the key visible. The list is intentionally conservative to
+// avoid over-redacting common non-secret params (e.g. `limit`, `name`).
+var secretParamKeyParts = []string{
+	"password",
+	"passwd",
+	"pwd",
+	"secret",
+	"token",
+	"apikey",
+	"api-key",
+	"api_key",
+	"access-key",
+	"accesskey",
+	"key",
+}
+
 // RedactArgs renders an argv slice as a single space-separated string with
 // the values of secret-bearing flags replaced by ***. It handles three argv
 // shapes:
@@ -39,6 +58,13 @@ const redactedPlaceholder = "***"
 // A trailing secret flag with no following argument is left as-is — there is
 // no value to scrub. Positional arguments and non-secret flags are emitted
 // unchanged.
+//
+// For `--param key=value` (and `-param`, both shapes), a best-effort heuristic
+// scrubs only the value when the base key (the part before any `:embed`
+// modifier and the first `=`) looks secret-bearing — see secretParamKeyParts.
+// Non-secret params (e.g. `--param limit=10`) pass through unchanged so the
+// history stays useful. This is a name-based heuristic: a secret stored under
+// an innocuous key name (e.g. `--param x=sk-live-...`) is NOT caught.
 //
 // This helper is the single source of truth for "what flag is sensitive" in
 // the CLI; telemetry, panic templates, and error formatting all funnel
@@ -70,6 +96,22 @@ func RedactArgs(args []string) string {
 			continue
 		}
 
+		// --param=key=value form (equals-on-flag, defensive).
+		if name, value, ok := splitFlagEq(arg); ok && isParamFlag(name) {
+			out = append(out, dashPrefix(arg)+name+"="+redactParamValue(value))
+			continue
+		}
+
+		// --param key=value form (the common space-separated shape).
+		if name, ok := flagName(arg); ok && isParamFlag(name) {
+			out = append(out, arg)
+			if i+1 < len(args) {
+				out = append(out, redactParamValue(args[i+1]))
+				i++
+			}
+			continue
+		}
+
 		// --flag=value or -flag=value form.
 		if name, _, ok := splitFlagEq(arg); ok && isSecretFlag(name) {
 			out = append(out, dashPrefix(arg)+name+"="+redactedPlaceholder)
@@ -95,6 +137,44 @@ func RedactArgs(args []string) string {
 // flag whose value may carry credentials in userinfo.
 func isURIFlag(name string) bool {
 	return name == "uri"
+}
+
+// isParamFlag reports whether name (without leading dashes) is the query
+// `--param` flag, whose values are bind parameters of the form key=value.
+func isParamFlag(name string) bool {
+	return name == "param"
+}
+
+// redactParamValue scrubs the value of a `--param key=value` token when the
+// base key looks secret-bearing, preserving the key (e.g. `token=***`). A
+// value without `=` (malformed) is returned unchanged. The base key is the
+// part before the first `=` with any `:embed`-style modifier stripped, so
+// `token:embed=...` matches on `token`.
+func redactParamValue(value string) string {
+	idx := strings.Index(value, "=")
+	if idx < 0 {
+		return value
+	}
+	key := value[:idx]
+	if modIdx := strings.Index(key, ":"); modIdx >= 0 {
+		key = key[:modIdx]
+	}
+	if !isSecretParamKey(key) {
+		return value
+	}
+	return value[:idx+1] + redactedPlaceholder
+}
+
+// isSecretParamKey reports whether a bind-parameter key (case-insensitive)
+// contains any secret-bearing substring.
+func isSecretParamKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, part := range secretParamKeyParts {
+		if strings.Contains(lower, part) {
+			return true
+		}
+	}
+	return false
 }
 
 // redactURIUserinfo rewrites a connection URI's userinfo password to *** while
