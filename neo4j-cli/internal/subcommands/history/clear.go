@@ -22,7 +22,7 @@ func newClearCmd(cfg *clicfg.Config) *cobra.Command {
 neo4j-cli history clear
 
 # Empty the history log
-neo4j-cli history clear --force`,
+neo4j-cli history clear --force --rw`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

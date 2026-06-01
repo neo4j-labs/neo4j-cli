@@ -85,3 +85,7 @@ Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
 
 ## REVIEW — 2026-06-01T18:30:00Z
 Added 1 review task (task-016): add --rw to history clear write-invocation Example + bundle regen (CI conventions-review finding on PR #195).
+
+## TASK-016 — 2026-06-01T10:45:58Z
+Changed history clear write-invocation Example to `neo4j-cli history clear --force --rw` (no-flag guidance invocation retained), then regenerated the skill bundle. Clean diff: only references/history.md mirrored the Example. make test (incl. TestGenerator_RoundTrip), fmt-check, lint all green.
+Files: ~neo4j-cli/internal/subcommands/history/clear.go, ~neo4j-cli/internal/skill/bundle/references/history.md

@@ -27,7 +27,7 @@ Examples:
 neo4j-cli history clear
 
 # Empty the history log
-neo4j-cli history clear --force
+neo4j-cli history clear --force --rw
 ```
 
 ## neo4j-cli history list

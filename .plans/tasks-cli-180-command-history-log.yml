@@ -420,7 +420,7 @@ tasks:
       the skill bundle (references/history.md), so after editing the Example, run
       `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle or
       TestGenerator_RoundTrip fails.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -429,4 +429,4 @@ tasks:
       - "Skill bundle regenerated (references/history.md updated); go generate diff is clean"
       - "make test (incl. TestGenerator_RoundTrip), make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T10:45:58Z
