@@ -78,59 +78,45 @@ func RedactArgs(args []string) string {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		// --uri=value form: a Bolt URI can embed credentials as
-		// user:password@host userinfo, so strip only the password while
-		// keeping scheme/host/port/path (which are useful and non-secret).
-		if name, value, ok := splitFlagEq(arg); ok && isURIFlag(name) {
-			out = append(out, dashPrefix(arg)+name+"="+redactURIUserinfo(value))
-			continue
-		}
-
-		// --uri value form.
-		if name, ok := flagName(arg); ok && isURIFlag(name) {
-			out = append(out, arg)
-			if i+1 < len(args) {
-				out = append(out, redactURIUserinfo(args[i+1]))
-				i++
+		// Equals form (--flag=value / -flag=value).
+		if name, value, ok := splitFlagEq(arg); ok {
+			if red, sensitive := redactByFlag(name, value); sensitive {
+				out = append(out, dashPrefix(arg)+name+"="+red)
+				continue
 			}
-			continue
 		}
 
-		// --param=key=value form (equals-on-flag, defensive).
-		if name, value, ok := splitFlagEq(arg); ok && isParamFlag(name) {
-			out = append(out, dashPrefix(arg)+name+"="+redactParamValue(value))
-			continue
-		}
-
-		// --param key=value form (the common space-separated shape).
-		if name, ok := flagName(arg); ok && isParamFlag(name) {
-			out = append(out, arg)
-			if i+1 < len(args) {
-				out = append(out, redactParamValue(args[i+1]))
-				i++
+		// Space form (--flag value / -flag value); the value is the next token.
+		if name, ok := flagName(arg); ok {
+			if _, sensitive := redactByFlag(name, ""); sensitive {
+				out = append(out, arg)
+				if i+1 < len(args) {
+					red, _ := redactByFlag(name, args[i+1])
+					out = append(out, red)
+					i++
+				}
+				continue
 			}
-			continue
-		}
-
-		// --flag=value or -flag=value form.
-		if name, _, ok := splitFlagEq(arg); ok && isSecretFlag(name) {
-			out = append(out, dashPrefix(arg)+name+"="+redactedPlaceholder)
-			continue
-		}
-
-		// --flag value or -flag value form.
-		if name, ok := flagName(arg); ok && isSecretFlag(name) {
-			out = append(out, arg)
-			if i+1 < len(args) {
-				out = append(out, redactedPlaceholder)
-				i++
-			}
-			continue
 		}
 
 		out = append(out, arg)
 	}
 	return strings.Join(out, " ")
+}
+
+// redactByFlag returns the scrubbed value for a known sensitive flag, and
+// whether the flag is sensitive at all. Precedence matches the prior branch
+// order: uri (userinfo) and param (key=value) before generic secret flags.
+func redactByFlag(name, value string) (string, bool) {
+	switch {
+	case isURIFlag(name):
+		return redactURIUserinfo(value), true
+	case isParamFlag(name):
+		return redactParamValue(value), true
+	case isSecretFlag(name):
+		return redactedPlaceholder, true
+	}
+	return value, false
 }
 
 // isURIFlag reports whether name (without leading dashes) is a connection-style

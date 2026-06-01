@@ -67,3 +67,7 @@ Files: ~common/agent/agent.go, +common/agent/export_test_seam.go, ~common/clieve
 
 ## REVIEW — 2026-06-01T16:00:00Z
 Added 2 review tasks (task-013..task-014): collapse RedactArgs shape-branches into flag-name dispatch; delete shipped export_test_seam.go in favour of same-package seams.
+
+## TASK-013 — 2026-06-01T16:30:00Z
+Collapsed RedactArgs from 6 near-identical category×shape branches to 2 shape branches (equals + space), each delegating value redaction to a new redactByFlag(name, value) dispatch (uri→param→secret precedence encoded once). Behavior byte-identical; redact_test.go unchanged and green (50 tests).
+Files: ~common/clievents/redact.go

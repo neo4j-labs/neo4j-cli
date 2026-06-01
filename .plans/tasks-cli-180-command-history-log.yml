@@ -333,7 +333,6 @@ tasks:
       secret) encoded once in the switch, and adding a future sensitive flag is a one-line case. Behavior
       MUST be identical; the existing redact tests (incl. the task-008/009 -p, --uri userinfo, and
       secret-named --param cases) are the regression guard and must stay green unchanged.
-    status: pending
     dependencies:
       - task-009
     acceptance_criteria:
@@ -342,7 +341,8 @@ tasks:
       - "All existing redact tests pass unchanged (behavior identical for -p, --uri userinfo, --param, generic secret flags)"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-01T16:30:00Z
 
   - id: task-014
     title: 'Delete shipped export_test_seam.go; use same-package test seams'
