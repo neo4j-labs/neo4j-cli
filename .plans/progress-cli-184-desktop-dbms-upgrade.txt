@@ -11,3 +11,7 @@ Decisions: Not yet mounted (task-003), so newUpgradeCmd/pluginUpgradeModeWire/pt
 Mounted the upgrade leaf in dbms.go (AddCommand), added 'upgrade' to parent Long lifecycle + --rw lists, and removed the three temporary //nolint:unused directives now that the symbols are referenced.
 Files: ~neo4j-cli/internal/subcommands/desktop/dbms/dbms.go, ~neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go, ~neo4j-cli/internal/skill/bundle/references/desktop.md
 Decisions: Ran go generate now (task-005) so make test stays green — the new leaf changed the cobra tree, regenerating references/desktop.md; task-005 becomes a no-drift verification.
+
+## TASK-004 — 2026-06-01T14:30:00Z
+Added table-driven upgrade_test.go mirroring create/start helpers: happy path (body+row), version auto-pick (breadcrumb+body), running refuse vs --force Stop->GET(stopped)->upgrade ordering, plugin-mode mapping+invalid usage error, --no-migrate/--backup=false body mapping, --format json full DbmsInfo, write annotation. All gates green (make test/fmt-check/lint).
+Files: +neo4j-cli/internal/subcommands/desktop/dbms/upgrade_test.go

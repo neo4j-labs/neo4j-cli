@@ -62,7 +62,7 @@ tasks:
       using an httptest.Server, SetNewDesktopClientFnForTest, and the poll-sleep
       seam. Cover the happy path, version auto-pick, running-target refuse/force,
       plugin-mode mapping/validation, flag-to-body mapping, and JSON output.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -72,7 +72,7 @@ tasks:
       - "Running target without --force asserts a refusal error and that no upgrade POST is issued; with --force asserts Stop -> GET(stopped) -> upgrade sequence"
       - "--plugin-upgrade-mode none/all uppercased in body; invalid value yields a usage error; --no-migrate and --backup=false reflected in body; --format json emits full DbmsInfo"
       - "Tests use the in-memory test FS (no real-FS/credentials access) and pass with go test ./neo4j-cli/internal/subcommands/desktop/dbms/..."
-    completed_at: null
+    completed_at: 2026-06-01T14:30:00Z
 
   - id: task-005
     title: 'Regenerate skill bundle for the new leaf'
