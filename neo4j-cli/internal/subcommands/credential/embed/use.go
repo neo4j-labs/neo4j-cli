@@ -24,6 +24,7 @@ neo4j-cli credential embed use hf-bge --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			return cfg.Credentials.Embed.SetDefault(args[0])
 		},
 	}

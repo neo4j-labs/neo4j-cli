@@ -87,6 +87,7 @@ neo4j-cli credential aura-client add --name work --env ~/Downloads/aura-client-c
 neo4j-cli credential aura-client use personal --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			// Distinguish file-had-empty-value (error) from file-missing-key (fall through to flag).
 			var (
 				fileVals    = map[string]string{}

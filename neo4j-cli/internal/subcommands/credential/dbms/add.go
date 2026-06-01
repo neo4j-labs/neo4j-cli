@@ -55,6 +55,7 @@ neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --userna
 neo4j-cli credential dbms add --name local --uri neo4j://localhost:7687 --username neo4j --password secret --embed-credential openai-small --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			// Distinguish file-had-empty-value (error) from file-missing-key (fall through to flag/default).
 			var (
 				fileVals    = map[string]string{}

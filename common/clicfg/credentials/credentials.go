@@ -115,6 +115,18 @@ func (c *Credentials) StorageMode() string {
 	return c.storageMode
 }
 
+// WarnIfEnvMode writes a one-line warning to w when storage mode is env,
+// explaining that the change will not be persisted because credentials are
+// sourced from environment variables. It is a no-op in other modes. Call it
+// from user-facing credential write commands only — never from automatic paths
+// (token refresh, instance create auto-store).
+func (c *Credentials) WarnIfEnvMode(w io.Writer) {
+	if c.storageMode != StorageModeEnv {
+		return
+	}
+	fmt.Fprintln(w, "Warning: credential-storage is set to env; this change is not persisted. Credentials are sourced from environment variables for this process only.") //nolint:errcheck
+}
+
 // load reads credentials.json into the Credentials struct.
 //
 // On a malformed file, load backs up the corrupt bytes to

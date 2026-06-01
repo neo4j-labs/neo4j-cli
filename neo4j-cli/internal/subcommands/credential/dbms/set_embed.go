@@ -27,6 +27,7 @@ neo4j-cli credential dbms set-embed local --rw`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			dbmsName := args[0]
 			embedName := ""
 			if len(args) == 2 {

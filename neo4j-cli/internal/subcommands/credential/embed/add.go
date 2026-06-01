@@ -62,6 +62,7 @@ neo4j-cli credential embed add --name gemini-default --provider gemini --model g
 neo4j-cli credential embed add --name vertex-default --provider vertex --model gemini-embedding-001 --dimensions 3072 --vertex-project my-gcp-project --vertex-location us-central1 --rw`,
 		Annotations: map[string]string{"write": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			if !isValidProvider(provider) {
 				return clierr.NewUsageError("invalid --provider %q: must be one of %v", provider, validProviders)
 			}

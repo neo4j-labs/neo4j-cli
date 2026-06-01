@@ -27,6 +27,7 @@ neo4j-cli credential dbms remove prod --rw --yes --force`,
 		Annotations: map[string]string{"write": "true"},
 		Args:        cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.Credentials.WarnIfEnvMode(cmd.ErrOrStderr())
 			if err := confirm.Require(cmd, args[0]); err != nil {
 				return err
 			}
