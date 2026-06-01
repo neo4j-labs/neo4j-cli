@@ -143,6 +143,51 @@ func TestCategorizeBoltError_ServerRespondedHTTP(t *testing.T) {
 	}
 }
 
+// TestCategorizeBoltError_SchemaTxForbidden locks the --atomic remediation
+// path: ForbiddenDueToTransactionType (schema change mixed with data writes in
+// one transaction) stays a validation error (exit 6) but gains a Suggestion
+// pointing the user at dropping --atomic. Both the typed-driver path and the
+// plain-text seam path must attach it; an ordinary SyntaxError must NOT, so the
+// generic validation mapping stays suggestion-free.
+func TestCategorizeBoltError_SchemaTxForbidden(t *testing.T) {
+	cases := []struct {
+		name           string
+		in             error
+		wantSuggestion bool
+	}{
+		{
+			name:           "typed Neo4jError forbidden-tx-type → validation + suggestion",
+			in:             &neo4j.Neo4jError{Code: forbiddenTxTypeCode, Msg: "Tried to execute Write query after executing Schema modification"},
+			wantSuggestion: true,
+		},
+		{
+			name:           "plain forbidden-tx-type text → validation + suggestion",
+			in:             errors.New("Neo.ClientError.Transaction.ForbiddenDueToTransactionType: Tried to execute Write query after executing Schema modification"),
+			wantSuggestion: true,
+		},
+		{
+			name:           "ordinary SyntaxError → validation, no suggestion (regression)",
+			in:             errors.New("Neo.ClientError.Statement.SyntaxError: Invalid input"),
+			wantSuggestion: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := categorizeBoltError(tc.in)
+			require.Error(t, got)
+			var ce *clierr.CLIError
+			require.True(t, errors.As(got, &ce), "expected *clierr.CLIError, got %T", got)
+			assert.Equal(t, 6, ce.Code, "stays a validation error regardless of suggestion")
+			if tc.wantSuggestion {
+				assert.Contains(t, ce.Suggestion, "without --atomic", "remediation must name the --atomic fix")
+			} else {
+				assert.Empty(t, ce.Suggestion, "ordinary validation errors carry no suggestion")
+			}
+		})
+	}
+}
+
 // TestCategorizeBoltError_PreservesWrappedChain locks that errors.As reaches
 // the original *neo4j.Neo4jError through the CLIError wrap so future code that
 // inspects driver-specific error types (e.g. retry decisions) keeps working.

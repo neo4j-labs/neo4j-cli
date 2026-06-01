@@ -57,6 +57,49 @@ type conn struct {
 type queryResult struct {
 	Columns []string
 	Rows    [][]any
+	Stats   *writeStats
+}
+
+// writeStats is a driver-free snapshot of the mutation counters reported by a
+// statement's ResultSummary. It is nil for pure reads (statsFromCounters returns
+// nil when the counters report no updates) so read output stays unchanged.
+type writeStats struct {
+	NodesCreated         int `json:"nodes_created,omitempty"`
+	NodesDeleted         int `json:"nodes_deleted,omitempty"`
+	RelationshipsCreated int `json:"relationships_created,omitempty"`
+	RelationshipsDeleted int `json:"relationships_deleted,omitempty"`
+	PropertiesSet        int `json:"properties_set,omitempty"`
+	LabelsAdded          int `json:"labels_added,omitempty"`
+	LabelsRemoved        int `json:"labels_removed,omitempty"`
+	IndexesAdded         int `json:"indexes_added,omitempty"`
+	IndexesRemoved       int `json:"indexes_removed,omitempty"`
+	ConstraintsAdded     int `json:"constraints_added,omitempty"`
+	ConstraintsRemoved   int `json:"constraints_removed,omitempty"`
+	SystemUpdates        int `json:"system_updates,omitempty"`
+}
+
+// statsFromCounters copies a driver Counters into the driver-free writeStats,
+// returning nil when the statement made no updates (a pure read) so callers can
+// nil-check to decide whether to render a stats line at all. A nil counters
+// argument also yields nil.
+func statsFromCounters(c neo4j.Counters) *writeStats {
+	if c == nil || !c.ContainsUpdates() {
+		return nil
+	}
+	return &writeStats{
+		NodesCreated:         c.NodesCreated(),
+		NodesDeleted:         c.NodesDeleted(),
+		RelationshipsCreated: c.RelationshipsCreated(),
+		RelationshipsDeleted: c.RelationshipsDeleted(),
+		PropertiesSet:        c.PropertiesSet(),
+		LabelsAdded:          c.LabelsAdded(),
+		LabelsRemoved:        c.LabelsRemoved(),
+		IndexesAdded:         c.IndexesAdded(),
+		IndexesRemoved:       c.IndexesRemoved(),
+		ConstraintsAdded:     c.ConstraintsAdded(),
+		ConstraintsRemoved:   c.ConstraintsRemoved(),
+		SystemUpdates:        c.SystemUpdates(),
+	}
 }
 
 // queryResponse is the structured envelope around a Cypher response. Backed
@@ -73,6 +116,7 @@ type queryResponse struct {
 	}
 	Bookmarks []string
 	QueryType neo4j.QueryType
+	Counters  neo4j.Counters
 }
 
 // stderrLogger is an in-package adapter implementing the neo4j/log.Logger
@@ -158,6 +202,13 @@ var driverOpener = func(target string, username, password, userAgent string, deb
 // The readOnly flag selects ExecuteRead vs ExecuteWrite in production; tests
 // can assert on it to verify correct routing.
 var runStatementResponseFn = runStatementResponseImpl
+
+// runStatementsResponseFn is the batch counterpart of runStatementResponseFn.
+// It lets tests inject canned per-statement responses for the single-transaction
+// (--atomic) path without booting a real Neo4j. Production sets it to
+// runStatementsResponseImpl. The readOnly flag selects ExecuteRead vs
+// ExecuteWrite in production; tests can assert on it.
+var runStatementsResponseFn = runStatementsResponseImpl
 
 // resolveConn merges connection settings from .env, OS environment, and
 // command-line flags (lowest → highest precedence). When --credential is set,
@@ -533,84 +584,18 @@ func runStatementResponse(ctx context.Context, c *conn, statement string, params
 	return resp, nil
 }
 
-// runStatementResponseImpl is the real Bolt-backed implementation. Opens a
-// session targeted at c.database, runs the statement inside a managed
-// transaction (ExecuteRead when readOnly is true, ExecuteWrite otherwise),
-// collects all records, and pulls summary.QueryType() (used by the --rw
-// classifier on EXPLAIN preflight runs) onto the response. The session is
-// closed via defer; the driver retains pooling.
+// runStatementResponseImpl is the single-statement Bolt-backed implementation,
+// expressed as a batch-of-one over runStatementsResponseImpl. Delegating to the
+// impl (not the categorizing runStatementsResponse wrapper) keeps error
+// categorization at the single runStatementResponse boundary — no double-wrap.
+// A successful batch-of-one always yields exactly one envelope, so resps[0] is
+// safe.
 func runStatementResponseImpl(ctx context.Context, c *conn, statement string, params map[string]any, readOnly bool) (*queryResponse, error) {
-	if c == nil {
-		return nil, errors.New("query: nil connection")
-	}
-	if c.driver == nil {
-		return nil, errors.New("query: connection driver not opened (call openDriver first)")
-	}
-
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
-	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
-
-	work := func(tx neo4j.ManagedTransaction) (any, error) {
-		result, err := tx.Run(ctx, statement, params)
-		if err != nil {
-			return nil, err
-		}
-
-		records, err := result.Collect(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		summary, err := result.Consume(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		resp := &queryResponse{}
-		if len(records) > 0 {
-			resp.Data.Fields = append([]string(nil), records[0].Keys...)
-			resp.Data.Values = make([][]any, 0, len(records))
-			for _, rec := range records {
-				row := make([]any, len(rec.Values))
-				for i, v := range rec.Values {
-					row[i] = coerceDriverValue(v)
-				}
-				resp.Data.Values = append(resp.Data.Values, row)
-			}
-		} else {
-			// Even with zero rows the result keys are available via the result
-			// metadata so downstream renderers see the column header. Fall back
-			// to an empty (but non-nil) slice when nothing came back.
-			keys, _ := result.Keys()
-			resp.Data.Fields = append([]string(nil), keys...)
-			resp.Data.Values = [][]any{}
-		}
-
-		if summary != nil {
-			resp.QueryType = summary.QueryType()
-		}
-
-		return resp, nil
-	}
-
-	var (
-		out any
-		err error
-	)
-	if readOnly {
-		out, err = session.ExecuteRead(ctx, work)
-	} else {
-		out, err = session.ExecuteWrite(ctx, work)
-	}
+	resps, err := runStatementsResponseImpl(ctx, c, []string{statement}, params, readOnly)
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		return nil, err
 	}
-
-	resp, ok := out.(*queryResponse)
-	if !ok || resp == nil {
-		return nil, errors.New("query: unexpected nil response from managed transaction")
-	}
-	return resp, nil
+	return resps[0], nil
 }
 
 // runStatement executes a Cypher statement and returns the tabular result.
@@ -637,5 +622,129 @@ func runStatementWithMode(ctx context.Context, c *conn, statement string, params
 	return &queryResult{
 		Columns: parsed.Data.Fields,
 		Rows:    parsed.Data.Values,
+		Stats:   statsFromCounters(parsed.Counters),
 	}, nil
+}
+
+// runStatementsResponse executes a batch of Cypher statements inside a single
+// managed transaction and returns one parsed envelope per statement, in source
+// order. Routes through runStatementsResponseFn so tests can override. The
+// readOnly flag drives ExecuteRead vs ExecuteWrite selection inside the
+// production impl.
+//
+// Driver errors are categorised here (the single dispatch boundary that both
+// production and the test seam flow through), mirroring runStatementResponse:
+// Cypher ClientError-class failures map to validation errors (exit 6);
+// transport / TransientError / DatabaseError failures map to upstream errors
+// (exit 8). An error from any statement aborts the transaction, so the managed
+// transaction rolls back automatically and no partial result is returned.
+func runStatementsResponse(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {
+	resps, err := runStatementsResponseFn(ctx, c, statements, params, readOnly)
+	if err != nil {
+		return nil, categorizeBoltError(err)
+	}
+	return resps, nil
+}
+
+// runStatementsResponseImpl is the real Bolt-backed batch implementation. Opens
+// ONE session targeted at c.database and runs ONE managed transaction
+// (ExecuteRead when readOnly is true, ExecuteWrite otherwise) whose work
+// callback loops tx.Run → Collect → Consume per statement, appending a
+// *queryResponse each (reusing coerceDriverValue). Any error returned from the callback aborts the
+// transaction, so the driver rolls it back automatically. The session is closed
+// via defer; the driver retains pooling.
+func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResponse, error) {
+	if c == nil {
+		return nil, errors.New("query: nil connection")
+	}
+	if c.driver == nil {
+		return nil, errors.New("query: connection driver not opened (call openDriver first)")
+	}
+
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
+	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
+
+	work := func(tx neo4j.ManagedTransaction) (any, error) {
+		responses := make([]*queryResponse, 0, len(statements))
+		for _, statement := range statements {
+			result, err := tx.Run(ctx, statement, params)
+			if err != nil {
+				return nil, err
+			}
+
+			records, err := result.Collect(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			summary, err := result.Consume(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			resp := &queryResponse{}
+			if len(records) > 0 {
+				resp.Data.Fields = append([]string(nil), records[0].Keys...)
+				resp.Data.Values = make([][]any, 0, len(records))
+				for _, rec := range records {
+					row := make([]any, len(rec.Values))
+					for i, v := range rec.Values {
+						row[i] = coerceDriverValue(v)
+					}
+					resp.Data.Values = append(resp.Data.Values, row)
+				}
+			} else {
+				keys, _ := result.Keys()
+				resp.Data.Fields = append([]string(nil), keys...)
+				resp.Data.Values = [][]any{}
+			}
+
+			if summary != nil {
+				resp.QueryType = summary.QueryType()
+				resp.Counters = summary.Counters()
+			}
+
+			responses = append(responses, resp)
+		}
+		return responses, nil
+	}
+
+	var (
+		out any
+		err error
+	)
+	if readOnly {
+		out, err = session.ExecuteRead(ctx, work)
+	} else {
+		out, err = session.ExecuteWrite(ctx, work)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	resps, ok := out.([]*queryResponse)
+	if !ok {
+		return nil, errors.New("query: unexpected nil response from managed transaction")
+	}
+	return resps, nil
+}
+
+// runStatementsWithMode executes a batch of statements in a single managed
+// transaction and unwraps the envelopes into []*queryResult (Columns/Rows),
+// mirroring runStatementWithMode. Results are returned in source order.
+func runStatementsWithMode(ctx context.Context, c *conn, statements []string, params map[string]any, readOnly bool) ([]*queryResult, error) {
+	parsed, err := runStatementsResponse(ctx, c, statements, params, readOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*queryResult, 0, len(parsed))
+	for _, p := range parsed {
+		results = append(results, &queryResult{
+			Columns: p.Data.Fields,
+			Rows:    p.Data.Values,
+			Stats:   statsFromCounters(p.Counters),
+		})
+	}
+	return results, nil
 }

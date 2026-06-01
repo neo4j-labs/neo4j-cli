@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'query: accept multiple statements separated by ; at line end; --atomic runs them in a single transaction; --continue-on-error keeps going past failing statements (non-atomic only); write statements now report summary stats (nodes/relationships/properties created, etc.); comment-only statements are skipped instead of erroring'
+time: 2026-05-29T11:30:13.807506+02:00

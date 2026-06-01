@@ -6,6 +6,7 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,11 @@ type renderResult struct {
 	rows            []map[string]any
 	truncated       bool
 	arraysTruncated int
+	stats           *writeStats
+	// errMsg is set only for an error-placeholder result produced under
+	// --continue-on-error: the statement failed, so it has no columns/rows but
+	// keeps its positional slot in the rendered array. Empty for successes.
+	errMsg string
 }
 
 // AsArray implements commonoutput.ResponseData. Each row is returned as a
@@ -56,6 +62,9 @@ func (r renderResult) AsArray() []map[string]any {
 //	{columns, rows, truncated, arrays_truncated}
 //
 // Field order is fixed via struct field order so encoding/json preserves it.
+// The `stats` and `error` keys are additive (omitempty): a successful read
+// stays byte-identical, while an error-placeholder (--continue-on-error) keeps
+// its positional slot and surfaces the failure under `error`.
 func (r renderResult) MarshalJSON() ([]byte, error) {
 	cols := r.columns
 	if cols == nil {
@@ -70,11 +79,15 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Rows            []map[string]any `json:"rows"`
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
+		Stats           *writeStats      `json:"stats,omitempty"`
+		Error           string           `json:"error,omitempty"`
 	}{
 		Columns:         cols,
 		Rows:            rows,
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
+		Stats:           r.stats,
+		Error:           r.errMsg,
 	})
 }
 
@@ -90,6 +103,81 @@ func renderRows(cmd *cobra.Command, cfg *clicfg.Config, columns []string, rows [
 		arraysTruncated: arraysTruncated,
 	}
 	commonoutput.PrintBodyMap(cmd, cfg, result, columns)
+}
+
+// renderResults writes one or more query results to cmd's stdout. A single
+// result takes the existing PrintBodyMap path so its output is byte-identical
+// to the single-statement case; multiple results delegate to PrintBodyMaps,
+// which emits a JSON array, stacked tables, or the TOON array form depending on
+// the resolved format. Each result carries its own column ordering.
+func renderResults(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if len(results) == 1 {
+		commonoutput.PrintBodyMap(cmd, cfg, results[0], results[0].columns)
+		renderStatsLines(cmd, cfg, results)
+		return
+	}
+	items := make([]commonoutput.ResponseData, len(results))
+	fields := make([][]string, len(results))
+	for i, r := range results {
+		items[i] = r
+		fields[i] = r.columns
+	}
+	commonoutput.PrintBodyMaps(cmd, cfg, items, fields)
+	renderStatsLines(cmd, cfg, results)
+}
+
+// renderStatsLines writes a per-statement write-summary line to stdout, but only
+// in table mode — JSON/TOON carry the stats inside the envelope instead. A
+// result with no mutations (nil stats) produces no line, so reads stay
+// byte-identical. With more than one statement each line is prefixed
+// "statement N: " to match truncateResult's warning convention.
+func renderStatsLines(cmd *cobra.Command, cfg *clicfg.Config, results []renderResult) {
+	if commonoutput.ResolveOutput(cmd, cfg) != "table" {
+		return
+	}
+	multi := len(results) > 1
+	for i, r := range results {
+		if r.stats == nil {
+			continue
+		}
+		prefix := ""
+		if multi {
+			prefix = fmt.Sprintf("statement %d: ", i+1)
+		}
+		cmd.Println(prefix + formatStatsLine(r.stats))
+	}
+}
+
+// formatStatsLine renders a write-summary as a comma-separated list of only the
+// non-zero counters (cypher-shell style), e.g.
+// "2 nodes created, 1 relationship created, 5 properties set". A writeStats is
+// only ever non-nil when at least one counter is set, so the slice is never
+// empty.
+func formatStatsLine(s *writeStats) string {
+	parts := make([]string, 0, 12)
+	add := func(n int, singular, plural string) {
+		if n == 0 {
+			return
+		}
+		noun := plural
+		if n == 1 {
+			noun = singular
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", n, noun))
+	}
+	add(s.NodesCreated, "node created", "nodes created")
+	add(s.NodesDeleted, "node deleted", "nodes deleted")
+	add(s.RelationshipsCreated, "relationship created", "relationships created")
+	add(s.RelationshipsDeleted, "relationship deleted", "relationships deleted")
+	add(s.PropertiesSet, "property set", "properties set")
+	add(s.LabelsAdded, "label added", "labels added")
+	add(s.LabelsRemoved, "label removed", "labels removed")
+	add(s.IndexesAdded, "index added", "indexes added")
+	add(s.IndexesRemoved, "index removed", "indexes removed")
+	add(s.ConstraintsAdded, "constraint added", "constraints added")
+	add(s.ConstraintsRemoved, "constraint removed", "constraints removed")
+	add(s.SystemUpdates, "system update", "system updates")
+	return strings.Join(parts, ", ")
 }
 
 // rowsFromValues converts the API's positional values (one []any per row, in

@@ -26,6 +26,7 @@ type decodedResult struct {
 	Rows            []map[string]any `json:"rows"`
 	Truncated       bool             `json:"truncated"`
 	ArraysTruncated int              `json:"arrays_truncated"`
+	Error           string           `json:"error"`
 }
 
 // newRenderCmd returns a fresh cobra command with stdout captured into the
@@ -333,6 +334,69 @@ func TestRenderRows_DefaultOutputRendersTable(t *testing.T) {
 	// Table rendering should not produce a JSON envelope.
 	assert.NotContains(t, out, `"columns"`)
 	assert.NotContains(t, out, `"truncated"`)
+}
+
+func TestRenderResults_SingleParityWithRenderRows(t *testing.T) {
+	// len==1 must produce output byte-identical to the existing single path.
+	for _, format := range []string{"json", "table"} {
+		t.Run(format, func(t *testing.T) {
+			columns := []string{"n", "m"}
+			rows := []map[string]any{{"n": float64(1), "m": "alice"}}
+
+			cmdA, cfgA, bufA := newRenderCmd(t, format)
+			renderRows(cmdA, cfgA, columns, rows, false, 0)
+
+			cmdB, cfgB, bufB := newRenderCmd(t, format)
+			renderResults(cmdB, cfgB, []renderResult{{columns: columns, rows: rows}})
+
+			assert.Equal(t, bufA.String(), bufB.String())
+		})
+	}
+}
+
+func TestRenderResults_MultiJSONArray(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "json")
+	renderResults(cmd, cfg, []renderResult{
+		{columns: []string{"a"}, rows: []map[string]any{{"a": float64(1)}}},
+		{columns: []string{"b"}, rows: []map[string]any{{"b": "two"}}, truncated: true},
+	})
+
+	out := stdout.String()
+	var got []decodedResult
+	require.NoError(t, json.Unmarshal([]byte(out), &got), "output must be a JSON array, got: %s", out)
+	require.Len(t, got, 2)
+	assert.Equal(t, []string{"a"}, got[0].Columns)
+	assert.Equal(t, []string{"b"}, got[1].Columns)
+	assert.False(t, got[0].Truncated)
+	assert.True(t, got[1].Truncated)
+}
+
+func TestRenderResults_MultiTableStacked(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "table")
+	renderResults(cmd, cfg, []renderResult{
+		{columns: []string{"a"}, rows: []map[string]any{{"a": "first"}}},
+		{columns: []string{"b"}, rows: []map[string]any{{"b": "second"}}},
+	})
+
+	out := stdout.String()
+	assert.Contains(t, out, "first")
+	assert.Contains(t, out, "second")
+	assert.Contains(t, out, "\n\n", "stacked tables must be separated by a blank line")
+	assert.Less(t, strings.Index(out, "first"), strings.Index(out, "second"))
+	assert.NotContains(t, out, `"columns"`, "table output must not be a JSON envelope")
+}
+
+func TestRenderResults_MultiToon(t *testing.T) {
+	cmd, cfg, stdout := newRenderCmd(t, "toon")
+	renderResults(cmd, cfg, []renderResult{
+		{columns: []string{"a"}, rows: []map[string]any{{"a": float64(1)}}},
+		{columns: []string{"b"}, rows: []map[string]any{{"b": float64(2)}}},
+	})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	var v any
+	assert.Error(t, json.Unmarshal([]byte(out), &v), "toon output must not be valid JSON")
 }
 
 // withStdoutIsTerminal locally overrides the common/output.StdoutIsTerminal

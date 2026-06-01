@@ -54,6 +54,23 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		return err
 	}
 
+	atomicFlag := cmd.Flag("atomic")
+	atomic := atomicFlag != nil && atomicFlag.Value.String() == "true"
+
+	continueFlag := cmd.Flag("continue-on-error")
+	continueOnError := continueFlag != nil && continueFlag.Value.String() == "true"
+
+	// Reject the incoherent combination before doing any work (no connection,
+	// no DB calls): --atomic is all-or-nothing in one transaction, so
+	// "continue on error" has no meaning there.
+	if atomic && continueOnError {
+		return clierr.NewUsageError(
+			"--atomic and --continue-on-error are mutually exclusive: --atomic runs all " +
+				"statements in one all-or-nothing transaction. Drop --continue-on-error to keep " +
+				"atomic rollback, or drop --atomic to run each statement in its own transaction " +
+				"and continue past failures.")
+	}
+
 	rawParams, _ := cmd.Flags().GetStringArray("param")
 	params, embeds, err := parseParams(rawParams)
 	if err != nil {
@@ -82,46 +99,109 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	}
 	defer c.driver.Close(cmd.Context()) //nolint:errcheck // driver close error not actionable in defer
 
+	statements := splitStatements(cypher)
+
 	rwFlag := cmd.Flag("rw")
 	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
-	if !allowWrite {
-		if err := rejectWriteCypher(cmd, c, cypher, params); err != nil {
+
+	truncOver, _ := cmd.Flags().GetInt("truncate-arrays-over")
+	maxRows, _ := cmd.Flags().GetInt("max-rows")
+	multi := len(statements) > 1
+
+	var results []renderResult
+
+	if atomic {
+		// Run the write-guard preflight over every statement first (read-only,
+		// outside the transaction) so a write statement is blocked before any
+		// batch transaction is opened.
+		if !allowWrite {
+			if err := preflightAll(cmd, c, statements, params); err != nil {
+				return err
+			}
+		}
+		batch, err := runStatementsWithMode(cmd.Context(), c, statements, params, !allowWrite)
+		if err != nil {
 			return err
+		}
+		for i, res := range batch {
+			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
+		}
+	} else {
+		// Default mode keeps preflight interleaved with execution (not hoisted via
+		// preflightAll) so statement N executes before statement N+1 is classified,
+		// preserving fail-fast ordering across separate transactions.
+		failures := 0
+		for i, stmt := range statements {
+			res, err := runOneStatement(cmd, c, stmt, params, allowWrite)
+			if err != nil {
+				if !continueOnError {
+					return err
+				}
+				failures++
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "statement %d: %s\n", i+1, err)
+				results = append(results, renderResult{errMsg: err.Error()})
+				continue
+			}
+			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
+		}
+
+		if failures > 0 {
+			// Render the full array first so the caller sees every statement's
+			// outcome, then signal overall failure with a non-zero exit.
+			renderResults(cmd, cfg, results)
+			return clierr.NewValidationError("%d of %d statements failed", failures, len(statements))
 		}
 	}
 
-	// When --rw is set the user has opted in to writing, so run inside
-	// ExecuteWrite. When --rw is unset the preflight already classified the
-	// statement as read-only, so run inside ExecuteRead.
-	var res *queryResult
-	if allowWrite {
-		res, err = runStatementWrite(cmd.Context(), c, cypher, params)
-	} else {
-		res, err = runStatement(cmd.Context(), c, cypher, params)
-	}
-	if err != nil {
-		return err
-	}
+	renderResults(cmd, cfg, results)
+	return nil
+}
 
-	truncOver, _ := cmd.Flags().GetInt("truncate-arrays-over")
+// runOneStatement runs the non-rw EXPLAIN write-guard preflight then executes a
+// single statement: read-only (ExecuteRead) when writes are not allowed, write
+// (ExecuteWrite) when --rw opted in. It is the unit the default-mode loop
+// fails-fast or continues past per --continue-on-error.
+func runOneStatement(cmd *cobra.Command, c *conn, stmt string, params map[string]any, allowWrite bool) (*queryResult, error) {
+	if !allowWrite {
+		if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+			return nil, err
+		}
+		return runStatement(cmd.Context(), c, stmt, params)
+	}
+	return runStatementWrite(cmd.Context(), c, stmt, params)
+}
+
+// truncateResult applies array and row truncation to a single statement's
+// result and emits the corresponding stderr warnings, returning the
+// renderResult ready for output. When multi is true (more than one statement
+// ran) each warning is prefixed with "statement N: " (1-based index); a single
+// statement keeps the unprefixed wording byte-identical to today.
+func truncateResult(cmd *cobra.Command, res *queryResult, truncOver, maxRows int, multi bool, index int) renderResult {
 	values, arraysTruncated := truncateValues(res.Rows, truncOver)
-
-	maxRows, _ := cmd.Flags().GetInt("max-rows")
 	values, truncated := capRows(values, maxRows)
+
+	prefix := ""
+	if multi {
+		prefix = fmt.Sprintf("statement %d: ", index)
+	}
 	if truncated {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"warning: truncated to %d rows (use --max-rows 0 for unlimited)\n",
-			len(values))
+			"%swarning: truncated to %d rows (use --max-rows 0 for unlimited)\n",
+			prefix, len(values))
 	}
 	if arraysTruncated > 0 && truncOver > 0 {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"warning: truncated %d arrays larger than %d items (use --truncate-arrays-over 0 to disable)\n",
-			arraysTruncated, truncOver)
+			"%swarning: truncated %d arrays larger than %d items (use --truncate-arrays-over 0 to disable)\n",
+			prefix, arraysTruncated, truncOver)
 	}
 
-	rows := rowsFromValues(res.Columns, values)
-	renderRows(cmd, cfg, res.Columns, rows, truncated, arraysTruncated)
-	return nil
+	return renderResult{
+		columns:         res.Columns,
+		rows:            rowsFromValues(res.Columns, values),
+		truncated:       truncated,
+		arraysTruncated: arraysTruncated,
+		stats:           res.Stats,
+	}
 }
 
 // resolveCypher returns the Cypher statement from the positional arg or, if
@@ -163,6 +243,17 @@ func rejectWriteCypher(cmd *cobra.Command, c *conn, cypher string, params map[st
 	}
 	if resp.QueryType != neo4j.QueryTypeReadOnly {
 		return clierr.NewUsageError("this command writes; pass --rw to allow it")
+	}
+	return nil
+}
+
+// preflightAll runs the rejectWriteCypher write-guard over every statement and
+// returns the first error, blocking a write statement before any execution.
+func preflightAll(cmd *cobra.Command, c *conn, statements []string, params map[string]any) error {
+	for _, stmt := range statements {
+		if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+			return err
+		}
 	}
 	return nil
 }

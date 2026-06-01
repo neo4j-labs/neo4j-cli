@@ -28,6 +28,15 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
 			"The sibling `query :embed [text]` leaf computes a vector standalone " +
 			"without opening a Bolt connection. " +
+			"Multiple statements may be passed in a single string: they are split on " +
+			"a `;` at the end of a line (a mid-line `;` is kept verbatim; the " +
+			"terminating `;` is stripped). By default each statement runs in its own " +
+			"transaction, in order, failing fast on the first error; pass `--atomic` " +
+			"to run them all in one transaction that rolls back if any statement " +
+			"fails, or `--continue-on-error` (non-atomic only) to report each failure " +
+			"and keep going, exiting non-zero at the end. " +
+			"Multiple result sets render as a JSON array with `--format json` " +
+			"or as stacked blocks with `--format table`/`toon`. " +
 			"Write operations require `--rw`; without `--rw`, an EXPLAIN preflight " +
 			"runs first and statements classified as writes are blocked.",
 		Example: `# Introspect the schema before writing Cypher (always do this first)
@@ -55,7 +64,16 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop-connection:f4e2
 neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 
 # Write Cypher requires --rw (opt-in)
-neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json`,
+neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
+
+# Run multiple read statements in one call (split on ; at end of line); results render as a JSON array
+neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people; MATCH (m:Movie) RETURN count(m) AS movies" --format json
+
+# Run multiple write statements atomically — all in one transaction, rolled back if any fails
+neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bob\"})" --rw --atomic --format json
+
+# Import many write statements, skipping over any that fail (reports each failure, exits non-zero)
+neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bob\"})" --rw --continue-on-error --format json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runQuery(cmd, args, cfg)
@@ -71,6 +89,8 @@ neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format jso
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")
 	cmd.PersistentFlags().Int("truncate-arrays-over", 100, "Recursively truncate any array longer than N inside row values (0 = off); rendered as [\"<truncated: K items>\"]")
 	cmd.PersistentFlags().StringP("credential", "c", "", "Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list')")
+	cmd.PersistentFlags().Bool("atomic", false, "Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast)")
+	cmd.PersistentFlags().Bool("continue-on-error", false, "Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic)")
 
 	cmd.PersistentFlags().String("embed-credential", "", "Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list')")
 	cmd.PersistentFlags().String("embed-provider", "", "Embedding provider: openai | ollama | huggingface | gemini | vertex [env: NEO4J_EMBED_PROVIDER]")

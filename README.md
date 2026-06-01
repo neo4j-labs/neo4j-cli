@@ -311,6 +311,24 @@ echo 'MATCH (p:Person {name:$name}) RETURN p' | neo4j-cli query --param name=Ali
 
 Output is a table by default; pass `--format json` for a stable envelope (`columns`, `rows`, `truncated`, `arrays_truncated`). When stdout is not a terminal (piped or redirected), `--format` defaults to `json`. Applies to both `query` and `:schema`. Large results are capped at 100 rows and arrays inside cells at 100 items — tune with `--max-rows` / `--truncate-arrays-over` (0 = unlimited).
 
+### Multiple statements
+
+A single Cypher string may contain multiple statements. They are split on a `;` at the **end of a line** (followed only by trailing whitespace, or at the end of input) — a `;` in the middle of a line is kept verbatim, and the terminating `;` is stripped. A trailing `;` on a single statement is therefore harmless.
+
+```bash
+neo4j-cli query 'MATCH (n:Person) RETURN count(n) AS people;
+MATCH (m:Movie) RETURN count(m) AS movies'
+```
+
+By default each statement runs in its own transaction, in order, **failing fast** on the first error (statements that already committed are not rolled back). Pass `--atomic` to run every statement inside a single transaction that **rolls back** if any statement fails:
+
+```bash
+neo4j-cli query 'CREATE (:Person {name:"Alice"});
+CREATE (:Person {name:"Bob"})' --rw --atomic
+```
+
+When more than one statement runs, results are combined: `--format json` emits a JSON **array** of result envelopes (one per statement, in order); `--format table` and `--format toon` print **stacked blocks** separated by a blank line. A single statement renders exactly as before. Truncation warnings are prefixed `statement N:` only when more than one statement ran.
+
 Schema introspection:
 
 ```bash

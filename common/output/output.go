@@ -106,10 +106,42 @@ func PrintBodyMap(cmd *cobra.Command, cfg *clicfg.Config, values ResponseData, f
 	}
 }
 
-// printToon renders values as a TOON document. It first marshals values to
-// canonical JSON (honouring any MarshalJSON implementations), unmarshals to
-// any to obtain a plain Go value, then encodes with toon.Marshal.
+// PrintBodyMaps renders multiple result envelopes to the command output in the
+// format resolved by ResolveOutput. Each item carries its own column ordering
+// in the matching fields entry (items[i] uses fields[i]):
+//
+//   - json: a single JSON array of envelopes (each element via its own MarshalJSON).
+//   - toon: the slice marshalled through the TOON path (array form).
+//   - table: one table block per item, separated by a blank line.
+func PrintBodyMaps(cmd *cobra.Command, cfg *clicfg.Config, items []ResponseData, fields [][]string) {
+	switch ResolveOutput(cmd, cfg) {
+	case "json":
+		bytes, err := json.MarshalIndent(items, "", "\t")
+		if err != nil {
+			panic(err)
+		}
+		cmd.Println(string(bytes))
+	case "toon":
+		printToonValue(cmd, items)
+	default:
+		for i, item := range items {
+			if i > 0 {
+				cmd.Println()
+			}
+			printTable(cmd, item, fields[i])
+		}
+	}
+}
+
+// printToon renders a single ResponseData as a TOON document.
 func printToon(cmd *cobra.Command, values ResponseData) {
+	printToonValue(cmd, values)
+}
+
+// printToonValue renders an arbitrary value as a TOON document. It first
+// marshals to canonical JSON (honouring any MarshalJSON implementations),
+// unmarshals to any to obtain a plain Go value, then encodes with toon.Marshal.
+func printToonValue(cmd *cobra.Command, values any) {
 	jsonBytes, err := json.Marshal(values)
 	if err != nil {
 		panic(err)

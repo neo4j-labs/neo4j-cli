@@ -7,7 +7,7 @@
 
 Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol
 
-Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
+Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Multiple statements may be passed in a single string: they are split on a `;` at the end of a line (a mid-line `;` is kept verbatim; the terminating `;` is stripped). By default each statement runs in its own transaction, in order, failing fast on the first error; pass `--atomic` to run them all in one transaction that rolls back if any statement fails, or `--continue-on-error` (non-atomic only) to report each failure and keep going, exiting non-zero at the end. Multiple result sets render as a JSON array with `--format json` or as stacked blocks with `--format table`/`toon`. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
 
 Usage: `neo4j-cli query [cypher]`
 
@@ -15,6 +15,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--atomic` | bool | false | Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast) |
+| `--continue-on-error` | bool | false | Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic) |
 | `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
 | `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
 | `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
@@ -61,6 +63,15 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
 
 # Write Cypher requires --rw (opt-in)
 neo4j-cli query "CREATE (n:Person {name: \"Alice\"}) RETURN n" --rw --format json
+
+# Run multiple read statements in one call (split on ; at end of line); results render as a JSON array
+neo4j-cli query "MATCH (n:Person) RETURN count(n) AS people; MATCH (m:Movie) RETURN count(m) AS movies" --format json
+
+# Run multiple write statements atomically — all in one transaction, rolled back if any fails
+neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bob\"})" --rw --atomic --format json
+
+# Import many write statements, skipping over any that fail (reports each failure, exits non-zero)
+neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bob\"})" --rw --continue-on-error --format json
 ```
 
 ## neo4j-cli query :embed

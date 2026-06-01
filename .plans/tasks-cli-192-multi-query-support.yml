@@ -1,0 +1,375 @@
+feature: cli-192-multi-query-support
+prd: ./prd-cli-192-multi-query-support.md
+created_at: 2026-05-29T09:11:32Z
+updated_at: 2026-05-29T09:11:32Z
+
+tasks:
+  - id: task-001
+    title: 'Add splitStatements with line-end semicolon splitting'
+    description: |
+      Add splitStatements(cypher string) []string to the query package
+      (neo4j-cli/query/run.go or a new split.go). Split only on a semicolon at
+      end of line (";" + optional trailing whitespace then "\n", or ";" at end
+      of input); a mid-line ";" is kept verbatim. Use a line-walk implementation
+      that handles CRLF, strips the terminating ";", TrimSpaces each statement,
+      and drops empty fragments. Non-empty input always yields at least one
+      statement.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "splitStatements splits on ; at end of line only; a mid-line ; is not a split point"
+      - "Each returned statement has its terminating ; stripped and is whitespace-trimmed"
+      - "Empty/whitespace-only fragments dropped; non-empty input yields >=1 statement; CRLF handled like LF"
+      - "Table-driven tests in split_test.go cover: single, two/three statements, trailing ;, mid-line ;, blank lines, CRLF, whitespace-only fragments"
+      - "New file (if any) carries the Neo4j copyright header"
+    completed_at: 2026-05-29T09:30:00Z
+
+  - id: task-002
+    title: 'Add single-transaction batch execution path in connect.go'
+    description: |
+      Add a batch execution path mirroring the single-statement seam pattern in
+      neo4j-cli/query/connect.go: a runStatementsResponseFn test seam defaulting
+      to runStatementsResponseImpl, a runStatementsResponse dispatcher that wraps
+      errors via categorizeBoltError, and runStatementsWithMode unwrapping into
+      []*queryResult. runStatementsResponseImpl opens one session and runs one
+      ExecuteRead/ExecuteWrite whose work callback loops tx.Run -> Collect ->
+      Consume per statement (reusing coerceDriverValue); any error aborts so the
+      managed transaction rolls back automatically.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "runStatementsResponse/runStatementsResponseImpl/runStatementsWithMode added, mirroring the single-statement helpers"
+      - "All statements run inside one managed transaction (ExecuteRead when readOnly, ExecuteWrite otherwise); one *queryResponse collected per statement in order"
+      - "Errors are categorised once via categorizeBoltError at the dispatch boundary"
+      - "runStatementsResponseFn package var exists as a test seam"
+      - "Unit tests assert batch ordering and that an error from one statement surfaces (rollback is driver-side)"
+    completed_at: 2026-05-29T10:05:00Z
+
+  - id: task-003
+    title: 'Add multi-result rendering (PrintBodyMaps + renderResults)'
+    description: |
+      Add commonoutput.PrintBodyMaps(cmd, cfg, items []ResponseData, fields
+      [][]string) to common/output/output.go reusing ResolveOutput/printTable/
+      printToon: json -> MarshalIndent of the slice (array of envelopes), toon ->
+      marshal the slice, table -> loop printTable with a blank line between
+      blocks. Add renderResults(cmd, cfg, results []renderResult) to
+      neo4j-cli/query/output.go: len==1 uses the existing PrintBodyMap path
+      (byte-identical to today), len>1 delegates to PrintBodyMaps.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "PrintBodyMaps renders json as an array of envelopes, toon as the array form, table as stacked blocks separated by a blank line"
+      - "renderResults len==1 produces output byte-identical to the current single-statement output"
+      - "renderResults len>1 delegates to PrintBodyMaps with per-result columns"
+      - "Tests in common/output/output_test.go and neo4j-cli/query/output_test.go cover json/table/toon for multiple results"
+      - "make fmt-check and make lint clean for touched files"
+    completed_at: 2026-05-29T10:40:00Z
+
+  - id: task-004
+    title: 'Register --atomic flag and refactor runQuery for multi-statement'
+    description: |
+      Register a persistent --atomic bool flag (default false) on the query
+      command in neo4j-cli/query/query.go. Refactor runQuery to split the
+      resolved Cypher via splitStatements, keep one-time setup (params, embeds,
+      conn, password, openDriver) unchanged, then branch: default mode loops
+      statements (per-statement EXPLAIN preflight when !--rw, then runStatement/
+      runStatementWrite, fail-fast); --atomic mode runs the preflight loop first
+      when !--rw then executes the whole batch via runStatementsWithMode. Apply
+      per-statement truncation, prefix warnings with "statement N:" only when >1
+      statement ran, and render via renderResults.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "--atomic persistent bool flag registered with help text describing single-transaction/rollback semantics; allowed with and without --rw"
+      - "Default mode: statements run in order, each in its own transaction, fail-fast on first error"
+      - "Non---rw mode blocks a write statement via per-statement EXPLAIN preflight with the existing --rw usage error"
+      - "--atomic runs all statements through the single-transaction batch path; --param/:embed resolved once and shared"
+      - "Single statement (with/without trailing ;) output unchanged; truncation warnings prefixed 'statement N:' only when >1 statement"
+      - "run_test.go covers default multi, fail-fast, non-rw write block, --rw multi, --atomic happy path/error, and single-statement-with-trailing-; cases"
+    completed_at: 2026-05-29T11:20:00Z
+
+  - id: task-005
+    title: 'Update help text, README, additions.md and regenerate skill bundle'
+    description: |
+      Extend the query command Long and Example fields (multi-statement read
+      example + --rw --atomic multi-write example, flush-left) in
+      neo4j-cli/query/query.go. Verify neo4j-cli/internal/skill/additions.md
+      documents query before editing it; document the multi-statement splitting
+      rule, --atomic, and the multi-result output shape there and in the README
+      query section. Run go generate ./neo4j-cli/internal/skill/... and commit
+      the regenerated neo4j-cli/internal/skill/bundle/** so TestGenerator_RoundTrip
+      passes.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "query Long/Example updated; examples remain flush-left, with comments, --rw on writes and --format json on reads"
+      - "README query section and additions.md (where it documents query) describe multi-statement splitting, --atomic, and multi-result output"
+      - "go generate ./neo4j-cli/internal/skill/... run and regenerated bundle committed"
+      - "TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+    completed_at: 2026-05-29T12:05:00Z
+
+  - id: task-006
+    title: 'Add changelog entry and pass all final gates'
+    description: |
+      Add a changie Minor changelog entry under .changes/unreleased/ describing
+      multi-statement support and --atomic. Run the full gate suite and confirm
+      it is clean. Document the live-DB manual verification steps from the PRD
+      (JSON array for multi reads, stacked table/toon, --atomic rollback vs
+      default persistence, single-statement parity).
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "changie Minor entry added under .changes/unreleased/ for multi-statement + --atomic"
+      - "make test, make fmt-check, make lint, make license-check all clean"
+      - "make generate-check clean against a committed tree (no bundle drift)"
+      - "Manual live-DB verification steps documented/executed: multi-read JSON array, stacked table/toon, --atomic rollback vs default persistence, single-statement parity"
+    completed_at: 2026-05-29T09:31:37Z
+
+  - id: task-007
+    title: 'Collapse single-statement Bolt impl into batch-of-one'
+    description: |
+      BLOCKER from /hone:review. runStatementsResponseImpl (connect.go ~689-731)
+      duplicates runStatementResponseImpl (~560-601) almost line-for-line: the
+      entire record->envelope construction (tx.Run -> Collect -> Consume ->
+      resp.Data.Fields from records[0].Keys -> per-row coerceDriverValue loop ->
+      empty-records keys fallback -> resp.QueryType = summary.QueryType()) is
+      copy-pasted, plus the surrounding session-open + ExecuteRead/ExecuteWrite +
+      type-assertion scaffolding. That is ~40 lines of identical Bolt-execution
+      logic (~65 with scaffolding); the doc comment even admits "reusing
+      coerceDriverValue, identical to the single-statement impl". The code-judo
+      move: the single-statement path IS a batch of one. Reimplement
+      runStatementResponseImpl as a thin delegate that calls
+      runStatementsResponseImpl(ctx, c, []string{statement}, params, readOnly) and
+      returns resps[0], deleting the entire single-statement impl body (session
+      open, the work closure, read/write dispatch, type assertion). Delegate to
+      the IMPL (runStatementsResponseImpl), NOT the categorizing wrapper
+      runStatementsResponse, so error categorization still happens exactly once at
+      the existing runStatementResponse boundary (no double-wrap). Both seams
+      (runStatementResponseFn, runStatementsResponseFn) stay independent so all
+      existing unit tests keep working unchanged. batch-of-one always yields len 1
+      on success so resps[0] cannot panic, and QueryType is set per-statement so
+      the EXPLAIN preflight (rejectWriteCypher) still reads it correctly. Drop the
+      now-redundant "identical to the single-statement impl" remark from the batch
+      doc comment since there is only one impl afterwards.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "runStatementResponseImpl no longer contains its own session/work/dispatch body; it delegates to runStatementsResponseImpl([]string{statement}) and returns element 0"
+      - "Delegation targets the impl, not runStatementsResponse, so categorizeBoltError runs exactly once at the runStatementResponse boundary (no double categorization)"
+      - "No behaviour change: EXPLAIN preflight still classifies via QueryType; single-statement output unchanged; both seam vars remain and existing tests pass unmodified"
+      - "~40+ lines of duplicated Bolt-execution logic removed; stale 'identical to the single-statement impl' comment dropped"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-05-29T13:05:00Z
+
+  - id: task-008
+    title: 'Extract preflightAll to dedupe the write-guard loop in runQuery'
+    description: |
+      Minor finding from /hone:review. In run.go runQuery (~99-139) the !allowWrite
+      EXPLAIN write-guard is written twice: the atomic branch hoists a
+      `for stmt { rejectWriteCypher }` loop before opening the batch transaction,
+      and the default branch interleaves the same rejectWriteCypher call per
+      statement inside its execution loop. Extract a small helper
+      preflightAll(cmd, c, statements, params) error that runs rejectWriteCypher
+      over all statements and returns the first error, and call it from the atomic
+      branch. Keep the default branch's interleaved per-statement preflight as-is
+      if interleaving with execution is intentional for fail-fast ordering, OR use
+      the helper in both branches if behaviour is identical — choose whichever
+      keeps the two orchestrations honest without changing observable behaviour
+      (preflight still blocks a write statement with the existing
+      "this command writes; pass --rw to allow it" usage error before any write
+      executes).
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "A preflightAll helper exists and removes the duplicated !allowWrite write-guard loop"
+      - "Non---rw write statements are still blocked with the existing --rw usage error before any write executes, in both atomic and default modes"
+      - "No observable behaviour change; existing run_test.go cases pass unmodified"
+      - "make test, make fmt-check, make lint all clean"
+    status: completed
+    source: review
+    completed_at: 2026-05-29T14:10:00Z
+
+  - id: task-009
+    title: 'Surface per-statement write summary stats from ResultSummary.Counters'
+    description: |
+      PR #187 review (jexp): a local build ran a 41-statement movies.cypher with
+      --rw, all data inserted correctly, but the command "outputs 41 empty lines
+      (one per input line)". Write statements return no rows so each renders as an
+      empty table. Reviewer asks for write statistics (nodes/rels/props
+      created/deleted/updated, indexes/constraints created/deleted) per statement,
+      cypher-shell style. Root cause: runStatementsResponseImpl (connect.go:657-659)
+      captures only summary.QueryType() and discards summary.Counters(). Capture the
+      counters and surface a per-statement summary line, ONLY when the statement
+      mutates state (Counters.ContainsUpdates()), so pure reads stay byte-identical.
+      Thread end-to-end through the BATCH path (single-statement delegates to it):
+      add Counters neo4j.Counters to queryResponse; a driver-free writeStats struct +
+      nil-safe statsFromCounters(neo4j.Counters) *writeStats; Stats *writeStats on
+      queryResult set in runStatementWithMode + runStatementsWithMode; stats *writeStats
+      on renderResult threaded via truncateResult. Render: a formatStatsLine printing
+      only non-zero counters, emitted ONLY in table mode (commonoutput.ResolveOutput
+      == "table") after the table, multi-statement prefixed "statement N: " matching
+      the existing truncateResult convention. JSON: add a fifth field
+      Stats *jsonStats `json:"stats,omitempty"` (snake_case tags) to renderResult.MarshalJSON,
+      nil when stats==nil || !ContainsUpdates — omitempty on a nil pointer keeps the
+      existing {columns,rows,truncated,arrays_truncated} read envelope byte-identical.
+      Keep stats out of cobra help text so no skill-bundle regeneration is needed.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "runStatementsResponseImpl captures summary.Counters() into queryResponse; single-statement path inherits it via delegation"
+      - "Write statements print a non-zero-counters-only summary line in table mode (multi-statement prefixed 'statement N: '); read statements print no stats line"
+      - "JSON output adds a 'stats' object only when the statement ContainsUpdates; read JSON stays exactly {columns,rows,truncated,arrays_truncated} (regression-locked in output_test.go)"
+      - "Tests cover statsFromCounters (nil-safe), formatStatsLine wording, write vs read seam responses (fakeCounters helper)"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-06-01T07:05:00Z
+
+  - id: task-010
+    title: 'Skip comment-only statements in splitStatements'
+    description: |
+      PR #187 review (jexp): a commented-out line in movies.cypher
+      ("//CREATE CONSTRAINT movie_title IF NOT EXISTS ...") is shipped to Neo4j as a
+      statement and crashes with Neo.ClientError.Statement.SyntaxError. Reviewer notes
+      it's a cypher issue that it cannot execute a comment-only statement — the CLI
+      should not send it. Root cause: splitStatements (split.go) does no comment
+      handling. Add stripComments(s string) string — a single-pass scanner that
+      respects '...' , "..." and backtick `...` string literals (including backslash
+      escapes inside ' and "), stripping // to end-of-line and /* ... */ (may span
+      lines, which the splitter already accumulates into buf before flush). Comment
+      markers INSIDE string literals must NOT be treated as comments. At both flush
+      points in splitStatements (the flush closure and the tail), run stripComments,
+      trim, and drop if empty; otherwise append the stripped form (so a trailing
+      // comment after real cypher is also removed). Keep the end-of-line ';' split
+      decision comment/string-unaware (matches the documented contract) and note this
+      limitation in the doc comment.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "A statement that is only // or /* */ comments (single- or multi-line) is dropped, not sent to Neo4j"
+      - "Trailing // or /* */ comments after real cypher are stripped while the cypher is kept"
+      - "// and /* */ inside '...', \"...\", and backtick literals are preserved unchanged"
+      - "split_test.go table extended: full-line //, // between statements, trailing //, single/multi-line /* */, comment markers inside string/backtick literals"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-06-01T07:40:00Z
+
+  - id: task-011
+    title: 'Add --continue-on-error flag (non-atomic only)'
+    description: |
+      PR #187 review (jexp): default multi-statement semantics are sequential, each
+      statement its own transaction, fail-fast on first error. Reviewer asks for an
+      option to just report the error and continue — e.g. for import where it's OK if
+      one import fails in the middle without having to re-run all, just fix the one
+      failure afterwards. Add a persistent Bool flag --continue-on-error on the query
+      command (query.go). It applies to the DEFAULT (non-atomic) sequential loop only
+      and MUST be mutually exclusive with --atomic (atomic = one all-or-nothing
+      transaction; continue-on-error is incoherent there): if both set, return
+      clierr.NewUsageError(...) (exit 2) with remediation (drop one or the other).
+      In the non-atomic loop (run.go:115-140), on a preflight OR execution error: if
+      continueOnError, record the failure, append an error-placeholder renderResult
+      (empty columns/rows + new errMsg field), write a stderr line "statement N: <err>"
+      (1-based), and continue; otherwise keep today's return err fail-fast
+      (byte-identical). After the loop, if any failures: call renderResults first (full
+      stdout array), then return clierr.NewValidationError("N of M statements failed ...")
+      (exit 6). JSON: add an additive "error,omitempty" key to renderResult.MarshalJSON
+      so each statement keeps one positional array element; successful results stay
+      byte-identical. Add one sentence to the query parent Long and a multi-statement
+      --rw Example (feeds the skill bundle / TestAllLeafCommands_HaveExamples), then run
+      go generate ./neo4j-cli/internal/skill/... and commit the regenerated references.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "--continue-on-error + --atomic returns a usage error (exit 2) with remediation and makes no DB calls"
+      - "In non-atomic mode with the flag, a failing middle statement does not abort: all statements render, the failed one carries an 'error' key in JSON at its index, stderr has 'statement N: <err>', and the process exits 6"
+      - "Without the flag, default mode still fails fast after the first error (byte-identical to current behaviour)"
+      - "Parent Long + a multi-statement --rw Example added; go generate run and regenerated references/*.md committed; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-06-01T08:20:00Z
+
+  - id: task-012
+    title: 'Add remediation hint for --atomic + schema-modification error'
+    description: |
+      PR #187 review (jexp): with --atomic, a movies.cypher containing CREATE CONSTRAINT
+      plus data writes fails opaquely with
+      "Neo4jError: Neo.ClientError.Transaction.ForbiddenDueToTransactionType (Tried to
+      execute Write query after executing Schema modification)"; it works once schema
+      ops are removed. This is a hard Neo4j constraint (schema and data writes cannot
+      share a transaction), not a CLI bug, but the error gives the user no path forward.
+      In categorizeBoltError (errors.go:32), detect the code
+      Neo.ClientError.Transaction.ForbiddenDueToTransactionType BEFORE the generic
+      ClientError->validation mapping, in BOTH the typed branch (errors.As into
+      neo4j.Neo4jError, check .Code) and the plain-text branch (strings.Contains, as the
+      FIRST switch case). Route to a helper schemaTxError(err) that returns
+      clierr.NewValidationError("%w", err).WithSuggestion(<remediation>) — stays exit 6,
+      WithSuggestion renders to stderr + the JSON "suggestion" field. Remediation must be
+      concrete: schema changes (CREATE/DROP CONSTRAINT or INDEX) cannot share a
+      transaction with data writes; re-run without --atomic so each statement gets its
+      own transaction, or move the schema statements into a separate invocation. Touches
+      no cobra help text, so no bundle regeneration.
+    status: completed
+    completed_at: 2026-06-01T09:05:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "categorizeBoltError detects ForbiddenDueToTransactionType (typed and plain-text variants) and returns a validation error (exit 6) carrying a Suggestion containing 'without --atomic'"
+      - "An ordinary Neo.ClientError.Statement.SyntaxError still maps to a plain validation error with NO suggestion (regression)"
+      - "errors_test.go covers both detection variants and the regression case"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+
+  - id: task-013
+    title: 'Collapse jsonStats into writeStats to delete the parallel struct + copy'
+    description: |
+      /hone:review finding (priority 2/4, missed simplification). output.go declares
+      jsonStats as a second 12-field struct identical to writeStats (connect.go) except
+      for json tags, then renderResult.MarshalJSON hand-copies all 12 fields one-by-one
+      from writeStats into jsonStats. That is the same data shape enumerated twice plus
+      a mechanical ~12-line copy block — roughly 36 lines of boilerplate that will drift
+      the moment a counter is added. writeStats is package-internal, so there is no
+      reason it cannot carry the serialization tags itself. Put the snake_case
+      `json:"...,omitempty"` tags directly on writeStats (connect.go), delete the
+      jsonStats type and the entire field-for-field copy block in MarshalJSON, and
+      marshal r.stats directly via a `Stats *writeStats `json:"stats,omitempty"`` field
+      on the anonymous output struct. Output must stay byte-identical: omitempty on the
+      nil pointer still drops the `stats` key for reads, and per-field omitempty still
+      drops zero counters for writes. formatStatsLine legitimately stays separate (it is
+      display strings with singular/plural nouns, not the same shape) — do NOT try to
+      merge that in.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "jsonStats type is deleted; writeStats carries the snake_case omitempty json tags; MarshalJSON marshals r.stats directly with no field-by-field copy block"
+      - "JSON output is byte-identical: reads omit the 'stats' key, writes emit only non-zero counters under 'stats', error placeholders still carry 'error'"
+      - "Existing output_test.go / stats_test.go regression locks pass unchanged (read envelope stays {columns,rows,truncated,arrays_truncated})"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-06-01T10:15:00Z
+
+  - id: task-014
+    title: 'Move const forbiddenTxTypeCode out from between doc comment and func'
+    description: |
+      /hone:review nit (priority 7, legibility). In errors.go the const
+      forbiddenTxTypeCode was inserted AFTER the categorizeBoltError doc-comment block
+      but BEFORE the func, so the multi-paragraph doc comment now visually documents the
+      const and categorizeBoltError is left with no adjacent doc. Move the const so the
+      doc comment sits directly above the func it describes — either place the const
+      above the doc comment, or group it with the other package-level error constants if
+      one exists. Pure code-movement; no behaviour change.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "The categorizeBoltError doc comment is immediately adjacent to (directly above) the func, with no const wedged between them"
+      - "No behaviour change; errors_test.go and all gates pass unchanged"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+    completed_at: 2026-06-01T10:45:00Z
