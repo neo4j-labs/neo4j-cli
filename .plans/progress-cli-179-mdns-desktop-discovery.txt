@@ -12,3 +12,8 @@ Decisions: Discover's e2ePortOverride branch reuses origin() (localhost) to mirr
 Added hermetic seam-driven tests for Discover/DiscoverViaMDNS/discoverPinned covering mDNS hit, dns-sd hit (darwin), non-darwin dns-sd skip, port-scan fallback, all-miss ErrNoDesktop, pinned confirm (127.0.0.1), pinned silent (localhost), pinned different-port, and cancelled-ctx prompt return. All via SetMDNS/DNSSD/GOOS/HTTPClient seams + the existing pinProbeTo roundtripper helper; no real multicast/dns-sd/network.
 Files: +discovery_mdns_test.go
 Decisions: cancelled-ctx test stubs mDNS/dns-sd seams to honour ctx.Err() so Discover falls through to the port scan, whose ctx.Err() check returns the cancellation; asserts return within 2s via a goroutine+timeout instead of relying on real timeouts.
+
+## TASK-004 — 2026-06-01T11:05:00Z
+Migrated all five ProbePort callers to Discover (passing the same pinned --port value; 0 in query). ErrNoDesktop branching unchanged at every site. Remaining production ProbePort callers are only Discover/discoverPinned (intended fallback) and doctor (task-006 scope).
+Files: ~query/desktop.go, ~.../desktop/helpers.go, ~.../dbms/helpers.go, ~.../connection/create.go, ~.../dbms/plugin/helpers.go (+ query/desktop_test.go)
+Decisions: the two _RealClient tests in query/desktop_test.go are the only call-site tests hitting the real Discover(ctx,0) path; stubbed SetMDNSBrowseFnForTest/SetDNSSDLookupFnForTest to (0,false) so they fall through to the httptest-backed port scan and stay hermetic (no real multicast / dns-sd on darwin CI). All subcommand tests override newDesktopClientFn so they never reach Discover.

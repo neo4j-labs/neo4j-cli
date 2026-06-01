@@ -79,14 +79,14 @@ tasks:
       dbms/helpers.go, connection/create.go, and dbms/plugin/helpers.go. Pass the existing
       pinned --port value (0 for query). Preserve each site's existing ErrNoDesktop
       branching unchanged. Update any affected call-site tests.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
       - "All five call sites use Discover; no production ProbePort calls remain except the legacy fallback inside Discover and the e2e override"
       - "ErrNoDesktop handling at each site is preserved"
       - "Affected subcommand/query tests pass"
-    completed_at: null
+    completed_at: 2026-06-01T11:05:00Z
 
   - id: task-005
     title: 'Update canonicalUnreachable and Client.origin comment'

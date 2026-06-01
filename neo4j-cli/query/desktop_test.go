@@ -448,6 +448,11 @@ func TestResolveDesktopActiveDbmsCredential_RealClient(t *testing.T) {
 		return &http.Client{Transport: roundTripperFunc(rewriteToSrv)}
 	}))
 	t.Cleanup(desktopclient.SetHTTPDoFnForTest(rewriteToSrv))
+	// Discover(ctx, 0) runs the mDNS/dns-sd tiers before the port scan; stub
+	// them to miss so the test falls through to the httptest-backed scan and
+	// stays hermetic (no real multicast / dns-sd shell-out on darwin CI).
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetDNSSDLookupFnForTest(func(context.Context) (int, bool) { return 0, false }))
 
 	fs, _ := newDesktopFallthroughFs(t, srv.URL, salt)
 
@@ -502,6 +507,11 @@ func TestResolveDesktopConnectionCredential_RealClient(t *testing.T) {
 		return &http.Client{Transport: roundTripperFunc(rewriteToSrv)}
 	}))
 	t.Cleanup(desktopclient.SetHTTPDoFnForTest(rewriteToSrv))
+	// Discover(ctx, 0) runs the mDNS/dns-sd tiers before the port scan; stub
+	// them to miss so the test falls through to the httptest-backed scan and
+	// stays hermetic (no real multicast / dns-sd shell-out on darwin CI).
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetDNSSDLookupFnForTest(func(context.Context) (int, bool) { return 0, false }))
 
 	fs, _ := newDesktopFallthroughFs(t, srv.URL, salt)
 

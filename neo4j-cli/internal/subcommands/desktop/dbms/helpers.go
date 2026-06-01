@@ -25,9 +25,9 @@ import (
 var newDesktopClientFn = newDesktopClient
 
 func newDesktopClient(ctx context.Context, fs afero.Fs, port int) (*desktopclient.Client, error) {
-	// ProbePort runs first so its origin can feed ResolveDataDir's /info/app
+	// Discover runs first so its origin can feed ResolveDataDir's /info/app
 	// discovery step.
-	probe, err := desktopclient.ProbePort(ctx, port)
+	probe, err := desktopclient.Discover(ctx, port)
 	if err != nil {
 		if errors.Is(err, desktopclient.ErrNoDesktop) {
 			return nil, desktopclient.UnreachableError()
