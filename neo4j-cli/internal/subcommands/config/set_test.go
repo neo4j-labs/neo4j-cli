@@ -144,7 +144,7 @@ func TestConfigSet(t *testing.T) {
 		{
 			name:         "set credential-storage to invalid value with rw returns error",
 			command:      "config set --rw credential-storage plaintext",
-			wantErr:      "Error: invalid value for 'credential-storage': plaintext (valid values: keyring, insecure)",
+			wantErr:      "Error: invalid value for 'credential-storage': plaintext (valid values: keyring, insecure, env)",
 			wantOutEmpty: true,
 		},
 	}

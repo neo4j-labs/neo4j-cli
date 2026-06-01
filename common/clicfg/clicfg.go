@@ -440,8 +440,8 @@ func (config *GlobalConfig) Set(key string, value string) error {
 	}
 
 	if key == "credential-storage" {
-		if value != credentials.StorageModeKeyring && value != credentials.StorageModeInsecure {
-			return clierr.NewUsageError("invalid value for 'credential-storage': %s (valid values: %s, %s)", value, credentials.StorageModeKeyring, credentials.StorageModeInsecure)
+		if value != credentials.StorageModeKeyring && value != credentials.StorageModeInsecure && value != credentials.StorageModeEnv {
+			return clierr.NewUsageError("invalid value for 'credential-storage': %s (valid values: %s, %s, %s)", value, credentials.StorageModeKeyring, credentials.StorageModeInsecure, credentials.StorageModeEnv)
 		}
 	}
 
