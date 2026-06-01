@@ -146,6 +146,3 @@ neo4j-cli desktop dbms upgrade my-dbms-id --version 5.26.1 --format json --rw`,
 
 	return cmd
 }
-
-// ptr returns a pointer to v; used to set the optional *bool upgrade options.
-func ptr[T any](v T) *T { return &v }

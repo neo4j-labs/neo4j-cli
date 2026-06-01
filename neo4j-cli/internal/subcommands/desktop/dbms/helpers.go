@@ -284,3 +284,6 @@ func ctxSleep(ctx context.Context, d time.Duration) error {
 		return nil
 	}
 }
+
+// ptr returns a pointer to v; used to set the optional *bool upgrade options.
+func ptr[T any](v T) *T { return &v }

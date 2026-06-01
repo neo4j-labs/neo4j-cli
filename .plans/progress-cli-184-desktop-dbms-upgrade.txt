@@ -30,3 +30,7 @@ Added 2 review tasks (task-007..task-008).
 ## TASK-007 — 2026-06-01T15:30:00Z
 Pure rename of shared DbmsInfo-row render adapter: dbmsCreateResult->dbmsInfoResult, dbmsCreateFields->dbmsInfoFields (defined in create.go, used by create.go + upgrade.go). No behavior change; all gates green.
 Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go
+
+## TASK-008 — 2026-06-01T16:00:00Z
+Pure move of generic ptr[T any] helper (with doc comment) from upgrade.go to helpers.go, alongside the other shared package-level helpers. upgrade.go still uses ptr at both call sites; no import or behavior change. All gates green. Feature complete (all eight tasks done).
+Files: ~neo4j-cli/internal/subcommands/desktop/dbms/upgrade.go, ~neo4j-cli/internal/subcommands/desktop/dbms/helpers.go
