@@ -38,3 +38,7 @@ Files: ~neo4j-cli/internal/subcommands/history/list.go, ~neo4j-cli/internal/subc
 
 ## REVIEW — 2026-06-01T12:00:00Z
 Added 3 review tasks (task-008..task-010) from golang-security review: redact -p/--uri userinfo, redact secret-named --param, strengthen privacy docs.
+
+## TASK-008 — 2026-06-01T13:00:00Z
+Closed two HIGH secret leaks in clievents.RedactArgs: added "p" (query password shorthand) to secretFlags so -p value/-p=value redact to ***, and added uri-userinfo-aware redaction (--uri / --uri=) that rewrites user:password@host to user:***@host preserving scheme/host/port/path, leaving non-URL and credential-free URIs unchanged. New table-driven cases verified to fail without the fix.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go

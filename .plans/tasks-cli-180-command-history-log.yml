@@ -182,7 +182,7 @@ tasks:
       covering `-p value`, `-p=value`, `--uri neo4j://u:pw@h:7687`, and `--uri=neo4j://u:pw@h` (assert
       the password is gone and the host/scheme remain). Do NOT blanket-redact the whole URI (host is
       useful and non-secret).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "RedactArgs scrubs `-p value` and `-p=value` (password shorthand) to ***"
@@ -191,7 +191,7 @@ tasks:
       - "New table-driven tests in common/clievents cover both shapes for -p and --uri"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T13:00:00Z
 
   - id: task-009
     title: 'Redact secret-named --param values in RedactArgs'

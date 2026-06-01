@@ -3,15 +3,23 @@
 
 package clievents
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // secretFlags is the canonical list of flag names whose values must never be
 // echoed in telemetry, panic templates, or error output. The list is matched
 // against both the long form (--flag) and the defensive single-dash form
 // (-flag), and both space-separated (--flag value) and equals-separated
 // (--flag=value) shapes.
+//
+// "p" is the `query` password shorthand (StringP("password","p")); it is the
+// only -p in the tree, so including it here fails closed — over-redaction in a
+// redaction context is acceptable.
 var secretFlags = []string{
 	"password",
+	"p",
 	"client-secret",
 	"api-key",
 	"instance-password",
@@ -44,6 +52,24 @@ func RedactArgs(args []string) string {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
+		// --uri=value form: a Bolt URI can embed credentials as
+		// user:password@host userinfo, so strip only the password while
+		// keeping scheme/host/port/path (which are useful and non-secret).
+		if name, value, ok := splitFlagEq(arg); ok && isURIFlag(name) {
+			out = append(out, dashPrefix(arg)+name+"="+redactURIUserinfo(value))
+			continue
+		}
+
+		// --uri value form.
+		if name, ok := flagName(arg); ok && isURIFlag(name) {
+			out = append(out, arg)
+			if i+1 < len(args) {
+				out = append(out, redactURIUserinfo(args[i+1]))
+				i++
+			}
+			continue
+		}
+
 		// --flag=value or -flag=value form.
 		if name, _, ok := splitFlagEq(arg); ok && isSecretFlag(name) {
 			out = append(out, dashPrefix(arg)+name+"="+redactedPlaceholder)
@@ -63,6 +89,28 @@ func RedactArgs(args []string) string {
 		out = append(out, arg)
 	}
 	return strings.Join(out, " ")
+}
+
+// isURIFlag reports whether name (without leading dashes) is a connection-style
+// flag whose value may carry credentials in userinfo.
+func isURIFlag(name string) bool {
+	return name == "uri"
+}
+
+// redactURIUserinfo rewrites a connection URI's userinfo password to *** while
+// preserving scheme, user, host, port, and path. Non-URL values, and URLs with
+// no embedded password, are returned unchanged.
+func redactURIUserinfo(value string) string {
+	u, err := url.Parse(value)
+	if err != nil || u.User == nil {
+		return value
+	}
+	if _, hasPassword := u.User.Password(); !hasPassword {
+		return value
+	}
+	u.User = url.UserPassword(u.User.Username(), redactedPlaceholder)
+	// url.UserPassword percent-encodes "*" to %2A; restore the readable form.
+	return strings.Replace(u.String(), "%2A%2A%2A", redactedPlaceholder, 1)
 }
 
 // flagName returns the bare flag name (no dashes) if arg is a flag token of

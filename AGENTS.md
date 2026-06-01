@@ -220,6 +220,8 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for maintainer-
 
 See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of `onUpdate` callbacks, sensitive-field omission, omitempty-vs-printable patterns, cross-type validation order, and test fixture seeding for the `Aura` / `Dbms` / `Embed` credential types.
 
+`common/clievents/RedactArgs` is the single source of truth for secret scrubbing (feeds telemetry, panic/error messages, AND on-disk command history). It scrubs the `secretFlags` allow-list (incl. the `-p` query password shorthand) AND `--uri` userinfo passwords (`user:pw@host` → `user:***@host`, host/scheme preserved). Add new secret-bearing flags there, not at call sites.
+
 ## query Subsystem Notes
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.

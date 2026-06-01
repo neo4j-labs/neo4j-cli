@@ -75,6 +75,42 @@ func TestRedactArgs(t *testing.T) {
 			mustContain: []string{"my-api", "--instance-password ***", "--format json"},
 		},
 		{
+			name:        "password shorthand space value",
+			args:        []string{"query", "-p", secret, "MATCH (n) RETURN n"},
+			flagNames:   []string{"-p"},
+			mustContain: []string{"-p ***"},
+		},
+		{
+			name:        "password shorthand equals value",
+			args:        []string{"query", "-p=" + secret},
+			flagNames:   []string{"-p"},
+			mustContain: []string{"-p=***"},
+		},
+		{
+			name:        "uri space value with userinfo password",
+			args:        []string{"query", "--uri", "neo4j://u:" + secret + "@h:7687"},
+			flagNames:   []string{"--uri"},
+			mustContain: []string{"--uri neo4j://u:***@h:7687"},
+		},
+		{
+			name:        "uri equals value with userinfo password",
+			args:        []string{"query", "--uri=neo4j://u:" + secret + "@h"},
+			flagNames:   []string{"--uri"},
+			mustContain: []string{"--uri=neo4j://u:***@h"},
+		},
+		{
+			name:        "uri without credentials unchanged",
+			args:        []string{"query", "--uri", "neo4j://h:7687"},
+			flagNames:   []string{"--uri"},
+			mustContain: []string{"--uri neo4j://h:7687"},
+		},
+		{
+			name:        "uri non-url value unchanged",
+			args:        []string{"query", "--uri", "garbage"},
+			flagNames:   []string{"--uri"},
+			mustContain: []string{"--uri garbage"},
+		},
+		{
 			name:        "empty args",
 			args:        []string{},
 			mustContain: []string{},
