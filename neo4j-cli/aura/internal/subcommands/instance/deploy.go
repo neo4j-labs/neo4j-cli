@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -139,7 +140,7 @@ A new Aura instance is provisioned using the same flags as 'instance create', th
 
 The command waits for the instance to be ready and for the data load to finish before returning. On success the structured output reports the instance connection details plus deploy_status=succeeded. If the data load fails after the instance was created, the instance is left in place (it is not deleted), deploy_status=failed is reported, and the instance id is printed so you can retry or delete it manually.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if database == "system" {
+			if strings.EqualFold(database, "system") {
 				return clierr.NewUsageError(`invalid argument "system" for "--%s" flag: the system database cannot be cloned`, databaseFlag)
 			}
 

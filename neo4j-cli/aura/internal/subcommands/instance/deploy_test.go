@@ -167,10 +167,14 @@ func TestDeploySourceFlagsOneRequired(t *testing.T) {
 }
 
 func TestDeployRejectsSystemDatabase(t *testing.T) {
-	h := newDeployHarness(t)
-	err := h.run("deploy --from-docker my-container --database system --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "system database cannot be cloned")
+	for _, name := range []string{"system", "SYSTEM", "System"} {
+		t.Run(name, func(t *testing.T) {
+			h := newDeployHarness(t)
+			err := h.run("deploy --from-docker my-container --database " + name + " --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "system database cannot be cloned")
+		})
+	}
 }
 
 func TestDeployFreeDbRejectsTargetSizingFlags(t *testing.T) {
