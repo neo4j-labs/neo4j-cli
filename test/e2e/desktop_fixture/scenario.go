@@ -298,6 +298,23 @@ func scenarioSetVersions(s *state, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// scenarioSetUploadFail toggles whether the next-settled db:upload task
+// reports isError instead of isSuccess. Body `{enabled: bool}`. Lets the
+// deploy sad-path (Desktop reported the upload failed) get e2e coverage.
+func scenarioSetUploadFail(s *state, w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := decodeBody(r, &body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.mu.Lock()
+	s.uploadFail = body.Enabled
+	s.mu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // scenarioGetLog returns the accumulated request trace as a plain-text
 // log. The e2e harness dumps this on test failure so CI logs are
 // debuggable.

@@ -131,7 +131,7 @@ tasks:
       /fastify/api/tasks routes to test/e2e/desktop_fixture/handlers.go (and
       supporting state) so the desktop deploy path has e2e coverage, and add an
       e2e test driving deploy --from-desktop against the fixture.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -139,7 +139,7 @@ tasks:
       - "Fixture serves the upload route and a tasks list that transitions a db:upload task to success"
       - "An e2e test exercises the desktop deploy path end to end against the fixture"
       - "The e2e test passes on the standard test matrix"
-    completed_at: null
+    completed_at: 2026-06-01T15:10:00Z
 
   - id: task-008
     title: 'Add changelog entry and run all final gates'
