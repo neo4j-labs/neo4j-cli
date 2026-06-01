@@ -17,3 +17,7 @@ Decisions: Record's 2nd param is unused (uses os.Args internally) but the call p
 Added `neo4j-cli history` command tree (one-file-per-leaf): list (last 20 newest-first, --limit N, --format json|table|toon) + clear (--force or UsageError). Default/table view renders the human form `[time] <command> {invoker:..., workspace:..., credential:...}`; json/toon use the shared commonoutput.PrintBodyMap path via a historyRows ResponseData adapter. Registered history.NewCmd(cfg) in app.go next to config. Regenerated skill bundle (references/history.md + SKILL.md row).
 Files: +.../history/history.go, +.../history/list.go, +.../history/clear.go, +.../history/{list_test,clear_test,helpers_test}.go, ~neo4j-cli/app/app.go, +bundle/references/history.md, ~bundle/SKILL.md
 Decisions: --format inherited as a persistent flag from the root (no per-leaf registration); standalone leaf tests set format via config JSON rather than the --format flag. clear is annotated write:true so the Example gate skips the --format-json requirement.
+
+## TASK-005 — 2026-06-01T08:55:00Z
+Final gates task: confirmed skill bundle idempotent (go generate produced no diff post task-004), documented `neo4j-cli history` (list/clear, --format, --limit) plus a local-logging privacy note in README, and added a Minor changelog entry. make test, fmt-check, lint all green.
+Files: ~README.md, +.changes/unreleased/neo4j-cli-Minor-20260601-105129.yaml

@@ -99,7 +99,7 @@ tasks:
       history command and a privacy note that commands are logged locally and query Cypher
       bodies are stored verbatim. Add a user-facing changelog entry via
       `changie new --projects neo4j-cli --kind Minor`. Run the full gate suite.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -108,4 +108,4 @@ tasks:
       - "README documents `neo4j-cli history` and the local-logging privacy note"
       - "A Minor changelog entry exists under .changes/unreleased/"
       - "make test, make fmt-check, and make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-01T08:55:00Z

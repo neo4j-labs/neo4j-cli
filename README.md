@@ -346,6 +346,26 @@ API-key precedence (highest first): per-provider OS env (`OPENAI_API_KEY` for op
 
 Provider defaults: OpenAI base URL `https://api.openai.com/v1`, Ollama `http://localhost:11434`, HuggingFace `https://router.huggingface.co/hf-inference/models` (serverless mode). Setting `--embed-base-url` switches HuggingFace to dedicated-endpoint mode. Gemini base URL `https://generativelanguage.googleapis.com/v1beta` (called as `{base}/models/{model}:embedContent`). Vertex AI builds the URL from `--vertex-project` and `--vertex-location` (no `--embed-base-url` knob) and authenticates via Application Default Credentials (`gcloud auth application-default login` or `GOOGLE_APPLICATION_CREDENTIALS`).
 
+## Command history
+
+`neo4j-cli history` shows a local log of recently run commands. Every invocation is appended to a `history.jsonl` file in the config dir (alongside `config.json`, mode `0600`).
+
+```bash
+# Show the last 20 commands, newest first
+neo4j-cli history list
+
+# Show the last 5, or emit the full structured log
+neo4j-cli history list --limit 5
+neo4j-cli history list --format json
+
+# Empty the log (requires --force)
+neo4j-cli history clear --force
+```
+
+`history list` prints the human form `[time] <command> {invoker:...}` by default; `--format json|table|toon` emits the structured entries and `--limit N` caps how many are shown (0 = all).
+
+Privacy: history is stored **locally only** and never transmitted. Secret flag values (e.g. `--password`) are redacted to `***`, **but `neo4j-cli query` Cypher bodies are stored verbatim** — anything you embed inline in a query is written to the log. Disable recording with `neo4j-cli config set history-enabled false --rw`, and cap retained entries with `neo4j-cli config set history-limit <n> --rw` (default `1000`; `0` disables recording).
+
 ## Write operations
 
 Write commands are gated by `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.
