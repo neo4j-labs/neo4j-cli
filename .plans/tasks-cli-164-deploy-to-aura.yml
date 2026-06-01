@@ -94,7 +94,7 @@ tasks:
       StopDbms+poll, UploadDatabase, WaitForUploadTask, then restore prior state)
       -> print instance fields plus a deploy_status field. On post-create failure,
       leave the instance and emit deploy_status=failed with a retry/delete hint.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-003
@@ -106,7 +106,7 @@ tasks:
       - "Structured output includes instance fields plus deploy_status (succeeded/failed); the write annotation is set"
       - "Post-create push failure leaves the instance, sets deploy_status=failed, names the instance id, and surfaces the tool error verbatim"
       - "Aura target password is absent from stderr, telemetry, and command history"
-    completed_at: null
+    completed_at: 2026-06-01T14:05:00Z
 
   - id: task-006
     title: 'Register the deploy leaf and regenerate the skill bundle'

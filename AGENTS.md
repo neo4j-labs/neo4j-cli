@@ -251,6 +251,7 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 - Volume flags (`--data-dir`/`--logs-dir`/`--import-dir`) bind-mount host paths to `/data`/`/logs`/`/import`; empty-default = no mount; paths support `~`/`$VAR` expansion via the package-local `expandHostPath` helper (`homeDirFn` test seam); missing dirs are created at 0o755; incompatible with `--ephemeral`.
 - Live-docker smoke test: `go test -tags=smoke ./neo4j-cli/internal/subcommands/docker/...` runs a create→list→get→delete lifecycle against the host Docker daemon. NOT part of `make test`. Skips cleanly when `docker` is not on PATH (belt-and-braces — also gated by the `smoke` build tag).
 - Missing-`docker` error suggests `alias docker=podman` when podman is also detected on PATH; podman lookup goes through the `lookPathFn` package var seam in `client.go`.
+- `docker.NewDeployClient()` is the ONLY exported dockerClient constructor (the `dockerClient` interface + `execClient` stay unexported). Cross-package callers (e.g. aura `instance deploy`) get a client from it and pass it straight into `docker.PushToAura(...)` without naming the unexported type.
 
 ## Cobra Help / Skill Bundle Rendering Notes
 

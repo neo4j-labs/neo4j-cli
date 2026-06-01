@@ -131,6 +131,15 @@ func newClient() dockerClient {
 	return &execClient{}
 }
 
+// NewDeployClient returns the default exec-backed dockerClient for callers
+// outside the docker package (e.g. the aura `instance deploy` leaf) that need
+// to pass a client into PushToAura. The concrete client type stays unexported;
+// only this constructor and the dockerClient methods are reachable, preserving
+// the package's existing test seam.
+func NewDeployClient() dockerClient {
+	return newClient()
+}
+
 // resolve performs the cached exec.LookPath("docker") and converts a miss
 // into the documented usage error. All execClient methods funnel through
 // this so the hint appears exactly once per process invocation.
