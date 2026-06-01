@@ -60,3 +60,7 @@ Files: ~neo4j-cli/internal/subcommands/history/store.go, ~neo4j-cli/internal/sub
 
 ## REVIEW — 2026-06-01T13:30:00Z
 Added 1 review task (task-012): emit human/agent invoker property on Mixpanel events via shared common/agent classifier.
+
+## TASK-012 — 2026-06-01T15:00:00Z
+Extracted the canonical human/agent classifier into common/agent.Invoker() (Detect() || !stdin-TTY) with an overridable stdin seam; history.Record now delegates to it (history's own invoker()/seams removed) and clievents Emit stamps an invoker (json:invoker) property on COMMAND/AURA/QUERY/SKILL/HELP/STARTUP events. Added agent.SetSeamsForTest so dependent-package tests drive the matrix deterministically; history + clievents tests pinned via it (green under CLAUDECODE).
+Files: ~common/agent/agent.go, +common/agent/export_test_seam.go, ~common/clievents/clievents.go, ~neo4j-cli/internal/subcommands/history/store.go, +tests

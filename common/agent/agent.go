@@ -10,11 +10,19 @@ package agent
 import (
 	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // getenv is the overridable seam for environment lookups so tests can drive
 // detection without mutating real process state.
 var getenv = os.Getenv
+
+// stdinIsTerminal is the overridable seam for stdin TTY detection, mirroring
+// the getenv seam so tests can drive the Invoker matrix.
+var stdinIsTerminal = func() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
+}
 
 // presenceVars enumerates env vars whose mere presence (non-empty) marks a
 // known agent harness.
@@ -61,4 +69,15 @@ func Detect() bool {
 		}
 	}
 	return false
+}
+
+// Invoker is the single source of truth for human/agent classification across
+// the CLI (command history + telemetry). It returns "agent" when a known agent
+// harness is detected (Detect) or when stdin is not a TTY, and "human" only for
+// an interactive terminal with no harness env var.
+func Invoker() string {
+	if Detect() || !stdinIsTerminal() {
+		return "agent"
+	}
+	return "human"
 }

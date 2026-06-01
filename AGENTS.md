@@ -179,6 +179,10 @@ See [`.agents/hermetic-tests.md`](.agents/hermetic-tests.md) — env/path expans
 
 See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling in `expandPath` helpers and LF-pinning of committed `.md` / golden / bundle files via `.gitattributes`.
 
+## Invoker Classification Notes
+
+- `common/agent.Invoker()` is the single human/agent classifier (`Detect() || !stdin-TTY`) reused by command history (`history.Record`) and telemetry (`clievents.Emit` stamps an `invoker` property on every event). Don't add a second classifier — both surfaces must stay consistent. `agent.SetSeamsForTest(detected, tty)` drives the matrix from dependent-package tests.
+
 ## Feature Flag Notes
 
 See [`.agents/feature-flags.md`](.agents/feature-flags.md) — naming (`flag.<area>-<feature>`), default-false lifecycle, override surface (config + env), registry shape, and the `aura.beta-enabled` → `flag.aura-beta` migration.

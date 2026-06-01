@@ -122,3 +122,39 @@ func TestDetect(t *testing.T) {
 		})
 	}
 }
+
+func TestInvoker(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		detected bool
+		tty      bool
+		want     string
+	}{
+		{"interactive terminal, no harness", false, true, "human"},
+		{"non-tty, no harness", false, false, "agent"},
+		{"harness with tty", true, true, "agent"},
+		{"harness without tty", true, false, "agent"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			origGetenv := getenv
+			origTTY := stdinIsTerminal
+			if tc.detected {
+				getenv = func(key string) string {
+					if key == "CLAUDECODE" {
+						return "1"
+					}
+					return ""
+				}
+			} else {
+				getenv = func(string) string { return "" }
+			}
+			stdinIsTerminal = func() bool { return tc.tty }
+			t.Cleanup(func() {
+				getenv = origGetenv
+				stdinIsTerminal = origTTY
+			})
+
+			assert.Equal(t, tc.want, Invoker())
+		})
+	}
+}

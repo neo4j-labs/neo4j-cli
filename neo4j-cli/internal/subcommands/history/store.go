@@ -20,7 +20,6 @@ import (
 	"github.com/neo4j/cli/common/clicfg/fileutils"
 	"github.com/neo4j/cli/common/clievents"
 	"github.com/spf13/afero"
-	"golang.org/x/term"
 )
 
 const fileName = "history.jsonl"
@@ -39,27 +38,6 @@ type Entry struct {
 // set per-OS in clicfg/{darwin,linux,windows}.go.
 func path() string {
 	return filepath.Join(clicfg.ConfigPrefix, "neo4j", "cli", fileName)
-}
-
-// stdinIsTerminal is the package-level test seam for terminal detection on
-// stdin. Production calls term.IsTerminal; tests override the var.
-var stdinIsTerminal = func() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
-}
-
-// detectAgent is the test seam for agent-harness detection. Production calls
-// agent.Detect (the same env-var detector that gates --rw in common/flags);
-// tests override the var.
-var detectAgent = agent.Detect
-
-// invoker resolves "agent" when running under a known agent harness or when
-// stdin is not a TTY, and "human" only for an interactive terminal with no
-// harness env var.
-func invoker() string {
-	if detectAgent() || !stdinIsTerminal() {
-		return "agent"
-	}
-	return "human"
 }
 
 // Record appends a redacted history entry for the current invocation. It is
@@ -86,7 +64,7 @@ func Record(cfg *clicfg.Config) {
 	entry := Entry{
 		Time:      time.Now().UTC(),
 		Command:   strings.TrimSpace("neo4j-cli " + clievents.RedactArgs(os.Args[1:])),
-		Invoker:   invoker(),
+		Invoker:   agent.Invoker(),
 		Version:   cfg.Version,
 		Workspace: cfg.Aura.DefaultWorkspace(),
 	}

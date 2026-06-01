@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
@@ -30,14 +31,7 @@ func withArgs(t *testing.T, args []string) {
 
 func withInvoker(t *testing.T, tty bool) {
 	t.Helper()
-	origTTY := stdinIsTerminal
-	origAgent := detectAgent
-	stdinIsTerminal = func() bool { return tty }
-	detectAgent = func() bool { return false }
-	t.Cleanup(func() {
-		stdinIsTerminal = origTTY
-		detectAgent = origAgent
-	})
+	t.Cleanup(agent.SetSeamsForTest(false, tty))
 }
 
 func TestRecord_AppendsRedactedEntry(t *testing.T) {
@@ -85,14 +79,7 @@ func TestRecord_AgentHarnessWinsOverTTY(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json"}`, "{}")
 	withArgs(t, []string{"neo4j-cli", "instance", "list"})
 
-	origTTY := stdinIsTerminal
-	origAgent := detectAgent
-	stdinIsTerminal = func() bool { return true }
-	detectAgent = func() bool { return true }
-	t.Cleanup(func() {
-		stdinIsTerminal = origTTY
-		detectAgent = origAgent
-	})
+	t.Cleanup(agent.SetSeamsForTest(true, true))
 
 	Record(cfg)
 

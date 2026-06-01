@@ -298,7 +298,6 @@ tasks:
       QUERY/SKILL; include HELP/STARTUP for completeness), populated from agent.Invoker() inside Emit,
       so Mixpanel receives invoker=human|agent on every event. Telemetry is opt-in/off-by-default so
       this adds no new privacy exposure, and invoker is not PII.
-    status: pending
     dependencies:
       - task-011
     acceptance_criteria:
@@ -308,4 +307,5 @@ tasks:
       - "Table-driven tests: agent.Invoker() across the Detect x TTY matrix; clievents Emit sets invoker on the event via the fake analytics service"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-01T15:00:00Z
