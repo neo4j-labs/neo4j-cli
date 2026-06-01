@@ -1,0 +1,159 @@
+feature: cli-164-deploy-to-aura
+prd: ./prd-cli-164-deploy-to-aura.md
+created_at: 2026-06-01T00:00:00Z
+updated_at: 2026-06-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Extract shared instance-create helpers into create_core.go'
+    description: |
+      Pull the Aura instance provisioning logic out of
+      neo4j-cli/aura/internal/subcommands/instance/create.go into a new
+      package-internal file create_core.go: buildCreateInstanceBody(...) (the
+      POST /instances body with free-db defaults, memory/region/cloud-provider,
+      version, vector/GA plugin) and createAndStoreInstance(cfg, body, credOpts)
+      (POST, parse single, store dbms credential). Refactor NewCreateCmd to call
+      these helpers with zero behavioural change so NewDeployCmd can reuse them.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "create_core.go defines buildCreateInstanceBody and createAndStoreInstance with the copyright header"
+      - "NewCreateCmd is refactored to call the extracted helpers"
+      - "Existing instance create tests pass unchanged (no behavioural change)"
+      - "make fmt-check and make lint are clean for the changed files"
+    completed_at: null
+
+  - id: task-002
+    title: 'Add Exec to dockerClient interface, execClient, and fake'
+    description: |
+      Add Exec(ctx context.Context, name string, args []string) (string, error)
+      to the dockerClient interface and the exec-backed execClient in
+      neo4j-cli/internal/subcommands/docker/client.go (shells
+      `docker exec <name> <args...>`, wrapping stderr verbatim and redacting
+      AUTH/PASSWORD via the existing redactArgs/redactString). Add a matching
+      recording Exec method to fakeDockerClient in helpers_test.go.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "dockerClient interface and execClient implement Exec; argv is `docker exec <name> <args...>`"
+      - "Non-zero exit wraps docker stderr in a clierr.UsageError with AUTH/PASSWORD redacted"
+      - "fakeDockerClient records Exec calls for assertion in tests"
+      - "Unit test covers the Exec success and error paths without a real docker daemon"
+    completed_at: null
+
+  - id: task-003
+    title: 'Implement docker PushToAura orchestrator (dump + upload)'
+    description: |
+      Add neo4j-cli/internal/subcommands/docker/deploy.go with exported
+      PushToAura(ctx, cfg, containerName, database string, target AuraTarget)
+      error and type AuraTarget{URI, Username, Password string}. Resolve the
+      source DB password from the stored dbms credential keyed by containerName,
+      then STOP DATABASE (via an injectable stopStartFn seam over the query
+      connect/run machinery), `neo4j-admin database dump --to-path=/tmp/neo4j-cli-deploy`,
+      `neo4j-admin database upload --from-path=... --to-uri/--to-user/--to-password
+      --overwrite-destination`, then START DATABASE and best-effort cleanup.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "PushToAura and AuraTarget are exported; dump precedes upload with the documented argv"
+      - "Source DB password is resolved from the dbms credential named after the container; missing credential yields a usage error"
+      - "STOP/START run via an injectable stopStartFn seam; START is deferred so it runs even when dump/upload fails"
+      - "The Aura target password never appears in stderr/logs (argv redaction applied)"
+      - "Unit tests with fakeDockerClient + stubbed stopStartFn assert ordering, upload flags, cleanup, and the START-on-failure path"
+    completed_at: null
+
+  - id: task-004
+    title: 'Add desktopclient UploadDatabase, ListTasks, and task wait helper'
+    description: |
+      Extend neo4j-cli/internal/desktopclient: UploadDatabase(ctx, dbmsID,
+      source, target) posting to /fastify/api/dbmss/{id}/databases/upload with
+      {source:{databaseName}, target:{uri,username,password,overwrite:true}} via
+      the existing authed do() path; ListTasks(ctx) GET /fastify/api/tasks with a
+      new Task type (id, tags []string, status{isLoading,isSuccess,isError});
+      and WaitForUploadTask(ctx, client, dbmsID) that polls for the db:upload +
+      dbmsID task and returns on isSuccess/isError.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "UploadDatabase, ListTasks, Task, UploadSource/UploadTarget types added with copyright headers"
+      - "UploadDatabase request body and auth headers (X-Client-Id/X-API-Token) match the Desktop 2 contract"
+      - "WaitForUploadTask filters tasks by tags containing both db:upload and the dbmsID and returns on success/error"
+      - "Unit tests use the newAuthedServer pattern to assert request shape and polling termination"
+    completed_at: null
+
+  - id: task-005
+    title: 'Implement aura instance deploy leaf (orchestration + output)'
+    description: |
+      Add neo4j-cli/aura/internal/subcommands/instance/deploy.go with
+      NewDeployCmd(cfg). Define mutually-exclusive --from-docker/--from-desktop
+      (exactly one required), --database (default neo4j, reject system),
+      --desktop-port, and the instance-create mirror flags. Flow: validate ->
+      resolve org/project -> createAndStoreInstance + poll to running -> dispatch
+      to docker.PushToAura or the desktop path (stop DBMS for a clean dump via
+      StopDbms+poll, UploadDatabase, WaitForUploadTask, then restore prior state)
+      -> print instance fields plus a deploy_status field. On post-create failure,
+      leave the instance and emit deploy_status=failed with a retry/delete hint.
+    status: pending
+    dependencies:
+      - task-001
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "--from-docker and --from-desktop are mutually exclusive and exactly one is required; --database system is rejected"
+      - "Instance is created (via shared helpers) and polled to running before any data load"
+      - "Desktop path stops the DBMS for the dump and restores its prior running state after the task completes"
+      - "Structured output includes instance fields plus deploy_status (succeeded/failed); the write annotation is set"
+      - "Post-create push failure leaves the instance, sets deploy_status=failed, names the instance id, and surfaces the tool error verbatim"
+      - "Aura target password is absent from stderr, telemetry, and command history"
+    completed_at: null
+
+  - id: task-006
+    title: 'Register the deploy leaf and regenerate the skill bundle'
+    description: |
+      Register NewDeployCmd in instance.go via cmd.AddCommand(NewDeployCmd(cfg))
+      and add a flush-left Example field (>=2 --rw invocations, one --from-docker
+      and one --from-desktop, comment + blank-line separated). Run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "deploy leaf is registered under the instance command tree"
+      - "Example field satisfies TestAllLeafCommands_HaveExamples (>=2 --rw invocations, flush-left, comments)"
+      - "go generate leaves no diff and TestGenerator_RoundTrip passes"
+    completed_at: null
+
+  - id: task-007
+    title: 'Extend e2e desktop fixture with upload + tasks routes'
+    description: |
+      Add the POST /fastify/api/dbmss/{id}/databases/upload and GET
+      /fastify/api/tasks routes to test/e2e/desktop_fixture/handlers.go (and
+      supporting state) so the desktop deploy path has e2e coverage, and add an
+      e2e test driving deploy --from-desktop against the fixture.
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Fixture serves the upload route and a tasks list that transitions a db:upload task to success"
+      - "An e2e test exercises the desktop deploy path end to end against the fixture"
+      - "The e2e test passes on the standard test matrix"
+    completed_at: null
+
+  - id: task-008
+    title: 'Add changelog entry and run all final gates'
+    description: |
+      Add a Minor changelog entry via
+      `changie new --projects neo4j-cli --kind Minor --body "..."` (or hand-author
+      the YAML per repo convention). Run make test, make fmt-check, make lint,
+      make license-check, and generate-check as the final completion gates.
+    status: pending
+    dependencies:
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "A Minor changelog entry for the deploy command exists under .changes/unreleased/"
+      - "make test, make fmt-check, make lint, and make license-check all pass"
+      - "go generate leaves no diff (generate-check clean)"
+    completed_at: null
