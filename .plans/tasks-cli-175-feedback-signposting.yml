@@ -49,7 +49,7 @@ tasks:
       transport/ServiceUnavailable (upstream) path to verify the URI / that Neo4j is running.
       (3) Add a 'neo4j-cli credential embed add' suggestion to the NewAuthError sites in
       query/embed/{openai,gemini,huggingface,vertex}.go. Preserve error chains via %w.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Bolt Neo.ClientError.Security.Unauthorized errors carry a suggestion naming 'neo4j-cli credential dbms add'; detected via both Neo4jError and string-prefix paths"
@@ -57,7 +57,7 @@ tasks:
       - "Embed missing-API-key auth errors in all four providers suggest 'neo4j-cli credential embed add'"
       - "Each suggestion is a single imperative line; underlying errors remain reachable via errors.As/%w"
       - "Colocated table-driven tests assert .Suggestion is set for the new branches"
-    completed_at: null
+    completed_at: 2026-06-01T10:05:00Z
 
   - id: task-004
     title: 'Add changelog entry and run final gates'

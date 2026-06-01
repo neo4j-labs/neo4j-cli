@@ -158,13 +158,15 @@ func (p *vertexProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if err != nil {
 		return nil, clierr.NewAuthError(
 			"vertex: Application Default Credentials not found: %v; run `gcloud auth application-default login` or set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON file",
-			err)
+			err).
+			WithSuggestion("authenticate with `gcloud auth application-default login`, then store project/location with `neo4j-cli credential embed add`")
 	}
 	tok, err := ts.Token()
 	if err != nil {
 		return nil, clierr.NewAuthError(
 			"vertex: failed to obtain OAuth token: %v; run `gcloud auth application-default login` or set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON file",
-			err)
+			err).
+			WithSuggestion("authenticate with `gcloud auth application-default login`, then store project/location with `neo4j-cli credential embed add`")
 	}
 
 	reqURL := vertexURLHostPrefix(p.cfg.VertexLocation) +

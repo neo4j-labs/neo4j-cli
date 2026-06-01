@@ -6,3 +6,8 @@ Decisions: line-483 site is a plain string append (not a format string), wrapped
 ## TASK-002 — 2026-06-01T09:20:00Z
 Added "Questions or found a bug? <issues URL>" signpost to install-neo4j-cli.sh (info(), after PATH check) and .ps1 (Write-Step), plus a bats case asserting the URL prints. Moved the .ps1 line to after the skill-install switch so the signpost lands last in both installers.
 Files: ~distribution/installation-scripts/install-neo4j-cli.sh, ~distribution/installation-scripts/install-neo4j-cli.ps1, ~distribution/installation-scripts/tests/install-neo4j-cli.bats
+
+## TASK-003 — 2026-06-01T10:05:00Z
+Added .WithSuggestion signposts to three Bolt/embed error paths: Bolt auth failure (Neo.ClientError.Security.Unauthorized → dbms add + --credential, both typed+plain-text paths), unreachable-DB connection failures (new connectionError fall-through → verify URI + `neo4j-cli docker list`), and all four embed providers' NewAuthError sites (→ `neo4j-cli credential embed add`; vertex also keeps gcloud ADC guidance). Error chains preserved via %w. Colocated table-driven tests assert .Suggestion.
+Files: ~neo4j-cli/query/errors.go, ~neo4j-cli/query/errors_test.go, ~neo4j-cli/query/embed/{openai,gemini,huggingface,vertex}.go, ~neo4j-cli/query/embed/{openai,gemini,huggingface,vertex}_test.go
+Decisions: unauthorized check placed BEFORE generic Neo.ClientError fallback in both passes; connection hint scoped to the no-Neo-code fall-through only so typed TransientError/DatabaseError server errors don't get a misleading "is Neo4j running" hint.

@@ -162,6 +162,7 @@ func TestGemini_Embed_MissingKeyReturnsAuthError(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code)
+	assert.Contains(t, ce.Suggestion, "neo4j-cli credential embed add", "auth error signposts the credential-store command")
 }
 
 func TestGemini_Embed_Non2xxWrapsStatusNoKeyLeak(t *testing.T) {
