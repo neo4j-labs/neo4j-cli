@@ -90,6 +90,43 @@ neo4j-cli credential embed use openai-shared
 neo4j-cli credential embed remove openai-shared
 ```
 
+### Storage modes
+
+`credential-storage` controls where credentials live. Set it with `neo4j-cli config set credential-storage <mode>`.
+
+| Mode | Where secrets are stored |
+| --- | --- |
+| `keyring` | OS keyring (secrets), with non-secret fields in `credentials.json`. |
+| `insecure` (default) | Everything in plaintext in `credentials.json`. |
+| `env` | Nothing persisted — credentials are synthesized in-memory from environment variables on each run. |
+
+`env` mode is intended for CI/CD and other ephemeral environments. Credentials are read from the environment at startup and never written to disk or the keyring. The synthesized credential for each type is named `env` and set as that type's default, so downstream commands (`query`, `aura ...`) work with no further config. The `env` name is reserved — `credential ... add --name env` is rejected.
+
+Set the relevant variables for the credential types you need:
+
+```bash
+# Aura Console API (both required to synthesize the Aura credential)
+export NEO4J_AURA_CLIENT_ID=<id>
+export NEO4J_AURA_CLIENT_SECRET=<secret>
+
+# Neo4j connection (NEO4J_PASSWORD required to synthesize the dbms credential)
+export NEO4J_URI=neo4j+s://example.databases.neo4j.io
+export NEO4J_USERNAME=neo4j
+export NEO4J_PASSWORD=<pw>
+export NEO4J_DATABASE=neo4j
+
+# Embedding provider (NEO4J_EMBED_PROVIDER required to synthesize the embed credential)
+export NEO4J_EMBED_PROVIDER=openai
+export NEO4J_EMBED_MODEL=text-embedding-3-small
+export NEO4J_EMBED_BASE_URL=https://api.openai.com/v1
+export NEO4J_EMBED_DIMENSIONS=1536
+export NEO4J_EMBED_API_KEY=<key>
+
+neo4j-cli config set credential-storage env
+```
+
+In `env` mode, `credential ... add/use/remove` commands still run and mutate in-memory state but print a warning that nothing is persisted. Switching away from `env` to `keyring` or `insecure` is blocked, since there are no on-disk credentials to migrate; unset or reset the environment instead.
+
 ## Aura
 
 Manage Neo4j Aura instances from the terminal. Requires an `aura-client` credential — create one in your Aura [Account Settings](https://console.neo4j.io/#account) and add it via [Credentials](#credentials) above.

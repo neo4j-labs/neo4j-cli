@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Add credential-storage: env mode to source credentials from environment variables for CI/CD (nothing persisted to disk or keyring)'
+time: 2026-06-01T15:19:36.981684+02:00
