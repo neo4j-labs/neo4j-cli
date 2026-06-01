@@ -555,3 +555,77 @@ func TestDoctor_CheckInfoApp_NeverFails(t *testing.T) {
 		t.Fatalf("unexpected status %q (want info on 418); got %+v", got.Status, got)
 	}
 }
+
+// --- checkMDNS -------------------------------------------------------------
+//
+// Drives checkMDNS directly via CheckMDNSForTest through the desktopclient
+// mDNS browse seam (no real multicast) and the doctor GOOS seam. Mirrors the
+// info_app pattern: PASS with the advertised origin on a hit, INFO on a miss,
+// and NEVER StatusFail.
+
+// TestDoctor_CheckMDNS_Hit — a responder yields PASS with the 127.0.0.1
+// origin the new Desktop advertises.
+func TestDoctor_CheckMDNS_Hit(t *testing.T) {
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 49160, true }))
+
+	got := desktop.CheckMDNSForTest(context.Background())
+
+	if got.Name != desktop.CheckMDNS {
+		t.Errorf("Name = %q, want %q", got.Name, desktop.CheckMDNS)
+	}
+	if got.Status != desktop.StatusPass {
+		t.Fatalf("expected PASS on mDNS hit, got %+v", got)
+	}
+	if !strings.Contains(got.Detail, "http://127.0.0.1:49160") {
+		t.Errorf("expected detail to carry the 127.0.0.1 origin+port, got %q", got.Detail)
+	}
+}
+
+// TestDoctor_CheckMDNS_Miss_NonDarwin — no responder on a non-macOS host
+// renders as INFO with no Local Network hint.
+func TestDoctor_CheckMDNS_Miss_NonDarwin(t *testing.T) {
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetGOOSFnForTest(func() string { return "linux" }))
+	t.Cleanup(desktop.SetDoctorGoosFnForTest(func() string { return "linux" }))
+
+	got := desktop.CheckMDNSForTest(context.Background())
+
+	if got.Status != desktop.StatusInfo {
+		t.Fatalf("expected INFO on mDNS miss, got %+v", got)
+	}
+	if got.Hint != "" {
+		t.Errorf("expected no Local Network hint off-darwin, got %q", got.Hint)
+	}
+}
+
+// TestDoctor_CheckMDNS_Miss_Darwin — on macOS a miss pairs the INFO with the
+// Local Network permission + --port remediation hint.
+func TestDoctor_CheckMDNS_Miss_Darwin(t *testing.T) {
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetGOOSFnForTest(func() string { return "darwin" }))
+	t.Cleanup(desktop.SetDoctorGoosFnForTest(func() string { return "darwin" }))
+
+	got := desktop.CheckMDNSForTest(context.Background())
+
+	if got.Status != desktop.StatusInfo {
+		t.Fatalf("expected INFO on mDNS miss, got %+v", got)
+	}
+	if !strings.Contains(got.Hint, "Local Network") || !strings.Contains(got.Hint, "--port") {
+		t.Errorf("expected darwin hint to mention Local Network and --port, got %q", got.Hint)
+	}
+}
+
+// TestDoctor_CheckMDNS_NeverFails — checkMDNS is purely diagnostic and must
+// never gate downstream checks via a StatusFail.
+func TestDoctor_CheckMDNS_NeverFails(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+		t.Cleanup(desktopclient.SetGOOSFnForTest(func() string { return goos }))
+		t.Cleanup(desktop.SetDoctorGoosFnForTest(func() string { return goos }))
+
+		got := desktop.CheckMDNSForTest(context.Background())
+		if got.Status == desktop.StatusFail {
+			t.Fatalf("mdns_discovery must never FAIL (goos=%s); got %+v", goos, got)
+		}
+	}
+}

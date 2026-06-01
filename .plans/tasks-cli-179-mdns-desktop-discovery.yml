@@ -116,7 +116,7 @@ tasks:
       ("six"->"seven"), Example, and checkStandardProbe detail/hint strings that say
       "probing/scanning 44222..44232" to "mDNS first, then the 44222..44232 fallback".
       Update doctor tests.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -124,7 +124,7 @@ tasks:
       - "Doctor Long/Example and checkStandardProbe strings reflect mDNS-first then the legacy scan"
       - "Existing doctor checks, skip semantics, and summary shape are unchanged aside from the added row"
       - "doctor_*_test.go updated and passing"
-    completed_at: null
+    completed_at: 2026-06-01T12:30:00Z
 
   - id: task-007
     title: 'Regenerate skill bundle, add changie Minor entry, run all gates'

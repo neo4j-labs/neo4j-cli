@@ -28,6 +28,9 @@ func pinAllPassSeams(t *testing.T) {
 	t.Cleanup(desktop.SetCheckInstallPresentFnForTest(func() desktop.CheckResult {
 		return desktop.CheckResult{Name: desktop.CheckInstallPresent, Label: desktop.LabelInstallPresent, Status: desktop.StatusPass, Detail: "/Applications/Neo4j Desktop.app (version 2.0.0)"}
 	}))
+	t.Cleanup(desktop.SetCheckMDNSFnForTest(func(_ context.Context) desktop.CheckResult {
+		return desktop.CheckResult{Name: desktop.CheckMDNS, Label: desktop.LabelMDNS, Status: desktop.StatusPass, Detail: "Relate API advertised over mDNS at http://127.0.0.1:44222."}
+	}))
 	t.Cleanup(desktop.SetCheckDataDirFnForTest(func(_ context.Context, _ afero.Fs, _ desktopclient.ProbeResult) (desktop.CheckResult, string) {
 		return desktop.CheckResult{Name: desktop.CheckDataDir, Label: desktop.LabelDataDir, Status: desktop.StatusPass, Detail: "/home/test/.config/Neo4j Desktop"}, "/home/test/.config/Neo4j Desktop"
 	}))
@@ -65,6 +68,9 @@ func pinProbeFailSeams(t *testing.T, pinnedPort int) {
 	t.Cleanup(desktop.SetCheckInstallPresentFnForTest(func() desktop.CheckResult {
 		return desktop.CheckResult{Name: desktop.CheckInstallPresent, Label: desktop.LabelInstallPresent, Status: desktop.StatusPass, Detail: "/Applications/Neo4j Desktop.app"}
 	}))
+	t.Cleanup(desktop.SetCheckMDNSFnForTest(func(_ context.Context) desktop.CheckResult {
+		return desktop.CheckResult{Name: desktop.CheckMDNS, Label: desktop.LabelMDNS, Status: desktop.StatusInfo, Detail: "No mDNS responder found; falling back to the standard port scan."}
+	}))
 	t.Cleanup(desktop.SetCheckDataDirFnForTest(func(_ context.Context, _ afero.Fs, _ desktopclient.ProbeResult) (desktop.CheckResult, string) {
 		return desktop.CheckResult{Name: desktop.CheckDataDir, Label: desktop.LabelDataDir, Status: desktop.StatusPass, Detail: "/home/test/.config/Neo4j Desktop"}, "/home/test/.config/Neo4j Desktop"
 	}))
@@ -76,7 +82,7 @@ func pinProbeFailSeams(t *testing.T, pinnedPort int) {
 			Name:   desktop.CheckStandardProbe,
 			Label:  desktop.LabelStandardProbe,
 			Status: desktop.StatusFail,
-			Detail: "No relate server answered on the standard port range (44222..44232).",
+			Detail: "No relate server answered on the 44222..44232 fallback range (after mDNS found nothing).",
 			Hint:   "Start Neo4j Desktop 2 from your applications menu, or pass --port if it's on a non-default port.",
 		}, desktopclient.ProbeResult{}
 	}))
@@ -116,11 +122,12 @@ func TestDoctor_FormatJSON_EmitsParseableDocument(t *testing.T) {
 		t.Fatalf("json.Unmarshal: %v\nstdout was:\n%s", err, out)
 	}
 
-	if len(got.Checks) != 6 {
-		t.Fatalf("expected 6 checks; got %d (rows=%+v)", len(got.Checks), got.Checks)
+	if len(got.Checks) != 7 {
+		t.Fatalf("expected 7 checks; got %d (rows=%+v)", len(got.Checks), got.Checks)
 	}
 	wantNames := []string{
 		desktop.CheckInstallPresent,
+		desktop.CheckMDNS,
 		desktop.CheckStandardProbe,
 		desktop.CheckInfoApp,
 		desktop.CheckDataDir,
@@ -209,6 +216,7 @@ func TestDoctor_FormatTable_RendersAlignedColumns_AllPass(t *testing.T) {
 	for _, want := range []string{
 		"CHECK", "STATUS", "DETAIL",
 		desktop.LabelInstallPresent,
+		desktop.LabelMDNS,
 		desktop.LabelStandardProbe,
 		desktop.LabelInfoApp,
 		desktop.LabelDataDir,
@@ -360,7 +368,7 @@ func TestDoctor_DefaultFormat_NonTTYIsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("default non-TTY output not JSON: %v\nstdout:\n%s", err, out)
 	}
-	if len(got.Checks) != 6 {
-		t.Errorf("default non-TTY JSON: expected 6 checks; got %d", len(got.Checks))
+	if len(got.Checks) != 7 {
+		t.Errorf("default non-TTY JSON: expected 7 checks; got %d", len(got.Checks))
 	}
 }

@@ -43,7 +43,7 @@ func TestDoctor_Help_BuildsAndListsLeaf(t *testing.T) {
 		got := out.String()
 		for _, want := range []string{
 			"doctor",
-			"Run an ordered sequence of six health checks",
+			"Run an ordered sequence of seven health checks",
 			"neo4j-cli desktop doctor",
 			"--port",
 		} {
@@ -75,6 +75,9 @@ func TestDoctor_Help_BuildsAndListsLeaf(t *testing.T) {
 		// even a worst-case mix of FAILs still exits 0 per REQ-F-009.
 		t.Cleanup(desktop.SetCheckInstallPresentFnForTest(func() desktop.CheckResult {
 			return desktop.CheckResult{Name: desktop.CheckInstallPresent, Label: desktop.LabelInstallPresent, Status: desktop.StatusFail, Detail: "no install", Hint: "install hint"}
+		}))
+		t.Cleanup(desktop.SetCheckMDNSFnForTest(func(_ context.Context) desktop.CheckResult {
+			return desktop.CheckResult{Name: desktop.CheckMDNS, Label: desktop.LabelMDNS, Status: desktop.StatusInfo, Detail: "no mDNS responder"}
 		}))
 		t.Cleanup(desktop.SetCheckDataDirFnForTest(func(_ context.Context, _ afero.Fs, _ desktopclient.ProbeResult) (desktop.CheckResult, string) {
 			return desktop.CheckResult{Name: desktop.CheckDataDir, Label: desktop.LabelDataDir, Status: desktop.StatusFail, Detail: "no data dir", Hint: "data dir hint"}, ""

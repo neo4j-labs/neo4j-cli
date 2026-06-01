@@ -22,3 +22,8 @@ Decisions: the two _RealClient tests in query/desktop_test.go are the only call-
 Extended canonicalUnreachable to note mDNS-then-port-scan discovery and the macOS Local Network permission caveat, pairing each caveat with the --port / desktop doctor remediation. Updated the Client.origin field comment to document localhost (legacy scan) vs 127.0.0.1 (mDNS) and the JWT/httpOrigin coupling.
 Files: ~client.go
 Decisions: kept the existing test substrings ("doesn't appear to be running", "--port", "or run 'neo4j-cli desktop doctor' to scan.") intact so no client/query/doctor test assertions needed changes.
+
+## TASK-006 — 2026-06-01T12:30:00Z
+Added non-gating mdns_discovery doctor check modelled on info_app: checkMDNS calls DiscoverViaMDNS, PASS+origin on a hit, INFO on a miss (never FAIL), with a macOS Local Network + --port remediation hint off the darwin seam. Inserted after install_present, before standard_probe (slice cap 6->7); standard_probe still runs unconditionally. Refreshed doctor Long (six->seven, mDNS-first wording), Example, and checkStandardProbe detail (44222..44232 "fallback range after mDNS"). Regenerated skill bundle (desktop.md). Updated all doctor tests (count 6->7, order/wantNames lists, mdns seam stubs in hermetic paths) + added CheckMDNS hit/miss-darwin/miss-nondarwin/never-fails tests.
+Files: ~doctor.go, ~doctor_checks.go, ~doctor_orchestrator.go, ~skill bundle (+ doctor_test.go, doctor_checks_test.go, doctor_orchestrator_test.go, doctor_render_test.go)
+Decisions: stubbed the checkMDNS seam (default INFO) in pinSeams and every render-test seam set so the orchestrator never reaches real multicast; CheckMDNS tests drive desktopclient.SetMDNSBrowseFnForTest + GOOS seams for hermeticity.
