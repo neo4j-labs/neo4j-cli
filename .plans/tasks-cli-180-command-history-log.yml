@@ -395,7 +395,7 @@ tasks:
       following secret flag (so `--uri --password hunter2` leaves `--uri` valueless and the loop then
       redacts `--password ***`), while `--password <secret>` (including a secret starting with '-') stays
       fully redacted.
-    status: pending
+    status: completed
     dependencies:
       - task-013
     acceptance_criteria:
@@ -405,4 +405,4 @@ tasks:
       - "Existing redact cases (--uri neo4j://u:pw@h userinfo, --password secret, --param token=...) still pass"
       - "New regression tests added in redact_test.go; make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T10:35:03Z

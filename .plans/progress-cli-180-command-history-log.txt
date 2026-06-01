@@ -78,3 +78,7 @@ Files: -common/agent/export_test_seam.go, ~common/clievents/clievents.go, ~commo
 
 ## REVIEW — 2026-06-01T18:00:00Z
 Added 1 review task (task-015): fix RedactArgs leak when --uri/--param precedes a valueless secret flag (CI security-review finding on PR #195).
+
+## TASK-015 — 2026-06-01T10:35:03Z
+Guarded RedactArgs space-form consumption with a new looksLikeFlag helper: uri/param no longer swallow a following flag (`--uri --password hunter2` -> `--uri --password ***`), while generic secret flags still consume unconditionally so a dash-leading value (`--password -dashysecret`) stays redacted. Added 3 regression tests; all gates green.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go

@@ -147,6 +147,24 @@ func TestRedactArgs(t *testing.T) {
 			mustContain: []string{"--param token"},
 		},
 		{
+			name:        "uri followed by valueless secret flag does not leak",
+			args:        []string{"query", "--uri", "--password", secret},
+			flagNames:   []string{"--uri", "--password"},
+			mustContain: []string{"--uri --password ***"},
+		},
+		{
+			name:        "param followed by valueless secret flag does not leak",
+			args:        []string{"query", "--param", "--password", secret},
+			flagNames:   []string{"--param", "--password"},
+			mustContain: []string{"--param --password ***"},
+		},
+		{
+			name:        "generic secret flag redacts dash-leading value",
+			args:        []string{"credential", "add", "--password", "-dashysecret"},
+			flagNames:   []string{"--password"},
+			mustContain: []string{"--password ***"},
+		},
+		{
 			name:        "empty args",
 			args:        []string{},
 			mustContain: []string{},

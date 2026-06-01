@@ -90,7 +90,13 @@ func RedactArgs(args []string) string {
 		if name, ok := flagName(arg); ok {
 			if _, sensitive := redactByFlag(name, ""); sensitive {
 				out = append(out, arg)
-				if i+1 < len(args) {
+				// A value-taking flag with no value must not swallow a following
+				// flag: for uri/param a flag-looking next token is not a value, so
+				// leaving it unconsumed lets the loop redact it (e.g.
+				// `--uri --password hunter2` -> `--uri --password ***`). Generic
+				// secret flags still consume unconditionally — the next token
+				// becomes ***, so a secret value starting with '-' stays redacted.
+				if i+1 < len(args) && (isSecretFlag(name) || !looksLikeFlag(args[i+1])) {
 					red, _ := redactByFlag(name, args[i+1])
 					out = append(out, red)
 					i++
@@ -177,6 +183,12 @@ func redactURIUserinfo(value string) string {
 	u.User = url.UserPassword(u.User.Username(), redactedPlaceholder)
 	// url.UserPassword percent-encodes "*" to %2A; restore the readable form.
 	return strings.Replace(u.String(), "%2A%2A%2A", redactedPlaceholder, 1)
+}
+
+// looksLikeFlag reports whether s is a flag-looking token (starts with a dash
+// but is not the lone "-" stdin sentinel).
+func looksLikeFlag(s string) bool {
+	return strings.HasPrefix(s, "-") && s != "-"
 }
 
 // flagName returns the bare flag name (no dashes) if arg is a flag token of
