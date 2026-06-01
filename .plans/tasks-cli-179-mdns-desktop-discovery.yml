@@ -134,7 +134,7 @@ tasks:
       text, and commit the regen. Add one changie entry via
       changie new --projects neo4j-cli --kind Minor describing mDNS/DNS-SD discovery with
       the port-scan fallback and the macOS --port caveat. Run the full gate set.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -144,4 +144,4 @@ tasks:
       - "go generate produces an up-to-date bundle; make generate-check passes with no drift in internal/skill/bundle/**"
       - "Exactly one Minor changie entry exists under .changes/unreleased/ for this change"
       - "make build, make test, make fmt-check, make lint, and make license-check all pass"
-    completed_at: null
+    completed_at: 2026-06-01T09:12:00Z

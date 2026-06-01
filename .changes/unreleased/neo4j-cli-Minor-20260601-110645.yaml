@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'desktop: discover the local Neo4j Desktop 2 API via mDNS/DNS-SD (_neo4j-desktop-2._tcp.local), so it''s found even on non-standard or ephemeral ports; the 44222..44232 port scan remains a fallback. On macOS a dns-sd tier covers Local Network restrictions — if discovery still fails, pass --port.'
+time: 2026-06-01T11:06:45.974362+02:00
