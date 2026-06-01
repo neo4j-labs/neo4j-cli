@@ -22,3 +22,7 @@ Added 2 review tasks (task-005..task-006).
 ## TASK-005 — 2026-06-01T12:05:00Z
 Extracted private reportIssueFatal(statusCode) helper in response.go; collapsed the 9 verbatim-identical "unexpected error [status %d]...report an issue" NewFatalError sites to one-line panic/return calls. Output byte-identical. Left body-%s default, NewAuthError+WithSuggestion, and message-append sites untouched.
 Files: ~neo4j-cli/aura/internal/api/response.go
+
+## TASK-006 — 2026-06-01T12:45:00Z
+Rewrote openai/gemini/huggingface embed auth suggestions so they no longer verbatim-repeat the `credential embed add` command already in the message — now point at env-var precedence + `credential embed add --help`. Hoisted vertex's duplicated auth suggestion into a function-scoped `authSuggestion` const shared by both NewAuthError sites. Existing test assertions (substring `neo4j-cli credential embed add`) still hold; no edits needed.
+Files: ~neo4j-cli/query/embed/{openai,gemini,huggingface,vertex}.go

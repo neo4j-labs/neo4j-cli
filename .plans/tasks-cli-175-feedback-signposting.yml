@@ -117,7 +117,7 @@ tasks:
       populated for all four providers (it is a distinct field in JSON/TOON output); the goal
       is to remove verbatim duplication, not to drop the suggestion. Update the colocated
       embed tests if assertions need adjusting.
-    status: pending
+    status: completed
     source: review
     dependencies: []
     acceptance_criteria:
@@ -125,4 +125,4 @@ tasks:
       - "vertex.go's two NewAuthError suggestion strings reference a single shared local const"
       - "All four embed providers still set a non-empty .Suggestion"
       - "Colocated embed tests pass; make test, make fmt-check, make lint pass"
-    completed_at: null
+    completed_at: 2026-06-01T12:45:00Z

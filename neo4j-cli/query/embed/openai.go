@@ -63,7 +63,7 @@ func (p *openAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 	if p.cfg.APIKey == "" {
 		return nil, clierr.NewAuthError(
 			"missing API key for openai: set OPENAI_API_KEY, NEO4J_EMBED_API_KEY, or store one with `neo4j-cli credential embed add`").
-			WithSuggestion("store an embedding API key with `neo4j-cli credential embed add`")
+			WithSuggestion("provide a key via an env var, or see `neo4j-cli credential embed add --help` to store one")
 	}
 
 	base := p.cfg.BaseURL
