@@ -17,7 +17,7 @@ tasks:
       gate; dns-sd -L streamed under a deadline, parse first ":<port>" line, then kill).
       Both return (port int, ok bool) and never an error the caller must branch on.
       Include a doc comment capturing the macOS Local Network permission rationale.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "github.com/hashicorp/mdns is in go.mod/go.sum; transitive deps (miekg/dns, x/net) resolve; go build ./... passes"
@@ -25,7 +25,7 @@ tasks:
       - "browseDesktopMDNS and lookupDesktopDNSSD return (port, ok), returning (0,false) on miss/error/timeout/missing-binary/non-darwin"
       - "mdnsBrowseFn and dnssdLookupFn seams exist with SetMDNSBrowseFnForTest / SetDNSSDLookupFnForTest restorers matching the package pattern"
       - "New .go file carries the Neo4j copyright header (make license-check passes)"
-    completed_at: null
+    completed_at: 2026-06-01T09:05:00Z
 
   - id: task-002
     title: 'Add Discover orchestrator, DiscoverViaMDNS, mdnsOrigin, and e2e mDNS seam'

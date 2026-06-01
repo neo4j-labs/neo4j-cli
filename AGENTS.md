@@ -220,6 +220,10 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
 
+## desktopclient mDNS Notes
+
+`hashicorp/mdns` gotchas (used in `neo4j-cli/internal/desktopclient/discovery_mdns.go`): `mdns.QueryContext` honors the caller-supplied `params.Entries` channel (the channel reassignment is only inside `Lookup`/`Query`, NOT `QueryContext`). The library logs socket-bind warnings via `log.Default()` (stderr) — set `params.Logger = log.New(io.Discard, "", 0)` to keep them out of CLI output. All mDNS imports + the macOS `dns-sd` exec are intentionally isolated to `discovery_mdns.go`; keep them there.
+
 ## Docker Subsystem Notes
 
 `neo4j-cli/internal/subcommands/docker/` runs local Neo4j by shelling out to the host `docker` CLI. Docker itself is the source-of-truth: managed containers carry `org.neo4j.cli.managed=true` plus metadata labels (`...edition`, `...version`, `...bolt-port`, `...http-port`, `...ephemeral`) and the `list`/`get`/`start`/`stop`/`delete` leaves discover state via `docker ps`/`docker inspect` — no separate state file is maintained.

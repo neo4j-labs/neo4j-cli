@@ -10,6 +10,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/mdns v1.0.6
 	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/neo4j/neo4j-go-driver/v6 v6.0.0
 	github.com/spf13/afero v1.15.0
@@ -26,7 +27,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.44.0
-	golang.org/x/term v0.29.0
+	golang.org/x/term v0.34.0
 )
 
 require (
@@ -35,9 +36,11 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/miekg/dns v1.1.55 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 )
 

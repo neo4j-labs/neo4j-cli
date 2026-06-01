@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-01T09:05:00Z
+Added github.com/hashicorp/mdns (MIT) and scaffolded discovery_mdns.go isolating all mDNS lib imports + the macOS dns-sd exec, with browseDesktopMDNS / lookupDesktopDNSSD seam fns (Set*ForTest restorers) returning (port, ok).
+Files: +neo4j-cli/internal/desktopclient/discovery_mdns.go, ~go.mod, ~go.sum
+Decisions: silenced hashicorp/mdns's log.Default() output via an io.Discard logger so socket-bind warnings don't leak to CLI stderr; mdns.QueryContext honors the caller-supplied params.Entries (the reassignment is only in Lookup, not QueryContext).
