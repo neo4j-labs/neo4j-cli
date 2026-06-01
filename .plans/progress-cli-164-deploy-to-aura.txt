@@ -46,3 +46,6 @@ Added 2 review tasks (task-009..task-010).
 ## TASK-009 — 2026-06-01T16:30:00Z
 Extracted 3 duplicated blocks from create.go/deploy.go into create_core.go: validateInstanceFlags (shared PreRunE body via instanceFlags struct; create adds graph-analytics check after, deploy adds system-db check before), resolveInstanceName (auto-name lookup), renderInstanceResult (field slice + tenant_id->project_id rename + PrintBodyMap, variadic extraFields for deploy_status). Removed deploy.go printDeployResult; both leaves delegate. Net -6 LOC, no behaviour/output change. All gates green, no bundle drift.
 Files: create.go, create_core.go, deploy.go
+
+## REVIEW — 2026-06-01T17:30:00Z
+Added 2 review tasks (task-011..task-012) — env-based secret passing for deploy + create.

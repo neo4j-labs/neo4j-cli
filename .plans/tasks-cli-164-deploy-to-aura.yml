@@ -213,3 +213,66 @@ tasks:
       - "make test, make fmt-check, and make lint are clean"
     source: review
     completed_at: 2026-06-01T17:10:00Z
+
+  - id: task-011
+    title: 'Pass the Aura password to neo4j-admin via env, not docker exec argv'
+    description: |
+      Security review (Medium): docker/deploy.go passes the freshly-generated
+      Aura instance admin password to neo4j-admin as a command-line argument
+      (`--to-password=` + target.Password, deploy.go:128). execClient.Exec shells
+      `docker exec <name> neo4j-admin ... --to-password=<secret>`, so the secret
+      lands in the docker CLI process argv on the host AND in neo4j-admin's argv
+      inside the container — both readable via the world-readable
+      /proc/<pid>/cmdline during the upload window, so any unprivileged local
+      user can capture the Aura admin credential. neo4j-admin database upload
+      reads NEO4J_USERNAME/NEO4J_PASSWORD from the environment as an alternative
+      to --to-user/--to-password (Operations Manual). Harden by keeping the
+      secret out of argv entirely: add an env-aware exec seam (e.g.
+      ExecWithEnv(ctx, name, args, env) on the dockerClient interface +
+      execClient + fakeDockerClient) that sets the extra KEY=VALUE entries on the
+      docker process's exec.Cmd.Env (append to os.Environ()), and have PushToAura
+      invoke `docker exec -e NEO4J_PASSWORD -e NEO4J_USERNAME <name> neo4j-admin
+      database upload <db> --from-path=... --to-uri=... --overwrite-destination`
+      — the `-e VAR` passthrough form (NAME only, no =value) forwards the values
+      from the docker CLI's environment, so they travel via /proc/<pid>/environ
+      (same-uid/root readable) instead of world-readable cmdline. Drop
+      --to-password and --to-user from the neo4j-admin argv. Ensure the env value
+      is never echoed in the error path (it isn't in args, so redactArgs already
+      won't touch it — verify). This is the canonical-layer fix for the exported
+      PushToAura entry point.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "The Aura password is supplied to neo4j-admin via the docker process environment (exec.Cmd.Env) and the `docker exec -e NEO4J_PASSWORD`/`-e NEO4J_USERNAME` passthrough flags, not as a --to-password/--to-user argv value"
+      - "An env-aware exec seam exists on the dockerClient interface, execClient, and fakeDockerClient, and the fake records the env so tests can assert it"
+      - "A unit test asserts the password value never appears in the recorded docker argv and is provided via env, and that argv carries `-e NEO4J_PASSWORD` (name only)"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: null
+
+  - id: task-012
+    title: 'Pass NEO4J_AUTH to docker run via env passthrough, not argv'
+    description: |
+      Follow-on from the same security finding: docker/create.go builds the
+      generated container password into the `docker run` argv as
+      `-e NEO4J_AUTH=neo4j/<pw>` (create.go ~322) and calls client.Run(argv).
+      The value is therefore in the docker CLI process's world-readable
+      /proc/<pid>/cmdline (any local user can read it during create), and is
+      ALSO persisted permanently in `docker inspect <container>.Config.Env`. The
+      Config.Env persistence is inherent to how NEO4J_AUTH provisions the
+      password and is out of scope; this task closes the world-readable
+      host-argv leak the same way as task-011: pass the value via the docker
+      process environment and use the `docker run -e NEO4J_AUTH` passthrough form
+      (NAME only, no =value) so it isn't in argv. Reuse the env-aware run
+      plumbing introduced in task-011 (e.g. a RunWithEnv variant sharing the same
+      cmd.Env mechanism). This narrows readability from "any local user via
+      cmdline" to "docker-socket users via docker inspect", a real reduction.
+    status: pending
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "docker run receives NEO4J_AUTH via the docker process environment + `-e NEO4J_AUTH` passthrough flag, not as an `-e NEO4J_AUTH=<value>` argv element"
+      - "create's existing tests still pass (container still gets the password; credential storage unchanged), with a test asserting the password value is absent from the recorded docker argv"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: null
