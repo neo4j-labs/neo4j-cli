@@ -6,6 +6,7 @@ package config
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/spf13/cobra"
 )
 
@@ -70,6 +71,15 @@ neo4j-cli config set aura.default-workspace my-org-id/my-project-id --rw`,
 				// MigrateToInsecure sets storageMode = StorageModeInsecure itself.
 				if bareKey == "credential-storage" {
 					currentMode := cfg.Credentials.StorageMode()
+					if currentMode == credentials.StorageModeEnv &&
+						(value == credentials.StorageModeKeyring || value == credentials.StorageModeInsecure) {
+						cmd.SilenceUsage = true
+						return clierr.NewUsageError(
+							"cannot migrate credentials out of env storage mode: env-mode credentials are " +
+								"ephemeral and sourced from environment variables, so there is nothing to migrate. " +
+								"To leave env mode, unset the NEO4J_* credential environment variables (or run from a " +
+								"clean environment) and set credential-storage to keyring or insecure there.")
+					}
 					if value == credentials.StorageModeKeyring {
 						// Always run the repair/migration pass for keyring target.
 						if migrateErr := cfg.Credentials.MigrateToKeyring(); migrateErr != nil {
