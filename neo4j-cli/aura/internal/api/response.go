@@ -67,6 +67,15 @@ type ServerError struct {
 	Error string `json:"error"`
 }
 
+// reportIssueFatal is the canonical "unexpected status, please report an
+// issue" fatal error used by every handleResponseError site that hits a status
+// code or unmarshal failure the CLI never expects. Single-sources the message
+// text, redacted-args, and issues-URL contract so the ~nine identical sites
+// stay in lock-step.
+func reportIssueFatal(statusCode int) error {
+	return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL)
+}
+
 func handleResponseError(res *http.Response, credential *credentials.AuraCredential, cfg *clicfg.Config) error {
 	resBody, err := io.ReadAll(res.Body)
 
@@ -77,14 +86,14 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 	switch statusCode := res.StatusCode; statusCode {
 	// redirection messages
 	case http.StatusPermanentRedirect:
-		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
+		panic(reportIssueFatal(statusCode))
 	// client error responses
 	case http.StatusBadRequest:
 		var errorResponse ErrorResponse
 
 		err = json.Unmarshal(resBody, &errorResponse)
 		if err != nil {
-			panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
+			panic(reportIssueFatal(statusCode))
 		}
 
 		messages := []string{}
@@ -104,7 +113,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var serverError ServerError
 		err := json.Unmarshal(resBody, &serverError)
 		if err != nil {
-			panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
+			panic(reportIssueFatal(statusCode))
 		}
 		if serverError.Error != "" {
 			return clierr.NewAuthError("%s", serverError.Error).WithSuggestion(authSuggestion)
@@ -115,7 +124,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var errorResponse ErrorResponse
 
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+			return reportIssueFatal(statusCode)
 		}
 
 		messages := []string{}
@@ -129,7 +138,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var errorResponse ErrorResponse
 
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+			return reportIssueFatal(statusCode)
 		}
 
 		messages := []string{}
@@ -142,7 +151,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var errorResponse ErrorResponse
 
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+			return reportIssueFatal(statusCode)
 		}
 
 		messages := []string{}
@@ -159,7 +168,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var errorResponse ErrorResponse
 
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+			return reportIssueFatal(statusCode)
 		}
 
 		messages := []string{}
@@ -169,7 +178,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 
 		return clierr.NewConflictError("%s", formatBracketedMessages(messages))
 	case http.StatusUnsupportedMediaType:
-		panic(clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])))
+		panic(reportIssueFatal(statusCode))
 	case http.StatusTooManyRequests:
 		retryAfter := res.Header.Get("Retry-After")
 		return clierr.NewRateLimitError(retryAfter, "server rate limit exceeded, suggested cool-off period is %s seconds before rerunning the command", retryAfter).WithSuggestion(fmt.Sprintf("Retry after %s seconds.", retryAfter))
@@ -178,7 +187,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 		var errorResponse ErrorResponse
 
 		if err = json.Unmarshal(resBody, &errorResponse); err != nil {
-			return clierr.NewFatalError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j-labs/neo4j-cli", statusCode, clievents.RedactArgs(os.Args[1:]))
+			return reportIssueFatal(statusCode)
 		}
 
 		messages := []string{}
@@ -188,7 +197,7 @@ func handleResponseError(res *http.Response, credential *credentials.AuraCredent
 
 		return clierr.NewUpstreamError("%s", formatBracketedMessages(messages))
 	default:
-		panic(clierr.NewFatalError("unexpected status code %d and body %s running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, resBody, clievents.RedactArgs(os.Args[1:])))
+		panic(clierr.NewFatalError("unexpected status code %d and body %s running CLI with args %s, please report an issue in %s", statusCode, resBody, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL))
 	}
 }
 
@@ -470,7 +479,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	err := json.Unmarshal(resBody, &errorResponse)
 	if err != nil {
-		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in https://github.com/neo4j/cli", statusCode, clievents.RedactArgs(os.Args[1:])).WithSuggestion(authSuggestion)
+		return clierr.NewAuthError("unexpected error [status %d] running CLI with args %s, please report an issue in %s", statusCode, clievents.RedactArgs(os.Args[1:]), clierr.IssuesURL).WithSuggestion(authSuggestion)
 	}
 
 	messages := []string{}
@@ -480,7 +489,7 @@ func formatAuthorizationError(resBody []byte, statusCode int, credential *creden
 
 	_, err = cfg.Credentials.Aura.ClearAccessToken(credential)
 	if err != nil {
-		messages = append(messages, "Request failed authorization - attempted to clear the access token but encountered an error, please report an issue in https://github.com/neo4j/cli")
+		messages = append(messages, fmt.Sprintf("Request failed authorization - attempted to clear the access token but encountered an error, please report an issue in %s", clierr.IssuesURL))
 	} else {
 		messages = append(messages, "Request failed authorization - access token has been cleared and will be refreshed on next request - please retry the command")
 	}

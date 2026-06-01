@@ -188,6 +188,98 @@ func TestCategorizeBoltError_SchemaTxForbidden(t *testing.T) {
 	}
 }
 
+// TestCategorizeBoltError_Unauthorized locks the auth-failure signpost:
+// Neo.ClientError.Security.Unauthorized stays a validation error (exit 6) but
+// gains a Suggestion naming `neo4j-cli credential dbms add` and --credential.
+// Both the typed-driver path and the plain-text seam path must attach it
+// (Security.Unauthorized must be caught BEFORE the generic Neo.ClientError.
+// fallback so the suggestion is not lost). An ordinary SyntaxError must NOT.
+func TestCategorizeBoltError_Unauthorized(t *testing.T) {
+	cases := []struct {
+		name           string
+		in             error
+		wantSuggestion bool
+	}{
+		{
+			name:           "typed Neo4jError unauthorized → validation + suggestion",
+			in:             &neo4j.Neo4jError{Code: unauthorizedCode, Msg: "The client is unauthorized due to authentication failure"},
+			wantSuggestion: true,
+		},
+		{
+			name:           "plain unauthorized text → validation + suggestion",
+			in:             errors.New("Neo.ClientError.Security.Unauthorized: The client is unauthorized due to authentication failure"),
+			wantSuggestion: true,
+		},
+		{
+			name:           "ordinary SyntaxError → validation, no suggestion (regression)",
+			in:             errors.New("Neo.ClientError.Statement.SyntaxError: Invalid input"),
+			wantSuggestion: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := categorizeBoltError(tc.in)
+			require.Error(t, got)
+			var ce *clierr.CLIError
+			require.True(t, errors.As(got, &ce), "expected *clierr.CLIError, got %T", got)
+			assert.Equal(t, 6, ce.Code, "auth failure stays a validation error")
+			if tc.wantSuggestion {
+				assert.Contains(t, ce.Suggestion, "neo4j-cli credential dbms add", "suggestion names the credential-store command")
+				assert.Contains(t, ce.Suggestion, "--credential", "suggestion mentions the --credential override")
+			} else {
+				assert.Empty(t, ce.Suggestion, "ordinary validation errors carry no suggestion")
+			}
+		})
+	}
+}
+
+// TestCategorizeBoltError_ConnectionUnreachable locks the connection-failure
+// signpost: a transport-level error with no Neo.* code (connection refused /
+// ServiceUnavailable / DNS) stays an upstream error (exit 8) but gains a
+// Suggestion to verify the URI / that Neo4j is running. Typed
+// TransientError/DatabaseError server errors must NOT get this hint — it would
+// mislead, since the database is reachable and the failure is server-side.
+func TestCategorizeBoltError_ConnectionUnreachable(t *testing.T) {
+	cases := []struct {
+		name           string
+		in             error
+		wantSuggestion bool
+	}{
+		{
+			name:           "connection refused → upstream + suggestion",
+			in:             errors.New("dial tcp 127.0.0.1:7687: connect: connection refused"),
+			wantSuggestion: true,
+		},
+		{
+			name:           "typed TransientError → upstream, no connection suggestion",
+			in:             &neo4j.Neo4jError{Code: "Neo.TransientError.Transaction.DeadlockDetected", Msg: "deadlock"},
+			wantSuggestion: false,
+		},
+		{
+			name:           "plain DatabaseError prefix → upstream, no connection suggestion",
+			in:             errors.New("Neo.DatabaseError.General.UnknownError: boom"),
+			wantSuggestion: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := categorizeBoltError(tc.in)
+			require.Error(t, got)
+			var ce *clierr.CLIError
+			require.True(t, errors.As(got, &ce), "expected *clierr.CLIError, got %T", got)
+			assert.Equal(t, 8, ce.Code, "transport/server failure stays an upstream error")
+			if tc.wantSuggestion {
+				assert.Contains(t, ce.Suggestion, "neo4j-cli docker list", "suggestion names a way to check Neo4j is running")
+				assert.Contains(t, ce.Suggestion, "URI", "suggestion mentions verifying the connection URI")
+			} else {
+				assert.Empty(t, ce.Suggestion, "server-side errors carry no connection suggestion")
+			}
+		})
+	}
+}
+
 // TestCategorizeBoltError_PreservesWrappedChain locks that errors.As reaches
 // the original *neo4j.Neo4jError through the CLIError wrap so future code that
 // inspects driver-specific error types (e.g. retry decisions) keeps working.

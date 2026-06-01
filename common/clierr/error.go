@@ -5,6 +5,11 @@ package clierr
 
 import "fmt"
 
+// IssuesURL is the public bug-report URL surfaced in error messages.
+// Note: github.com/neo4j/cli is only the Go module path; the actual
+// repository for reporting issues lives at neo4j-labs/neo4j-cli.
+const IssuesURL = "https://github.com/neo4j-labs/neo4j-cli/issues"
+
 // CLIError is a typed error carrying a process exit code so that the top-level
 // main can map it via errors.As to os.Exit. The closed set of codes mirrors the
 // agent-cli-auditor.md §4.1 table and is also advertised by `neo4j-cli

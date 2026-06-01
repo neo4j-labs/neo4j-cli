@@ -231,6 +231,16 @@ run_installer() {
   fi
 }
 
+# Test: install output signposts the feedback/issues URL.
+@test "install output contains the feedback/issues URL" {
+  unset NEO4J_CLI_AUTO_INSTALL_SKILL
+  run run_installer
+
+  [ "$status" -eq 0 ]
+
+  [[ "$output" == *"neo4j-labs/neo4j-cli/issues"* ]]
+}
+
 # Test 3: =1 but skill install exits non-zero → installer still exits 0.
 @test "NEO4J_CLI_AUTO_INSTALL_SKILL=1 and skill install fails: installer still exits 0" {
   # NEO4J_CLI_STUB_EXIT=1 makes the stub exit 1 for skill subcommands.

@@ -240,6 +240,8 @@ func TestVertex_Embed_MissingADC(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 4, ce.Code, "ADC failure is an auth error")
+	assert.Contains(t, ce.Suggestion, "gcloud auth application-default login", "auth error signposts ADC login")
+	assert.Contains(t, ce.Suggestion, "neo4j-cli credential embed add", "auth error signposts the credential-store command")
 }
 
 func TestVertex_Embed_HappyPath_NoDimensions(t *testing.T) {

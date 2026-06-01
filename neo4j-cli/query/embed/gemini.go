@@ -78,7 +78,8 @@ type geminiEmbedResponse struct {
 func (p *geminiProvider) Embed(ctx context.Context, text string) ([]float32, error) {
 	if p.cfg.APIKey == "" {
 		return nil, clierr.NewAuthError(
-			"missing API key for gemini: set GEMINI_API_KEY, GOOGLE_API_KEY, NEO4J_EMBED_API_KEY, or store one with `neo4j-cli credential embed add`")
+			"missing API key for gemini: set GEMINI_API_KEY, GOOGLE_API_KEY, NEO4J_EMBED_API_KEY, or store one with `neo4j-cli credential embed add`").
+			WithSuggestion("provide a key via an env var, or see `neo4j-cli credential embed add --help` to store one")
 	}
 
 	base := p.cfg.BaseURL

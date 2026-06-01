@@ -14,6 +14,8 @@ import (
 
 const forbiddenTxTypeCode = "Neo.ClientError.Transaction.ForbiddenDueToTransactionType"
 
+const unauthorizedCode = "Neo.ClientError.Security.Unauthorized"
+
 // categorizeBoltError wraps a Bolt-driver error into a typed *CLIError so the
 // top-level main can map it to a process exit code via errors.As. Cypher
 // ClientError-class failures (Neo.ClientError.*) surface as validation errors
@@ -65,6 +67,9 @@ func categorizeBoltError(err error) error {
 		if ne.Code == forbiddenTxTypeCode {
 			return schemaTxError(err)
 		}
+		if ne.Code == unauthorizedCode {
+			return unauthorizedError(err)
+		}
 		if ne.Classification() == "ClientError" {
 			return validationFrom(err)
 		}
@@ -78,6 +83,8 @@ func categorizeBoltError(err error) error {
 	switch {
 	case strings.Contains(msg, forbiddenTxTypeCode):
 		return schemaTxError(err)
+	case strings.Contains(msg, unauthorizedCode):
+		return unauthorizedError(err)
 	case strings.Contains(msg, "Neo.ClientError."):
 		return validationFrom(err)
 	case strings.Contains(msg, "Neo.TransientError."),
@@ -85,7 +92,7 @@ func categorizeBoltError(err error) error {
 		return upstreamFrom(err)
 	}
 
-	return upstreamFrom(err)
+	return connectionError(err)
 }
 
 // schemaTxError handles ForbiddenDueToTransactionType: Neo4j forbids mixing
@@ -97,6 +104,28 @@ func schemaTxError(err error) error {
 		"schema changes (CREATE/DROP CONSTRAINT or INDEX) cannot share a transaction " +
 			"with data writes; re-run without --atomic so each statement gets its own " +
 			"transaction, or move the schema statements into a separate invocation")
+}
+
+// unauthorizedError handles Neo.ClientError.Security.Unauthorized (wrong
+// username/password or an expired credential). Stays a validation error (exit
+// 6) like other ClientError codes but carries a concrete next step naming the
+// credential-store command and the --credential override.
+func unauthorizedError(err error) error {
+	return clierr.NewValidationError("%w", err).WithSuggestion(
+		"authentication failed: check the username/password, store working credentials " +
+			"with `neo4j-cli credential dbms add`, or select a stored credential with --credential")
+}
+
+// connectionError handles transport-level failures that carry no Neo.* code —
+// connection refused / ServiceUnavailable / DNS failures where the database is
+// unreachable rather than rejecting the request. Stays an upstream error (exit
+// 8) but adds a one-line hint to verify the URI and that Neo4j is running. The
+// typed TransientError/DatabaseError path deliberately does NOT get this hint:
+// those are genuine server-side errors where "is Neo4j running" would mislead.
+func connectionError(err error) error {
+	return clierr.NewUpstreamError("%w", err).WithSuggestion(
+		"could not reach Neo4j: verify the connection URI and that the database is running " +
+			"(e.g. `neo4j-cli docker list`)")
 }
 
 // validationFrom returns a NewValidationError that preserves the underlying
