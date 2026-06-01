@@ -406,3 +406,27 @@ tasks:
       - "New regression tests added in redact_test.go; make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-01T10:35:03Z
+
+  - id: task-016
+    title: 'Add --rw to history clear write-invocation Example (+ bundle regen)'
+    description: |
+      Conventions-review (CI on PR #195) flagged [High]: neo4j-cli/internal/subcommands/history/clear.go
+      line 25 — the write-invocation example is missing --rw. The clear command carries
+      Annotations["write"]="true", so the global write gate blocks it in agent/non-interactive contexts
+      without --rw, and AGENTS.md requires every write invocation in a cobra Example to include --rw
+      (mirrors `config set ... --rw`). The Example currently shows `neo4j-cli history clear --force` for
+      the actual-clear invocation; change it to `neo4j-cli history clear --force --rw`. The first
+      (no-flag) invocation demonstrating the guidance error stays as-is. clear.go's Example is embedded in
+      the skill bundle (references/history.md), so after editing the Example, run
+      `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle or
+      TestGenerator_RoundTrip fails.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "history clear Example's clear invocation reads `neo4j-cli history clear --force --rw`"
+      - "The no-flag guidance-error invocation is retained"
+      - "Skill bundle regenerated (references/history.md updated); go generate diff is clean"
+      - "make test (incl. TestGenerator_RoundTrip), make fmt-check, make lint pass"
+    source: review
+    completed_at: null
