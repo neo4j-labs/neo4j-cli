@@ -2,3 +2,8 @@
 Added github.com/hashicorp/mdns (MIT) and scaffolded discovery_mdns.go isolating all mDNS lib imports + the macOS dns-sd exec, with browseDesktopMDNS / lookupDesktopDNSSD seam fns (Set*ForTest restorers) returning (port, ok).
 Files: +neo4j-cli/internal/desktopclient/discovery_mdns.go, ~go.mod, ~go.sum
 Decisions: silenced hashicorp/mdns's log.Default() output via an io.Discard logger so socket-bind warnings don't leak to CLI stderr; mdns.QueryContext honors the caller-supplied params.Entries (the reassignment is only in Lookup, not QueryContext).
+
+## TASK-002 — 2026-06-01T08:41:41Z
+Added Discover orchestrator + DiscoverViaMDNS / discoverPinned / mdnsOrigin to discovery.go and wired the NEO4J_CLI_DESKTOP_E2E_MDNS_PORT seam. mDNS/dns-sd paths yield 127.0.0.1 origins (auth-coupled), legacy port scan keeps localhost; ErrNoDesktop only after the tier-3 scan misses.
+Files: ~neo4j-cli/internal/desktopclient/discovery.go, ~neo4j-cli/internal/desktopclient/seams_e2e.go
+Decisions: Discover's e2ePortOverride branch reuses origin() (localhost) to mirror ProbePort exactly; discoverPinned only adopts the 127.0.0.1 origin when an mDNS/dns-sd responder confirms the exact pinned port.

@@ -60,8 +60,12 @@ func SetGOOSFnForTest(fn func() string) func() {
 // the canonical origin string the auth layer needs (matches Desktop's own
 // auth-token key derivation).
 type ProbeResult struct {
-	Port   int
-	Origin string // "http://localhost:<port>"
+	Port int
+	// Origin is "http://localhost:<port>" for port-scan / old-Desktop results
+	// or "http://127.0.0.1:<port>" for mDNS / DNS-SD / new-Desktop results. The
+	// host half is auth-coupled: it is folded verbatim into the JWT signing key
+	// (signToken) so it MUST match the host Desktop signs with.
+	Origin string
 }
 
 // AppInfo is the unauthenticated `GET /fastify/api/info/app` reply shape.
@@ -165,6 +169,12 @@ func SetProbeHostFnForTest(fn func() string) func() {
 // `e2e_desktop_seams`) assigns to it.
 var e2ePortOverride int
 
+// e2eMDNSPortOverride is read at the top of DiscoverViaMDNS; when non-zero it
+// short-circuits the mDNS browse and returns the override port verbatim with a
+// 127.0.0.1 origin. Only seams_e2e.go (build tag `e2e_desktop_seams`) assigns
+// to it.
+var e2eMDNSPortOverride int
+
 // ProbePort scans the 44222..44232 range looking for a relate server that
 // responds 200 on /fastify/api-docs. Returns the first match. When `pinned`
 // is non-zero, ProbePort tries only that port — supports the `--port`
@@ -243,6 +253,71 @@ func origin(port int) string {
 		return e2eOriginOverride
 	}
 	return fmt.Sprintf("http://%s:%d", probeHostFn(), port)
+}
+
+// mdnsOrigin is the origin for an mDNS / DNS-SD discovered instance. New
+// Desktop builds advertise over mDNS and sign with the explicit 127.0.0.1 host
+// (NOT the "localhost" alias the legacy port scan uses), so the auth layer must
+// derive its JWT key from 127.0.0.1 here or the token won't validate.
+func mdnsOrigin(port int) string {
+	if e2eOriginOverride != "" {
+		return e2eOriginOverride
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", port)
+}
+
+// Discover is the high-level entry point that resolves a running Desktop relate
+// API. When pinned is non-zero it confirms that exact port; otherwise it tries,
+// in order: (1) in-process mDNS multicast, (2) the macOS dns-sd fallback, and
+// (3) the legacy 44222..44232 port scan. Every tier fails gracefully and falls
+// through; ErrNoDesktop is returned only after the legacy scan also misses.
+func Discover(ctx context.Context, pinned int) (ProbeResult, error) {
+	if e2ePortOverride != 0 {
+		return ProbeResult{Port: e2ePortOverride, Origin: origin(e2ePortOverride)}, nil
+	}
+	if pinned != 0 {
+		return discoverPinned(ctx, pinned)
+	}
+
+	if res, err := DiscoverViaMDNS(ctx); err == nil {
+		return res, nil
+	}
+
+	if goosFn() == "darwin" {
+		if port, ok := dnssdLookupFn(ctx); ok {
+			return ProbeResult{Port: port, Origin: mdnsOrigin(port)}, nil
+		}
+	}
+
+	return ProbePort(ctx, 0)
+}
+
+// DiscoverViaMDNS resolves the relate API via in-process mDNS multicast,
+// yielding a 127.0.0.1 origin. Returns ErrNoDesktop when no responder answers.
+func DiscoverViaMDNS(ctx context.Context) (ProbeResult, error) {
+	if e2eMDNSPortOverride != 0 {
+		return ProbeResult{Port: e2eMDNSPortOverride, Origin: mdnsOrigin(e2eMDNSPortOverride)}, nil
+	}
+	if port, ok := mdnsBrowseFn(ctx); ok {
+		return ProbeResult{Port: port, Origin: mdnsOrigin(port)}, nil
+	}
+	return ProbeResult{}, ErrNoDesktop
+}
+
+// discoverPinned confirms the caller-pinned port. A new Desktop advertises over
+// mDNS, so if an mDNS / dns-sd responder reports the pinned port we use the
+// 127.0.0.1 origin; otherwise we fall back to the HTTP port probe, which yields
+// the localhost origin an old Desktop signs with.
+func discoverPinned(ctx context.Context, pinned int) (ProbeResult, error) {
+	if port, ok := mdnsBrowseFn(ctx); ok && port == pinned {
+		return ProbeResult{Port: pinned, Origin: mdnsOrigin(pinned)}, nil
+	}
+	if goosFn() == "darwin" {
+		if port, ok := dnssdLookupFn(ctx); ok && port == pinned {
+			return ProbeResult{Port: pinned, Origin: mdnsOrigin(pinned)}, nil
+		}
+	}
+	return ProbePort(ctx, pinned)
 }
 
 // e2eDataDirOverride is read at the top of ResolveDataDir; when non-empty it
