@@ -125,7 +125,7 @@ export NEO4J_EMBED_API_KEY=<key>
 neo4j-cli config set credential-storage env
 ```
 
-In `env` mode, `credential ... add/use/remove` commands still run and mutate in-memory state but print a warning that nothing is persisted. Switching away from `env` to `keyring` or `insecure` is blocked, since there are no on-disk credentials to migrate; unset or reset the environment instead.
+In `env` mode, `credential ... add/use/remove` commands still run and mutate in-memory state but print a warning that nothing is persisted. Switching away from `env` to `keyring` or `insecure` is blocked, since there are no on-disk credentials to migrate; unset or reset the environment instead. Switching *to* `env` does not remove credentials a previous mode already stored in `credentials.json` or the keyring — clear those explicitly if you need them gone.
 
 ## Aura
 
