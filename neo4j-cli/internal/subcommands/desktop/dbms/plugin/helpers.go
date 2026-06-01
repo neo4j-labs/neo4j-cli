@@ -20,8 +20,8 @@ import (
 var newDesktopClientFn = newDesktopClient
 
 func newDesktopClient(ctx context.Context, fs afero.Fs, port int) (*desktopclient.Client, error) {
-	// ProbePort runs first so its origin can be threaded into ResolveDataDir.
-	probe, err := desktopclient.ProbePort(ctx, port)
+	// Discover runs first so its origin can be threaded into ResolveDataDir.
+	probe, err := desktopclient.Discover(ctx, port)
 	if err != nil {
 		if errors.Is(err, desktopclient.ErrNoDesktop) {
 			return nil, desktopclient.UnreachableError()

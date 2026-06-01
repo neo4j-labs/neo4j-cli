@@ -1,0 +1,182 @@
+feature: cli-179-mdns-desktop-discovery
+prd: ./prd-cli-179-mdns-desktop-discovery.md
+created_at: 2026-06-01T08:32:02Z
+updated_at: 2026-06-01T08:32:02Z
+
+tasks:
+  - id: task-001
+    title: 'Add hashicorp/mdns dep and scaffold isolated discovery_mdns.go'
+    description: |
+      Add github.com/hashicorp/mdns (MIT) via go get and run go mod tidy. Create
+      neo4j-cli/internal/desktopclient/discovery_mdns.go isolating ALL mDNS library
+      imports and the macOS dns-sd exec. Define MDNSServiceType="_neo4j-desktop-2._tcp",
+      mdnsInstanceName="Neo4j Desktop 2", mdnsDomain="local.", tight tier timeouts,
+      and the test seams (mdnsBrowseFn=browseDesktopMDNS, dnssdLookupFn=lookupDesktopDNSSD)
+      with SetXxxFnForTest restorers. Implement browseDesktopMDNS (mdns.QueryContext,
+      first ServiceEntry.Port) and lookupDesktopDNSSD (goosFn()=="darwin" + exec.LookPath
+      gate; dns-sd -L streamed under a deadline, parse first ":<port>" line, then kill).
+      Both return (port int, ok bool) and never an error the caller must branch on.
+      Include a doc comment capturing the macOS Local Network permission rationale.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "github.com/hashicorp/mdns is in go.mod/go.sum; transitive deps (miekg/dns, x/net) resolve; go build ./... passes"
+      - "All mDNS library imports and the dns-sd exec live only in discovery_mdns.go"
+      - "browseDesktopMDNS and lookupDesktopDNSSD return (port, ok), returning (0,false) on miss/error/timeout/missing-binary/non-darwin"
+      - "mdnsBrowseFn and dnssdLookupFn seams exist with SetMDNSBrowseFnForTest / SetDNSSDLookupFnForTest restorers matching the package pattern"
+      - "New .go file carries the Neo4j copyright header (make license-check passes)"
+    completed_at: 2026-06-01T09:05:00Z
+
+  - id: task-002
+    title: 'Add Discover orchestrator, DiscoverViaMDNS, mdnsOrigin, and e2e mDNS seam'
+    status: completed
+    description: |
+      In discovery.go add the high-level Discover(ctx, pinned) orchestrator plus
+      DiscoverViaMDNS(ctx), discoverPinned(ctx, pinned), and mdnsOrigin(port) (returns
+      "http://127.0.0.1:<port>", honoring e2eOriginOverride). Ordering: pinned!=0 -> mDNS
+      confirm the port (127.0.0.1) else ProbePort(ctx,pinned) (localhost); pinned==0 ->
+      (1) mDNS multicast, (2) macOS dns-sd if (1) empty, (3) ProbePort(ctx,0) legacy scan.
+      Every tier fails gracefully and falls through; Discover returns ErrNoDesktop ONLY
+      after the port scan also misses. Leave ProbePort/origin/ProbeResult intact (update
+      ProbeResult.Origin doc to note localhost-or-127.0.0.1). Declare e2eMDNSPortOverride
+      in discovery.go and wire NEO4J_CLI_DESKTOP_E2E_MDNS_PORT in seams_e2e.go (assignment
+      only there); update the seams_e2e.go package doc block. seams_default.go unchanged.
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Discover(ctx,pinned) implements the documented tier ordering and graceful per-tier fallthrough"
+      - "mDNS/dns-sd results carry Origin http://127.0.0.1:<port>; port-scan results keep http://localhost:<port>"
+      - "Discover returns ErrNoDesktop only when all tiers (including the legacy scan) miss"
+      - "ProbePort, origin(), and ProbeResult are unchanged except the Origin doc comment"
+      - "e2eMDNSPortOverride is declared in discovery.go and assigned only under the e2e_desktop_seams build tag via NEO4J_CLI_DESKTOP_E2E_MDNS_PORT"
+    completed_at: 2026-06-01T08:41:41Z
+
+  - id: task-003
+    title: 'Unit-test all discovery tiers via seams (hermetic)'
+    description: |
+      Create discovery_mdns_test.go and extend discovery_test.go to drive Discover /
+      DiscoverViaMDNS / discoverPinned through the mdnsBrowseFn, dnssdLookupFn, httpClientFn
+      and goosFn seams with NO real multicast or dns-sd invocation. Cover: mDNS hit
+      (127.0.0.1 origin+port), mDNS miss + dns-sd hit on darwin (127.0.0.1), all-miss ->
+      port-scan fallback (localhost), pinned + mDNS-confirm (127.0.0.1), pinned + silent
+      (localhost), and ctx-cancelled. Prefer table-driven cases. Must pass on ubuntu,
+      windows, and macos runners without network access.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Tests exercise every tier and the pinned-port branches purely through seams (no real multicast/dns-sd)"
+      - "Origin assertions verify 127.0.0.1 for mDNS/dns-sd paths and localhost for port-scan path"
+      - "go test ./neo4j-cli/internal/desktopclient/... passes and is hermetic (no network dependency)"
+      - "Tests follow the existing SetXxxFnForTest restore pattern with t.Cleanup/defer"
+    completed_at: 2026-06-01T10:05:00Z
+
+  - id: task-004
+    title: 'Migrate the five ProbePort callers to Discover'
+    description: |
+      Replace desktopclient.ProbePort(ctx, ...) with desktopclient.Discover(ctx, ...) in
+      neo4j-cli/query/desktop.go, neo4j-cli/internal/subcommands/desktop/helpers.go,
+      dbms/helpers.go, connection/create.go, and dbms/plugin/helpers.go. Pass the existing
+      pinned --port value (0 for query). Preserve each site's existing ErrNoDesktop
+      branching unchanged. Update any affected call-site tests.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "All five call sites use Discover; no production ProbePort calls remain except the legacy fallback inside Discover and the e2e override"
+      - "ErrNoDesktop handling at each site is preserved"
+      - "Affected subcommand/query tests pass"
+    completed_at: 2026-06-01T11:05:00Z
+
+  - id: task-005
+    title: 'Update canonicalUnreachable and Client.origin comment'
+    description: |
+      In client.go extend canonicalUnreachable to mention mDNS discovery, the macOS Local
+      Network permission caveat, and the --port escape hatch (pair the caveat with a
+      concrete remediation per repo convention). Update the Client.origin field comment to
+      note it may be localhost or 127.0.0.1 depending on discovery path.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "canonicalUnreachable mentions mDNS, the macOS Local Network permission, and --port with actionable remediation"
+      - "Client.origin field comment reflects the localhost-vs-127.0.0.1 distinction"
+      - "Existing client tests asserting the unreachable string are updated and pass"
+    completed_at: 2026-06-01T08:50:07Z
+
+  - id: task-006
+    title: 'Add non-gating mdns_discovery doctor check and refresh doctor strings'
+    description: |
+      Add an mdns_discovery check to desktop doctor mirroring the info_app INFO/skip
+      pattern (non-gating). Add CheckMDNS/LabelMDNS constants in doctor.go; checkMDNS(ctx)
+      + CheckMDNSForTest in doctor_checks.go; checkMDNSFn seam + SetCheckMDNSFnForTest in
+      doctor_orchestrator.go, inserted after install_present and before standard_probe
+      (bump slice cap to 7). The check reports whether mDNS found a responder and its
+      port, with a macOS Local Network hint when nothing was found. Refresh doctor Long
+      ("six"->"seven"), Example, and checkStandardProbe detail/hint strings that say
+      "probing/scanning 44222..44232" to "mDNS first, then the 44222..44232 fallback".
+      Update doctor tests.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "desktop doctor emits an mdns_discovery row in table and JSON output and it never gates downstream checks"
+      - "Doctor Long/Example and checkStandardProbe strings reflect mDNS-first then the legacy scan"
+      - "Existing doctor checks, skip semantics, and summary shape are unchanged aside from the added row"
+      - "doctor_*_test.go updated and passing"
+    completed_at: 2026-06-01T12:30:00Z
+
+  - id: task-007
+    title: 'Regenerate skill bundle, add changie Minor entry, run all gates'
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... so the generated bundle
+      (internal/skill/bundle/references/desktop.md) picks up the refreshed doctor help
+      text, and commit the regen. Add one changie entry via
+      changie new --projects neo4j-cli --kind Minor describing mDNS/DNS-SD discovery with
+      the port-scan fallback and the macOS --port caveat. Run the full gate set.
+    status: completed
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "go generate produces an up-to-date bundle; make generate-check passes with no drift in internal/skill/bundle/**"
+      - "Exactly one Minor changie entry exists under .changes/unreleased/ for this change"
+      - "make build, make test, make fmt-check, make lint, and make license-check all pass"
+    completed_at: 2026-06-01T09:12:00Z
+
+  - id: task-008
+    title: 'Extract advertisedPort helper; fold dns-sd into DiscoverViaMDNS'
+    description: |
+      Review finding (blocking): the two-tier advertisement lookup (in-process mDNS
+      multicast -> macOS dns-sd fallback) in neo4j-cli/internal/desktopclient/discovery.go
+      is spread across Discover, DiscoverViaMDNS, and discoverPinned in a way that
+      duplicates a branch and creates an asymmetry. DiscoverViaMDNS does multicast ONLY
+      (no dns-sd tier), so Discover bolts the darwin dns-sd tier on separately as tier-2,
+      and discoverPinned re-implements the same multicast + darwin-dns-sd sequence again
+      (with a `== pinned` guard) while calling mdnsBrowseFn directly — bypassing
+      DiscoverViaMDNS, which is why the e2eMDNSPortOverride seam doesn't reach the pinned
+      path. Fix: extract a single `advertisedPort(ctx) (int, bool)` helper that does
+      multicast then (on darwin) dns-sd, and let DiscoverViaMDNS own ALL of mDNS by calling
+      it (after the e2eMDNSPortOverride short-circuit). Then Discover's unpinned path
+      collapses to "DiscoverViaMDNS else ProbePort(ctx,0)", and discoverPinned becomes
+      "advertisedPort; if ok && port==pinned -> mdnsOrigin else ProbePort(ctx,pinned)".
+      Behavior must stay identical (same tier order, same origins, same e2e short-circuits).
+      Bonus correctness win this delivers: doctor's checkMDNS calls DiscoverViaMDNS, so
+      folding dns-sd in makes `desktop doctor`'s mdns_discovery row reflect the same path
+      production uses on macOS (today it only reports the multicast result). Tests stay
+      hermetic — advertisedPort goes through the existing mdnsBrowseFn/dnssdLookupFn/goosFn
+      seams; update/extend discovery_mdns_test.go as needed (and confirm doctor tests still
+      stub the seams so checkMDNS never shells out to real dns-sd).
+    status: completed
+    source: review
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "A single advertisedPort(ctx) (int, bool) helper performs multicast then (darwin only) dns-sd; the darwin dns-sd branch is no longer duplicated"
+      - "DiscoverViaMDNS calls advertisedPort (after its e2eMDNSPortOverride short-circuit); Discover unpinned path is 'DiscoverViaMDNS else ProbePort'; discoverPinned uses advertisedPort"
+      - "Tier order, origins (mDNS->127.0.0.1, port-scan->localhost), and e2e short-circuits are unchanged; existing discovery tests still pass without behavioral edits"
+      - "doctor mdns_discovery still non-gating and tests remain hermetic (no real multicast/dns-sd)"
+      - "make build, make test, make fmt-check, make lint, make license-check, make generate-check all pass"
+    completed_at: 2026-06-01T09:28:48Z

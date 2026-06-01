@@ -18,6 +18,8 @@ import (
 var (
 	checkInstallPresentFn = checkInstallPresent
 
+	checkMDNSFn = checkMDNS
+
 	checkDataDirFn = func(ctx context.Context, fs afero.Fs, probe desktopclient.ProbeResult) (CheckResult, string) {
 		dataDir, err := desktopclient.ResolveDataDir(ctx, fs, probe)
 		result := checkDataDir(ctx, fs, probe)
@@ -30,7 +32,7 @@ var (
 	checkAuthDataReadableFn = checkAuthDataReadable
 
 	checkStandardProbeFn = func(ctx context.Context, pinned int) (CheckResult, desktopclient.ProbeResult) {
-		probe, err := desktopclient.ProbePort(ctx, pinned)
+		probe, err := desktopclient.Discover(ctx, pinned)
 		result := checkStandardProbe(ctx, pinned)
 		if err != nil {
 			return result, desktopclient.ProbeResult{}
@@ -79,6 +81,13 @@ func SetCheckStandardProbeFnForTest(fn func(context.Context, int) (CheckResult, 
 	return func() { checkStandardProbeFn = prev }
 }
 
+// SetCheckMDNSFnForTest overrides the mdns_discovery check.
+func SetCheckMDNSFnForTest(fn func(context.Context) CheckResult) func() {
+	prev := checkMDNSFn
+	checkMDNSFn = fn
+	return func() { checkMDNSFn = prev }
+}
+
 // SetCheckInfoAppFnForTest overrides the info_app check.
 func SetCheckInfoAppFnForTest(fn func(context.Context, desktopclient.ProbeResult) CheckResult) func() {
 	prev := checkInfoAppFn
@@ -116,20 +125,26 @@ func RunChecksForTest(ctx context.Context, cfg *clicfg.Config, pinnedPort int) D
 	return runChecks(ctx, cfg, pinnedPort)
 }
 
-// runChecks executes the six health checks in order:
+// runChecks executes the seven health checks in order:
 //
-//	install_present → standard_probe → info_app → data_dir
+//	install_present → mdns_discovery → standard_probe → info_app → data_dir
 //	  → auth_data_readable → authenticated_probe
 //
-// info_app is purely diagnostic and never gates downstream checks (data-dir
-// resolution falls back on its own); failure renders as INFO rather than FAIL.
+// mdns_discovery and info_app are purely diagnostic and never gate downstream
+// checks (data-dir resolution falls back on its own); a miss/failure renders
+// as INFO rather than FAIL. standard_probe runs regardless of the mDNS result.
 func runChecks(ctx context.Context, cfg *clicfg.Config, pinnedPort int) DoctorReport {
 	fs := cfg.Aura.Fs()
 
-	checks := make([]CheckResult, 0, 6)
+	checks := make([]CheckResult, 0, 7)
 
 	installR := checkInstallPresentFn()
 	checks = append(checks, installR)
+
+	// mDNS discovery is purely diagnostic — it reports whether Desktop
+	// advertises over mDNS but never gates the standard-port probe below.
+	mdnsR := checkMDNSFn(ctx)
+	checks = append(checks, mdnsR)
 
 	// Probe runs before anything that touches the relate API so its origin
 	// can be threaded into /info/app and the data-dir check.

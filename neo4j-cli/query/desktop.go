@@ -127,14 +127,14 @@ func resolveDesktopConnectionCredential(ctx context.Context, fs afero.Fs, raw st
 	return &desktopMatch{connection: match, creds: creds}, nil
 }
 
-// newDesktopFallthroughClient bundles the probe → data-dir → salt → client
+// newDesktopFallthroughClient bundles the discovery → data-dir → salt → client
 // chain that both Desktop prefix resolvers begin with. Returns (nil, nil)
 // for every "Desktop is just not here" failure so callers can map the
 // absence to a single unreachable error rather than distinguishing each
-// kind. ProbePort runs first so its origin can be threaded into
+// kind. Discover runs first so its origin can be threaded into
 // ResolveDataDir for the /info/app discovery step.
 func newDesktopFallthroughClient(ctx context.Context, fs afero.Fs) (*desktopclient.Client, error) {
-	probe, err := desktopclient.ProbePort(ctx, 0)
+	probe, err := desktopclient.Discover(ctx, 0)
 	if err != nil {
 		if errors.Is(err, desktopclient.ErrNoDesktop) {
 			return nil, nil

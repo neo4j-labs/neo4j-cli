@@ -54,6 +54,9 @@ func CheckInfoAppForTest(ctx context.Context, probe desktopclient.ProbeResult) C
 	return checkInfoApp(ctx, probe)
 }
 
+// CheckMDNSForTest is the exported wrapper around checkMDNS.
+func CheckMDNSForTest(ctx context.Context) CheckResult { return checkMDNS(ctx) }
+
 // checkInstallPresent reuses the install-detection helper that powers
 // `desktop install`'s already-installed breadcrumb.
 func checkInstallPresent() CheckResult {
@@ -77,6 +80,35 @@ func checkInstallPresent() CheckResult {
 		Label:  LabelInstallPresent,
 		Status: StatusPass,
 		Detail: detail,
+	}
+}
+
+// checkMDNS browses for the Desktop relate API over mDNS / DNS-SD. Purely
+// diagnostic and modelled on checkInfoApp: a responder yields PASS with the
+// advertised port, and a miss (no responder, blocked multicast, timeout)
+// renders as INFO so it never gates the standard-port probe or any later
+// check. On macOS the INFO hint points at the Local Network permission and
+// the --port escape hatch, since macOS can silently drop a bare CLI's
+// multicast with no error.
+func checkMDNS(ctx context.Context) CheckResult {
+	probe, err := desktopclient.DiscoverViaMDNS(ctx)
+	if err != nil {
+		result := CheckResult{
+			Name:   CheckMDNS,
+			Label:  LabelMDNS,
+			Status: StatusInfo,
+			Detail: "No mDNS responder found; falling back to the standard port scan.",
+		}
+		if doctorGoosFn() == "darwin" {
+			result.Hint = "If Desktop is running but undiscovered, grant the terminal app Local Network access in System Settings > Privacy & Security, or pass --port to skip discovery."
+		}
+		return result
+	}
+	return CheckResult{
+		Name:   CheckMDNS,
+		Label:  LabelMDNS,
+		Status: StatusPass,
+		Detail: fmt.Sprintf("Relate API advertised over mDNS at %s.", probe.Origin),
 	}
 }
 
@@ -135,12 +167,16 @@ func checkAuthDataReadable(fs afero.Fs, dataDir string) CheckResult {
 	}
 }
 
-// checkStandardProbe runs the relate-port discovery. `pinned == 0` scans
-// 44222..44232; non-zero tries only that port.
+// checkStandardProbe resolves the relate API exactly as the real commands do —
+// mDNS first, then the 44222..44232 port-scan fallback — and reports the origin
+// the CLI will authenticate against. It must use Discover (not bare ProbePort):
+// a new Desktop signs its JWT with the 127.0.0.1 origin mDNS yields, so probing
+// only the localhost port scan would thread the wrong origin into the
+// authenticated probe and surface a false 401. `pinned != 0` confirms that port.
 func checkStandardProbe(ctx context.Context, pinned int) CheckResult {
-	probe, err := desktopclient.ProbePort(ctx, pinned)
+	probe, err := desktopclient.Discover(ctx, pinned)
 	if err != nil {
-		detail := "No relate server answered on the standard port range (44222..44232)."
+		detail := "No relate server found via mDNS or the 44222..44232 port scan."
 		hint := "Start Neo4j Desktop 2 from your applications menu, or pass --port if it's on a non-default port."
 		if pinned != 0 {
 			detail = fmt.Sprintf("No relate server answered on port %d.", pinned)

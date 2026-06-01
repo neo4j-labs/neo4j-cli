@@ -30,6 +30,7 @@ import (
 // check and let the others run.
 type pin struct {
 	install    *desktop.CheckResult
+	mdns       *desktop.CheckResult
 	dataDir    *desktop.CheckResult
 	dataDirRes string
 	authData   *desktop.CheckResult
@@ -45,6 +46,16 @@ func pinSeams(t *testing.T, p pin) {
 	if p.install != nil {
 		install := *p.install
 		t.Cleanup(desktop.SetCheckInstallPresentFnForTest(func() desktop.CheckResult { return install }))
+	}
+	if p.mdns != nil {
+		mdns := *p.mdns
+		t.Cleanup(desktop.SetCheckMDNSFnForTest(func(_ context.Context) desktop.CheckResult { return mdns }))
+	} else {
+		// Default to a neutral INFO so the orchestrator never reaches real
+		// multicast / dns-sd during these hermetic tests.
+		t.Cleanup(desktop.SetCheckMDNSFnForTest(func(_ context.Context) desktop.CheckResult {
+			return desktop.CheckResult{Name: desktop.CheckMDNS, Label: desktop.LabelMDNS, Status: desktop.StatusInfo, Detail: "No mDNS responder found; falling back to the standard port scan."}
+		}))
 	}
 	if p.dataDir != nil {
 		dataDirR := *p.dataDir
@@ -134,6 +145,7 @@ func TestDoctor_RunChecks_AllPass(t *testing.T) {
 	cfg := newDoctorCfg(t)
 	pinSeams(t, pin{
 		install:    passResult(desktop.CheckInstallPresent, desktop.LabelInstallPresent, "/Applications/Neo4j Desktop 2.app"),
+		mdns:       passResult(desktop.CheckMDNS, desktop.LabelMDNS, "Relate API advertised over mDNS at http://127.0.0.1:44222."),
 		dataDir:    passResult(desktop.CheckDataDir, desktop.LabelDataDir, "/data"),
 		dataDirRes: "/data",
 		authData:   passResult(desktop.CheckAuthDataReadable, desktop.LabelAuthDataReadable, "Auth data readable at /data."),
@@ -145,8 +157,8 @@ func TestDoctor_RunChecks_AllPass(t *testing.T) {
 
 	got := desktop.RunChecksForTest(context.Background(), cfg, 0)
 
-	if len(got.Checks) != 6 {
-		t.Fatalf("expected 6 checks, got %d (%+v)", len(got.Checks), got.Checks)
+	if len(got.Checks) != 7 {
+		t.Fatalf("expected 7 checks, got %d (%+v)", len(got.Checks), got.Checks)
 	}
 	for _, c := range got.Checks {
 		if c.Status != desktop.StatusPass {
@@ -413,12 +425,13 @@ func TestDoctor_RunChecks_InstallFails_OthersStillRun(t *testing.T) {
 }
 
 // TestDoctor_RunChecks_ChecksInOrder — sanity-check that the rows come out
-// in the documented order (REQ-F-207): install, standard_probe, info_app,
+// in the documented order: install, mdns_discovery, standard_probe, info_app,
 // data_dir, auth_data, authenticated_probe.
 func TestDoctor_RunChecks_ChecksInOrder(t *testing.T) {
 	cfg := newDoctorCfg(t)
 	pinSeams(t, pin{
 		install:    passResult(desktop.CheckInstallPresent, desktop.LabelInstallPresent, "/Applications/Neo4j Desktop 2.app"),
+		mdns:       passResult(desktop.CheckMDNS, desktop.LabelMDNS, "Relate API advertised over mDNS at http://127.0.0.1:44222."),
 		dataDir:    passResult(desktop.CheckDataDir, desktop.LabelDataDir, "/data"),
 		dataDirRes: "/data",
 		authData:   passResult(desktop.CheckAuthDataReadable, desktop.LabelAuthDataReadable, "Auth data readable at /data."),
@@ -432,6 +445,7 @@ func TestDoctor_RunChecks_ChecksInOrder(t *testing.T) {
 
 	want := []string{
 		desktop.CheckInstallPresent,
+		desktop.CheckMDNS,
 		desktop.CheckStandardProbe,
 		desktop.CheckInfoApp,
 		desktop.CheckDataDir,

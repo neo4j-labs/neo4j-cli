@@ -20,6 +20,10 @@
 //     (no scan, no /api-docs validation). Honors a decimal integer; a
 //     non-integer or zero value is treated as "unset" and the production
 //     scan still runs.
+//   - NEO4J_CLI_DESKTOP_E2E_MDNS_PORT    → DiscoverViaMDNS returns it verbatim
+//     with a 127.0.0.1 origin (no multicast browse). Honors a decimal integer;
+//     a non-integer or zero value is treated as "unset" and the production
+//     mDNS browse still runs.
 //   - NEO4J_CLI_DESKTOP_E2E_HTTP_ORIGIN  → replaces the
 //     `http://<probeHost>:<port>` origin used both for API URL construction
 //     in client.do and for the JWT signing key in signToken. Must match the
@@ -41,6 +45,11 @@ func init() {
 	if v := os.Getenv("NEO4J_CLI_DESKTOP_E2E_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil && p > 0 {
 			e2ePortOverride = p
+		}
+	}
+	if v := os.Getenv("NEO4J_CLI_DESKTOP_E2E_MDNS_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			e2eMDNSPortOverride = p
 		}
 	}
 	if v := os.Getenv("NEO4J_CLI_DESKTOP_E2E_HTTP_ORIGIN"); v != "" {

@@ -21,6 +21,7 @@ const (
 // — no "secret"/"salt"/"JWT"/"key" wording.
 const (
 	CheckInstallPresent   = "install_present"
+	CheckMDNS             = "mdns_discovery"
 	CheckStandardProbe    = "standard_probe"
 	CheckInfoApp          = "info_app"
 	CheckDataDir          = "data_dir"
@@ -32,6 +33,7 @@ const (
 // nothing about secrets / keys / JWTs / salts.
 const (
 	LabelInstallPresent   = "Install present"
+	LabelMDNS             = "mDNS discovery"
 	LabelStandardProbe    = "Standard port probe"
 	LabelInfoApp          = "Desktop info"
 	LabelDataDir          = "Data directory"
@@ -74,18 +76,19 @@ func newDoctorCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Diagnose a local Neo4j Desktop 2 install end-to-end",
-		Long: "Run an ordered sequence of six health checks against the local Neo4j Desktop 2 install: " +
-			"(1) install present, (2) standard port probe, (3) Desktop info (version, app path, data path), (4) data directory present, (5) auth data readable, (6) authenticated probe. " +
+		Long: "Run an ordered sequence of seven health checks against the local Neo4j Desktop 2 install: " +
+			"(1) install present, (2) mDNS discovery, (3) standard port probe, (4) Desktop info (version, app path, data path), (5) data directory present, (6) auth data readable, (7) authenticated probe. " +
 			"Each check produces a `{name, status, detail, hint?}` record; when a check FAILs, dependent later checks render as `skip` with a `(depends on …)` detail. " +
-			"The Desktop-info check is purely diagnostic: an unavailable `/info/app` endpoint (older Desktop) renders as INFO and never blocks subsequent checks. " +
+			"Discovery tries mDNS first, then the 44222..44232 fallback scan. The mDNS-discovery check is purely diagnostic: it reports the advertised port when a responder answers and renders as INFO (never blocking) otherwise. " +
+			"The Desktop-info check is also purely diagnostic: an unavailable `/info/app` endpoint (older Desktop) renders as INFO and never blocks subsequent checks. " +
 			"`--format json` (or `toon`) emits a single `{checks: [...], summary: {reachable, port?, standard_port_range, next_step?}}` document for agent consumption. " +
 			"Default-TTY table format renders aligned name / status / detail columns and a trailing one-line summary. " +
-			"Inherits `--port <n>` from the `desktop` parent: when set, the standard-port probe tries only that port instead of scanning 44222..44232. " +
+			"Inherits `--port <n>` from the `desktop` parent: when set, the standard-port probe tries only that port instead of the 44222..44232 fallback scan. " +
 			"The leaf is read-only and always exits 0 — parse `summary.reachable` to gate downstream actions.",
-		Example: `# Run all six checks against the local Desktop install (default table output)
+		Example: `# Run all seven checks against the local Desktop install (default table output)
 neo4j-cli desktop doctor
 
-# Pin the probe to a specific port instead of scanning 44222..44232
+# Pin the probe to a specific port instead of the 44222..44232 fallback scan
 neo4j-cli desktop doctor --port 44222
 
 # Emit a structured JSON report suitable for agent consumption
