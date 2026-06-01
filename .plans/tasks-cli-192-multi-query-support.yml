@@ -197,3 +197,128 @@ tasks:
     status: completed
     source: review
     completed_at: 2026-05-29T14:10:00Z
+
+  - id: task-009
+    title: 'Surface per-statement write summary stats from ResultSummary.Counters'
+    description: |
+      PR #187 review (jexp): a local build ran a 41-statement movies.cypher with
+      --rw, all data inserted correctly, but the command "outputs 41 empty lines
+      (one per input line)". Write statements return no rows so each renders as an
+      empty table. Reviewer asks for write statistics (nodes/rels/props
+      created/deleted/updated, indexes/constraints created/deleted) per statement,
+      cypher-shell style. Root cause: runStatementsResponseImpl (connect.go:657-659)
+      captures only summary.QueryType() and discards summary.Counters(). Capture the
+      counters and surface a per-statement summary line, ONLY when the statement
+      mutates state (Counters.ContainsUpdates()), so pure reads stay byte-identical.
+      Thread end-to-end through the BATCH path (single-statement delegates to it):
+      add Counters neo4j.Counters to queryResponse; a driver-free writeStats struct +
+      nil-safe statsFromCounters(neo4j.Counters) *writeStats; Stats *writeStats on
+      queryResult set in runStatementWithMode + runStatementsWithMode; stats *writeStats
+      on renderResult threaded via truncateResult. Render: a formatStatsLine printing
+      only non-zero counters, emitted ONLY in table mode (commonoutput.ResolveOutput
+      == "table") after the table, multi-statement prefixed "statement N: " matching
+      the existing truncateResult convention. JSON: add a fifth field
+      Stats *jsonStats `json:"stats,omitempty"` (snake_case tags) to renderResult.MarshalJSON,
+      nil when stats==nil || !ContainsUpdates — omitempty on a nil pointer keeps the
+      existing {columns,rows,truncated,arrays_truncated} read envelope byte-identical.
+      Keep stats out of cobra help text so no skill-bundle regeneration is needed.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "runStatementsResponseImpl captures summary.Counters() into queryResponse; single-statement path inherits it via delegation"
+      - "Write statements print a non-zero-counters-only summary line in table mode (multi-statement prefixed 'statement N: '); read statements print no stats line"
+      - "JSON output adds a 'stats' object only when the statement ContainsUpdates; read JSON stays exactly {columns,rows,truncated,arrays_truncated} (regression-locked in output_test.go)"
+      - "Tests cover statsFromCounters (nil-safe), formatStatsLine wording, write vs read seam responses (fakeCounters helper)"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+
+  - id: task-010
+    title: 'Skip comment-only statements in splitStatements'
+    description: |
+      PR #187 review (jexp): a commented-out line in movies.cypher
+      ("//CREATE CONSTRAINT movie_title IF NOT EXISTS ...") is shipped to Neo4j as a
+      statement and crashes with Neo.ClientError.Statement.SyntaxError. Reviewer notes
+      it's a cypher issue that it cannot execute a comment-only statement — the CLI
+      should not send it. Root cause: splitStatements (split.go) does no comment
+      handling. Add stripComments(s string) string — a single-pass scanner that
+      respects '...' , "..." and backtick `...` string literals (including backslash
+      escapes inside ' and "), stripping // to end-of-line and /* ... */ (may span
+      lines, which the splitter already accumulates into buf before flush). Comment
+      markers INSIDE string literals must NOT be treated as comments. At both flush
+      points in splitStatements (the flush closure and the tail), run stripComments,
+      trim, and drop if empty; otherwise append the stripped form (so a trailing
+      // comment after real cypher is also removed). Keep the end-of-line ';' split
+      decision comment/string-unaware (matches the documented contract) and note this
+      limitation in the doc comment.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A statement that is only // or /* */ comments (single- or multi-line) is dropped, not sent to Neo4j"
+      - "Trailing // or /* */ comments after real cypher are stripped while the cypher is kept"
+      - "// and /* */ inside '...', \"...\", and backtick literals are preserved unchanged"
+      - "split_test.go table extended: full-line //, // between statements, trailing //, single/multi-line /* */, comment markers inside string/backtick literals"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+
+  - id: task-011
+    title: 'Add --continue-on-error flag (non-atomic only)'
+    description: |
+      PR #187 review (jexp): default multi-statement semantics are sequential, each
+      statement its own transaction, fail-fast on first error. Reviewer asks for an
+      option to just report the error and continue — e.g. for import where it's OK if
+      one import fails in the middle without having to re-run all, just fix the one
+      failure afterwards. Add a persistent Bool flag --continue-on-error on the query
+      command (query.go). It applies to the DEFAULT (non-atomic) sequential loop only
+      and MUST be mutually exclusive with --atomic (atomic = one all-or-nothing
+      transaction; continue-on-error is incoherent there): if both set, return
+      clierr.NewUsageError(...) (exit 2) with remediation (drop one or the other).
+      In the non-atomic loop (run.go:115-140), on a preflight OR execution error: if
+      continueOnError, record the failure, append an error-placeholder renderResult
+      (empty columns/rows + new errMsg field), write a stderr line "statement N: <err>"
+      (1-based), and continue; otherwise keep today's return err fail-fast
+      (byte-identical). After the loop, if any failures: call renderResults first (full
+      stdout array), then return clierr.NewValidationError("N of M statements failed ...")
+      (exit 6). JSON: add an additive "error,omitempty" key to renderResult.MarshalJSON
+      so each statement keeps one positional array element; successful results stay
+      byte-identical. Add one sentence to the query parent Long and a multi-statement
+      --rw Example (feeds the skill bundle / TestAllLeafCommands_HaveExamples), then run
+      go generate ./neo4j-cli/internal/skill/... and commit the regenerated references.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "--continue-on-error + --atomic returns a usage error (exit 2) with remediation and makes no DB calls"
+      - "In non-atomic mode with the flag, a failing middle statement does not abort: all statements render, the failed one carries an 'error' key in JSON at its index, stderr has 'statement N: <err>', and the process exits 6"
+      - "Without the flag, default mode still fails fast after the first error (byte-identical to current behaviour)"
+      - "Parent Long + a multi-statement --rw Example added; go generate run and regenerated references/*.md committed; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+      - "make test, make fmt-check, make lint all clean"
+    source: review
+
+  - id: task-012
+    title: 'Add remediation hint for --atomic + schema-modification error'
+    description: |
+      PR #187 review (jexp): with --atomic, a movies.cypher containing CREATE CONSTRAINT
+      plus data writes fails opaquely with
+      "Neo4jError: Neo.ClientError.Transaction.ForbiddenDueToTransactionType (Tried to
+      execute Write query after executing Schema modification)"; it works once schema
+      ops are removed. This is a hard Neo4j constraint (schema and data writes cannot
+      share a transaction), not a CLI bug, but the error gives the user no path forward.
+      In categorizeBoltError (errors.go:32), detect the code
+      Neo.ClientError.Transaction.ForbiddenDueToTransactionType BEFORE the generic
+      ClientError->validation mapping, in BOTH the typed branch (errors.As into
+      neo4j.Neo4jError, check .Code) and the plain-text branch (strings.Contains, as the
+      FIRST switch case). Route to a helper schemaTxError(err) that returns
+      clierr.NewValidationError("%w", err).WithSuggestion(<remediation>) — stays exit 6,
+      WithSuggestion renders to stderr + the JSON "suggestion" field. Remediation must be
+      concrete: schema changes (CREATE/DROP CONSTRAINT or INDEX) cannot share a
+      transaction with data writes; re-run without --atomic so each statement gets its
+      own transaction, or move the schema statements into a separate invocation. Touches
+      no cobra help text, so no bundle regeneration.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "categorizeBoltError detects ForbiddenDueToTransactionType (typed and plain-text variants) and returns a validation error (exit 6) carrying a Suggestion containing 'without --atomic'"
+      - "An ordinary Neo.ClientError.Statement.SyntaxError still maps to a plain validation error with NO suggestion (regression)"
+      - "errors_test.go covers both detection variants and the regression case"
+      - "make test, make fmt-check, make lint all clean"
+    source: review

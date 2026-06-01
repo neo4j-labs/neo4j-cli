@@ -48,3 +48,6 @@ Decisions: delegate to the impl not the categorizing wrapper, so categorizeBoltE
 ## TASK-008 — 2026-05-29T14:10:00Z
 Extracted preflightAll helper to dedupe the !allowWrite write-guard loop; atomic branch now calls it. Default branch kept interleaved per-statement preflight (with WHY comment) to preserve fail-fast ordering across separate transactions.
 Files: ~neo4j-cli/query/run.go, ~.plans tasks+progress
+
+## REVIEW — 2026-06-01T06:45:19Z
+Added 4 review tasks (task-009..task-012).
