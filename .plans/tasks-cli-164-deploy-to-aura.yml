@@ -52,7 +52,7 @@ tasks:
       connect/run machinery), `neo4j-admin database dump --to-path=/tmp/neo4j-cli-deploy`,
       `neo4j-admin database upload --from-path=... --to-uri/--to-user/--to-password
       --overwrite-destination`, then START DATABASE and best-effort cleanup.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -61,7 +61,7 @@ tasks:
       - "STOP/START run via an injectable stopStartFn seam; START is deferred so it runs even when dump/upload fails"
       - "The Aura target password never appears in stderr/logs (argv redaction applied)"
       - "Unit tests with fakeDockerClient + stubbed stopStartFn assert ordering, upload flags, cleanup, and the START-on-failure path"
-    completed_at: null
+    completed_at: 2026-06-01T13:30:00Z
 
   - id: task-004
     title: 'Add desktopclient UploadDatabase, ListTasks, and task wait helper'
