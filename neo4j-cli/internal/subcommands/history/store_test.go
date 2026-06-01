@@ -7,13 +7,21 @@ import (
 	"os"
 	"testing"
 
-	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// pinInvoker overrides the local invokerFn seam to a fixed classification and
+// restores it via t.Cleanup.
+func pinInvoker(t *testing.T, want string) {
+	t.Helper()
+	orig := invokerFn
+	invokerFn = func() string { return want }
+	t.Cleanup(func() { invokerFn = orig })
+}
 
 func newTestConfig(t *testing.T, config, credentials string) *clicfg.Config {
 	t.Helper()
@@ -31,7 +39,11 @@ func withArgs(t *testing.T, args []string) {
 
 func withInvoker(t *testing.T, tty bool) {
 	t.Helper()
-	t.Cleanup(agent.SetSeamsForTest(false, tty))
+	if tty {
+		pinInvoker(t, "human")
+	} else {
+		pinInvoker(t, "agent")
+	}
 }
 
 func TestRecord_AppendsRedactedEntry(t *testing.T) {
@@ -75,11 +87,10 @@ func TestRecord_InvokerResolution(t *testing.T) {
 	}
 }
 
-func TestRecord_AgentHarnessWinsOverTTY(t *testing.T) {
+func TestRecord_StampsInvokerFromSeam(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json"}`, "{}")
 	withArgs(t, []string{"neo4j-cli", "instance", "list"})
-
-	t.Cleanup(agent.SetSeamsForTest(true, true))
+	pinInvoker(t, "agent")
 
 	Record(cfg)
 

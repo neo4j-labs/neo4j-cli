@@ -11,6 +11,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// invokerFn is the overridable seam for human/agent classification so tests can
+// drive it deterministically without mutating real process state.
+var invokerFn = agent.Invoker
+
 // commandEventProperties carries the command-specific fields
 type commandEventProperties struct {
 	Command string `json:"command"`
@@ -54,7 +58,7 @@ func Emit(events analytics.Service, args []string, state bool) {
 	_ = flags.Parse(args)
 
 	// inv classifies the caller as human or agent — recorded on every event.
-	inv := agent.Invoker()
+	inv := invokerFn()
 
 	// No command name present — bare invocation or top-level --help.
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {

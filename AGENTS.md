@@ -181,7 +181,7 @@ See [`.agents/windows-ci.md`](.agents/windows-ci.md) — path-separator handling
 
 ## Invoker Classification Notes
 
-- `common/agent.Invoker()` is the single human/agent classifier (`Detect() || !stdin-TTY`) reused by command history (`history.Record`) and telemetry (`clievents.Emit` stamps an `invoker` property on every event). Don't add a second classifier — both surfaces must stay consistent. `agent.SetSeamsForTest(detected, tty)` drives the matrix from dependent-package tests.
+- `common/agent.Invoker()` is the single human/agent classifier (`Detect() || !stdin-TTY`) reused by command history (`history.Record`) and telemetry (`clievents.Emit` stamps an `invoker` property on every event). Don't add a second classifier — both surfaces must stay consistent. The `agent` package tests `Invoker()`/`Detect()` via a same-package `_test.go` that sets the unexported `getenv`/`stdinIsTerminal` seams directly (no shipped test mutator). Each consumer owns a local `var invokerFn = agent.Invoker` seam (see `clievents.go`, `history/store.go`) overridden in its own `_test.go` — mirror that pattern rather than reaching into agent's internals from another package.
 
 ## Feature Flag Notes
 

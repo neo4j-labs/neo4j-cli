@@ -7,17 +7,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/analytics"
 	amocks "github.com/neo4j/cli/common/analytics/mocks"
 	"go.uber.org/mock/gomock"
 )
 
+// pinInvoker overrides the local invokerFn seam to a fixed classification and
+// restores it via t.Cleanup.
+func pinInvoker(t *testing.T, want string) {
+	t.Helper()
+	orig := invokerFn
+	invokerFn = func() string { return want }
+	t.Cleanup(func() { invokerFn = orig })
+}
+
 func newMockService(t *testing.T) *amocks.MockService {
 	t.Helper()
 	// Pin the invoker classification to "human" so exact-match expectations are
 	// deterministic regardless of the test host (e.g. CI vs CLAUDECODE).
-	t.Cleanup(agent.SetSeamsForTest(false, true))
+	pinInvoker(t, "human")
 	ctrl := gomock.NewController(t)
 	return amocks.NewMockService(ctrl)
 }
@@ -196,23 +204,21 @@ func invokerOf(t *testing.T, ev analytics.TrackEvent) string {
 func TestEmit_SetsInvokerProperty(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		detected    bool
-		tty         bool
 		args        []string
 		wantInvoker string
 	}{
-		{"command human", false, true, []string{"unknown", "sub"}, "human"},
-		{"command agent via non-tty", false, false, []string{"unknown", "sub"}, "agent"},
-		{"aura agent via harness", true, true, []string{"aura", "instances", "list"}, "agent"},
-		{"query human", false, true, []string{"query", "--uri", "bolt://localhost:7687"}, "human"},
-		{"skill agent via harness", true, true, []string{"skill", "list"}, "agent"},
-		{"help human", false, true, []string{}, "human"},
-		{"startup agent via non-tty", false, false, []string{"startup"}, "agent"},
+		{"command human", []string{"unknown", "sub"}, "human"},
+		{"command agent", []string{"unknown", "sub"}, "agent"},
+		{"aura agent", []string{"aura", "instances", "list"}, "agent"},
+		{"query human", []string{"query", "--uri", "bolt://localhost:7687"}, "human"},
+		{"skill agent", []string{"skill", "list"}, "agent"},
+		{"help human", []string{}, "human"},
+		{"startup agent", []string{"startup"}, "agent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := amocks.NewMockService(ctrl)
-			t.Cleanup(agent.SetSeamsForTest(tc.detected, tc.tty))
+			pinInvoker(t, tc.wantInvoker)
 
 			captured := new(string)
 			svc.EXPECT().

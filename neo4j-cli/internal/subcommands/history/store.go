@@ -24,6 +24,10 @@ import (
 
 const fileName = "history.jsonl"
 
+// invokerFn is the overridable seam for human/agent classification so tests can
+// drive it deterministically without mutating real process state.
+var invokerFn = agent.Invoker
+
 // Entry is the on-disk shape of a single history record.
 type Entry struct {
 	Time       time.Time `json:"time"`
@@ -64,7 +68,7 @@ func Record(cfg *clicfg.Config) {
 	entry := Entry{
 		Time:      time.Now().UTC(),
 		Command:   strings.TrimSpace("neo4j-cli " + clievents.RedactArgs(os.Args[1:])),
-		Invoker:   agent.Invoker(),
+		Invoker:   invokerFn(),
 		Version:   cfg.Version,
 		Workspace: cfg.Aura.DefaultWorkspace(),
 	}
