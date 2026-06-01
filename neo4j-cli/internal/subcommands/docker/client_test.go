@@ -4,8 +4,13 @@
 package docker
 
 import (
+	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -255,6 +260,64 @@ func TestClassifyInspectError(t *testing.T) {
 			}
 		})
 	}
+}
+
+// stubDocker writes a fake `docker` executable into a temp dir, prepends that
+// dir to PATH, and returns the dir. The stub records its full argv (one per
+// line) to a file the caller can read back, and exits with the supplied code
+// after emitting stdoutLine to stdout and stderrLine to stderr. This lets the
+// execClient.Exec argv-shaping and error-wrapping paths be exercised without a
+// real docker daemon. Unix-only (shell script); the test skips on Windows.
+func stubDocker(t *testing.T, exitCode int, stdoutLine, stderrLine string) (argvFile string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("docker stub is a POSIX shell script; skipped on Windows")
+	}
+	dir := t.TempDir()
+	argvFile = filepath.Join(dir, "argv.txt")
+	script := "#!/bin/sh\n" +
+		"for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + argvFile + "\"; done\n" +
+		"printf '%s' \"" + stdoutLine + "\"\n" +
+		"printf '%s' \"" + stderrLine + "\" 1>&2\n" +
+		"exit " + strconv.Itoa(exitCode) + "\n"
+	dockerStub := filepath.Join(dir, "docker")
+	require.NoError(t, os.WriteFile(dockerStub, []byte(script), 0o755))
+	t.Setenv("PATH", dir)
+	return argvFile
+}
+
+// TestExec_Success drives execClient.Exec against a stub docker binary and
+// asserts the argv shape is `exec <name> <args...>` and that trimmed stdout is
+// returned to the caller.
+func TestExec_Success(t *testing.T) {
+	argvFile := stubDocker(t, 0, "  hello world  \n", "")
+
+	ec := &execClient{}
+	out, err := ec.Exec(context.Background(), "my-neo4j", []string{"cypher-shell", "-u", "neo4j"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", out, "stdout must be returned trimmed")
+
+	raw, readErr := os.ReadFile(argvFile)
+	require.NoError(t, readErr)
+	wantArgv := "exec\nmy-neo4j\ncypher-shell\n-u\nneo4j\n"
+	assert.Equal(t, wantArgv, string(raw), "argv must be `exec <name> <args...>`")
+}
+
+// TestExec_ErrorRedacted drives execClient.Exec against a stub docker binary
+// that exits non-zero and emits a PASSWORD-bearing stderr line. The returned
+// error must wrap docker's stderr verbatim except for the redacted secret, and
+// the secret value must never appear in the message.
+func TestExec_ErrorRedacted(t *testing.T) {
+	stubDocker(t, 1, "", "failed: NEO4J_PASSWORD=hunter2 rejected")
+
+	ec := &execClient{}
+	out, err := ec.Exec(context.Background(), "my-neo4j", []string{"neo4j-admin", "database", "dump"})
+	require.Error(t, err)
+	assert.Empty(t, out)
+	msg := err.Error()
+	assert.Contains(t, msg, "NEO4J_PASSWORD=<redacted>", "secret env value must be redacted")
+	assert.NotContains(t, msg, "hunter2", "raw secret must not leak into the error")
+	assert.Contains(t, msg, "rejected", "surrounding stderr text must be preserved")
 }
 
 // TestAltRuntimeHint_PodmanMissing verifies altRuntimeHint returns the empty

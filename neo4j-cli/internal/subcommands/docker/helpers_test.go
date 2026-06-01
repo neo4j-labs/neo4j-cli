@@ -20,6 +20,7 @@ type fakeDockerClient struct {
 	RemoveForceCalls []string
 	PsAllCalls       [][]string
 	InspectCalls     []string
+	ExecCalls        []ExecCall
 
 	// Optional behaviour overrides.
 	RunFn         func(ctx context.Context, args []string) (string, error)
@@ -28,10 +29,18 @@ type fakeDockerClient struct {
 	RemoveForceFn func(ctx context.Context, name string) error
 	PsAllFn       func(ctx context.Context, filters []string) ([]PsEntry, error)
 	InspectFn     func(ctx context.Context, name string) (Container, error)
+	ExecFn        func(ctx context.Context, name string, args []string) (string, error)
 
 	// Stored state for default behaviours.
 	Containers map[string]Container
 	PsEntries  []PsEntry
+}
+
+// ExecCall records the arguments of a single fakeDockerClient.Exec invocation
+// so tests can assert both the target container name and the argv passed.
+type ExecCall struct {
+	Name string
+	Args []string
 }
 
 func newFakeDockerClient() *fakeDockerClient {
@@ -95,6 +104,14 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return c, nil
+}
+
+func (f *fakeDockerClient) Exec(ctx context.Context, name string, args []string) (string, error) {
+	f.ExecCalls = append(f.ExecCalls, ExecCall{Name: name, Args: append([]string(nil), args...)})
+	if f.ExecFn != nil {
+		return f.ExecFn(ctx, name, args)
+	}
+	return "", nil
 }
 
 // Compile-time check that fakeDockerClient satisfies the dockerClient

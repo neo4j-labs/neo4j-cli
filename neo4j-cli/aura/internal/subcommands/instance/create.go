@@ -138,69 +138,20 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 				name = defaultInstanceName(existingNames)
 			}
 
-			body := map[string]any{
-				"version":        version,
-				"region":         region,
-				"name":           name,
-				"type":           _type,
-				"cloud_provider": cloudProvider,
-				"tenant_id":      resolvedProjectID,
-			}
+			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
 
-			if _type == "free-db" {
-				body["memory"] = "1GB"
-				body["region"] = "europe-west1"
-				body["cloud_provider"] = "gcp"
-				body["version"] = "5"
-			} else {
-				body["memory"] = memory
-				body["region"] = region
-				body["vector_optimized"] = vectorOptimized
-			}
-
-			if _type == "professional-db" {
-				body["graph_analytics_plugin"] = graphAnalyticsPlugin
-			}
-
-			if customerManagedKeyId != "" {
-				body["customer_managed_key_id"] = customerManagedKeyId
-			}
-
-			resBody, statusCode, err := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
-				PostBody: body,
-				Method:   http.MethodPost,
+			instance, err := createAndStoreInstance(cfg, body, credentialOptions{
+				instanceType:        string(_type),
+				credentialName:      credentialName,
+				noCredentialStorage: noCredentialStorage,
+				noCredentialPrint:   noCredentialPrint,
+				warnOut:             cmd.ErrOrStderr(),
 			})
 			if err != nil {
 				return err
 			}
 
-			// NOTE: Instance create should not return OK (200), it always returns 202, checking both just in case
-			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
-				responseData := api.ParseBody(resBody)
-				instance, err := responseData.GetSingleOrError()
-				if err != nil {
-					return err
-				}
-
-				if !noCredentialStorage {
-					instanceID, _ := instance["id"].(string)
-					username, _ := instance["username"].(string)
-					password, _ := instance["password"].(string)
-					uri, _ := instance["connection_url"].(string)
-
-					base := baseCredentialName(instanceID, credentialName)
-					resolvedName := resolveCredentialName(cfg.Credentials.Dbms, base)
-					instance["credential_name"] = resolvedName
-
-					if addErr := cfg.Credentials.Dbms.Add(resolvedName, username, password, databaseName(string(_type), username), uri); addErr != nil {
-						if noCredentialPrint {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). The password has been omitted from output; reset it via the Aura Console.\n", addErr) //nolint:errcheck // warning to stderr; write errors are not actionable
-						} else {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to store credentials locally (%s). Save the printed password now — it cannot be retrieved later.\n", addErr) //nolint:errcheck // warning to stderr; write errors are not actionable
-						}
-					}
-				}
-
+			if instance != nil {
 				if noCredentialPrint {
 					delete(instance, "password")
 				}

@@ -98,6 +98,10 @@ type dockerClient interface {
 	// state needed to populate a Container metadata struct. Returns a
 	// NotFound-style clierr when the container does not exist.
 	Inspect(ctx context.Context, name string) (Container, error)
+	// Exec shells `docker exec <name> <args...>` and returns trimmed stdout.
+	// Non-zero exit wraps docker's captured stderr (with AUTH/PASSWORD
+	// redacted) in a clierr.UsageError via the shared run path.
+	Exec(ctx context.Context, name string, args []string) (string, error)
 }
 
 // PsEntry is the subset of `docker ps --format '{{json .}}'` fields we use.
@@ -231,6 +235,14 @@ func (c *execClient) PsAll(ctx context.Context, filters []string) ([]PsEntry, er
 		return nil, err
 	}
 	return parsePsOutput(out)
+}
+
+func (c *execClient) Exec(ctx context.Context, name string, args []string) (string, error) {
+	out, err := c.run(ctx, append([]string{"exec", name}, args...)...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
 }
 
 func (c *execClient) Inspect(ctx context.Context, name string) (Container, error) {

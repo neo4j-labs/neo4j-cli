@@ -14,14 +14,14 @@ tasks:
       version, vector/GA plugin) and createAndStoreInstance(cfg, body, credOpts)
       (POST, parse single, store dbms credential). Refactor NewCreateCmd to call
       these helpers with zero behavioural change so NewDeployCmd can reuse them.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "create_core.go defines buildCreateInstanceBody and createAndStoreInstance with the copyright header"
       - "NewCreateCmd is refactored to call the extracted helpers"
       - "Existing instance create tests pass unchanged (no behavioural change)"
       - "make fmt-check and make lint are clean for the changed files"
-    completed_at: null
+    completed_at: 2026-06-01T13:14:05Z
 
   - id: task-002
     title: 'Add Exec to dockerClient interface, execClient, and fake'
