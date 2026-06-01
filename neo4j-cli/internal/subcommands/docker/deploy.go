@@ -40,6 +40,12 @@ func validateDatabaseName(database string) error {
 // /data volume and is cleaned up best-effort once the upload finishes.
 const dumpPath = "/tmp/neo4j-cli-deploy"
 
+// dumpUser is the container user the in-container neo4j-admin steps run as. The
+// official neo4j image stores data owned by `neo4j`; docker exec defaults to
+// root, which trips an owner-mismatch and can leave root-owned files in /data
+// that break the server on restart — so dump/upload/cleanup all run as neo4j.
+const dumpUser = "neo4j"
+
 // AuraTarget is the destination for a database upload: the Aura instance's
 // Bolt URI plus the admin credentials neo4j-admin authenticates with.
 type AuraTarget struct {
@@ -113,12 +119,19 @@ func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, co
 
 	// best-effort scratch cleanup once we're done, regardless of outcome.
 	defer func() {
-		_, _ = client.Exec(ctx, containerName, []string{"rm", "-rf", dumpPath})
+		_, _ = client.ExecAs(ctx, containerName, dumpUser, []string{"rm", "-rf", dumpPath}, nil)
 	}()
 
-	if _, err := client.Exec(ctx, containerName, []string{
+	// neo4j-admin --to-path requires the target directory to already exist; it
+	// does not create it. Create it as the neo4j user so it (and the dump files
+	// written into it) are owned by the same user neo4j-admin runs as.
+	if _, err := client.ExecAs(ctx, containerName, dumpUser, []string{"mkdir", "-p", dumpPath}, nil); err != nil {
+		return err
+	}
+
+	if _, err := client.ExecAs(ctx, containerName, dumpUser, []string{
 		"neo4j-admin", "database", "dump", database, "--to-path=" + dumpPath,
-	}); err != nil {
+	}, nil); err != nil {
 		return err
 	}
 
@@ -129,7 +142,7 @@ func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, co
 	// lands in the host docker CLI argv or the in-container neo4j-admin argv
 	// (both world-readable via /proc/<pid>/cmdline); it travels through
 	// /proc/<pid>/environ instead.
-	if _, err := client.ExecWithEnv(ctx, containerName, []string{
+	if _, err := client.ExecAs(ctx, containerName, dumpUser, []string{
 		"neo4j-admin", "database", "upload", database,
 		"--from-path=" + dumpPath,
 		"--to-uri=" + target.URI,

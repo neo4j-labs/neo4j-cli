@@ -51,6 +51,7 @@ type RunCall struct {
 // process environment.
 type ExecCall struct {
 	Name string
+	User string
 	Args []string
 	Env  []string
 }
@@ -127,12 +128,17 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 }
 
 func (f *fakeDockerClient) Exec(ctx context.Context, name string, args []string) (string, error) {
-	return f.ExecWithEnv(ctx, name, args, nil)
+	return f.ExecAs(ctx, name, "", args, nil)
 }
 
 func (f *fakeDockerClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	return f.ExecAs(ctx, name, "", args, env)
+}
+
+func (f *fakeDockerClient) ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error) {
 	f.ExecCalls = append(f.ExecCalls, ExecCall{
 		Name: name,
+		User: user,
 		Args: append([]string(nil), args...),
 		Env:  append([]string(nil), env...),
 	})

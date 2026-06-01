@@ -117,6 +117,12 @@ type dockerClient interface {
 	// via /proc/<pid>/cmdline), routing them through /proc/<pid>/environ
 	// instead. Exec is ExecWithEnv with nil env.
 	ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error)
+	// ExecAs shells `docker exec -u <user> [-e KEY ...] <name> <args...>`. It is
+	// the user-scoped superset of ExecWithEnv: when user is non-empty the
+	// command runs as that container user (e.g. "neo4j", so neo4j-admin matches
+	// the store owner and does not leave root-owned files in /data). Env is
+	// forwarded via the `-e KEY` passthrough form exactly as ExecWithEnv.
+	ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error)
 }
 
 // PsEntry is the subset of `docker ps --format '{{json .}}'` fields we use.
@@ -278,16 +284,23 @@ func (c *execClient) PsAll(ctx context.Context, filters []string) ([]PsEntry, er
 }
 
 func (c *execClient) Exec(ctx context.Context, name string, args []string) (string, error) {
-	return c.ExecWithEnv(ctx, name, args, nil)
+	return c.ExecAs(ctx, name, "", args, nil)
 }
 
-// ExecWithEnv builds `docker exec [-e KEY ...] <name> <args...>`. Each
-// KEY=VALUE in env contributes one `-e KEY` passthrough option (NAME only, no
-// =value) placed BEFORE the container name (docker requires exec OPTIONS to
-// precede CONTAINER), while the full KEY=VALUE entries are set on the docker
-// process environment via runEnv so the values never appear in argv.
 func (c *execClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	return c.ExecAs(ctx, name, "", args, env)
+}
+
+// ExecAs builds `docker exec [-u <user>] [-e KEY ...] <name> <args...>`. The
+// optional `-u <user>` and each `-e KEY` passthrough option (NAME only, no
+// =value) are placed BEFORE the container name (docker requires exec OPTIONS to
+// precede CONTAINER), while the full KEY=VALUE env entries are set on the
+// docker process environment via runEnv so the values never appear in argv.
+func (c *execClient) ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error) {
 	dockerArgs := []string{"exec"}
+	if user != "" {
+		dockerArgs = append(dockerArgs, "-u", user)
+	}
 	for _, kv := range env {
 		key := kv
 		if i := strings.IndexByte(kv, '='); i >= 0 {

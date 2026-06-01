@@ -77,14 +77,20 @@ func TestPushToAura_HappyPath_Ordering(t *testing.T) {
 	assert.Equal(t, "neo4j://localhost:7687", (*starts)[0].uri)
 	assert.Equal(t, "srcpw", (*starts)[0].pass)
 
-	// dump -> upload -> cleanup, all against the source container.
-	require.Len(t, fake.ExecCalls, 3)
+	// mkdir -> dump -> upload -> cleanup, all against the source container and
+	// all as the neo4j user (so neo4j-admin matches the store owner).
+	require.Len(t, fake.ExecCalls, 4)
 	for _, c := range fake.ExecCalls {
 		assert.Equal(t, "dev", c.Name)
+		assert.Equal(t, "neo4j", c.User, "in-container steps must run as the neo4j user")
 	}
 	assert.Equal(t,
-		[]string{"neo4j-admin", "database", "dump", "neo4j", "--to-path=/tmp/neo4j-cli-deploy"},
+		[]string{"mkdir", "-p", "/tmp/neo4j-cli-deploy"},
 		fake.ExecCalls[0].Args,
+	)
+	assert.Equal(t,
+		[]string{"neo4j-admin", "database", "dump", "neo4j", "--to-path=/tmp/neo4j-cli-deploy"},
+		fake.ExecCalls[1].Args,
 	)
 	assert.Equal(t,
 		[]string{
@@ -93,19 +99,19 @@ func TestPushToAura_HappyPath_Ordering(t *testing.T) {
 			"--to-uri=neo4j+s://abc.databases.neo4j.io",
 			"--overwrite-destination",
 		},
-		fake.ExecCalls[1].Args,
+		fake.ExecCalls[2].Args,
 	)
 	// The Aura credentials travel via the docker process environment, never argv.
 	assert.Equal(t,
 		[]string{"NEO4J_USERNAME=neo4j", "NEO4J_PASSWORD=aurasecret"},
-		fake.ExecCalls[1].Env,
+		fake.ExecCalls[2].Env,
 	)
-	for _, a := range fake.ExecCalls[1].Args {
+	for _, a := range fake.ExecCalls[2].Args {
 		assert.NotContains(t, a, "aurasecret", "Aura password must not appear in any docker argv element")
 		assert.NotContains(t, a, "--to-password", "argv must not carry --to-password")
 		assert.NotContains(t, a, "--to-user", "argv must not carry --to-user")
 	}
-	assert.Equal(t, []string{"rm", "-rf", "/tmp/neo4j-cli-deploy"}, fake.ExecCalls[2].Args)
+	assert.Equal(t, []string{"rm", "-rf", "/tmp/neo4j-cli-deploy"}, fake.ExecCalls[3].Args)
 }
 
 func TestPushToAura_StartRunsWhenUploadFails(t *testing.T) {

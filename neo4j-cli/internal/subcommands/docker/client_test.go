@@ -337,6 +337,30 @@ func TestExecWithEnv_PassesEnvNotArgv(t *testing.T) {
 	assert.NotContains(t, string(raw), "aurasecret", "secret value must not appear in argv")
 }
 
+func TestExecAs_PlacesUserBeforeContainer(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("docker stub is a POSIX shell script; skipped on Windows")
+	}
+	dir := t.TempDir()
+	argvFile := filepath.Join(dir, "argv.txt")
+	script := "#!/bin/sh\n" +
+		"for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + argvFile + "\"; done\n" +
+		"exit 0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0o755))
+	t.Setenv("PATH", dir)
+
+	ec := &execClient{}
+	_, err := ec.ExecAs(context.Background(), "my-neo4j", "neo4j",
+		[]string{"neo4j-admin", "database", "dump", "neo4j"}, nil)
+	require.NoError(t, err)
+
+	raw, readErr := os.ReadFile(argvFile)
+	require.NoError(t, readErr)
+	wantArgv := "exec\n-u\nneo4j\nmy-neo4j\nneo4j-admin\ndatabase\ndump\nneo4j\n"
+	assert.Equal(t, wantArgv, string(raw),
+		"argv must be `exec -u <user> <name> <args...>` with -u before the container name")
+}
+
 // TestExec_ErrorRedacted drives execClient.Exec against a stub docker binary
 // that exits non-zero and emits a PASSWORD-bearing stderr line. The returned
 // error must wrap docker's stderr verbatim except for the redacted secret, and
