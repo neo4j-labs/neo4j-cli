@@ -11,3 +11,7 @@ Files: ~distribution/installation-scripts/install-neo4j-cli.sh, ~distribution/in
 Added .WithSuggestion signposts to three Bolt/embed error paths: Bolt auth failure (Neo.ClientError.Security.Unauthorized → dbms add + --credential, both typed+plain-text paths), unreachable-DB connection failures (new connectionError fall-through → verify URI + `neo4j-cli docker list`), and all four embed providers' NewAuthError sites (→ `neo4j-cli credential embed add`; vertex also keeps gcloud ADC guidance). Error chains preserved via %w. Colocated table-driven tests assert .Suggestion.
 Files: ~neo4j-cli/query/errors.go, ~neo4j-cli/query/errors_test.go, ~neo4j-cli/query/embed/{openai,gemini,huggingface,vertex}.go, ~neo4j-cli/query/embed/{openai,gemini,huggingface,vertex}_test.go
 Decisions: unauthorized check placed BEFORE generic Neo.ClientError fallback in both passes; connection hint scoped to the no-Neo-code fall-through only so typed TransientError/DatabaseError server errors don't get a misleading "is Neo4j running" hint.
+
+## TASK-004 — 2026-06-01T11:02:00Z
+Added a single user-facing Minor changelog entry via changie covering the corrected bug-report URL, installer issues-URL signpost, and the new Bolt auth/connection + embed API-key error suggestions. All gates green: test, fmt-check, lint, bats; generate-check shows no skill-bundle drift (only the .plans status flip + new changelog file).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260601-105039.yaml

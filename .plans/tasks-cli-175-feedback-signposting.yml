@@ -65,7 +65,7 @@ tasks:
       Add a user-facing changelog entry via changie (kind Minor) covering the corrected
       bug-report URL, installer signpost, and clearer errors. Run the full gate suite and
       confirm no skill-bundle regeneration is required (no cobra help/command-tree changes).
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -74,4 +74,4 @@ tasks:
       - "A changie entry (kind Minor) is added under .changes/unreleased/ describing the user-facing change"
       - "make test, make fmt-check, and make lint all pass"
       - "make generate-check shows no skill-bundle drift attributable to these changes"
-    completed_at: null
+    completed_at: 2026-06-01T11:02:00Z
