@@ -26,6 +26,7 @@ type decodedResult struct {
 	Rows            []map[string]any `json:"rows"`
 	Truncated       bool             `json:"truncated"`
 	ArraysTruncated int              `json:"arrays_truncated"`
+	Error           string           `json:"error"`
 }
 
 // newRenderCmd returns a fresh cobra command with stdout captured into the

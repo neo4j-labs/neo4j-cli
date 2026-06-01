@@ -285,7 +285,7 @@ tasks:
       byte-identical. Add one sentence to the query parent Long and a multi-statement
       --rw Example (feeds the skill bundle / TestAllLeafCommands_HaveExamples), then run
       go generate ./neo4j-cli/internal/skill/... and commit the regenerated references.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -295,6 +295,7 @@ tasks:
       - "Parent Long + a multi-statement --rw Example added; go generate run and regenerated references/*.md committed; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
       - "make test, make fmt-check, make lint all clean"
     source: review
+    completed_at: 2026-06-01T08:20:00Z
 
   - id: task-012
     title: 'Add remediation hint for --atomic + schema-modification error'

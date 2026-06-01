@@ -30,6 +30,10 @@ type renderResult struct {
 	truncated       bool
 	arraysTruncated int
 	stats           *writeStats
+	// errMsg is set only for an error-placeholder result produced under
+	// --continue-on-error: the statement failed, so it has no columns/rows but
+	// keeps its positional slot in the rendered array. Empty for successes.
+	errMsg string
 }
 
 // jsonStats is the JSON projection of writeStats. Only non-zero counters are
@@ -77,6 +81,9 @@ func (r renderResult) AsArray() []map[string]any {
 //	{columns, rows, truncated, arrays_truncated}
 //
 // Field order is fixed via struct field order so encoding/json preserves it.
+// The `stats` and `error` keys are additive (omitempty): a successful read
+// stays byte-identical, while an error-placeholder (--continue-on-error) keeps
+// its positional slot and surfaces the failure under `error`.
 func (r renderResult) MarshalJSON() ([]byte, error) {
 	cols := r.columns
 	if cols == nil {
@@ -109,12 +116,14 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
 		Stats           *jsonStats       `json:"stats,omitempty"`
+		Error           string           `json:"error,omitempty"`
 	}{
 		Columns:         cols,
 		Rows:            rows,
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
 		Stats:           stats,
+		Error:           r.errMsg,
 	})
 }
 

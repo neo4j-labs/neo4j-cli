@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/query/embed"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
@@ -271,6 +272,103 @@ func TestRunQuery_SingleStatement_TrailingSemicolonParity(t *testing.T) {
 	var obj decodedResult
 	require.NoError(t, json.Unmarshal([]byte(withSemi), &obj))
 	assert.Equal(t, []string{"n"}, obj.Columns)
+}
+
+// TestRunQuery_ContinueOnError_WithAtomic_UsageErrorNoDBCalls verifies that
+// combining --continue-on-error with --atomic is rejected as a usage error
+// (exit 2) before any DB call is made.
+func TestRunQuery_ContinueOnError_WithAtomic_UsageError(t *testing.T) {
+	calls := 0
+	withRunStatementsSeam(t, func(_ context.Context, _ *conn, _ []string, _ map[string]any, _ bool) ([]*queryResponse, error) {
+		calls++
+		return nil, nil
+	})
+	origFn := runStatementResponseFn
+	t.Cleanup(func() { runStatementResponseFn = origFn })
+	runStatementResponseFn = func(_ context.Context, _ *conn, _ string, _ map[string]any, _ bool) (*queryResponse, error) {
+		calls++
+		return nil, nil
+	}
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--atomic",
+		"--continue-on-error",
+		"RETURN 1 AS a;\nRETURN 2 AS b",
+	)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
+	assert.Equal(t, 2, ce.Code, "must be a usage error")
+	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.Equal(t, 0, calls, "no DB calls may be made when the flags conflict")
+}
+
+// TestRunQuery_ContinueOnError_FailingMiddleStatement verifies that with the
+// flag a failing middle statement does not abort: every statement renders, the
+// failed one carries an "error" key at its index, stderr reports the failure,
+// and the process exits 6 (validation error).
+func TestRunQuery_ContinueOnError_FailingMiddleStatement(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS a"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 1 AS a"] = makeQueryResponse([]string{"a"}, [][]any{{int64(1)}})
+	r.resp["EXPLAIN RETURN 2 AS b"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.respErr["RETURN 2 AS b"] = errors.New("Neo.ClientError.Statement.SyntaxError: boom")
+	r.resp["EXPLAIN RETURN 3 AS c"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 3 AS c"] = makeQueryResponse([]string{"c"}, [][]any{{int64(3)}})
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"--continue-on-error",
+		"RETURN 1 AS a;\nRETURN 2 AS b;\nRETURN 3 AS c",
+	)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
+	assert.Equal(t, 6, ce.Code, "overall failure must be a validation error (exit 6)")
+	assert.Contains(t, err.Error(), "1 of 3 statements failed")
+
+	// Third statement still ran despite the second failing.
+	assert.Contains(t, r.calls, "RETURN 3 AS c")
+	assert.Contains(t, h.stderr.String(), "statement 2: ")
+	assert.Contains(t, h.stderr.String(), "boom")
+
+	var got []decodedResult
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got), "output must be a JSON array of all statements")
+	require.Len(t, got, 3)
+	assert.Equal(t, []string{"a"}, got[0].Columns)
+	assert.Empty(t, got[0].Error)
+	assert.Contains(t, got[1].Error, "boom", "failed statement keeps its slot with an error key")
+	assert.Equal(t, []string{"c"}, got[2].Columns)
+	assert.Empty(t, got[2].Error)
+}
+
+// TestRunQuery_NoContinueOnError_StillFailsFast verifies that without the flag,
+// the default mode still aborts on the first error and renders no output (the
+// pre-flag behaviour).
+func TestRunQuery_NoContinueOnError_StillFailsFast(t *testing.T) {
+	r := newSeamRouter()
+	r.resp["EXPLAIN RETURN 1 AS a"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.resp["RETURN 1 AS a"] = makeQueryResponse([]string{"a"}, [][]any{{int64(1)}})
+	r.resp["EXPLAIN RETURN 2 AS b"] = makeExplainResponse(neo4j.QueryTypeReadOnly)
+	r.respErr["RETURN 2 AS b"] = errors.New("Neo.ClientError.Statement.SyntaxError: boom")
+	r.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		"RETURN 1 AS a;\nRETURN 2 AS b;\nRETURN 3 AS c",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
+	assert.NotContains(t, r.calls, "RETURN 3 AS c", "third statement must never run on fail-fast")
+	assert.Empty(t, h.stdout.String(), "fail-fast renders no stdout")
 }
 
 // seamRouter is a tiny statement-router used to swap the runStatementResponseFn

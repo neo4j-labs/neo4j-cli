@@ -59,3 +59,7 @@ Files: ~3 mod (connect.go, output.go, run.go), +1 new (stats_test.go)
 ## TASK-010 — 2026-06-01T07:40:00Z
 Added stripComments single-pass rune scanner (string/backtick-literal aware, // and /* */ stripping) to split.go, wired into both flush points of splitStatements so comment-only fragments drop and trailing comments are removed. Extended split_test.go.
 Files: ~2 mod (split.go, split_test.go)
+
+## TASK-011 — 2026-06-01T08:20:00Z
+Added persistent --continue-on-error flag (non-atomic only; mutually exclusive with --atomic, returns a usage error before any DB call). Default loop refactored into runOneStatement helper; on error under the flag it records an error-placeholder renderResult (new errMsg field → additive "error,omitempty" JSON key), writes "statement N: <err>" to stderr, and continues, rendering all results then returning a validation error (exit 6). Fail-fast path byte-identical when off. Updated parent Long + added a multi-statement --rw Example; regenerated skill bundle.
+Files: ~5 mod (query.go, run.go, output.go, run_test.go, output_test.go), ~1 mod (skill bundle references/query.md)

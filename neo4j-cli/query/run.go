@@ -54,6 +54,23 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		return err
 	}
 
+	atomicFlag := cmd.Flag("atomic")
+	atomic := atomicFlag != nil && atomicFlag.Value.String() == "true"
+
+	continueFlag := cmd.Flag("continue-on-error")
+	continueOnError := continueFlag != nil && continueFlag.Value.String() == "true"
+
+	// Reject the incoherent combination before doing any work (no connection,
+	// no DB calls): --atomic is all-or-nothing in one transaction, so
+	// "continue on error" has no meaning there.
+	if atomic && continueOnError {
+		return clierr.NewUsageError(
+			"--atomic and --continue-on-error are mutually exclusive: --atomic runs all " +
+				"statements in one all-or-nothing transaction. Drop --continue-on-error to keep " +
+				"atomic rollback, or drop --atomic to run each statement in its own transaction " +
+				"and continue past failures.")
+	}
+
 	rawParams, _ := cmd.Flags().GetStringArray("param")
 	params, embeds, err := parseParams(rawParams)
 	if err != nil {
@@ -87,9 +104,6 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 	rwFlag := cmd.Flag("rw")
 	allowWrite := rwFlag != nil && rwFlag.Value.String() == "true"
 
-	atomicFlag := cmd.Flag("atomic")
-	atomic := atomicFlag != nil && atomicFlag.Value.String() == "true"
-
 	truncOver, _ := cmd.Flags().GetInt("truncate-arrays-over")
 	maxRows, _ := cmd.Flags().GetInt("max-rows")
 	multi := len(statements) > 1
@@ -116,31 +130,45 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		// Default mode keeps preflight interleaved with execution (not hoisted via
 		// preflightAll) so statement N executes before statement N+1 is classified,
 		// preserving fail-fast ordering across separate transactions.
+		failures := 0
 		for i, stmt := range statements {
-			if !allowWrite {
-				if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+			res, err := runOneStatement(cmd, c, stmt, params, allowWrite)
+			if err != nil {
+				if !continueOnError {
 					return err
 				}
-			}
-
-			// When --rw is set the user has opted in to writing, so run inside
-			// ExecuteWrite. When --rw is unset the preflight already classified
-			// the statement as read-only, so run inside ExecuteRead.
-			var res *queryResult
-			if allowWrite {
-				res, err = runStatementWrite(cmd.Context(), c, stmt, params)
-			} else {
-				res, err = runStatement(cmd.Context(), c, stmt, params)
-			}
-			if err != nil {
-				return err
+				failures++
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "statement %d: %s\n", i+1, err)
+				results = append(results, renderResult{errMsg: err.Error()})
+				continue
 			}
 			results = append(results, truncateResult(cmd, res, truncOver, maxRows, multi, i+1))
+		}
+
+		if failures > 0 {
+			// Render the full array first so the caller sees every statement's
+			// outcome, then signal overall failure with a non-zero exit.
+			renderResults(cmd, cfg, results)
+			return clierr.NewValidationError("%d of %d statements failed", failures, len(statements))
 		}
 	}
 
 	renderResults(cmd, cfg, results)
 	return nil
+}
+
+// runOneStatement runs the non-rw EXPLAIN write-guard preflight then executes a
+// single statement: read-only (ExecuteRead) when writes are not allowed, write
+// (ExecuteWrite) when --rw opted in. It is the unit the default-mode loop
+// fails-fast or continues past per --continue-on-error.
+func runOneStatement(cmd *cobra.Command, c *conn, stmt string, params map[string]any, allowWrite bool) (*queryResult, error) {
+	if !allowWrite {
+		if err := rejectWriteCypher(cmd, c, stmt, params); err != nil {
+			return nil, err
+		}
+		return runStatement(cmd.Context(), c, stmt, params)
+	}
+	return runStatementWrite(cmd.Context(), c, stmt, params)
 }
 
 // truncateResult applies array and row truncation to a single statement's
