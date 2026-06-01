@@ -21,3 +21,6 @@ Decisions: --format inherited as a persistent flag from the root (no per-leaf re
 ## TASK-005 — 2026-06-01T08:55:00Z
 Final gates task: confirmed skill bundle idempotent (go generate produced no diff post task-004), documented `neo4j-cli history` (list/clear, --format, --limit) plus a local-logging privacy note in README, and added a Minor changelog entry. make test, fmt-check, lint all green.
 Files: ~README.md, +.changes/unreleased/neo4j-cli-Minor-20260601-105129.yaml
+
+## REVIEW — 2026-06-01T09:00:00Z
+Added 2 review tasks (task-006..task-007).

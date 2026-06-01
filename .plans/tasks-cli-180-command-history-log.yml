@@ -109,3 +109,46 @@ tasks:
       - "A Minor changelog entry exists under .changes/unreleased/"
       - "make test, make fmt-check, and make lint all pass"
     completed_at: 2026-06-01T08:55:00Z
+
+  - id: task-006
+    title: 'Drop the dead/misleading parameter from history.Record'
+    description: |
+      Review finding (should-fix): history.Record has signature `Record(cfg *clicfg.Config, _ string)`
+      and the call site in neo4j-cli/app/app.go passes `cmd.CommandPath()` on every command
+      invocation, but Record ignores that argument — it rebuilds the command string from os.Args
+      internally. So the signature advertises a contract it doesn't honor, and the per-command hot
+      path does pointless work computing CommandPath(). Fix by dropping the param entirely:
+      `Record(cfg *clicfg.Config)`. os.Args remains the source of truth for the full redacted
+      invocation (including flags, which CommandPath() can't reconstruct anyway). Update the call
+      site to `history.Record(cfg)` and any tests/usages that pass the second arg.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "history.Record's signature is Record(cfg *clicfg.Config) with no unused parameter"
+      - "app.go calls history.Record(cfg) and no longer computes cmd.CommandPath() for the hook"
+      - "Recorded command string is unchanged (neo4j-cli + redacted os.Args[1:])"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
+
+  - id: task-007
+    title: 'Remove redundant historyRows.MarshalJSON'
+    description: |
+      Review finding (optional): historyRows.MarshalJSON in neo4j-cli/internal/subcommands/history/list.go
+      duplicates what default struct-tag marshaling of []Entry already produces — matching keys,
+      RFC3339 time.Time, omitempty on workspace/credential. The only thing it buys over default
+      marshaling is empty->`[]`, but Load returns a non-nil []Entry{}, so the slice is already
+      non-nil and marshals to `[]`. Remove MarshalJSON and let the json path marshal the entries
+      directly. Keep AsArray() (required by the commonoutput.ResponseData interface for the
+      toon/table paths). Verify json and toon output for list is unchanged (including the empty case).
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "historyRows.MarshalJSON is removed; AsArray() remains"
+      - "history list --format json output is unchanged, including empty history rendering as []"
+      - "history list --format toon output is unchanged"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
