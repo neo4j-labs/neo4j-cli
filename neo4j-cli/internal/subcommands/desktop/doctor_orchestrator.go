@@ -32,7 +32,7 @@ var (
 	checkAuthDataReadableFn = checkAuthDataReadable
 
 	checkStandardProbeFn = func(ctx context.Context, pinned int) (CheckResult, desktopclient.ProbeResult) {
-		probe, err := desktopclient.ProbePort(ctx, pinned)
+		probe, err := desktopclient.Discover(ctx, pinned)
 		result := checkStandardProbe(ctx, pinned)
 		if err != nil {
 			return result, desktopclient.ProbeResult{}

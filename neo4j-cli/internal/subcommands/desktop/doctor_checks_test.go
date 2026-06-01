@@ -257,6 +257,12 @@ func (rt doctorProbeRT) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func pinProbeForDoctor(t *testing.T, hits map[int]bool) {
 	t.Helper()
+	// checkStandardProbe now resolves via Discover (mDNS first, then the port
+	// scan). Stub the mDNS/dns-sd tiers to empty so the test deterministically
+	// exercises the HTTP port-scan seam below instead of reaching real
+	// multicast (which would otherwise find a Desktop running on the host).
+	t.Cleanup(desktopclient.SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
+	t.Cleanup(desktopclient.SetDNSSDLookupFnForTest(func(_ context.Context) (int, bool) { return 0, false }))
 	t.Cleanup(desktopclient.SetProbeHostFnForTest(func() string { return "127.0.0.1" }))
 	t.Cleanup(desktopclient.SetHTTPClientFnForTest(func() *http.Client {
 		return &http.Client{Transport: doctorProbeRT{hits: hits}, Timeout: 200 * time.Millisecond}

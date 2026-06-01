@@ -167,13 +167,16 @@ func checkAuthDataReadable(fs afero.Fs, dataDir string) CheckResult {
 	}
 }
 
-// checkStandardProbe runs the legacy relate-port scan, the fallback after the
-// mDNS-discovery check. `pinned == 0` scans the 44222..44232 fallback range;
-// non-zero tries only that port.
+// checkStandardProbe resolves the relate API exactly as the real commands do —
+// mDNS first, then the 44222..44232 port-scan fallback — and reports the origin
+// the CLI will authenticate against. It must use Discover (not bare ProbePort):
+// a new Desktop signs its JWT with the 127.0.0.1 origin mDNS yields, so probing
+// only the localhost port scan would thread the wrong origin into the
+// authenticated probe and surface a false 401. `pinned != 0` confirms that port.
 func checkStandardProbe(ctx context.Context, pinned int) CheckResult {
-	probe, err := desktopclient.ProbePort(ctx, pinned)
+	probe, err := desktopclient.Discover(ctx, pinned)
 	if err != nil {
-		detail := "No relate server answered on the 44222..44232 fallback range (after mDNS found nothing)."
+		detail := "No relate server found via mDNS or the 44222..44232 port scan."
 		hint := "Start Neo4j Desktop 2 from your applications menu, or pass --port if it's on a non-default port."
 		if pinned != 0 {
 			detail = fmt.Sprintf("No relate server answered on port %d.", pinned)
