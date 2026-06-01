@@ -3,7 +3,17 @@
 
 package credentials
 
-import "testing"
+import (
+	"io"
+	"testing"
+)
+
+// LoadFromEnv exposes the unexported loadFromEnv for tests in other packages
+// and for the env_test.go in this package, prior to it being wired into
+// SetStorageMode.
+func (c *Credentials) LoadFromEnv(warnW io.Writer) {
+	c.loadFromEnv(warnW)
+}
 
 // SetNowUnixForTest swaps the package-level nowUnix function for the
 // duration of the test. Restores the previous value via t.Cleanup.

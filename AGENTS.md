@@ -215,6 +215,7 @@ See [`distribution/pypi/README.md`](distribution/pypi/README.md) for maintainer-
 - Config lives at `.golangci.yml` in repo root
 - In CI, `golangci/golangci-lint-action@v6` is used as the lint step — it installs, caches, and runs golangci-lint using `.golangci.yml`. This is equivalent to `make lint`. Renovate will pin the SHA.
 - If `make lint` reports issues whose paths point to a non-existent worktree (e.g. `.claude/worktrees/agent-…`) the cache is stale; run `golangci-lint cache clean` once and re-run — issues evaporate when the source path no longer exists.
+- The `unused` linter (staticcheck U1000) treats a fully-disconnected call subgraph as dead even if you `//nolint:unused` only its entry point. When landing a not-yet-wired helper chain across tasks, expose the entry function from `export_test.go` (e.g. `func (c *Credentials) LoadFromEnv(...) { c.loadFromEnv(...) }`) — a same-package `_test.go` reference marks the whole reachable chain as used, no per-function nolint needed.
 
 ## fileutils Notes
 
