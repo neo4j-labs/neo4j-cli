@@ -36,25 +36,6 @@ type renderResult struct {
 	errMsg string
 }
 
-// jsonStats is the JSON projection of writeStats. Only non-zero counters are
-// emitted (omitempty) so a statement that, say, only created nodes does not
-// carry a wall of zeros. It appears in renderResult JSON solely when the
-// statement mutated state, keeping the read envelope byte-identical.
-type jsonStats struct {
-	NodesCreated         int `json:"nodes_created,omitempty"`
-	NodesDeleted         int `json:"nodes_deleted,omitempty"`
-	RelationshipsCreated int `json:"relationships_created,omitempty"`
-	RelationshipsDeleted int `json:"relationships_deleted,omitempty"`
-	PropertiesSet        int `json:"properties_set,omitempty"`
-	LabelsAdded          int `json:"labels_added,omitempty"`
-	LabelsRemoved        int `json:"labels_removed,omitempty"`
-	IndexesAdded         int `json:"indexes_added,omitempty"`
-	IndexesRemoved       int `json:"indexes_removed,omitempty"`
-	ConstraintsAdded     int `json:"constraints_added,omitempty"`
-	ConstraintsRemoved   int `json:"constraints_removed,omitempty"`
-	SystemUpdates        int `json:"system_updates,omitempty"`
-}
-
 // AsArray implements commonoutput.ResponseData. Each row is returned as a
 // column-name → pre-formatted-string map so that common/output.printTable can
 // render them correctly. Each cell is formatted by formatCell: strings are
@@ -93,36 +74,19 @@ func (r renderResult) MarshalJSON() ([]byte, error) {
 	if rows == nil {
 		rows = []map[string]any{}
 	}
-	var stats *jsonStats
-	if r.stats != nil {
-		stats = &jsonStats{
-			NodesCreated:         r.stats.NodesCreated,
-			NodesDeleted:         r.stats.NodesDeleted,
-			RelationshipsCreated: r.stats.RelationshipsCreated,
-			RelationshipsDeleted: r.stats.RelationshipsDeleted,
-			PropertiesSet:        r.stats.PropertiesSet,
-			LabelsAdded:          r.stats.LabelsAdded,
-			LabelsRemoved:        r.stats.LabelsRemoved,
-			IndexesAdded:         r.stats.IndexesAdded,
-			IndexesRemoved:       r.stats.IndexesRemoved,
-			ConstraintsAdded:     r.stats.ConstraintsAdded,
-			ConstraintsRemoved:   r.stats.ConstraintsRemoved,
-			SystemUpdates:        r.stats.SystemUpdates,
-		}
-	}
 	return json.Marshal(struct {
 		Columns         []string         `json:"columns"`
 		Rows            []map[string]any `json:"rows"`
 		Truncated       bool             `json:"truncated"`
 		ArraysTruncated int              `json:"arrays_truncated"`
-		Stats           *jsonStats       `json:"stats,omitempty"`
+		Stats           *writeStats      `json:"stats,omitempty"`
 		Error           string           `json:"error,omitempty"`
 	}{
 		Columns:         cols,
 		Rows:            rows,
 		Truncated:       r.truncated,
 		ArraysTruncated: r.arraysTruncated,
-		Stats:           stats,
+		Stats:           r.stats,
 		Error:           r.errMsg,
 	})
 }

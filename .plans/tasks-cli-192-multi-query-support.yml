@@ -345,7 +345,7 @@ tasks:
       drops zero counters for writes. formatStatsLine legitimately stays separate (it is
       display strings with singular/plural nouns, not the same shape) — do NOT try to
       merge that in.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "jsonStats type is deleted; writeStats carries the snake_case omitempty json tags; MarshalJSON marshals r.stats directly with no field-by-field copy block"
@@ -353,6 +353,7 @@ tasks:
       - "Existing output_test.go / stats_test.go regression locks pass unchanged (read envelope stays {columns,rows,truncated,arrays_truncated})"
       - "make test, make fmt-check, make lint all clean"
     source: review
+    completed_at: 2026-06-01T10:15:00Z
 
   - id: task-014
     title: 'Move const forbiddenTxTypeCode out from between doc comment and func'

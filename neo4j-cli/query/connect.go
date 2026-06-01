@@ -64,18 +64,18 @@ type queryResult struct {
 // statement's ResultSummary. It is nil for pure reads (statsFromCounters returns
 // nil when the counters report no updates) so read output stays unchanged.
 type writeStats struct {
-	NodesCreated         int
-	NodesDeleted         int
-	RelationshipsCreated int
-	RelationshipsDeleted int
-	PropertiesSet        int
-	LabelsAdded          int
-	LabelsRemoved        int
-	IndexesAdded         int
-	IndexesRemoved       int
-	ConstraintsAdded     int
-	ConstraintsRemoved   int
-	SystemUpdates        int
+	NodesCreated         int `json:"nodes_created,omitempty"`
+	NodesDeleted         int `json:"nodes_deleted,omitempty"`
+	RelationshipsCreated int `json:"relationships_created,omitempty"`
+	RelationshipsDeleted int `json:"relationships_deleted,omitempty"`
+	PropertiesSet        int `json:"properties_set,omitempty"`
+	LabelsAdded          int `json:"labels_added,omitempty"`
+	LabelsRemoved        int `json:"labels_removed,omitempty"`
+	IndexesAdded         int `json:"indexes_added,omitempty"`
+	IndexesRemoved       int `json:"indexes_removed,omitempty"`
+	ConstraintsAdded     int `json:"constraints_added,omitempty"`
+	ConstraintsRemoved   int `json:"constraints_removed,omitempty"`
+	SystemUpdates        int `json:"system_updates,omitempty"`
 }
 
 // statsFromCounters copies a driver Counters into the driver-free writeStats,

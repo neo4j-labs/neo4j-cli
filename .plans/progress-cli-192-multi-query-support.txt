@@ -70,3 +70,7 @@ Files: ~2 (errors.go, errors_test.go)
 
 ## REVIEW — 2026-06-01T07:09:48Z
 Added 2 review tasks (task-013..task-014).
+
+## TASK-013 — 2026-06-01T10:15:00Z
+Collapsed jsonStats into writeStats: moved snake_case omitempty json tags onto writeStats, deleted jsonStats type and the 12-field copy block in MarshalJSON, now marshal r.stats directly. JSON byte-identical; regression locks pass.
+Files: neo4j-cli/query/connect.go (~mod), neo4j-cli/query/output.go (~mod)
