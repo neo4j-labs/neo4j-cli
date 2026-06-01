@@ -32,14 +32,14 @@ tasks:
       `docker exec <name> <args...>`, wrapping stderr verbatim and redacting
       AUTH/PASSWORD via the existing redactArgs/redactString). Add a matching
       recording Exec method to fakeDockerClient in helpers_test.go.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "dockerClient interface and execClient implement Exec; argv is `docker exec <name> <args...>`"
       - "Non-zero exit wraps docker stderr in a clierr.UsageError with AUTH/PASSWORD redacted"
       - "fakeDockerClient records Exec calls for assertion in tests"
       - "Unit test covers the Exec success and error paths without a real docker daemon"
-    completed_at: null
+    completed_at: 2026-06-01T13:13:20Z
 
   - id: task-003
     title: 'Implement docker PushToAura orchestrator (dump + upload)'

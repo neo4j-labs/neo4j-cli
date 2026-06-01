@@ -7,3 +7,8 @@ Decisions: overwrite is passed through UploadTarget (defaulted true at the deplo
 Extracted buildCreateInstanceBody + createAndStoreInstance into create_core.go and refactored NewCreateCmd to call them with zero behavioural change; NewDeployCmd can now reuse the same provisioning + credential-storage path.
 Files: neo4j-cli/aura/internal/subcommands/instance/create_core.go (new), neo4j-cli/aura/internal/subcommands/instance/create.go (refactored)
 Decisions: createAndStoreInstance returns a nil instance map (nil error) for any status other than 202/200, preserving the original output guard; credential-store warnings route to an injected warnOut io.Writer instead of cmd.ErrOrStderr() directly.
+
+## TASK-002 — 2026-06-01T13:13:20Z
+Added Exec(ctx, name, args) to dockerClient interface and execClient (shells `docker exec <name> <args...>` via c.run, trims stdout; non-zero exit reuses the shared redacted clierr.UsageError path). Added recording Exec to fakeDockerClient (ExecCalls []ExecCall{Name, Args} + ExecFn override). Unit tests drive the real execClient against a POSIX shell stub docker binary on PATH.
+Files: neo4j-cli/internal/subcommands/docker/client.go (M), client_test.go (M), helpers_test.go (M)
+Decisions: Tested via real stub-docker-on-PATH rather than only the fake, so argv shaping + redaction in the production execClient path are covered; the two Exec tests skip on Windows (Unix-shell stub).
