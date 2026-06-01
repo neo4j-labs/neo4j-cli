@@ -319,7 +319,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			}
 			argv = append(argv, "-p", fmt.Sprintf("%d:7474", httpPort))
 			argv = append(argv, "-p", fmt.Sprintf("%d:7687", boltPort))
-			argv = append(argv, "-e", "NEO4J_AUTH=neo4j/"+resolvedPassword)
+			// Pass NEO4J_AUTH via the docker process environment + `-e NEO4J_AUTH`
+			// passthrough (NAME only) so the generated password never lands in the
+			// host docker CLI argv (world-readable /proc/<pid>/cmdline). It still
+			// reaches the container exactly as before. (Config.Env persistence via
+			// docker inspect is inherent to NEO4J_AUTH provisioning and out of scope.)
+			argv = append(argv, "-e", "NEO4J_AUTH")
 			if edition == "enterprise" {
 				licenseValue := "eval"
 				if acceptLicense {
@@ -354,7 +359,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			argv = append(argv, "--label", LabelEphemeral+"="+ephemeralLabelValue)
 			argv = append(argv, image)
 
-			if _, err := client.Run(ctx, argv); err != nil {
+			if _, err := client.RunWithEnv(ctx, argv, []string{"NEO4J_AUTH=neo4j/" + resolvedPassword}); err != nil {
 				// dockerClient.Run already wraps stderr verbatim (REQ-F-061)
 				// in a clierr.UsageError, so we surface as-is.
 				cmd.SilenceUsage = true

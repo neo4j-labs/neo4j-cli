@@ -267,7 +267,7 @@ tasks:
       plumbing introduced in task-011 (e.g. a RunWithEnv variant sharing the same
       cmd.Env mechanism). This narrows readability from "any local user via
       cmdline" to "docker-socket users via docker inspect", a real reduction.
-    status: pending
+    status: completed
     dependencies:
       - task-011
     acceptance_criteria:
@@ -275,4 +275,4 @@ tasks:
       - "create's existing tests still pass (container still gets the password; credential storage unchanged), with a test asserting the password value is absent from the recorded docker argv"
       - "make test, make fmt-check, and make lint are clean"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T14:20:59Z

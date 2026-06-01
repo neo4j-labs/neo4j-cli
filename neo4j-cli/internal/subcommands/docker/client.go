@@ -85,6 +85,13 @@ type dockerClient interface {
 	// Run shells `docker run -d ...args` and returns the container ID (stdout)
 	// or a typed error including captured stderr (REQ-F-061).
 	Run(ctx context.Context, args []string) (string, error)
+	// RunWithEnv is the env-aware variant of Run: each KEY=VALUE in env is set
+	// on the docker process environment via runEnv so secret values travel
+	// through /proc/<pid>/environ instead of the world-readable argv. Callers
+	// pair this with the `-e KEY` passthrough form (NAME only) in args so docker
+	// forwards the value from its own environment into the container. Run is
+	// RunWithEnv with nil env.
+	RunWithEnv(ctx context.Context, args []string, env []string) (string, error)
 	// Start shells `docker start <name>`.
 	Start(ctx context.Context, name string) error
 	// Stop shells `docker stop <name>`.
@@ -232,7 +239,11 @@ func redactArgs(args []string) []string {
 }
 
 func (c *execClient) Run(ctx context.Context, args []string) (string, error) {
-	out, err := c.run(ctx, append([]string{"run", "-d"}, args...)...)
+	return c.RunWithEnv(ctx, args, nil)
+}
+
+func (c *execClient) RunWithEnv(ctx context.Context, args []string, env []string) (string, error) {
+	out, err := c.runEnv(ctx, env, append([]string{"run", "-d"}, args...)...)
 	if err != nil {
 		return "", err
 	}

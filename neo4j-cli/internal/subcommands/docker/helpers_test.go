@@ -15,6 +15,7 @@ import (
 type fakeDockerClient struct {
 	// Recorded args.
 	RunCalls         [][]string
+	RunEnvCalls      []RunCall
 	StartCalls       []string
 	StopCalls        []string
 	RemoveForceCalls []string
@@ -36,6 +37,14 @@ type fakeDockerClient struct {
 	PsEntries  []PsEntry
 }
 
+// RunCall records the args + env of a single fakeDockerClient.RunWithEnv
+// invocation so tests can assert that secret values travel via Env (the
+// docker process environment) and never appear in the recorded Args.
+type RunCall struct {
+	Args []string
+	Env  []string
+}
+
 // ExecCall records the arguments of a single fakeDockerClient.Exec /
 // ExecWithEnv invocation so tests can assert the target container name, the
 // argv passed, and (for ExecWithEnv) the env forwarded through the docker
@@ -53,7 +62,15 @@ func newFakeDockerClient() *fakeDockerClient {
 }
 
 func (f *fakeDockerClient) Run(ctx context.Context, args []string) (string, error) {
+	return f.RunWithEnv(ctx, args, nil)
+}
+
+func (f *fakeDockerClient) RunWithEnv(ctx context.Context, args []string, env []string) (string, error) {
 	f.RunCalls = append(f.RunCalls, append([]string(nil), args...))
+	f.RunEnvCalls = append(f.RunEnvCalls, RunCall{
+		Args: append([]string(nil), args...),
+		Env:  append([]string(nil), env...),
+	})
 	if f.RunFn != nil {
 		return f.RunFn(ctx, args)
 	}

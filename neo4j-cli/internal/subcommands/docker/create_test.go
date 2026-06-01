@@ -189,9 +189,19 @@ func TestCreate_HappyPath_StoresCredentialAndSetsExpectedArgs(t *testing.T) {
 	// Port publishings.
 	assert.True(t, containsPair(argv, "-p", "7474:7474"), "argv missing HTTP -p mapping: %v", argv)
 	assert.True(t, containsPair(argv, "-p", "7687:7687"), "argv missing Bolt -p mapping: %v", argv)
-	// NEO4J_AUTH env carries the generated password.
-	assert.True(t, containsPair(argv, "-e", "NEO4J_AUTH=neo4j/"+expectedPassword),
-		"argv missing NEO4J_AUTH env: %v", argv)
+	// NEO4J_AUTH is passed via the `-e NEO4J_AUTH` passthrough form (NAME only);
+	// the password value must NOT appear anywhere in the argv (REQ-NF-004 — the
+	// docker CLI argv is world-readable via /proc/<pid>/cmdline).
+	assert.True(t, containsPair(argv, "-e", "NEO4J_AUTH"),
+		"argv missing NEO4J_AUTH passthrough: %v", argv)
+	for _, a := range argv {
+		assert.NotContains(t, a, expectedPassword,
+			"generated password must not appear in docker run argv: %v", argv)
+	}
+	// The password reaches docker via the process environment instead.
+	require.Len(t, fake.RunEnvCalls, 1)
+	assert.Contains(t, fake.RunEnvCalls[0].Env, "NEO4J_AUTH=neo4j/"+expectedPassword,
+		"NEO4J_AUTH value must travel via the docker process environment, not argv")
 	// Enterprise license env present and default value is "eval" (REQ-F-012).
 	assert.True(t, containsPair(argv, "-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval"),
 		"argv missing license env: %v", argv)
@@ -277,7 +287,12 @@ func TestCreate_ExplicitPassword_HonouredAndSurfaced(t *testing.T) {
 	fake, cfg, stdout, err := runCreate(t, "--name dev --password mysecret --format json")
 	require.NoError(t, err)
 	argv := runArgv(t, fake)
-	assert.True(t, containsPair(argv, "-e", "NEO4J_AUTH=neo4j/mysecret"))
+	assert.True(t, containsPair(argv, "-e", "NEO4J_AUTH"), "argv missing NEO4J_AUTH passthrough: %v", argv)
+	for _, a := range argv {
+		assert.NotContains(t, a, "mysecret", "password must not appear in docker run argv: %v", argv)
+	}
+	require.Len(t, fake.RunEnvCalls, 1)
+	assert.Contains(t, fake.RunEnvCalls[0].Env, "NEO4J_AUTH=neo4j/mysecret")
 
 	// JSON output carries the password verbatim.
 	var rows []map[string]any
@@ -1604,7 +1619,7 @@ func TestCreate_VersionValidation(t *testing.T) {
 // TestCreate_NoPrintPassword_OmitsPasswordFromOutput — CLI-161. When the
 // flag is set, every output format (JSON, default table, TOON) must omit
 // the `password` field from rendered stdout. The generated password still
-// flows into the docker run argv (NEO4J_AUTH=...) and into the persisted
+// flows into docker (via the NEO4J_AUTH env passthrough) and into the persisted
 // dbms credential — only the rendering surface is suppressed.
 func TestCreate_NoPrintPassword_OmitsPasswordFromOutput(t *testing.T) {
 	origRand := randSource
