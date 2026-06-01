@@ -29,6 +29,8 @@ import (
 // concrete *neo4j.Neo4jError type (real driver path), then by string-prefix
 // match on the error message (tests inject plain `errors.New("Neo.ClientError…")`
 // without constructing a real Neo4jError). A nil error is returned unchanged.
+const forbiddenTxTypeCode = "Neo.ClientError.Transaction.ForbiddenDueToTransactionType"
+
 func categorizeBoltError(err error) error {
 	if err == nil {
 		return nil
@@ -60,6 +62,9 @@ func categorizeBoltError(err error) error {
 	// upstream/transport failures the user can retry.
 	var ne *neo4j.Neo4jError
 	if errors.As(err, &ne) {
+		if ne.Code == forbiddenTxTypeCode {
+			return schemaTxError(err)
+		}
 		if ne.Classification() == "ClientError" {
 			return validationFrom(err)
 		}
@@ -71,6 +76,8 @@ func categorizeBoltError(err error) error {
 	// as an upstream/transport failure.
 	msg := err.Error()
 	switch {
+	case strings.Contains(msg, forbiddenTxTypeCode):
+		return schemaTxError(err)
 	case strings.Contains(msg, "Neo.ClientError."):
 		return validationFrom(err)
 	case strings.Contains(msg, "Neo.TransientError."),
@@ -79,6 +86,17 @@ func categorizeBoltError(err error) error {
 	}
 
 	return upstreamFrom(err)
+}
+
+// schemaTxError handles ForbiddenDueToTransactionType: Neo4j forbids mixing
+// schema changes and data writes in one transaction, which only surfaces under
+// --atomic (everything in a single managed transaction). Stays a validation
+// error (exit 6) but carries a concrete next step the bare driver message lacks.
+func schemaTxError(err error) error {
+	return clierr.NewValidationError("%w", err).WithSuggestion(
+		"schema changes (CREATE/DROP CONSTRAINT or INDEX) cannot share a transaction " +
+			"with data writes; re-run without --atomic so each statement gets its own " +
+			"transaction, or move the schema statements into a separate invocation")
 }
 
 // validationFrom returns a NewValidationError that preserves the underlying

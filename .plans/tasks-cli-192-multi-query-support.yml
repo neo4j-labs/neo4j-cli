@@ -317,7 +317,8 @@ tasks:
       transaction with data writes; re-run without --atomic so each statement gets its
       own transaction, or move the schema statements into a separate invocation. Touches
       no cobra help text, so no bundle regeneration.
-    status: pending
+    status: completed
+    completed_at: 2026-06-01T09:05:00Z
     dependencies: []
     acceptance_criteria:
       - "categorizeBoltError detects ForbiddenDueToTransactionType (typed and plain-text variants) and returns a validation error (exit 6) carrying a Suggestion containing 'without --atomic'"

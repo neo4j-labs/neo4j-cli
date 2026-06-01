@@ -63,3 +63,7 @@ Files: ~2 mod (split.go, split_test.go)
 ## TASK-011 — 2026-06-01T08:20:00Z
 Added persistent --continue-on-error flag (non-atomic only; mutually exclusive with --atomic, returns a usage error before any DB call). Default loop refactored into runOneStatement helper; on error under the flag it records an error-placeholder renderResult (new errMsg field → additive "error,omitempty" JSON key), writes "statement N: <err>" to stderr, and continues, rendering all results then returning a validation error (exit 6). Fail-fast path byte-identical when off. Updated parent Long + added a multi-statement --rw Example; regenerated skill bundle.
 Files: ~5 mod (query.go, run.go, output.go, run_test.go, output_test.go), ~1 mod (skill bundle references/query.md)
+
+## TASK-012 — 2026-06-01T09:05:00Z
+Added schemaTxError remediation in categorizeBoltError for Neo.ClientError.Transaction.ForbiddenDueToTransactionType (typed + plain-text), routing to a validation error (exit 6) with a "re-run without --atomic" suggestion; ordinary SyntaxError stays suggestion-free.
+Files: ~2 (errors.go, errors_test.go)
