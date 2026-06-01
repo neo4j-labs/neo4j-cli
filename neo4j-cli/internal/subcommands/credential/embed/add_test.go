@@ -65,6 +65,12 @@ func TestEmbedCredentialAdd(t *testing.T) {
 			wantErr:      `required flag(s) "name" not set`,
 		},
 		{
+			name:         "reserved name 'env' is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name env --provider openai --model m --api-key sk-...",
+			wantErr:      `credential name "env" is reserved`,
+		},
+		{
 			name:         "missing --provider produces usage error",
 			initialCreds: []map[string]interface{}{},
 			command:      "add --name x --model m",

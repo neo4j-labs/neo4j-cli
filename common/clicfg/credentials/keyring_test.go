@@ -14,8 +14,11 @@ import (
 )
 
 // mockKeyringProvider is a simple in-memory KeyringProvider used in tests.
+// setCalls counts the number of Set invocations so tests can assert zero
+// keyring writes occurred (e.g. in env mode).
 type mockKeyringProvider struct {
-	store map[string]map[string]string
+	store    map[string]map[string]string
+	setCalls int
 }
 
 func newMockKeyringProvider() *mockKeyringProvider {
@@ -32,6 +35,7 @@ func (m *mockKeyringProvider) Get(service, user string) (string, error) {
 }
 
 func (m *mockKeyringProvider) Set(service, user, password string) error {
+	m.setCalls++
 	if m.store[service] == nil {
 		m.store[service] = make(map[string]string)
 	}

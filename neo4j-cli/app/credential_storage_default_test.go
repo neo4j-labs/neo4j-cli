@@ -109,6 +109,36 @@ func TestInitCredentialStorageDefault(t *testing.T) {
 	}
 }
 
+// TestInitCredentialStorageDefault_NeverSelectsEnv verifies that the first-run
+// default logic never auto-selects env mode, regardless of whether credentials
+// exist. env is explicitly settable only (REQ-F: non-goal of auto-selection).
+func TestInitCredentialStorageDefault_NeverSelectsEnv(t *testing.T) {
+	tests := []struct {
+		name            string
+		credentialsJSON string
+	}{
+		{name: "no credentials", credentialsJSON: "{}"},
+		{name: "existing credentials", credentialsJSON: credentialsJSONWithAura},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gokeyring.MockInit()
+
+			fs, err := testfs.GetTestFs("{}", tc.credentialsJSON)
+			require.NoError(t, err)
+
+			cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+			var stderr bytes.Buffer
+			initCredentialStorageDefault(cfg, &stderr)
+
+			assert.NotEqual(t, credentials.StorageModeEnv, cfg.Credentials.StorageMode())
+			assert.NotEqual(t, credentials.StorageModeEnv, cfg.Global.CredentialStorage())
+		})
+	}
+}
+
 // TestInitCredentialStorageDefault_NoCreds_KeyringUnavailable verifies that
 // when no credentials exist but the OS keyring daemon is unavailable, the
 // function falls back to insecure mode and emits a warning to stderr.

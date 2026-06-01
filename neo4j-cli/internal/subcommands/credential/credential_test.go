@@ -190,6 +190,36 @@ func TestCredentialAddAuraClient(t *testing.T) {
 	}
 }
 
+// TestCredentialAddAuraClient_EnvModeWarnsButAllows verifies that adding an
+// aura-client credential while credential-storage is env prints the
+// not-persisted warning but still succeeds (warn-but-allow).
+func TestCredentialAddAuraClient_EnvModeWarnsButAllows(t *testing.T) {
+	gokeyring.MockInit()
+	h := newCredentialTestHelper(t)
+
+	err := h.executeCommandWithConfig(
+		"aura-client add --rw --name work --client-id id --client-secret secret",
+		`{"credential-storage":"env"}`,
+	)
+	assert.NoError(t, err, "env mode is warn-but-allow; the command must not error")
+
+	errOut, readErr := io.ReadAll(h.err)
+	assert.Nil(t, readErr)
+	assert.Contains(t, string(errOut), "not persisted")
+}
+
+// TestCredentialAddAuraClient_ReservedEnvName verifies that the reserved "env"
+// credential name is rejected at the command level.
+func TestCredentialAddAuraClient_ReservedEnvName(t *testing.T) {
+	h := newCredentialTestHelper(t)
+
+	h.executeCommand("aura-client add --rw --name env --client-id id --client-secret secret") //nolint:errcheck // error checked via assertErr
+
+	errOut, readErr := io.ReadAll(h.err)
+	assert.Nil(t, readErr)
+	assert.Contains(t, string(errOut), "reserved")
+}
+
 // --- list aura-client tests ---
 
 func TestCredentialListAuraClient(t *testing.T) {

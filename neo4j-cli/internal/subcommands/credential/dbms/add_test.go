@@ -168,6 +168,12 @@ func TestDbmsCredentialAdd(t *testing.T) {
 			wantErr:      `credential name "desktop-connection:abc123" is reserved`,
 		},
 		{
+			name:         "reserved name 'env' is rejected",
+			initialCreds: []map[string]interface{}{},
+			command:      "add --name env --username neo4j --password secret --uri bolt://localhost:7687",
+			wantErr:      `credential name "env" is reserved`,
+		},
+		{
 			name:            "custom database-name is stored",
 			initialCreds:    []map[string]interface{}{},
 			initialDefault:  "",

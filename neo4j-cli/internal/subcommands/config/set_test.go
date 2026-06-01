@@ -142,6 +142,12 @@ func TestConfigSet(t *testing.T) {
 			wantConfigValue: "insecure",
 		},
 		{
+			name:            "set credential-storage to env with rw succeeds",
+			command:         "config set --rw credential-storage env",
+			wantConfigKey:   "credential-storage",
+			wantConfigValue: "env",
+		},
+		{
 			name:         "set credential-storage to invalid value with rw returns error",
 			command:      "config set --rw credential-storage plaintext",
 			wantErr:      "Error: invalid value for 'credential-storage': plaintext (valid values: keyring, insecure, env)",
@@ -234,6 +240,40 @@ func TestConfigSet_CredentialStorageMigration(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, "s3cr3t", secret)
 		h.assertCredentialsValue("aura.credentials.0.client-secret", "")
+	})
+
+	t.Run("switching to env runs no migration and persists the value", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newNeo4jTestHelper(t)
+		// Start from a populated insecure store; switching to env must not touch it.
+		h.executeCommandWithCredentials("config set --rw credential-storage env", credentialsWithAura)
+		h.assertErr("")
+		h.assertConfigValue("credential-storage", "env")
+		// No migration runs, so the plaintext secret stays in credentials.json.
+		h.assertCredentialsValue("aura.credentials.0.client-secret", "s3cr3t")
+	})
+
+	t.Run("switching from env to keyring is blocked and leaves config unchanged", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newNeo4jTestHelper(t)
+		h.setConfigValue("credential-storage", "env")
+		h.executeCommandWithCredentials("config set --rw credential-storage keyring", credentialsWithAura)
+		errOut, err := io.ReadAll(h.err)
+		assert.Nil(t, err)
+		assert.Contains(t, string(errOut), "env")
+		// Config value must remain env.
+		h.assertConfigValue("credential-storage", "env")
+	})
+
+	t.Run("switching from env to insecure is blocked and leaves config unchanged", func(t *testing.T) {
+		gokeyring.MockInit()
+		h := newNeo4jTestHelper(t)
+		h.setConfigValue("credential-storage", "env")
+		h.executeCommandWithCredentials("config set --rw credential-storage insecure", credentialsWithAura)
+		errOut, err := io.ReadAll(h.err)
+		assert.Nil(t, err)
+		assert.Contains(t, string(errOut), "env")
+		h.assertConfigValue("credential-storage", "env")
 	})
 
 	t.Run("setting credential-storage insecure to insecure is a no-op", func(t *testing.T) {
