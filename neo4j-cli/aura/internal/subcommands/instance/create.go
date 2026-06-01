@@ -6,12 +6,10 @@ package instance
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
@@ -72,42 +70,21 @@ This subcommand returns your instance ID, initial credentials, connection URL al
 
 For Enterprise instances you can specify a --customer-managed-key-id flag to use a Customer Managed Key for encryption.`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if _type != "free-db" {
-				cmd.MarkFlagRequired(memoryFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-				cmd.MarkFlagRequired(regionFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-			} else {
-				if memory != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--memory" flag: must not be set when "--type" flag is set to "free-db"`, memory)
-				}
-				if region != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--region" flag: must not be set when "--type" flag is set to "free-db"`, region)
-				}
-				if cloudProvider != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free-db"`, cloudProvider)
-				}
-			}
-
-			if version != "4" && version != "5" {
-				return fmt.Errorf(`invalid argument "%s" for "--version" flag: must be one of "4" or "5"`, version)
+			if err := validateInstanceFlags(cmd, cfg, instanceFlags{
+				instanceType:        _type,
+				memory:              memory,
+				region:              region,
+				cloudProvider:       cloudProvider,
+				version:             version,
+				credentialName:      credentialName,
+				credentialNameSet:   cmd.Flags().Changed(credentialNameFlag),
+				noCredentialStorage: noCredentialStorage,
+			}); err != nil {
+				return err
 			}
 
 			if graphAnalyticsPlugin && _type != "professional-db" {
 				return errors.New(`"--graph-analytics-plugin" flag can only be set when "--type" flag is set to "professional-db"`)
-			}
-
-			credentialNameChanged := cmd.Flags().Changed(credentialNameFlag)
-
-			if credentialNameChanged && noCredentialStorage {
-				return fmt.Errorf(`"--%s" and "--%s" cannot be used together`, credentialNameFlag, noCredentialStorageFlag)
-			}
-
-			if credentialNameChanged && credentialName == "" {
-				return fmt.Errorf(`invalid argument "" for "--%s" flag: name must not be empty`, credentialNameFlag)
-			}
-
-			if !noCredentialStorage && (cfg.Credentials == nil || cfg.Credentials.Dbms == nil) {
-				return fmt.Errorf("credential storage is not available; use --%s to skip storing credentials locally", noCredentialStorageFlag)
 			}
 
 			return nil
@@ -120,22 +97,9 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			// Auto-generate a default name when --name is omitted.
-			if name == "" {
-				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
-					Method:      http.MethodGet,
-					QueryParams: map[string]string{"tenantId": resolvedProjectID},
-				})
-				if listErr != nil {
-					return listErr
-				}
-				listData := api.ParseBody(listBody)
-				existingNames := make([]string, 0, len(listData.AsArray()))
-				for _, inst := range listData.AsArray() {
-					if n, ok := inst["name"].(string); ok {
-						existingNames = append(existingNames, n)
-					}
-				}
-				name = defaultInstanceName(existingNames)
+			name, err = resolveInstanceName(cfg, name, resolvedProjectID)
+			if err != nil {
+				return err
 			}
 
 			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
@@ -152,24 +116,7 @@ For Enterprise instances you can specify a --customer-managed-key-id flag to use
 			}
 
 			if instance != nil {
-				if noCredentialPrint {
-					delete(instance, "password")
-				}
-
-				// Rename tenant_id -> project_id before output
-				renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")
-				renamedInstance, _ := renamed.GetSingleOrError()
-
-				fields := []string{"id", "name", "project_id", "connection_url", "username"}
-				if !noCredentialPrint {
-					fields = append(fields, "password")
-				}
-				if !noCredentialStorage {
-					fields = append(fields, "credential_name")
-				}
-				fields = append(fields, "cloud_provider", "region", "type")
-
-				output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(renamedInstance), fields)
+				renderInstanceResult(cmd, cfg, instance, noCredentialPrint, noCredentialStorage)
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for instance to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable

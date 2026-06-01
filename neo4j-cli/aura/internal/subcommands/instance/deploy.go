@@ -8,14 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
-	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker"
@@ -145,41 +143,16 @@ The command waits for the instance to be ready and for the data load to finish b
 				return clierr.NewUsageError(`invalid argument "system" for "--%s" flag: the system database cannot be cloned`, databaseFlag)
 			}
 
-			if _type != "free-db" {
-				cmd.MarkFlagRequired(memoryFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-				cmd.MarkFlagRequired(regionFlag)        //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-				cmd.MarkFlagRequired(cloudProviderFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-			} else {
-				if memory != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--memory" flag: must not be set when "--type" flag is set to "free-db"`, memory)
-				}
-				if region != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--region" flag: must not be set when "--type" flag is set to "free-db"`, region)
-				}
-				if cloudProvider != "" {
-					return fmt.Errorf(`invalid argument "%s" for "--cloud-provider" flag: must not be set when "--type" flag is set to "free-db"`, cloudProvider)
-				}
-			}
-
-			if version != "4" && version != "5" {
-				return fmt.Errorf(`invalid argument "%s" for "--version" flag: must be one of "4" or "5"`, version)
-			}
-
-			credentialNameChanged := cmd.Flags().Changed(credentialNameFlag)
-
-			if credentialNameChanged && noCredentialStorage {
-				return fmt.Errorf(`"--%s" and "--%s" cannot be used together`, credentialNameFlag, noCredentialStorageFlag)
-			}
-
-			if credentialNameChanged && credentialName == "" {
-				return fmt.Errorf(`invalid argument "" for "--%s" flag: name must not be empty`, credentialNameFlag)
-			}
-
-			if !noCredentialStorage && (cfg.Credentials == nil || cfg.Credentials.Dbms == nil) {
-				return fmt.Errorf("credential storage is not available; use --%s to skip storing credentials locally", noCredentialStorageFlag)
-			}
-
-			return nil
+			return validateInstanceFlags(cmd, cfg, instanceFlags{
+				instanceType:        _type,
+				memory:              memory,
+				region:              region,
+				cloudProvider:       cloudProvider,
+				version:             version,
+				credentialName:      credentialName,
+				credentialNameSet:   cmd.Flags().Changed(credentialNameFlag),
+				noCredentialStorage: noCredentialStorage,
+			})
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
@@ -191,22 +164,9 @@ The command waits for the instance to be ready and for the data load to finish b
 				return err
 			}
 
-			if name == "" {
-				listBody, _, listErr := api.MakeRequest(cfg, "/instances", &api.RequestConfig{
-					Method:      http.MethodGet,
-					QueryParams: map[string]string{"tenantId": resolvedProjectID},
-				})
-				if listErr != nil {
-					return listErr
-				}
-				listData := api.ParseBody(listBody)
-				existingNames := make([]string, 0, len(listData.AsArray()))
-				for _, inst := range listData.AsArray() {
-					if n, ok := inst["name"].(string); ok {
-						existingNames = append(existingNames, n)
-					}
-				}
-				name = defaultInstanceName(existingNames)
+			name, err = resolveInstanceName(cfg, name, resolvedProjectID)
+			if err != nil {
+				return err
 			}
 
 			body := buildCreateInstanceBody(version, region, name, _type, cloudProvider, customerManagedKeyId, memory, vectorOptimized, graphAnalyticsPlugin, resolvedProjectID)
@@ -257,7 +217,8 @@ The command waits for the instance to be ready and for the data load to finish b
 				fmt.Fprintf(errOut, "Error: data load failed; the instance %q was created and left in place — retry the upload or delete it with `neo4j-cli aura instance delete %s --rw`.\n", instanceID, instanceID) //nolint:errcheck // narration to stderr; write errors are not actionable
 			}
 
-			printDeployResult(cmd, cfg, instance, deployStatus, noCredentialPrint, noCredentialStorage)
+			instance["deploy_status"] = deployStatus
+			renderInstanceResult(cmd, cfg, instance, noCredentialPrint, noCredentialStorage, "deploy_status")
 
 			return pushErr
 		},
@@ -294,29 +255,6 @@ The command waits for the instance to be ready and for the data load to finish b
 func stringField(m map[string]any, key string) string {
 	v, _ := m[key].(string)
 	return v
-}
-
-// printDeployResult renders the instance fields plus the discrete deploy_status
-// field, renaming tenant_id -> project_id like instance create does.
-func printDeployResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[string]any, deployStatus string, noCredentialPrint, noCredentialStorage bool) {
-	if noCredentialPrint {
-		delete(instance, "password")
-	}
-	instance["deploy_status"] = deployStatus
-
-	renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")
-	renamedInstance, _ := renamed.GetSingleOrError()
-
-	fields := []string{"id", "name", "project_id", "connection_url", "username"}
-	if !noCredentialPrint {
-		fields = append(fields, "password")
-	}
-	if !noCredentialStorage {
-		fields = append(fields, "credential_name")
-	}
-	fields = append(fields, "cloud_provider", "region", "type", "deploy_status")
-
-	output.PrintBodyMap(cmd, cfg, api.NewSingleValueResponseData(renamedInstance), fields)
 }
 
 // deployViaDesktop manages the source DBMS lifecycle around a Desktop upload:
