@@ -154,6 +154,37 @@ func TestPushToAura_MissingCredential_UsageError(t *testing.T) {
 	assert.Empty(t, fake.ExecCalls)
 }
 
+func TestPushToAura_InjectionDatabaseName_Rejected(t *testing.T) {
+	for _, name := range []string{
+		"neo4j; DROP DATABASE neo4j",
+		"neo4j` STOP DATABASE system; //",
+		"neo4j foo",
+		"",
+		"1neo4j",
+		"neo4j\nSTART DATABASE system",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := newDeployTestCfg(t)
+			require.NoError(t, cfg.Credentials.Dbms.Add("dev", "neo4j", "srcpw", "neo4j", "neo4j://localhost:7687"))
+
+			starts := stubStopStartFn(t, nil)
+			fake := newFakeDockerClient()
+
+			err := PushToAura(context.Background(), cfg, fake, "dev", name, AuraTarget{
+				URI:      "neo4j+s://abc.databases.neo4j.io",
+				Username: "neo4j",
+				Password: "aurasecret",
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid database name")
+
+			// The injectable name must never reach the Cypher builder or docker.
+			assert.Empty(t, *starts, "no STOP/START DATABASE statement may run for an invalid name")
+			assert.Empty(t, fake.ExecCalls, "no neo4j-admin call may run for an invalid name")
+		})
+	}
+}
+
 func TestPushToAura_TargetPasswordRedactedInError(t *testing.T) {
 	cfg := newDeployTestCfg(t)
 	require.NoError(t, cfg.Credentials.Dbms.Add("dev", "neo4j", "srcpw", "neo4j", "neo4j://localhost:7687"))

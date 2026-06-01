@@ -204,7 +204,7 @@ tasks:
       a Neo4j identifier pattern before use, or quote it as a backtick-escaped
       identifier, so a name like `neo4j; DROP ...` cannot inject. Keep the change
       minimal and covered by a unit test.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -212,4 +212,4 @@ tasks:
       - "A unit test covers rejection (or safe quoting) of an injection-style database name"
       - "make test, make fmt-check, and make lint are clean"
     source: review
-    completed_at: null
+    completed_at: 2026-06-01T17:10:00Z

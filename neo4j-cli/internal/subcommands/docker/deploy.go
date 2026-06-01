@@ -6,12 +6,34 @@ package docker
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 )
+
+// databaseNamePattern is a conservative Neo4j database-name rule: an ASCII
+// letter followed by letters, digits, dots, or dashes (1-63 chars total). It is
+// stricter than the full Neo4j grammar on purpose — the name is concatenated
+// into admin Cypher (STOP/START DATABASE) and passed to neo4j-admin, so
+// rejecting anything outside this set closes the injection seam without needing
+// to quote.
+var databaseNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9.-]{0,62}$`)
+
+// validateDatabaseName guards the source --database value before it is
+// interpolated into admin Cypher. A name carrying spaces, semicolons, backticks,
+// or any other non-identifier character cannot reach the statement builder.
+func validateDatabaseName(database string) error {
+	if !databaseNamePattern.MatchString(database) {
+		return clierr.NewUsageError(
+			"invalid database name %q: must start with a letter and contain only letters, digits, dots, or dashes (1-63 characters)",
+			database,
+		)
+	}
+	return nil
+}
 
 // dumpPath is the in-container scratch directory neo4j-admin dumps into and
 // uploads from. Lives under /tmp so it never collides with a bind-mounted
@@ -56,6 +78,10 @@ var stopStartFn = stopStartDatabase
 // redactString, which masks `--to-password=<v>` (the regex matches the
 // PASSWORD substring), so the secret never reaches stderr or logs.
 func PushToAura(ctx context.Context, cfg *clicfg.Config, client dockerClient, containerName, database string, target AuraTarget) error {
+	if err := validateDatabaseName(database); err != nil {
+		return err
+	}
+
 	if cfg == nil || cfg.Credentials == nil || cfg.Credentials.Dbms == nil {
 		return clierr.NewUsageError(
 			"credential storage is not available; cannot resolve the source password for container %q",
