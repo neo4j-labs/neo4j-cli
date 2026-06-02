@@ -104,3 +104,53 @@ tasks:
       - "make fmt-check passes"
       - "make lint passes"
     completed_at: 2026-06-02T17:42:00Z
+
+  - id: task-006
+    title: 'Fix: invocation id dropped on CLIError error paths'
+    description: |
+      Found during live manual verification: the invocation id is silently
+      dropped for every server-error response. A live upstream 500 from
+      `aura agent invoke ... --format json` printed
+      `{"error":{"code":"upstream_error","exit_code":8,"message":"[\n\tInternal server error\n]","retryable":true}}`
+      with NO invocation id (and `Error: [...] (exit 8)` on stderr).
+
+      Root cause: `withInvocationID` in
+      neo4j-cli/aura/internal/subcommands/agent/invoke.go appends the id by
+      wrapping the error via `fmt.Errorf("%w (invocation id: %s)", err, id)`.
+      But `clierr.Render` (common/clierr/render.go:69-102) extracts the inner
+      `*clierr.CLIError` via `errors.As(err, &ce)` and renders from `ce.Message`
+      / `ce.Code` (BuildEnvelope uses `e.Message`), NOT from the wrapped error's
+      `Error()` string. So the appended suffix is dropped for ANY error that is
+      (or wraps) a `*clierr.CLIError`. `api.MakeRequest` -> `handleResponseError`
+      (neo4j-cli/aura/internal/api/response.go:79) returns `*clierr.CLIError` for
+      400 (NewValidationError), 401/403 (NewAuthError), 404 (NewNotFoundError),
+      405, 429, and 5xx (NewUpstreamError, exit 8), plus the 2xx embedded-error
+      path returns NewNotFoundError. All of these lose the id. It only survived
+      in the existing tests because invoke.go's own 403-forbidden and
+      application-error paths construct PLAIN `fmt.Errorf` errors (non-CLIError),
+      which clierr.Render wraps via `NewFatalError("%s", err.Error())` —
+      preserving the suffix. That coverage gap is why this shipped.
+
+      Fix: make `withInvocationID` append the id to the structured CLIError when
+      present, preserving its exit code / code name / retryable:
+        if err == nil || id == "" { return err }
+        var ce *clierr.CLIError
+        if errors.As(err, &ce) {
+            ce.Message = fmt.Sprintf("%s (invocation id: %s)", ce.Message, id)
+            return err
+        }
+        return fmt.Errorf("%w (invocation id: %s)", err, id)
+      Add `errors` and `github.com/neo4j/cli/common/clierr` imports to invoke.go.
+      Do NOT change the header-capture logic in api.go — it is correct.
+    status: pending
+    source: review
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "withInvocationID appends the id to ce.Message when errors.As finds a *clierr.CLIError, returning the original error so exit code / code name / retryable are preserved"
+      - "Plain (non-CLIError) errors still get the id via %w wrapping; nil err or empty id is a no-op"
+      - "New regression tests assert the id is rendered for a 500 upstream error (stderr suffix AND --format json envelope `message` contains it with `exit_code` still 8), a 404 not-found, and a server-originated 403 routed through clierr"
+      - "Existing plain-error 403 and application-error id assertions still pass; header-absent case prints nothing extra"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: null

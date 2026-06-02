@@ -17,3 +17,6 @@ Files: ~mod (invoke_test.go)
 ## TASK-005 — 2026-06-02T17:42:00Z
 Added user-facing changelog entry (kind Minor) for the agent invocation id feature via changie; all final gates (test, fmt-check, lint) pass.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260602-173929.yaml
+
+## REVIEW — 2026-06-02T16:00:33Z
+Added 1 review task (task-006): invocation id dropped on CLIError error paths.
