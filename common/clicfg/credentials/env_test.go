@@ -231,6 +231,29 @@ func TestLoadFromEnv_ClearsCarriedOverAccessToken(t *testing.T) {
 	assert.False(t, cred.HasValidAccessToken(), "must force a fresh fetch for the current credentials")
 }
 
+// TestEnvMode_MigrateFunctionsRefuse verifies the function-level guard: the
+// migration entry points refuse to run in env mode even when called directly,
+// so env-sourced secrets can never be persisted by a caller that bypasses the
+// config-set guard.
+func TestEnvMode_MigrateFunctionsRefuse(t *testing.T) {
+	mock := newMockKeyringProvider()
+	credentials.SetKeyringProviderForTest(t, mock)
+	credentials.SetGetenvForTest(t, envFromMap(map[string]string{
+		"NEO4J_AURA_CLIENT_ID":     "id",
+		"NEO4J_AURA_CLIENT_SECRET": "secret",
+	}))
+
+	creds, fs := newEnvTestCredentials(t, emptyCredentialsJSON)
+	before := readCredentialsFile(t, fs)
+	creds.SetStorageMode(credentials.StorageModeEnv, io.Discard)
+
+	require.Error(t, creds.MigrateToKeyring())
+	require.Error(t, creds.MigrateToInsecure())
+
+	assert.Equal(t, before, readCredentialsFile(t, fs), "migration must not write to disk in env mode")
+	assert.Zero(t, mock.setCalls, "migration must not write to keyring in env mode")
+}
+
 // TestEnvMode_SaveIsNoOp verifies that mutating credentials in env mode writes
 // nothing to disk (the MemMapFs credentials.json is unchanged) and never calls
 // the keyring Set.

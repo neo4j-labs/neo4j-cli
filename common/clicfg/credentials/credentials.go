@@ -290,6 +290,13 @@ func (c *Credentials) saveWithKeyring() error {
 // save() is called to scrub them from credentials.json, and storageMode is
 // set to StorageModeKeyring.
 func (c *Credentials) MigrateToKeyring() error {
+	// Defense in depth: env-mode credentials are synthesized from the
+	// environment and must never be persisted. Refuse here too, not only at the
+	// config-set call site, so a future caller cannot write env-sourced secrets
+	// to the keyring by bypassing that guard.
+	if c.storageMode == StorageModeEnv {
+		return errCannotMigrateFromEnv()
+	}
 	// Probe keyring availability before writing any entries.
 	if err := ProbeKeyringAvailability(); err != nil {
 		return clierr.NewUsageError(
@@ -355,6 +362,11 @@ func (c *Credentials) MigrateToKeyring() error {
 // called to persist the secrets to JSON, then keyring.Delete() is called for
 // all non-empty entries (best-effort: errors are ignored).
 func (c *Credentials) MigrateToInsecure() error {
+	// Defense in depth: see MigrateToKeyring. Never write env-sourced secrets to
+	// credentials.json, even if a caller reaches this without the config-set guard.
+	if c.storageMode == StorageModeEnv {
+		return errCannotMigrateFromEnv()
+	}
 	// Phase 1: read all sensitive fields from the keyring into in-memory structs.
 	// If any required field is missing (ErrNotFound) or any Get returns a
 	// non-ErrNotFound error, abort immediately.

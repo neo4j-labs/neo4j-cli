@@ -24,6 +24,14 @@ func errReservedEnvName(name string) error {
 		name)
 }
 
+// errCannotMigrateFromEnv guards the migration paths against persisting
+// env-sourced secrets. It is the function-level backstop to the config-set
+// call-site guard.
+func errCannotMigrateFromEnv() error {
+	return clierr.NewUsageError(
+		"cannot migrate credentials while in 'credential-storage: env' mode: env-sourced credentials are ephemeral and must not be written to disk or the keyring")
+}
+
 const (
 	envAuraClientID     = "NEO4J_AURA_CLIENT_ID"
 	envAuraClientSecret = "NEO4J_AURA_CLIENT_SECRET"
