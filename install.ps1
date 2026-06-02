@@ -201,6 +201,9 @@ try {
         }
     }
 
+    Write-Host ""
+    Write-Step "Questions or found a bug? https://github.com/neo4j-labs/neo4j-cli/issues"
+
 } finally {
     # Always clean up temp files
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue

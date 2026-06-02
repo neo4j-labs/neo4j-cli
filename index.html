@@ -1639,6 +1639,10 @@
           <span>desktop</span>
           <span class="label-tag">local</span>
         </button>
+        <button class="example-tab" data-ref-tab="history" role="tab">
+          <span>history</span>
+          <span class="label-tag">local</span>
+        </button>
         <button class="example-tab" data-ref-tab="write-gate" role="tab">
           <span>confirmation</span>
           <span class="label-tag">flags</span>
@@ -1860,6 +1864,7 @@
 <span class="prompt">$</span> neo4j-cli desktop dbms create <span class="flag">--name</span> dev <span class="flag">--version</span> 2026.04.0 <span class="flag">--wait</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms start &lt;id&gt; <span class="flag">--wait</span> <span class="flag">--rw</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms stop &lt;id&gt; <span class="flag">--rw</span>
+<span class="prompt">$</span> neo4j-cli desktop dbms upgrade &lt;id&gt; <span class="flag">--rw</span>          <span class="comment"># upgrade to latest stable; --version pins, --backup snapshots first</span>
 <span class="prompt">$</span> neo4j-cli desktop dbms delete &lt;id&gt; <span class="flag">--rw</span></pre>
           <p class="ref-sub"><span class="keyword">dbms plugin</span> — manage plugins on a Desktop DBMS.</p>
           <pre><span class="prompt">$</span> neo4j-cli desktop dbms plugin available &lt;dbms-id&gt;        <span class="comment"># catalog of installable plugins</span>
@@ -1878,6 +1883,25 @@
         </div>
       </div>
       <!-- END:docs:desktop -->
+
+      <!-- BEGIN:docs:history -->
+      <div class="example-pane" data-ref-pane="history">
+        <div class="example-header">
+          <span class="desc">Command history</span>
+        </div>
+        <div class="ref-body">
+          <p>A local, best-effort log of the commands you have run, written one redacted JSON line per command to <code>history.jsonl</code> (mode <code>0600</code>) alongside <code>config.json</code>. On by default.</p>
+          <pre><span class="prompt">$</span> neo4j-cli history list                       <span class="comment"># last 20 commands, newest first</span>
+<span class="prompt">$</span> neo4j-cli history list <span class="flag">--limit</span> 5              <span class="comment"># show the last 5 (0 = all)</span>
+<span class="prompt">$</span> neo4j-cli history list <span class="flag">--format</span> json         <span class="comment"># structured entries</span>
+<span class="prompt">$</span> neo4j-cli history clear <span class="flag">--force</span> <span class="flag">--rw</span>          <span class="comment"># empty the log (destructive)</span></pre>
+          <p>Secret flag values (<code>--password</code>, <code>--client-secret</code>, <code>--api-key</code>, <code>--uri</code> userinfo, secret-named <code>--param</code>) are redacted before writing; Cypher query bodies are stored verbatim.</p>
+          <p class="ref-sub"><span class="keyword">Toggle &amp; cap</span> via config keys:</p>
+          <pre><span class="prompt">$</span> neo4j-cli config set history-enabled false <span class="flag">--rw</span>   <span class="comment"># stop recording</span>
+<span class="prompt">$</span> neo4j-cli config set history-limit 500 <span class="flag">--rw</span>       <span class="comment"># cap retained entries</span></pre>
+        </div>
+      </div>
+      <!-- END:docs:history -->
 
       <!-- BEGIN:docs:write-gate -->
       <div class="example-pane" data-ref-pane="write-gate">
