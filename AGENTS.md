@@ -226,6 +226,11 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 `common/clievents/RedactArgs` is the single source of truth for secret scrubbing (feeds telemetry, panic/error messages, AND on-disk command history). It scrubs the `secretFlags` allow-list (incl. the `-p` query password shorthand) AND `--uri` userinfo passwords (`user:pw@host` → `user:***@host`, host/scheme preserved). Add new secret-bearing flags there, not at call sites.
 
+## clierr Rendering Notes
+
+- `clierr.Render` (`common/clierr/render.go`) renders a `*clierr.CLIError` from `ce.Message` / `ce.Code` via `errors.As` — NOT from the error's `Error()` string. So wrapping a CLIError with `fmt.Errorf("...: %w", ce)` to append context (e.g. an id/suffix) DROPS that text in JSON/toon/plaintext output. To append text to a CLIError, mutate `ce.Message` (recovered via `errors.As`) and return the original error — that preserves exit code / code name / retryable. Plain (non-CLIError) errors get `NewFatalError("%s", err.Error())` so `%w` text survives for them only.
+- The Aura test harness (`ExecuteCommand`/`ExecuteCommandE`) does NOT invoke `clierr.Render` — that lives in `neo4j-cli/main.go`. Tests get cobra's default `Error: <err.Error()>` on stderr (no `(exit N)`, no JSON envelope). To assert the JSON-envelope/exit-code contract, recover the returned `*clierr.CLIError` via `errors.As` and inspect `ce.Code` / `ce.BuildEnvelope()` directly.
+
 ## query Subsystem Notes
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.

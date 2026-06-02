@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'aura agent invoke now prints the agent invocation id on success and failure for support/tracing'
+time: 2026-06-02T17:39:29.562705+02:00
