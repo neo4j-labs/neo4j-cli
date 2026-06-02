@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -201,6 +202,33 @@ func TestLoadFromEnv_OverlaysExistingEnvCredential(t *testing.T) {
 	assert.Equal(t, "env", cred.Name)
 	assert.Equal(t, "new-id", cred.ClientId)
 	assert.Equal(t, "new-secret", cred.ClientSecret)
+}
+
+// TestLoadFromEnv_ClearsCarriedOverAccessToken verifies that synthesizing from
+// env discards any access token already attached to an "env" credential. A
+// token minted for an earlier client id/secret must never be reused, or the CLI
+// could act as a previous identity.
+func TestLoadFromEnv_ClearsCarriedOverAccessToken(t *testing.T) {
+	// Seeded "env" credential carries a non-expired token issued for the OLD
+	// client id/secret (expiry far in the future).
+	const farFuture = 32503680000000 // year 3000 in unix millis
+	seeded := `{"aura":{"default-credential":"env","credentials":[{"name":"env","client-id":"old-id","client-secret":"old-secret","access-token":"stale-jwt","token-expiry":` +
+		strconv.FormatInt(farFuture, 10) + `}]},"dbms":{"credentials":[]},"embed":{"credentials":[]}}`
+
+	credentials.SetGetenvForTest(t, envFromMap(map[string]string{
+		"NEO4J_AURA_CLIENT_ID":     "new-id",
+		"NEO4J_AURA_CLIENT_SECRET": "new-secret",
+	}))
+	creds, _ := newEnvTestCredentials(t, seeded)
+
+	creds.SetStorageMode(credentials.StorageModeEnv, io.Discard)
+
+	cred, err := creds.Aura.GetDefault()
+	require.NoError(t, err)
+	assert.Equal(t, "new-id", cred.ClientId)
+	assert.Empty(t, cred.AccessToken, "carried-over token must be cleared")
+	assert.Zero(t, cred.TokenExpiry, "carried-over expiry must be cleared")
+	assert.False(t, cred.HasValidAccessToken(), "must force a fresh fetch for the current credentials")
 }
 
 // TestEnvMode_SaveIsNoOp verifies that mutating credentials in env mode writes

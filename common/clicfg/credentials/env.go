@@ -66,6 +66,12 @@ func (c *Credentials) loadAuraFromEnv(warnW io.Writer) {
 	cred := c.findOrAppendAura()
 	cred.ClientId = clientID
 	cred.ClientSecret = clientSecret
+	// The env vars (and thus the identity) can change between runs, so a token
+	// minted for an earlier client id/secret must never be reused — that would
+	// let the CLI act as a previous identity. Clear any carried-over token so
+	// the next Aura call fetches a fresh JWT for the current credentials.
+	cred.AccessToken = ""
+	cred.TokenExpiry = 0
 	if len(c.Aura.Credentials) == 1 || c.Aura.DefaultCredential == "" {
 		c.Aura.DefaultCredential = envCredentialName
 	}
