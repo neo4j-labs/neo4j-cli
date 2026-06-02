@@ -276,3 +276,47 @@ tasks:
       - "make test, make fmt-check, and make lint are clean"
     source: review
     completed_at: 2026-06-01T14:20:59Z
+
+  - id: task-013
+    title: 'Fast-fail deploy --from-docker on community-edition containers'
+    description: |
+      The `aura instance deploy --from-docker` path is Enterprise-only and fails
+      cryptically on a community-edition container. Empirically confirmed: the
+      docker path runs `STOP DATABASE <db>` over Bolt to take a consistent
+      offline dump, but `STOP DATABASE` is an Enterprise-only Cypher admin
+      command — on community edition it errors `51N27 ... 'STOP DATABASE' is not
+      supported in community edition`, and `neo4j-admin dump` refuses to run on a
+      live database. Because `neo4j-cli docker create --edition community` makes
+      community containers trivial to create, a user can point `--from-docker` at
+      one; today the failure happens mid-deploy AFTER the Aura instance is
+      already created and left behind (cryptic error + an orphaned billable
+      instance). Fix: add a fast-fail pre-flight in the `--from-docker` branch of
+      the deploy leaf that inspects the source container's edition (the docker
+      client's Inspect already returns Edition from the container labels) BEFORE
+      creating any Aura instance, returning a clear clierr.UsageError when the
+      container is community edition — e.g. "deploy --from-docker requires an
+      enterprise Neo4j container; community edition cannot take an online dump
+      (STOP DATABASE is enterprise-only). Recreate the container with `neo4j-cli
+      docker create --edition enterprise`." Also add a one-line note to the
+      deploy command's Long help text stating that deploy operates on Enterprise
+      sources only (Desktop 2 only manages enterprise DBMSs, and the docker path
+      requires enterprise). The edition check must run as part of the docker
+      source pre-flight before createAndStoreInstance, must not regress the
+      existing enterprise happy path, and (since deploy.go is in the aura/instance
+      package and docker.Inspect/Container live in the docker package) will need
+      a small exported docker helper or to reuse docker.NewDeployClient plus an
+      exported Inspect/Container surface — keep it minimal and consistent with
+      the existing docker.PushToAura entry point. Cover the guard with a unit
+      test using a fake/seamed docker client returning a community-edition
+      container, asserting no Aura instance is created (no POST to /instances)
+      and the usage error is returned; if go generate is needed for the Long
+      change, run `go generate ./neo4j-cli/internal/skill/...`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "deploy --from-docker performs a pre-flight edition check BEFORE creating any Aura instance and returns a clear clierr.UsageError for a community-edition source container"
+      - "No Aura instance is created when the source container is community edition (test asserts no POST to /instances)"
+      - "The enterprise happy path is unchanged; the deploy Long help text notes deploy requires Enterprise sources"
+      - "make test, make fmt-check, and make lint are clean (and the skill bundle is regenerated if the Long text changed)"
+    source: review
+    completed_at: null
