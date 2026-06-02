@@ -46,6 +46,10 @@ type RequestConfig struct {
 	// WarnW receives keyring-failure warnings produced during token acquisition.
 	// If nil, warnings are written to os.Stderr.
 	WarnW io.Writer
+	// ResponseHeader, when non-nil, receives the response header on every return
+	// path so callers can read headers (e.g. X-Agent-Invocation-Id) regardless
+	// of success or failure.
+	ResponseHeader *http.Header
 }
 
 func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (responseBody []byte, statusCode int, err error) {
@@ -108,6 +112,10 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	}
 
 	defer res.Body.Close() //nolint:errcheck // response body close error is not actionable in a defer
+
+	if config.ResponseHeader != nil {
+		*config.ResponseHeader = res.Header
+	}
 
 	if IsSuccessful(res.StatusCode) {
 		responseBody, err = io.ReadAll(res.Body)

@@ -1,0 +1,3 @@
+## TASK-001 — 2026-06-02T12:00:00Z
+Added opt-in `ResponseHeader *http.Header` to api.RequestConfig; MakeRequest assigns res.Header to it (when non-nil) after Body.Close defer, above all return paths. Signature unchanged.
+Files: ~1 (neo4j-cli/aura/internal/api/api.go)

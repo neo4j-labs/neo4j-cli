@@ -13,14 +13,14 @@ tasks:
       it (`*config.ResponseHeader = res.Header`) when non-nil so the header is
       available on every return path (success, embedded-error,
       handleResponseError). Do not change the MakeRequest signature.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "RequestConfig has a documented `ResponseHeader *http.Header` field"
       - "MakeRequest assigns res.Header to *config.ResponseHeader when non-nil, above all return paths"
       - "MakeRequest signature is unchanged; the 44 other callers compile and behave identically"
       - "make build succeeds"
-    completed_at: null
+    completed_at: 2026-06-02T12:00:00Z
 
   - id: task-002
     title: 'Add per-response header support to the test mock'
