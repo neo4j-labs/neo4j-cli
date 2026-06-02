@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add `neo4j-cli history` command (list, clear) that records a local log of recently run commands; secret flag values are redacted but query Cypher is stored verbatim. Toggle with `config set history-enabled` and cap with `history-limit`.
-time: 2026-06-01T10:51:29.47717+02:00
