@@ -303,6 +303,10 @@ func (helper *AuraTestHelper) NewRequestHandlerMock(path string, status int, bod
 		} else {
 			response := mock.Responses[requestCount]
 
+			for key, value := range response.headers {
+				res.Header().Set(key, value)
+			}
+
 			res.WriteHeader(response.status)
 			res.Write([]byte(response.body)) //nolint:errcheck // test HTTP response write; errors would manifest as test assertion failures
 		}

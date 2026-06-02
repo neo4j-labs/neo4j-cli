@@ -32,14 +32,14 @@ tasks:
       targets the most-recently-added response, and update the handler in
       `auratesthelper.go` (NewRequestHandlerMock) to call `res.Header().Set(k,v)`
       for each header before `res.WriteHeader(...)`.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "response struct carries a headers map; WithResponseHeader sets it on the last response"
       - "NewRequestHandlerMock handler writes configured headers before WriteHeader"
       - "Responses created without headers behave exactly as before"
       - "Existing testutils-dependent tests still pass"
-    completed_at: null
+    completed_at: 2026-06-02T13:00:00Z
 
   - id: task-003
     title: 'Read and surface the invocation id in aura agent invoke'

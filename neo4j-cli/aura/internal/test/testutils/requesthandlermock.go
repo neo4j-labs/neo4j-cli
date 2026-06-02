@@ -20,8 +20,9 @@ type call struct {
 }
 
 type response struct {
-	body   string
-	status int
+	body    string
+	status  int
+	headers map[string]string
 }
 
 type requestHandlerMock struct {
@@ -35,6 +36,22 @@ func (mock *requestHandlerMock) AddResponse(status int, body string) *requestHan
 		body:   body,
 		status: status,
 	})
+
+	return mock
+}
+
+// WithResponseHeader sets an HTTP response header on the most-recently-added
+// response. The configured headers are written before WriteHeader when the
+// response is served.
+func (mock *requestHandlerMock) WithResponseHeader(key, value string) *requestHandlerMock {
+	last := len(mock.Responses) - 1
+	if last < 0 {
+		return mock
+	}
+	if mock.Responses[last].headers == nil {
+		mock.Responses[last].headers = map[string]string{}
+	}
+	mock.Responses[last].headers[key] = value
 
 	return mock
 }
