@@ -673,6 +673,8 @@ This subcommand creates a new Aura instance and clones a local Neo4j database in
 
 The source database can come from a local Neo4j Docker container managed by 'neo4j-cli docker' (--from-docker) or from a DBMS managed by a local Neo4j Desktop 2 install (--from-desktop). Exactly one source must be specified.
 
+deploy operates on Enterprise Neo4j sources only: Neo4j Desktop 2 manages only enterprise DBMSs, and the --from-docker path requires an enterprise container (the dump relies on the enterprise-only STOP DATABASE command).
+
 A new Aura instance is provisioned using the same flags as 'instance create', then the named --database (default "neo4j") is dumped from the source and uploaded into the new instance, overwriting its contents. The "system" database cannot be cloned.
 
 The command waits for the instance to be ready and for the data load to finish before returning. On success the structured output reports the instance connection details plus deploy_status=succeeded. If the data load fails after the instance was created, the instance is left in place (it is not deleted), deploy_status=failed is reported, and the instance id is printed so you can retry or delete it manually.

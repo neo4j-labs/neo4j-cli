@@ -311,7 +311,6 @@ tasks:
       container, asserting no Aura instance is created (no POST to /instances)
       and the usage error is returned; if go generate is needed for the Long
       change, run `go generate ./neo4j-cli/internal/skill/...`.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "deploy --from-docker performs a pre-flight edition check BEFORE creating any Aura instance and returns a clear clierr.UsageError for a community-edition source container"
@@ -319,4 +318,5 @@ tasks:
       - "The enterprise happy path is unchanged; the deploy Long help text notes deploy requires Enterprise sources"
       - "make test, make fmt-check, and make lint are clean (and the skill bundle is regenerated if the Long text changed)"
     source: review
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-02T00:00:00Z

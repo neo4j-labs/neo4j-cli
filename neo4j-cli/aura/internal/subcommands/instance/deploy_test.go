@@ -140,13 +140,20 @@ func withStubbedDispatch(t *testing.T, dockerFn func(ctx context.Context, cfg *c
 	t.Helper()
 	prevDocker := deployViaDockerFn
 	prevDesktop := deployViaDesktopFn
+	prevEdition := dockerSourceEditionFn
 	deployViaDockerFn = dockerFn
 	deployViaDesktopFn = func(_ context.Context, _ *clicfg.Config, _, _ string, _ int, _ deployTarget, _ io.Writer) error {
 		return errors.New("desktop dispatch not expected in this test")
 	}
+	// Default the edition guard to enterprise so docker happy-path tests proceed
+	// without a real daemon; the community-edition test overrides it directly.
+	dockerSourceEditionFn = func(_ context.Context, _ string) (string, error) {
+		return "enterprise", nil
+	}
 	t.Cleanup(func() {
 		deployViaDockerFn = prevDocker
 		deployViaDesktopFn = prevDesktop
+		dockerSourceEditionFn = prevEdition
 	})
 }
 
@@ -336,4 +343,37 @@ func TestDeployTargetPasswordNotLeaked(t *testing.T) {
 	_ = h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
 
 	require.NotContains(t, h.err.String(), "letMeIn123!", "target password must not appear on stderr")
+}
+
+// TestDeployDockerCommunityFastFails asserts a community-edition source container
+// is rejected with a clear usage error BEFORE any Aura instance is created.
+func TestDeployDockerCommunityFastFails(t *testing.T) {
+	h := newDeployHarness(t)
+
+	var createCalled bool
+	h.mux.HandleFunc("POST /v1/instances", func(res http.ResponseWriter, _ *http.Request) {
+		createCalled = true
+		res.WriteHeader(http.StatusAccepted)
+		_, _ = res.Write([]byte(deployCreateResponse))
+	})
+
+	prevDocker := deployViaDockerFn
+	prevEdition := dockerSourceEditionFn
+	deployViaDockerFn = func(_ context.Context, _ *clicfg.Config, _, _ string, _ deployTarget) error {
+		t.Fatal("docker dispatch must not run for a community-edition source")
+		return nil
+	}
+	dockerSourceEditionFn = func(_ context.Context, _ string) (string, error) {
+		return "community", nil
+	}
+	t.Cleanup(func() {
+		deployViaDockerFn = prevDocker
+		dockerSourceEditionFn = prevEdition
+	})
+
+	err := h.run("deploy --from-docker my-container --name Instance01 --type free-db --rw --organization-id " + deployOrgID + " --project-id " + deployProjectID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "enterprise")
+
+	require.False(t, createCalled, "no Aura instance must be created when the source container is community edition")
 }

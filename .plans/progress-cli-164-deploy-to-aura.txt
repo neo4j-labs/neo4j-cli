@@ -62,3 +62,8 @@ Decisions: kept RunCalls populated for both Run and RunWithEnv (added a parallel
 
 ## REVIEW — 2026-06-02T09:00:00Z
 Added 1 review task (task-013) — fast-fail deploy --from-docker on community-edition containers (EE-only path).
+
+## TASK-013 — 2026-06-02T00:00:00Z
+Added a fast-fail pre-flight in deploy --from-docker: inspects the source container's edition via new dockerSourceEditionFn seam (wires docker.Inspect(docker.NewDeployClient())) BEFORE createAndStoreInstance; community edition returns a clierr.UsageError pointing at `docker create --edition enterprise`. Added Enterprise-only note to the deploy Long (regenerated bundle). New TestDeployDockerCommunityFastFails asserts no POST /instances on the CE path; withStubbedDispatch now defaults the edition seam to "enterprise" for the happy path.
+Files: M deploy.go, M deploy_test.go, M bundle/references/aura.md
+Decisions: reused existing docker.Inspect (takes dockerClient) via docker.NewDeployClient() rather than adding a new InspectContainer export — minimal surface, consistent with PushToAura wiring.
