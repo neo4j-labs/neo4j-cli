@@ -142,7 +142,7 @@ tasks:
         return fmt.Errorf("%w (invocation id: %s)", err, id)
       Add `errors` and `github.com/neo4j/cli/common/clierr` imports to invoke.go.
       Do NOT change the header-capture logic in api.go — it is correct.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-003
@@ -153,4 +153,4 @@ tasks:
       - "New regression tests assert the id is rendered for a 500 upstream error (stderr suffix AND --format json envelope `message` contains it with `exit_code` still 8), a 404 not-found, and a server-originated 403 routed through clierr"
       - "Existing plain-error 403 and application-error id assertions still pass; header-absent case prints nothing extra"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-02T18:30:00Z

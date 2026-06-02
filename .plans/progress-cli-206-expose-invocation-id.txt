@@ -20,3 +20,8 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260602-173929.yaml
 
 ## REVIEW — 2026-06-02T16:00:33Z
 Added 1 review task (task-006): invocation id dropped on CLIError error paths.
+
+## TASK-006 — 2026-06-02T18:30:00Z
+withInvocationID now mutates ce.Message (via errors.As) for *clierr.CLIError so the id survives clierr.Render, preserving exit code/code name; %w path kept for plain errors. Added 500/404/401 regression tests asserting the id on stderr AND on the recovered *CLIError's Message + BuildEnvelope exit_code.
+Files: ~mod (invoke.go, invoke_test.go)
+Decisions: test harness never calls clierr.Render (lives in main.go) — verified the envelope/exit-code contract against the returned *CLIError, not rendered output.

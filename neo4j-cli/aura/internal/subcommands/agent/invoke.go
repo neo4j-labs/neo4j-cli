@@ -5,12 +5,14 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -131,10 +133,17 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 	return cmd
 }
 
-// withInvocationID wraps err with the agent invocation id for support/tracing.
+// withInvocationID appends the agent invocation id to err for support/tracing.
 // It is a no-op when err is nil or id is empty.
 func withInvocationID(err error, id string) error {
 	if err == nil || id == "" {
+		return err
+	}
+	// clierr.Render renders a *clierr.CLIError from ce.Message via errors.As, so
+	// %w wrapping would drop the suffix — mutate ce.Message and preserve the code.
+	var ce *clierr.CLIError
+	if errors.As(err, &ce) {
+		ce.Message = fmt.Sprintf("%s (invocation id: %s)", ce.Message, id)
 		return err
 	}
 	return fmt.Errorf("%w (invocation id: %s)", err, id)
