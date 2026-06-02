@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Clearer feedback signposting: the installer now prints the GitHub issues URL, the bug-report link in error messages is corrected, and Bolt auth/connection and embedding API-key errors now include actionable next-step suggestions.'
-time: 2026-06-01T10:50:39.150635+02:00
