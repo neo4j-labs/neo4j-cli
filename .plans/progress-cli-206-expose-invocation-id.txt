@@ -9,3 +9,7 @@ Files: ~2 (requesthandlermock.go, auratesthelper.go)
 ## TASK-003 — 2026-06-02T14:00:00Z
 aura agent invoke now captures the response header, reads X-Agent-Invocation-Id, wraps the 403/generic/application errors via a no-op-safe withInvocationID helper, appends `| Invocation ID:` to the text/table stats line, and prints the id to stderr for --format json (stdout stays pure JSON).
 Files: ~1 (neo4j-cli/aura/internal/subcommands/agent/invoke.go)
+
+## TASK-004 — 2026-06-02T15:00:00Z
+Extended invoke_test.go: 403/application-error/table-success now set X-Agent-Invocation-Id and assert it; added HTTP-200 tool-failure regression (success path still prints id), --format json success (id on stderr + valid-JSON stdout), and header-absent (no id suffix, clean stderr).
+Files: ~mod (invoke_test.go)

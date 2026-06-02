@@ -76,7 +76,7 @@ tasks:
       prints. Add a `--format json` success test asserting the id goes to stderr
       while stdout stays valid JSON, and a header-absent test asserting nothing
       extra is printed.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -86,7 +86,7 @@ tasks:
       - "JSON success test asserts id on stderr and valid-JSON stdout"
       - "Header-absent test asserts no (invocation id: ) and no stderr id line"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-06-02T15:00:00Z
 
   - id: task-005
     title: 'Add changelog entry and run final gates'
