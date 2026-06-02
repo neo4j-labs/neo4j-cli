@@ -54,7 +54,7 @@ tasks:
       param: append ` | Invocation ID: <id>` to the text/table stats line when
       id is non-empty, and for `--format json` write `Invocation ID: <id>` to
       stderr (cmd.PrintErrln) while keeping stdout pure JSON.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -63,7 +63,7 @@ tasks:
       - "text/table success stats line shows | Invocation ID: <id> only when id is non-empty"
       - "--format json keeps stdout valid JSON and prints the id to stderr when present"
       - "No empty (invocation id: ) or stray stderr line when the header is absent"
-    completed_at: null
+    completed_at: 2026-06-02T14:00:00Z
 
   - id: task-004
     title: 'Add and extend invoke_test.go coverage for the invocation id'

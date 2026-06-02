@@ -5,3 +5,7 @@ Files: ~1 (neo4j-cli/aura/internal/api/api.go)
 ## TASK-002 — 2026-06-02T13:00:00Z
 Added per-response header support to the Aura test mock: `headers` map on the response struct, fluent `WithResponseHeader(key,value)` setter on the last response, and handler now writes configured headers before WriteHeader.
 Files: ~2 (requesthandlermock.go, auratesthelper.go)
+
+## TASK-003 — 2026-06-02T14:00:00Z
+aura agent invoke now captures the response header, reads X-Agent-Invocation-Id, wraps the 403/generic/application errors via a no-op-safe withInvocationID helper, appends `| Invocation ID:` to the text/table stats line, and prints the id to stderr for --format json (stdout stays pure JSON).
+Files: ~1 (neo4j-cli/aura/internal/subcommands/agent/invoke.go)

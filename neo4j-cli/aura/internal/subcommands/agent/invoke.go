@@ -88,16 +88,19 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 			body := map[string]any{"input": input}
 
 			cmd.SilenceUsage = true
+			var respHeader http.Header
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method:   http.MethodPost,
-				PostBody: body,
-				Version:  api.AuraApiVersion2,
+				Method:         http.MethodPost,
+				PostBody:       body,
+				Version:        api.AuraApiVersion2,
+				ResponseHeader: &respHeader,
 			})
+			invocationID := respHeader.Get("X-Agent-Invocation-Id")
 			if err != nil {
 				if statusCode == http.StatusForbidden {
-					return fmt.Errorf("agent invocation forbidden: agent may be disabled or private")
+					return withInvocationID(fmt.Errorf("agent invocation forbidden: agent may be disabled or private"), invocationID)
 				}
-				return err
+				return withInvocationID(err, invocationID)
 			}
 
 			if api.IsSuccessful(statusCode) {
@@ -107,10 +110,10 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 				}
 
 				if err := invokeApplicationError(result); err != nil {
-					return err
+					return withInvocationID(err, invocationID)
 				}
 
-				printInvokeResult(cmd, cfg, resBody, result)
+				printInvokeResult(cmd, cfg, resBody, result, invocationID)
 			}
 
 			return nil
@@ -128,6 +131,15 @@ neo4j-cli aura agent invoke 00000000-0000-0000-0000-000000000000 --input "hello"
 	return cmd
 }
 
+// withInvocationID wraps err with the agent invocation id for support/tracing.
+// It is a no-op when err is nil or id is empty.
+func withInvocationID(err error, id string) error {
+	if err == nil || id == "" {
+		return err
+	}
+	return fmt.Errorf("%w (invocation id: %s)", err, id)
+}
+
 // invokeApplicationError returns an error for application-level failures (type "error" with HTTP 200).
 func invokeApplicationError(r invokeResponse) error {
 	if r.Type != "error" {
@@ -140,9 +152,12 @@ func invokeApplicationError(r invokeResponse) error {
 }
 
 // printInvokeResult prints the invoke response: raw JSON or text answer + stats line.
-func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, result invokeResponse) {
+func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, result invokeResponse, invocationID string) {
 	if commonoutput.ResolveOutput(cmd, cfg) == "json" {
 		output.PrintRawBody(cmd, cfg, resBody, nil)
+		if invocationID != "" {
+			cmd.PrintErrln("Invocation ID: " + invocationID)
+		}
 		return
 	}
 
@@ -161,7 +176,7 @@ func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, r
 		cmd.Println(strings.Join(texts, "\n"))
 	}
 
-	cmd.Printf("\nStatus: %s | End reason: %s | Tool calls: %d | Tokens: %d req / %d res / %d total\n",
+	statsLine := fmt.Sprintf("\nStatus: %s | End reason: %s | Tool calls: %d | Tokens: %d req / %d res / %d total",
 		strings.ToUpper(result.Status),
 		strings.ToUpper(strings.ReplaceAll(result.EndReason, "_", " ")),
 		toolCalls,
@@ -169,4 +184,8 @@ func printInvokeResult(cmd *cobra.Command, cfg *clicfg.Config, resBody []byte, r
 		result.Usage.ResponseTokens,
 		result.Usage.TotalTokens,
 	)
+	if invocationID != "" {
+		statsLine += " | Invocation ID: " + invocationID
+	}
+	cmd.Println(statsLine)
 }
