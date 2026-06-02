@@ -95,7 +95,7 @@ tasks:
       `changie new --projects neo4j-cli --kind Minor --body "aura agent invoke now prints the agent invocation id on success and failure for support/tracing"`
       (confirm the kind against `.changie.yaml`; hand-author the unreleased YAML
       if changie is unavailable). Then run the final gates.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
@@ -103,4 +103,4 @@ tasks:
       - "make test passes"
       - "make fmt-check passes"
       - "make lint passes"
-    completed_at: null
+    completed_at: 2026-06-02T17:42:00Z
