@@ -34,3 +34,7 @@ Added 4 review tasks (task-007..task-010) from /golang-security audit: JSON reda
 Closed RedactText quoted-key JSON leak: added textJSONFieldRe matching a quoted secret-word key + quoted value, rewriting value to "***" (valid JSON preserved); runs before bare-assignment pass so the trailing `"` blocks re-processing. Table-driven JSON positives + non-secret "name" negative added.
 Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
 Decisions: JSON pass ordered before textAssignmentRe — quoted "***" trailing quote is not a valid assignment separator, so no double-mangle.
+
+## TASK-008 — 2026-06-03T14:30:00Z
+Extended textBearerRe to (?i)((?:bearer|basic)\s+)\S+ so `Authorization: Basic <base64>` is redacted to *** alongside Bearer; updated regex + RedactText doc comments. Added "basic header" table case.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go

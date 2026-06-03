@@ -171,7 +171,7 @@ tasks:
       addition is trivial. Extend the bearer regex to also cover the Basic scheme
       (e.g. `(?i)(bearer\s+|basic\s+)\S+`) so the base64 credential blob is
       replaced with ***.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-007
@@ -179,7 +179,7 @@ tasks:
       - "RedactText rewrites `Authorization: Basic dXNlcjpwYXNz` to `Authorization: Basic ***`"
       - "Existing `Bearer` redaction still works"
       - "New test case added; make test/lint/fmt-check pass"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-009
     title: 'Address table-format secret column leak'

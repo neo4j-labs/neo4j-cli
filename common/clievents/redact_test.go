@@ -296,6 +296,12 @@ func TestRedactText(t *testing.T) {
 			want: "Authorization: Bearer ***",
 		},
 		{
+			name:    "basic header",
+			in:      "Authorization: Basic dXNlcjpwYXNz",
+			want:    "Authorization: Basic ***",
+			mustNot: []string{"dXNlcjpwYXNz"},
+		},
+		{
 			name: "non-secret assignment unchanged",
 			in:   "limit=10",
 			want: "limit=10",

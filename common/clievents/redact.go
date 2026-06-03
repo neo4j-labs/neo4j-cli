@@ -134,16 +134,17 @@ var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:password|passwd|pwd|secret
 // both `"k":"v"` and `"k": "v"` spacings are handled.
 var textJSONFieldRe = regexp.MustCompile(`(?i)("[^"]*(?:password|passwd|pwd|secret|token|api[-_]?key|access[-_]?key)[^"]*"\s*:\s*)"[^"]*"`)
 
-// textBearerRe matches an Authorization bearer token in free text and rewrites
-// the token to ***.
-var textBearerRe = regexp.MustCompile(`(?i)(bearer\s+)\S+`)
+// textBearerRe matches an Authorization Bearer token or Basic credential blob
+// in free text and rewrites it to ***. Group 1 captures the scheme word
+// (Bearer/Basic) so the replacement keeps the scheme verbatim.
+var textBearerRe = regexp.MustCompile(`(?i)((?:bearer|basic)\s+)\S+`)
 
 // RedactText scrubs secrets from arbitrary multi-line text, the text-level
 // counterpart to RedactArgs (which is argv-only). It applies conservative
 // regexes for (a) URI userinfo passwords in free text, (b) quoted-key JSON
 // secret fields (`"password":"x"`), (c) password/secret/token/api-key/auth
-// key-value assignments, and (d) bearer authorization headers, replacing each
-// secret value with ***. It is the single source of truth for redacting
+// key-value assignments, and (d) Bearer/Basic authorization headers, replacing
+// each secret value with ***. It is the single source of truth for redacting
 // captured command output before it is persisted. Non-secret text (e.g.
 // `limit=10`, ordinary prose) is left intact.
 func RedactText(s string) string {
