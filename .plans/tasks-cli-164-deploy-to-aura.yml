@@ -320,3 +320,37 @@ tasks:
     source: review
     status: completed
     completed_at: 2026-06-02T00:00:00Z
+
+  - id: task-014
+    title: 'Rename docker push_to_aura.go to follow the *_helpers.go convention'
+    description: |
+      PR #198 review nit (Liam-Doodson): the docker-side deploy orchestrator file
+      sits among the docker command leaves in
+      neo4j-cli/internal/subcommands/docker/ (create.go, list.go, get.go,
+      start.go, stop.go, delete.go — each a cobra leaf). Its original name
+      deploy.go therefore reads, at a glance, like a `docker deploy` command had
+      been added — but no such command exists; the file defines the PushToAura
+      orchestrator helper (+ validateDatabaseName, AuraTarget, stopStartDatabase)
+      that the aura `instance deploy` leaf calls into. The reviewer found this
+      misleading. The helper must stay in package docker because it depends on
+      package-private internals (the dockerClient interface, ExecAs, dumpPath,
+      stopStartFn) — a Go subfolder would be a separate package and couldn't see
+      them without exporting everything. The repo's established convention for
+      non-command helper code living next to command leaves is a same-package
+      *_helpers.go / *_core.go file (instance/name_helpers.go,
+      instance/credential_helpers.go, instance/create_core.go,
+      common/skill/helpers.go). Rename the file to match the PushToAura function
+      and that convention. NOTE: an earlier manual `git mv deploy.go
+      push_to_aura.go` (and deploy_test.go -> push_to_aura_test.go) may already be
+      staged in the working tree — reconcile to the final names below regardless
+      of intermediate state. Pure file rename via `git mv`; no symbol or logic
+      changes (Go file names are package-scoped). No skill-bundle regen needed
+      (the bundle is generated from the cobra tree, not filenames).
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/docker/push_to_aura_helpers.go exists (renamed from deploy.go/push_to_aura.go) and the test is push_to_aura_helpers_test.go; no deploy.go remains in the docker package"
+      - "The rename is pure: PushToAura/validateDatabaseName/AuraTarget/stopStartDatabase and all call sites are byte-for-byte unchanged"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    status: pending
