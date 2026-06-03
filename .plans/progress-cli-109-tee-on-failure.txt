@@ -1,0 +1,3 @@
+## TASK-001 — 2026-06-03T00:00:00Z
+Added tee_path to clierr error envelope: TeePath field + chainable WithTeePath on CLIError, tee_path,omitempty on EnvelopeBody projected in BuildEnvelope, and a writeTeePath helper printing `Full output saved: <path>` to stderr in json/toon/plaintext branches.
+Files: ~common/clierr/error.go, ~common/clierr/render.go, ~common/clierr/render_test.go

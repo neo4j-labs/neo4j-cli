@@ -14,7 +14,7 @@ tasks:
       project it in BuildEnvelope(). Update clierr.Render so that, after the
       `Error: <message> (exit N)` stderr line in every format branch, it prints
       `Full output saved: <path>` to stderr when TeePath is non-empty.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "CLIError has a TeePath field and a chainable WithTeePath setter returning *CLIError"
@@ -22,7 +22,7 @@ tasks:
       - "JSON and toon envelopes include tee_path when set and omit it when empty"
       - "Render prints `Full output saved: <path>` to stderr in json/toon/plaintext when TeePath set"
       - "Existing clierr render tests still pass; new cases cover tee_path present/absent"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-002
     title: 'Add clievents.RedactText for multi-line secret scrubbing'

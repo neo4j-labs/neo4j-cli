@@ -443,6 +443,60 @@ func TestRender_ToonMode_WithSuggestion_StderrSummaryHasNoSuggestion(t *testing.
 	}
 }
 
+// TestBuildEnvelope_TeePath asserts the tee_path field is projected when set
+// and omitted from the JSON when empty.
+func TestBuildEnvelope_TeePath(t *testing.T) {
+	withPath := NewFatalError("boom").WithTeePath("/tmp/tee/x.log")
+	env := withPath.BuildEnvelope()
+	if env.Error.TeePath != "/tmp/tee/x.log" {
+		t.Errorf("TeePath = %q, want /tmp/tee/x.log", env.Error.TeePath)
+	}
+	buf, err := json.Marshal(env)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if !bytes.Contains(buf, []byte(`"tee_path":"/tmp/tee/x.log"`)) {
+		t.Errorf("JSON missing tee_path\nfull: %s", buf)
+	}
+
+	noPath := NewFatalError("boom")
+	buf, err = json.Marshal(noPath.BuildEnvelope())
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if bytes.Contains(buf, []byte("tee_path")) {
+		t.Errorf("JSON should omit tee_path when empty\nfull: %s", buf)
+	}
+}
+
+// TestRender_TeePath asserts the `Full output saved: <path>` stderr line is
+// emitted (after the Error summary) in every format when TeePath is set, and
+// absent when it is empty.
+func TestRender_TeePath(t *testing.T) {
+	for _, format := range []string{"json", "toon", ""} {
+		t.Run("set/"+format, func(t *testing.T) {
+			err := NewFatalError("boom").WithTeePath("/tmp/tee/x.log")
+			var stdout, stderr bytes.Buffer
+			Render(error(err), &stdout, &stderr, format)
+
+			want := "Error: boom (exit 1)\nFull output saved: /tmp/tee/x.log\n"
+			if stderr.String() != want {
+				t.Errorf("stderr = %q, want %q", stderr.String(), want)
+			}
+		})
+
+		t.Run("empty/"+format, func(t *testing.T) {
+			err := NewFatalError("boom")
+			var stdout, stderr bytes.Buffer
+			Render(error(err), &stdout, &stderr, format)
+
+			if bytes.Contains(stderr.Bytes(), []byte("Full output saved")) {
+				t.Errorf("stderr should not mention tee path when empty; got %q", stderr.String())
+			}
+		})
+	}
+}
+
 // TestBuildEnvelope_NoIO documents that BuildEnvelope is a pure projection —
 // it's exercised here without any writer to prove the contract.
 func TestBuildEnvelope_NoIO(t *testing.T) {
