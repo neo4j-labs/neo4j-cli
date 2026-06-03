@@ -56,3 +56,7 @@ Added 1 review task (task-011): integration test for the tee-on-failure main() w
 Extracted handleFailure(cfg,cmd,args,captured,err) *clierr.CLIError from main() (tee.Save + resolve-to-CLIError + WithTeePath); main() stays thin and keeps os.Exit/Render/ErrCancelled guard. Added integration tests asserting a redacted tee file lands on memfs with TeePath set, tee-disabled writes nothing, and exit codes are preserved.
 Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
 Decisions: ErrCancelled exit-0 guard left in main() before handleFailure (covered by existing TestConfirmCancellation_EndToEnd); tee tests hermetic via testfs memfs — file read back through returned TeePath so clicfg.ConfigPrefix never resolves to real home.
+
+## CI-SECURITY-REVIEW — 2026-06-03T00:00:00Z
+CI security-review bot flagged 1 Low: tee.Save did not sanitize path separators in commandSlug (defence-in-depth for the public common/ API). Sanitized slug (/,\ -> -) before filename + rotation; added TestSave_SanitizesSlugPathSeparators.
+Files: ~common/tee/tee.go, ~common/tee/tee_test.go

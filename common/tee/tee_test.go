@@ -87,6 +87,17 @@ func TestSave_WritesRedactedFile(t *testing.T) {
 	assert.Contains(t, got, "ok")
 }
 
+func TestSave_SanitizesSlugPathSeparators(t *testing.T) {
+	cfg := newTestConfig(t, `{"format":"json"}`)
+
+	path, err := Save(cfg, "../../evil", []byte("data"))
+	require.NoError(t, err)
+	require.NotEmpty(t, path)
+
+	assert.Equal(t, Dir(), filepath.Dir(path), "slug must not escape the tee dir")
+	assert.True(t, strings.HasSuffix(path, "_..-..-evil.log"), "got %q", path)
+}
+
 func TestSave_FileMode0600(t *testing.T) {
 	cfg := newTestConfig(t, `{"format":"json"}`)
 	path, err := Save(cfg, "query", []byte("x"))

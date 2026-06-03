@@ -99,12 +99,15 @@ func Save(cfg *clicfg.Config, commandSlug string, content []byte) (string, error
 	}
 
 	dir := Dir()
-	name := time.Now().UTC().Format(timestampFormat) + "_" + commandSlug + ".log"
+	// Strip path separators so a slug can never escape the tee dir via
+	// filepath.Clean (defence-in-depth for callers other than the cobra tree).
+	safeSlug := strings.NewReplacer("/", "-", `\`, "-").Replace(commandSlug)
+	name := time.Now().UTC().Format(timestampFormat) + "_" + safeSlug + ".log"
 	path := filepath.Join(dir, name)
 
 	// Rotate to tee-limit-1 before the write so exactly tee-limit files remain
 	// once the new file lands.
-	rotate(fs, dir, commandSlug, limit-1)
+	rotate(fs, dir, safeSlug, limit-1)
 
 	if err := fileutils.WriteFileErr(fs, path, []byte(clievents.RedactText(string(content)))); err != nil {
 		return "", err
