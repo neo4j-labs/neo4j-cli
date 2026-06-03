@@ -106,7 +106,7 @@ func NewConfig(fs afero.Fs, version string, scope ConfigScope) *Config {
 		fs:              fs,
 		viper:           Viper,
 		configPath:      fullConfigPath,
-		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage", "history-enabled", "history-limit"},
+		ValidConfigKeys: []string{"format", "telemetry", "skill-auto-refresh", "credential-storage", "history-enabled", "history-limit", "tee-enabled", "tee-limit"},
 	}
 
 	// Wire the storage mode only when credential-storage is explicitly set in
@@ -237,6 +237,8 @@ func setDefaultValues(Viper *viper.Viper) {
 	Viper.SetDefault("skill-auto-refresh", true)
 	Viper.SetDefault("history-enabled", true)
 	Viper.SetDefault("history-limit", 1000)
+	Viper.SetDefault("tee-enabled", true)
+	Viper.SetDefault("tee-limit", 20)
 
 	// Feature-flag defaults are intentionally NOT seeded into viper:
 	// viper.IsSet returns true whenever a default is registered, which
@@ -456,6 +458,19 @@ func (config *GlobalConfig) Set(key string, value string) error {
 		}
 	}
 
+	if key == "tee-enabled" {
+		if value != "true" && value != "false" {
+			return clierr.NewUsageError("invalid value for 'tee-enabled': %s (valid values: true, false)", value)
+		}
+	}
+
+	if key == "tee-limit" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return clierr.NewUsageError("invalid value for 'tee-limit': %s (must be a non-negative integer)", value)
+		}
+	}
+
 	data := fileutils.ReadFileSafe(config.fs, config.configPath)
 
 	updated, err := sjson.Set(string(data), key, value)
@@ -484,6 +499,17 @@ func (config *GlobalConfig) HistoryEnabled() bool {
 // to 1000; a value of 0 disables history retention.
 func (config *GlobalConfig) HistoryLimit() int {
 	return config.viper.GetInt("history-limit")
+}
+
+// TeeEnabled reports whether tee-on-failure output capture is enabled. Defaults to true.
+func (config *GlobalConfig) TeeEnabled() bool {
+	return config.viper.GetBool("tee-enabled")
+}
+
+// TeeLimit returns the maximum number of tee files to retain per command type.
+// Defaults to 20; a value of 0 disables tee retention.
+func (config *GlobalConfig) TeeLimit() int {
+	return config.viper.GetInt("tee-limit")
 }
 
 // CredentialStorage is a read accessor for the persisted credential-storage

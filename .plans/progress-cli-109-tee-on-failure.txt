@@ -6,3 +6,8 @@ Files: ~common/clierr/error.go, ~common/clierr/render.go, ~common/clierr/render_
 Added clievents.RedactText for multi-line secret scrubbing: three package-level regexes (URI userinfo, password/secret/token/api-key/auth assignments, bearer headers) replacing values with ***; table-driven tests cover positives, no-false-positives, and multi-line.
 Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
 Decisions: tightened the `auth` assignment alternative (auth(?:[-_]?token|[-_]?key)?) instead of PRD's literal `auth\w*` so it doesn't swallow the HTTP header name "Authorization" — that case is handled by the bearer pass.
+
+## TASK-003 — 2026-06-03T00:00:00Z
+Added tee-enabled (bool default true) / tee-limit (int default 20) global config keys mirroring history-*: ValidConfigKeys, setDefaultValues, setGlobal validation (bool / non-negative int), GlobalConfig.TeeEnabled()/TeeLimit() accessors. New colocated tee_config_test.go; updated two config-list golden fixtures.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/tee_config_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go
+Decisions: no bundle regen needed — TestGenerator_RoundTrip passed (config reference doesn't enumerate keys); bundle regen remains task-006's scope.

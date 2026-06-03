@@ -32,6 +32,8 @@ func TestConfigList(t *testing.T) {
 	"history-enabled": true,
 	"history-limit": 1000,
 	"skill-auto-refresh": true,
+	"tee-enabled": true,
+	"tee-limit": 20,
 	"telemetry": true
 }`,
 		},
@@ -50,6 +52,8 @@ func TestConfigList(t *testing.T) {
 	"history-enabled": true,
 	"history-limit": 1000,
 	"skill-auto-refresh": true,
+	"tee-enabled": true,
+	"tee-limit": 20,
 	"telemetry": true
 }`,
 		},

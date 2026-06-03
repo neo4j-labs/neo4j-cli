@@ -52,7 +52,7 @@ tasks:
       validation in setGlobal (bool for tee-enabled, non-negative int for
       tee-limit), and add GlobalConfig accessors TeeEnabled() bool and
       TeeLimit() int.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "tee-enabled and tee-limit appear in ValidConfigKeys and have defaults (true / 20)"
@@ -60,7 +60,7 @@ tasks:
       - "cfg.Global.TeeEnabled() and cfg.Global.TeeLimit() return the configured/default values"
       - "config set/get/list operate on both keys (Global scope)"
       - "clicfg validation tests cover valid and invalid values for both keys"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-004
     title: 'Create common/tee package (LimitedBuffer, Dir, Save, rotation)'
