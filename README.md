@@ -100,7 +100,9 @@ neo4j-cli credential embed remove openai-shared
 | `insecure` (default) | Everything in plaintext in `credentials.json`. |
 | `env` | Nothing persisted — credentials are synthesized in-memory from environment variables on each run. |
 
-`env` mode is intended for CI/CD and other ephemeral environments. Credentials are read from the environment at startup and never written to disk or the keyring. The synthesized credential for each type is named `env` and set as that type's default, so downstream commands (`query`, `aura ...`) work with no further config. The `env` name is reserved — `credential ... add --name env` is rejected.
+`env` mode is intended for CI/CD and other ephemeral environments. Credentials are read from the environment at startup and your secrets (Aura client secret, dbms password, embed API key) are never written to disk or the keyring. The synthesized credential for each type is named `env` and set as that type's default, so downstream commands (`query`, `aura ...`) work with no further config. The `env` name is reserved — `credential ... add --name env` is rejected.
+
+One derived value is cached: the short-lived Aura OAuth token. To avoid re-minting (and tripping Aura's token rate limit) on every CLI call in a CI job, it is written to an identity-bound `0600` file in the OS temp directory and reused while valid. No secret is stored in it, and a changed client id/secret/auth-url always misses and re-mints.
 
 Set the relevant variables for the credential types you need:
 

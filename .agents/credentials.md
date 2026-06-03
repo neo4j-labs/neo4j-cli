@@ -28,6 +28,13 @@ Patterns for `CredentialsFile` and the `Aura` / `Dbms` / `Embed` credential type
 
 - For commands like `credential dbms add --embed-credential x`: validate the target with `Embed.Get(name)` BEFORE calling `Dbms.Add(...)` so a bad name never half-creates a cred. Then call `Dbms.SetEmbed(name, embedName)` AFTER `Dbms.Add` succeeds — keeps the storage `Add` signature stable rather than threading new optional fields through.
 
+## Env-mode JWT cache
+
+- In `StorageModeEnv` secrets are never persisted, but the derived Aura OAuth JWT may be cached so repeated CLI calls in CI don't re-mint (and trip Aura's token-minting rate limit). The cache lives in `neo4j-cli/aura/internal/api/token_cache.go`, wired via `getToken` (`token.go`) — that's the right layer because `getToken` has `cfg` in scope for the auth-url, fs handle, and storage-mode gate (the credentials package can't import clicfg).
+- Location: `filepath.Join(os.TempDir(), "neo4j-cli-aura-token-"+identity[:16]+".json")`. Identity = `sha256(clientID + "\x00" + clientSecret + "\x00" + authURL)`; the short prefix keys the filename, the FULL hash is stored in the file and re-verified on load, so a changed clientID/secret/auth-url always misses and re-mints (never identity reuse).
+- File contents: `access-token`, `token-expiry` (the tolerance-adjusted ms value `UpdateAccessToken` computes), and `identity` (full hash). No raw secret is ever written.
+- Writes are atomic 0600 via `fileutils.WriteFileErr` using `cfg.Aura.Fs()`. Reads are best-effort (afero `Exists`/`ReadFile` + `HasValidAccessToken`): missing/corrupt/identity-mismatch/expired all yield a cache miss, never a panic (do NOT use `fileutils.ReadFileSafe`, which panics). All cache behavior is gated to `StorageModeEnv` — insecure/keyring never touch the temp file.
+
 ## Test fixtures
 
 - To verify DBMS credential storage in integration tests, use `helper.AssertCredentialsValue("dbms.credentials.0.name", "expected-name")`. To pre-populate DBMS credentials for collision tests, use `helper.SetCredentialsValue("dbms.credentials", []map[string]string{{...}})` + `helper.SetCredentialsValue("dbms.default-credential", "name")`.

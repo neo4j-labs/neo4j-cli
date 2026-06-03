@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: env credential-storage mode now caches the Aura OAuth token ephemerally (per-identity, in the OS temp dir) so repeated CLI calls in CI reuse a token instead of re-minting on every invocation.
+time: 2026-06-03T08:43:14.177365+02:00

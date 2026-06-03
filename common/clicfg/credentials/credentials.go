@@ -32,9 +32,17 @@ const StorageModeInsecure = "insecure"
 // StorageModeKeyring stores sensitive fields in the OS keyring.
 const StorageModeKeyring = "keyring"
 
-// StorageModeEnv sources sensitive fields from environment variables at runtime
-// and never persists them to disk or the OS keyring. Credentials are ephemeral
-// per process; save() is a no-op in this mode.
+// StorageModeEnv sources sensitive fields from environment variables at runtime.
+// Secrets — the Aura client secret, the dbms password, and the embed API key —
+// are NEVER persisted to disk or the OS keyring; save() is a no-op in this mode
+// and credentials are ephemeral per process.
+//
+// The one exception is the short-lived Aura OAuth JWT: it is a derived token (not
+// a secret the user supplied) and MAY be cached in an OS-temp file (mode 0600,
+// identity-bound — keyed on a hash of clientID+secret+auth-url, so a changed
+// identity always misses) so repeated CLI invocations in CI reuse a still-valid
+// token instead of re-minting one via POST /oauth/token on every call. See
+// neo4j-cli/aura/internal/api/token_cache.go.
 const StorageModeEnv = "env"
 
 type CredentialsFile struct {
