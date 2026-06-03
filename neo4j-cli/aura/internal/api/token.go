@@ -28,7 +28,6 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 		if accessToken, tokenExpiry, ok := loadTokenCache(cfg.Aura.Fs(), credential.ClientId, credential.ClientSecret, cfg.Aura.AuthUrl()); ok {
 			credential.AccessToken = accessToken
 			credential.TokenExpiry = tokenExpiry
-			return accessToken, nil
 		}
 	}
 
