@@ -40,7 +40,7 @@ jobs:
               if: matrix.os == 'ubuntu-latest'
               uses: golangci/golangci-lint-action@v7
               with:
-                  version: v2.11.4
+                  version: v2.12.1
                   install-mode: binary
 
             - name: Test
