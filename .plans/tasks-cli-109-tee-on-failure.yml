@@ -254,7 +254,7 @@ tasks:
       that drives it with a memfs-backed config and a synthetic failing error.
       Keep main() thin (call the helper); do not regress the existing
       confirm.ErrCancelled exit-0 path or the exit-code behaviour.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-005
@@ -265,4 +265,4 @@ tasks:
       - "The test asserts the tee file content is redacted (a secret in the captured/error content appears as *** in the file)"
       - "Tests cover: confirm.ErrCancelled writes no tee file; a tee-disabled config writes no file and yields empty TeePath"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z

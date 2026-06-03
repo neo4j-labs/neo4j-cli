@@ -163,27 +163,35 @@ func main() {
 
 	if err != nil {
 		// Intercept confirm.ErrCancelled before render: cancellation is exit-0,
-		// not exit-1, and the helper already wrote "cancelled." to stderr.
+		// not exit-1, and the helper already wrote "cancelled." to stderr. This
+		// guard stays in main (before handleFailure) so cancellation never tees.
 		if errors.Is(err, confirm.ErrCancelled) {
 			os.Exit(0)
 		}
 
-		// Best-effort tee of the captured output; a failed/disabled save yields
-		// an empty path and never affects the exit code.
-		path, _ := tee.Save(cfg, commandSlug(cmd, os.Args[1:]), teeContent(buf.Bytes(), err))
-
-		// Resolve to a *CLIError before Render so the tee path can be attached;
-		// Render reads the typed value, not the wrapped Error() string.
-		var ce *clierr.CLIError
-		if !errors.As(err, &ce) {
-			ce = clierr.NewFatalError("%s", err.Error())
-		}
-		if path != "" {
-			ce = ce.WithTeePath(path)
-		}
+		ce := handleFailure(cfg, cmd, os.Args[1:], buf.Bytes(), err)
 
 		format := resolveFormatForRender(os.Args[1:], cfg.Global.Format())
 		clierr.Render(ce, os.Stdout, os.Stderr, format)
 		os.Exit(exitCodeFor(ce))
 	}
+}
+
+// handleFailure best-effort tees the captured output for a failing command and
+// resolves err to the *clierr.CLIError that Render should print. It saves a
+// redacted tee file (empty path when tee is disabled or the save fails — never
+// affecting the exit code), resolves err to a typed CLIError via errors.As
+// (falling back to a fatal error), and attaches the tee path when one was
+// written. os.Exit and clierr.Render stay in main so this helper is testable.
+func handleFailure(cfg *clicfg.Config, cmd *cobra.Command, args []string, captured []byte, err error) *clierr.CLIError {
+	path, _ := tee.Save(cfg, commandSlug(cmd, args), teeContent(captured, err))
+
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		ce = clierr.NewFatalError("%s", err.Error())
+	}
+	if path != "" {
+		ce = ce.WithTeePath(path)
+	}
+	return ce
 }

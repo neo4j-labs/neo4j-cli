@@ -8,14 +8,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,6 +67,81 @@ func TestTeeContent(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, string(teeContent(tc.captured, tc.err)))
+		})
+	}
+}
+
+// TestHandleFailure_TeesRedactedAndAttachesPath exercises the integration of
+// the tee feature wired into main(): handleFailure must run tee.Save on the
+// captured+error content, land a redacted file on cfg.Aura.Fs() under the tee
+// dir, and return a *CLIError carrying that path. Uses a memfs-backed config so
+// nothing touches the real ~/Library/Preferences (Dir() resolves via
+// clicfg.ConfigPrefix, but the file is written to and read back from the same
+// in-memory fs via the returned path).
+func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
+	const secret = "hunter2"
+
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	captured := []byte("connecting to neo4j://neo4j:" + secret + "@host\npassword=" + secret + "\n")
+	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, captured, errors.New("boom"))
+
+	require.NotNil(t, ce)
+	require.NotEmpty(t, ce.TeePath, "tee path must be attached to the resolved CLIError")
+	assert.Equal(t, tee.Dir(), filepath.Dir(ce.TeePath))
+	assert.True(t, strings.HasSuffix(ce.TeePath, "_aura-instance-list.log"), "slug-derived filename; got %q", ce.TeePath)
+
+	data, err := afero.ReadFile(fs, ce.TeePath)
+	require.NoError(t, err, "tee file must exist on cfg.Aura.Fs()")
+	got := string(data)
+	assert.NotContains(t, got, secret, "secret must be redacted in the tee file")
+	assert.Contains(t, got, "***", "redacted placeholder must be present")
+	assert.Contains(t, got, "boom", "appended error message must be teed")
+}
+
+// TestHandleFailure_TeeDisabled verifies that a tee-disabled config writes no
+// file and yields an empty TeePath, while still resolving the error to a
+// CLIError that Render can print.
+func TestHandleFailure_TeeDisabled(t *testing.T) {
+	fs, err := testfs.GetTestFs(`{"format":"json","tee-enabled":false}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("password=hunter2\n"), errors.New("boom"))
+
+	require.NotNil(t, ce)
+	assert.Empty(t, ce.TeePath, "tee disabled must yield an empty tee path")
+
+	entries, err := afero.ReadDir(fs, tee.Dir())
+	if err == nil {
+		assert.Empty(t, entries, "no tee file may be written when tee is disabled")
+	}
+}
+
+// TestHandleFailure_PreservesExitCode verifies the tee attach does not change
+// the error's typed code/exit: an existing *CLIError keeps its code (validation
+// → 6) and a plain error is wrapped as fatal (→ 1).
+func TestHandleFailure_PreservesExitCode(t *testing.T) {
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "existing CLIError keeps validation exit 6", err: clierr.NewValidationError("bad input"), want: 6},
+		{name: "plain error wraps as fatal exit 1", err: errors.New("boom"), want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("data\n"), tc.err)
+			assert.Equal(t, tc.want, exitCodeFor(ce), "tee attach must not change the exit code")
 		})
 	}
 }

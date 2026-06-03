@@ -51,3 +51,8 @@ Decisions: placeholder unified to *** (docker tests updated from <redacted>) —
 
 ## REVIEW — 2026-06-03T00:00:00Z
 Added 1 review task (task-011): integration test for the tee-on-failure main() wiring via a testable handleFailure helper.
+
+## TASK-011 — 2026-06-03T00:00:00Z
+Extracted handleFailure(cfg,cmd,args,captured,err) *clierr.CLIError from main() (tee.Save + resolve-to-CLIError + WithTeePath); main() stays thin and keeps os.Exit/Render/ErrCancelled guard. Added integration tests asserting a redacted tee file lands on memfs with TeePath set, tee-disabled writes nothing, and exit codes are preserved.
+Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: ErrCancelled exit-0 guard left in main() before handleFailure (covered by existing TestConfirmCancellation_EndToEnd); tee tests hermetic via testfs memfs — file read back through returned TeePath so clicfg.ConfigPrefix never resolves to real home.
