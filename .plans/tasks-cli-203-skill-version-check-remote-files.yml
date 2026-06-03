@@ -51,7 +51,7 @@ tasks:
       leaves the SKILL.md frontmatter verbatim, so an installed catalog skill
       keeps its own upstream `version:` line. The self-skill path (binary
       version injection) must remain unchanged.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -59,7 +59,7 @@ tasks:
       - "Self-skill and self-alias resolution still inject the binary version"
       - "A freshly installed catalog skill retains its upstream SKILL.md `version:` line"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
   - id: task-004
     title: 'Audit/update affected tests and add per-skill regression test'
     description: |

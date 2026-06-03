@@ -5,3 +5,7 @@ Files: ~1 (common/skill/catalog_load_test.go)
 ## TASK-002 — 2026-06-03T00:00:00Z
 Added catalogSkillVersion helper in inventory.go: reuses cat.Lookup (per-skill fs.FS) + parseVersion to source each catalog skill's available version from its cached remote SKILL.md instead of cat.Version; Lookup/read errors resolve to "" (unknown-version).
 Files: ~mod (common/skill/inventory.go)
+
+## TASK-003 — 2026-06-03T00:00:00Z
+resolveSkillSource catalog branch now returns Source{Version: ""} so installed catalog skills keep their upstream SKILL.md version: line verbatim (injectVersion no-op on empty). Self/self-alias paths still inject binary version. All gates green.
+Files: ~mod (common/skill/catalog_load.go)
