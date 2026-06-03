@@ -73,7 +73,7 @@ tasks:
       clievents.RedactText, writes <UTC-timestamp>_<slug>.log atomically (0600)
       via fileutils.WriteFileErr, and rotates to keep at most tee-limit files per
       slug.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -83,7 +83,7 @@ tasks:
       - "Save writes a redacted 0600 file and returns its absolute path on success"
       - "Save returns empty path/no write when tee disabled, tee-limit<=0, fs nil, or content empty"
       - "Rotation keeps at most tee-limit files matching *_<slug>.log, independently per slug; tests use afero memfs"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-005
     title: 'Wire tee-on-failure into main.go'

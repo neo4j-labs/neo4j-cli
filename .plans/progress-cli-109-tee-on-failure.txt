@@ -11,3 +11,8 @@ Decisions: tightened the `auth` assignment alternative (auth(?:[-_]?token|[-_]?k
 Added tee-enabled (bool default true) / tee-limit (int default 20) global config keys mirroring history-*: ValidConfigKeys, setDefaultValues, setGlobal validation (bool / non-negative int), GlobalConfig.TeeEnabled()/TeeLimit() accessors. New colocated tee_config_test.go; updated two config-list golden fixtures.
 Files: ~common/clicfg/clicfg.go, ~common/clicfg/tee_config_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go
 Decisions: no bundle regen needed — TestGenerator_RoundTrip passed (config reference doesn't enumerate keys); bundle regen remains task-006's scope.
+
+## TASK-004 — 2026-06-03T00:00:00Z
+Added cobra-free common/tee package: LimitedBuffer (5 MiB head cap + truncation footer, Write never errors), Dir() -> ConfigPrefix/neo4j/cli/tee, Save(cfg,slug,content) redacting via clievents.RedactText, writing 0600 via fileutils.WriteFileErr, rotating per-slug to keep tee-limit files (delete oldest to limit-1 before write).
+Files: +common/tee/tee.go, +common/tee/tee_test.go
+Decisions: rotation runs before the write (to limit-1) so exactly tee-limit remain after; list/remove errors swallowed but write error returns ("",err). Tests assert on Dir()-relative paths (ConfigPrefix empty in tests).
