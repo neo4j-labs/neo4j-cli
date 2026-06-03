@@ -6,6 +6,7 @@ package api_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -73,13 +74,9 @@ func buildEnvModeConfig(t *testing.T, serverURL string) *clicfg.Config {
 	require.NoError(t, err)
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Credentials.SetStorageMode(credentials.StorageModeEnv, &noopWriter{})
+	cfg.Credentials.SetStorageMode(credentials.StorageModeEnv, io.Discard)
 	return cfg
 }
-
-type noopWriter struct{}
-
-func (noopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 // authURL returns the mint URL the env-mode config keys its cache identity on.
 func authURL(serverURL string) string { return serverURL + "/oauth/token" }
@@ -209,7 +206,7 @@ func TestTokenCache_NonEnvModeNeverTouchesCache(t *testing.T) {
 			fs, err := testfs.GetTestFs(cfgJSON, credJSON)
 			require.NoError(t, err)
 			cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-			cfg.Credentials.SetStorageMode(mode, &noopWriter{})
+			cfg.Credentials.SetStorageMode(mode, io.Discard)
 
 			// A valid pre-seeded entry at the non-env identity path must NOT be read.
 			path := api.TokenCachePath(api.TokenIdentity("id", "s", authURL(srv.URL)))
