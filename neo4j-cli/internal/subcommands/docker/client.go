@@ -12,11 +12,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 )
 
 // lookPathFn is the injectable seam used by altRuntimeHint to detect
@@ -53,25 +53,14 @@ func altRuntimeHint(lookPath func(string) (string, error)) string {
 // usage error only on that match.
 var ErrNotFound = errors.New("docker: container not found")
 
-// sensitiveAssignmentRe matches `KEY=VALUE` env-style assignments whose LHS
-// contains AUTH or PASSWORD (case-insensitive), tolerating whitespace around
-// `=`. Group 1 captures the full LHS including the `=` so the replacement
-// template can preserve it while masking the value. The pattern is shared by
-// argv-echo (redactArgs) and docker stderr (redactString) so a future
-// tightening edits one regex, not two algorithms.
-var sensitiveAssignmentRe = regexp.MustCompile(`(?i)(\w*(?:AUTH|PASSWORD)\w*\s*=\s*)(\S+)`)
-
-// redactString returns s with every `KEY=VALUE` assignment whose LHS contains
-// AUTH or PASSWORD (case-insensitive) rewritten as `KEY=<redacted>`. The
-// underlying regex `(?i)(\w*(?:AUTH|PASSWORD)\w*\s*=\s*)(\S+)` captures the
-// full LHS (including `=`) in group 1 and the non-whitespace value in group 2;
-// the replacement template `${1}<redacted>` keeps the LHS verbatim. Backed by
-// ReplaceAllString so multi-match stderr blobs (e.g. multi-line docker errors
-// echoing several env vars) are fully covered, not just the first hit.
-// Single source of truth for credential redaction across the argv echo and
-// docker's own captured stderr.
+// redactString masks credential-bearing assignments (e.g. NEO4J_AUTH=,
+// *PASSWORD*=) in arbitrary text. It delegates to clievents.RedactText so the
+// CLI has a single text-level redaction implementation rather than a second
+// docker-local regex; the secret value is replaced with the shared ***
+// placeholder. Applied to both the argv echo (redactArgs) and docker's own
+// captured stderr on the non-zero-exit error path.
 func redactString(s string) string {
-	return sensitiveAssignmentRe.ReplaceAllString(s, "${1}<redacted>")
+	return clievents.RedactText(s)
 }
 
 // dockerClient abstracts the host `docker` CLI. The default execClient shells
@@ -226,13 +215,12 @@ func (c *execClient) runEnv(ctx context.Context, env []string, args ...string) (
 }
 
 // redactArgs returns a copy of args with any element shaped like a sensitive
-// env-var assignment (LHS contains AUTH or PASSWORD) replaced by
-// `<LHS>=<redacted>`. Non-env elements are preserved unchanged and the input
-// slice is never mutated. Per-element redaction is delegated to redactString,
-// so the LHS match is regex-driven and case-insensitive (the previous
-// strings.ToUpper LHS-fold is now folded into the (?i) flag on the shared
-// regex). The nil/empty short-circuit is preserved: nil input returns nil,
-// empty input returns an empty slice.
+// env-var assignment (e.g. an AUTH/PASSWORD LHS) replaced by `<LHS>=***`.
+// Non-env elements are preserved unchanged and the input slice is never
+// mutated. Per-element redaction is delegated to redactString (which in turn
+// delegates to clievents.RedactText), so docker shares the CLI's single
+// text-level redactor. The nil/empty short-circuit is preserved: nil input
+// returns nil, empty input returns an empty slice.
 func redactArgs(args []string) []string {
 	if args == nil {
 		return nil

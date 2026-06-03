@@ -223,7 +223,7 @@ tasks:
       text-level redaction implementation. Preserve docker's existing behaviour
       (its tests must still pass) — RedactText must cover the env-assignment
       cases docker relies on before docker is switched over.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-009
@@ -232,4 +232,4 @@ tasks:
       - "docker.redactString delegates to the shared clievents redaction (no separate text-redaction implementation); docker tests still pass"
       - "RedactText covers all cases docker.redactString previously handled (NEO4J_AUTH=, *PASSWORD* assignments)"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z

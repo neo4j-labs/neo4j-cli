@@ -31,12 +31,20 @@ var secretFlags = []string{
 // redactedPlaceholder is what the secret value is replaced with in output.
 const redactedPlaceholder = "***"
 
-// secretParamKeyParts are case-insensitive substrings that mark a `--param`
-// bind-parameter key as secret-bearing. A query parameter can legitimately
-// carry a token/password/api-key, so when the key matches we scrub only the
-// value and keep the key visible. The list is intentionally conservative to
-// avoid over-redacting common non-secret params (e.g. `limit`, `name`).
-var secretParamKeyParts = []string{
+// secretWords is the single canonical vocabulary of case-insensitive substrings
+// that mark a key (a `--param` bind-parameter key, a JSON field name, or a
+// key=value LHS) as secret-bearing. Every secret-key heuristic in this file is
+// driven from this one slice — secretParamKeyParts for the argv `--param`
+// matcher, and the assignment/JSON regexes (built at package init) — so the
+// word list lives in exactly one place. The list is intentionally conservative
+// to avoid over-redacting common non-secret keys (e.g. `limit`, `name`).
+//
+// "auth" is deliberately NOT in this list: the assignment regex needs special
+// handling for it (its own `auth(?:[-_]?token|[-_]?key)?` branch in
+// textAssignmentRe) so it does not swallow the HTTP header name "Authorization",
+// and treating "auth" as a generic substring would over-match. It is added back
+// in only where that nuance is encoded.
+var secretWords = []string{
 	"password",
 	"passwd",
 	"pwd",
@@ -48,6 +56,21 @@ var secretParamKeyParts = []string{
 	"access-key",
 	"accesskey",
 	"key",
+}
+
+// secretParamKeyParts are the substrings that mark a `--param` key secret. It
+// is an alias of the canonical vocabulary so the param heuristic and the
+// regex-based passes can never drift apart.
+var secretParamKeyParts = secretWords
+
+// quotedAlternation joins the words into a regex alternation, QuoteMeta'ing
+// each so metacharacters in any future vocabulary entry stay literal.
+func quotedAlternation(words []string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = regexp.QuoteMeta(w)
+	}
+	return strings.Join(quoted, "|")
 }
 
 // RedactArgs renders an argv slice as a single space-separated string with
@@ -172,22 +195,30 @@ func redactKnownSecrets(s string) string {
 // are preserved.
 var textURIUserinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s@]+@`)
 
-// textAssignmentRe matches password/secret/token/api-key/auth key-value
-// assignments (= or :) in free text and rewrites the value to ***. Group 1
-// captures the key and separator so the replacement keeps them verbatim.
-// The `auth` alternative deliberately ends at a `[=:]`-bounded word rather than
-// using `auth\w*`, so it does NOT swallow the HTTP header name "Authorization"
-// (handled by the bearer pass) while still matching auth/auth_token/authkey.
-var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:password|passwd|pwd|secret|token|api[-_]?key)\w*|auth(?:[-_]?token|[-_]?key)?)\s*[=:]\s*)(\S+)`)
+// secretWordsAlt is the regex alternation of the canonical vocabulary, each
+// word QuoteMeta'd so any future entry with regex metacharacters stays literal
+// (current words are alnum/dash/underscore — safe — but the quoting fails closed
+// against drift).
+var secretWordsAlt = quotedAlternation(secretWords)
+
+// textAssignmentRe matches a secret key-value assignment (= or :) in free text
+// and rewrites the value to ***. Group 1 captures the key and separator so the
+// replacement keeps them verbatim. The alternation is built from the canonical
+// secretWords vocabulary (with a trailing `\w*` so `MY_PASSWORD`/`api_key2`
+// match) plus the special `auth` branch, which deliberately ends at a
+// `[=:]`-bounded word rather than using `auth\w*` so it does NOT swallow the
+// HTTP header name "Authorization" (handled by the bearer pass) while still
+// matching auth/auth_token/authkey.
+var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:` + secretWordsAlt + `)\w*|auth(?:[-_]?token|[-_]?key)?)\s*[=:]\s*)(\S+)`)
 
 // textJSONFieldRe matches a quoted JSON key containing a secret-bearing
 // substring followed by a quoted value, rewriting only the value to "***". It
 // exists because textAssignmentRe cannot match the JSON shape: the `"` between
 // the key and the `:` breaks its `key[=:]value` form, so `"password":"x"` would
-// otherwise leak. The key is matched by substring (mirroring secretParamKeyParts)
-// so `"client_secret"`, `"x-api-key"`, `"current_password"` are all covered, and
-// both `"k":"v"` and `"k": "v"` spacings are handled.
-var textJSONFieldRe = regexp.MustCompile(`(?i)("[^"]*(?:password|passwd|pwd|secret|token|api[-_]?key|access[-_]?key)[^"]*"\s*:\s*)"[^"]*"`)
+// otherwise leak. The key is matched by substring against the canonical
+// vocabulary so `"client_secret"`, `"x-api-key"`, `"current_password"` are all
+// covered, and both `"k":"v"` and `"k": "v"` spacings are handled.
+var textJSONFieldRe = regexp.MustCompile(`(?i)("[^"]*(?:` + secretWordsAlt + `)[^"]*"\s*:\s*)"[^"]*"`)
 
 // textBearerRe matches an Authorization Bearer token or Basic credential blob
 // in free text and rewrites it to ***. Group 1 captures the scheme word
