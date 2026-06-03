@@ -98,7 +98,7 @@ func makeCatalogTarball(t *testing.T, version string, skills ...string) []byte {
 	top := "neo4j-skills-" + version + "/"
 	require.NoError(t, tw.WriteHeader(&tar.Header{Name: top, Mode: 0o755, Typeflag: tar.TypeDir}))
 	for _, s := range skills {
-		body := "---\nname: " + s + "\n---\n# " + s + "\nbody\n"
+		body := "---\nname: " + s + "\nversion: " + version + "\n---\n# " + s + "\nbody\n"
 		require.NoError(t, tw.WriteHeader(&tar.Header{
 			Name: top + s + "/SKILL.md", Mode: 0o600, Typeflag: tar.TypeReg, Size: int64(len(body)),
 		}))
@@ -158,7 +158,7 @@ func seedCatalogCache(t *testing.T, fs afero.Fs, version string, skills ...strin
 	for _, s := range skills {
 		dir := filepath.Join(contentRoot, s)
 		require.NoError(t, fs.MkdirAll(dir, 0755))
-		body := "---\nname: " + s + "\n---\n# cached " + s + "\n"
+		body := "---\nname: " + s + "\nversion: " + version + "\n---\n# cached " + s + "\n"
 		require.NoError(t, afero.WriteFile(fs, filepath.Join(dir, "SKILL.md"), []byte(body), 0600))
 	}
 }

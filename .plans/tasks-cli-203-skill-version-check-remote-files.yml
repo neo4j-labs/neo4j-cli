@@ -14,14 +14,14 @@ tasks:
       cache content). This is a safe, standalone change: existing tests still
       pass because the available version is currently sourced from cat.Version,
       and it lays the groundwork for sourcing it from the file.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "makeCatalogTarball writes `version: <version>` into each SKILL.md frontmatter"
       - "seedCatalogCache writes `version: <version>` into each cached SKILL.md frontmatter"
       - "Default version equals the existing `version` argument so callers need no changes"
       - "make test still passes with no other code changes"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
   - id: task-002
     title: 'Source catalog skill available version from cached remote SKILL.md'
     description: |
