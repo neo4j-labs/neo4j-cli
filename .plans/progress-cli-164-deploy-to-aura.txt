@@ -1,3 +1,7 @@
+## TASK-014 — 2026-06-03T06:27:33Z
+Renamed docker deploy orchestrator file to follow the *_helpers.go convention; pure rename, no code change.
+Files: >neo4j-cli/internal/subcommands/docker/deploy.go=>push_to_aura_helpers.go, >neo4j-cli/internal/subcommands/docker/deploy_test.go=>push_to_aura_helpers_test.go
+
 ## TASK-010 — 2026-06-01T17:10:00Z
 Closed the Cypher-injection seam on the source --database name in docker/deploy.go. Added validateDatabaseName + conservative databaseNamePattern (`^[a-zA-Z][a-zA-Z0-9.-]{0,62}$`); PushToAura validates the name first, before resolving creds or running any STOP/START DATABASE statement or neo4j-admin call, returning a clierr.UsageError on a bad name. Chose validation-then-plain-name (over backtick quoting) per task guidance — keeps emitted Cypher readable and rejects injection regardless of the upstream deploy-leaf system check. Table-driven test TestPushToAura_InjectionDatabaseName_Rejected covers `;`/backtick/space/newline names plus empty + leading-digit, asserting the name never reaches stopStartFn or docker Exec. All gates green: make test (no failures), make fmt-check, make lint (0 issues).
 Files: M neo4j-cli/internal/subcommands/docker/deploy.go, M neo4j-cli/internal/subcommands/docker/deploy_test.go
