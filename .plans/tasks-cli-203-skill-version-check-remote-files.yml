@@ -87,7 +87,7 @@ tasks:
       (replacing the "plugin.json version for catalog skills" wording). Verify
       list.go Long has no plugin.json mention. Regenerate the skill bundle with
       `go generate ./neo4j-cli/internal/skill/...` so references/skill.md matches.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "check.go Long no longer attributes catalog-skill versions to plugin.json"
@@ -95,7 +95,7 @@ tasks:
       - "go generate ./neo4j-cli/internal/skill/... run; references/skill.md regenerated"
       - "make generate-check clean (only internal/skill/bundle/** diffs)"
       - "TestGenerator_RoundTrip passes"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
   - id: task-006
     title: 'Add changelog entry and run final gates'
     description: |

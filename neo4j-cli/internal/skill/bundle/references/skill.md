@@ -25,7 +25,7 @@ Flags:
 
 Check installed skills for version drift
 
-Inspects every installed skill across detected agents and compares its frontmatter `version:` against the source version (binary version for the self-skill, plugin.json version for catalog skills). Columns: skill, agent, installed_version, current_version, status where status ∈ ok | drift | unknown-version. Exits non-zero when any row is drift or unknown-version. Auto-refreshes the catalog cache on 24h staleness when network is available; --refresh forces a fetch.
+Inspects every installed skill across detected agents and compares its frontmatter `version:` against the source version (binary version for the self-skill, the skill's own SKILL.md `version:` for catalog skills). Columns: skill, agent, installed_version, current_version, status where status ∈ ok | drift | unknown-version. Exits non-zero when any row is drift or unknown-version. Auto-refreshes the catalog cache on 24h staleness when network is available; --refresh forces a fetch.
 
 Usage: `neo4j-cli skill check [flags]`
 

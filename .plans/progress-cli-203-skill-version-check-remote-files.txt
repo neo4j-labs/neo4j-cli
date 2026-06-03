@@ -14,3 +14,7 @@ Files: ~mod (common/skill/catalog_load.go)
 Audited check/install/installer/list/resolve tests — no assertions tied available version to plugin.json (all already keyed to per-skill SKILL.md, which equals plugin version in fixtures), so none broke. Added TestCheckCmd_CatalogVersionFromSkillFile proving current_version comes from the skill's own SKILL.md (2.5.0) not plugin.json (1.0.0).
 Files: ~mod (catalog_load_test.go, check_test.go)
 Decisions: Added seedCatalogCacheWithSkillVersion helper so SKILL.md version can differ from plugin.json version; content dir stays keyed by plugin version (cat.Lookup resolves by it). seedCatalogCache delegates to it.
+
+## TASK-005 — 2026-06-03T00:00:00Z
+Updated check.go Long: catalog-skill source version now attributed to the skill's own SKILL.md `version:` (was "plugin.json version"); regenerated bundle references/skill.md. list.go plugin.json mention describes the catalog index (skill list source), not version, so left unchanged.
+Files: ~mod (common/skill/check.go, neo4j-cli/internal/skill/bundle/references/skill.md)
