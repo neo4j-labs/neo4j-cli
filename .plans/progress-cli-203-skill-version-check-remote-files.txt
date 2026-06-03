@@ -32,3 +32,8 @@ Files: ~mod (common/skill/inventory.go)
 
 ## REVIEW — 2026-06-03T12:30:00Z
 Added 1 review task (task-008): validate remote skill version at inventory boundary (terminal escape injection).
+
+## TASK-008 — 2026-06-03T13:05:00Z
+Added shared sanitizeVersion helper (installer.go) that fails closed on version strings carrying C0 control bytes (< 0x20) or DEL (0x7F), returning "" so the row falls into unknown-version. Wired into both version-read boundaries: catalogSkillVersion (inventory.go, available) and readInstalledSkill (helpers.go, installed). Added regression test proving an ESC (0x1b) version yields unknown-version and never reaches output raw, plus a sanitizeVersion unit table. All gates green; no bundle drift.
+Files: ~3 (installer.go, inventory.go, helpers.go), ~2 tests (check_test.go, installer_test.go)
+Decisions: chose fail-closed validator over commonoutput.StripControl replace-with-"?" — a version is a constrained token and the skill check/list table+toon path bypasses StripControl, so sanitizing at the inventory boundary covers both renderers.

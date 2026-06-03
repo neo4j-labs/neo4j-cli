@@ -81,7 +81,7 @@ func catalogSkillVersion(filesystem afero.Fs, cat *catalog.Catalog, name, binary
 	if err != nil {
 		return ""
 	}
-	return parseVersion(data)
+	return sanitizeVersion(parseVersion(data))
 }
 
 // inventoryRowsForSkill returns one row per agent for `skillName`. detected/

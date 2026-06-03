@@ -94,7 +94,7 @@ func readInstalledSkill(filesystem afero.Fs, agent *Agent, skillName string) (bo
 	if err != nil {
 		return true, ""
 	}
-	return true, parseVersion(data)
+	return true, sanitizeVersion(parseVersion(data))
 }
 
 // agentDetected reports whether `agent`'s DetectDir exists on `filesystem`.

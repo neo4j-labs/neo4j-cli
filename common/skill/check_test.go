@@ -143,6 +143,42 @@ func TestCheckCmd_CatalogVersionFromSkillFile(t *testing.T) {
 	assert.Equal(t, "ok", cypherRow["status"])
 }
 
+// TestCheckCmd_CatalogVersionControlChars_Neutralized proves that a catalog
+// skill whose SKILL.md `version:` carries an ANSI/escape sequence (ESC 0x1b)
+// is treated as unknown-version: the raw control byte must never reach the
+// rendered output, and the available (current_version) value must collapse to
+// "" rather than the tampered string.
+func TestCheckCmd_CatalogVersionControlChars_Neutralized(t *testing.T) {
+	cs := newCatalogServer(t)
+	withCatalogSeams(t, cs.doer())
+
+	const evil = "1.0.0\x1b[31mFAKE"
+	f := newFixture(t, "/home/alice", "json", "claude-code")
+	seedCatalogCacheWithSkillVersion(t, f.fs, "1.0.0", evil, "neo4j-cypher-skill")
+	require.NoError(t, f.exec(t, "install", "neo4j-cypher-skill"))
+	f.resetBuffers()
+
+	err := f.exec(t, "check")
+	require.Error(t, err, "unknown-version must exit non-zero")
+
+	out := f.stdout.String()
+	assert.NotContains(t, out, "\x1b", "raw ESC byte must not reach output")
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+	var cypherRow map[string]any
+	for _, r := range rows {
+		if r["skill"] == "neo4j-cypher-skill" {
+			cypherRow = r
+			break
+		}
+	}
+	require.NotNil(t, cypherRow, "catalog row missing")
+	assert.Equal(t, "unknown-version", cypherRow["status"])
+	assert.Equal(t, "", cypherRow["current_version"], "tampered version must collapse to unknown")
+	assert.Equal(t, "", cypherRow["installed_version"], "tampered installed version must collapse to unknown")
+}
+
 func TestCheckCmd_NoneInstalled(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code")
 	require.NoError(t, f.exec(t, "check"))

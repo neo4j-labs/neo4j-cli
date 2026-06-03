@@ -258,3 +258,19 @@ func parseVersion(data []byte) string {
 	}
 	return string(m[1])
 }
+
+// sanitizeVersion fails closed on version strings that contain bytes a
+// legitimate version token never carries. SECURITY: catalog skill SKILL.md
+// content is fetched from an external, community-PR'd trust boundary; an
+// embedded ANSI/escape sequence (e.g. ESC 0x1b) in a `version:` line would
+// otherwise reach a terminal table/toon cell raw and could spoof output or
+// drive the terminal emulator. A rejected value collapses to "" so the row
+// surfaces as unknown-version rather than rendering the tampered bytes.
+func sanitizeVersion(version string) string {
+	for _, r := range version {
+		if r < 0x20 || r == 0x7F {
+			return ""
+		}
+	}
+	return version
+}

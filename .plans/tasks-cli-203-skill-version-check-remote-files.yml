@@ -177,7 +177,6 @@ tasks:
       Do not over-broaden scope: the skill/agent/status columns share the same
       un-stripped path but the version columns are the in-scope untrusted-remote
       vector for this change.
-    status: pending
     dependencies: []
     acceptance_criteria:
       - "A version string containing control chars (e.g. ESC 0x1b) sourced from a catalog skill's SKILL.md is treated as unknown-version (\"\"), not rendered raw"
@@ -185,5 +184,6 @@ tasks:
       - "Legitimate semantic versions (e.g. 1.2.3, 1.0.0-rc.1) are unaffected in table, toon, and JSON output"
       - "A regression test proves an escape-sequence version is neutralized (does not appear raw in check/list output and yields unknown-version)"
       - "make test, make fmt-check, make lint pass; make generate-check clean"
+    status: completed
     source: review
-    completed_at: null
+    completed_at: 2026-06-03T13:05:00Z
