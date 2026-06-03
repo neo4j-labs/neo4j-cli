@@ -38,3 +38,8 @@ Decisions: JSON pass ordered before textAssignmentRe — quoted "***" trailing q
 ## TASK-008 — 2026-06-03T14:30:00Z
 Extended textBearerRe to (?i)((?:bearer|basic)\s+)\S+ so `Authorization: Basic <base64>` is redacted to *** alongside Bearer; updated regex + RedactText doc comments. Added "basic header" table case.
 Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+
+## TASK-009 — 2026-06-03T15:10:00Z
+Closed table-format secret column leak via runtime literal-value redaction: added clievents.RegisterSecretValue + a knownSecrets registry scrubbed (longest-first, literal ReplaceAll) by RedactText; renderInstanceResult registers the generated password before printing so tee redaction catches it in any format.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go, ~neo4j-cli/aura/internal/subcommands/instance/create_core.go
+Decisions: chose source-adjacent literal registration over (A) blanket source mask (breaks "password shown once" success UX) and (B) table-cell regex (horizontal box-drawing layout puts value in a width-offset column on a different line from header — unmatchable without fragile parsing). Literal pass is format-agnostic, never over-redacts (exact match, <4-char guard), preserves UX (value still printed to real stdout, only the captured/teed copy scrubbed). Residual risk: an unregistered runtime secret in a non-regex-modeled layout still leaks — documented in RedactText "Coverage limit" comment.

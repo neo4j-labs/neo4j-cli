@@ -343,3 +343,70 @@ func TestRedactText(t *testing.T) {
 		})
 	}
 }
+
+// resetKnownSecrets clears the process-global registry so a test starts clean
+// and restores it afterward (the registry is package state shared across tests).
+func resetKnownSecrets(t *testing.T) {
+	t.Helper()
+	knownSecretsMu.Lock()
+	saved := knownSecrets
+	knownSecrets = nil
+	knownSecretsMu.Unlock()
+	t.Cleanup(func() {
+		knownSecretsMu.Lock()
+		knownSecrets = saved
+		knownSecretsMu.Unlock()
+	})
+}
+
+func TestRedactText_RegisteredSecretValue(t *testing.T) {
+	const pw = "Abc123-generated-DB-password"
+
+	t.Run("table cell value scrubbed", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue(pw)
+		// A horizontal box-drawing table: the value sits in its own column, on a
+		// different line from the "PASSWORD" header — the shape-based regexes
+		// cannot reach it, only the literal-match pass can.
+		in := "│ PASSWORD                     │ USERNAME │\n│ " + pw + " │ neo4j    │"
+		got := RedactText(in)
+		if strings.Contains(got, pw) {
+			t.Fatalf("registered secret leaked: %q", got)
+		}
+		if !strings.Contains(got, "***") {
+			t.Fatalf("expected *** placeholder, got %q", got)
+		}
+		if !strings.Contains(got, "neo4j") {
+			t.Errorf("non-secret cell over-redacted: %q", got)
+		}
+	})
+
+	t.Run("unregistered output untouched", func(t *testing.T) {
+		resetKnownSecrets(t)
+		in := "│ NAME       │ USERNAME │\n│ Instance01 │ neo4j    │"
+		if got := RedactText(in); got != in {
+			t.Errorf("non-secret table over-redacted: %q", got)
+		}
+	})
+
+	t.Run("short values ignored", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue("abc") // < 4 chars
+		in := "value abc here"
+		if got := RedactText(in); got != in {
+			t.Errorf("short value should not be registered/scrubbed: %q", got)
+		}
+	})
+
+	t.Run("duplicate registration idempotent", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue(pw)
+		RegisterSecretValue(pw)
+		knownSecretsMu.RLock()
+		n := len(knownSecrets)
+		knownSecretsMu.RUnlock()
+		if n != 1 {
+			t.Errorf("expected 1 registered secret, got %d", n)
+		}
+	})
+}

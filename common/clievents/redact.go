@@ -6,7 +6,9 @@ package clievents
 import (
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 )
 
 // secretFlags is the canonical list of flag names whose values must never be
@@ -111,6 +113,59 @@ func RedactArgs(args []string) string {
 	return strings.Join(out, " ")
 }
 
+// knownSecrets holds literal secret VALUES (not flag names) registered at
+// runtime that must be scrubbed from captured output regardless of how they are
+// formatted. It exists because the regex passes below are shape-based: they
+// catch `key=value`, JSON fields, URIs, and auth headers, but cannot catch a
+// secret that appears in a layout they don't model — most notably a value cell
+// in a horizontal box-drawing table (`aura instance create --format table`
+// prints the Aura-generated password in its own column, on a different line
+// from the "password" header, offset by dynamic column widths). Registering the
+// exact value lets RedactText scrub it by literal match in any format without
+// over-redacting unrelated output. See RegisterSecretValue.
+var (
+	knownSecretsMu sync.RWMutex
+	knownSecrets   []string
+)
+
+// RegisterSecretValue records a literal secret value so RedactText scrubs every
+// later occurrence of it (any format) to ***. Use it for secrets minted at
+// runtime that are printed in machine-capturable output whose layout the
+// shape-based regexes don't cover (e.g. a generated DB password rendered into a
+// table cell). Empty or very short values are ignored to avoid scrubbing common
+// substrings. Registration is process-local and additive; it is never persisted.
+func RegisterSecretValue(v string) {
+	if len(v) < 4 {
+		return
+	}
+	knownSecretsMu.Lock()
+	defer knownSecretsMu.Unlock()
+	for _, s := range knownSecrets {
+		if s == v {
+			return
+		}
+	}
+	knownSecrets = append(knownSecrets, v)
+}
+
+// redactKnownSecrets replaces every registered literal secret value in s with
+// ***. Longest-first so a secret that is a substring of another is handled
+// before its container.
+func redactKnownSecrets(s string) string {
+	knownSecretsMu.RLock()
+	values := make([]string, len(knownSecrets))
+	copy(values, knownSecrets)
+	knownSecretsMu.RUnlock()
+	if len(values) == 0 {
+		return s
+	}
+	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
+	for _, v := range values {
+		s = strings.ReplaceAll(s, v, redactedPlaceholder)
+	}
+	return s
+}
+
 // textURIUserinfoRe matches a connection URI's userinfo password embedded in
 // free text: scheme://user:password@ with the password rewritten to ***. Only
 // the password segment (group 1 is scheme://user:) is replaced; host/port/path
@@ -144,10 +199,20 @@ var textBearerRe = regexp.MustCompile(`(?i)((?:bearer|basic)\s+)\S+`)
 // regexes for (a) URI userinfo passwords in free text, (b) quoted-key JSON
 // secret fields (`"password":"x"`), (c) password/secret/token/api-key/auth
 // key-value assignments, and (d) Bearer/Basic authorization headers, replacing
-// each secret value with ***. It is the single source of truth for redacting
-// captured command output before it is persisted. Non-secret text (e.g.
-// `limit=10`, ordinary prose) is left intact.
+// each secret value with ***, plus (e) any literal value registered via
+// RegisterSecretValue. It is the single source of truth for redacting captured
+// command output before it is persisted. Non-secret text (e.g. `limit=10`,
+// ordinary prose) is left intact.
+//
+// Coverage limit: the regex passes are shape-based and fully cover key=value,
+// JSON fields, connection URIs, and auth headers. They do NOT model
+// table-formatted output (horizontal box-drawing tables put a value in a column
+// on a different line from its header, offset by dynamic widths), so a secret
+// printed only as a table cell is caught solely by the RegisterSecretValue
+// literal-match pass — callers that emit a runtime secret into a table must
+// register it (e.g. `aura instance create` registers the generated password).
 func RedactText(s string) string {
+	s = redactKnownSecrets(s)
 	s = textURIUserinfoRe.ReplaceAllString(s, "${1}"+redactedPlaceholder+"@")
 	// JSON pass runs before the bare-assignment pass: it rewrites the value to a
 	// quoted "***", whose trailing `"` is not a valid assignment separator, so

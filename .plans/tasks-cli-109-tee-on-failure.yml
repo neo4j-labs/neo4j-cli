@@ -196,7 +196,7 @@ tasks:
       the approach that is robust without over-redacting normal table output, and
       document the residual risk if full coverage isn't achievable. Coordinate
       with task-007 so the chosen vocab/source stays consistent.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-008
@@ -204,7 +204,7 @@ tasks:
       - "A generated password is not present in cleartext in the tee output for `instance create --format table` on a post-print failure"
       - "Normal non-secret table output is not over-redacted"
       - "Chosen approach + any residual risk documented (code comment or progress note); make test/lint/fmt-check pass"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-010
     title: 'Consolidate redaction onto a single canonical source'
