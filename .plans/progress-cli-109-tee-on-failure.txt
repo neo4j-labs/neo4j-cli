@@ -48,3 +48,6 @@ Decisions: chose source-adjacent literal registration over (A) blanket source ma
 Consolidated redaction onto one source: introduced canonical secretWords vocabulary (secretParamKeyParts now aliases it; assignment + JSON regexes built from quotedAlternation(secretWords), each word QuoteMeta'd) so no word list is duplicated; migrated docker.redactString to delegate to clievents.RedactText (removed sensitiveAssignmentRe/regexp import), making RedactText the only text-level redactor.
 Files: ~common/clievents/redact.go, ~neo4j-cli/internal/subcommands/docker/client.go, ~neo4j-cli/internal/subcommands/docker/client_test.go
 Decisions: placeholder unified to *** (docker tests updated from <redacted>) — one placeholder across all surfaces; RedactText verified to cover docker's NEO4J_AUTH=/*PASSWORD* cases before switching. Broadens textAssignment/JSON to also match key/accesskey/access-key words — fail-closed, acceptable per redaction philosophy.
+
+## REVIEW — 2026-06-03T00:00:00Z
+Added 1 review task (task-011): integration test for the tee-on-failure main() wiring via a testable handleFailure helper.
