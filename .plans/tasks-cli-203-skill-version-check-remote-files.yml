@@ -1,0 +1,117 @@
+feature: cli-203-skill-version-check-remote-files
+prd: ./prd-cli-203-skill-version-check-remote-files.md
+created_at: 2026-06-03T00:00:00Z
+updated_at: 2026-06-03T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Stamp per-skill version into shared catalog test fixtures'
+    description: |
+      Update the shared test helpers in common/skill/catalog_load_test.go so
+      every generated SKILL.md carries a `version: <version>` frontmatter line,
+      defaulting to the catalog `version` argument. Touch both
+      makeCatalogTarball (tarball bodies) and seedCatalogCache (pre-extracted
+      cache content). This is a safe, standalone change: existing tests still
+      pass because the available version is currently sourced from cat.Version,
+      and it lays the groundwork for sourcing it from the file.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "makeCatalogTarball writes `version: <version>` into each SKILL.md frontmatter"
+      - "seedCatalogCache writes `version: <version>` into each cached SKILL.md frontmatter"
+      - "Default version equals the existing `version` argument so callers need no changes"
+      - "make test still passes with no other code changes"
+    completed_at: null
+  - id: task-002
+    title: 'Source catalog skill available version from cached remote SKILL.md'
+    description: |
+      In common/skill/inventory.go, replace the `cat.Version` passed per catalog
+      skill in BuildInventory with a per-skill version read from that skill's
+      cached remote SKILL.md. Add a small helper that reuses
+      catalog.Catalog.Lookup (per-skill fs.FS) and the existing parseVersion
+      helper from installer.go; add the io/fs import. Missing content or an
+      unparseable version resolves to "" (existing unknown-version path). No new
+      regex and no new field on catalog.SkillEntry.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "BuildInventory sets AvailableVersion per catalog skill from its cached SKILL.md `version:`"
+      - "Helper reuses catalog.Catalog.Lookup and parseVersion; no new regex, no SkillEntry change"
+      - "Missing/unparseable content resolves to \"\" (unknown-version), no panic or error"
+      - "Reserved-name skip in BuildInventory is preserved"
+      - "make test passes"
+    completed_at: null
+  - id: task-003
+    title: 'Preserve upstream version verbatim on catalog skill install'
+    description: |
+      In common/skill/catalog_load.go, change resolveSkillSource so the catalog
+      branch returns Source{FS: sub, Version: ""} instead of Version:
+      cat.Version. Per the documented Source.Version contract, an empty version
+      leaves the SKILL.md frontmatter verbatim, so an installed catalog skill
+      keeps its own upstream `version:` line. The self-skill path (binary
+      version injection) must remain unchanged.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "resolveSkillSource catalog branch passes Version: \"\" (verbatim)"
+      - "Self-skill and self-alias resolution still inject the binary version"
+      - "A freshly installed catalog skill retains its upstream SKILL.md `version:` line"
+      - "make test passes"
+    completed_at: null
+  - id: task-004
+    title: 'Audit/update affected tests and add per-skill regression test'
+    description: |
+      Audit common/skill/{check,install,installer,list,resolve}_test.go for any
+      assertion that a catalog skill's installed/available version equals the
+      plugin.json version, and update to the per-skill SKILL.md value. Add a new
+      regression test that seeds a catalog skill whose SKILL.md `version:`
+      differs from plugin.json's top-level version and asserts the check's
+      current_version reflects the SKILL.md value, not plugin.json.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "All affected skill-package tests updated and passing"
+      - "New regression test proves available version comes from SKILL.md, not plugin.json"
+      - "TestCheckCmd_AllOk_ExitsZero and TestCheckCmd_CatalogSkillDrift pass under the new sourcing"
+      - "make test passes"
+    completed_at: null
+  - id: task-005
+    title: 'Update check help text and regenerate skill bundle'
+    description: |
+      Update the Long help text in common/skill/check.go to describe the
+      catalog-skill version source as the skill's own SKILL.md `version:`
+      (replacing the "plugin.json version for catalog skills" wording). Verify
+      list.go Long has no plugin.json mention. Regenerate the skill bundle with
+      `go generate ./neo4j-cli/internal/skill/...` so references/skill.md matches.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "check.go Long no longer attributes catalog-skill versions to plugin.json"
+      - "list.go Long confirmed free of plugin.json references"
+      - "go generate ./neo4j-cli/internal/skill/... run; references/skill.md regenerated"
+      - "make generate-check clean (only internal/skill/bundle/** diffs)"
+      - "TestGenerator_RoundTrip passes"
+    completed_at: null
+  - id: task-006
+    title: 'Add changelog entry and run final gates'
+    description: |
+      Add a single user-facing changie entry (kind Patch) describing that skill
+      version checks now use each skill's own remote SKILL.md version. Run the
+      full gate suite as final verification.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Single changie Patch entry added under .changes/unreleased/ for neo4j-cli"
+      - "make test passes"
+      - "make fmt-check passes"
+      - "make lint passes"
+      - "make generate-check clean"
+    completed_at: null
