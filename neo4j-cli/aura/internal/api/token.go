@@ -18,6 +18,20 @@ import (
 )
 
 func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW io.Writer) (string, error) {
+	envMode := cfg.Credentials.StorageMode() == credentials.StorageModeEnv
+
+	// In env mode the in-memory token is cleared on every process start, so an
+	// identity-bound temp cache lets CI reuse a still-valid token instead of
+	// re-minting. The cache re-verifies identity, so a stale/corrupt entry can
+	// only cost an extra mint — never identity reuse (defense in depth).
+	if envMode && !credential.HasValidAccessToken() {
+		if accessToken, tokenExpiry, ok := loadTokenCache(cfg.Aura.Fs(), credential.ClientId, credential.ClientSecret, cfg.Aura.AuthUrl()); ok {
+			credential.AccessToken = accessToken
+			credential.TokenExpiry = tokenExpiry
+			return accessToken, nil
+		}
+	}
+
 	if credential.HasValidAccessToken() {
 		return credential.AccessToken, nil
 	}
@@ -75,6 +89,12 @@ func getToken(credential *credentials.AuraCredential, cfg *clicfg.Config, warnW 
 
 	if _, saveErr := cfg.Credentials.Aura.UpdateAccessToken(credential, grant.AccessToken, grant.ExpiresIn); saveErr != nil {
 		fmt.Fprintf(warnW, "Warning: failed to persist access token to keyring: %v\n", saveErr) //nolint:errcheck
+	}
+
+	if envMode {
+		if cacheErr := saveTokenCache(cfg.Aura.Fs(), credential.ClientId, credential.ClientSecret, cfg.Aura.AuthUrl(), credential.AccessToken, credential.TokenExpiry); cacheErr != nil {
+			fmt.Fprintf(warnW, "Warning: failed to cache access token: %v\n", cacheErr) //nolint:errcheck
+		}
 	}
 	return grant.AccessToken, err
 }
