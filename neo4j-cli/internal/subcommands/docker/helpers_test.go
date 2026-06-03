@@ -15,11 +15,13 @@ import (
 type fakeDockerClient struct {
 	// Recorded args.
 	RunCalls         [][]string
+	RunEnvCalls      []RunCall
 	StartCalls       []string
 	StopCalls        []string
 	RemoveForceCalls []string
 	PsAllCalls       [][]string
 	InspectCalls     []string
+	ExecCalls        []ExecCall
 
 	// Optional behaviour overrides.
 	RunFn         func(ctx context.Context, args []string) (string, error)
@@ -28,10 +30,30 @@ type fakeDockerClient struct {
 	RemoveForceFn func(ctx context.Context, name string) error
 	PsAllFn       func(ctx context.Context, filters []string) ([]PsEntry, error)
 	InspectFn     func(ctx context.Context, name string) (Container, error)
+	ExecFn        func(ctx context.Context, name string, args []string) (string, error)
 
 	// Stored state for default behaviours.
 	Containers map[string]Container
 	PsEntries  []PsEntry
+}
+
+// RunCall records the args + env of a single fakeDockerClient.RunWithEnv
+// invocation so tests can assert that secret values travel via Env (the
+// docker process environment) and never appear in the recorded Args.
+type RunCall struct {
+	Args []string
+	Env  []string
+}
+
+// ExecCall records the arguments of a single fakeDockerClient.Exec /
+// ExecWithEnv invocation so tests can assert the target container name, the
+// argv passed, and (for ExecWithEnv) the env forwarded through the docker
+// process environment.
+type ExecCall struct {
+	Name string
+	User string
+	Args []string
+	Env  []string
 }
 
 func newFakeDockerClient() *fakeDockerClient {
@@ -41,7 +63,15 @@ func newFakeDockerClient() *fakeDockerClient {
 }
 
 func (f *fakeDockerClient) Run(ctx context.Context, args []string) (string, error) {
+	return f.RunWithEnv(ctx, args, nil)
+}
+
+func (f *fakeDockerClient) RunWithEnv(ctx context.Context, args []string, env []string) (string, error) {
 	f.RunCalls = append(f.RunCalls, append([]string(nil), args...))
+	f.RunEnvCalls = append(f.RunEnvCalls, RunCall{
+		Args: append([]string(nil), args...),
+		Env:  append([]string(nil), env...),
+	})
 	if f.RunFn != nil {
 		return f.RunFn(ctx, args)
 	}
@@ -95,6 +125,27 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return c, nil
+}
+
+func (f *fakeDockerClient) Exec(ctx context.Context, name string, args []string) (string, error) {
+	return f.ExecAs(ctx, name, "", args, nil)
+}
+
+func (f *fakeDockerClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	return f.ExecAs(ctx, name, "", args, env)
+}
+
+func (f *fakeDockerClient) ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error) {
+	f.ExecCalls = append(f.ExecCalls, ExecCall{
+		Name: name,
+		User: user,
+		Args: append([]string(nil), args...),
+		Env:  append([]string(nil), env...),
+	})
+	if f.ExecFn != nil {
+		return f.ExecFn(ctx, name, args)
+	}
+	return "", nil
 }
 
 // Compile-time check that fakeDockerClient satisfies the dockerClient

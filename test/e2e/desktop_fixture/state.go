@@ -89,6 +89,35 @@ type dbmsLite struct {
 	Edition       string `json:"edition"`
 }
 
+// uploadTask mirrors one entry in the relate `GET /tasks` response that the
+// Aura deploy path waits on. `POST /dbmss/:id/databases/upload` registers one
+// tagged ["db:upload", <dbmsId>] with isLoading=true; subsequent `GET /tasks`
+// polls advance it to isSuccess (or isError when the scenario forces failure).
+type uploadTask struct {
+	ID     string         `json:"id"`
+	Tags   []string       `json:"tags"`
+	Status uploadTaskStat `json:"status"`
+}
+
+// uploadTaskStat mirrors the relate task `status` object — exactly one boolean
+// is true once the task settles.
+type uploadTaskStat struct {
+	IsLoading bool `json:"isLoading"`
+	IsSuccess bool `json:"isSuccess"`
+	IsError   bool `json:"isError"`
+}
+
+// uploadRecord captures the request shape the production client sent to
+// `POST /dbmss/:id/databases/upload` so tests can assert the source/target body.
+type uploadRecord struct {
+	DbmsID         string
+	SourceDatabase string
+	TargetURI      string
+	TargetUsername string
+	TargetPassword string
+	Overwrite      bool
+}
+
 // dbmsVersion mirrors one entry in `GET /dbmss/versions`. Fixture serves a
 // small canned catalog; `desktop dbms create` without --version picks the latest
 // stable enterprise entry from this list.
@@ -167,6 +196,22 @@ type state struct {
 	// behavior overwrite it via the scenario admin.
 	versions []dbmsVersion
 
+	// uploadTasks accumulates the db:upload tasks registered by
+	// `POST /dbmss/:id/databases/upload`. `GET /tasks` returns them and, on
+	// each poll, settles any still-loading task per uploadFail (success by
+	// default, error when uploadFail is true). This is how the Aura deploy
+	// path's WaitForUploadTask poll loop converges against the fixture.
+	uploadTasks []*uploadTask
+
+	// uploadFail, when true, makes the next-settled db:upload task report
+	// isError instead of isSuccess. Toggled via `POST /_scenario/upload_fail`
+	// so the deploy sad-path (upload task failed) has e2e coverage.
+	uploadFail bool
+
+	// uploads records every `POST .../databases/upload` request body so tests
+	// can assert the exact source/target shape the production client sent.
+	uploads []uploadRecord
+
 	// requestLog accumulates one line per /fastify/api/* call (method +
 	// path + status) so test failures can dump the trace. Bounded only by
 	// process lifetime; e2e tests spawn a fresh process per Go test so
@@ -220,6 +265,9 @@ func (s *state) reset() {
 		{Edition: "enterprise", Version: "5.20.0", Origin: "online",
 			Dist: "https://dist.neo4j.org/neo4j-enterprise-5.20.0-unix.tar.gz"},
 	}
+	s.uploadTasks = nil
+	s.uploadFail = false
+	s.uploads = nil
 	s.requestLog = nil
 }
 

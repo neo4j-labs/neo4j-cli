@@ -35,3 +35,6 @@ test-api/
 
 # session-scoped auditor skill file (not part of the repo)
 /agent-cli-auditor.md
+
+# agent worktree scratch (Claude Code isolated worktrees)
+/.claude/worktrees/

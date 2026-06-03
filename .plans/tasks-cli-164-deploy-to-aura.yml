@@ -1,0 +1,357 @@
+feature: cli-164-deploy-to-aura
+prd: ./prd-cli-164-deploy-to-aura.md
+created_at: 2026-06-01T00:00:00Z
+updated_at: 2026-06-01T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Extract shared instance-create helpers into create_core.go'
+    description: |
+      Pull the Aura instance provisioning logic out of
+      neo4j-cli/aura/internal/subcommands/instance/create.go into a new
+      package-internal file create_core.go: buildCreateInstanceBody(...) (the
+      POST /instances body with free-db defaults, memory/region/cloud-provider,
+      version, vector/GA plugin) and createAndStoreInstance(cfg, body, credOpts)
+      (POST, parse single, store dbms credential). Refactor NewCreateCmd to call
+      these helpers with zero behavioural change so NewDeployCmd can reuse them.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "create_core.go defines buildCreateInstanceBody and createAndStoreInstance with the copyright header"
+      - "NewCreateCmd is refactored to call the extracted helpers"
+      - "Existing instance create tests pass unchanged (no behavioural change)"
+      - "make fmt-check and make lint are clean for the changed files"
+    completed_at: 2026-06-01T13:14:05Z
+
+  - id: task-002
+    title: 'Add Exec to dockerClient interface, execClient, and fake'
+    description: |
+      Add Exec(ctx context.Context, name string, args []string) (string, error)
+      to the dockerClient interface and the exec-backed execClient in
+      neo4j-cli/internal/subcommands/docker/client.go (shells
+      `docker exec <name> <args...>`, wrapping stderr verbatim and redacting
+      AUTH/PASSWORD via the existing redactArgs/redactString). Add a matching
+      recording Exec method to fakeDockerClient in helpers_test.go.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "dockerClient interface and execClient implement Exec; argv is `docker exec <name> <args...>`"
+      - "Non-zero exit wraps docker stderr in a clierr.UsageError with AUTH/PASSWORD redacted"
+      - "fakeDockerClient records Exec calls for assertion in tests"
+      - "Unit test covers the Exec success and error paths without a real docker daemon"
+    completed_at: 2026-06-01T13:13:20Z
+
+  - id: task-003
+    title: 'Implement docker PushToAura orchestrator (dump + upload)'
+    description: |
+      Add neo4j-cli/internal/subcommands/docker/deploy.go with exported
+      PushToAura(ctx, cfg, containerName, database string, target AuraTarget)
+      error and type AuraTarget{URI, Username, Password string}. Resolve the
+      source DB password from the stored dbms credential keyed by containerName,
+      then STOP DATABASE (via an injectable stopStartFn seam over the query
+      connect/run machinery), `neo4j-admin database dump --to-path=/tmp/neo4j-cli-deploy`,
+      `neo4j-admin database upload --from-path=... --to-uri/--to-user/--to-password
+      --overwrite-destination`, then START DATABASE and best-effort cleanup.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "PushToAura and AuraTarget are exported; dump precedes upload with the documented argv"
+      - "Source DB password is resolved from the dbms credential named after the container; missing credential yields a usage error"
+      - "STOP/START run via an injectable stopStartFn seam; START is deferred so it runs even when dump/upload fails"
+      - "The Aura target password never appears in stderr/logs (argv redaction applied)"
+      - "Unit tests with fakeDockerClient + stubbed stopStartFn assert ordering, upload flags, cleanup, and the START-on-failure path"
+    completed_at: 2026-06-01T13:30:00Z
+
+  - id: task-004
+    title: 'Add desktopclient UploadDatabase, ListTasks, and task wait helper'
+    description: |
+      Extend neo4j-cli/internal/desktopclient: UploadDatabase(ctx, dbmsID,
+      source, target) posting to /fastify/api/dbmss/{id}/databases/upload with
+      {source:{databaseName}, target:{uri,username,password,overwrite:true}} via
+      the existing authed do() path; ListTasks(ctx) GET /fastify/api/tasks with a
+      new Task type (id, tags []string, status{isLoading,isSuccess,isError});
+      and WaitForUploadTask(ctx, client, dbmsID) that polls for the db:upload +
+      dbmsID task and returns on isSuccess/isError.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "UploadDatabase, ListTasks, Task, UploadSource/UploadTarget types added with copyright headers"
+      - "UploadDatabase request body and auth headers (X-Client-Id/X-API-Token) match the Desktop 2 contract"
+      - "WaitForUploadTask filters tasks by tags containing both db:upload and the dbmsID and returns on success/error"
+      - "Unit tests use the newAuthedServer pattern to assert request shape and polling termination"
+    completed_at: 2026-06-01T13:14:36Z
+
+  - id: task-005
+    title: 'Implement aura instance deploy leaf (orchestration + output)'
+    description: |
+      Add neo4j-cli/aura/internal/subcommands/instance/deploy.go with
+      NewDeployCmd(cfg). Define mutually-exclusive --from-docker/--from-desktop
+      (exactly one required), --database (default neo4j, reject system),
+      --desktop-port, and the instance-create mirror flags. Flow: validate ->
+      resolve org/project -> createAndStoreInstance + poll to running -> dispatch
+      to docker.PushToAura or the desktop path (stop DBMS for a clean dump via
+      StopDbms+poll, UploadDatabase, WaitForUploadTask, then restore prior state)
+      -> print instance fields plus a deploy_status field. On post-create failure,
+      leave the instance and emit deploy_status=failed with a retry/delete hint.
+    status: completed
+    dependencies:
+      - task-001
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "--from-docker and --from-desktop are mutually exclusive and exactly one is required; --database system is rejected"
+      - "Instance is created (via shared helpers) and polled to running before any data load"
+      - "Desktop path stops the DBMS for the dump and restores its prior running state after the task completes"
+      - "Structured output includes instance fields plus deploy_status (succeeded/failed); the write annotation is set"
+      - "Post-create push failure leaves the instance, sets deploy_status=failed, names the instance id, and surfaces the tool error verbatim"
+      - "Aura target password is absent from stderr, telemetry, and command history"
+    completed_at: 2026-06-01T14:05:00Z
+
+  - id: task-006
+    title: 'Register the deploy leaf and regenerate the skill bundle'
+    description: |
+      Register NewDeployCmd in instance.go via cmd.AddCommand(NewDeployCmd(cfg))
+      and add a flush-left Example field (>=2 --rw invocations, one --from-docker
+      and one --from-desktop, comment + blank-line separated). Run
+      `go generate ./neo4j-cli/internal/skill/...` to refresh the bundle.
+    status: completed
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "deploy leaf is registered under the instance command tree"
+      - "Example field satisfies TestAllLeafCommands_HaveExamples (>=2 --rw invocations, flush-left, comments)"
+      - "go generate leaves no diff and TestGenerator_RoundTrip passes"
+    completed_at: 2026-06-01T14:35:00Z
+
+  - id: task-007
+    title: 'Extend e2e desktop fixture with upload + tasks routes'
+    description: |
+      Add the POST /fastify/api/dbmss/{id}/databases/upload and GET
+      /fastify/api/tasks routes to test/e2e/desktop_fixture/handlers.go (and
+      supporting state) so the desktop deploy path has e2e coverage, and add an
+      e2e test driving deploy --from-desktop against the fixture.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Fixture serves the upload route and a tasks list that transitions a db:upload task to success"
+      - "An e2e test exercises the desktop deploy path end to end against the fixture"
+      - "The e2e test passes on the standard test matrix"
+    completed_at: 2026-06-01T15:10:00Z
+
+  - id: task-008
+    title: 'Add changelog entry and run all final gates'
+    description: |
+      Add a Minor changelog entry via
+      `changie new --projects neo4j-cli --kind Minor --body "..."` (or hand-author
+      the YAML per repo convention). Run make test, make fmt-check, make lint,
+      make license-check, and generate-check as the final completion gates.
+    status: completed
+    dependencies:
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "A Minor changelog entry for the deploy command exists under .changes/unreleased/"
+      - "make test, make fmt-check, make lint, and make license-check all pass"
+      - "go generate leaves no diff (generate-check clean)"
+    completed_at: 2026-06-01T15:45:00Z
+
+  - id: task-009
+    title: 'Extract duplicated create-leaf logic into create_core.go'
+    description: |
+      The review found that deploy.go re-copies three blocks from create.go
+      verbatim instead of sharing them, leaving ~70 lines of drift-prone
+      duplication that must be hand-synced. Task-001 extracted
+      buildCreateInstanceBody + createAndStoreInstance into create_core.go but
+      stopped there. The three still-duplicated blocks are: (1) the PreRunE
+      validation — create.go:74-113 vs deploy.go:148-182, ~35 identical lines
+      (free-db flag rules, version 4|5, the three credential-flag rules); the
+      only deltas are create's --graph-analytics-plugin check and deploy's
+      --database system check. (2) The auto-generate-default-name block —
+      create.go:122-139 vs deploy.go:194-210, identical (list /instances,
+      collect names, defaultInstanceName). (3) The output-rendering block —
+      create.go:154-172 vs deploy.go:301-319 (printDeployResult), identical
+      field slice + tenant_id->project_id rename + PrintBodyMap, deploy just
+      appends deploy_status. Finish the extraction into create_core.go so create
+      and deploy become genuine siblings over one core: add
+      validateInstanceFlags(...) (shared PreRunE body — create calls it then adds
+      the graph-analytics check; deploy runs its system-db check then calls it),
+      resolveInstanceName(cfg, name, projectID) (string, error) for the auto-name
+      lookup, and a shared result renderer (e.g. renderInstanceResult with extra
+      fields, or a helper returning the base field slice) so deploy just adds
+      deploy_status. Preserve exact behaviour and output for both leaves.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "The PreRunE validation, auto-name lookup, and output-rendering blocks live once in create_core.go and are called by both create.go and deploy.go"
+      - "deploy.go no longer contains copy-pasted copies of those three blocks"
+      - "Existing create and deploy tests pass unchanged (behaviour and output identical for both leaves)"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: 2026-06-01T16:30:00Z
+
+  - id: task-010
+    title: 'Quote/validate the database name in docker deploy admin Cypher'
+    description: |
+      The review flagged that docker/deploy.go builds the admin Cypher by string
+      concatenation — "STOP DATABASE "+database and "START DATABASE "+database
+      (deploy.go:75,83) — interpolating the user-supplied --database flag
+      directly into the statement. The blast radius is small (a local,
+      self-owned container, and "system" is already rejected upstream), but the
+      Cypher-injection seam should be closed: validate the database name against
+      a Neo4j identifier pattern before use, or quote it as a backtick-escaped
+      identifier, so a name like `neo4j; DROP ...` cannot inject. Keep the change
+      minimal and covered by a unit test.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The --database value is validated or safely quoted before being placed into STOP/START DATABASE statements"
+      - "A unit test covers rejection (or safe quoting) of an injection-style database name"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: 2026-06-01T17:10:00Z
+
+  - id: task-011
+    title: 'Pass the Aura password to neo4j-admin via env, not docker exec argv'
+    description: |
+      Security review (Medium): docker/deploy.go passes the freshly-generated
+      Aura instance admin password to neo4j-admin as a command-line argument
+      (`--to-password=` + target.Password, deploy.go:128). execClient.Exec shells
+      `docker exec <name> neo4j-admin ... --to-password=<secret>`, so the secret
+      lands in the docker CLI process argv on the host AND in neo4j-admin's argv
+      inside the container — both readable via the world-readable
+      /proc/<pid>/cmdline during the upload window, so any unprivileged local
+      user can capture the Aura admin credential. neo4j-admin database upload
+      reads NEO4J_USERNAME/NEO4J_PASSWORD from the environment as an alternative
+      to --to-user/--to-password (Operations Manual). Harden by keeping the
+      secret out of argv entirely: add an env-aware exec seam (e.g.
+      ExecWithEnv(ctx, name, args, env) on the dockerClient interface +
+      execClient + fakeDockerClient) that sets the extra KEY=VALUE entries on the
+      docker process's exec.Cmd.Env (append to os.Environ()), and have PushToAura
+      invoke `docker exec -e NEO4J_PASSWORD -e NEO4J_USERNAME <name> neo4j-admin
+      database upload <db> --from-path=... --to-uri=... --overwrite-destination`
+      — the `-e VAR` passthrough form (NAME only, no =value) forwards the values
+      from the docker CLI's environment, so they travel via /proc/<pid>/environ
+      (same-uid/root readable) instead of world-readable cmdline. Drop
+      --to-password and --to-user from the neo4j-admin argv. Ensure the env value
+      is never echoed in the error path (it isn't in args, so redactArgs already
+      won't touch it — verify). This is the canonical-layer fix for the exported
+      PushToAura entry point.
+    dependencies: []
+    acceptance_criteria:
+      - "The Aura password is supplied to neo4j-admin via the docker process environment (exec.Cmd.Env) and the `docker exec -e NEO4J_PASSWORD`/`-e NEO4J_USERNAME` passthrough flags, not as a --to-password/--to-user argv value"
+      - "An env-aware exec seam exists on the dockerClient interface, execClient, and fakeDockerClient, and the fake records the env so tests can assert it"
+      - "A unit test asserts the password value never appears in the recorded docker argv and is provided via env, and that argv carries `-e NEO4J_PASSWORD` (name only)"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    status: completed
+    completed_at: 2026-06-01T14:16:17Z
+
+  - id: task-012
+    title: 'Pass NEO4J_AUTH to docker run via env passthrough, not argv'
+    description: |
+      Follow-on from the same security finding: docker/create.go builds the
+      generated container password into the `docker run` argv as
+      `-e NEO4J_AUTH=neo4j/<pw>` (create.go ~322) and calls client.Run(argv).
+      The value is therefore in the docker CLI process's world-readable
+      /proc/<pid>/cmdline (any local user can read it during create), and is
+      ALSO persisted permanently in `docker inspect <container>.Config.Env`. The
+      Config.Env persistence is inherent to how NEO4J_AUTH provisions the
+      password and is out of scope; this task closes the world-readable
+      host-argv leak the same way as task-011: pass the value via the docker
+      process environment and use the `docker run -e NEO4J_AUTH` passthrough form
+      (NAME only, no =value) so it isn't in argv. Reuse the env-aware run
+      plumbing introduced in task-011 (e.g. a RunWithEnv variant sharing the same
+      cmd.Env mechanism). This narrows readability from "any local user via
+      cmdline" to "docker-socket users via docker inspect", a real reduction.
+    status: completed
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "docker run receives NEO4J_AUTH via the docker process environment + `-e NEO4J_AUTH` passthrough flag, not as an `-e NEO4J_AUTH=<value>` argv element"
+      - "create's existing tests still pass (container still gets the password; credential storage unchanged), with a test asserting the password value is absent from the recorded docker argv"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    completed_at: 2026-06-01T14:20:59Z
+
+  - id: task-013
+    title: 'Fast-fail deploy --from-docker on community-edition containers'
+    description: |
+      The `aura instance deploy --from-docker` path is Enterprise-only and fails
+      cryptically on a community-edition container. Empirically confirmed: the
+      docker path runs `STOP DATABASE <db>` over Bolt to take a consistent
+      offline dump, but `STOP DATABASE` is an Enterprise-only Cypher admin
+      command — on community edition it errors `51N27 ... 'STOP DATABASE' is not
+      supported in community edition`, and `neo4j-admin dump` refuses to run on a
+      live database. Because `neo4j-cli docker create --edition community` makes
+      community containers trivial to create, a user can point `--from-docker` at
+      one; today the failure happens mid-deploy AFTER the Aura instance is
+      already created and left behind (cryptic error + an orphaned billable
+      instance). Fix: add a fast-fail pre-flight in the `--from-docker` branch of
+      the deploy leaf that inspects the source container's edition (the docker
+      client's Inspect already returns Edition from the container labels) BEFORE
+      creating any Aura instance, returning a clear clierr.UsageError when the
+      container is community edition — e.g. "deploy --from-docker requires an
+      enterprise Neo4j container; community edition cannot take an online dump
+      (STOP DATABASE is enterprise-only). Recreate the container with `neo4j-cli
+      docker create --edition enterprise`." Also add a one-line note to the
+      deploy command's Long help text stating that deploy operates on Enterprise
+      sources only (Desktop 2 only manages enterprise DBMSs, and the docker path
+      requires enterprise). The edition check must run as part of the docker
+      source pre-flight before createAndStoreInstance, must not regress the
+      existing enterprise happy path, and (since deploy.go is in the aura/instance
+      package and docker.Inspect/Container live in the docker package) will need
+      a small exported docker helper or to reuse docker.NewDeployClient plus an
+      exported Inspect/Container surface — keep it minimal and consistent with
+      the existing docker.PushToAura entry point. Cover the guard with a unit
+      test using a fake/seamed docker client returning a community-edition
+      container, asserting no Aura instance is created (no POST to /instances)
+      and the usage error is returned; if go generate is needed for the Long
+      change, run `go generate ./neo4j-cli/internal/skill/...`.
+    dependencies: []
+    acceptance_criteria:
+      - "deploy --from-docker performs a pre-flight edition check BEFORE creating any Aura instance and returns a clear clierr.UsageError for a community-edition source container"
+      - "No Aura instance is created when the source container is community edition (test asserts no POST to /instances)"
+      - "The enterprise happy path is unchanged; the deploy Long help text notes deploy requires Enterprise sources"
+      - "make test, make fmt-check, and make lint are clean (and the skill bundle is regenerated if the Long text changed)"
+    source: review
+    status: completed
+    completed_at: 2026-06-02T00:00:00Z
+
+  - id: task-014
+    title: 'Rename docker push_to_aura.go to follow the *_helpers.go convention'
+    description: |
+      PR #198 review nit (Liam-Doodson): the docker-side deploy orchestrator file
+      sits among the docker command leaves in
+      neo4j-cli/internal/subcommands/docker/ (create.go, list.go, get.go,
+      start.go, stop.go, delete.go — each a cobra leaf). Its original name
+      deploy.go therefore reads, at a glance, like a `docker deploy` command had
+      been added — but no such command exists; the file defines the PushToAura
+      orchestrator helper (+ validateDatabaseName, AuraTarget, stopStartDatabase)
+      that the aura `instance deploy` leaf calls into. The reviewer found this
+      misleading. The helper must stay in package docker because it depends on
+      package-private internals (the dockerClient interface, ExecAs, dumpPath,
+      stopStartFn) — a Go subfolder would be a separate package and couldn't see
+      them without exporting everything. The repo's established convention for
+      non-command helper code living next to command leaves is a same-package
+      *_helpers.go / *_core.go file (instance/name_helpers.go,
+      instance/credential_helpers.go, instance/create_core.go,
+      common/skill/helpers.go). Rename the file to match the PushToAura function
+      and that convention. NOTE: an earlier manual `git mv deploy.go
+      push_to_aura.go` (and deploy_test.go -> push_to_aura_test.go) may already be
+      staged in the working tree — reconcile to the final names below regardless
+      of intermediate state. Pure file rename via `git mv`; no symbol or logic
+      changes (Go file names are package-scoped). No skill-bundle regen needed
+      (the bundle is generated from the cobra tree, not filenames).
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/docker/push_to_aura_helpers.go exists (renamed from deploy.go/push_to_aura.go) and the test is push_to_aura_helpers_test.go; no deploy.go remains in the docker package"
+      - "The rename is pure: PushToAura/validateDatabaseName/AuraTarget/stopStartDatabase and all call sites are byte-for-byte unchanged"
+      - "make test, make fmt-check, and make lint are clean"
+    source: review
+    status: completed
+    completed_at: 2026-06-03T06:27:33Z

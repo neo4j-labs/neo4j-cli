@@ -65,6 +65,9 @@ func newMux(s *state) *http.ServeMux {
 	mux.HandleFunc("/_scenario/versions", func(w http.ResponseWriter, r *http.Request) {
 		scenarioSetVersions(s, w, r)
 	})
+	mux.HandleFunc("/_scenario/upload_fail", func(w http.ResponseWriter, r *http.Request) {
+		scenarioSetUploadFail(s, w, r)
+	})
 	mux.HandleFunc("/_scenario/log", func(w http.ResponseWriter, r *http.Request) {
 		scenarioGetLog(s, w, r)
 	})
@@ -99,6 +102,10 @@ func serveRelate(s *state, w http.ResponseWriter, r *http.Request) {
 		installPlugin(s, w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/dbmss/"), "/plugins/install"))
 	case strings.HasPrefix(path, "/dbmss/") && strings.HasSuffix(path, "/plugins/uninstall") && r.Method == http.MethodPost:
 		uninstallPlugin(s, w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/dbmss/"), "/plugins/uninstall"))
+	case strings.HasPrefix(path, "/dbmss/") && strings.HasSuffix(path, "/databases/upload") && r.Method == http.MethodPost:
+		uploadDatabase(s, w, r, strings.TrimSuffix(strings.TrimPrefix(path, "/dbmss/"), "/databases/upload"))
+	case path == "/tasks" && r.Method == http.MethodGet:
+		listTasks(s, w, r)
 	case strings.HasPrefix(path, "/dbmss/") && r.Method == http.MethodGet:
 		getDbms(s, w, r, strings.TrimPrefix(path, "/dbmss/"))
 	case strings.HasPrefix(path, "/dbmss/") && r.Method == http.MethodDelete:
@@ -443,6 +450,74 @@ func uninstallPlugin(s *state, w http.ResponseWriter, r *http.Request, id string
 func listVersions(s *state, w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	out := append([]dbmsVersion(nil), s.versions...)
+	s.mu.Unlock()
+	writeJSON(s, w, r, http.StatusOK, out)
+}
+
+// uploadDatabase serves POST /dbmss/:id/databases/upload. Records the request
+// source/target body and registers a db:upload task tagged ["db:upload", <id>]
+// with isLoading=true; subsequent GET /tasks polls settle it. Mirrors relate's
+// fire-and-forget contract — the task list, not this response, carries the
+// outcome, so the body is the empty object the production client discards.
+// Unknown DBMS → 404 with the relate-shaped body.
+func uploadDatabase(s *state, w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		Source struct {
+			DatabaseName string `json:"databaseName"`
+		} `json:"source"`
+		Target struct {
+			URI       string `json:"uri"`
+			Username  string `json:"username"`
+			Password  string `json:"password"`
+			Overwrite bool   `json:"overwrite"`
+		} `json:"target"`
+	}
+	if err := decodeBody(r, &body); err != nil {
+		writeError(s, w, r, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.mu.Lock()
+	if _, ok := s.dbmss[id]; !ok {
+		s.mu.Unlock()
+		writeError(s, w, r, http.StatusNotFound, fmt.Sprintf("Could not find DBMS %q", id))
+		return
+	}
+	s.uploads = append(s.uploads, uploadRecord{
+		DbmsID:         id,
+		SourceDatabase: body.Source.DatabaseName,
+		TargetURI:      body.Target.URI,
+		TargetUsername: body.Target.Username,
+		TargetPassword: body.Target.Password,
+		Overwrite:      body.Target.Overwrite,
+	})
+	s.uploadTasks = append(s.uploadTasks, &uploadTask{
+		ID:     uuid.NewString(),
+		Tags:   []string{"db:upload", id},
+		Status: uploadTaskStat{IsLoading: true},
+	})
+	s.mu.Unlock()
+	writeJSON(s, w, r, http.StatusOK, map[string]any{})
+}
+
+// listTasks serves GET /tasks. On each poll it settles every still-loading
+// db:upload task — to isError when the scenario armed uploadFail, otherwise to
+// isSuccess. This drives the production WaitForUploadTask poll loop to
+// convergence (success by default; one toggle exercises the failed-task path).
+func listTasks(s *state, w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	for _, t := range s.uploadTasks {
+		if t.Status.IsLoading {
+			if s.uploadFail {
+				t.Status = uploadTaskStat{IsError: true}
+			} else {
+				t.Status = uploadTaskStat{IsSuccess: true}
+			}
+		}
+	}
+	out := make([]uploadTask, 0, len(s.uploadTasks))
+	for _, t := range s.uploadTasks {
+		out = append(out, *t)
+	}
 	s.mu.Unlock()
 	writeJSON(s, w, r, http.StatusOK, out)
 }

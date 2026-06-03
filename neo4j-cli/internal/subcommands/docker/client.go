@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -84,6 +85,13 @@ type dockerClient interface {
 	// Run shells `docker run -d ...args` and returns the container ID (stdout)
 	// or a typed error including captured stderr (REQ-F-061).
 	Run(ctx context.Context, args []string) (string, error)
+	// RunWithEnv is the env-aware variant of Run: each KEY=VALUE in env is set
+	// on the docker process environment via runEnv so secret values travel
+	// through /proc/<pid>/environ instead of the world-readable argv. Callers
+	// pair this with the `-e KEY` passthrough form (NAME only) in args so docker
+	// forwards the value from its own environment into the container. Run is
+	// RunWithEnv with nil env.
+	RunWithEnv(ctx context.Context, args []string, env []string) (string, error)
 	// Start shells `docker start <name>`.
 	Start(ctx context.Context, name string) error
 	// Stop shells `docker stop <name>`.
@@ -98,6 +106,23 @@ type dockerClient interface {
 	// state needed to populate a Container metadata struct. Returns a
 	// NotFound-style clierr when the container does not exist.
 	Inspect(ctx context.Context, name string) (Container, error)
+	// Exec shells `docker exec <name> <args...>` and returns trimmed stdout.
+	// Non-zero exit wraps docker's captured stderr (with AUTH/PASSWORD
+	// redacted) in a clierr.UsageError via the shared run path.
+	Exec(ctx context.Context, name string, args []string) (string, error)
+	// ExecWithEnv shells `docker exec -e KEY ... <name> <args...>`, forwarding
+	// each KEY=VALUE in env through the docker process environment (NOT argv)
+	// via the `-e KEY` passthrough form. This keeps secrets out of the host
+	// docker CLI argv and the in-container command argv (both world-readable
+	// via /proc/<pid>/cmdline), routing them through /proc/<pid>/environ
+	// instead. Exec is ExecWithEnv with nil env.
+	ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error)
+	// ExecAs shells `docker exec -u <user> [-e KEY ...] <name> <args...>`. It is
+	// the user-scoped superset of ExecWithEnv: when user is non-empty the
+	// command runs as that container user (e.g. "neo4j", so neo4j-admin matches
+	// the store owner and does not leave root-owned files in /data). Env is
+	// forwarded via the `-e KEY` passthrough form exactly as ExecWithEnv.
+	ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error)
 }
 
 // PsEntry is the subset of `docker ps --format '{{json .}}'` fields we use.
@@ -127,6 +152,15 @@ func newClient() dockerClient {
 	return &execClient{}
 }
 
+// NewDeployClient returns the default exec-backed dockerClient for callers
+// outside the docker package (e.g. the aura `instance deploy` leaf) that need
+// to pass a client into PushToAura. The concrete client type stays unexported;
+// only this constructor and the dockerClient methods are reachable, preserving
+// the package's existing test seam.
+func NewDeployClient() dockerClient {
+	return newClient()
+}
+
 // resolve performs the cached exec.LookPath("docker") and converts a miss
 // into the documented usage error. All execClient methods funnel through
 // this so the hint appears exactly once per process invocation.
@@ -152,12 +186,24 @@ func (c *execClient) resolve() (string, error) {
 // wraps the captured stderr (REQ-F-061) in a clierr.UsageError so the user
 // sees Docker's own error verbatim.
 func (c *execClient) run(ctx context.Context, args ...string) (string, error) {
+	return c.runEnv(ctx, nil, args...)
+}
+
+// runEnv is the env-aware variant of run: when env is non-empty its KEY=VALUE
+// entries are appended to the docker process's exec.Cmd.Env (on top of the
+// inherited os.Environ()), so secret values travel through the docker CLI's
+// environment instead of its argv. Redaction on the error path is applied to
+// args only — env is never echoed.
+func (c *execClient) runEnv(ctx context.Context, env []string, args ...string) (string, error) {
 	path, err := c.resolve()
 	if err != nil {
 		return "", err
 	}
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, path, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -199,7 +245,11 @@ func redactArgs(args []string) []string {
 }
 
 func (c *execClient) Run(ctx context.Context, args []string) (string, error) {
-	out, err := c.run(ctx, append([]string{"run", "-d"}, args...)...)
+	return c.RunWithEnv(ctx, args, nil)
+}
+
+func (c *execClient) RunWithEnv(ctx context.Context, args []string, env []string) (string, error) {
+	out, err := c.runEnv(ctx, env, append([]string{"run", "-d"}, args...)...)
 	if err != nil {
 		return "", err
 	}
@@ -231,6 +281,40 @@ func (c *execClient) PsAll(ctx context.Context, filters []string) ([]PsEntry, er
 		return nil, err
 	}
 	return parsePsOutput(out)
+}
+
+func (c *execClient) Exec(ctx context.Context, name string, args []string) (string, error) {
+	return c.ExecAs(ctx, name, "", args, nil)
+}
+
+func (c *execClient) ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error) {
+	return c.ExecAs(ctx, name, "", args, env)
+}
+
+// ExecAs builds `docker exec [-u <user>] [-e KEY ...] <name> <args...>`. The
+// optional `-u <user>` and each `-e KEY` passthrough option (NAME only, no
+// =value) are placed BEFORE the container name (docker requires exec OPTIONS to
+// precede CONTAINER), while the full KEY=VALUE env entries are set on the
+// docker process environment via runEnv so the values never appear in argv.
+func (c *execClient) ExecAs(ctx context.Context, name, user string, args []string, env []string) (string, error) {
+	dockerArgs := []string{"exec"}
+	if user != "" {
+		dockerArgs = append(dockerArgs, "-u", user)
+	}
+	for _, kv := range env {
+		key := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			key = kv[:i]
+		}
+		dockerArgs = append(dockerArgs, "-e", key)
+	}
+	dockerArgs = append(dockerArgs, name)
+	dockerArgs = append(dockerArgs, args...)
+	out, err := c.runEnv(ctx, env, dockerArgs...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
 }
 
 func (c *execClient) Inspect(ctx context.Context, name string) (Container, error) {
