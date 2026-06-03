@@ -137,3 +137,53 @@ tasks:
       - "make test, make fmt-check, make lint pass"
     source: review
     completed_at: 2026-06-03T12:05:00Z
+
+  - id: task-008
+    title: 'Validate remote skill version at inventory boundary (terminal escape injection)'
+    description: |
+      Security review finding (Medium, defense-in-depth — terminal escape
+      injection). The available/installed version for a catalog skill is now
+      sourced from each skill's own remote SKILL.md `version:` frontmatter via
+      parseVersion (installer.go), which does ZERO validation — it captures any
+      bytes except CR/LF, including ESC (0x1b) and other C0 control characters.
+      That string flows into InventoryRow.AvailableVersion / installed_version
+      and is rendered by the skill check/list table and toon output, which go
+      through commonoutput.PrintBodyMap -> printTable using fmt.Sprintf("%+v")
+      with NO sanitization. The toon path is also raw (round-trips JSON then
+      toon.Marshal, decoding  back to a literal ESC). A malicious or
+      compromised upstream skill (neo4j-contrib/neo4j-skills is community-PR'd,
+      a real external trust boundary) could embed ANSI/escape sequences in a
+      SKILL.md version line to spoof output (fake an `ok` status, hide rows),
+      manipulate the cursor/terminal title, or exploit terminal-emulator bugs.
+      JSON output is safe (encoding/json escapes control bytes). The codebase
+      already established the mitigation pattern — commonoutput.StripControl is
+      deliberately applied at every other untrusted-data terminal-table render
+      site (desktop/{connection,dbms,plugin}/list.go, desktop/doctor_render.go,
+      query/{schema,output}.go) — but the skill check/list renderers never
+      adopted it, and this change is what newly routes unvalidated remote
+      content into that column.
+
+      Chosen fix (option 2 — sanitize/validate at the inventory boundary so BOTH
+      table and toon are covered, fail-closed): validate the version string at
+      the points where it enters an InventoryRow — i.e. catalogSkillVersion in
+      common/skill/inventory.go AND the installed-version read in
+      readInstalledSkill (common/skill/helpers.go) — and treat a value that
+      fails validation as "" so the row falls into the existing unknown-version
+      status (surfacing tampering rather than silently rendering it). A version
+      is legitimately a constrained token; reject any value containing control
+      characters (and other clearly-illegitimate bytes) rather than passing it
+      through. Keep JSON behavior intact for legitimate values. Prefer a small
+      shared validation helper over duplicating the check at both call sites.
+      Do not over-broaden scope: the skill/agent/status columns share the same
+      un-stripped path but the version columns are the in-scope untrusted-remote
+      vector for this change.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A version string containing control chars (e.g. ESC 0x1b) sourced from a catalog skill's SKILL.md is treated as unknown-version (\"\"), not rendered raw"
+      - "The same validation applies to both the available (catalogSkillVersion) and installed (readInstalledSkill) version reads, via a shared helper (no duplicated logic)"
+      - "Legitimate semantic versions (e.g. 1.2.3, 1.0.0-rc.1) are unaffected in table, toon, and JSON output"
+      - "A regression test proves an escape-sequence version is neutralized (does not appear raw in check/list output and yields unknown-version)"
+      - "make test, make fmt-check, make lint pass; make generate-check clean"
+    source: review
+    completed_at: null
