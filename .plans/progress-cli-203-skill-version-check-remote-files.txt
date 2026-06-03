@@ -22,3 +22,6 @@ Files: ~mod (common/skill/check.go, neo4j-cli/internal/skill/bundle/references/s
 ## TASK-006 — 2026-06-03T11:38:00Z
 Added single user-facing Patch changie entry: skill check/list now report each catalog skill's available version from its own remote SKILL.md version: instead of a shared plugin.json version. Full gate suite green (test, fmt-check, lint, generate-check — only diff is the harness in_progress YAML flip, no bundle drift). Feature complete.
 Files: +.changes/unreleased/neo4j-cli-Patch-20260603-113613.yaml
+
+## REVIEW — 2026-06-03T11:45:00Z
+Added 1 review task (task-007).

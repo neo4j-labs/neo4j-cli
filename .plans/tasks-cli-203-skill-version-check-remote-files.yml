@@ -115,3 +115,25 @@ tasks:
       - "make lint passes"
       - "make generate-check clean"
     completed_at: 2026-06-03T11:38:00Z
+
+  - id: task-007
+    title: 'Drop ticket reference from catalogSkillVersion comment'
+    description: |
+      Hone review finding: the catalogSkillVersion doc-comment in
+      common/skill/inventory.go references the ticket ("per CLI-203, the version
+      is sourced per skill, not from the catalog-wide plugin.json"). The
+      project's comment policy says comments must not reference the task/PR/
+      ticket. The rest of the comment earns its keep — it captures the
+      non-obvious intent (the available version is sourced per-skill from each
+      skill's own cached SKILL.md rather than the catalog-wide plugin.json, and
+      any lookup/read failure resolves to "" so the row falls into the
+      unknown-version path). Trim only the "per CLI-203" back-reference while
+      preserving that non-obvious explanation; do not delete the whole comment.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "catalogSkillVersion comment no longer references CLI-203 (or any ticket/PR)"
+      - "Comment still explains per-skill sourcing and the error->\"\" unknown-version behavior"
+      - "make test, make fmt-check, make lint pass"
+    source: review
+    completed_at: null
