@@ -69,9 +69,9 @@ func BuildInventory(filesystem afero.Fs, binaryName, binaryVersion string, cat *
 }
 
 // catalogSkillVersion reads the available version from a catalog skill's
-// cached remote SKILL.md (per CLI-203, the version is sourced per skill, not
-// from the catalog-wide plugin.json). Any lookup or read failure resolves to
-// "" so the row falls into the unknown-version path.
+// cached remote SKILL.md — sourced per skill, not from the catalog-wide
+// plugin.json. Any lookup or read failure resolves to "" so the row falls
+// into the unknown-version path.
 func catalogSkillVersion(filesystem afero.Fs, cat *catalog.Catalog, name, binaryName string) string {
 	_, sub, err := cat.Lookup(filesystem, name, binaryName)
 	if err != nil {

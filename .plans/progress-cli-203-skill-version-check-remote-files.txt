@@ -25,3 +25,7 @@ Files: +.changes/unreleased/neo4j-cli-Patch-20260603-113613.yaml
 
 ## REVIEW — 2026-06-03T11:45:00Z
 Added 1 review task (task-007).
+
+## TASK-007 — 2026-06-03T12:05:00Z
+Trimmed "per CLI-203" ticket back-reference from catalogSkillVersion doc-comment; kept the per-skill sourcing + error->"" unknown-version explanation. All gates green.
+Files: ~mod (common/skill/inventory.go)

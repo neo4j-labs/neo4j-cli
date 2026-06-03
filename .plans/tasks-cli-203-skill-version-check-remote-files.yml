@@ -129,11 +129,11 @@ tasks:
       any lookup/read failure resolves to "" so the row falls into the
       unknown-version path). Trim only the "per CLI-203" back-reference while
       preserving that non-obvious explanation; do not delete the whole comment.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "catalogSkillVersion comment no longer references CLI-203 (or any ticket/PR)"
       - "Comment still explains per-skill sourcing and the error->\"\" unknown-version behavior"
       - "make test, make fmt-check, make lint pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-03T12:05:00Z
