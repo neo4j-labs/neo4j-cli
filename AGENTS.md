@@ -227,6 +227,8 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 `common/clievents/RedactArgs` is the single source of truth for secret scrubbing (feeds telemetry, panic/error messages, AND on-disk command history). It scrubs the `secretFlags` allow-list (incl. the `-p` query password shorthand) AND `--uri` userinfo passwords (`user:pw@host` → `user:***@host`, host/scheme preserved). Add new secret-bearing flags there, not at call sites.
 
+- The credentials package test seams (`SetGetenvForTest`, `SetKeyringProviderForTest` in `export_test.go`) are only visible inside `package credentials` test files — an external `_test.go` (e.g. `package api_test` exercising env-mode `getToken`) CANNOT call them. From outside the package use `t.Setenv` (the `getenv` seam defaults to `os.Getenv`, so it picks up real env vars) and `gokeyring.MockInit()` for hermetic env+keyring isolation instead.
+
 ## Tee-on-failure Notes
 
 - Failing commands tee their full redacted output to `common/tee` (file under `ConfigPrefix/neo4j/cli/tee/`); `tee_path` surfaces in the error envelope. Because the root command sets `SilenceErrors: true`, the failure message is rendered by `clierr.Render` AFTER the capture buffer is read in `main.go` — so anything that only surfaces via the returned error is NOT in the buffer. `main.go`'s `teeContent` helper appends `err.Error()` to the captured bytes before `tee.Save`; preserve that when touching the capture/render order or tee files for no-intermediate-output failures will be empty.
