@@ -102,7 +102,7 @@ tasks:
       Add a single user-facing changie entry (kind Patch) describing that skill
       version checks now use each skill's own remote SKILL.md version. Run the
       full gate suite as final verification.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -114,4 +114,4 @@ tasks:
       - "make fmt-check passes"
       - "make lint passes"
       - "make generate-check clean"
-    completed_at: null
+    completed_at: 2026-06-03T11:38:00Z
