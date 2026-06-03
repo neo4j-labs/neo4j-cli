@@ -26,3 +26,6 @@ Decisions: WithTeePath reassigned to ce (returns *CLIError) to satisfy errcheck;
 Regenerated skill bundle (no drift), added single Minor changelog entry, README "Tee on failure" section. All gates green (test/fmt-check/lint/license, no bundle drift). E2E smoke: failing `query` writes <ts>_query.log under config tee dir, tee_path in JSON envelope, `Full output saved:` on stderr, 0600, no secret leak. Fixed capture gap: root sets SilenceErrors so failure msg renders after capture (empty buffer -> no tee file); added teeContent helper appending err.Error() before Save, with table-driven test.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260603-153002.yaml, ~README.md, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
 Decisions: teeContent extracted (mirrors commandSlug/exitCodeFor) so the SilenceErrors-appended error content is unit-testable without invoking main().
+
+## REVIEW — 2026-06-03T00:00:00Z
+Added 4 review tasks (task-007..task-010) from /golang-security audit: JSON redaction gap (HIGH), Basic-auth redaction (LOW), table-format column leak, redaction consolidation.
