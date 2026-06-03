@@ -69,7 +69,7 @@ tasks:
       regression test that seeds a catalog skill whose SKILL.md `version:`
       differs from plugin.json's top-level version and asserts the check's
       current_version reflects the SKILL.md value, not plugin.json.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -78,7 +78,7 @@ tasks:
       - "New regression test proves available version comes from SKILL.md, not plugin.json"
       - "TestCheckCmd_AllOk_ExitsZero and TestCheckCmd_CatalogSkillDrift pass under the new sourcing"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
   - id: task-005
     title: 'Update check help text and regenerate skill bundle'
     description: |

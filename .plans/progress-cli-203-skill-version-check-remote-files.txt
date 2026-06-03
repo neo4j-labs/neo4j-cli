@@ -9,3 +9,8 @@ Files: ~mod (common/skill/inventory.go)
 ## TASK-003 — 2026-06-03T00:00:00Z
 resolveSkillSource catalog branch now returns Source{Version: ""} so installed catalog skills keep their upstream SKILL.md version: line verbatim (injectVersion no-op on empty). Self/self-alias paths still inject binary version. All gates green.
 Files: ~mod (common/skill/catalog_load.go)
+
+## TASK-004 — 2026-06-03T00:00:00Z
+Audited check/install/installer/list/resolve tests — no assertions tied available version to plugin.json (all already keyed to per-skill SKILL.md, which equals plugin version in fixtures), so none broke. Added TestCheckCmd_CatalogVersionFromSkillFile proving current_version comes from the skill's own SKILL.md (2.5.0) not plugin.json (1.0.0).
+Files: ~mod (catalog_load_test.go, check_test.go)
+Decisions: Added seedCatalogCacheWithSkillVersion helper so SKILL.md version can differ from plugin.json version; content dir stays keyed by plugin version (cat.Lookup resolves by it). seedCatalogCache delegates to it.
