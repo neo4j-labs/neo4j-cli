@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-06-03T00:00:00Z
 Added tee_path to clierr error envelope: TeePath field + chainable WithTeePath on CLIError, tee_path,omitempty on EnvelopeBody projected in BuildEnvelope, and a writeTeePath helper printing `Full output saved: <path>` to stderr in json/toon/plaintext branches.
 Files: ~common/clierr/error.go, ~common/clierr/render.go, ~common/clierr/render_test.go
+
+## TASK-002 — 2026-06-03T00:00:00Z
+Added clievents.RedactText for multi-line secret scrubbing: three package-level regexes (URI userinfo, password/secret/token/api-key/auth assignments, bearer headers) replacing values with ***; table-driven tests cover positives, no-false-positives, and multi-line.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+Decisions: tightened the `auth` assignment alternative (auth(?:[-_]?token|[-_]?key)?) instead of PRD's literal `auth\w*` so it doesn't swallow the HTTP header name "Authorization" — that case is handled by the bearer pass.

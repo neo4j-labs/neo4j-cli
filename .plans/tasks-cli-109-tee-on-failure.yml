@@ -33,7 +33,7 @@ tasks:
       URI userinfo passwords in free text, password/secret/token/api-key/auth
       key-value assignments, and bearer headers, reusing the existing secret
       vocabulary where practical.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "RedactText scrubs neo4j://user:pw@host to neo4j://user:***@host (userinfo in free text)"
@@ -41,7 +41,7 @@ tasks:
       - "Non-secret text (e.g. limit=10, ordinary prose) is left unchanged"
       - "Multi-line input with multiple secrets has every match redacted"
       - "Table-driven tests in redact_test.go cover positives and no false positives"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-003
     title: 'Add tee-enabled / tee-limit global config keys'

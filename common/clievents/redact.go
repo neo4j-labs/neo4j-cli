@@ -5,6 +5,7 @@ package clievents
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -108,6 +109,38 @@ func RedactArgs(args []string) string {
 		out = append(out, arg)
 	}
 	return strings.Join(out, " ")
+}
+
+// textURIUserinfoRe matches a connection URI's userinfo password embedded in
+// free text: scheme://user:password@ with the password rewritten to ***. Only
+// the password segment (group 1 is scheme://user:) is replaced; host/port/path
+// are preserved.
+var textURIUserinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s@]+@`)
+
+// textAssignmentRe matches password/secret/token/api-key/auth key-value
+// assignments (= or :) in free text and rewrites the value to ***. Group 1
+// captures the key and separator so the replacement keeps them verbatim.
+// The `auth` alternative deliberately ends at a `[=:]`-bounded word rather than
+// using `auth\w*`, so it does NOT swallow the HTTP header name "Authorization"
+// (handled by the bearer pass) while still matching auth/auth_token/authkey.
+var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:password|passwd|pwd|secret|token|api[-_]?key)\w*|auth(?:[-_]?token|[-_]?key)?)\s*[=:]\s*)(\S+)`)
+
+// textBearerRe matches an Authorization bearer token in free text and rewrites
+// the token to ***.
+var textBearerRe = regexp.MustCompile(`(?i)(bearer\s+)\S+`)
+
+// RedactText scrubs secrets from arbitrary multi-line text, the text-level
+// counterpart to RedactArgs (which is argv-only). It applies conservative
+// regexes for (a) URI userinfo passwords in free text, (b)
+// password/secret/token/api-key/auth key-value assignments, and (c) bearer
+// authorization headers, replacing each secret value with ***. It is the
+// single source of truth for redacting captured command output before it is
+// persisted. Non-secret text (e.g. `limit=10`, ordinary prose) is left intact.
+func RedactText(s string) string {
+	s = textURIUserinfoRe.ReplaceAllString(s, "${1}"+redactedPlaceholder+"@")
+	s = textAssignmentRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
+	s = textBearerRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
+	return s
 }
 
 // redactByFlag returns the scrubbed value for a known sensitive flag, and

@@ -196,3 +196,103 @@ func TestRedactArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestRedactText(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		mustNot []string
+	}{
+		{
+			name: "uri userinfo password in free text",
+			in:   "connecting to neo4j://neo4j:s3cret@host:7687 now",
+			want: "connecting to neo4j://neo4j:***@host:7687 now",
+		},
+		{
+			name: "https userinfo password",
+			in:   "https://admin:hunter2@example.com/path",
+			want: "https://admin:***@example.com/path",
+		},
+		{
+			name: "uri without password unchanged",
+			in:   "neo4j://host:7687/db",
+			want: "neo4j://host:7687/db",
+		},
+		{
+			name: "password assignment equals",
+			in:   "password=topsecret",
+			want: "password=***",
+		},
+		{
+			name: "secret assignment colon",
+			in:   "client_secret: abc123",
+			want: "client_secret: ***",
+		},
+		{
+			name: "token assignment",
+			in:   "token=eyJhbGci",
+			want: "token=***",
+		},
+		{
+			name: "api-key assignment",
+			in:   "api-key=sk-live-xyz",
+			want: "api-key=***",
+		},
+		{
+			name: "api_key underscore assignment",
+			in:   "api_key=sk-live-xyz",
+			want: "api_key=***",
+		},
+		{
+			name: "auth assignment",
+			in:   "auth=Zm9vOmJhcg==",
+			want: "auth=***",
+		},
+		{
+			name: "bearer header",
+			in:   "Authorization: Bearer abc.def.ghi",
+			want: "Authorization: Bearer ***",
+		},
+		{
+			name: "non-secret assignment unchanged",
+			in:   "limit=10",
+			want: "limit=10",
+		},
+		{
+			name: "ordinary prose unchanged",
+			in:   "the quick brown fox ran 10 miles",
+			want: "the quick brown fox ran 10 miles",
+		},
+		{
+			name: "name assignment unchanged",
+			in:   "name=bob",
+			want: "name=bob",
+		},
+		{
+			name: "empty string",
+			in:   "",
+			want: "",
+		},
+		{
+			name:    "multi-line with multiple secrets",
+			in:      "uri=neo4j://u:p4ss@h:7687\npassword=hunter2\nAuthorization: Bearer tok-123\nlimit=5",
+			want:    "uri=neo4j://u:***@h:7687\npassword=***\nAuthorization: Bearer ***\nlimit=5",
+			mustNot: []string{"p4ss", "hunter2", "tok-123"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RedactText(tc.in)
+			if got != tc.want {
+				t.Errorf("RedactText(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+			for _, leak := range tc.mustNot {
+				if strings.Contains(got, leak) {
+					t.Errorf("secret %q leaked in output %q", leak, got)
+				}
+			}
+		})
+	}
+}
