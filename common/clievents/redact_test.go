@@ -250,6 +250,47 @@ func TestRedactText(t *testing.T) {
 			want: "auth=***",
 		},
 		{
+			name:    "json password field no space",
+			in:      `{"password":"hunter2"}`,
+			want:    `{"password":"***"}`,
+			mustNot: []string{"hunter2"},
+		},
+		{
+			name:    "json password field with space",
+			in:      `{"password": "hunter2"}`,
+			want:    `{"password": "***"}`,
+			mustNot: []string{"hunter2"},
+		},
+		{
+			name:    "json token field",
+			in:      `{"token": "eyJhbGci.abc.def"}`,
+			want:    `{"token": "***"}`,
+			mustNot: []string{"eyJhbGci"},
+		},
+		{
+			name:    "json client_secret field",
+			in:      `{"client_secret":"abc123"}`,
+			want:    `{"client_secret":"***"}`,
+			mustNot: []string{"abc123"},
+		},
+		{
+			name:    "json x-api-key field",
+			in:      `{"x-api-key":"sk-live-xyz"}`,
+			want:    `{"x-api-key":"***"}`,
+			mustNot: []string{"sk-live-xyz"},
+		},
+		{
+			name: "json non-secret name field unchanged",
+			in:   `{"name":"bob"}`,
+			want: `{"name":"bob"}`,
+		},
+		{
+			name:    "json secret field among non-secret fields",
+			in:      `{"id":"123","password":"p4ss","name":"bob"}`,
+			want:    `{"id":"123","password":"***","name":"bob"}`,
+			mustNot: []string{"p4ss"},
+		},
+		{
 			name: "bearer header",
 			in:   "Authorization: Bearer abc.def.ghi",
 			want: "Authorization: Bearer ***",

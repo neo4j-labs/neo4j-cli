@@ -125,19 +125,33 @@ var textURIUserinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@]+
 // (handled by the bearer pass) while still matching auth/auth_token/authkey.
 var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:password|passwd|pwd|secret|token|api[-_]?key)\w*|auth(?:[-_]?token|[-_]?key)?)\s*[=:]\s*)(\S+)`)
 
+// textJSONFieldRe matches a quoted JSON key containing a secret-bearing
+// substring followed by a quoted value, rewriting only the value to "***". It
+// exists because textAssignmentRe cannot match the JSON shape: the `"` between
+// the key and the `:` breaks its `key[=:]value` form, so `"password":"x"` would
+// otherwise leak. The key is matched by substring (mirroring secretParamKeyParts)
+// so `"client_secret"`, `"x-api-key"`, `"current_password"` are all covered, and
+// both `"k":"v"` and `"k": "v"` spacings are handled.
+var textJSONFieldRe = regexp.MustCompile(`(?i)("[^"]*(?:password|passwd|pwd|secret|token|api[-_]?key|access[-_]?key)[^"]*"\s*:\s*)"[^"]*"`)
+
 // textBearerRe matches an Authorization bearer token in free text and rewrites
 // the token to ***.
 var textBearerRe = regexp.MustCompile(`(?i)(bearer\s+)\S+`)
 
 // RedactText scrubs secrets from arbitrary multi-line text, the text-level
 // counterpart to RedactArgs (which is argv-only). It applies conservative
-// regexes for (a) URI userinfo passwords in free text, (b)
-// password/secret/token/api-key/auth key-value assignments, and (c) bearer
-// authorization headers, replacing each secret value with ***. It is the
-// single source of truth for redacting captured command output before it is
-// persisted. Non-secret text (e.g. `limit=10`, ordinary prose) is left intact.
+// regexes for (a) URI userinfo passwords in free text, (b) quoted-key JSON
+// secret fields (`"password":"x"`), (c) password/secret/token/api-key/auth
+// key-value assignments, and (d) bearer authorization headers, replacing each
+// secret value with ***. It is the single source of truth for redacting
+// captured command output before it is persisted. Non-secret text (e.g.
+// `limit=10`, ordinary prose) is left intact.
 func RedactText(s string) string {
 	s = textURIUserinfoRe.ReplaceAllString(s, "${1}"+redactedPlaceholder+"@")
+	// JSON pass runs before the bare-assignment pass: it rewrites the value to a
+	// quoted "***", whose trailing `"` is not a valid assignment separator, so
+	// the assignment regex cannot re-process (and double-mangle) the result.
+	s = textJSONFieldRe.ReplaceAllString(s, `${1}"`+redactedPlaceholder+`"`)
 	s = textAssignmentRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
 	s = textBearerRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
 	return s

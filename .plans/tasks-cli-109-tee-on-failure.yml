@@ -150,7 +150,7 @@ tasks:
       (handle both `"k":"v"` and `"k": "v"`). Match the key by substring (like
       the existing secretParamKeyParts philosophy) so `"client_secret"`,
       `"x-api-key"`, `"current_password"` are all covered.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-002
@@ -159,7 +159,7 @@ tasks:
       - "\"token\":\"...\", \"client_secret\":\"...\", and \"x-api-key\":\"...\" values are redacted"
       - "A JSON field named \"name\" (non-secret) is left unchanged; bare key=value redaction still works"
       - "New table-driven RedactText cases cover JSON positives and the non-secret negative; make test/lint/fmt-check pass"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-008
     title: 'Redact Authorization: Basic credentials in RedactText'

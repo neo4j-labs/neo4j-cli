@@ -29,3 +29,8 @@ Decisions: teeContent extracted (mirrors commandSlug/exitCodeFor) so the Silence
 
 ## REVIEW — 2026-06-03T00:00:00Z
 Added 4 review tasks (task-007..task-010) from /golang-security audit: JSON redaction gap (HIGH), Basic-auth redaction (LOW), table-format column leak, redaction consolidation.
+
+## TASK-007 — 2026-06-03T14:10:00Z
+Closed RedactText quoted-key JSON leak: added textJSONFieldRe matching a quoted secret-word key + quoted value, rewriting value to "***" (valid JSON preserved); runs before bare-assignment pass so the trailing `"` blocks re-processing. Table-driven JSON positives + non-secret "name" negative added.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+Decisions: JSON pass ordered before textAssignmentRe — quoted "***" trailing quote is not a valid assignment separator, so no double-mangle.
