@@ -95,7 +95,7 @@ tasks:
       '-', fallback "root"), call tee.Save, resolve the error to a *clierr.CLIError
       (errors.As else NewFatalError), set WithTeePath when non-empty, and pass it
       to clierr.Render.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-004
@@ -105,7 +105,7 @@ tasks:
       - "On failure a tee file is written and its path set on the rendered *CLIError via WithTeePath"
       - "confirm.ErrCancelled still exits 0 with no tee file; exit code is unchanged by tee logic"
       - "Tee write failure never changes exit code and yields an empty tee_path"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
 
   - id: task-006
     title: 'Regenerate skill bundle, add changelog, pass all gates'

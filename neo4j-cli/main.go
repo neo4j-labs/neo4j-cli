@@ -14,8 +14,10 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 )
 
 // recoverPanic prints a redacted "unexpected error" line to w.
@@ -92,6 +94,24 @@ func peekFormatFromArgs(args []string) string {
 	return ""
 }
 
+// commandSlug derives a filesystem-friendly slug for the command cobra
+// resolved from args. The root command name is stripped from the front of the
+// CommandPath so `neo4j-cli aura instance list` becomes `aura-instance-list`
+// rather than `neo4j-cli-aura-instance-list`; remaining spaces become dashes.
+// Returns "root" when no subcommand matched (parse failure or bare invocation).
+func commandSlug(cmd *cobra.Command, args []string) string {
+	matched, _, err := cmd.Find(args)
+	if err != nil || matched == nil {
+		return "root"
+	}
+	path := strings.TrimPrefix(matched.CommandPath(), cmd.Name())
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "root"
+	}
+	return strings.ReplaceAll(path, " ", "-")
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -107,8 +127,12 @@ func main() {
 	clievents.Emit(cfg.Events, []string{"startup"}, true)
 
 	cmd := app.NewCmd(cfg)
-	cmd.SetOut(os.Stdout)
-	cmd.SetErr(os.Stderr)
+
+	// Capture emitted output into a shared bounded buffer while passing it
+	// through to the real streams, so a failing command can be teed to disk.
+	buf := &tee.LimitedBuffer{}
+	cmd.SetOut(io.MultiWriter(os.Stdout, buf))
+	cmd.SetErr(io.MultiWriter(os.Stderr, buf))
 
 	// cobra prints the error itself; we only add the hook for errors that bypassed
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
@@ -126,8 +150,23 @@ func main() {
 		if errors.Is(err, confirm.ErrCancelled) {
 			os.Exit(0)
 		}
+
+		// Best-effort tee of the captured output; a failed/disabled save yields
+		// an empty path and never affects the exit code.
+		path, _ := tee.Save(cfg, commandSlug(cmd, os.Args[1:]), buf.Bytes())
+
+		// Resolve to a *CLIError before Render so the tee path can be attached;
+		// Render reads the typed value, not the wrapped Error() string.
+		var ce *clierr.CLIError
+		if !errors.As(err, &ce) {
+			ce = clierr.NewFatalError("%s", err.Error())
+		}
+		if path != "" {
+			ce = ce.WithTeePath(path)
+		}
+
 		format := resolveFormatForRender(os.Args[1:], cfg.Global.Format())
-		clierr.Render(err, os.Stdout, os.Stderr, format)
-		os.Exit(exitCodeFor(err))
+		clierr.Render(ce, os.Stdout, os.Stderr, format)
+		os.Exit(exitCodeFor(ce))
 	}
 }

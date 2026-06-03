@@ -20,6 +20,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCommandSlug covers the slug derivation main.go feeds to tee.Save:
+// CommandPath with the root name stripped and spaces turned into dashes, with a
+// "root" fallback for parse failures / bare invocations.
+func TestCommandSlug(t *testing.T) {
+	fs, err := testfs.GetTestFs("{}", "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "nested leaf", args: []string{"aura", "instance", "list"}, want: "aura-instance-list"},
+		{name: "single subcommand", args: []string{"config"}, want: "config"},
+		{name: "unknown command falls back to root", args: []string{"definitely-not-a-command"}, want: "root"},
+		{name: "no args falls back to root", args: []string{}, want: "root"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := app.NewCmd(cfg)
+			assert.Equal(t, tc.want, commandSlug(cmd, tc.args))
+		})
+	}
+}
+
 // TestRecoverPanic_RedactsSecretArgs verifies that the panic-recover path in
 // main() never leaks secret-flag values into stdout. The recoverPanic helper
 // re-panics so callers complete normal panic flow; the test recovers from that
