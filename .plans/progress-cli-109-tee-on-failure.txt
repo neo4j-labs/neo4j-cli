@@ -21,3 +21,8 @@ Decisions: rotation runs before the write (to limit-1) so exactly tee-limit rema
 Wired tee-on-failure into main.go: shared LimitedBuffer fronts os.Stdout/os.Stderr via io.MultiWriter before Execute; on error (after confirm.ErrCancelled exit-0) derive slug via commandSlug helper, tee.Save (best-effort), resolve err to *CLIError (errors.As else NewFatalError), WithTeePath when path non-empty, then Render+exitCodeFor(ce).
 Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
 Decisions: WithTeePath reassigned to ce (returns *CLIError) to satisfy errcheck; commandSlug extracted as unit-testable helper.
+
+## TASK-006 — 2026-06-03T13:35:00Z
+Regenerated skill bundle (no drift), added single Minor changelog entry, README "Tee on failure" section. All gates green (test/fmt-check/lint/license, no bundle drift). E2E smoke: failing `query` writes <ts>_query.log under config tee dir, tee_path in JSON envelope, `Full output saved:` on stderr, 0600, no secret leak. Fixed capture gap: root sets SilenceErrors so failure msg renders after capture (empty buffer -> no tee file); added teeContent helper appending err.Error() before Save, with table-driven test.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260603-153002.yaml, ~README.md, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: teeContent extracted (mirrors commandSlug/exitCodeFor) so the SilenceErrors-appended error content is unit-testable without invoking main().

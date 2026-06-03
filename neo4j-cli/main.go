@@ -112,6 +112,23 @@ func commandSlug(cmd *cobra.Command, args []string) string {
 	return strings.ReplaceAll(path, " ", "-")
 }
 
+// teeContent builds the bytes persisted by tee.Save from the captured
+// stdout+stderr stream plus the failing error. The root command sets
+// SilenceErrors, so the failure message is rendered by clierr.Render (after
+// capture) rather than during Execute; appending err here ensures the tee
+// always reflects the command's full output, including the error itself, even
+// when the command emitted nothing else before failing.
+func teeContent(captured []byte, err error) []byte {
+	if err == nil {
+		return captured
+	}
+	msg := strings.TrimSpace(err.Error())
+	if msg == "" {
+		return captured
+	}
+	return append(append([]byte{}, captured...), []byte(msg+"\n")...)
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -153,7 +170,7 @@ func main() {
 
 		// Best-effort tee of the captured output; a failed/disabled save yields
 		// an empty path and never affects the exit code.
-		path, _ := tee.Save(cfg, commandSlug(cmd, os.Args[1:]), buf.Bytes())
+		path, _ := tee.Save(cfg, commandSlug(cmd, os.Args[1:]), teeContent(buf.Bytes(), err))
 
 		// Resolve to a *CLIError before Render so the tee path can be attached;
 		// Render reads the typed value, not the wrapped Error() string.

@@ -114,7 +114,7 @@ tasks:
       (config help text embeds ValidConfigKeys) and commit source + regenerated
       bundle together. Add a user-facing changie Minor entry. Ensure the full gate
       suite passes.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-005
@@ -123,4 +123,4 @@ tasks:
       - "A single changie Minor entry for neo4j-cli describes the tee-on-failure feature"
       - "make test, make fmt-check, make lint, and make license-check all pass"
       - "End-to-end: a failing command writes a redacted tee file and tee_path appears in the JSON envelope"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z

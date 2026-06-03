@@ -45,6 +45,29 @@ func TestCommandSlug(t *testing.T) {
 	}
 }
 
+// TestTeeContent covers the content main.go feeds to tee.Save: the captured
+// stream with the failing error's message appended. Because the root command
+// sets SilenceErrors, the error is rendered after capture, so a command that
+// emits nothing before failing would otherwise tee an empty buffer — appending
+// the error guarantees the tee reflects the failure.
+func TestTeeContent(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		captured []byte
+		err      error
+		want     string
+	}{
+		{name: "empty buffer falls back to error", captured: nil, err: errors.New("boom"), want: "boom\n"},
+		{name: "captured output keeps error appended", captured: []byte("partial\n"), err: errors.New("boom"), want: "partial\nboom\n"},
+		{name: "nil error returns captured as-is", captured: []byte("partial\n"), err: nil, want: "partial\n"},
+		{name: "blank error message returns captured", captured: []byte("partial\n"), err: errors.New("   "), want: "partial\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, string(teeContent(tc.captured, tc.err)))
+		})
+	}
+}
+
 // TestRecoverPanic_RedactsSecretArgs verifies that the panic-recover path in
 // main() never leaks secret-flag values into stdout. The recoverPanic helper
 // re-panics so callers complete normal panic flow; the test recovers from that
