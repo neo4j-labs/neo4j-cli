@@ -1,3 +1,7 @@
 ## TASK-001 — 2026-06-03T00:00:00Z
 Stamped `version: <version>` frontmatter into both makeCatalogTarball (tarball SKILL.md bodies) and seedCatalogCache (cached SKILL.md) in catalog_load_test.go, defaulting to the catalog version arg. All gates green.
 Files: ~1 (common/skill/catalog_load_test.go)
+
+## TASK-002 — 2026-06-03T00:00:00Z
+Added catalogSkillVersion helper in inventory.go: reuses cat.Lookup (per-skill fs.FS) + parseVersion to source each catalog skill's available version from its cached remote SKILL.md instead of cat.Version; Lookup/read errors resolve to "" (unknown-version).
+Files: ~mod (common/skill/inventory.go)

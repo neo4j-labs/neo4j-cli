@@ -4,6 +4,8 @@
 package skill
 
 import (
+	"io/fs"
+
 	"github.com/spf13/afero"
 
 	"github.com/neo4j/cli/common/skill/catalog"
@@ -61,9 +63,25 @@ func BuildInventory(filesystem afero.Fs, binaryName, binaryVersion string, cat *
 		if catalog.IsReserved(entry.Name, binaryName) {
 			continue
 		}
-		out = append(out, inventoryRowsForSkill(filesystem, entry.Name, sourceCatalog, cat.Version)...)
+		out = append(out, inventoryRowsForSkill(filesystem, entry.Name, sourceCatalog, catalogSkillVersion(filesystem, cat, entry.Name, binaryName))...)
 	}
 	return out
+}
+
+// catalogSkillVersion reads the available version from a catalog skill's
+// cached remote SKILL.md (per CLI-203, the version is sourced per skill, not
+// from the catalog-wide plugin.json). Any lookup or read failure resolves to
+// "" so the row falls into the unknown-version path.
+func catalogSkillVersion(filesystem afero.Fs, cat *catalog.Catalog, name, binaryName string) string {
+	_, sub, err := cat.Lookup(filesystem, name, binaryName)
+	if err != nil {
+		return ""
+	}
+	data, err := fs.ReadFile(sub, "SKILL.md")
+	if err != nil {
+		return ""
+	}
+	return parseVersion(data)
 }
 
 // inventoryRowsForSkill returns one row per agent for `skillName`. detected/

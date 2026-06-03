@@ -32,7 +32,7 @@ tasks:
       helper from installer.go; add the io/fs import. Missing content or an
       unparseable version resolves to "" (existing unknown-version path). No new
       regex and no new field on catalog.SkillEntry.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -41,7 +41,7 @@ tasks:
       - "Missing/unparseable content resolves to \"\" (unknown-version), no panic or error"
       - "Reserved-name skip in BuildInventory is preserved"
       - "make test passes"
-    completed_at: null
+    completed_at: 2026-06-03T00:00:00Z
   - id: task-003
     title: 'Preserve upstream version verbatim on catalog skill install'
     description: |
