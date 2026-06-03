@@ -1,0 +1,39 @@
+## TASK-001 — 2026-06-03T00:00:00Z
+Stamped `version: <version>` frontmatter into both makeCatalogTarball (tarball SKILL.md bodies) and seedCatalogCache (cached SKILL.md) in catalog_load_test.go, defaulting to the catalog version arg. All gates green.
+Files: ~1 (common/skill/catalog_load_test.go)
+
+## TASK-002 — 2026-06-03T00:00:00Z
+Added catalogSkillVersion helper in inventory.go: reuses cat.Lookup (per-skill fs.FS) + parseVersion to source each catalog skill's available version from its cached remote SKILL.md instead of cat.Version; Lookup/read errors resolve to "" (unknown-version).
+Files: ~mod (common/skill/inventory.go)
+
+## TASK-003 — 2026-06-03T00:00:00Z
+resolveSkillSource catalog branch now returns Source{Version: ""} so installed catalog skills keep their upstream SKILL.md version: line verbatim (injectVersion no-op on empty). Self/self-alias paths still inject binary version. All gates green.
+Files: ~mod (common/skill/catalog_load.go)
+
+## TASK-004 — 2026-06-03T00:00:00Z
+Audited check/install/installer/list/resolve tests — no assertions tied available version to plugin.json (all already keyed to per-skill SKILL.md, which equals plugin version in fixtures), so none broke. Added TestCheckCmd_CatalogVersionFromSkillFile proving current_version comes from the skill's own SKILL.md (2.5.0) not plugin.json (1.0.0).
+Files: ~mod (catalog_load_test.go, check_test.go)
+Decisions: Added seedCatalogCacheWithSkillVersion helper so SKILL.md version can differ from plugin.json version; content dir stays keyed by plugin version (cat.Lookup resolves by it). seedCatalogCache delegates to it.
+
+## TASK-005 — 2026-06-03T00:00:00Z
+Updated check.go Long: catalog-skill source version now attributed to the skill's own SKILL.md `version:` (was "plugin.json version"); regenerated bundle references/skill.md. list.go plugin.json mention describes the catalog index (skill list source), not version, so left unchanged.
+Files: ~mod (common/skill/check.go, neo4j-cli/internal/skill/bundle/references/skill.md)
+
+## TASK-006 — 2026-06-03T11:38:00Z
+Added single user-facing Patch changie entry: skill check/list now report each catalog skill's available version from its own remote SKILL.md version: instead of a shared plugin.json version. Full gate suite green (test, fmt-check, lint, generate-check — only diff is the harness in_progress YAML flip, no bundle drift). Feature complete.
+Files: +.changes/unreleased/neo4j-cli-Patch-20260603-113613.yaml
+
+## REVIEW — 2026-06-03T11:45:00Z
+Added 1 review task (task-007).
+
+## TASK-007 — 2026-06-03T12:05:00Z
+Trimmed "per CLI-203" ticket back-reference from catalogSkillVersion doc-comment; kept the per-skill sourcing + error->"" unknown-version explanation. All gates green.
+Files: ~mod (common/skill/inventory.go)
+
+## REVIEW — 2026-06-03T12:30:00Z
+Added 1 review task (task-008): validate remote skill version at inventory boundary (terminal escape injection).
+
+## TASK-008 — 2026-06-03T13:05:00Z
+Added shared sanitizeVersion helper (installer.go) that fails closed on version strings carrying C0 control bytes (< 0x20) or DEL (0x7F), returning "" so the row falls into unknown-version. Wired into both version-read boundaries: catalogSkillVersion (inventory.go, available) and readInstalledSkill (helpers.go, installed). Added regression test proving an ESC (0x1b) version yields unknown-version and never reaches output raw, plus a sanitizeVersion unit table. All gates green; no bundle drift.
+Files: ~3 (installer.go, inventory.go, helpers.go), ~2 tests (check_test.go, installer_test.go)
+Decisions: chose fail-closed validator over commonoutput.StripControl replace-with-"?" — a version is a constrained token and the skill check/list table+toon path bypasses StripControl, so sanitizing at the inventory boundary covers both renderers.

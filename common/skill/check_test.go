@@ -111,6 +111,74 @@ func TestCheckCmd_CatalogSkillDrift(t *testing.T) {
 	assert.Equal(t, "1.0.0", cypherRow["current_version"])
 }
 
+// TestCheckCmd_CatalogVersionFromSkillFile proves the available
+// (current_version) value is sourced from the catalog skill's own cached
+// SKILL.md `version:` line, NOT from the plugin.json top-level version. The
+// fixture deliberately sets them apart (SKILL.md 2.5.0 vs plugin.json 1.0.0);
+// if sourcing regressed to plugin.json this assertion would see 1.0.0.
+func TestCheckCmd_CatalogVersionFromSkillFile(t *testing.T) {
+	cs := newCatalogServer(t)
+	withCatalogSeams(t, cs.doer())
+
+	f := newFixture(t, "/home/alice", "json", "claude-code")
+	seedCatalogCacheWithSkillVersion(t, f.fs, "1.0.0", "2.5.0", "neo4j-cypher-skill")
+	require.NoError(t, f.exec(t, "install", "neo4j-cypher-skill"))
+	f.resetBuffers()
+
+	require.NoError(t, f.exec(t, "check"))
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+
+	var cypherRow map[string]any
+	for _, r := range rows {
+		if r["skill"] == "neo4j-cypher-skill" {
+			cypherRow = r
+			break
+		}
+	}
+	require.NotNil(t, cypherRow, "catalog row missing")
+	assert.Equal(t, "2.5.0", cypherRow["current_version"], "current_version must come from the skill's SKILL.md, not plugin.json")
+	assert.Equal(t, "2.5.0", cypherRow["installed_version"], "install preserves the upstream SKILL.md version verbatim")
+	assert.Equal(t, "ok", cypherRow["status"])
+}
+
+// TestCheckCmd_CatalogVersionControlChars_Neutralized proves that a catalog
+// skill whose SKILL.md `version:` carries an ANSI/escape sequence (ESC 0x1b)
+// is treated as unknown-version: the raw control byte must never reach the
+// rendered output, and the available (current_version) value must collapse to
+// "" rather than the tampered string.
+func TestCheckCmd_CatalogVersionControlChars_Neutralized(t *testing.T) {
+	cs := newCatalogServer(t)
+	withCatalogSeams(t, cs.doer())
+
+	const evil = "1.0.0\x1b[31mFAKE"
+	f := newFixture(t, "/home/alice", "json", "claude-code")
+	seedCatalogCacheWithSkillVersion(t, f.fs, "1.0.0", evil, "neo4j-cypher-skill")
+	require.NoError(t, f.exec(t, "install", "neo4j-cypher-skill"))
+	f.resetBuffers()
+
+	err := f.exec(t, "check")
+	require.Error(t, err, "unknown-version must exit non-zero")
+
+	out := f.stdout.String()
+	assert.NotContains(t, out, "\x1b", "raw ESC byte must not reach output")
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(f.stdout.Bytes(), &rows))
+	var cypherRow map[string]any
+	for _, r := range rows {
+		if r["skill"] == "neo4j-cypher-skill" {
+			cypherRow = r
+			break
+		}
+	}
+	require.NotNil(t, cypherRow, "catalog row missing")
+	assert.Equal(t, "unknown-version", cypherRow["status"])
+	assert.Equal(t, "", cypherRow["current_version"], "tampered version must collapse to unknown")
+	assert.Equal(t, "", cypherRow["installed_version"], "tampered installed version must collapse to unknown")
+}
+
 func TestCheckCmd_NoneInstalled(t *testing.T) {
 	f := newFixture(t, "/home/alice", "table", "claude-code")
 	require.NoError(t, f.exec(t, "check"))

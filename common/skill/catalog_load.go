@@ -168,7 +168,7 @@ func resolveSkillSource(bundle fs.FS, version string, cat *catalog.Catalog, file
 	if cat != nil {
 		entry, sub, lookupErr := cat.Lookup(filesystem, skillArg, binaryName)
 		if lookupErr == nil {
-			return Source{FS: sub, Version: cat.Version}, entry, nil
+			return Source{FS: sub, Version: ""}, entry, nil
 		}
 	}
 

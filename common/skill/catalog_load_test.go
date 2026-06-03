@@ -98,7 +98,7 @@ func makeCatalogTarball(t *testing.T, version string, skills ...string) []byte {
 	top := "neo4j-skills-" + version + "/"
 	require.NoError(t, tw.WriteHeader(&tar.Header{Name: top, Mode: 0o755, Typeflag: tar.TypeDir}))
 	for _, s := range skills {
-		body := "---\nname: " + s + "\n---\n# " + s + "\nbody\n"
+		body := "---\nname: " + s + "\nversion: " + version + "\n---\n# " + s + "\nbody\n"
 		require.NoError(t, tw.WriteHeader(&tar.Header{
 			Name: top + s + "/SKILL.md", Mode: 0o600, Typeflag: tar.TypeReg, Size: int64(len(body)),
 		}))
@@ -145,20 +145,32 @@ func withCatalogSeams(t *testing.T, doer catalog.HTTPDoer) {
 
 // seedCatalogCache pre-populates the cache with a plugin.json + a tarball-
 // extracted content tree so tests for warm-cache / cold-cache branches can
-// distinguish "we hit the network" from "we read the cache".
+// distinguish "we hit the network" from "we read the cache". Each cached
+// SKILL.md carries the same `version:` as plugin.json.
 func seedCatalogCache(t *testing.T, fs afero.Fs, version string, skills ...string) {
+	t.Helper()
+	seedCatalogCacheWithSkillVersion(t, fs, version, version, skills...)
+}
+
+// seedCatalogCacheWithSkillVersion is like seedCatalogCache but stamps a
+// distinct `version:` into each cached SKILL.md (skillVersion), independent
+// of the plugin.json top-level version (pluginVersion). It lets tests prove
+// the available version is sourced from the skill's own SKILL.md rather than
+// from plugin.json. The content tree still lives under content/<pluginVersion>
+// because cat.Lookup resolves the content dir by the plugin.json version.
+func seedCatalogCacheWithSkillVersion(t *testing.T, fs afero.Fs, pluginVersion, skillVersion string, skills ...string) {
 	t.Helper()
 	require.NoError(t, fs.MkdirAll(installCatalogCacheRoot, 0755))
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(installCatalogCacheRoot, "plugin.json"),
-		pluginJSONBody(version, skills...), 0600))
+		pluginJSONBody(pluginVersion, skills...), 0600))
 	// fetched-at: use a known fresh timestamp so default Stale() = false.
 	require.NoError(t, afero.WriteFile(fs, filepath.Join(installCatalogCacheRoot, "fetched-at"),
 		[]byte("2999-01-01T00:00:00Z"), 0600))
-	contentRoot := filepath.Join(installCatalogCacheRoot, "content", version)
+	contentRoot := filepath.Join(installCatalogCacheRoot, "content", pluginVersion)
 	for _, s := range skills {
 		dir := filepath.Join(contentRoot, s)
 		require.NoError(t, fs.MkdirAll(dir, 0755))
-		body := "---\nname: " + s + "\n---\n# cached " + s + "\n"
+		body := "---\nname: " + s + "\nversion: " + skillVersion + "\n---\n# cached " + s + "\n"
 		require.NoError(t, afero.WriteFile(fs, filepath.Join(dir, "SKILL.md"), []byte(body), 0600))
 	}
 }

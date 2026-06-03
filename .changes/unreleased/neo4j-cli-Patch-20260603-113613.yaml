@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Patch
+body: '`skill check` and `skill list` now report each catalog skill''s available version from that skill''s own remote SKILL.md `version:` instead of a single shared plugin.json version.'
+time: 2026-06-03T11:36:13.822367+02:00

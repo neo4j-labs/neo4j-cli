@@ -291,6 +291,30 @@ func TestParseVersion(t *testing.T) {
 	}
 }
 
+func TestSanitizeVersion(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain semver", "1.2.3", "1.2.3"},
+		{"prerelease", "1.0.0-rc.1", "1.0.0-rc.1"},
+		{"build metadata", "1.0.0+abc", "1.0.0+abc"},
+		{"empty", "", ""},
+		{"esc sequence rejected", "1.0.0\x1b[31mFAKE", ""},
+		{"newline rejected", "1.0.0\n", ""},
+		{"tab rejected", "1.0.0\t", ""},
+		{"del rejected", "1.0.0\x7f", ""},
+		{"null rejected", "1.0.0\x00", ""},
+		{"unicode preserved", "1.0.0-å", "1.0.0-å"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, sanitizeVersion(tc.in))
+		})
+	}
+}
+
 func TestInjectVersion(t *testing.T) {
 	tests := []struct {
 		name    string
