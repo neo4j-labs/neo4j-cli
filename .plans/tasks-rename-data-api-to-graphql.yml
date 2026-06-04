@@ -111,7 +111,7 @@ tasks:
       case-insensitive collision avoidance. Create a colocated
       `name_helpers_test.go` with table-driven unit tests covering: empty list returns
       `GraphQL01`; collision skipping; zero-padding boundary at 99→100.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "name_helpers.go exists with defaultGraphQLName(existingNames []string) string"
@@ -119,7 +119,7 @@ tasks:
       - "Skips taken names case-insensitively and returns next available"
       - "Zero-pads 1–99, uses full decimal for 100+"
       - "name_helpers_test.go table-driven tests cover empty list, collision, and padding boundary"
-    completed_at: null
+    completed_at: "2026-06-04T12:30:00Z"
 
   - id: task-007
     title: "Make --name optional on graphql create with auto-name resolution"

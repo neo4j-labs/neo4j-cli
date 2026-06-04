@@ -1,3 +1,7 @@
+## TASK-006 — 2026-06-04T12:30:00Z
+Added defaultGraphQLName helper and table-driven unit tests mirroring the instance equivalent. All 11 test cases pass; make test and make fmt-check both exit 0.
+Files: +graphql/name_helpers.go, +graphql/name_helpers_test.go
+
 ## TASK-001 through TASK-005 — 2026-06-04T12:00:00Z
 Completed all 5 tasks atomically: moved dataapi/graphql/ to graphql/, merged data_api.go flags into graphql.go, removed dataapi/ entirely, updated aura.go, fixed all Example/test command strings from "aura data-api graphql" to "aura graphql", regenerated skill bundle, and added changelog entry. All quality gates pass.
 Files: +neo4j-cli/aura/internal/subcommands/graphql/ (33 files), ~neo4j-cli/aura/aura.go, ~neo4j-cli/aura/internal/subcommands/graphql/graphql.go, ~neo4j-cli/internal/skill/bundle/references/aura.md, +.changes/unreleased/neo4j-cli-Minor-20260604-120000.yaml, -.plans/...(33 deleted dataapi files)
