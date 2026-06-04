@@ -1,0 +1,154 @@
+feature: cli-127-uniform-output-casing
+prd: ./prd-cli-127-uniform-output-casing.md
+created_at: 2026-06-04T12:00:00Z
+updated_at: 2026-06-04T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add input kebab-case gate test (cobra tree-walk)'
+    description: |
+      Add a hermetic gate test that walks the live cobra tree from app.NewCmd(cfg)
+      and asserts every command Use name, command alias, and flag long name is
+      kebab-case (^[a-z][a-z0-9]*(-[a-z0-9]+)*$). Single-character flag shorthands
+      are exempt from the multi-segment shape. Model it on the existing tree-walk
+      TestAllLeafCommands_HaveExamples in
+      neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go. The current
+      tree already complies, so this passes immediately and guards future additions.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Test walks the full app.NewCmd(cfg) tree (recursing into subcommands)"
+      - "Asserts kebab-case for command names, aliases, and flag long names; exempts single-char shorthands"
+      - "Failure message names the offending command path / identifier"
+      - "Passes on the current tree; flagged failure when a temp --bad_flag or snake command name is introduced"
+      - "make test runs it; hermetic (no network, no real FS)"
+    completed_at: null
+
+  - id: task-002
+    title: 'Convert docker output fields to snake_case (bolt_port, http_port)'
+    description: |
+      In neo4j-cli/internal/subcommands/docker, rename rendered output fields
+      bolt-port -> bolt_port and http-port -> http_port across labels.go (Container
+      json tags), and the output map keys + fields []string slices in list.go,
+      get.go, and create.go. Keep the persisted Docker label constants
+      (LabelBoltPort = "org.neo4j.cli.bolt-port", LabelHTTPPort) unchanged and keep
+      the labels[LabelBoltPort] lookups intact. Update list_test.go and get_test.go
+      (map key assertions and the BOLT-PORT/HTTP-PORT table header expectations).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Container json tags use bolt_port/http_port; LabelBoltPort/LabelHTTPPort constants unchanged"
+      - "list/get/create output maps and fields slices use bolt_port/http_port"
+      - "docker list/get/create render bolt_port/http_port in JSON, TOON, and table"
+      - "Docker label lookups (labels[LabelBoltPort]) still resolve; container discovery unaffected"
+      - "Updated docker tests pass"
+    completed_at: null
+
+  - id: task-003
+    title: 'Convert credential output columns to snake_case (database_name, embed_credential, base_url)'
+    description: |
+      Rename the rendered output column keys in the Printable() projections in
+      common/clicfg/credentials/dbms.go (database-name -> database_name,
+      embed-credential -> embed_credential) and common/clicfg/credentials/embed.go
+      (base-url -> base_url), plus the matching dbmsCredentialFields /
+      embedCredentialFields slices in the credential dbms/embed list commands. Do
+      NOT change the --database-name / --embed-credential / --base-url CLI flags or
+      the aura.base-url config key, nor the credential-lookup keys in add/set_embed/
+      remove. Update dbms_test.go / embed_test.go and the list tests.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Printable() output keys are database_name, embed_credential, base_url"
+      - "dbmsCredentialFields and embedCredentialFields slices use snake_case"
+      - "--database-name/--embed-credential/--base-url flags and aura.base-url config key remain kebab"
+      - "credential dbms list and credential embed list render snake_case columns in all formats"
+      - "Updated credential tests pass"
+    completed_at: null
+
+  - id: task-004
+    title: 'Convert workspace list output fields to snake_case'
+    description: |
+      In neo4j-cli/aura/internal/subcommands/workspace/list.go rename the rendered
+      output fields organizationId/projectId/projectName to organization_id/
+      project_id/project_name in the workspaceEntry json tags and in the AsArray()
+      and MarshalJSON map keys. The struct is built in-code from local project
+      config (not parsed from a camelCase payload), so this is output-only. Update
+      the workspace list test.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "workspaceEntry json tags use organization_id/project_id/project_name"
+      - "AsArray() and MarshalJSON emit snake_case keys"
+      - "aura workspace list renders snake_case in JSON, TOON, and table"
+      - "Updated workspace list test passes"
+    completed_at: null
+
+  - id: task-005
+    title: 'Decouple desktop output from camelCase wire structs and convert to snake_case'
+    description: |
+      Render desktop output as snake_case (connection_uri, pending_restart,
+      file_path) without changing the desktopclient wire structs in
+      neo4j-cli/internal/desktopclient/types.go (which parse Neo4j Desktop's API and
+      serialize request bodies). Introduce snake output projections (maps or output
+      structs) in connection/{create,list,delete}.go, dbms/list.go, and
+      dbms/plugin/list.go, and update their …Fields slices. Verify request bodies
+      sent to Desktop still send connectionUri (camelCase). Update the desktop
+      connection/dbms/plugin tests (output assertions only).
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "desktopclient/types.go wire tags unchanged (still camelCase)"
+      - "Desktop connection/dbms/plugin output renders connection_uri/pending_restart/file_path"
+      - "Requests sent to Neo4j Desktop still contain connectionUri (camelCase)"
+      - "…Fields slices updated to snake_case"
+      - "Updated desktop tests pass (output snake, request-body camel)"
+    completed_at: null
+
+  - id: task-006
+    title: 'Add output snake_case AST gate test'
+    description: |
+      Add a hermetic go/parser + go/ast repo-walking gate test (e.g.
+      common/output/casing_gate_test.go) that extracts every string-literal element
+      of the fields argument to PrintBodyMap/PrintBodyMaps/PrintBody/PrintRawBody and
+      the json:"…" tags on the enumerated output structs (docker labels, dbms/embed
+      Printable, workspace list, desktop output projections, clierr render,
+      agentcontext build, query output, update), asserting each is snake_case
+      (^[a-z0-9]+(_[a-z0-9]+)*$). Allowlist the wire/parse files (aura api/response.go,
+      desktopclient/types.go, OAuth, update/release.go) and Docker label constants.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Gate extracts Print* fields-slice literals and enumerated output-struct json tags"
+      - "Asserts snake_case; rejects '-' and uppercase"
+      - "Allowlist covers wire/parse files and Docker label constants (no false positives)"
+      - "Passes on the converted tree; fails on a reintroduced kebab/camel output field"
+      - "Failure message names the file and offending token; runs under make test"
+    completed_at: null
+
+  - id: task-007
+    title: 'Document conventions, regenerate skill bundle, add changelog entry'
+    description: |
+      Add an Output/Input Casing section to AGENTS.md (output field names =
+      snake_case; commands/aliases/flags = kebab-case; exemptions: wire/parse structs,
+      config keys, Docker label constants, enum values) and note it in CONTRIBUTING.md.
+      Run go generate ./... so docker/credential field-name changes refresh the skill
+      bundle references and TestGenerator_RoundTrip stays green; update any README/
+      bundle examples showing the old field names. Add a single changie entry
+      (--projects neo4j-cli --kind Minor) describing the breaking output rename.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "AGENTS.md documents both conventions and the exemptions for future additions"
+      - "CONTRIBUTING.md lists the casing convention alongside other CLI conventions"
+      - "go generate ./... run; bundle regenerated; make generate-check and TestGenerator_RoundTrip pass"
+      - "Any README/bundle examples with old field names updated"
+      - "Single changie entry exists (kind Minor, projects neo4j-cli) describing the breaking rename"
+    completed_at: null
