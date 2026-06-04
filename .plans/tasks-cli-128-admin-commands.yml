@@ -204,7 +204,7 @@ tasks:
       'changie new --projects neo4j-cli --kind Minor --body "..."'. Run make test,
       make fmt-check, and make lint as final gates — all must be clean before this
       task is marked complete.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-007
@@ -217,4 +217,4 @@ tasks:
       - "make test passes with zero failures"
       - "make fmt-check passes (no files need gofmt)"
       - "make lint passes clean"
-    completed_at: null
+    completed_at: "2026-06-04T17:10:00Z"
