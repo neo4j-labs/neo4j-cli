@@ -19,26 +19,13 @@ import (
 // resolveDatasetFn / downloadDatasetFn are the injectable seams the load leaf
 // uses to talk to the internal/dataset support layer (manifest resolution +
 // secure LFS download). Production wires dataset.Resolve / dataset.Download;
-// load_test.go swaps deterministic fakes so the leaf's orchestration can be
-// exercised without touching the network. Mirrors the docker load leaf seam.
+// the in-package load_test.go swaps deterministic fakes so the leaf's
+// orchestration can be exercised without touching the network. Mirrors the
+// docker load leaf seam.
 var (
 	resolveDatasetFn  = dataset.Resolve
 	downloadDatasetFn = dataset.Download
 )
-
-// SetResolveDatasetFnForTest / SetDownloadDatasetFnForTest swap the dataset
-// support seams so tests drive the load orchestration without the network.
-func SetResolveDatasetFnForTest(fn func(context.Context, string, string) (dataset.Spec, error)) func() {
-	prev := resolveDatasetFn
-	resolveDatasetFn = fn
-	return func() { resolveDatasetFn = prev }
-}
-
-func SetDownloadDatasetFnForTest(fn func(context.Context, dataset.Spec, int64) (string, func(), error)) func() {
-	prev := downloadDatasetFn
-	downloadDatasetFn = fn
-	return func() { downloadDatasetFn = prev }
-}
 
 var dbmsLoadFields = []string{"id", "name", "version", "status", "connectionUri"}
 

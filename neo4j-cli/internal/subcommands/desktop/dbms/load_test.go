@@ -77,13 +77,16 @@ func (h *loadHelper) withHandler(handler http.HandlerFunc) *httptest.Server {
 func (h *loadHelper) stubDataset(spec dataset.Spec) *[]string {
 	h.t.Helper()
 	var resolveCalls []string
-	h.t.Cleanup(dbms.SetResolveDatasetFnForTest(func(_ context.Context, ownerRepo, version string) (dataset.Spec, error) {
-		resolveCalls = append(resolveCalls, ownerRepo+"@"+version)
-		return spec, nil
-	}))
-	h.t.Cleanup(dbms.SetDownloadDatasetFnForTest(func(_ context.Context, _ dataset.Spec, _ int64) (string, func(), error) {
-		return "/tmp/fake-dump/neo4j.dump", func() {}, nil
-	}))
+	dbms.StubDatasetSeams(
+		h.t,
+		func(_ context.Context, ownerRepo, version string) (dataset.Spec, error) {
+			resolveCalls = append(resolveCalls, ownerRepo+"@"+version)
+			return spec, nil
+		},
+		func(_ context.Context, _ dataset.Spec, _ int64) (string, func(), error) {
+			return "/tmp/fake-dump/neo4j.dump", func() {}, nil
+		},
+	)
 	return &resolveCalls
 }
 

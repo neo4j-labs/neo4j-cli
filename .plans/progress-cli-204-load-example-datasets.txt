@@ -54,3 +54,8 @@ NOTE: golang-security review portion of this task's acceptance is deferred to th
 
 ## REVIEW — 2026-06-04T19:19:16Z
 Added 2 review tasks (task-011..task-012).
+
+## TASK-011 — 2026-06-04T23:10:00Z
+Removed exported test-only setters SetResolveDatasetFnForTest/SetDownloadDatasetFnForTest from dbms/load.go (they leaked into the shipped package surface, diverging from docker/instance sibling load leaves + AGENTS.md local-seam idiom). Added in-package dbms/load_seam_test.go (package dbms) with StubDatasetSeams(t, resolve, download) that swaps the unexported resolveDatasetFn/downloadDatasetFn vars directly and restores via t.Cleanup. Because StubDatasetSeams lives in a _test.go it is NOT in the shipped package surface but IS visible to the external dbms_test load_test.go (same dir, same test binary) — so the external HTTP-fixture assertions stay intact: loadHelper.stubDataset now calls dbms.StubDatasetSeams instead of the deleted setters. All other external test coverage unchanged.
+Files: M dbms/load.go, +dbms/load_seam_test.go, M dbms/load_test.go.
+Gates: desktop dbms pkg tests green (149 passed); make test (no fail/panic), make fmt-check (ok), make lint (0 issues). No cobra-tree change → no skill regen needed.

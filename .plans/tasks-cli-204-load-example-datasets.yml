@@ -230,14 +230,14 @@ tasks:
       exported `Set...ForTest` functions. Go allows `dbms` and `dbms_test` test files to
       coexist in the same directory, so the rest of the external test file can stay as-is
       if convenient. Keep all existing test coverage green.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "SetResolveDatasetFnForTest and SetDownloadDatasetFnForTest no longer exist in the dbms package"
       - "The desktop load tests swap the unexported resolveDatasetFn/downloadDatasetFn vars from an in-package (package dbms) test, restoring via t.Cleanup"
       - "Existing desktop load test coverage is preserved and passes; make test, make fmt-check, make lint clean"
-    completed_at: null
+    completed_at: 2026-06-04T23:10:00Z
 
   - id: task-012
     title: 'Scope docker loader bind-mount to a dedicated temp subdir'
