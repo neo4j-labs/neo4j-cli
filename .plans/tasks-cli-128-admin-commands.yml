@@ -18,7 +18,7 @@ tasks:
       -> "renaming users is not supported on Aura connections". Study
       neo4j-cli/query/run.go and neo4j-cli/query/connect.go for the Bolt connection
       pattern to reuse.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "runAdminStatement executes Cypher via ExecuteWrite targeting the system database"
@@ -27,7 +27,7 @@ tasks:
       - "Errors matching 'SET STATUS is not available in community edition' are translated to a clear Community-limitation message"
       - "RENAME USER ArgumentError matching 'non-native' auth text is translated to 'renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)'"
       - "All error-translation paths are covered by unit tests using a fakeQueryRunner"
-    completed_at: null
+    completed_at: "2026-06-04T08:30:00Z"
 
   - id: task-002
     title: "admin.go parent command + wire into neo4j-cli app tree"
