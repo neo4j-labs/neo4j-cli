@@ -32,9 +32,9 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&credential, "credential", "", "Name of the stored dbms credential to use (see `neo4j-cli credential dbms list`)")
 
-	cmd.AddCommand(database.NewCmd(cfg, &credential))
-	cmd.AddCommand(user.NewCmd(cfg, &credential))
-	cmd.AddCommand(role.NewCmd(cfg, &credential))
+	cmd.AddCommand(database.NewCmd(cfg, &credential, RunAdminStatement))
+	cmd.AddCommand(user.NewCmd(cfg, &credential, RunAdminStatement))
+	cmd.AddCommand(role.NewCmd(cfg, &credential, RunAdminStatement))
 
 	return cmd
 }

@@ -9,7 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+// NewCmd returns the `admin role` parent cobra command. execFn is the Cypher
+// execution function injected by the parent (admin.RunAdminStatement in
+// production); passing it here avoids an import cycle between the role and
+// admin packages.
+func NewCmd(cfg *clicfg.Config, credential *string, execFn ExecFnType) *cobra.Command {
+	roleExecFn = execFn
+
 	cmd := &cobra.Command{
 		Use:   "role",
 		Short: "Manage Neo4j roles via the system database",
@@ -23,8 +29,8 @@ neo4j-cli admin role --help
 neo4j-cli admin role list --credential local --format json`,
 	}
 
-	_ = cfg
-	_ = credential
+	cmd.AddCommand(newListCmd(cfg, credential))
+	cmd.AddCommand(newGetCmd(cfg, credential))
 
 	return cmd
 }

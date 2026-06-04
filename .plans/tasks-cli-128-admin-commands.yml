@@ -56,7 +56,7 @@ tasks:
       --rw. Column selection for list: name, type, status (currentStatus), access,
       default. Include >=2 flush-left Example invocations per leaf. Write colocated
       tests using fakeQueryRunner covering happy path and error cases.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -66,7 +66,7 @@ tasks:
       - "Neither command requires --rw"
       - "Both have >=2 flush-left Example invocations including at least one --format json"
       - "Unit tests pass with fakeQueryRunner; go test ./... clean"
-    completed_at: null
+    completed_at: "2026-06-04T09:45:00Z"
 
   - id: task-004
     title: "database subtree: create, drop, start, stop with --wait and --yes"
@@ -100,7 +100,7 @@ tasks:
       (wrapping golang.org/x/term) and the promptPassword(cmd) helper function,
       copied from neo4j-cli/query/run.go. list and get do not require --rw.
       Write colocated tests.
-    status: pending
+    status: in_progress
     dependencies:
       - task-002
     acceptance_criteria:
@@ -162,7 +162,7 @@ tasks:
       (SHOW ROLE <name> PRIVILEGES). Both support --format json|table|toon and do
       not require --rw. Write colocated tests; include >=2 flush-left Example
       invocations per leaf.
-    status: pending
+    status: in_progress
     dependencies:
       - task-002
     acceptance_criteria:
