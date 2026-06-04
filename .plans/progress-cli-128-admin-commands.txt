@@ -1,3 +1,8 @@
+## task-002 — 2026-06-04T09:00:00Z
+Created admin.go parent command (NewCmd with persistent --credential flag, AddCommand for database/user/role); stub parents database/database.go, user/user.go, role/role.go; wired admin.NewCmd into neo4j-cli/app/app.go; regenerated skill bundle (go generate ./neo4j-cli/internal/skill/...).
+Files: +neo4j-cli/internal/subcommands/admin/admin.go, +neo4j-cli/internal/subcommands/admin/database/database.go, +neo4j-cli/internal/subcommands/admin/user/user.go, +neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/app/app.go, ~neo4j-cli/internal/skill/bundle/SKILL.md, ~neo4j-cli/internal/skill/bundle/references/admin.md
+Decisions: Stub packages use _ = cfg / _ = credential blank identifiers so imports compile cleanly; leaf commands (task-003+) will replace these with real usage.
+
 ## task-001 — 2026-06-04T08:30:00Z
 Created neo4j-cli/internal/subcommands/admin/run.go with the queryRunner interface (test seam via adminRunnerFn), boltAdminRunner (ExecuteWrite targeting system database), and runAdminStatement(ctx, cfg, cred, cypher, params) with all four error-translation paths; run_test.go covers all paths using fakeQueryRunner.
 Files: +neo4j-cli/internal/subcommands/admin/run.go, +neo4j-cli/internal/subcommands/admin/run_test.go
