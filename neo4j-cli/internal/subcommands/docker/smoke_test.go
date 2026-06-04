@@ -100,7 +100,7 @@ func TestSmoke_Lifecycle(t *testing.T) {
 	}
 	require.NotNil(t, listRow, "list output did not include container %q; stdout=%s", name, listStdout)
 	assert.Equal(t, "enterprise", asString(listRow["edition"]), "list edition mismatch")
-	assert.Equal(t, strconv.Itoa(boltPort), asString(listRow["bolt-port"]), "list bolt-port mismatch")
+	assert.Equal(t, strconv.Itoa(boltPort), asString(listRow["bolt_port"]), "list bolt-port mismatch")
 
 	// Phase 3 — get. singleRow.MarshalJSON wraps the row in a one-element
 	// JSON array, so we parse as []map[string]any and pull row[0].
@@ -122,15 +122,15 @@ func TestSmoke_Lifecycle(t *testing.T) {
 
 	// All 9 documented fields are present; status is Docker's
 	// "Up X seconds" or similar (non-empty); ephemeral is bool false.
-	for _, field := range []string{"name", "status", "edition", "version", "bolt-port", "http-port", "ephemeral", "uri", "image"} {
+	for _, field := range []string{"name", "status", "edition", "version", "bolt_port", "http_port", "ephemeral", "uri", "image"} {
 		_, ok := getRow[field]
 		assert.True(t, ok, "get row missing field %q; row=%v", field, getRow)
 	}
 	assert.NotEmpty(t, asString(getRow["status"]), "get status must be non-empty (Docker emits 'Up X seconds')")
 	assert.Equal(t, false, getRow["ephemeral"], "ephemeral must be bool false for non-ephemeral container")
 	assert.Equal(t, "enterprise", asString(getRow["edition"]), "get edition mismatch")
-	assert.Equal(t, strconv.Itoa(boltPort), asString(getRow["bolt-port"]), "get bolt-port mismatch")
-	assert.Equal(t, strconv.Itoa(httpPort), asString(getRow["http-port"]), "get http-port mismatch")
+	assert.Equal(t, strconv.Itoa(boltPort), asString(getRow["bolt_port"]), "get bolt-port mismatch")
+	assert.Equal(t, strconv.Itoa(httpPort), asString(getRow["http_port"]), "get http-port mismatch")
 
 	// Phase 4 — delete. --yes --force are required in non-TTY (CI) contexts;
 	// --rw passes the write gate. Then verify with a direct
@@ -245,9 +245,9 @@ func TestSmoke_PortFallback(t *testing.T) {
 	require.Len(t, getRows, 1, "get must emit exactly one row; got %s", getStdout)
 	row := getRows[0]
 
-	resolvedBolt, err := strconv.Atoi(asString(row["bolt-port"]))
+	resolvedBolt, err := strconv.Atoi(asString(row["bolt_port"]))
 	require.NoError(t, err, "B bolt-port not parseable; row=%v", row)
-	resolvedHTTP, err := strconv.Atoi(asString(row["http-port"]))
+	resolvedHTTP, err := strconv.Atoi(asString(row["http_port"]))
 	require.NoError(t, err, "B http-port not parseable; row=%v", row)
 
 	boltOffset := resolvedBolt - boltPort

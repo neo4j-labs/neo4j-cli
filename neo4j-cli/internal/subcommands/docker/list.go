@@ -62,13 +62,13 @@ neo4j-cli docker list --format toon`,
 					"status":    entry.Status,
 					"edition":   labels[LabelEdition],
 					"version":   labels[LabelVersion],
-					"bolt-port": labels[LabelBoltPort],
-					"http-port": labels[LabelHTTPPort],
+					"bolt_port": labels[LabelBoltPort],
+					"http_port": labels[LabelHTTPPort],
 					"ephemeral": labels[LabelEphemeral] == "true",
 				})
 			}
 
-			fields := []string{"name", "status", "edition", "version", "bolt-port", "http-port", "ephemeral"}
+			fields := []string{"name", "status", "edition", "version", "bolt_port", "http_port", "ephemeral"}
 			commonoutput.PrintBodyMap(cmd, cfg, listRows(rows), fields)
 			return nil
 		},

@@ -100,7 +100,7 @@ func TestList_EmptyResult_FormatTable_RendersHeaderOnly(t *testing.T) {
 	_, stdout, err := runList(t, "--format table", nil)
 	require.NoError(t, err)
 	upper := strings.ToUpper(stdout)
-	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT-PORT", "HTTP-PORT", "EPHEMERAL"} {
+	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT_PORT", "HTTP_PORT", "EPHEMERAL"} {
 		assert.Contains(t, upper, col, "table header missing column %q", col)
 	}
 }
@@ -129,8 +129,8 @@ func TestList_OneManagedRunning_RendersAllSevenFields(t *testing.T) {
 	assert.Equal(t, "Up 5 minutes", row["status"])
 	assert.Equal(t, "enterprise", row["edition"])
 	assert.Equal(t, "latest", row["version"])
-	assert.Equal(t, "7687", row["bolt-port"])
-	assert.Equal(t, "7474", row["http-port"])
+	assert.Equal(t, "7687", row["bolt_port"])
+	assert.Equal(t, "7474", row["http_port"])
 	assert.Equal(t, false, row["ephemeral"], "ephemeral=false label must render as JSON bool false")
 }
 
@@ -242,7 +242,7 @@ func TestList_FormatTable_RendersAllSevenColumnsAndRow(t *testing.T) {
 	// go-pretty/v6 uppercases header text — assert headers against the
 	// uppercased copy of stdout.
 	upper := strings.ToUpper(stdout)
-	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT-PORT", "HTTP-PORT", "EPHEMERAL"} {
+	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT_PORT", "HTTP_PORT", "EPHEMERAL"} {
 		assert.Contains(t, upper, col, "table missing column %q in output:\n%s", col, stdout)
 	}
 	// Row values render as-is (lower-case where appropriate).

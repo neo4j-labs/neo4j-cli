@@ -2,3 +2,8 @@
 Added hermetic kebab-case input gate test walking live app.NewCmd(cfg) tree; asserts kebab-case command names/aliases/flag-long-names. Exempts single-char shorthands, help/completion, and the `:schema`/`:embed` REPL colon prefix.
 Files: +neo4j-cli/internal/subcommands/agentcontext/casing_input_gate_test.go
 Decisions: leading `:` stripped before regex (intentional REPL meta-command convention); verified gate fails on injected --bad_flag.
+
+## TASK-002 — 2026-06-04T00:00:00Z
+Converted docker rendered output fields bolt-port/http-port -> bolt_port/http_port: Container json tags, list/get/create output maps + fields slices, plus test assertions and table headers (BOLT_PORT/HTTP_PORT). Label constants (org.neo4j.cli.bolt-port) and --bolt-port/--http-port flags left kebab.
+Files: ~neo4j-cli/internal/subcommands/docker/{labels,list,get,create}.go, ~{list,get,create,smoke}_test.go
+Decisions: go-pretty uppercases header keys verbatim, so snake key -> BOLT_PORT header. No bundle drift (only flag/prose mentions in bundle, not output keys).

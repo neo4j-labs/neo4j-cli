@@ -341,15 +341,15 @@ func TestCreate_FormatJson_RendersDocumentedFields(t *testing.T) {
 	require.Len(t, rows, 1)
 	row := rows[0]
 
-	for _, key := range []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username", "password"} {
+	for _, key := range []string{"name", "edition", "version", "bolt_port", "http_port", "uri", "username", "password"} {
 		_, ok := row[key]
 		assert.True(t, ok, "JSON output missing field %q (full row: %v)", key, row)
 	}
 	assert.Equal(t, "dev", row["name"])
 	assert.Equal(t, "enterprise", row["edition"])
 	assert.Equal(t, "latest", row["version"])
-	assert.EqualValues(t, 7688, row["bolt-port"])
-	assert.EqualValues(t, 7475, row["http-port"])
+	assert.EqualValues(t, 7688, row["bolt_port"])
+	assert.EqualValues(t, 7475, row["http_port"])
 	assert.Equal(t, "neo4j://localhost:7688", row["uri"])
 	assert.Equal(t, "neo4j", row["username"])
 }
@@ -503,8 +503,8 @@ func TestCreate_AutoPortFallback_DefaultsTaken(t *testing.T) {
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
 	require.Len(t, rows, 1)
-	assert.EqualValues(t, 7688, rows[0]["bolt-port"])
-	assert.EqualValues(t, 7475, rows[0]["http-port"])
+	assert.EqualValues(t, 7688, rows[0]["bolt_port"])
+	assert.EqualValues(t, 7475, rows[0]["http_port"])
 	assert.Equal(t, "neo4j://localhost:7688", rows[0]["uri"])
 }
 
@@ -526,8 +526,8 @@ func TestCreate_AutoPortFallback_PreservesOffset(t *testing.T) {
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &rows))
 	require.Len(t, rows, 1)
-	assert.EqualValues(t, 8001, rows[0]["bolt-port"])
-	assert.EqualValues(t, 9001, rows[0]["http-port"])
+	assert.EqualValues(t, 8001, rows[0]["bolt_port"])
+	assert.EqualValues(t, 9001, rows[0]["http_port"])
 }
 
 // TestCreate_AutoPortFallback_Exhausted — REQ-F-005..007. The loop caps at

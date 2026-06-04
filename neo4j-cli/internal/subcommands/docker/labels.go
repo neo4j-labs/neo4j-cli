@@ -32,8 +32,8 @@ type Container struct {
 	Status    string `json:"status"`
 	Edition   string `json:"edition"`
 	Version   string `json:"version"`
-	BoltPort  string `json:"bolt-port"`
-	HTTPPort  string `json:"http-port"`
+	BoltPort  string `json:"bolt_port"`
+	HTTPPort  string `json:"http_port"`
 	Ephemeral bool   `json:"ephemeral"`
 	URI       string `json:"uri,omitempty"`
 	Image     string `json:"image,omitempty"`

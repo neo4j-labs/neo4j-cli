@@ -78,13 +78,13 @@ neo4j-cli docker get dev --format toon`,
 				"status":    container.Status,
 				"edition":   container.Edition,
 				"version":   container.Version,
-				"bolt-port": container.BoltPort,
-				"http-port": container.HTTPPort,
+				"bolt_port": container.BoltPort,
+				"http_port": container.HTTPPort,
 				"ephemeral": container.Ephemeral,
 				"uri":       uri,
 				"image":     container.Image,
 			}
-			fields := []string{"name", "status", "edition", "version", "bolt-port", "http-port", "ephemeral", "uri", "image"}
+			fields := []string{"name", "status", "edition", "version", "bolt_port", "http_port", "ephemeral", "uri", "image"}
 			commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 			return nil
 		},

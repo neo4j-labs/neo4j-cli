@@ -34,7 +34,7 @@ tasks:
       (LabelBoltPort = "org.neo4j.cli.bolt-port", LabelHTTPPort) unchanged and keep
       the labels[LabelBoltPort] lookups intact. Update list_test.go and get_test.go
       (map key assertions and the BOLT-PORT/HTTP-PORT table header expectations).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Container json tags use bolt_port/http_port; LabelBoltPort/LabelHTTPPort constants unchanged"
@@ -42,7 +42,7 @@ tasks:
       - "docker list/get/create render bolt_port/http_port in JSON, TOON, and table"
       - "Docker label lookups (labels[LabelBoltPort]) still resolve; container discovery unaffected"
       - "Updated docker tests pass"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-003
     title: 'Convert credential output columns to snake_case (database_name, embed_credential, base_url)'
