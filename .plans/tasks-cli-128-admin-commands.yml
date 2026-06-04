@@ -1,0 +1,220 @@
+feature: cli-128-admin-commands
+prd: ./prd-cli-128-admin-commands.md
+created_at: "2026-06-04T08:15:00Z"
+updated_at: "2026-06-04T08:15:00Z"
+
+tasks:
+  - id: task-001
+    title: "Execution helper: queryRunner interface, runAdminStatement, error translation"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/run.go with the queryRunner
+      interface (test seam), a default Bolt-backed implementation, and
+      runAdminStatement(ctx, cred, cypher, params). The helper resolves the dbms
+      credential, opens an ExecuteWrite session targeting the system database, and
+      translates errors: UnsupportedAdministrationCommand -> "(requires Enterprise
+      edition)" hint or "(not supported on Aura)" hint when the message contains the
+      Aura KB URL; Community SET STATUS / HOME DATABASE errors -> clear
+      Community-limitation message; RENAME USER ArgumentError about non-native auth
+      -> "renaming users is not supported on Aura connections". Study
+      neo4j-cli/query/run.go and neo4j-cli/query/connect.go for the Bolt connection
+      pattern to reuse.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "runAdminStatement executes Cypher via ExecuteWrite targeting the system database"
+      - "UnsupportedAdministrationCommand without Aura URL appends '(requires Enterprise edition)'"
+      - "UnsupportedAdministrationCommand containing the Aura KB URL appends '(not supported on Aura — use the Aura Console or API)'"
+      - "Errors matching 'SET STATUS is not available in community edition' are translated to a clear Community-limitation message"
+      - "RENAME USER ArgumentError matching 'non-native' auth text is translated to 'renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)'"
+      - "All error-translation paths are covered by unit tests using a fakeQueryRunner"
+    completed_at: null
+
+  - id: task-002
+    title: "admin.go parent command + wire into neo4j-cli app tree"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/admin.go with NewCmd that
+      registers a persistent --credential flag and adds the database, user, and role
+      subcommand parents (stubs at this stage). Mount admin.NewCmd into
+      neo4j-cli/app/app.go so it appears as 'neo4j-cli admin'. Add the Neo4j
+      copyright header to all new .go files. Run go build to confirm the tree compiles.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "'neo4j-cli admin --help' shows database, user, and role subcommands"
+      - "--credential flag is persistent and inherited by all admin subcommands"
+      - "go build ./... produces no errors"
+      - "All new .go files carry the Neo4j copyright header"
+    completed_at: null
+
+  - id: task-003
+    title: "database subtree: list and get (read-only)"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/database/database.go (parent),
+      list.go (SHOW DATABASES), and get.go (SHOW DATABASE <name>). Both commands
+      support --format json|table|toon via RegisterOutputFlag and do not require
+      --rw. Column selection for list: name, type, status (currentStatus), access,
+      default. Include >=2 flush-left Example invocations per leaf. Write colocated
+      tests using fakeQueryRunner covering happy path and error cases.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "'neo4j-cli admin database list' executes SHOW DATABASES and renders name/type/currentStatus/access/default columns"
+      - "'neo4j-cli admin database get <name>' executes SHOW DATABASE <name> and renders the full record"
+      - "Both commands accept --format json|table|toon"
+      - "Neither command requires --rw"
+      - "Both have >=2 flush-left Example invocations including at least one --format json"
+      - "Unit tests pass with fakeQueryRunner; go test ./... clean"
+    completed_at: null
+
+  - id: task-004
+    title: "database subtree: create, drop, start, stop with --wait and --yes"
+    description: |
+      Create create.go, drop.go, start.go, and stop.go under the database subtree.
+      All require --rw. drop requires --yes confirmation (y/N prompt or error if
+      non-TTY without --yes, same pattern as docker delete). create and start accept
+      --wait and poll SHOW DATABASE <name> YIELD currentStatus at 1-second intervals
+      (60s timeout) until currentStatus="online"; stop --wait polls until
+      currentStatus="offline". Emit progress messages to stderr during polling
+      (follow docker create --wait style). Write colocated tests.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "'database create <name> --rw' executes 'CREATE DATABASE <name> IF NOT EXISTS'"
+      - "'database create <name> --wait --rw' blocks and polls until currentStatus=online, emitting progress to stderr"
+      - "'database stop <name> --wait --rw' polls until currentStatus=offline"
+      - "'database drop <name> --rw --yes' executes DROP DATABASE without prompting; without --yes prompts interactively or errors on non-TTY"
+      - "All four commands require --rw; omitting it produces a usage error"
+      - "All four have >=2 flush-left Example invocations including --rw"
+      - "Unit tests cover happy path, --wait timeout, and --yes/non-TTY error paths"
+    completed_at: null
+
+  - id: task-005
+    title: "user subtree: list, get, and shared password-prompt helpers"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/user/user.go (parent), list.go
+      (SHOW USERS), and get.go (SHOW USERS WHERE user = $name). Also create
+      helpers.go with the passwordReader and stdinIsTTY package-level test seams
+      (wrapping golang.org/x/term) and the promptPassword(cmd) helper function,
+      copied from neo4j-cli/query/run.go. list and get do not require --rw.
+      Write colocated tests.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "'user list' executes SHOW USERS and renders user/roles/passwordChangeRequired/suspended columns"
+      - "'user get <name>' executes 'SHOW USERS WHERE user = $name'"
+      - "Both support --format json|table|toon and do not require --rw"
+      - "passwordReader and stdinIsTTY are package-level vars that tests can override"
+      - "promptPassword returns a UsageError on non-TTY when --password is absent"
+      - "Unit tests pass; go test ./... clean"
+    completed_at: null
+
+  - id: task-006
+    title: "user subtree: create, drop, rename"
+    description: |
+      Create create.go, drop.go, and rename.go under the user subtree. create
+      accepts --password (prompts via promptPassword if absent), --password-change-required
+      (default true), and --home-database (optional). drop requires --rw and --yes.
+      rename accepts two positional args (old-name new-name), requires --rw, and
+      the runAdminStatement error translation for the Aura ArgumentError is exercised
+      here. All three require --rw. Write colocated tests covering happy paths,
+      Community errors, and Aura RENAME USER error translation.
+    status: pending
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "'user create <name> --rw' prompts for password when --password is absent and stdin is a TTY"
+      - "'user create <name> --rw' returns a UsageError when --password is absent and stdin is not a TTY"
+      - "'user create <name> --home-database <db> --rw' includes SET HOME DATABASE in the Cypher"
+      - "'user drop <name> --rw --yes' drops without prompting; without --yes prompts or errors on non-TTY"
+      - "'user rename <old> <new> --rw' executes RENAME USER"
+      - "'user rename' on an Aura credential returns the translated ArgumentError message"
+      - "All three have >=2 flush-left Example invocations with --rw"
+    completed_at: null
+
+  - id: task-007
+    title: "user subtree: set-password, suspend, activate"
+    description: |
+      Create set_password.go, suspend.go, and activate.go under the user subtree.
+      set-password accepts --password (prompts if absent) and --password-change-required
+      (default false). suspend and activate are Enterprise-only (Community returns a
+      translated error via runAdminStatement). All three require --rw. Write colocated
+      tests covering Community-edition error translation and happy paths.
+    status: pending
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "'user set-password <name> --rw' prompts for password when --password is absent on a TTY"
+      - "'user suspend <name> --rw' on Community returns a clear Community-limitation error message"
+      - "'user activate <name> --rw' on Community returns a clear Community-limitation error message"
+      - "All three have >=2 flush-left Example invocations with --rw"
+      - "Unit tests pass for all three leaves"
+    completed_at: null
+
+  - id: task-008
+    title: "role subtree: list and get (read-only)"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/role/role.go (parent), list.go
+      (SHOW ROLES WITH USERS with optional --role and --user filters), and get.go
+      (SHOW ROLE <name> PRIVILEGES). Both support --format json|table|toon and do
+      not require --rw. Write colocated tests; include >=2 flush-left Example
+      invocations per leaf.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "'role list' executes SHOW ROLES WITH USERS and renders role/member columns"
+      - "'role list --role <name>' filters output to the specified role"
+      - "'role list --user <name>' filters output to the specified user"
+      - "'role get <role-name>' executes SHOW ROLE <name> PRIVILEGES"
+      - "Both support --format json|table|toon and do not require --rw"
+      - "Both have >=2 flush-left Example invocations including at least one --format json"
+    completed_at: null
+
+  - id: task-009
+    title: "role subtree: create, drop, grant, revoke"
+    description: |
+      Create create.go, drop.go, grant.go, and revoke.go under the role subtree.
+      All require --rw. drop requires --yes. grant and revoke accept --role and
+      --user flags (both required). All four are Enterprise-only (Community returns
+      UnsupportedAdministrationCommand translated with Enterprise hint). Write
+      colocated tests covering happy paths and Community-edition errors.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "'role create <name> --rw' executes CREATE ROLE <name>"
+      - "'role drop <name> --rw --yes' executes DROP ROLE without prompting"
+      - "'role grant --role <r> --user <u> --rw' executes GRANT ROLE <r> TO <u>"
+      - "'role revoke --role <r> --user <u> --rw' executes REVOKE ROLE <r> FROM <u>"
+      - "All four on Community return a translated '(requires Enterprise edition)' error"
+      - "All four have >=2 flush-left Example invocations with --rw"
+      - "Unit tests pass for all four leaves"
+    completed_at: null
+
+  - id: task-010
+    title: "Final gates: skill bundle regeneration, TestAllLeafCommands_HaveExamples, changelog"
+    description: |
+      Run 'go generate ./neo4j-cli/internal/skill/...' to regenerate the skill bundle
+      after the full admin command tree is wired. Verify TestGenerator_RoundTrip and
+      TestAllLeafCommands_HaveExamples both pass. Add a changie changelog entry via
+      'changie new --projects neo4j-cli --kind Minor --body "..."'. Run make test,
+      make fmt-check, and make lint as final gates — all must be clean before this
+      task is marked complete.
+    status: pending
+    dependencies:
+      - task-004
+      - task-007
+      - task-009
+    acceptance_criteria:
+      - "'go generate ./neo4j-cli/internal/skill/...' produces no git diff in bundle/ files"
+      - "TestGenerator_RoundTrip passes"
+      - "TestAllLeafCommands_HaveExamples passes (all admin leaves have non-empty flush-left Example fields)"
+      - "A .changes/unreleased/ entry exists for this feature"
+      - "make test passes with zero failures"
+      - "make fmt-check passes (no files need gofmt)"
+      - "make lint passes clean"
+    completed_at: null
