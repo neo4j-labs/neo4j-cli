@@ -27,24 +27,28 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 		expectedError   string
 	}{
 		"missing any type defs flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --rw", instanceId, name),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --rw", instanceId, name),
 			expectedError:   "Error: at least one of the flags in the group [type-definitions type-definitions-file] is required",
 		},
 		"only one type defs flag can be provided": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --type-definitions-file %s --rw", instanceId, name, typeDefs, typeDefsFile),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --type-definitions %s --type-definitions-file %s --rw", instanceId, name, typeDefs, typeDefsFile),
 			expectedError:   "Error: if any flags in the group [type-definitions type-definitions-file] are set none of the others can be; [type-definitions type-definitions-file] were all set",
 		},
 		"invalid base64 for type defs": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --rw", instanceId, name, invalidBase64TypeDefs),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --type-definitions %s --rw", instanceId, name, invalidBase64TypeDefs),
 			expectedError:   "Error: provided type definitions are not valid base64",
 		},
 		"invalid type defs file": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions-file %s --rw", instanceId, name, invalidTypeDefsFile),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --type-definitions-file %s --rw", instanceId, name, invalidTypeDefsFile),
 			expectedError:   "Error: type definitions file '../invalid/typeDefs.graphql' does not exist",
 		},
 		"invalid service account value": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --service-account bad_value --rw", instanceId, name, typeDefs),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --type-definitions %s --service-account bad_value --rw", instanceId, name, typeDefs),
 			expectedError:   `Error: invalid value for --service-account: "bad_value", must be one of: read_only, read_write`,
+		},
+		"invalid memory value": {
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --memory 128MB --type-definitions %s --rw", instanceId, name, typeDefs),
+			expectedError:   `Error: invalid value for --memory: "128MB", must be one of: 256MB, 512MB, 1024MB, 2048MB, 4096MB`,
 		},
 	}
 
@@ -119,13 +123,13 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 	}{
 		"create with default service account": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
-			expectedRequestBody: `{"aura_instance":{"service_account":"read_write"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
+			executeCommand:      fmt.Sprintf("graphql create --instance-id %s --name %s --memory 256MB --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_write"},"memory":"256MB","name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseJson,
 		}, "create with read_only service account and output as table": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql create --format table --instance-id %s --name %s --service-account read_only --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
-			expectedRequestBody: `{"aura_instance":{"service_account":"read_only"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
+			executeCommand:      fmt.Sprintf("graphql create --format table --instance-id %s --name %s --memory 512MB --service-account read_only --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_only"},"memory":"512MB","name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseTable,
 		},
 	}
@@ -187,14 +191,14 @@ func TestCreateGraphQLDataApi_AutoName(t *testing.T) {
 		mockHandler.AddResponse(http.StatusAccepted, createResponse)
 
 		helper.ExecuteCommand(fmt.Sprintf(
-			"graphql create --instance-id %s --type-definitions %s --rw",
+			"graphql create --instance-id %s --memory 256MB --type-definitions %s --rw",
 			instanceId, typeDefsEncoded,
 		))
 
 		mockHandler.AssertCalledTimes(2)
 		mockHandler.AssertCalledWithMethod(http.MethodGet)
 		mockHandler.AssertCalledWithMethod(http.MethodPost)
-		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"name":"GraphQL02","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
+		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"memory":"256MB","name":"GraphQL02","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
 	})
 
 	t.Run("explicit --name skips list GET and posts exact name", func(t *testing.T) {
@@ -208,13 +212,13 @@ func TestCreateGraphQLDataApi_AutoName(t *testing.T) {
 		)
 
 		helper.ExecuteCommand(fmt.Sprintf(
-			"graphql create --instance-id %s --name my-api --type-definitions %s --rw",
+			"graphql create --instance-id %s --name my-api --memory 256MB --type-definitions %s --rw",
 			instanceId, typeDefsEncoded,
 		))
 
 		mockHandler.AssertCalledTimes(1)
 		mockHandler.AssertCalledWithMethod(http.MethodPost)
-		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"name":"my-api","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
+		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"memory":"256MB","name":"my-api","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
 	})
 }
 
@@ -247,7 +251,7 @@ func TestCreateGraphQLDataApi_StdoutIsValidJSON(t *testing.T) {
 
 	helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusAccepted, mockResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql create --instance-id %s --name my-data-api-1 --type-definitions dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ== --rw --format json", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql create --instance-id %s --name my-data-api-1 --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ== --rw --format json", instanceId))
 
 	helper.AssertOutIsValidJSON()
 }

@@ -836,6 +836,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
+| `--memory` | string | - | (required) Memory allocated to the GraphQL Data API, must be one of: 256MB, 512MB, 1024MB, 2048MB, 4096MB |
 | `--name` | string | - | The name of the GraphQL Data API (auto-generated if not specified) |
 | `--service-account` | string | read_write | The service account type for the instance connection, must be one of: read_only, read_write |
 | `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
@@ -846,19 +847,19 @@ Examples:
 
 ```
 # Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
 
 # Create a GraphQL Data API without specifying a name (auto-generated)
-neo4j-cli aura graphql create --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --memory 256MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API with read-only service account
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --wait --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --rw
 ```
 
 ### neo4j-cli aura graphql delete

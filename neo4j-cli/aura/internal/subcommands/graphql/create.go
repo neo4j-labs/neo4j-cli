@@ -20,6 +20,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		instanceIdFlag     = "instance-id"
 		nameFlag           = "name"
 		serviceAccountFlag = "service-account"
+		memoryFlag         = "memory"
 		typeDefsFlag       = "type-definitions"
 		typeDefsFileFlag   = "type-definitions-file"
 	)
@@ -28,6 +29,7 @@ func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 		instanceId     string
 		name           string
 		serviceAccount string
+		memory         string
 		typeDefs       string
 		typeDefsFile   string
 		wait           bool
@@ -45,22 +47,28 @@ This command returns your GraphQL Data API ID, API key, and connection URL for y
 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
 		Example: `# Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
 
 # Create a GraphQL Data API without specifying a name (auto-generated)
-neo4j-cli aura graphql create --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --memory 256MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API with read-only service account
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --wait --rw`,
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if serviceAccount != "read_only" && serviceAccount != "read_write" {
 				return fmt.Errorf("invalid value for --service-account: %q, must be one of: read_only, read_write", serviceAccount)
+			}
+
+			switch memory {
+			case "256MB", "512MB", "1024MB", "2048MB", "4096MB":
+			default:
+				return fmt.Errorf("invalid value for --memory: %q, must be one of: 256MB, 512MB, 1024MB, 2048MB, 4096MB", memory)
 			}
 
 			resolvedName, err := resolveGraphQLName(cfg, name, instanceId)
@@ -69,7 +77,8 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-defini
 			}
 
 			body := map[string]any{
-				"name": resolvedName,
+				"name":   resolvedName,
+				"memory": memory,
 				"aura_instance": map[string]string{
 					"service_account": serviceAccount,
 				},
@@ -133,6 +142,9 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-defini
 	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&serviceAccount, serviceAccountFlag, "read_write", "The service account type for the instance connection, must be one of: read_only, read_write")
+
+	cmd.Flags().StringVar(&memory, memoryFlag, "", "(required) Memory allocated to the GraphQL Data API, must be one of: 256MB, 512MB, 1024MB, 2048MB, 4096MB")
+	cmd.MarkFlagRequired(memoryFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the GraphQL Data API (auto-generated if not specified)")
 
