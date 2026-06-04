@@ -274,6 +274,10 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## Output/Input Casing Gates
+
+Two hermetic gates enforce CLI-127 casing: input identifiers (command/alias/flag-long names) are kebab-case — `agentcontext/casing_input_gate_test.go`; rendered OUTPUT field names are snake_case — `common/output/casing_gate_test.go`. The output gate checks Print*(`fields`) literals + an enumerated output-struct json-tag allowlist; wire/parse structs (desktopclient/types.go, api/response.go, docker client.go, query schema.go YIELD columns, credentials on-disk kebab tags) and Docker label consts are intentionally NOT output and are excluded. Adding a new output struct/field → add it to the allowlist (or it's covered if its keys flow through a `fields` slice).
+
 ## macOS Subprocess Test Isolation Notes
 
 - `common/clicfg/darwin.go` uses `$HOME` env var (not `user.Current().HomeDir`) for the config prefix so that subprocess tests can override HOME to isolate config files. If you add subprocess tests that need config isolation on macOS, pass `HOME=<tempdir>` in the subprocess env and symlink `<real-home>/Library/Keychains/login.keychain-db` into `<tempdir>/Library/Keychains/` — go-keyring resolves keychains relative to `$HOME` but still needs the real login keychain in the search list.

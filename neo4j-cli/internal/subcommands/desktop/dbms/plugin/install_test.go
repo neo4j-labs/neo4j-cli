@@ -215,7 +215,7 @@ func TestPluginInstall_StartedDbms_Default_AutoRestartSequence(t *testing.T) {
 		t.Fatalf("expected stderr breadcrumb confirming plugin is active; got: %q", stderr)
 	}
 
-	// stdout shows the installed plugin as JSON (full DbmsPlugin wire shape).
+	// stdout shows the installed plugin as JSON (snake_case DbmsPlugin projection).
 	var pl map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(h.out.Bytes()), &pl); err != nil {
 		t.Fatalf("json out: %v (raw: %s)", err, h.out.String())

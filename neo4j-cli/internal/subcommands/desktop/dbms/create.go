@@ -21,7 +21,7 @@ import (
 	"golang.org/x/term"
 )
 
-var dbmsInfoFields = []string{"id", "name", "version", "status", "connectionUri"}
+var dbmsInfoFields = []string{"id", "name", "version", "status", "connection_uri"}
 
 // 1s cadence matches `docker.WaitForBolt`; 30s ceiling matches `docker create --wait`.
 const (
@@ -102,21 +102,21 @@ func (r dbmsInfoResult) AsArray() []map[string]any {
 	}
 	return []map[string]any{
 		{
-			"id":            r.Item.ID,
-			"name":          r.Item.Name,
-			"version":       r.Item.Version,
-			"status":        r.Item.Status,
-			"connectionUri": r.Item.ConnectionURI,
+			"id":             r.Item.ID,
+			"name":           r.Item.Name,
+			"version":        r.Item.Version,
+			"status":         r.Item.Status,
+			"connection_uri": r.Item.ConnectionURI,
 		},
 	}
 }
 
-// MarshalJSON emits the full DbmsInfo so `--format json` matches `desktop dbms list`.
+// MarshalJSON emits the snake_case DbmsInfo projection so `--format json` matches `desktop dbms list`.
 func (r dbmsInfoResult) MarshalJSON() ([]byte, error) {
 	if r.Item == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(r.Item)
+	return json.Marshal(r.Item.ToOutput())
 }
 
 func newCreateCmd(cfg *clicfg.Config) *cobra.Command {

@@ -147,8 +147,8 @@ func TestStart_NoWait_EnrichedSingleGet(t *testing.T) {
 	if got["status"] != "starting" {
 		t.Fatalf("expected enriched status=starting, got %v", got["status"])
 	}
-	if got["connectionUri"] != "neo4j://localhost:7687" {
-		t.Fatalf("expected enriched connectionUri, got %v", got["connectionUri"])
+	if got["connection_uri"] != "neo4j://localhost:7687" {
+		t.Fatalf("expected enriched connection_uri, got %v", got["connection_uri"])
 	}
 }
 
@@ -232,8 +232,8 @@ func TestStart_Wait_PollsUntilOnline(t *testing.T) {
 	if got["status"] != "started" {
 		t.Fatalf("expected status=started in output, got %v", got["status"])
 	}
-	if got["connectionUri"] != "neo4j://localhost:7687" {
-		t.Fatalf("expected connectionUri in output, got %v", got["connectionUri"])
+	if got["connection_uri"] != "neo4j://localhost:7687" {
+		t.Fatalf("expected connection_uri in output, got %v", got["connection_uri"])
 	}
 }
 

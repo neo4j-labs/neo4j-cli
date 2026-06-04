@@ -138,8 +138,8 @@ func TestStop_NoWait_EnrichedSingleGet(t *testing.T) {
 	if got["status"] != "stopping" {
 		t.Fatalf("expected enriched status=stopping, got %v", got["status"])
 	}
-	if got["connectionUri"] != "neo4j://localhost:7687" {
-		t.Fatalf("expected enriched connectionUri, got %v", got["connectionUri"])
+	if got["connection_uri"] != "neo4j://localhost:7687" {
+		t.Fatalf("expected enriched connection_uri, got %v", got["connection_uri"])
 	}
 }
 

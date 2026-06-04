@@ -170,8 +170,8 @@ func TestUpgrade_StoppedExplicitVersion(t *testing.T) {
 	if got["id"] != "abc" || got["version"] != "5.26.1" || got["status"] != "stopped" {
 		t.Fatalf("unexpected rendered row: %+v", got)
 	}
-	if got["connectionUri"] != "neo4j://localhost:7687" {
-		t.Fatalf("expected connectionUri in rendered row, got %v", got["connectionUri"])
+	if got["connection_uri"] != "neo4j://localhost:7687" {
+		t.Fatalf("expected connection_uri in rendered row, got %v", got["connection_uri"])
 	}
 	// The stopped-DBMS start hint is on stderr.
 	if !strings.Contains(h.err.String(), "desktop dbms start abc --rw") {
@@ -449,11 +449,11 @@ func TestUpgrade_FormatJSON_EmitsFullDbmsInfo(t *testing.T) {
 		t.Fatalf("json out: %v (raw: %s)", err, h.out.String())
 	}
 	for k, want := range map[string]any{
-		"id":            "abc",
-		"name":          "my-dbms",
-		"version":       "5.26.1",
-		"status":        "stopped",
-		"connectionUri": "neo4j://localhost:7687",
+		"id":             "abc",
+		"name":           "my-dbms",
+		"version":        "5.26.1",
+		"status":         "stopped",
+		"connection_uri": "neo4j://localhost:7687",
 	} {
 		if got[k] != want {
 			t.Fatalf("expected %s=%v in full DbmsInfo, got %v", k, want, got[k])

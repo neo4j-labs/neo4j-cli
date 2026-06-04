@@ -115,7 +115,7 @@ tasks:
       agentcontext build, query output, update), asserting each is snake_case
       (^[a-z0-9]+(_[a-z0-9]+)*$). Allowlist the wire/parse files (aura api/response.go,
       desktopclient/types.go, OAuth, update/release.go) and Docker label constants.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -127,7 +127,7 @@ tasks:
       - "Allowlist covers wire/parse files and Docker label constants (no false positives)"
       - "Passes on the converted tree; fails on a reintroduced kebab/camel output field"
       - "Failure message names the file and offending token; runs under make test"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-007
     title: 'Document conventions, regenerate skill bundle, add changelog entry'
