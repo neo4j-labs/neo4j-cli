@@ -55,7 +55,7 @@ tasks:
       NOT change the --database-name / --embed-credential / --base-url CLI flags or
       the aura.base-url config key, nor the credential-lookup keys in add/set_embed/
       remove. Update dbms_test.go / embed_test.go and the list tests.
-    status: in_progress
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Printable() output keys are database_name, embed_credential, base_url"
