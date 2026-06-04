@@ -56,7 +56,7 @@ func TestRunAdminStatement_HappyPath(t *testing.T) {
 	fake := &fakeQueryRunner{rows: expected}
 	withFakeRunner(t, fake)
 
-	rows, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
+	rows, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
 	require.NoError(t, err)
 	assert.Equal(t, expected, rows)
 }
@@ -65,7 +65,7 @@ func TestRunAdminStatement_NoRows(t *testing.T) {
 	fake := &fakeQueryRunner{rows: []map[string]any{}}
 	withFakeRunner(t, fake)
 
-	rows, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo IF NOT EXISTS", nil)
+	rows, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo IF NOT EXISTS", nil)
 	require.NoError(t, err)
 	assert.Empty(t, rows)
 }
@@ -74,7 +74,7 @@ func TestTranslateAdminError_UnsupportedAdmin_EnterpriseHint(t *testing.T) {
 	fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.UnsupportedAdministrationCommand (CREATE DATABASE is not supported)")}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -87,7 +87,7 @@ func TestTranslateAdminError_UnsupportedAdmin_AuraHint(t *testing.T) {
 	fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.UnsupportedAdministrationCommand (not supported, for more info see https://support.neo4j.com/kb/article)")}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -102,7 +102,7 @@ func TestTranslateAdminError_ArgumentError_NonNativeAuth(t *testing.T) {
 			fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.ArgumentError (%s)", msgFragment)}
 			withFakeRunner(t, fake)
 
-			_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "RENAME USER old TO new", nil)
+			_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "RENAME USER old TO new", nil)
 			require.Error(t, err)
 
 			var ce *clierr.CLIError
@@ -117,7 +117,7 @@ func TestTranslateAdminError_SetStatus_CommunityEdition(t *testing.T) {
 	fake := &fakeQueryRunner{err: fmt.Errorf("'SET STATUS' is not available in community edition")}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET STATUS SUSPENDED", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET STATUS SUSPENDED", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -131,7 +131,7 @@ func TestTranslateAdminError_HomeDatabase_CommunityEdition(t *testing.T) {
 	fake := &fakeQueryRunner{err: fmt.Errorf("'HOME DATABASE' is not available in community edition")}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET HOME DATABASE foo", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET HOME DATABASE foo", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -146,7 +146,7 @@ func TestTranslateAdminError_AlreadyCLIError_PassThrough(t *testing.T) {
 	fake := &fakeQueryRunner{err: original}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -158,7 +158,7 @@ func TestTranslateAdminError_GenericError_MappedToValidation(t *testing.T) {
 	fake := &fakeQueryRunner{err: errors.New("something unexpected")}
 	withFakeRunner(t, fake)
 
-	_, err := runAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "SHOW DATABASES", nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError

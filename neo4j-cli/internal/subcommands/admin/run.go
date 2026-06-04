@@ -101,22 +101,15 @@ func (r *boltAdminRunner) run(ctx context.Context, cred *credentials.DbmsCredent
 	return rows, nil
 }
 
-// runAdminStatement executes a Cypher statement against the system database
+// RunAdminStatement executes a Cypher statement against the system database
 // and translates well-known Neo4j errors into actionable CLI errors.
-func runAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
+func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
 	runner := adminRunnerFn(cfg)
 	rows, err := runner.run(ctx, cred, cypher, params)
 	if err != nil {
 		return nil, translateAdminError(err)
 	}
 	return rows, nil
-}
-
-// RunAdminStatement is the exported entry-point used by sub-packages (database,
-// user, role). It delegates to the package-level seam so all callers share the
-// same injectable runner.
-func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
-	return runAdminStatement(ctx, cfg, cred, cypher, params)
 }
 
 // translateAdminError converts Neo4j Bolt errors that have well-known

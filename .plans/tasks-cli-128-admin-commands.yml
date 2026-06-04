@@ -260,7 +260,7 @@ tasks:
       Remove the bespoke bufio/stdinIsTTY logic from both files. Update tests for
       both commands to use the confirmtest helpers. Run make test, make fmt-check,
       make lint.
-    status: pending
+    status: in_progress
     dependencies:
       - task-010
     acceptance_criteria:
@@ -308,11 +308,11 @@ tasks:
       within the admin package (currently only runAdminStatement is called from
       RunAdminStatement itself, so no other internal callers to update). The exported
       name is already used by sub-packages via injection — no change needed there.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
       - "Only one function named RunAdminStatement exists in admin package (no runAdminStatement private alias)"
       - "make test passes with zero failures"
       - "make fmt-check and make lint pass clean"
-    completed_at: null
+    completed_at: "2026-06-04T18:00:00Z"

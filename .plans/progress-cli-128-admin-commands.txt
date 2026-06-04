@@ -1,3 +1,7 @@
+## task-014 — 2026-06-04T18:00:00Z
+Merged `runAdminStatement` (unexported) directly into `RunAdminStatement` (exported), removing the identity delegation wrapper. Updated 8 call sites in run_test.go to use the exported name.
+Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcommands/admin/run_test.go
+
 ## REVIEW — 2026-06-04T17:30:00Z
 Added 4 review tasks (task-011..task-014).
 
