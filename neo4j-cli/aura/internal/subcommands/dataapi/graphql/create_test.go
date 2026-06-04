@@ -15,8 +15,6 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	instanceUsername := "neo4j"
 	instancePassword := "dfjglhssdopfrow"
@@ -153,8 +151,6 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("flag.aura-beta", true)
-
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusAccepted, tt.mockResponse)
 
 			helper.ExecuteCommand(tt.executeCommand)
@@ -179,8 +175,6 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 func TestCreateGraphQLDataApi_StdoutIsValidJSON(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	mockResponse := `{

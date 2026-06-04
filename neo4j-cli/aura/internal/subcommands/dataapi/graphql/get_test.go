@@ -15,8 +15,6 @@ func TestGetGraphQLDataApi(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, `{
@@ -55,8 +53,6 @@ func TestGetGraphQLDataApiWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, `{
@@ -77,8 +73,6 @@ func TestGetGraphQLDataApiWithTrailingNewline(t *testing.T) {
 func TestGetGraphQLDataApiIncludingGraphQLServerErrors(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"

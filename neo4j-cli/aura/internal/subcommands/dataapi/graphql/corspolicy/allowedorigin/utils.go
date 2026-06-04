@@ -34,7 +34,8 @@ type CorsPolicyBody struct {
 func getExistingOrigins(cfg *clicfg.Config, dataApiId, instanceId string) ([]string, error) {
 	getPath := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, dataApiId)
 	getResBody, statusCode, err := api.MakeRequest(cfg, getPath, &api.RequestConfig{
-		Method: http.MethodGet,
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersionBeta1,
 	})
 	if err != nil {
 		return nil, err

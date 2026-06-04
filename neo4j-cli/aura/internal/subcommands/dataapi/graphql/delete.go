@@ -45,7 +45,8 @@ neo4j-cli aura data-api graphql delete $(neo4j-cli aura data-api graphql list --
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodDelete,
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

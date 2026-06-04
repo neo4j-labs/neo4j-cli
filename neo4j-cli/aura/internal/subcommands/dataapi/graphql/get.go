@@ -36,7 +36,8 @@ neo4j-cli aura data-api graphql get 11111111 --instance-id 00000000 --format jso
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodGet,
+				Method:  http.MethodGet,
+				Version: api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

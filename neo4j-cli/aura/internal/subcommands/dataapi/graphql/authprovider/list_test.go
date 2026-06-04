@@ -15,8 +15,6 @@ func TestListAuthProviders(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId), http.StatusOK, `{

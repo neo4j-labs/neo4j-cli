@@ -44,7 +44,7 @@ func PollCMK(cfg *clicfg.Config, cmkId string) (*PollResponse, error) {
 
 func PollGraphQLDataApi(cfg *clicfg.Config, instanceId string, graphQLDataApiId string, waitingStatus string) (*PollResponse, error) {
 	path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphQLDataApiId)
-	return Poll(cfg, path, func(status string) bool {
+	return PollWithVersion(cfg, path, AuraApiVersionBeta1, func(status string) bool {
 		return status != waitingStatus
 	})
 }
@@ -57,12 +57,17 @@ func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, sessionId string, waitin
 }
 
 func Poll(cfg *clicfg.Config, url string, cond func(status string) bool) (*PollResponse, error) {
+	return PollWithVersion(cfg, url, AuraApiVersion1, cond)
+}
+
+func PollWithVersion(cfg *clicfg.Config, url string, version AuraApiVersion, cond func(status string) bool) (*PollResponse, error) {
 	debug := cfg.Aura.Debug()
 	pollingConfig := cfg.Aura.PollingConfig()
 	for i := 0; i < pollingConfig.MaxRetries; i++ {
 		time.Sleep(time.Second * time.Duration(pollingConfig.Interval))
 		resBody, statusCode, err := MakeRequest(cfg, url, &RequestConfig{
-			Method: http.MethodGet,
+			Method:  http.MethodGet,
+			Version: version,
 		})
 		if err != nil {
 			return nil, clierr.NewUpstreamError("error polling: %w", err)

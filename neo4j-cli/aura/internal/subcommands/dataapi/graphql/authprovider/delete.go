@@ -48,7 +48,8 @@ neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api g
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodDelete,
+				Method:  http.MethodDelete,
+				Version: api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

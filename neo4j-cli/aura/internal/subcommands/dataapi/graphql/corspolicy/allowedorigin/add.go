@@ -75,6 +75,7 @@ neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.examp
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,
 				Method:   http.MethodPatch,
+				Version:  api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err

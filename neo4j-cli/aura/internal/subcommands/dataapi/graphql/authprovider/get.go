@@ -38,7 +38,7 @@ neo4j-cli aura data-api graphql auth-provider get 22222222 --instance-id 0000000
 			authProviderId := strings.TrimSpace(args[0])
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId)
 
-			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{Method: http.MethodGet})
+			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{Method: http.MethodGet, Version: api.AuraApiVersionBeta1})
 			if err != nil {
 				return err
 			}

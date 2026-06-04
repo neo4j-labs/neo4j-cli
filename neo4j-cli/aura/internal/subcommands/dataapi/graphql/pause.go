@@ -43,7 +43,8 @@ neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw --for
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/pause", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
-				Method: http.MethodPost,
+				Method:  http.MethodPost,
+				Version: api.AuraApiVersionBeta1,
 			})
 			if err != nil {
 				return err
