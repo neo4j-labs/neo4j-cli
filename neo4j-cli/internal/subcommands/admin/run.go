@@ -112,6 +112,13 @@ func runAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credential
 	return rows, nil
 }
 
+// RunAdminStatement is the exported entry-point used by sub-packages (database,
+// user, role). It delegates to the package-level seam so all callers share the
+// same injectable runner.
+func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
+	return runAdminStatement(ctx, cfg, cred, cypher, params)
+}
+
 // translateAdminError converts Neo4j Bolt errors that have well-known
 // admin-command semantics into targeted CLI errors.
 func translateAdminError(err error) error {

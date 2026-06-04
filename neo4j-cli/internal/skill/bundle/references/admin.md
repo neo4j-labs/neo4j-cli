@@ -1,5 +1,17 @@
 # neo4j-cli admin
 
+## Contents
+
+- [neo4j-cli admin database](#neo4j-cli-admin-database)
+- [neo4j-cli admin database get](#neo4j-cli-admin-database-get)
+- [neo4j-cli admin database list](#neo4j-cli-admin-database-list)
+- [neo4j-cli admin role](#neo4j-cli-admin-role)
+- [neo4j-cli admin role get](#neo4j-cli-admin-role-get)
+- [neo4j-cli admin role list](#neo4j-cli-admin-role-list)
+- [neo4j-cli admin user](#neo4j-cli-admin-user)
+- [neo4j-cli admin user get](#neo4j-cli-admin-user-get)
+- [neo4j-cli admin user list](#neo4j-cli-admin-user-list)
+
 Manage Neo4j databases, users, and roles
 
 Manage Neo4j databases, users, and roles via the system database. All subcommands connect over Bolt using the dbms credential named by --credential (see `neo4j-cli credential dbms list`). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke — Enterprise only).
@@ -30,6 +42,42 @@ neo4j-cli admin database --help
 neo4j-cli admin database list --credential local --format json
 ```
 
+### neo4j-cli admin database get
+
+Get details of a database
+
+Get the full record for a single database by name. Executes SHOW DATABASE $name against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin database get <name>`
+
+Examples:
+
+```
+# Get a database record as a table
+neo4j-cli admin database get neo4j --credential local
+
+# Get a database record as JSON for scripting
+neo4j-cli admin database get neo4j --credential local --format json
+```
+
+### neo4j-cli admin database list
+
+List all databases
+
+List all databases visible from the system database. Renders name, type, currentStatus, access, and default columns. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin database list`
+
+Examples:
+
+```
+# List all databases as a table
+neo4j-cli admin database list --credential local
+
+# List all databases as JSON for scripting
+neo4j-cli admin database list --credential local --format json
+```
+
 ## neo4j-cli admin role
 
 Manage Neo4j roles via the system database
@@ -48,6 +96,55 @@ neo4j-cli admin role --help
 neo4j-cli admin role list --credential local --format json
 ```
 
+### neo4j-cli admin role get
+
+Get privileges for a role
+
+Get the full privileges record for a single role by name. Executes SHOW ROLE $name PRIVILEGES against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin role get <role>`
+
+Examples:
+
+```
+# Get privileges for a role as a table
+neo4j-cli admin role get admin --credential local
+
+# Get privileges for a role as JSON for scripting
+neo4j-cli admin role get admin --credential local --format json
+```
+
+### neo4j-cli admin role list
+
+List all roles and their members
+
+List all roles and their member users. Executes SHOW ROLES WITH USERS against the system database. Use --role to filter by role name or --user to filter by user name. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin role list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Filter output to the specified role name |
+| `--user` | string | - | Filter output to rows where the member matches the specified user name |
+
+Examples:
+
+```
+# List all roles and their members as a table
+neo4j-cli admin role list --credential local
+
+# List all roles and members as JSON for scripting
+neo4j-cli admin role list --credential local --format json
+
+# Filter to a specific role
+neo4j-cli admin role list --credential local --role admin --format json
+
+# Filter to roles a specific user belongs to
+neo4j-cli admin role list --credential local --user alice
+```
+
 ## neo4j-cli admin user
 
 Manage Neo4j users via the system database
@@ -63,6 +160,42 @@ Examples:
 neo4j-cli admin user --help
 
 # List all users (read-only)
+neo4j-cli admin user list --credential local --format json
+```
+
+### neo4j-cli admin user get
+
+Get details of a user
+
+Get the full record for a single user by name. Executes 'SHOW USERS WHERE user = $name' against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin user get <username>`
+
+Examples:
+
+```
+# Get a user record as a table
+neo4j-cli admin user get neo4j --credential local
+
+# Get a user record as JSON for scripting
+neo4j-cli admin user get neo4j --credential local --format json
+```
+
+### neo4j-cli admin user list
+
+List all users
+
+List all users visible from the system database. Renders user, roles, passwordChangeRequired, and suspended columns. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin user list`
+
+Examples:
+
+```
+# List all users as a table
+neo4j-cli admin user list --credential local
+
+# List all users as JSON for scripting
 neo4j-cli admin user list --credential local --format json
 ```
 
