@@ -50,7 +50,7 @@ tasks:
       to a 0600 temp file (no io.ReadAll), capped at maxSize (default 2GiB), with a
       cleanup func. Detect an LFS pointer payload and fail loudly. Model on
       update/swap.go (assertAllowedHost, redactURL).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -60,7 +60,7 @@ tasks:
       - "Enforces the size cap and errors when exceeded"
       - "Detects an LFS pointer ('version https://git-lfs...') and fails with a clear error"
       - "Tests stub the media host via httptest and cover pointer-detection + cap paths"
-    completed_at: null
+    completed_at: 2026-06-04T17:05:00Z
 
   - id: task-004
     title: 'dataset discovery command: parent help signpost + list leaf'
