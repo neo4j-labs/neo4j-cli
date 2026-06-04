@@ -12,3 +12,8 @@ Decisions: go-pretty uppercases header keys verbatim, so snake key -> BOLT_PORT 
 Converted credential rendered output column keys to snake_case in Printable() AsArray maps + field slices: database-name->database_name, embed-credential->embed_credential (dbms), base-url->base_url plus vertex-project/vertex-location->vertex_project/vertex_location (embed). Left struct json tags (on-disk persistence/lookup keys), --database-name/--embed-credential/--base-url flags, and aura.base-url config key kebab.
 Files: ~common/clicfg/credentials/{dbms,embed}.go, ~{dbms,embed}_test.go, ~neo4j-cli/internal/subcommands/credential/{dbms,embed}/list.go, ~{dbms,embed}/list_test.go
 Decisions: struct json:"database-name" etc. are the credentials.json on-disk format (verified via load/save) — NOT changed; only AsArray output map keys + fields slices convert. Converted vertex_project/location too (same AsArray output) for consistency though task text named only base_url. No bundle drift (bundle only references flag names/prose, not output keys).
+
+## TASK-004 — 2026-06-04T00:00:00Z
+Converted workspace list rendered output fields organizationId/projectId/projectName -> organization_id/project_id/project_name in workspaceEntry json tags + AsArray map keys + PrintBodyMap fields slice; updated list_test.go JSON assertions. MarshalJSON aliases the struct so renamed tags drive JSON output.
+Files: ~neo4j-cli/aura/internal/subcommands/workspace/list.go, ~list_test.go
+Decisions: verified workspaceEntry is build-only (no camelCase Unmarshal); output-only change, safe.

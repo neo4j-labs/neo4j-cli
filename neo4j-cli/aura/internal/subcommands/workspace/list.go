@@ -16,9 +16,9 @@ import (
 // workspaceEntry represents a single org/project pair in the workspace list output.
 type workspaceEntry struct {
 	Workspace      string `json:"workspace"`
-	OrganizationId string `json:"organizationId"`
-	ProjectId      string `json:"projectId"`
-	ProjectName    string `json:"projectName"`
+	OrganizationId string `json:"organization_id"`
+	ProjectId      string `json:"project_id"`
+	ProjectName    string `json:"project_name"`
 	Default        bool   `json:"default"`
 }
 
@@ -31,11 +31,11 @@ func (r workspaceListResponse) AsArray() []map[string]any {
 	result := make([]map[string]any, len(r.Data))
 	for i, e := range r.Data {
 		result[i] = map[string]any{
-			"workspace":      e.Workspace,
-			"organizationId": e.OrganizationId,
-			"projectId":      e.ProjectId,
-			"projectName":    e.ProjectName,
-			"default":        e.Default,
+			"workspace":       e.Workspace,
+			"organization_id": e.OrganizationId,
+			"project_id":      e.ProjectId,
+			"project_name":    e.ProjectName,
+			"default":         e.Default,
 		}
 	}
 	return result
@@ -93,7 +93,7 @@ neo4j-cli aura workspace list --format json | jq -r '.data[] | select(.default =
 				entries = []workspaceEntry{}
 			}
 
-			output.PrintBodyMap(cmd, cfg, workspaceListResponse{Data: entries}, []string{"workspace", "organizationId", "projectId", "projectName", "default"})
+			output.PrintBodyMap(cmd, cfg, workspaceListResponse{Data: entries}, []string{"workspace", "organization_id", "project_id", "project_name", "default"})
 
 			return nil
 		},

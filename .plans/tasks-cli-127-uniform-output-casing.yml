@@ -74,14 +74,14 @@ tasks:
       and MarshalJSON map keys. The struct is built in-code from local project
       config (not parsed from a camelCase payload), so this is output-only. Update
       the workspace list test.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "workspaceEntry json tags use organization_id/project_id/project_name"
       - "AsArray() and MarshalJSON emit snake_case keys"
       - "aura workspace list renders snake_case in JSON, TOON, and table"
       - "Updated workspace list test passes"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-005
     title: 'Decouple desktop output from camelCase wire structs and convert to snake_case'
