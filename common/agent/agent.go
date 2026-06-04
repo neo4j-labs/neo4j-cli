@@ -76,7 +76,7 @@ func Detect() bool {
 //
 //   - "agent"       — a known agent harness env var is set (Detect)
 //   - "script"      — no harness and stdin is not a TTY (piped, CI, cron)
-//   - "interactive" — no harness and stdin is a TTY (a person at a terminal)
+//   - "human"       — no harness and stdin is a TTY (a person at a terminal)
 func Invoker() string {
 	switch {
 	case Detect():
@@ -84,6 +84,6 @@ func Invoker() string {
 	case !stdinIsTerminal():
 		return "script"
 	default:
-		return "interactive"
+		return "human"
 	}
 }

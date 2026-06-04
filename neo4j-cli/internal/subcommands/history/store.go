@@ -24,7 +24,7 @@ import (
 
 const fileName = "history.jsonl"
 
-// invokerFn is the overridable seam for caller classification (agent/script/interactive) so tests can
+// invokerFn is the overridable seam for caller classification (agent/script/human) so tests can
 // drive it deterministically without mutating real process state.
 var invokerFn = agent.Invoker
 
