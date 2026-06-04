@@ -203,11 +203,11 @@ tasks:
       as a final gate over the risky code (network download, LFS handling, neo4j-admin
       exec, temp files), addressing the allowlist, LFS-pointer detection, 0600 perms,
       and URL/secret redaction.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
       - "A Minor changelog entry is added via changie for the new load commands"
       - "make test, make fmt-check, and make lint all pass"
       - "golang-security gate run with findings addressed (allowlist, pointer detection, 0600, redaction)"
-    completed_at: null
+    completed_at: 2026-06-04T18:05:00Z

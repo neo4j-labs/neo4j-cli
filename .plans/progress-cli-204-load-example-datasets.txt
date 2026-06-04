@@ -45,3 +45,9 @@ Decisions: seams = resolveDatasetFn/downloadDatasetFn (dataset internals unexpor
 
 ## TASK-009 — 2026-06-04T22:10:00Z
 Verification-only task: all four new leaves (dataset list / docker load / desktop dbms load / aura instance load) already carried compliant flush-left Example fields from their respective tasks (each ≥2 invocations, # comment per invocation, --rw on writes, ≥1 --format json on the read/JSON-emitting examples). No edits needed. Ran go generate ./neo4j-cli/internal/skill/... — no bundle diff (already in sync). Gates: TestGenerator_RoundTrip + TestAllLeafCommands_HaveExamples pass; make test/fmt-check/lint all clean. Only the task-file/progress updates committed.
+
+## TASK-010 — 2026-06-04T18:05:00Z
+Added user-facing changelog entry via changie (kind Minor) for the new dataset/load commands: `changie new --projects neo4j-cli --kind Minor --body '...'` → .changes/unreleased/neo4j-cli-Minor-20260604-180134.yaml (project: neo4j-cli / kind: Minor / RFC3339 time). Body: "Add `dataset list` and per-target `load` commands (`docker load`, `desktop dbms load`, `aura instance load`) to load example datasets from neo4j-graph-examples repos."
+Files: +.changes/unreleased/neo4j-cli-Minor-20260604-180134.yaml.
+Gates: make test (all pass, no fail/panic), make fmt-check (ok), make lint (0 issues), go generate ./neo4j-cli/internal/skill/... (no bundle diff). No source changes — changelog-only.
+NOTE: golang-security review portion of this task's acceptance is deferred to the orchestrator (running it separately as a formal final security gate over the risky code: network download, LFS handling, neo4j-admin exec, temp files). This iteration covers changelog + gates only.
