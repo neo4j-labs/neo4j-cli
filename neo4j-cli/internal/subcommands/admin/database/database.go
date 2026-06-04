@@ -6,6 +6,7 @@ package database
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +14,7 @@ import (
 // Cypher execution function injected by the parent (admin.RunAdminStatement in
 // production); passing it here avoids an import cycle between the database and
 // admin packages.
-func NewCmd(cfg *clicfg.Config, credential *string, execFn ExecFnType) *cobra.Command {
+func NewCmd(cfg *clicfg.Config, credential *string, execFn adminutil.ExecFn) *cobra.Command {
 	dbExecFn = execFn
 
 	cmd := &cobra.Command{

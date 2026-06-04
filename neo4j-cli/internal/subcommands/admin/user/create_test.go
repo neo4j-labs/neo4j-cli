@@ -15,14 +15,15 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// captureExecFn returns an ExecFnType that records the last cypher+params and
+// captureExecFn returns an adminutil.ExecFn that records the last cypher+params and
 // returns execErr. It also registers a cleanup that restores userExecFn.
-func captureExecFn(t *testing.T, execErr error) (fn ExecFnType, getCypher func() string, getParams func() map[string]any) {
+func captureExecFn(t *testing.T, execErr error) (fn adminutil.ExecFn, getCypher func() string, getParams func() map[string]any) {
 	t.Helper()
 	orig := userExecFn
 	t.Cleanup(func() { userExecFn = orig })

@@ -6,6 +6,7 @@ package user
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +14,7 @@ import (
 // execution function injected by the parent (admin.RunAdminStatement in
 // production); passing it here avoids an import cycle between the user and
 // admin packages.
-func NewCmd(cfg *clicfg.Config, credential *string, execFn ExecFnType) *cobra.Command {
+func NewCmd(cfg *clicfg.Config, credential *string, execFn adminutil.ExecFn) *cobra.Command {
 	userExecFn = execFn
 
 	cmd := &cobra.Command{

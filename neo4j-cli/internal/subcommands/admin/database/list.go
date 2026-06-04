@@ -4,12 +4,9 @@
 package database
 
 import (
-	"context"
-	"encoding/json"
-
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +27,7 @@ neo4j-cli admin database list --credential local --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			cred, err := resolveCredential(cfg, credential)
+			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}
@@ -38,31 +35,13 @@ neo4j-cli admin database list --credential local --format json`,
 			if err != nil {
 				return err
 			}
-			commonoutput.PrintBodyMap(cmd, cfg, dbRows(rows), listFields)
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
 			return nil
 		},
 	}
 }
 
-// ExecFnType is the signature shared by all database leaf commands for their
-// Cypher execution seam.
-type ExecFnType func(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error)
-
 // dbExecFn is the package-level test seam. It must be set to a real
 // implementation by the parent command (NewCmd) before any leaf runs.
 // Tests replace it to inject fake results without opening a Bolt connection.
-var dbExecFn ExecFnType
-
-// dbRows adapts a []map[string]any into commonoutput.ResponseData.
-type dbRows []map[string]any
-
-func (r dbRows) AsArray() []map[string]any {
-	if r == nil {
-		return []map[string]any{}
-	}
-	return r
-}
-
-func (r dbRows) MarshalJSON() ([]byte, error) {
-	return json.Marshal(r.AsArray())
-}
+var dbExecFn adminutil.ExecFn

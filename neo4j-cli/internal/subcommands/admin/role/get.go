@@ -9,6 +9,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ neo4j-cli admin role get admin --credential local --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			cred, err := resolveCredential(cfg, credential)
+			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}
@@ -44,7 +45,7 @@ neo4j-cli admin role get admin --credential local --format json`,
 				fields = append(fields, k)
 			}
 			sort.Strings(fields)
-			commonoutput.PrintBodyMap(cmd, cfg, roleRows(rows), fields)
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), fields)
 			return nil
 		},
 	}

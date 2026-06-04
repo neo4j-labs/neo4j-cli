@@ -6,6 +6,7 @@ package role
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ neo4j-cli admin role list --credential local --user alice`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			cred, err := resolveCredential(cfg, credential)
+			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}
@@ -65,7 +66,7 @@ neo4j-cli admin role list --credential local --user alice`,
 				rows = filtered
 			}
 
-			commonoutput.PrintBodyMap(cmd, cfg, roleRows(rows), listFields)
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
 			return nil
 		},
 	}

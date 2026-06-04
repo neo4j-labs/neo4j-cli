@@ -16,14 +16,15 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// fakeExecFn returns an ExecFnType that returns the supplied rows or error.
+// fakeExecFn returns an adminutil.ExecFn that returns the supplied rows or error.
 // It also registers a cleanup that restores userExecFn to its original value.
-func fakeExecFn(t *testing.T, rows []map[string]any, execErr error) ExecFnType {
+func fakeExecFn(t *testing.T, rows []map[string]any, execErr error) adminutil.ExecFn {
 	t.Helper()
 	orig := userExecFn
 	t.Cleanup(func() { userExecFn = orig })
