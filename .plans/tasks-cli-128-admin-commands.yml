@@ -37,7 +37,7 @@ tasks:
       subcommand parents (stubs at this stage). Mount admin.NewCmd into
       neo4j-cli/app/app.go so it appears as 'neo4j-cli admin'. Add the Neo4j
       copyright header to all new .go files. Run go build to confirm the tree compiles.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -45,7 +45,7 @@ tasks:
       - "--credential flag is persistent and inherited by all admin subcommands"
       - "go build ./... produces no errors"
       - "All new .go files carry the Neo4j copyright header"
-    completed_at: null
+    completed_at: "2026-06-04T09:00:00Z"
 
   - id: task-003
     title: "database subtree: list and get (read-only)"
