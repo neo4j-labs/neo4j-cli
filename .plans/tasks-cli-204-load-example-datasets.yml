@@ -161,7 +161,7 @@ tasks:
       ephemeral docker neo4j via docker.LoadDumpIntoNewContainer, docker.PushToAura to
       the new instance, tear down the ephemeral container. Resolve org/project via
       utils/resolve.go.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -172,7 +172,7 @@ tasks:
       - "Creates a new instance, stages via ephemeral docker, pushes with docker.PushToAura, then tears down"
       - "Reuses the instance create flag set and utils/resolve.go for org/project"
       - "Tests cover the GDS hard-error and docker-absent early-error paths"
-    completed_at: null
+    completed_at: 2026-06-04T21:30:00Z
 
   - id: task-009
     title: 'Examples on all leaves + regenerate skill bundle'

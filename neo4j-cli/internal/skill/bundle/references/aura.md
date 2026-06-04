@@ -27,6 +27,7 @@
 - [neo4j-cli aura instance deploy](#neo4j-cli-aura-instance-deploy)
 - [neo4j-cli aura instance get](#neo4j-cli-aura-instance-get)
 - [neo4j-cli aura instance list](#neo4j-cli-aura-instance-list)
+- [neo4j-cli aura instance load](#neo4j-cli-aura-instance-load)
 - [neo4j-cli aura instance overwrite](#neo4j-cli-aura-instance-overwrite)
 - [neo4j-cli aura instance pause](#neo4j-cli-aura-instance-pause)
 - [neo4j-cli aura instance resume](#neo4j-cli-aura-instance-resume)
@@ -752,6 +753,49 @@ neo4j-cli aura instance list
 
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli aura instance list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
+```
+
+### neo4j-cli aura instance load
+
+Creates a new Aura instance pre-loaded with an example dataset
+
+This subcommand creates a new Aura instance and loads an example Neo4j dataset into it.
+
+A dataset is a '.dump' published by a GitHub repo carrying a 'relate.project-install.json' manifest (e.g. 'neo4j-graph-examples/movies'). The manifest is resolved for the requested --version, the matching dump is downloaded from the Git-LFS media host, and the data is loaded into the --database (default "neo4j") of a new Aura instance provisioned with the same flags as 'instance create'.
+
+Aura has no dump-upload API, so the dump is staged through an ephemeral local Neo4j Docker container and then uploaded into the new instance over Bolt. A local Docker daemon is therefore REQUIRED; the command errors early (before creating any Aura instance) if Docker is unavailable.
+
+Datasets requiring the graph-data-science plugin cannot be loaded into Aura (GDS is not installable there); such a dataset is rejected before any work is done. The apoc plugin is allowed.
+
+If the data load fails after the instance was created, the instance is left in place (it is not deleted), load_status=failed is reported, and the instance id is printed so you can retry or delete it manually.
+
+Usage: `neo4j-cli aura instance load <owner/repo> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cloud-provider` | cloud-provider | - | The cloud provider hosting the instance. Must be one of "aws", "azure", or "gcp". |
+| `--credential-name` | string | - | The name to use when storing the credentials locally. Defaults to <instance-id>-default. |
+| `--database` | string | neo4j | The target database the dataset is loaded into. The system database cannot be loaded into. |
+| `--max-size` | int64 | 2147483648 | Maximum dump download size in bytes; the download is refused if exceeded. |
+| `--memory` | memory | - | The size of the instance memory (e.g. 2GB, 8GB, 64GB). Run with an invalid value to see all accepted sizes. |
+| `--name` | string | - | The name of the instance (any UTF-8 characters with no trailing or leading whitespace). If omitted, a default name is generated automatically (e.g. Instance01). |
+| `--no-credential-print` | bool | false | Omit the password from the command output. |
+| `--no-credential-storage` | bool | false | Skip storing the instance credentials locally after creation. |
+| `--region` | string | - | The region where the instance is hosted. Values follow each cloud provider's naming convention (e.g. us-east-1 for AWS, eastus for Azure, europe-west1 for GCP). Run 'project get' to see the full list of supported regions for your project. |
+| `--type` | type | - | (required) The type of the instance. Must be one of "free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", or "enterprise-ds". |
+| `--vector-optimized` | bool | false | An optional vector optimization configuration to be set during instance creation |
+| `--version` | string | 5 | The Neo4j version of the instance. Also used to resolve the dataset manifest. |
+
+Examples:
+
+```
+# Load the movies dataset into a new free-db Aura instance
+neo4j-cli aura instance load neo4j-graph-examples/movies --rw --name movies-demo --type free-db --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Load the recommendations dataset into a new professional-db instance on AWS and emit JSON
+neo4j-cli aura instance load neo4j-graph-examples/recommendations --rw --name recs --type professional-db --cloud-provider aws --region us-east-1 --memory 2GB --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ### neo4j-cli aura instance overwrite
