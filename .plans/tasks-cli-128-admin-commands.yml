@@ -218,3 +218,101 @@ tasks:
       - "make fmt-check passes (no files need gofmt)"
       - "make lint passes clean"
     completed_at: "2026-06-04T17:10:00Z"
+
+  - id: task-011
+    title: "Extract shared adminutil package: ExecFnType, resolveCredential, Rows"
+    source: review
+    description: |
+      Three sub-packages (database, user, role) each contain character-for-character
+      identical copies of resolveCredential, ExecFnType, and a *Rows type (AsArray +
+      MarshalJSON). Create neo4j-cli/internal/subcommands/admin/adminutil/ with:
+        - ExecFnType defined once
+        - A single Rows type ([]map[string]any) with AsArray() and MarshalJSON()
+        - ResolveCredential exported function
+      Update database, user, and role packages to import adminutil and remove their
+      local copies. admin.go itself can also use adminutil.ExecFnType instead of
+      each sub-package's type. The adminutil package must not import database, user,
+      or role (no import cycles). Run make test, make fmt-check, make lint to confirm
+      all gates pass.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "adminutil package exists with ExecFnType, Rows, and ResolveCredential"
+      - "No copy of resolveCredential remains in database/, user/, or role/ packages"
+      - "No copy of ExecFnType remains in database/, user/, or role/ packages"
+      - "No *Rows type (dbRows, userRows, roleRows) remains in database/, user/, or role/ packages"
+      - "make test passes with zero failures"
+      - "make fmt-check and make lint pass clean"
+    completed_at: null
+
+  - id: task-012
+    title: "Fix database/drop and user/drop to use common/confirm instead of bespoke y/N logic"
+    source: review
+    description: |
+      database/drop.go and user/drop.go each implement their own bufio.Reader y/N
+      prompt and stdinIsTTY check, duplicating common/confirm which already provides
+      this as confirm.Register/Require. Worse, the three drop commands in this feature
+      have inconsistent cancel behavior: database/drop returns a non-zero UsageError,
+      user/drop returns nil, and role/drop (correctly) returns confirm.ErrCancelled.
+      Fix database/drop.go and user/drop.go to use confirm.Register(cmd) and
+      confirm.Require(cmd, name) exactly as role/drop.go and docker/delete.go do.
+      Remove the bespoke bufio/stdinIsTTY logic from both files. Update tests for
+      both commands to use the confirmtest helpers. Run make test, make fmt-check,
+      make lint.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "database/drop.go uses confirm.Register + confirm.Require; no bespoke bufio/stdinIsTTY code"
+      - "user/drop.go uses confirm.Register + confirm.Require; no bespoke bufio/stdinIsTTY code"
+      - "Cancelling database drop exits 0 with 'cancelled.' on stderr (matching role/drop behavior)"
+      - "Cancelling user drop exits 0 with 'cancelled.' on stderr (matching role/drop behavior)"
+      - "Tests for database/drop and user/drop use confirmtest helpers"
+      - "make test passes with zero failures"
+      - "make fmt-check and make lint pass clean"
+    completed_at: null
+
+  - id: task-013
+    title: "Remove plain-text fallback from translateAdminError; fix tests to use neo4j.Neo4jError"
+    source: review
+    description: |
+      run.go:141-158 contains a plain-text string-matching fallback path with the
+      comment 'Plain-text path for tests that inject plain errors (e.g. via errors.New)
+      rather than constructing a real Neo4jError.' This test accommodation leaks into
+      production code and creates a second, weaker error-detection mechanism with
+      broader false-positive potential. The fix: update run_test.go to inject proper
+      *neo4j.Neo4jError values (using neo4j.Neo4jError{Code: ..., Msg: ...}) instead
+      of plain errors.New() strings. Once tests use real Neo4jError values, the
+      plain-text fallback block in translateAdminError can be deleted. The
+      errors.As(err, &ne) path already handles Neo4jError correctly.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "run_test.go injects *neo4j.Neo4jError values, not plain errors.New() strings, for all error-translation tests"
+      - "The plain-text fallback block (run.go:141-158) is removed from translateAdminError"
+      - "translateAdminError has a single Neo4jError path via errors.As"
+      - "make test passes with zero failures"
+      - "make fmt-check and make lint pass clean"
+    completed_at: null
+
+  - id: task-014
+    title: "Remove RunAdminStatement identity wrapper — export directly"
+    source: review
+    description: |
+      run.go defines both runAdminStatement (unexported) and RunAdminStatement
+      (exported), where RunAdminStatement is a pure identity delegation to
+      runAdminStatement. This is unnecessary indirection. Rename runAdminStatement
+      to RunAdminStatement, remove the wrapper function, and update all call sites
+      within the admin package (currently only runAdminStatement is called from
+      RunAdminStatement itself, so no other internal callers to update). The exported
+      name is already used by sub-packages via injection — no change needed there.
+    status: pending
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "Only one function named RunAdminStatement exists in admin package (no runAdminStatement private alias)"
+      - "make test passes with zero failures"
+      - "make fmt-check and make lint pass clean"
+    completed_at: null
