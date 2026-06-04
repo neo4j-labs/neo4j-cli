@@ -15,30 +15,29 @@
 - [neo4j-cli aura customer-managed-key delete](#neo4j-cli-aura-customer-managed-key-delete)
 - [neo4j-cli aura customer-managed-key get](#neo4j-cli-aura-customer-managed-key-get)
 - [neo4j-cli aura customer-managed-key list](#neo4j-cli-aura-customer-managed-key-list)
-- [neo4j-cli aura data-api](#neo4j-cli-aura-data-api)
-- [neo4j-cli aura data-api graphql](#neo4j-cli-aura-data-api-graphql)
-- [neo4j-cli aura data-api graphql auth-provider](#neo4j-cli-aura-data-api-graphql-auth-provider)
-- [neo4j-cli aura data-api graphql auth-provider create](#neo4j-cli-aura-data-api-graphql-auth-provider-create)
-- [neo4j-cli aura data-api graphql auth-provider delete](#neo4j-cli-aura-data-api-graphql-auth-provider-delete)
-- [neo4j-cli aura data-api graphql auth-provider get](#neo4j-cli-aura-data-api-graphql-auth-provider-get)
-- [neo4j-cli aura data-api graphql auth-provider list](#neo4j-cli-aura-data-api-graphql-auth-provider-list)
-- [neo4j-cli aura data-api graphql cors-policy](#neo4j-cli-aura-data-api-graphql-cors-policy)
-- [neo4j-cli aura data-api graphql cors-policy allowed-origin](#neo4j-cli-aura-data-api-graphql-cors-policy-allowed-origin)
-- [neo4j-cli aura data-api graphql cors-policy allowed-origin add](#neo4j-cli-aura-data-api-graphql-cors-policy-allowed-origin-add)
-- [neo4j-cli aura data-api graphql cors-policy allowed-origin remove](#neo4j-cli-aura-data-api-graphql-cors-policy-allowed-origin-remove)
-- [neo4j-cli aura data-api graphql create](#neo4j-cli-aura-data-api-graphql-create)
-- [neo4j-cli aura data-api graphql delete](#neo4j-cli-aura-data-api-graphql-delete)
-- [neo4j-cli aura data-api graphql get](#neo4j-cli-aura-data-api-graphql-get)
-- [neo4j-cli aura data-api graphql list](#neo4j-cli-aura-data-api-graphql-list)
-- [neo4j-cli aura data-api graphql pause](#neo4j-cli-aura-data-api-graphql-pause)
-- [neo4j-cli aura data-api graphql resume](#neo4j-cli-aura-data-api-graphql-resume)
-- [neo4j-cli aura data-api graphql update](#neo4j-cli-aura-data-api-graphql-update)
 - [neo4j-cli aura graph-analytics](#neo4j-cli-aura-graph-analytics)
 - [neo4j-cli aura graph-analytics session](#neo4j-cli-aura-graph-analytics-session)
 - [neo4j-cli aura graph-analytics session create](#neo4j-cli-aura-graph-analytics-session-create)
 - [neo4j-cli aura graph-analytics session delete](#neo4j-cli-aura-graph-analytics-session-delete)
 - [neo4j-cli aura graph-analytics session get](#neo4j-cli-aura-graph-analytics-session-get)
 - [neo4j-cli aura graph-analytics session list](#neo4j-cli-aura-graph-analytics-session-list)
+- [neo4j-cli aura graphql](#neo4j-cli-aura-graphql)
+- [neo4j-cli aura graphql auth-provider](#neo4j-cli-aura-graphql-auth-provider)
+- [neo4j-cli aura graphql auth-provider create](#neo4j-cli-aura-graphql-auth-provider-create)
+- [neo4j-cli aura graphql auth-provider delete](#neo4j-cli-aura-graphql-auth-provider-delete)
+- [neo4j-cli aura graphql auth-provider get](#neo4j-cli-aura-graphql-auth-provider-get)
+- [neo4j-cli aura graphql auth-provider list](#neo4j-cli-aura-graphql-auth-provider-list)
+- [neo4j-cli aura graphql cors-policy](#neo4j-cli-aura-graphql-cors-policy)
+- [neo4j-cli aura graphql cors-policy allowed-origin](#neo4j-cli-aura-graphql-cors-policy-allowed-origin)
+- [neo4j-cli aura graphql cors-policy allowed-origin add](#neo4j-cli-aura-graphql-cors-policy-allowed-origin-add)
+- [neo4j-cli aura graphql cors-policy allowed-origin remove](#neo4j-cli-aura-graphql-cors-policy-allowed-origin-remove)
+- [neo4j-cli aura graphql create](#neo4j-cli-aura-graphql-create)
+- [neo4j-cli aura graphql delete](#neo4j-cli-aura-graphql-delete)
+- [neo4j-cli aura graphql get](#neo4j-cli-aura-graphql-get)
+- [neo4j-cli aura graphql list](#neo4j-cli-aura-graphql-list)
+- [neo4j-cli aura graphql pause](#neo4j-cli-aura-graphql-pause)
+- [neo4j-cli aura graphql resume](#neo4j-cli-aura-graphql-resume)
+- [neo4j-cli aura graphql update](#neo4j-cli-aura-graphql-update)
 - [neo4j-cli aura instance](#neo4j-cli-aura-instance)
 - [neo4j-cli aura instance create](#neo4j-cli-aura-instance-create)
 - [neo4j-cli aura instance delete](#neo4j-cli-aura-instance-delete)
@@ -448,456 +447,6 @@ neo4j-cli aura customer-managed-key list
 neo4j-cli aura customer-managed-key list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
-## neo4j-cli aura data-api
-
-Allows you to programmatically provision and manage your Data APIs
-
-Usage: `neo4j-cli aura data-api`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--auth-url` | string | - |  |
-| `--base-url` | string | - |  |
-| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
-
-### neo4j-cli aura data-api graphql
-
-Allows you to programmatically provision and manage your GraphQL Data APIs
-
-Usage: `neo4j-cli aura data-api graphql`
-
-#### neo4j-cli aura data-api graphql auth-provider
-
-Allows you to programmatically manage Authentication providers for a specific GraphQL Data API
-
-Usage: `neo4j-cli aura data-api graphql auth-provider`
-
-##### neo4j-cli aura data-api graphql auth-provider create
-
-Creates a new GraphQL Data API authentication provider
-
-This command creates a new GraphQL Data API authentication provider.
-
-Creating a GraphQL Data API authentication provider is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
-
-If you create an 'api-key' Authentication provider, an API key will be created. It is important to store the API key as it is not currently possible to get it or update it.
-
-If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-
-Usage: `neo4j-cli aura data-api graphql auth-provider create [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to create the authentication provider for |
-| `--disabled` | bool | false | Whether or not the Authentication provider is disabled |
-| `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
-| `--name` | string | - | (required) The name of the Authentication provider |
-| `--type` | type | - | (required) The type of the Authentication provider, one of 'api-key' or 'jwks' |
-| `--url` | string | - | The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type 'jwks' |
-| `--wait` | bool | false | Waits until created Authentication provider is ready. |
-
-Examples:
-
-```
-# Create an api-key authentication provider
-neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --rw
-
-# Create a JWKS authentication provider with a validation URL
-neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --rw
-
-# Create a disabled api-key provider and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --wait --rw
-```
-
-##### neo4j-cli aura data-api graphql auth-provider delete
-
-Delete a GraphQL Data API authentication provider
-
-Deletes a GraphQL Data API authentication provider. This action can not be undone.
-
-Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
-
-Usage: `neo4j-cli aura data-api graphql auth-provider delete <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to delete the Authentication provider for |
-| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
-| `--instance-id` | string | - | (required) The ID of the instance to delete the Data API for |
-| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
-
-Examples:
-
-```
-# Delete an authentication provider
-neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
-
-# Delete an authentication provider and capture the response as JSON
-neo4j-cli aura data-api graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
-
-# Delete the first authentication provider returned by list
-neo4j-cli aura data-api graphql auth-provider delete $(neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
-```
-
-##### neo4j-cli aura data-api graphql auth-provider get
-
-Get details of a GraphQL Data API authentication provider
-
-This endpoint returns details of a specific GraphQL Data API authentication provider.
-
-Usage: `neo4j-cli aura data-api graphql auth-provider get <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to get the authentication provider of |
-| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
-
-Examples:
-
-```
-# Get details of an authentication provider
-neo4j-cli aura data-api graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111
-
-# Get details of an authentication provider as JSON
-neo4j-cli aura data-api graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Extract just the enabled flag for scripting
-neo4j-cli aura data-api graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data.enabled'
-```
-
-##### neo4j-cli aura data-api graphql auth-provider list
-
-Returns a list of authentication providers of a specific GraphQL Data API
-
-Usage: `neo4j-cli aura data-api graphql auth-provider list [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to list the authentication providers of |
-| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
-
-Examples:
-
-```
-# List authentication providers of a GraphQL Data API
-neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111
-
-# List authentication providers as JSON for scripting
-neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Show only enabled provider names
-neo4j-cli aura data-api graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[] | select(.enabled) | .name'
-```
-
-#### neo4j-cli aura data-api graphql cors-policy
-
-Allows you to manage the Cross-Origin Resource Sharing (CORS) policy for a specific GraphQL Data API
-
-Usage: `neo4j-cli aura data-api graphql cors-policy`
-
-##### neo4j-cli aura data-api graphql cors-policy allowed-origin
-
-Allows you to manage Cross-Origin Resource Sharing (CORS) allowed origins for a specific GraphQL Data API
-
-Usage: `neo4j-cli aura data-api graphql cors-policy allowed-origin`
-
-###### neo4j-cli aura data-api graphql cors-policy allowed-origin add
-
-Adds a new allowed origin to the CORS policy
-
-This command adds a new allowed origin to the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
-
-Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
-
-Adding a new allowed origin to the CORS policy of a GraphQL Data API allows browsers to make requests to the GraphQL Data API from a web app that is served from the specified origin.
-
-Usage: `neo4j-cli aura data-api graphql cors-policy allowed-origin add <origin> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to add the CORS allowed origin for |
-| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
-| `--wait` | bool | false | Waits until updated GraphQL Data API is ready. |
-
-Examples:
-
-```
-# Add an allowed origin to the CORS policy
-neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
-
-# Add an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw
-
-# Add an allowed origin and capture the response as JSON
-neo4j-cli aura data-api graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json
-```
-
-###### neo4j-cli aura data-api graphql cors-policy allowed-origin remove
-
-Removes an allowed origin from the CORS policy
-
-This command removes an allowed origin from the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
-
-Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
-
-Removing an allowed origin from the CORS policy of a GraphQL Data API means that most browsers are no longer able to make requests to the GraphQL Data API from a web app that is served from the specified origin.
-
-Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
-
-Usage: `neo4j-cli aura data-api graphql cors-policy allowed-origin remove <origin> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to remove the CORS allowed origin for |
-| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
-| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
-| `--wait` | bool | false | Waits until updated GraphQL Data API is ready. |
-| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
-
-Examples:
-
-```
-# Remove an allowed origin from the CORS policy
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
-
-# Remove an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw --yes --force
-
-# Remove an allowed origin and capture the response as JSON
-neo4j-cli aura data-api graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
-```
-
-#### neo4j-cli aura data-api graphql create
-
-Creates a new GraphQL Data API
-
-This command starts the creation process of a GraphQL Data API.
-
-Creating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "creating" to "ready" you may begin to use your GraphQL Data API.
-
-This command returns your GraphQL Data API ID, API key, and connection URL for you to use once the GraphQL Data API is running. It is important to store the API key as it is not currently possible to get this or update it.
-
-If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
-
-Usage: `neo4j-cli aura data-api graphql create [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
-| `--instance-password` | string | - | (required) The password of the instance this GraphQL Data API will be connected to |
-| `--instance-username` | string | - | (required) The username of the instance this GraphQL Data API will be connected to |
-| `--name` | string | - | (required) The name of the GraphQL Data API |
-| `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
-| `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql. Must be of file type .graphql |
-| `--wait` | bool | false | Waits until created GraphQL Data API is ready. |
-
-Examples:
-
-```
-# Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
-
-# Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
-
-# Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura data-api graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --wait --rw
-```
-
-#### neo4j-cli aura data-api graphql delete
-
-Delete a GraphQL Data API
-
-Deletes a GraphQL Data API. This action can not be undone.
-
-Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
-
-Usage: `neo4j-cli aura data-api graphql delete <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
-| `--instance-id` | string | - | (required) The ID of the instance to delete the Data API for |
-| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
-
-Examples:
-
-```
-# Delete a GraphQL Data API
-neo4j-cli aura data-api graphql delete 11111111 --instance-id 00000000 --rw --yes --force
-
-# Delete a GraphQL Data API and capture the response as JSON
-neo4j-cli aura data-api graphql delete 11111111 --instance-id 00000000 --rw --yes --force --format json
-
-# Delete a GraphQL Data API discovered via list
-neo4j-cli aura data-api graphql delete $(neo4j-cli aura data-api graphql list --instance-id 00000000 --format json | jq -r '.data[0].id') --instance-id 00000000 --rw --yes --force
-```
-
-#### neo4j-cli aura data-api graphql get
-
-Get details of a GraphQL Data API
-
-This endpoint returns details of a specific GraphQL Data API.
-
-Usage: `neo4j-cli aura data-api graphql get <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to get the GraphQL Data API details for |
-
-Examples:
-
-```
-# Get details of a GraphQL Data API
-neo4j-cli aura data-api graphql get 11111111 --instance-id 00000000
-
-# Get details of a GraphQL Data API as JSON
-neo4j-cli aura data-api graphql get 11111111 --instance-id 00000000 --format json
-
-# Extract just the connection URL for scripting
-neo4j-cli aura data-api graphql get 11111111 --instance-id 00000000 --format json | jq -r '.data.url'
-```
-
-#### neo4j-cli aura data-api graphql list
-
-Returns a list of GraphQL Data APIs
-
-Usage: `neo4j-cli aura data-api graphql list [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to list the GraphQL Data APIs of |
-
-Examples:
-
-```
-# List GraphQL Data APIs of an instance
-neo4j-cli aura data-api graphql list --instance-id 00000000
-
-# List GraphQL Data APIs as JSON for scripting
-neo4j-cli aura data-api graphql list --instance-id 00000000 --format json
-
-# Extract just the IDs of every GraphQL Data API for an instance
-neo4j-cli aura data-api graphql list --instance-id 00000000 --format json | jq -r '.data[].id'
-```
-
-#### neo4j-cli aura data-api graphql pause
-
-Pause a GraphQL Data API
-
-This command starts the pausing process of an existing GraphQL Data API.
-
-Pausing a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be paused. The GraphQL Data API will only be paused once the status transitions from "pausing" to "paused".
-
-Usage: `neo4j-cli aura data-api graphql pause <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to pause the Data API for |
-| `--wait` | bool | false | Waits until GraphQL Data API is paused. |
-
-Examples:
-
-```
-# Pause a GraphQL Data API
-neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw
-
-# Pause a GraphQL Data API and wait until it is paused
-neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --wait --rw
-
-# Pause a GraphQL Data API and capture the response as JSON
-neo4j-cli aura data-api graphql pause 11111111 --instance-id 00000000 --rw --format json
-```
-
-#### neo4j-cli aura data-api graphql resume
-
-Resume a GraphQL Data API
-
-This command starts the resuming process of an existing GraphQL Data API.
-
-Resuming a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "resuming" to "ready" you may begin to use your GraphQL Data API.
-
-Usage: `neo4j-cli aura data-api graphql resume <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to resume the Data API for |
-| `--wait` | bool | false | Waits until GraphQL Data API is resumed. |
-
-Examples:
-
-```
-# Resume a paused GraphQL Data API
-neo4j-cli aura data-api graphql resume 11111111 --instance-id 00000000 --rw
-
-# Resume a GraphQL Data API and wait until it is ready
-neo4j-cli aura data-api graphql resume 11111111 --instance-id 00000000 --wait --rw
-
-# Resume a GraphQL Data API and capture the response as JSON
-neo4j-cli aura data-api graphql resume 11111111 --instance-id 00000000 --rw --format json
-```
-
-#### neo4j-cli aura data-api graphql update
-
-Edit a GraphQL Data API
-
-This endpoint edits a specific GraphQL Data API.
-
-Updating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.
-
-Usage: `neo4j-cli aura data-api graphql update <id> [flags]`
-
-Flags:
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--instance-id` | string | - | (required) The ID of the instance to update the Data API for |
-| `--instance-password` | string | - | The password of the instance this GraphQL Data API will be connected to |
-| `--instance-username` | string | - | The username of the instance this GraphQL Data API will be connected to |
-| `--name` | string | - | The name of the GraphQL Data API |
-| `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
-| `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql |
-| `--wait` | bool | false | Waits until updated GraphQL Data API is ready again. |
-
-Examples:
-
-```
-# Rename a GraphQL Data API
-neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
-
-# Update the underlying instance credentials and wait for the API to be ready
-neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --wait --rw
-
-# Replace the type definitions from a local file
-neo4j-cli aura data-api graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
-```
-
 ## neo4j-cli aura graph-analytics
 
 Relates to Aura Graph Analytics
@@ -1039,6 +588,450 @@ neo4j-cli aura graph-analytics session list
 
 # List sessions attached to a specific instance and emit JSON for scripting
 neo4j-cli aura graph-analytics session list --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --instance-id 00000000 --format json
+```
+
+## neo4j-cli aura graphql
+
+Allows you to programmatically provision and manage your GraphQL Data APIs
+
+Usage: `neo4j-cli aura graphql`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auth-url` | string | - |  |
+| `--base-url` | string | - |  |
+| `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+
+### neo4j-cli aura graphql auth-provider
+
+Allows you to programmatically manage Authentication providers for a specific GraphQL Data API
+
+Usage: `neo4j-cli aura graphql auth-provider`
+
+#### neo4j-cli aura graphql auth-provider create
+
+Creates a new GraphQL Data API authentication provider
+
+This command creates a new GraphQL Data API authentication provider.
+
+Creating a GraphQL Data API authentication provider is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
+
+If you create an 'api-key' Authentication provider, an API key will be created. It is important to store the API key as it is not currently possible to get it or update it.
+
+If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
+
+Usage: `neo4j-cli aura graphql auth-provider create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to create the authentication provider for |
+| `--disabled` | bool | false | Whether or not the Authentication provider is disabled |
+| `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
+| `--name` | string | - | (required) The name of the Authentication provider |
+| `--type` | type | - | (required) The type of the Authentication provider, one of 'api-key' or 'jwks' |
+| `--url` | string | - | The JWKS URL that you want the bearer tokens in incoming GraphQL requests to be validated against. NOTE: only applicable for Authentication provider type 'jwks' |
+| `--wait` | bool | false | Waits until created Authentication provider is ready. |
+
+Examples:
+
+```
+# Create an api-key authentication provider
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --rw
+
+# Create a JWKS authentication provider with a validation URL
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --rw
+
+# Create a disabled api-key provider and wait until the GraphQL Data API is ready
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --wait --rw
+```
+
+#### neo4j-cli aura graphql auth-provider delete
+
+Delete a GraphQL Data API authentication provider
+
+Deletes a GraphQL Data API authentication provider. This action can not be undone.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura graphql auth-provider delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to delete the Authentication provider for |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--instance-id` | string | - | (required) The ID of the instance to delete the Data API for |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete an authentication provider
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
+
+# Delete an authentication provider and capture the response as JSON
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
+
+# Delete the first authentication provider returned by list
+neo4j-cli aura graphql auth-provider delete $(neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
+```
+
+#### neo4j-cli aura graphql auth-provider get
+
+Get details of a GraphQL Data API authentication provider
+
+This endpoint returns details of a specific GraphQL Data API authentication provider.
+
+Usage: `neo4j-cli aura graphql auth-provider get <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to get the authentication provider of |
+| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
+
+Examples:
+
+```
+# Get details of an authentication provider
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111
+
+# Get details of an authentication provider as JSON
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json
+
+# Extract just the enabled flag for scripting
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data.enabled'
+```
+
+#### neo4j-cli aura graphql auth-provider list
+
+Returns a list of authentication providers of a specific GraphQL Data API
+
+Usage: `neo4j-cli aura graphql auth-provider list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to list the authentication providers of |
+| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
+
+Examples:
+
+```
+# List authentication providers of a GraphQL Data API
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111
+
+# List authentication providers as JSON for scripting
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json
+
+# Show only enabled provider names
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[] | select(.enabled) | .name'
+```
+
+### neo4j-cli aura graphql cors-policy
+
+Allows you to manage the Cross-Origin Resource Sharing (CORS) policy for a specific GraphQL Data API
+
+Usage: `neo4j-cli aura graphql cors-policy`
+
+#### neo4j-cli aura graphql cors-policy allowed-origin
+
+Allows you to manage Cross-Origin Resource Sharing (CORS) allowed origins for a specific GraphQL Data API
+
+Usage: `neo4j-cli aura graphql cors-policy allowed-origin`
+
+##### neo4j-cli aura graphql cors-policy allowed-origin add
+
+Adds a new allowed origin to the CORS policy
+
+This command adds a new allowed origin to the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
+
+Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
+
+Adding a new allowed origin to the CORS policy of a GraphQL Data API allows browsers to make requests to the GraphQL Data API from a web app that is served from the specified origin.
+
+Usage: `neo4j-cli aura graphql cors-policy allowed-origin add <origin> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to add the CORS allowed origin for |
+| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
+| `--wait` | bool | false | Waits until updated GraphQL Data API is ready. |
+
+Examples:
+
+```
+# Add an allowed origin to the CORS policy
+neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
+
+# Add an allowed origin and wait until the GraphQL Data API is ready
+neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw
+
+# Add an allowed origin and capture the response as JSON
+neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json
+```
+
+##### neo4j-cli aura graphql cors-policy allowed-origin remove
+
+Removes an allowed origin from the CORS policy
+
+This command removes an allowed origin from the Cross-Origin Resource Sharing (CORS) policy of a GraphQL Data API.
+
+Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "updating" to "ready" you may begin to use your GraphQL Data API.
+
+Removing an allowed origin from the CORS policy of a GraphQL Data API means that most browsers are no longer able to make requests to the GraphQL Data API from a web app that is served from the specified origin.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura graphql cors-policy allowed-origin remove <origin> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--data-api-id` | string | - | (required) The ID of the GraphQL Data API to remove the CORS allowed origin for |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--instance-id` | string | - | (required) The ID of the instance the GraphQL Data API is connected to |
+| `--wait` | bool | false | Waits until updated GraphQL Data API is ready. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Remove an allowed origin from the CORS policy
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
+
+# Remove an allowed origin and wait until the GraphQL Data API is ready
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw --yes --force
+
+# Remove an allowed origin and capture the response as JSON
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
+```
+
+### neo4j-cli aura graphql create
+
+Creates a new GraphQL Data API
+
+This command starts the creation process of a GraphQL Data API.
+
+Creating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "creating" to "ready" you may begin to use your GraphQL Data API.
+
+This command returns your GraphQL Data API ID, API key, and connection URL for you to use once the GraphQL Data API is running. It is important to store the API key as it is not currently possible to get this or update it.
+
+If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.
+
+Usage: `neo4j-cli aura graphql create [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
+| `--instance-password` | string | - | (required) The password of the instance this GraphQL Data API will be connected to |
+| `--instance-username` | string | - | (required) The username of the instance this GraphQL Data API will be connected to |
+| `--name` | string | - | (required) The name of the GraphQL Data API |
+| `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
+| `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql. Must be of file type .graphql |
+| `--wait` | bool | false | Waits until created GraphQL Data API is ready. |
+
+Examples:
+
+```
+# Create a GraphQL Data API from inline type definitions (base64-encoded)
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+
+# Create a GraphQL Data API from a local type definitions file
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
+
+# Create a GraphQL Data API and wait until it is ready
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --wait --rw
+```
+
+### neo4j-cli aura graphql delete
+
+Delete a GraphQL Data API
+
+Deletes a GraphQL Data API. This action can not be undone.
+
+Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+
+Usage: `neo4j-cli aura graphql delete <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--instance-id` | string | - | (required) The ID of the instance to delete the Data API for |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
+
+Examples:
+
+```
+# Delete a GraphQL Data API
+neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --rw --yes --force
+
+# Delete a GraphQL Data API and capture the response as JSON
+neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --rw --yes --force --format json
+
+# Delete a GraphQL Data API discovered via list
+neo4j-cli aura graphql delete $(neo4j-cli aura graphql list --instance-id 00000000 --format json | jq -r '.data[0].id') --instance-id 00000000 --rw --yes --force
+```
+
+### neo4j-cli aura graphql get
+
+Get details of a GraphQL Data API
+
+This endpoint returns details of a specific GraphQL Data API.
+
+Usage: `neo4j-cli aura graphql get <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to get the GraphQL Data API details for |
+
+Examples:
+
+```
+# Get details of a GraphQL Data API
+neo4j-cli aura graphql get 11111111 --instance-id 00000000
+
+# Get details of a GraphQL Data API as JSON
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json
+
+# Extract just the connection URL for scripting
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json | jq -r '.data.url'
+```
+
+### neo4j-cli aura graphql list
+
+Returns a list of GraphQL Data APIs
+
+Usage: `neo4j-cli aura graphql list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to list the GraphQL Data APIs of |
+
+Examples:
+
+```
+# List GraphQL Data APIs of an instance
+neo4j-cli aura graphql list --instance-id 00000000
+
+# List GraphQL Data APIs as JSON for scripting
+neo4j-cli aura graphql list --instance-id 00000000 --format json
+
+# Extract just the IDs of every GraphQL Data API for an instance
+neo4j-cli aura graphql list --instance-id 00000000 --format json | jq -r '.data[].id'
+```
+
+### neo4j-cli aura graphql pause
+
+Pause a GraphQL Data API
+
+This command starts the pausing process of an existing GraphQL Data API.
+
+Pausing a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be paused. The GraphQL Data API will only be paused once the status transitions from "pausing" to "paused".
+
+Usage: `neo4j-cli aura graphql pause <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to pause the Data API for |
+| `--wait` | bool | false | Waits until GraphQL Data API is paused. |
+
+Examples:
+
+```
+# Pause a GraphQL Data API
+neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --rw
+
+# Pause a GraphQL Data API and wait until it is paused
+neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --rw
+
+# Pause a GraphQL Data API and capture the response as JSON
+neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --rw --format json
+```
+
+### neo4j-cli aura graphql resume
+
+Resume a GraphQL Data API
+
+This command starts the resuming process of an existing GraphQL Data API.
+
+Resuming a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "resuming" to "ready" you may begin to use your GraphQL Data API.
+
+Usage: `neo4j-cli aura graphql resume <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to resume the Data API for |
+| `--wait` | bool | false | Waits until GraphQL Data API is resumed. |
+
+Examples:
+
+```
+# Resume a paused GraphQL Data API
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw
+
+# Resume a GraphQL Data API and wait until it is ready
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --rw
+
+# Resume a GraphQL Data API and capture the response as JSON
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw --format json
+```
+
+### neo4j-cli aura graphql update
+
+Edit a GraphQL Data API
+
+This endpoint edits a specific GraphQL Data API.
+
+Updating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.
+
+Usage: `neo4j-cli aura graphql update <id> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--instance-id` | string | - | (required) The ID of the instance to update the Data API for |
+| `--instance-password` | string | - | The password of the instance this GraphQL Data API will be connected to |
+| `--instance-username` | string | - | The username of the instance this GraphQL Data API will be connected to |
+| `--name` | string | - | The name of the GraphQL Data API |
+| `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
+| `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql |
+| `--wait` | bool | false | Waits until updated GraphQL Data API is ready again. |
+
+Examples:
+
+```
+# Rename a GraphQL Data API
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
+
+# Update the underlying instance credentials and wait for the API to be ready
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --wait --rw
+
+# Replace the type definitions from a local file
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
 ```
 
 ## neo4j-cli aura instance
