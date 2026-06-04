@@ -1,0 +1,213 @@
+feature: cli-204-load-example-datasets
+prd: ./prd-cli-204-load-example-datasets.md
+created_at: 2026-06-04T00:00:00Z
+updated_at: 2026-06-04T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Embedded dataset catalog (suggestions) in internal/dataset'
+    description: |
+      Create the non-cobra support package neo4j-cli/internal/dataset with
+      catalog.go holding an embedded curated list of suggested datasets
+      ({slug, title, description, owner/repo}) sourced from the README of
+      neo4j-graph-examples/demo.neo4jlabs.com. Expose a List() accessor. The
+      list is only a suggestion set; loading is not constrained to it.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "catalog.go exposes List() returning the curated entries with slug/title/description/owner-repo"
+      - "Entries match the demo.neo4jlabs.com README slugs (movies, recommendations, northwind, etc.)"
+      - "Package has the Neo4j copyright header and a table-driven catalog_test.go"
+      - "No network access in List() — data is embedded in the binary"
+    completed_at: null
+
+  - id: task-002
+    title: 'Manifest resolution: fetch + parse relate.project-install.json + version match'
+    description: |
+      Add resolve.go to neo4j-cli/internal/dataset. Resolve(ctx, owner/repo,
+      neo4jVersion) fetches relate.project-install.json from raw.githubusercontent
+      (branch main, then master), parses dbms[], and selects the entry whose
+      targetNeo4jVersion semver range matches the target version (newest compatible
+      on ambiguity). Returns a Spec {DumpPath, Plugins, MatchedVersionRange}. Verify
+      the selected dumpFile path exists in the repo and error clearly if not.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "Resolve tries branch main then falls back to master"
+      - "Selects the dbms[] entry whose targetNeo4jVersion range matches; picks newest compatible when several match"
+      - "Returns Spec with DumpPath, Plugins, MatchedVersionRange"
+      - "Errors clearly when no compatible entry exists or the dump path is missing in the repo"
+      - "Tests stub the manifest fetch via httptest (no real network)"
+    completed_at: null
+
+  - id: task-003
+    title: 'Secure, LFS-aware dump downloader (streamed, capped, allowlisted)'
+    description: |
+      Add download.go to neo4j-cli/internal/dataset. Download(ctx, spec, maxSize)
+      fetches the dump from the Git-LFS media host
+      (media.githubusercontent.com/media/...), HTTPS-only, against a host allowlist
+      (media./raw.githubusercontent.com, github.com, codeload.github.com), streamed
+      to a 0600 temp file (no io.ReadAll), capped at maxSize (default 2GiB), with a
+      cleanup func. Detect an LFS pointer payload and fail loudly. Model on
+      update/swap.go (assertAllowedHost, redactURL).
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Downloads from media.githubusercontent.com, not raw. (which returns an LFS pointer)"
+      - "Rejects non-HTTPS and non-allowlisted hosts; redacts URLs in any error/log"
+      - "Streams to a 0600 temp file and returns a cleanup func; never reads the whole dump into memory"
+      - "Enforces the size cap and errors when exceeded"
+      - "Detects an LFS pointer ('version https://git-lfs...') and fails with a clear error"
+      - "Tests stub the media host via httptest and cover pointer-detection + cap paths"
+    completed_at: null
+
+  - id: task-004
+    title: 'dataset discovery command: parent help signpost + list leaf'
+    description: |
+      Create the cobra package neo4j-cli/internal/subcommands/dataset (dataset.go,
+      list.go, list_test.go) following the one-file-per-leaf layout. The dataset
+      parent registers --format and its Long/help signposts the three per-target load
+      commands (docker load, desktop dbms load, aura instance load). dataset list
+      renders the curated suggestions honoring --format. Mount dataset.NewCmd(cfg) in
+      neo4j-cli/app/app.go. No load leaf under dataset.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli dataset --help describes the three per-target load commands"
+      - "neo4j-cli dataset list renders slug/title/description/repo in json, table, and toon"
+      - "dataset.NewCmd is mounted in app.go and reachable as 'neo4j-cli dataset'"
+      - "dataset list has a flush-left Example with >=2 invocations incl. one --format json"
+      - "No load leaf exists under dataset"
+    completed_at: null
+
+  - id: task-005
+    title: 'Docker loader helper + docker load leaf (new/existing container)'
+    description: |
+      Add neo4j-cli/internal/subcommands/docker/load.go and register 'docker load' in
+      docker.go. New container: download dump, run a one-shot loader container on a
+      named volume (neo4j-admin database load <db> --from-path=/import
+      --overwrite-destination=true), then create the server container reusing that
+      volume with NEO4J_PLUGINS from the manifest, image version satisfying the dump's
+      targetNeo4jVersion; expose this as a reusable LoadDumpIntoNewContainer helper.
+      Existing container (--force required): Bolt STOP DATABASE <db> -> docker exec
+      neo4j-admin database load -> START DATABASE <db>; refuse if a manifest-required
+      plugin is missing. Shared flags --name, --database (default neo4j), --max-size,
+      --force, --wait, --version. Honor --wait via docker.WaitForBolt. Reuse
+      NewDeployClient, the dockerClient iface, create.go port/name helpers, renderEnvFile.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "New container loads the dump on a named volume and starts with NEO4J_PLUGINS from the manifest"
+      - "Image version is chosen to satisfy the dump's targetNeo4jVersion"
+      - "Existing container is refused without --force; with --force it overwrites via STOP/load/START"
+      - "Existing container missing a manifest plugin is refused with a clear error"
+      - "--database overrides the default 'neo4j' target database; --wait uses docker.WaitForBolt"
+      - "LoadDumpIntoNewContainer is exported for reuse by the aura loader"
+      - "Tests swap the docker client via the clientFactory seam and stub manifest/LFS via httptest"
+    completed_at: null
+
+  - id: task-006
+    title: 'desktopclient.LoadDump method'
+    description: |
+      Add LoadDump(ctx, dbmsID, db, sourceFilePath, overwrite) to
+      neo4j-cli/internal/desktopclient (client.go + any types in types.go), calling
+      POST /fastify/api/dbmss/:id/databases/:db/load-dump (synchronous; DBMS must be
+      stopped), mirroring the existing UploadDatabase method shape.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "LoadDump issues POST /fastify/api/dbmss/:id/databases/:db/load-dump with {sourceFilePath, overwrite}"
+      - "Signature and error handling mirror the existing UploadDatabase method"
+      - "Unit test exercises the call against the desktop test fixture/handlers"
+      - "Copyright header present"
+    completed_at: null
+
+  - id: task-007
+    title: 'desktop dbms load leaf (existing via --dbms-id, new via --name)'
+    description: |
+      Add neo4j-cli/internal/subcommands/desktop/dbms/load.go and register 'dbms load'
+      in dbms/dbms.go. Existing DBMS (--dbms-id <uuid>, requires --force): stop if
+      running, LoadDump into --database, install each manifest plugin via InstallPlugin,
+      start. New DBMS (--name): create+load via POST /fastify/api/desktop/dbmss with
+      dumpOrBackupPath, install plugins, start, choosing the newest compatible Neo4j
+      version when the manifest spans ranges. --dbms-id and --name are mutually
+      exclusive and exactly one is required.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "--dbms-id and --name are mutually exclusive; exactly one required (usage error otherwise)"
+      - "Existing DBMS requires --force; loads via stop -> LoadDump -> InstallPlugin -> start"
+      - "New DBMS is created+loaded via dumpOrBackupPath then plugins installed and started"
+      - "--database selects the target database; default neo4j"
+      - "Tests use the desktop client seam; no afero.NewOsFs in query-adjacent tests"
+    completed_at: null
+
+  - id: task-008
+    title: 'aura instance load leaf (new instance via ephemeral docker staging)'
+    description: |
+      Add neo4j-cli/aura/internal/subcommands/instance/load.go and register
+      'instance load' in instance.go, reusing the aura instance create flag set
+      (--name, --cloud-provider, --region, --memory, --type, org/project). Error early
+      (before creating the instance) if no local Docker daemon is available, and
+      hard-error before any work if the manifest plugins include graph-data-science.
+      Otherwise: create a new Aura instance (create_core.go), stage the dump into an
+      ephemeral docker neo4j via docker.LoadDumpIntoNewContainer, docker.PushToAura to
+      the new instance, tear down the ephemeral container. Resolve org/project via
+      utils/resolve.go.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "Errors early (before instance creation) when no local Docker daemon is available"
+      - "Hard-errors before any work when manifest plugins include graph-data-science"
+      - "Creates a new instance, stages via ephemeral docker, pushes with docker.PushToAura, then tears down"
+      - "Reuses the instance create flag set and utils/resolve.go for org/project"
+      - "Tests cover the GDS hard-error and docker-absent early-error paths"
+    completed_at: null
+
+  - id: task-009
+    title: 'Examples on all leaves + regenerate skill bundle'
+    description: |
+      Ensure every new runnable leaf (dataset list, docker load, desktop dbms load,
+      aura instance load) has a flush-left Example with >=2 invocations, each preceded
+      by a # comment, writes using --rw where applicable and reads including one
+      --format json. Run go generate ./neo4j-cli/internal/skill/... and commit the
+      regenerated bundle so TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples
+      pass.
+    status: pending
+    dependencies:
+      - task-004
+      - task-005
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "All four new leaves have compliant flush-left Example fields"
+      - "go generate ./neo4j-cli/internal/skill/... produces no further diff after commit"
+      - "TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+    completed_at: null
+
+  - id: task-010
+    title: 'Changelog, final gates, and security review'
+    description: |
+      Add a user-facing changelog entry via changie (kind Minor). Run the full gates
+      (make test, make fmt-check, make lint) until clean. Run the golang-security skill
+      as a final gate over the risky code (network download, LFS handling, neo4j-admin
+      exec, temp files), addressing the allowlist, LFS-pointer detection, 0600 perms,
+      and URL/secret redaction.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "A Minor changelog entry is added via changie for the new load commands"
+      - "make test, make fmt-check, and make lint all pass"
+      - "golang-security gate run with findings addressed (allowlist, pointer detection, 0600, redaction)"
+    completed_at: null
