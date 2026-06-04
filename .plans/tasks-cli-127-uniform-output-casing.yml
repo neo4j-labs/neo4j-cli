@@ -14,7 +14,7 @@ tasks:
       TestAllLeafCommands_HaveExamples in
       neo4j-cli/internal/subcommands/agentcontext/agentcontext_test.go. The current
       tree already complies, so this passes immediately and guards future additions.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Test walks the full app.NewCmd(cfg) tree (recursing into subcommands)"
@@ -22,7 +22,7 @@ tasks:
       - "Failure message names the offending command path / identifier"
       - "Passes on the current tree; flagged failure when a temp --bad_flag or snake command name is introduced"
       - "make test runs it; hermetic (no network, no real FS)"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-002
     title: 'Convert docker output fields to snake_case (bolt_port, http_port)'

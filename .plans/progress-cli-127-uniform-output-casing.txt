@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-04T00:00:00Z
+Added hermetic kebab-case input gate test walking live app.NewCmd(cfg) tree; asserts kebab-case command names/aliases/flag-long-names. Exempts single-char shorthands, help/completion, and the `:schema`/`:embed` REPL colon prefix.
+Files: +neo4j-cli/internal/subcommands/agentcontext/casing_input_gate_test.go
+Decisions: leading `:` stripped before regex (intentional REPL meta-command convention); verified gate fails on injected --bad_flag.
