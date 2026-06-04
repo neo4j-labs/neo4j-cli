@@ -11,6 +11,7 @@ The current command hierarchy `aura data-api graphql <cmd>` has an unnecessary n
 - Update Go package layout to match: flatten `subcommands/dataapi/graphql/` → `subcommands/graphql/`.
 - Update all descriptions/Short/Long strings to say "GraphQL data APIs" rather than "Data APIs" / "GraphQL Data APIs".
 - Make `--name` optional on `graphql create` with auto-generated names (`GraphQL01`, `GraphQL02`, …).
+- Add `--organization-id`/`--project-id` flags to all graphql commands so they respect the configured workspace and validate instance ownership.
 
 ## Non-Goals
 
@@ -29,6 +30,10 @@ The current command hierarchy `aura data-api graphql <cmd>` has an unnecessary n
 - REQ-F-005: All `Short`, `Long`, and `Example` strings across every affected command must be updated — `Example` paths change from `aura data-api graphql` to `aura graphql`; descriptions use "GraphQL data API" terminology throughout.
 - REQ-F-006: `--name` on `graphql create` MUST be optional (remove `MarkFlagRequired`). When omitted the CLI must auto-generate a unique name.
 - REQ-F-007: Auto-name generation must query `GET /instances/{id}/data-apis/graphql` (the same endpoint used by `graphql list`) for the given `--instance-id`, collect the `name` field from each entry, then return the lowest unused name of the form `GraphQL01`, `GraphQL02`, …, `GraphQL99`, `GraphQL100`, … (zero-padded to two digits for 1–99, full decimal for 100+), case-insensitively avoiding collisions.
+- REQ-F-008: The `graphql` parent command must register `--organization-id` and `--project-id` as persistent flags via `auraflags.RegisterOrgProjectFlags(cmd)` (from `neo4j-cli/aura/internal/flags`). These flags must accept the same values and have the same description as the equivalent flags on `instance` and other Aura commands.
+- REQ-F-009: Every graphql leaf command that takes `--instance-id` must call `utils.ResolveAndValidateOrgProject(cmd, cfg)` to resolve org and project IDs (supporting both flag-based and configured-workspace resolution), then call `utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID)` to verify the instance belongs to the resolved project before proceeding. This applies to all 13 leaf commands: `list`, `get`, `create`, `update`, `delete`, `pause`, `resume`, `auth-provider list`, `auth-provider get`, `auth-provider create`, `auth-provider delete`, `cors-policy allowed-origin add`, `cors-policy allowed-origin remove`.
+- REQ-F-010: Example strings on all affected leaf commands must include at least one invocation that passes `--organization-id`/`--project-id` explicitly and one that omits them (relying on a configured workspace), mirroring the `instance list` Example pattern.
+- REQ-F-011: All write graphql commands (`create`, `delete`, `update`, `pause`, `resume`, `auth-provider create`, `auth-provider delete`, `cors-policy allowed-origin add`, `cors-policy allowed-origin remove`) must carry `Annotations: map[string]string{"write": "true"}` and must include `--rw` in their `Example` invocations. (This confirms existing state and must remain intact after the org/project changes.)
 
 ### Non-Functional Requirements
 
@@ -36,6 +41,7 @@ The current command hierarchy `aura data-api graphql <cmd>` has an unnecessary n
 - REQ-NF-004: The name-generation helper must be tested in isolation (unit tests for the `defaultGraphQLName` function) and the auto-name flow must be covered by an integration-style test using the mock HTTP server.
 - REQ-NF-002: All existing tests must continue to pass unchanged (or with minimal path/import updates only).
 - REQ-NF-003: A changelog entry (kind `Minor`) is required — this is a user-facing breaking change (command rename).
+- REQ-NF-005: Test coverage must be added for org/project resolution on graphql commands: (a) flags provided explicitly, (b) resolved from configured default workspace, (c) error when neither flag nor workspace is set, (d) `FetchAndVerifyInstanceInProject` returning an error when the instance belongs to a different project.
 
 ## Technical Considerations (auto-name addition)
 
@@ -53,6 +59,31 @@ Mirror the instance pattern exactly:
 ### API call order on create
 
 The auto-name path adds one extra `GET` before the `POST`. This only happens when `--name` is omitted; the fast path (explicit name) is unchanged.
+
+## Technical Considerations (org/project/workspace/--rw addition)
+
+### Org/project flag registration
+
+- Add `auraflags.RegisterOrgProjectFlags(cmd)` call to `graphql.go`'s `NewCmd`, after `flags.RegisterAuraCredentialFlag(cmd, cfg)`.  Import path: `auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"`.
+- This registers `--organization-id` and `--project-id` as persistent flags on the `graphql` parent, making them available to all leaf commands.
+
+### Ownership validation in leaf commands
+
+- Each leaf command calls `utils.ResolveAndValidateOrgProject(cmd, cfg)` at the top of `RunE` (after `cmd.SilenceUsage = true`).
+- If the command also has a `--instance-id` flag (all current graphql leaf commands do), follow immediately with `utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID)`. The returned `resBody` is discarded (the graphql leaf then makes its own API call); only the error matters.
+- For `create`, the ownership check must happen before `resolveGraphQLName` since `resolveGraphQLName` also calls the list API — validating ownership first prevents leaking information from the wrong project.
+- Import: `"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"`.
+
+### Example string pattern (mirroring `instance list`)
+
+Every affected leaf command must include:
+1. An invocation with explicit `--organization-id`/`--project-id` flags.
+2. An invocation that omits them (relying on a configured workspace).
+Write commands must still include `--rw` in all invocations.
+
+### --rw enforcement
+
+Write commands carry `Annotations: map[string]string{"write": "true"}`. The root `neo4j-cli` command's `PersistentPreRunE` (via `cobra.EnableTraverseRunHooks = true`) calls `flags.EnforceWriteGate(cmd)` which enforces `--rw` when running under an agent harness or non-interactive script. No changes needed to the annotation pattern — verify it is intact on all write commands after the org/project changes.
 
 ## Technical Considerations
 
@@ -114,6 +145,14 @@ The inner packages (`authprovider`, `corspolicy`, `allowedorigin`) keep their cu
 - [ ] `graphql create --instance-id X --name my-api ...` continues to work as before.
 - [ ] Auto-name skips names already used by existing data APIs (collision avoidance verified by test).
 - [ ] `name_helpers_test.go` covers the `defaultGraphQLName` function with table-driven cases.
+- [ ] `aura graphql list --instance-id X --organization-id <org> --project-id <proj>` validates org/project and ownership before returning results.
+- [ ] All 13 graphql leaf commands call `ResolveAndValidateOrgProject` + `FetchAndVerifyInstanceInProject`.
+- [ ] Omitting `--organization-id`/`--project-id` with a configured default workspace resolves correctly.
+- [ ] Omitting both flags and with no workspace configured returns a helpful error ("no organization specified…").
+- [ ] Specifying an `--instance-id` that belongs to a different project returns a "could not find instance X in project Y" error.
+- [ ] All write commands (`create`, `delete`, `update`, `pause`, `resume`, `auth-provider create`, `auth-provider delete`, `cors-policy allowed-origin add/remove`) retain `Annotations: map[string]string{"write": "true"}` and include `--rw` in examples.
+- [ ] Tests cover org/project flag path and workspace fallback for at least one graphql command (e.g. `list`).
+- [ ] `TestGenerator_RoundTrip` passes after bundle regeneration.
 
 ## Out of Scope
 
