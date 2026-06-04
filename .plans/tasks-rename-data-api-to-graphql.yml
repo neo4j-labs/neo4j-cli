@@ -1,0 +1,103 @@
+feature: rename-data-api-to-graphql
+prd: ./prd-rename-data-api-to-graphql.md
+created_at: 2026-06-04T00:00:00Z
+updated_at: 2026-06-04T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Move subcommands/dataapi/graphql/ to subcommands/graphql/ and fix imports"
+    description: |
+      Create the new `neo4j-cli/aura/internal/subcommands/graphql/` directory tree and move
+      all 34 files from `subcommands/dataapi/graphql/` into it, preserving the
+      `authprovider/` and `corspolicy/allowedorigin/` subdirectory structure.
+      Update every import path inside the moved files that referenced
+      `dataapi/graphql/authprovider` or `dataapi/graphql/corspolicy` to use the new
+      `graphql/authprovider` / `graphql/corspolicy` paths. Package-level `package` declarations
+      are unchanged (they stay `graphql`, `authprovider`, `corspolicy`, `allowedorigin`).
+      Do not yet touch `aura.go`, `data_api.go`, or the flags in `graphql.go`.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "All files previously under subcommands/dataapi/graphql/ now exist under subcommands/graphql/ with identical names"
+      - "subcommands/dataapi/graphql/ directory is gone (only data_api.go remains under subcommands/dataapi/)"
+      - "Import paths inside the moved files reference the new graphql/ location (e.g. .../subcommands/graphql/authprovider)"
+      - "Package declarations in all moved files are unchanged"
+    completed_at: null
+
+  - id: task-002
+    title: "Merge data_api.go flags into graphql.go, remove dataapi/, update aura.go"
+    description: |
+      Edit the new `subcommands/graphql/graphql.go` so its `NewCmd` function adds the
+      `--auth-url` and `--base-url` persistent flags and calls
+      `flags.RegisterAuraCredentialFlag(cmd, cfg)`, and includes the `PersistentPreRunE`
+      hook that binds both URL flags (exactly as in `data_api.go`). Then delete
+      `neo4j-cli/aura/internal/subcommands/dataapi/data_api.go` and the now-empty
+      `dataapi/` directory. Finally, update `neo4j-cli/aura/aura.go` to remove the
+      `dataapi` import, add a `graphql` import pointing to the new path, and replace
+      `cmd.AddCommand(dataapi.NewCmd(cfg))` with `cmd.AddCommand(graphql.NewCmd(cfg))`.
+      After this task the project must compile cleanly.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "graphql.NewCmd registers --auth-url, --base-url persistent flags and RegisterAuraCredentialFlag"
+      - "graphql.NewCmd has a PersistentPreRunE that calls cfg.Aura.BindBaseUrl and cfg.Aura.BindAuthUrl"
+      - "neo4j-cli/aura/internal/subcommands/dataapi/ directory no longer exists"
+      - "aura.go mounts graphql.NewCmd(cfg) and has no reference to the dataapi package"
+      - "`go build ./...` succeeds with no errors"
+    completed_at: null
+
+  - id: task-003
+    title: "Update Short/Long/Example strings across all affected commands"
+    description: |
+      Update every `Short`, `Long`, and `Example` field in the moved graphql command tree.
+      In `graphql.go` update Short to describe managing GraphQL data APIs. In every leaf
+      command (`create.go`, `get.go`, `list.go`, `update.go`, `delete.go`, `pause.go`,
+      `resume.go`) and in `authprovider/` and `corspolicy/allowedorigin/` commands, change
+      all `Example` strings so the command path reads `aura graphql` instead of
+      `aura data-api graphql`. Also update any Short/Long descriptions that still say
+      "Data APIs" to say "GraphQL data APIs". Every runnable leaf must retain at least two
+      example invocations as required by TestAllLeafCommands_HaveExamples.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "No Example field in the graphql subtree contains the string 'data-api'"
+      - "graphql.go Short describes managing GraphQL data APIs"
+      - "All leaf commands retain valid Example fields with >= 2 invocations using the neo4j-cli prefix"
+      - "`make test` passes TestAllLeafCommands_HaveExamples with no failures"
+    completed_at: null
+
+  - id: task-004
+    title: "Regenerate skill bundle and add changelog entry"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to regenerate the skill bundle so
+      that reference docs reflect the renamed command tree and `TestGenerator_RoundTrip`
+      passes. Then add a changelog entry using changie with kind `Minor` describing the
+      rename (e.g. "Renamed `aura data-api graphql` commands to `aura graphql`").
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Skill bundle files under neo4j-cli/internal/skill/bundle/ are regenerated and committed"
+      - "TestGenerator_RoundTrip passes (included in `make test`)"
+      - "A new .yaml file exists under .changes/unreleased/ with project: neo4j-cli and kind: Minor"
+      - "The changelog body mentions the graphql command rename"
+    completed_at: null
+
+  - id: task-005
+    title: "Run all quality gates and verify clean state"
+    description: |
+      Execute `make test`, `make fmt-check`, `make lint`, and `make license-check` in
+      sequence and confirm all pass with zero errors. Fix any residual issues (import
+      formatting, missing copyright headers, lint warnings) before marking complete. This
+      is the final gate before the feature branch is ready for review.
+    status: pending
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`make test` exits 0 with no failing tests"
+      - "`make fmt-check` exits 0 (no files need gofmt)"
+      - "`make lint` exits 0 with no lint errors"
+      - "`make license-check` exits 0 (all files have the Neo4j copyright header)"
+    completed_at: null
