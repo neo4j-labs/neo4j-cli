@@ -23,9 +23,9 @@ func pinInvoker(t *testing.T, want string) {
 
 func newMockService(t *testing.T) *amocks.MockService {
 	t.Helper()
-	// Pin the invoker classification to "non-agent" so exact-match expectations are
+	// Pin the invoker classification to "interactive" so exact-match expectations are
 	// deterministic regardless of the test host (e.g. CI vs CLAUDECODE).
-	pinInvoker(t, "non-agent")
+	pinInvoker(t, "interactive")
 	ctrl := gomock.NewController(t)
 	return amocks.NewMockService(ctrl)
 }
@@ -35,7 +35,7 @@ func newMockService(t *testing.T) *amocks.MockService {
 func TestEmit_NoArgs_EmitsHelp(t *testing.T) {
 	svc := newMockService(t)
 	svc.EXPECT().EmitEvent("HELP", analytics.TrackEvent{
-		Properties: helpEventProperties{Invoker: "non-agent"},
+		Properties: helpEventProperties{Invoker: "interactive"},
 	})
 	Emit(svc, []string{}, false)
 }
@@ -43,7 +43,7 @@ func TestEmit_NoArgs_EmitsHelp(t *testing.T) {
 func TestEmit_TopLevelHelpFlag_EmitsHelp(t *testing.T) {
 	svc := newMockService(t)
 	svc.EXPECT().EmitEvent("HELP", analytics.TrackEvent{
-		Properties: helpEventProperties{Invoker: "non-agent"},
+		Properties: helpEventProperties{Invoker: "interactive"},
 	})
 	Emit(svc, []string{"--help"}, false)
 }
@@ -51,7 +51,7 @@ func TestEmit_TopLevelHelpFlag_EmitsHelp(t *testing.T) {
 func TestEmit_ShortHelpFlag_EmitsHelp(t *testing.T) {
 	svc := newMockService(t)
 	svc.EXPECT().EmitEvent("HELP", analytics.TrackEvent{
-		Properties: helpEventProperties{Invoker: "non-agent"},
+		Properties: helpEventProperties{Invoker: "interactive"},
 	})
 	Emit(svc, []string{"-h"}, false)
 }
@@ -59,7 +59,7 @@ func TestEmit_ShortHelpFlag_EmitsHelp(t *testing.T) {
 func TestEmit_CommandWithHelpFlag_EmitsHelpWithCommandName(t *testing.T) {
 	svc := newMockService(t)
 	svc.EXPECT().EmitEvent("HELP", analytics.TrackEvent{
-		Properties: helpEventProperties{Command: "aura", Invoker: "non-agent"},
+		Properties: helpEventProperties{Command: "aura", Invoker: "interactive"},
 	})
 	Emit(svc, []string{"aura", "instances", "list", "--help"}, false)
 }
@@ -67,7 +67,7 @@ func TestEmit_CommandWithHelpFlag_EmitsHelpWithCommandName(t *testing.T) {
 func TestEmit_CommandWithShortHelpFlag_EmitsHelpWithCommandName(t *testing.T) {
 	svc := newMockService(t)
 	svc.EXPECT().EmitEvent("HELP", analytics.TrackEvent{
-		Properties: helpEventProperties{Command: "query", Invoker: "non-agent"},
+		Properties: helpEventProperties{Command: "query", Invoker: "interactive"},
 	})
 	Emit(svc, []string{"query", "-h"}, false)
 }
@@ -80,7 +80,7 @@ func TestEmit_AuraCommand_EmitsFullCommand(t *testing.T) {
 		Properties: commandEventProperties{
 			Command: "aura instances list --output json",
 			Success: true,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"aura", "instances", "list", "--output", "json"}, true)
@@ -92,7 +92,7 @@ func TestEmit_AuraCommand_PropagatesFailure(t *testing.T) {
 		Properties: commandEventProperties{
 			Command: "aura instances list",
 			Success: false,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"aura", "instances", "list"}, false)
@@ -107,7 +107,7 @@ func TestEmit_QueryCommand_EmitsCommandNameOnly(t *testing.T) {
 			Command: "query",
 			Success: true,
 			IsAura:  false,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	// Full args include a query string that could contain PII —
@@ -122,7 +122,7 @@ func TestEmit_QueryCommand_DetectsAuraURI(t *testing.T) {
 			Command: "query",
 			Success: true,
 			IsAura:  true,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"query", "--uri", "bolt+s://abc123.databases.neo4j.io"}, true)
@@ -135,7 +135,7 @@ func TestEmit_QueryCommand_NoURI_IsAuraFalse(t *testing.T) {
 			Command: "query",
 			Success: true,
 			IsAura:  false,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"query"}, true)
@@ -149,7 +149,7 @@ func TestEmit_SkillCommand_EmitsFullCommand(t *testing.T) {
 		Properties: commandEventProperties{
 			Command: "skill list",
 			Success: true,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"skill", "list"}, true)
@@ -161,7 +161,7 @@ func TestEmit_SkillCommand_PropagatesFailure(t *testing.T) {
 		Properties: commandEventProperties{
 			Command: "skill install my-skill",
 			Success: false,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"skill", "install", "my-skill"}, false)
@@ -175,7 +175,7 @@ func TestEmit_UnknownCommand_EmitsCommandUsed(t *testing.T) {
 		Properties: commandEventProperties{
 			Command: "unknown sub",
 			Success: true,
-			Invoker: "non-agent",
+			Invoker: "interactive",
 		},
 	})
 	Emit(svc, []string{"unknown", "sub"}, true)
@@ -207,12 +207,12 @@ func TestEmit_SetsInvokerProperty(t *testing.T) {
 		args        []string
 		wantInvoker string
 	}{
-		{"command non-agent", []string{"unknown", "sub"}, "non-agent"},
+		{"command interactive", []string{"unknown", "sub"}, "interactive"},
 		{"command agent", []string{"unknown", "sub"}, "agent"},
 		{"aura agent", []string{"aura", "instances", "list"}, "agent"},
-		{"query non-agent", []string{"query", "--uri", "bolt://localhost:7687"}, "non-agent"},
+		{"query interactive", []string{"query", "--uri", "bolt://localhost:7687"}, "interactive"},
 		{"skill agent", []string{"skill", "list"}, "agent"},
-		{"help non-agent", []string{}, "non-agent"},
+		{"help interactive", []string{}, "interactive"},
 		{"startup agent", []string{"startup"}, "agent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

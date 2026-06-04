@@ -71,14 +71,19 @@ func Detect() bool {
 	return false
 }
 
-// Invoker is the single source of truth for agent/non-agent classification
-// across the CLI (command history + telemetry). It returns "agent" when a known
-// agent harness is detected (Detect) or when stdin is not a TTY, and "non-agent"
-// only for an interactive terminal with no harness env var. "non-agent" covers
-// interactive humans as well as scripted/CI use that runs in a TTY.
+// Invoker is the single source of truth for caller classification across the
+// CLI (command history + telemetry). It returns one of three values:
+//
+//   - "agent"       — a known agent harness env var is set (Detect)
+//   - "script"      — no harness and stdin is not a TTY (piped, CI, cron)
+//   - "interactive" — no harness and stdin is a TTY (a person at a terminal)
 func Invoker() string {
-	if Detect() || !stdinIsTerminal() {
+	switch {
+	case Detect():
 		return "agent"
+	case !stdinIsTerminal():
+		return "script"
+	default:
+		return "interactive"
 	}
-	return "non-agent"
 }

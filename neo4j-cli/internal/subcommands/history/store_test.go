@@ -40,7 +40,7 @@ func withArgs(t *testing.T, args []string) {
 func withInvoker(t *testing.T, tty bool) {
 	t.Helper()
 	if tty {
-		pinInvoker(t, "non-agent")
+		pinInvoker(t, "interactive")
 	} else {
 		pinInvoker(t, "agent")
 	}
@@ -58,7 +58,7 @@ func TestRecord_AppendsRedactedEntry(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Equal(t, "neo4j-cli credential add --password ***", entries[0].Command)
 	assert.NotContains(t, entries[0].Command, "supersecret")
-	assert.Equal(t, "non-agent", entries[0].Invoker)
+	assert.Equal(t, "interactive", entries[0].Invoker)
 	assert.Equal(t, "test-version", entries[0].Version)
 	assert.False(t, entries[0].Time.IsZero())
 }
@@ -69,7 +69,7 @@ func TestRecord_InvokerResolution(t *testing.T) {
 		tty  bool
 		want string
 	}{
-		{"tty is non-agent", true, "non-agent"},
+		{"tty is interactive", true, "interactive"},
 		{"non-tty is agent", false, "agent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
