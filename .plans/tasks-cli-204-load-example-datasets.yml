@@ -136,7 +136,7 @@ tasks:
       dumpOrBackupPath, install plugins, start, choosing the newest compatible Neo4j
       version when the manifest spans ranges. --dbms-id and --name are mutually
       exclusive and exactly one is required.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -147,7 +147,7 @@ tasks:
       - "New DBMS is created+loaded via dumpOrBackupPath then plugins installed and started"
       - "--database selects the target database; default neo4j"
       - "Tests use the desktop client seam; no afero.NewOsFs in query-adjacent tests"
-    completed_at: null
+    completed_at: 2026-06-04T20:30:00Z
 
   - id: task-008
     title: 'aura instance load leaf (new instance via ephemeral docker staging)'

@@ -11,6 +11,7 @@
 - [neo4j-cli desktop dbms create](#neo4j-cli-desktop-dbms-create)
 - [neo4j-cli desktop dbms delete](#neo4j-cli-desktop-dbms-delete)
 - [neo4j-cli desktop dbms list](#neo4j-cli-desktop-dbms-list)
+- [neo4j-cli desktop dbms load](#neo4j-cli-desktop-dbms-load)
 - [neo4j-cli desktop dbms plugin](#neo4j-cli-desktop-dbms-plugin)
 - [neo4j-cli desktop dbms plugin available](#neo4j-cli-desktop-dbms-plugin-available)
 - [neo4j-cli desktop dbms plugin install](#neo4j-cli-desktop-dbms-plugin-install)
@@ -252,6 +253,40 @@ neo4j-cli desktop dbms list --format json
 
 # List local DBMSes against a pinned port instead of probing 44222..44232
 neo4j-cli desktop dbms list --port 44225
+```
+
+### neo4j-cli desktop dbms load
+
+Load an example dataset into a Neo4j Desktop 2 DBMS
+
+Load an example Neo4j dataset (a `.dump` published by a GitHub repo carrying a `relate.project-install.json` manifest, e.g. `neo4j-graph-examples/movies`) into a DBMS managed by the local Neo4j Desktop 2 install. The manifest is resolved, the matching dump is downloaded from the Git-LFS media host, and the data is loaded into the `--database` (default `neo4j`). Exactly one of `--dbms-id` or `--name` is required (they are mutually exclusive). `--dbms-id <uuid>` targets an EXISTING DBMS: the load OVERWRITES that database's contents and therefore REQUIRES `--force`; the DBMS is stopped, the dump is restored, manifest plugins are installed, then it is restarted. `--name <name>` creates a NEW DBMS (newest stable enterprise version Desktop knows about, or pin one with `--version`), loads the dump, installs plugins, and starts it. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running.
+
+Usage: `neo4j-cli desktop dbms load <owner/repo> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--database` | string | neo4j | The target database the dump is loaded into. |
+| `--dbms-id` | string | - | ID of an EXISTING DBMS to overwrite (mutually exclusive with --name; requires --force). |
+| `--force` | bool | false | Required to overwrite an EXISTING DBMS's database (the load destroys its current contents). Only valid with --dbms-id. |
+| `--max-size` | int64 | 2147483648 | Maximum dump download size in bytes; the download is refused if exceeded. |
+| `--name` | string | - | Name for a NEW DBMS to create and load the dataset into (mutually exclusive with --dbms-id). |
+| `--password` | string | - | Initial password for the new DBMS's `neo4j` user (stored by Desktop's safeStorage). Prefer the interactive TTY prompt (omit --password) so the value does not land in argv. Ignored with --dbms-id. |
+| `--version` | string | - | Neo4j version for the new DBMS (e.g. 5.26.1 or 2026.04.0). When omitted, the latest stable enterprise version Desktop knows about is used. Ignored with --dbms-id. |
+| `--wait` | bool | false | Block until the new DBMS reports status=started (polled every 1s, 30s ceiling). Only meaningful with --name. |
+
+Examples:
+
+```
+# Load the movies dataset into a brand-new Desktop DBMS
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --name movies --password supersecret --rw
+
+# Overwrite an existing Desktop DBMS's data with a dataset (requires --force)
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --dbms-id 1234abcd --force --rw
+
+# Load into a new DBMS and emit the resolved DbmsInfo as JSON for scripting
+neo4j-cli desktop dbms load neo4j-graph-examples/recommendations --name recs --password supersecret --format json --rw
 ```
 
 ### neo4j-cli desktop dbms plugin
