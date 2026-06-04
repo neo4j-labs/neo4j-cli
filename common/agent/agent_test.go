@@ -130,7 +130,7 @@ func TestInvoker(t *testing.T) {
 		tty      bool
 		want     string
 	}{
-		{"interactive terminal, no harness", false, true, "human"},
+		{"interactive terminal, no harness", false, true, "non-agent"},
 		{"non-tty, no harness", false, false, "agent"},
 		{"harness with tty", true, true, "agent"},
 		{"harness without tty", true, false, "agent"},

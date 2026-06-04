@@ -64,13 +64,13 @@ func TestList_LimitZeroShowsAll(t *testing.T) {
 func TestList_HumanLineIncludesMetadata(t *testing.T) {
 	cfg := newTestConfigFmt(t, "table")
 	at := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
-	e := Entry{Time: at, Command: "neo4j-cli instance list", Invoker: "human", Version: "v1", Workspace: "{org}", Credential: "prod"}
+	e := Entry{Time: at, Command: "neo4j-cli instance list", Invoker: "non-agent", Version: "v1", Workspace: "{org}", Credential: "prod"}
 	seedEntries(t, cfg, []Entry{e})
 
 	out, err := runCmd(t, newListCmd(cfg))
 	require.NoError(t, err)
 
-	assert.Contains(t, out, "[2026-06-01T12:00:00Z] neo4j-cli instance list {invoker:human, workspace:{org}, credential:prod}")
+	assert.Contains(t, out, "[2026-06-01T12:00:00Z] neo4j-cli instance list {invoker:non-agent, workspace:{org}, credential:prod}")
 }
 
 func TestList_FormatVariants(t *testing.T) {
@@ -115,7 +115,7 @@ func TestList_JSONNormalization(t *testing.T) {
 	cfg := newTestConfigFmt(t, "json")
 	// Sub-second timestamp: MarshalJSON must truncate the fraction.
 	at := time.Date(2026, 6, 1, 12, 0, 5, 123456789, time.UTC)
-	e := Entry{Time: at, Command: "neo4j-cli instance list", Invoker: "human", Version: "v1"}
+	e := Entry{Time: at, Command: "neo4j-cli instance list", Invoker: "non-agent", Version: "v1"}
 	seedEntries(t, cfg, []Entry{e})
 
 	out, err := runCmd(t, newListCmd(cfg))
