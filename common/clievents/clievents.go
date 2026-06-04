@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// invokerFn is the overridable seam for human/agent classification so tests can
+// invokerFn is the overridable seam for caller classification (agent/script/human) so tests can
 // drive it deterministically without mutating real process state.
 var invokerFn = agent.Invoker
 
@@ -57,7 +57,7 @@ func Emit(events analytics.Service, args []string, state bool) {
 
 	_ = flags.Parse(args)
 
-	// inv classifies the caller as human or agent — recorded on every event.
+	// inv classifies the caller as agent, script, or human — recorded on every event.
 	inv := invokerFn()
 
 	// No command name present — bare invocation or top-level --help.
