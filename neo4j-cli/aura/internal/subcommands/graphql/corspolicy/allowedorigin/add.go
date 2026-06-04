@@ -48,6 +48,7 @@ neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --
 neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			newOrigin := strings.TrimSpace(args[0])
 
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
@@ -65,14 +66,12 @@ neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --
 
 			for _, origin := range existingOrigins {
 				if origin == newOrigin {
-					cmd.SilenceUsage = true
 					return clierr.NewUsageError("Origin \"%s\" already exists in allowed origins", newOrigin)
 				}
 			}
 
 			newOrigins := append(existingOrigins, newOrigin)
 
-			cmd.SilenceUsage = true
 			body := map[string]any{
 				"security": map[string]any{
 					"cors_policy": map[string]any{

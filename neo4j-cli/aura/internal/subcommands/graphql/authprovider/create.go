@@ -68,6 +68,7 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
 			if err != nil {
 				return err
@@ -86,7 +87,6 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 				body["url"] = url
 			}
 
-			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,

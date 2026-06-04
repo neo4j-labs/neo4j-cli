@@ -59,6 +59,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512M
 # Create a GraphQL Data API and wait until it is ready
 neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			if serviceAccount != "read_only" && serviceAccount != "read_write" {
 				return fmt.Errorf("invalid value for --service-account: %q, must be one of: read_only, read_write", serviceAccount)
 			}
@@ -105,7 +106,6 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 			}
 			body["type_definitions"] = typeDefsForBody
 
-			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql", instanceId)
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
 				PostBody: body,

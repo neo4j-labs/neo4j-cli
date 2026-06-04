@@ -51,6 +51,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			graphqlId := strings.TrimSpace(args[0])
 
 			if serviceAccount != "" && serviceAccount != "read_only" && serviceAccount != "read_write" {
@@ -83,7 +84,6 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account 
 				body["aura_instance"] = map[string]string{"service_account": serviceAccount}
 			}
 
-			cmd.SilenceUsage = true
 			path := fmt.Sprintf("/instances/%s/data-apis/graphql/%s", instanceId, graphqlId)
 
 			resBody, statusCode, err := api.MakeRequest(cfg, path, &api.RequestConfig{
