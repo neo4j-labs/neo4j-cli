@@ -25,6 +25,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
+| [`dataset`](references/dataset.md) | Discover example Neo4j datasets |
 | [`desktop`](references/desktop.md) | Manage DBMSes under a local Neo4j Desktop 2 install |
 | [`docker`](references/docker.md) | Manage local Neo4j containers via Docker |
 | [`history`](references/history.md) | View and manage the local command history log |

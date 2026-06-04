@@ -71,7 +71,6 @@ tasks:
       commands (docker load, desktop dbms load, aura instance load). dataset list
       renders the curated suggestions honoring --format. Mount dataset.NewCmd(cfg) in
       neo4j-cli/app/app.go. No load leaf under dataset.
-    status: pending
     dependencies:
       - task-001
     acceptance_criteria:
@@ -80,7 +79,8 @@ tasks:
       - "dataset.NewCmd is mounted in app.go and reachable as 'neo4j-cli dataset'"
       - "dataset list has a flush-left Example with >=2 invocations incl. one --format json"
       - "No load leaf exists under dataset"
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-04T18:05:00Z
 
   - id: task-005
     title: 'Docker loader helper + docker load leaf (new/existing container)'
