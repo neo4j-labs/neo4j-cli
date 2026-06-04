@@ -182,7 +182,7 @@ tasks:
       --user flags (both required). All four are Enterprise-only (Community returns
       UnsupportedAdministrationCommand translated with Enterprise hint). Write
       colocated tests covering happy paths and Community-edition errors.
-    status: in_progress
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -193,7 +193,7 @@ tasks:
       - "All four on Community return a translated '(requires Enterprise edition)' error"
       - "All four have >=2 flush-left Example invocations with --rw"
       - "Unit tests pass for all four leaves"
-    completed_at: null
+    completed_at: "2026-06-04T12:00:00Z"
 
   - id: task-010
     title: "Final gates: skill bundle regeneration, TestAllLeafCommands_HaveExamples, changelog"

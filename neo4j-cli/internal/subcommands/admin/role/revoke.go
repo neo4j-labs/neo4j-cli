@@ -1,0 +1,46 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package role
+
+import (
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/spf13/cobra"
+)
+
+func newRevokeCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+	var roleName string
+	var userName string
+
+	cmd := &cobra.Command{
+		Use:         "revoke",
+		Short:       "Revoke a role from a user (Enterprise only)",
+		Annotations: map[string]string{"write": "true"},
+		Long: "Revoke a role from a user in the system database. " +
+			"Executes REVOKE ROLE $role FROM $user against the system database. " +
+			"Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. " +
+			"Uses the dbms credential named by --credential on the parent `admin` command.",
+		Example: `# Revoke the analyst role from a user
+neo4j-cli admin role revoke --role analyst --user alice --credential local --rw
+
+# Revoke the reader role from a user
+neo4j-cli admin role revoke --role reader --user bob --credential local --rw`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			cred, err := resolveCredential(cfg, credential)
+			if err != nil {
+				return err
+			}
+			_, err = roleExecFn(cmd.Context(), cfg, cred, "REVOKE ROLE $role FROM $user", map[string]any{"role": roleName, "user": userName})
+			return err
+		},
+	}
+
+	cmd.Flags().StringVar(&roleName, "role", "", "Role name to revoke (required)")
+	cmd.Flags().StringVar(&userName, "user", "", "Username to revoke the role from (required)")
+	_ = cmd.MarkFlagRequired("role")
+	_ = cmd.MarkFlagRequired("user")
+
+	return cmd
+}
