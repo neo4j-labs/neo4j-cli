@@ -345,7 +345,7 @@ func TestPrintableDbmsCredentials_AsArray(t *testing.T) {
 	// First credential is the default
 	assert.Equal(t, "first", rows[0]["name"])
 	assert.Equal(t, "user1", rows[0]["username"])
-	assert.Equal(t, "neo4j", rows[0]["database-name"])
+	assert.Equal(t, "neo4j", rows[0]["database_name"])
 	assert.Equal(t, "bolt://localhost:7687", rows[0]["uri"])
 	assert.Equal(t, true, rows[0]["default"])
 	// Insecure must not appear in output
@@ -485,7 +485,7 @@ func TestDbmsCredential_JSONRoundTrip_EmbedCredential(t *testing.T) {
 
 func TestPrintableDbmsCredentials_AlwaysIncludesEmbedCredential(t *testing.T) {
 	// Even when no credential has an embed link set, AsArray and JSON output
-	// must always emit the `embed-credential` key (empty string) so the
+	// must always emit the `embed_credential` key (empty string) so the
 	// column is stable for table rendering.
 	creds, _ := newTestDbmsCredentials(t, `{"aura":{"credentials":[]},"dbms":{"default-credential":"first","credentials":[{"name":"first","username":"u","password":"p","database-name":"neo4j","uri":"bolt://localhost:7687"},{"name":"second","username":"u2","password":"p2","database-name":"test","uri":"bolt://localhost:7688","embed-credential":"openai-default"}]}}`)
 
@@ -493,11 +493,11 @@ func TestPrintableDbmsCredentials_AlwaysIncludesEmbedCredential(t *testing.T) {
 	rows := printable.AsArray()
 	require.Len(t, rows, 2)
 
-	v1, has1 := rows[0]["embed-credential"]
-	assert.True(t, has1, "embed-credential key must always be present in AsArray")
-	assert.Equal(t, "", v1, "embed-credential must be empty string when unset")
+	v1, has1 := rows[0]["embed_credential"]
+	assert.True(t, has1, "embed_credential key must always be present in AsArray")
+	assert.Equal(t, "", v1, "embed_credential must be empty string when unset")
 
-	v2, has2 := rows[1]["embed-credential"]
+	v2, has2 := rows[1]["embed_credential"]
 	assert.True(t, has2)
 	assert.Equal(t, "openai-default", v2)
 
@@ -507,8 +507,8 @@ func TestPrintableDbmsCredentials_AlwaysIncludesEmbedCredential(t *testing.T) {
 	var parsed []map[string]any
 	require.NoError(t, json.Unmarshal(data, &parsed))
 	require.Len(t, parsed, 2)
-	_, jsonHas1 := parsed[0]["embed-credential"]
-	assert.True(t, jsonHas1, "embed-credential key must always be present in MarshalJSON")
-	assert.Equal(t, "", parsed[0]["embed-credential"])
-	assert.Equal(t, "openai-default", parsed[1]["embed-credential"])
+	_, jsonHas1 := parsed[0]["embed_credential"]
+	assert.True(t, jsonHas1, "embed_credential key must always be present in MarshalJSON")
+	assert.Equal(t, "", parsed[0]["embed_credential"])
+	assert.Equal(t, "openai-default", parsed[1]["embed_credential"])
 }

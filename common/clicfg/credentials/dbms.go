@@ -133,16 +133,16 @@ type PrintableDbmsCredentials struct {
 	defaultCredential string
 }
 
-// AsArray emits each credential as a map; Password is omitted, `embed-credential` is always present (empty when unset) so the column stays stable.
+// AsArray emits each credential as a map; Password is omitted, `embed_credential` is always present (empty when unset) so the column stays stable.
 func (d PrintableDbmsCredentials) AsArray() []map[string]any {
 	result := make([]map[string]any, len(d.credentials))
 	for i, cred := range d.credentials {
 		result[i] = map[string]any{
 			"name":             cred.Name,
 			"username":         cred.Username,
-			"database-name":    cred.DatabaseName,
+			"database_name":    cred.DatabaseName,
 			"uri":              cred.URI,
-			"embed-credential": cred.EmbedCredential,
+			"embed_credential": cred.EmbedCredential,
 			"default":          cred.Name == d.defaultCredential,
 		}
 	}

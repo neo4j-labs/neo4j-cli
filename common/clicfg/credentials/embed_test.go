@@ -356,17 +356,17 @@ func TestPrintableEmbedCredentials_AsArray(t *testing.T) {
 	assert.Equal(t, "first", rows[0]["name"])
 	assert.Equal(t, "openai", rows[0]["provider"])
 	assert.Equal(t, "text-embedding-3-small", rows[0]["model"])
-	assert.Equal(t, "https://api.openai.com/v1", rows[0]["base-url"])
+	assert.Equal(t, "https://api.openai.com/v1", rows[0]["base_url"])
 	assert.Equal(t, 1536, rows[0]["dimensions"])
 	assert.Equal(t, true, rows[0]["default"])
 	// api-key must not appear in output
 	_, hasAPIKey := rows[0]["api-key"]
 	assert.False(t, hasAPIKey, "api-key must not appear in AsArray output")
-	// vertex-* keys must be omitted when empty
-	_, hasVertexProj := rows[0]["vertex-project"]
-	assert.False(t, hasVertexProj, "vertex-project must be omitted when empty")
-	_, hasVertexLoc := rows[0]["vertex-location"]
-	assert.False(t, hasVertexLoc, "vertex-location must be omitted when empty")
+	// vertex_* keys must be omitted when empty
+	_, hasVertexProj := rows[0]["vertex_project"]
+	assert.False(t, hasVertexProj, "vertex_project must be omitted when empty")
+	_, hasVertexLoc := rows[0]["vertex_location"]
+	assert.False(t, hasVertexLoc, "vertex_location must be omitted when empty")
 
 	// Second credential is not the default
 	assert.Equal(t, "second", rows[1]["name"])
@@ -380,8 +380,8 @@ func TestPrintableEmbedCredentials_AsArray_VertexFieldsIncluded(t *testing.T) {
 	rows := printable.AsArray()
 
 	require.Len(t, rows, 1)
-	assert.Equal(t, "my-gcp-project", rows[0]["vertex-project"])
-	assert.Equal(t, "us-central1", rows[0]["vertex-location"])
+	assert.Equal(t, "my-gcp-project", rows[0]["vertex_project"])
+	assert.Equal(t, "us-central1", rows[0]["vertex_location"])
 }
 
 func TestPrintableEmbedCredentials_MarshalJSON(t *testing.T) {

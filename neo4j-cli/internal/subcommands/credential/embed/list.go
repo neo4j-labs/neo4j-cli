@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var embedCredentialFields = []string{"name", "provider", "model", "base-url", "dimensions", "default"}
+var embedCredentialFields = []string{"name", "provider", "model", "base_url", "dimensions", "default"}
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{

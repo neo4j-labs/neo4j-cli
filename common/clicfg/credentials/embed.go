@@ -124,15 +124,15 @@ func (d PrintableEmbedCredentials) AsArray() []map[string]any {
 			"name":       cred.Name,
 			"provider":   cred.Provider,
 			"model":      cred.Model,
-			"base-url":   cred.BaseURL,
+			"base_url":   cred.BaseURL,
 			"dimensions": cred.Dimensions,
 			"default":    cred.Name == d.defaultCredential,
 		}
 		if cred.VertexProject != "" {
-			row["vertex-project"] = cred.VertexProject
+			row["vertex_project"] = cred.VertexProject
 		}
 		if cred.VertexLocation != "" {
-			row["vertex-location"] = cred.VertexLocation
+			row["vertex_location"] = cred.VertexLocation
 		}
 		result[i] = row
 	}

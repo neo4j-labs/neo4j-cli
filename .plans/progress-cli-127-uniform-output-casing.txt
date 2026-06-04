@@ -7,3 +7,8 @@ Decisions: leading `:` stripped before regex (intentional REPL meta-command conv
 Converted docker rendered output fields bolt-port/http-port -> bolt_port/http_port: Container json tags, list/get/create output maps + fields slices, plus test assertions and table headers (BOLT_PORT/HTTP_PORT). Label constants (org.neo4j.cli.bolt-port) and --bolt-port/--http-port flags left kebab.
 Files: ~neo4j-cli/internal/subcommands/docker/{labels,list,get,create}.go, ~{list,get,create,smoke}_test.go
 Decisions: go-pretty uppercases header keys verbatim, so snake key -> BOLT_PORT header. No bundle drift (only flag/prose mentions in bundle, not output keys).
+
+## TASK-003 — 2026-06-04T00:00:00Z
+Converted credential rendered output column keys to snake_case in Printable() AsArray maps + field slices: database-name->database_name, embed-credential->embed_credential (dbms), base-url->base_url plus vertex-project/vertex-location->vertex_project/vertex_location (embed). Left struct json tags (on-disk persistence/lookup keys), --database-name/--embed-credential/--base-url flags, and aura.base-url config key kebab.
+Files: ~common/clicfg/credentials/{dbms,embed}.go, ~{dbms,embed}_test.go, ~neo4j-cli/internal/subcommands/credential/{dbms,embed}/list.go, ~{dbms,embed}/list_test.go
+Decisions: struct json:"database-name" etc. are the credentials.json on-disk format (verified via load/save) — NOT changed; only AsArray output map keys + fields slices convert. Converted vertex_project/location too (same AsArray output) for consistency though task text named only base_url. No bundle drift (bundle only references flag names/prose, not output keys).

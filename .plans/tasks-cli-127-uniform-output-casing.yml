@@ -55,7 +55,7 @@ tasks:
       NOT change the --database-name / --embed-credential / --base-url CLI flags or
       the aura.base-url config key, nor the credential-lookup keys in add/set_embed/
       remove. Update dbms_test.go / embed_test.go and the list tests.
-    status: pending
+    status: in_progress
     dependencies: []
     acceptance_criteria:
       - "Printable() output keys are database_name, embed_credential, base_url"
@@ -63,7 +63,7 @@ tasks:
       - "--database-name/--embed-credential/--base-url flags and aura.base-url config key remain kebab"
       - "credential dbms list and credential embed list render snake_case columns in all formats"
       - "Updated credential tests pass"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-004
     title: 'Convert workspace list output fields to snake_case'
