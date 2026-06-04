@@ -17,22 +17,20 @@ import (
 
 func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 	const (
-		instanceIdFlag       = "instance-id"
-		nameFlag             = "name"
-		instanceUsernameFlag = "instance-username"
-		instancePasswordFlag = "instance-password"
-		typeDefsFlag         = "type-definitions"
-		typeDefsFileFlag     = "type-definitions-file"
+		instanceIdFlag     = "instance-id"
+		nameFlag           = "name"
+		serviceAccountFlag = "service-account"
+		typeDefsFlag       = "type-definitions"
+		typeDefsFileFlag   = "type-definitions-file"
 	)
 
 	var (
-		instanceId       string
-		name             string
-		instanceUsername string
-		instancePassword string
-		typeDefs         string
-		typeDefsFile     string
-		wait             bool
+		instanceId     string
+		name           string
+		serviceAccount string
+		typeDefs       string
+		typeDefsFile   string
+		wait           bool
 	)
 
 	cmd := &cobra.Command{
@@ -45,14 +43,19 @@ Updating a GraphQL Data API is an asynchronous operation. Use the --wait flag to
 		Example: `# Rename a GraphQL Data API
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
 
-# Update the underlying instance credentials and wait for the API to be ready
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --wait --rw
+# Update the service account permission and wait for the API to be ready
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --rw
 
 # Replace the type definitions from a local file
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			graphqlId := strings.TrimSpace(args[0])
+
+			if serviceAccount != "" && serviceAccount != "read_only" && serviceAccount != "read_write" {
+				return fmt.Errorf("invalid --service-account value %q: must be read_only or read_write", serviceAccount)
+			}
+
 			body := map[string]any{}
 
 			if name != "" {
@@ -67,17 +70,8 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions
 				body["type_definitions"] = base64EncodedTypeDefs
 			}
 
-			if instanceUsername != "" || instancePassword != "" {
-				auraInstance := map[string]string{}
-
-				if instanceUsername != "" {
-					auraInstance["username"] = instanceUsername
-				}
-				if instancePassword != "" {
-					auraInstance["password"] = instancePassword
-				}
-
-				body["aura_instance"] = auraInstance
+			if serviceAccount != "" {
+				body["aura_instance"] = map[string]string{"service_account": serviceAccount}
 			}
 
 			cmd.SilenceUsage = true
@@ -115,9 +109,7 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the GraphQL Data API")
 
-	cmd.Flags().StringVar(&instanceUsername, instanceUsernameFlag, "", "The username of the instance this GraphQL Data API will be connected to")
-
-	cmd.Flags().StringVar(&instancePassword, instancePasswordFlag, "", "The password of the instance this GraphQL Data API will be connected to")
+	cmd.Flags().StringVar(&serviceAccount, serviceAccountFlag, "", "The service account permission for the instance this GraphQL Data API will be connected to (read_only or read_write)")
 
 	cmd.Flags().StringVar(&typeDefs, typeDefsFlag, "", "The GraphQL type definitions, NOTE: must be base64 encoded")
 

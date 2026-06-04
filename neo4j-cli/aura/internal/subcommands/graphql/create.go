@@ -17,22 +17,20 @@ import (
 
 func NewCreateCmd(cfg *clicfg.Config) *cobra.Command {
 	const (
-		instanceIdFlag       = "instance-id"
-		nameFlag             = "name"
-		instanceUsernameFlag = "instance-username"
-		instancePasswordFlag = "instance-password"
-		typeDefsFlag         = "type-definitions"
-		typeDefsFileFlag     = "type-definitions-file"
+		instanceIdFlag     = "instance-id"
+		nameFlag           = "name"
+		serviceAccountFlag = "service-account"
+		typeDefsFlag       = "type-definitions"
+		typeDefsFileFlag   = "type-definitions-file"
 	)
 
 	var (
-		instanceId       string
-		name             string
-		instanceUsername string
-		instancePassword string
-		typeDefs         string
-		typeDefsFile     string
-		wait             bool
+		instanceId     string
+		name           string
+		serviceAccount string
+		typeDefs       string
+		typeDefsFile   string
+		wait           bool
 	)
 
 	cmd := &cobra.Command{
@@ -47,19 +45,25 @@ This command returns your GraphQL Data API ID, API key, and connection URL for y
 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
 		Example: `# Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw
+
+# Create a GraphQL Data API with read-only service account
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --wait --rw`,
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --wait --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if serviceAccount != "read_only" && serviceAccount != "read_write" {
+				return fmt.Errorf("invalid value for --service-account: %q, must be one of: read_only, read_write", serviceAccount)
+			}
+
 			body := map[string]any{
 				"name": name,
 				"aura_instance": map[string]string{
-					"username": instanceUsername,
-					"password": instancePassword,
+					"service_account": serviceAccount,
 				},
 				"security": map[string]any{
 					"authentication_providers": []map[string]any{
@@ -120,11 +124,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-us
 	cmd.Flags().StringVar(&instanceId, instanceIdFlag, "", "(required) The ID of the instance to create the GraphQL Data API for")
 	cmd.MarkFlagRequired(instanceIdFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
 
-	cmd.Flags().StringVar(&instanceUsername, instanceUsernameFlag, "", "(required) The username of the instance this GraphQL Data API will be connected to")
-	cmd.MarkFlagRequired(instanceUsernameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
-
-	cmd.Flags().StringVar(&instancePassword, instancePasswordFlag, "", "(required) The password of the instance this GraphQL Data API will be connected to")
-	cmd.MarkFlagRequired(instancePasswordFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+	cmd.Flags().StringVar(&serviceAccount, serviceAccountFlag, "read_write", "The service account type for the instance connection, must be one of: read_only, read_write")
 
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the GraphQL Data API")
 	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
