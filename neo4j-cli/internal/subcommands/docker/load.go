@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -345,8 +346,21 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client do
 	image := "neo4j:" + version + "-enterprise"
 	volume := "neo4j-cli-" + chosenName + "-data"
 
-	dumpDir := filepath.Dir(load.DumpPath)
+	// Stage the dump in a dedicated dir so the loader container mounts only the
+	// single dump file, not the shared host temp dir (where dataset.Download's
+	// os.CreateTemp places it alongside every other process's temp files).
+	stageDir, err := os.MkdirTemp("", "neo4j-cli-load-*")
+	if err != nil {
+		return NewContainerResult{}, fmt.Errorf("docker load: create staging dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(stageDir) }()
+
 	dumpFile := filepath.Base(load.DumpPath)
+	stagedDump := filepath.Join(stageDir, dumpFile)
+	if err := copyFile(load.DumpPath, stagedDump); err != nil {
+		return NewContainerResult{}, fmt.Errorf("docker load: stage dump: %w", err)
+	}
+	dumpDir := stageDir
 
 	// One-shot loader container: bind-mount the host dump dir read-only at
 	// /import and the fresh named volume at /data, rename the dump to
@@ -421,6 +435,26 @@ func generatePassword() (string, error) {
 		return "", fmt.Errorf("generate password: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+// copyFile copies src to dst, creating dst with 0600 perms. Copying (rather than
+// moving) leaves the original temp file for the caller's cleanup() to remove.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 // pluginsEnvValue renders the manifest plugin slugs into the JSON-array string

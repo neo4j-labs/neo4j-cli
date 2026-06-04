@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -81,8 +83,9 @@ func runLoad(t *testing.T, fake *fakeDockerClient, deps *loadDeps, args string) 
 		}
 		path := deps.downloadPath
 		if path == "" {
-			path = t.TempDir() + "/movies-50.dump"
+			path = filepath.Join(t.TempDir(), "movies-50.dump")
 		}
+		require.NoError(t, os.WriteFile(path, []byte("dump"), 0o600))
 		return path, func() {}, nil
 	}
 	waitForBoltFn = func(_ context.Context, _, _, _ string, _ time.Duration) error {

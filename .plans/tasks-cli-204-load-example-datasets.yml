@@ -256,11 +256,11 @@ tasks:
       single dump into a fresh MkdirTemp dir before constructing the mount; ensure the
       dedicated dir is cleaned up alongside the existing cleanup. Keep behavior identical
       otherwise.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "The loader container bind-mounts a directory containing only the dump file, not the shared host temp dir"
       - "The dedicated staging directory is removed after the load (no temp leak)"
       - "Existing docker load tests pass; make test, make fmt-check, make lint clean"
-    completed_at: null
+    completed_at: 2026-06-04T23:45:00Z
