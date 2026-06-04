@@ -34,6 +34,9 @@ neo4j-cli admin user list --credential local --format json`,
 	cmd.AddCommand(newCreateCmd(cfg, credential))
 	cmd.AddCommand(newDropCmd(cfg, credential))
 	cmd.AddCommand(newRenameCmd(cfg, credential))
+	cmd.AddCommand(newSetPasswordCmd(cfg, credential))
+	cmd.AddCommand(newSuspendCmd(cfg, credential))
+	cmd.AddCommand(newActivateCmd(cfg, credential))
 
 	return cmd
 }

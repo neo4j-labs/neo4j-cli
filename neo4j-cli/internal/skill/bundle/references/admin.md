@@ -17,11 +17,14 @@
 - [neo4j-cli admin role list](#neo4j-cli-admin-role-list)
 - [neo4j-cli admin role revoke](#neo4j-cli-admin-role-revoke)
 - [neo4j-cli admin user](#neo4j-cli-admin-user)
+- [neo4j-cli admin user activate](#neo4j-cli-admin-user-activate)
 - [neo4j-cli admin user create](#neo4j-cli-admin-user-create)
 - [neo4j-cli admin user drop](#neo4j-cli-admin-user-drop)
 - [neo4j-cli admin user get](#neo4j-cli-admin-user-get)
 - [neo4j-cli admin user list](#neo4j-cli-admin-user-list)
 - [neo4j-cli admin user rename](#neo4j-cli-admin-user-rename)
+- [neo4j-cli admin user set-password](#neo4j-cli-admin-user-set-password)
+- [neo4j-cli admin user suspend](#neo4j-cli-admin-user-suspend)
 
 Manage Neo4j databases, users, and roles
 
@@ -363,6 +366,24 @@ neo4j-cli admin user --help
 neo4j-cli admin user list --credential local --format json
 ```
 
+### neo4j-cli admin user activate
+
+Activate (unsuspend) a Neo4j user (Enterprise edition only)
+
+Activate (unsuspend) an existing user in the system database, allowing them to log in again. Requires Enterprise edition (Community edition returns an error). Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin user activate <username>`
+
+Examples:
+
+```
+# Activate a previously suspended user
+neo4j-cli admin user activate alice --credential local --rw
+
+# Activate a user and verify status
+neo4j-cli admin user activate bob --credential local --rw && neo4j-cli admin user get bob --credential local --format json
+```
+
 ### neo4j-cli admin user create
 
 Create a Neo4j user
@@ -468,5 +489,48 @@ neo4j-cli admin user rename alice alice2 --credential local --rw
 
 # Rename a user and verify the change
 neo4j-cli admin user rename bob bob-renamed --credential local --rw && neo4j-cli admin user get bob-renamed --credential local --format json
+```
+
+### neo4j-cli admin user set-password
+
+Set the password for a Neo4j user
+
+Set the password for an existing user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default false) controls whether the user must change their password on next login. Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin user set-password <username> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--password` | string | - | New password (prompted if not supplied on a TTY) |
+| `--password-change-required` | bool | false | Require the user to change their password on next login |
+
+Examples:
+
+```
+# Set a user's password interactively (password will be prompted)
+neo4j-cli admin user set-password alice --credential local --rw
+
+# Set a user's password with a flag and require change on next login
+neo4j-cli admin user set-password bob --password newsecret --password-change-required --credential local --rw
+```
+
+### neo4j-cli admin user suspend
+
+Suspend a Neo4j user (Enterprise edition only)
+
+Suspend an existing user in the system database, preventing them from logging in. Requires Enterprise edition (Community edition returns an error). Uses the dbms credential named by --credential on the parent `admin` command.
+
+Usage: `neo4j-cli admin user suspend <username>`
+
+Examples:
+
+```
+# Suspend a user
+neo4j-cli admin user suspend alice --credential local --rw
+
+# Suspend a user and verify status
+neo4j-cli admin user suspend bob --credential local --rw && neo4j-cli admin user get bob --credential local --format json
 ```
 
