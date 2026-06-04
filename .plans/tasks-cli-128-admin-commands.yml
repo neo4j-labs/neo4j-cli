@@ -143,7 +143,7 @@ tasks:
       (default false). suspend and activate are Enterprise-only (Community returns a
       translated error via runAdminStatement). All three require --rw. Write colocated
       tests covering Community-edition error translation and happy paths.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -152,7 +152,7 @@ tasks:
       - "'user activate <name> --rw' on Community returns a clear Community-limitation error message"
       - "All three have >=2 flush-left Example invocations with --rw"
       - "Unit tests pass for all three leaves"
-    completed_at: null
+    completed_at: "2026-06-04T13:00:00Z"
 
   - id: task-008
     title: "role subtree: list and get (read-only)"
