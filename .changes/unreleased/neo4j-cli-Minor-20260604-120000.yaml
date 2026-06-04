@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Renamed `aura data-api graphql` commands to `aura graphql`'
-time: 2026-06-04T12:00:00.000000+00:00

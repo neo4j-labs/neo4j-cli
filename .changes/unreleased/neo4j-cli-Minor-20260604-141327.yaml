@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Replaced --instance-username and --instance-password flags with --service-account on graphql create and graphql update commands
-time: 2026-06-04T14:13:27.228309+01:00
