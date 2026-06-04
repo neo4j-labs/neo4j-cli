@@ -211,3 +211,56 @@ tasks:
       - "make test, make fmt-check, and make lint all pass"
       - "golang-security gate run with findings addressed (allowlist, pointer detection, 0600, redaction)"
     completed_at: 2026-06-04T18:05:00Z
+
+  - id: task-011
+    title: 'Remove desktop load test-only exported setters; test in-package'
+    description: |
+      The `desktop dbms load` leaf (neo4j-cli/internal/subcommands/desktop/dbms/load.go)
+      exports SetResolveDatasetFnForTest / SetDownloadDatasetFnForTest purely because its
+      test lives in the external `package dbms_test`. The two sibling load leaves —
+      `docker load` (package docker) and `aura instance load` (package instance) — test
+      in-package and swap the unexported `resolveDatasetFn`/`downloadDatasetFn` vars
+      directly, with no exported test-only API. This ships two test-only functions in the
+      package's exported surface and diverges from both its siblings and the documented
+      local-seam idiom in AGENTS.md (each consumer owns a local `var fooFn = pkg.Foo`
+      seam, overridden from its own in-package _test.go). Fix: add an in-package
+      `load_test.go` (`package dbms`) — or move the dataset-seam swapping portion of the
+      existing test into one — that assigns the unexported `resolveDatasetFn` /
+      `downloadDatasetFn` vars directly (saving/restoring via t.Cleanup), and delete both
+      exported `Set...ForTest` functions. Go allows `dbms` and `dbms_test` test files to
+      coexist in the same directory, so the rest of the external test file can stay as-is
+      if convenient. Keep all existing test coverage green.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "SetResolveDatasetFnForTest and SetDownloadDatasetFnForTest no longer exist in the dbms package"
+      - "The desktop load tests swap the unexported resolveDatasetFn/downloadDatasetFn vars from an in-package (package dbms) test, restoring via t.Cleanup"
+      - "Existing desktop load test coverage is preserved and passes; make test, make fmt-check, make lint clean"
+    completed_at: null
+
+  - id: task-012
+    title: 'Scope docker loader bind-mount to a dedicated temp subdir'
+    description: |
+      The docker new-container loader in LoadDumpIntoNewContainer
+      (neo4j-cli/internal/subcommands/docker/load.go) bind-mounts the dump's parent
+      directory into the one-shot loader container via `-v <dumpDir>:/import:ro`, where
+      `dumpDir = filepath.Dir(load.DumpPath)`. Because dataset.Download creates the dump
+      with os.CreateTemp("", ...), dumpDir is the whole host temp directory (os.TempDir()),
+      so the ephemeral loader container can read every file currently in the host temp dir
+      (read-only). The exposure is limited (read-only, the user's own ephemeral container,
+      the user's own files), hence Low severity, but it is broader than necessary. Fix:
+      stage the dump in a dedicated per-load directory (e.g. os.MkdirTemp) and bind-mount
+      only that directory, so the loader sees just the one dump file. This likely means
+      having Download (or the loader) place the file in an isolated subdir, or copying the
+      single dump into a fresh MkdirTemp dir before constructing the mount; ensure the
+      dedicated dir is cleaned up alongside the existing cleanup. Keep behavior identical
+      otherwise.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "The loader container bind-mounts a directory containing only the dump file, not the shared host temp dir"
+      - "The dedicated staging directory is removed after the load (no temp leak)"
+      - "Existing docker load tests pass; make test, make fmt-check, make lint clean"
+    completed_at: null

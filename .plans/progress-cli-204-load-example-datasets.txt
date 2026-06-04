@@ -51,3 +51,6 @@ Added user-facing changelog entry via changie (kind Minor) for the new dataset/l
 Files: +.changes/unreleased/neo4j-cli-Minor-20260604-180134.yaml.
 Gates: make test (all pass, no fail/panic), make fmt-check (ok), make lint (0 issues), go generate ./neo4j-cli/internal/skill/... (no bundle diff). No source changes — changelog-only.
 NOTE: golang-security review portion of this task's acceptance is deferred to the orchestrator (running it separately as a formal final security gate over the risky code: network download, LFS handling, neo4j-admin exec, temp files). This iteration covers changelog + gates only.
+
+## REVIEW — 2026-06-04T19:19:16Z
+Added 2 review tasks (task-011..task-012).
