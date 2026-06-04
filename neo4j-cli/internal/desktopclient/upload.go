@@ -31,6 +31,29 @@ var uploadTaskPollInterval = 2 * time.Second
 // budget is deliberately generous.
 const uploadTaskTimeout = 30 * time.Minute
 
+// loadDumpTimeout bounds `POST .../databases/:db/load-dump`. Unlike upload,
+// load-dump is synchronous on the relate side — the POST resolves only after
+// neo4j-admin finishes restoring the dump — so the budget mirrors the generous
+// upload-task ceiling rather than the short kick timeout.
+const loadDumpTimeout = 30 * time.Minute
+
+// LoadDump restores a local dump file into a database on a stopped Desktop DBMS
+// via `POST /dbmss/:id/databases/:db/load-dump`. Unlike UploadDatabase the call
+// is synchronous — relate runs `neo4j-admin database load` inline and the POST
+// resolves once the restore completes, so there is no task to poll. The DBMS
+// must be stopped; `overwrite` maps to neo4j-admin's
+// `--overwrite-destination`.
+func (c *Client) LoadDump(ctx context.Context, dbmsID, db, sourceFilePath string, overwrite bool) error {
+	payload := map[string]any{
+		"sourceFilePath": sourceFilePath,
+		"overwrite":      overwrite,
+	}
+	_, err := c.doWithTimeout(ctx, http.MethodPost,
+		"/dbmss/"+url.PathEscape(dbmsID)+"/databases/"+url.PathEscape(db)+"/load-dump",
+		payload, loadDumpTimeout)
+	return err
+}
+
 // UploadDatabase enqueues a database upload from a local Desktop DBMS to a
 // remote (Aura) target via `POST /dbmss/:id/databases/upload`. The call is
 // asynchronous on the relate side — it returns once the task is accepted;

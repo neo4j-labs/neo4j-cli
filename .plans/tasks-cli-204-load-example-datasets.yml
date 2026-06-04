@@ -117,14 +117,14 @@ tasks:
       neo4j-cli/internal/desktopclient (client.go + any types in types.go), calling
       POST /fastify/api/dbmss/:id/databases/:db/load-dump (synchronous; DBMS must be
       stopped), mirroring the existing UploadDatabase method shape.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "LoadDump issues POST /fastify/api/dbmss/:id/databases/:db/load-dump with {sourceFilePath, overwrite}"
       - "Signature and error handling mirror the existing UploadDatabase method"
       - "Unit test exercises the call against the desktop test fixture/handlers"
       - "Copyright header present"
-    completed_at: null
+    completed_at: 2026-06-04T19:05:00Z
 
   - id: task-007
     title: 'desktop dbms load leaf (existing via --dbms-id, new via --name)'
