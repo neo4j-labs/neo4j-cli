@@ -1,3 +1,8 @@
+## task-012 — 2026-06-04T18:30:00Z
+Replaced bespoke bufio/stdinIsTTY confirmation logic in database/drop.go and user/drop.go with confirm.Register(cmd)/confirm.Require(cmd, name), matching role/drop.go exactly. Removed stdinIsTTY from database/helpers.go (no longer used). Rewrote both drop_test.go files to use confirmtest.AssertLeafGate, covering all 4 canonical gating scenarios. Regenerated skill bundle to reflect new --force flag and updated Long/Example copy.
+Files: ~neo4j-cli/internal/subcommands/admin/database/drop.go, ~neo4j-cli/internal/subcommands/admin/database/drop_test.go, ~neo4j-cli/internal/subcommands/admin/database/helpers.go, ~neo4j-cli/internal/subcommands/admin/user/drop.go, ~neo4j-cli/internal/subcommands/admin/user/drop_test.go, ~neo4j-cli/internal/skill/bundle/references/admin.md
+Decisions: stdinIsTTY retained in user/helpers.go (still used by promptPassword for create/set-password); database/helpers.go stdinIsTTY removed entirely. Cancel path now returns confirm.ErrCancelled (exit 0) for both commands, consistent with role/drop.
+
 ## task-014 — 2026-06-04T18:00:00Z
 Merged `runAdminStatement` (unexported) directly into `RunAdminStatement` (exported), removing the identity delegation wrapper. Updated 8 call sites in run_test.go to use the exported name.
 Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcommands/admin/run_test.go

@@ -84,7 +84,7 @@ neo4j-cli admin database create mydb --credential local --wait --rw
 
 Drop a database
 
-Drop a database via DROP DATABASE <name> against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Pass --yes to skip the confirmation prompt. Without --yes: prompts interactively on a TTY or returns a usage error on non-TTY.
+Drop a database via DROP DATABASE <name> against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
 Usage: `neo4j-cli admin database drop <name> [flags]`
 
@@ -92,7 +92,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--yes` | bool | false | Skip the confirmation prompt and drop the database immediately. |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
@@ -101,7 +102,7 @@ Examples:
 neo4j-cli admin database drop mydb --credential local --rw
 
 # Drop a database without prompting (required for scripts and non-TTY callers)
-neo4j-cli admin database drop mydb --credential local --yes --rw
+neo4j-cli admin database drop mydb --credential local --rw --yes --force
 ```
 
 ### neo4j-cli admin database get
@@ -417,7 +418,7 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 
 Drop a Neo4j user
 
-Drop (delete) a user from the system database. Without --yes the command prompts for confirmation on a TTY, or returns a usage error on non-TTY. Uses the dbms credential named by --credential on the parent `admin` command.
+Drop (delete) a user from the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively. Uses the dbms credential named by --credential on the parent `admin` command.
 
 Usage: `neo4j-cli admin user drop <username> [flags]`
 
@@ -425,7 +426,8 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--yes` | bool | false | Confirm the drop without an interactive prompt |
+| `--force` | bool | false | Confirm the destructive action. Required together with --yes for non-TTY callers. |
+| `--yes` | bool | false | Confirm the destructive action. Required together with --force for non-TTY callers. |
 
 Examples:
 
@@ -434,7 +436,7 @@ Examples:
 neo4j-cli admin user drop alice --credential local --rw
 
 # Drop a user without prompting (required for scripts)
-neo4j-cli admin user drop alice --yes --credential local --rw
+neo4j-cli admin user drop alice --credential local --rw --yes --force
 ```
 
 ### neo4j-cli admin user get

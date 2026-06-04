@@ -4,18 +4,10 @@
 package database
 
 import (
-	"os"
-
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
-	"golang.org/x/term"
 )
-
-// stdinIsTTY is the test seam for terminal detection on stdin.
-var stdinIsTTY = func() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
-}
 
 // resolveCredential looks up the named dbms credential from cfg. If the
 // credential name is empty it falls back to the default credential. Returns a

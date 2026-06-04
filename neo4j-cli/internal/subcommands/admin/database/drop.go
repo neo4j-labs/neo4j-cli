@@ -4,51 +4,30 @@
 package database
 
 import (
-	"bufio"
-	"fmt"
-	"strings"
-
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
 	"github.com/spf13/cobra"
 )
 
 func newDropCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
-	var yes bool
-
 	cmd := &cobra.Command{
 		Use:         "drop <name>",
 		Short:       "Drop a database",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Drop a database via DROP DATABASE <name> against the system database. " +
 			"Uses the dbms credential named by --credential on the parent `admin` command. " +
-			"Pass --yes to skip the confirmation prompt. " +
-			"Without --yes: prompts interactively on a TTY or returns a usage error on non-TTY.",
+			"Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.",
 		Example: `# Drop a database, prompting for confirmation on a TTY
 neo4j-cli admin database drop mydb --credential local --rw
 
 # Drop a database without prompting (required for scripts and non-TTY callers)
-neo4j-cli admin database drop mydb --credential local --yes --rw`,
+neo4j-cli admin database drop mydb --credential local --rw --yes --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			if !yes {
-				if !stdinIsTTY() {
-					return clierr.NewUsageError(
-						"refusing to drop database %q without confirmation: pass --yes to proceed non-interactively",
-						name,
-					)
-				}
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Drop database %q? [y/N]: ", name)
-				reader := bufio.NewReader(cmd.InOrStdin())
-				line, _ := reader.ReadString('\n')
-				answer := strings.ToLower(strings.TrimSpace(line))
-				if answer != "y" && answer != "yes" {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "cancelled.")
-					cmd.SilenceErrors = true
-					return clierr.NewUsageError("drop cancelled")
-				}
+			if err := confirm.Require(cmd, name); err != nil {
+				return err
 			}
 			cred, err := resolveCredential(cfg, credential)
 			if err != nil {
@@ -61,6 +40,7 @@ neo4j-cli admin database drop mydb --credential local --yes --rw`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&yes, "yes", false, "Skip the confirmation prompt and drop the database immediately.")
+	confirm.Register(cmd)
+
 	return cmd
 }

@@ -5,25 +5,25 @@ package database
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// runDrop builds the `admin database drop` command tree, injects a fake
-// exec-fn that returns rows/execErr, then executes with args.
-func runDrop(t *testing.T, args string, rows []map[string]any, execErr error, stdin string) (string, string, error) {
+func buildDropCmd(t *testing.T, stdin string) (*bytes.Buffer, *bytes.Buffer, func(args string) error) {
 	t.Helper()
-
-	withFakeExecFn(t, rows, execErr)
 
 	fs, err := testfs.GetTestFs(`{}`, `{
 		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
@@ -32,71 +32,65 @@ func runDrop(t *testing.T, args string, rows []map[string]any, execErr error, st
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, dbExecFn)
-	flags.RegisterOutputFlag(cmd, cfg)
-
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)
-	cmd.SetOut(out)
-	cmd.SetErr(errBuf)
-	cmd.SetIn(strings.NewReader(stdin))
 
-	argv, splitErr := shlex.Split(args)
-	require.NoError(t, splitErr)
-	cmd.SetArgs(append([]string{"drop"}, argv...))
-
-	execCmdErr := cmd.Execute()
-	return out.String(), errBuf.String(), execCmdErr
+	credential := "local"
+	run := func(args string) error {
+		cmd := NewCmd(cfg, &credential, dbExecFn)
+		flags.RegisterOutputFlag(cmd, cfg)
+		cmd.SetOut(out)
+		cmd.SetErr(errBuf)
+		cmd.SetIn(strings.NewReader(stdin))
+		argv, splitErr := shlex.Split(args)
+		require.NoError(t, splitErr)
+		cmd.SetArgs(append([]string{"drop"}, argv...))
+		return cmd.Execute()
+	}
+	return out, errBuf, run
 }
 
-// withTTY overrides the stdinIsTTY seam for the duration of t.
-func withTTY(t *testing.T, isTTY bool) {
+func runDrop(t *testing.T, args string, stdin string, rows []map[string]any, execErr error) (string, string, error) {
 	t.Helper()
-	orig := stdinIsTTY
-	stdinIsTTY = func() bool { return isTTY }
-	t.Cleanup(func() { stdinIsTTY = orig })
+
+	withFakeExecFn(t, rows, execErr)
+	_, errBuf, run := buildDropCmd(t, stdin)
+	execCmdErr := run(args)
+	return "", errBuf.String(), execCmdErr
 }
 
-func TestDrop_YesFlag_SkipsPromptAndDrops(t *testing.T) {
-	_, _, err := runDrop(t, "mydb --yes", nil, nil, "")
+func TestDrop_ConfirmGate(t *testing.T) {
+	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
+		Name:          "admin database drop",
+		NoFlagsArgs:   "mydb",
+		BothFlagsArgs: "mydb --yes --force",
+		ResourceLabel: "database",
+		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
+			var invoked bool
+			orig := dbExecFn
+			dbExecFn = func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, _ string, _ map[string]any) ([]map[string]any, error) {
+				invoked = true
+				return []map[string]any{}, nil
+			}
+			t.Cleanup(func() { dbExecFn = orig })
+
+			_, errBuf, run := buildDropCmd(t, stdin)
+			err := run(args)
+			return confirmtest.GateRunResult{Err: err, Stderr: errBuf.String(), Invoked: invoked}
+		},
+	})
+}
+
+func TestDrop_YesForce_Succeeds(t *testing.T) {
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+	_, _, err := runDrop(t, "mydb --yes --force", "", []map[string]any{}, nil)
 	require.NoError(t, err)
-}
-
-func TestDrop_TTY_YesAnswer_Confirms(t *testing.T) {
-	withTTY(t, true)
-	_, stderr, err := runDrop(t, "mydb", nil, nil, "y\n")
-	require.NoError(t, err)
-	assert.Contains(t, stderr, "Drop database")
-}
-
-func TestDrop_TTY_NoAnswer_Cancels(t *testing.T) {
-	withTTY(t, true)
-	_, stderr, err := runDrop(t, "mydb", nil, nil, "n\n")
-	require.Error(t, err)
-	assert.Contains(t, stderr, "cancelled.")
-}
-
-func TestDrop_TTY_EmptyAnswer_Cancels(t *testing.T) {
-	withTTY(t, true)
-	_, stderr, err := runDrop(t, "mydb", nil, nil, "\n")
-	require.Error(t, err)
-	assert.Contains(t, stderr, "cancelled.")
-}
-
-func TestDrop_NonTTY_WithoutYes_ReturnsUsageError(t *testing.T) {
-	withTTY(t, false)
-	_, _, err := runDrop(t, "mydb", nil, nil, "")
-	require.Error(t, err)
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 2, ce.Code)
-	assert.Contains(t, ce.Message, "pass --yes")
 }
 
 func TestDrop_ExecError_PropagatesError(t *testing.T) {
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 	execErr := clierr.NewValidationError("bolt connection refused")
-	_, _, err := runDrop(t, "mydb --yes", nil, execErr, "")
+	_, _, err := runDrop(t, "mydb --yes --force", "", nil, execErr)
 	require.Error(t, err)
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
@@ -104,7 +98,7 @@ func TestDrop_ExecError_PropagatesError(t *testing.T) {
 }
 
 func TestDrop_NoArgs_CobraUsageError(t *testing.T) {
-	_, _, err := runDrop(t, "", nil, nil, "")
+	_, _, err := runDrop(t, "", "", nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "accepts 1 arg")
 }
