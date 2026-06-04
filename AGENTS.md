@@ -274,6 +274,22 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## Output / Input Casing Convention
+
+Single rule for every new command/field:
+
+- **Rendered OUTPUT field names = snake_case** — JSON/TOON keys, table headers, and the `fields []string` slices passed to `output.PrintBodyMap`/`PrintBodyMaps`/`PrintBody`/`PrintRawBody` (e.g. `bolt_port`, `connection_uri`, `database_name`, `project_id`).
+- **Input identifiers = kebab-case** — command `Use` names, command aliases, and flag long names (e.g. `bolt-port`, `--database-name`, `instance snapshot list`). Single-character flag shorthands are exempt.
+
+EXEMPTIONS (intentionally NOT snake_case output — do not "fix" these):
+
+- Wire/parse structs whose tags map to an external payload: `aura/internal/api/.../response.go`, `desktopclient/types.go`, OAuth structs, `update/release.go` (`tag_name`).
+- Config keys (`aura.base-url`, `flag.<area>-<feature>`).
+- Docker label constants (`org.neo4j.cli.bolt-port`, etc.) — persisted identifiers, not rendered output.
+- Enum / status VALUES (the value of a field, not the key).
+
+Both gate tests enforce this: input kebab-case → `agentcontext/casing_input_gate_test.go`; output snake_case → `common/output/casing_gate_test.go`.
+
 ## Output/Input Casing Gates
 
 Two hermetic gates enforce CLI-127 casing: input identifiers (command/alias/flag-long names) are kebab-case — `agentcontext/casing_input_gate_test.go`; rendered OUTPUT field names are snake_case — `common/output/casing_gate_test.go`. The output gate checks Print*(`fields`) literals + an enumerated output-struct json-tag allowlist; wire/parse structs (desktopclient/types.go, api/response.go, docker client.go, query schema.go YIELD columns, credentials on-disk kebab tags) and Docker label consts are intentionally NOT output and are excluded. Adding a new output struct/field → add it to the allowlist (or it's covered if its keys flow through a `fields` slice).

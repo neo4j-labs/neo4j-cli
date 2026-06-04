@@ -139,7 +139,7 @@ tasks:
       bundle references and TestGenerator_RoundTrip stays green; update any README/
       bundle examples showing the old field names. Add a single changie entry
       (--projects neo4j-cli --kind Minor) describing the breaking output rename.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -151,4 +151,4 @@ tasks:
       - "go generate ./... run; bundle regenerated; make generate-check and TestGenerator_RoundTrip pass"
       - "Any README/bundle examples with old field names updated"
       - "Single changie entry exists (kind Minor, projects neo4j-cli) describing the breaking rename"
-    completed_at: null
+    completed_at: 2026-06-04T12:58:00Z

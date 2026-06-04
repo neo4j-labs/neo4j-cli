@@ -27,7 +27,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 		Short: "List Neo4j containers managed by neo4j-cli",
 		Long: "List all Neo4j Docker containers carrying the `org.neo4j.cli.managed=true` label. " +
 			"Renders one row per container with name, status (Docker's human-readable state), edition, version, " +
-			"bolt-port, http-port, and ephemeral. Unmanaged containers (no label) are excluded. " +
+			"bolt_port, http_port, and ephemeral. Unmanaged containers (no label) are excluded. " +
 			"An empty result renders as an empty table or empty JSON array (exit 0).",
 		Example: `# List managed Neo4j containers as a table
 neo4j-cli docker list
