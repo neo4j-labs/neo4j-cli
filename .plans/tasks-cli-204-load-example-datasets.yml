@@ -30,7 +30,7 @@ tasks:
       targetNeo4jVersion semver range matches the target version (newest compatible
       on ambiguity). Returns a Spec {DumpPath, Plugins, MatchedVersionRange}. Verify
       the selected dumpFile path exists in the repo and error clearly if not.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "Resolve tries branch main then falls back to master"
@@ -38,7 +38,7 @@ tasks:
       - "Returns Spec with DumpPath, Plugins, MatchedVersionRange"
       - "Errors clearly when no compatible entry exists or the dump path is missing in the repo"
       - "Tests stub the manifest fetch via httptest (no real network)"
-    completed_at: null
+    completed_at: 2026-06-04T16:08:00Z
 
   - id: task-003
     title: 'Secure, LFS-aware dump downloader (streamed, capped, allowlisted)'

@@ -2,3 +2,8 @@
 Created neo4j-cli/internal/dataset support package with embedded curated suggestion catalog (List()) sourced from demo.neo4jlabs.com README; 10 entries, each verified to carry a relate.project-install.json manifest.
 Files: +neo4j-cli/internal/dataset/catalog.go, +neo4j-cli/internal/dataset/catalog_test.go
 Decisions: twitter slug maps to twitter-v2 repo; offshoreleaks -> icij-offshoreleaks; network -> network-management. List returns a defensive copy.
+
+## TASK-002 — 2026-06-04T16:08:00Z
+Added manifest resolution to internal/dataset: Resolve(ctx, owner/repo, version) fetches relate.project-install.json (branch main then master), selects compatible dbms[] dump entry (newest-compatible lower bound on overlap), verifies dump path via HEAD, returns Spec{Owner,Repo,Branch,DumpPath,Plugins,MatchedVersionRange}.
+Files: +neo4j-cli/internal/dataset/resolve.go, +neo4j-cli/internal/dataset/version.go, +resolve_test.go, +version_test.go
+Decisions: no semver-range lib in go.mod, so hand-rolled npm-style comparator-set matcher (>=,<=,>,<,= ANDed by whitespace) over golang.org/x/mod/semver compare; scriptFile entries skipped; rawBaseURL is a var seam so assertRawHost validates against the httptest host in tests.

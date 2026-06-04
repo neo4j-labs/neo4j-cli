@@ -243,6 +243,10 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 - `clierr.Render` (`common/clierr/render.go`) renders a `*clierr.CLIError` from `ce.Message` / `ce.Code` via `errors.As` — NOT from the error's `Error()` string. So wrapping a CLIError with `fmt.Errorf("...: %w", ce)` to append context (e.g. an id/suffix) DROPS that text in JSON/toon/plaintext output. To append text to a CLIError, mutate `ce.Message` (recovered via `errors.As`) and return the original error — that preserves exit code / code name / retryable. Plain (non-CLIError) errors get `NewFatalError("%s", err.Error())` so `%w` text survives for them only.
 - The Aura test harness (`ExecuteCommand`/`ExecuteCommandE`) does NOT invoke `clierr.Render` — that lives in `neo4j-cli/main.go`. Tests get cobra's default `Error: <err.Error()>` on stderr (no `(exit N)`, no JSON envelope). To assert the JSON-envelope/exit-code contract, recover the returned `*clierr.CLIError` via `errors.As` and inspect `ce.Code` / `ce.BuildEnvelope()` directly.
 
+## dataset Subsystem Notes
+
+- `neo4j-cli/internal/dataset/` has no semver-range lib (go.mod only ships `golang.org/x/mod/semver`, compare-only). `version.go` hand-rolls the npm-style comparator-set matcher (`>=`,`<=`,`>`,`<`,`=` whitespace-ANDed) the `relate.project-install.json` `targetNeo4jVersion` field uses; reuse `rangeMatches`/`canonicalVersion` rather than adding a dependency. `rawBaseURL`/`httpDoFn` are package-var seams tests override to point at an httptest server.
+
 ## query Subsystem Notes
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
