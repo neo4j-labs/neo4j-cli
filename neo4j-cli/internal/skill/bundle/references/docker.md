@@ -6,6 +6,7 @@
 - [neo4j-cli docker delete](#neo4j-cli-docker-delete)
 - [neo4j-cli docker get](#neo4j-cli-docker-get)
 - [neo4j-cli docker list](#neo4j-cli-docker-list)
+- [neo4j-cli docker load](#neo4j-cli-docker-load)
 - [neo4j-cli docker start](#neo4j-cli-docker-start)
 - [neo4j-cli docker stop](#neo4j-cli-docker-stop)
 
@@ -136,6 +137,38 @@ neo4j-cli docker list --format json
 
 # Emit TOON for token-efficient ingestion by agents
 neo4j-cli docker list --format toon
+```
+
+## neo4j-cli docker load
+
+Load an example dataset into a local Neo4j Docker container
+
+Load an example Neo4j dataset (a `.dump` published by a GitHub repo carrying a `relate.project-install.json` manifest, e.g. `neo4j-graph-examples/movies`) into a local Neo4j Docker container. The manifest is resolved for the requested --version, the matching dump is downloaded from the Git-LFS media host, and the data is loaded into the --database (default `neo4j`). When --name refers to a container that does not yet exist, a new container is created on a fresh named volume with NEO4J_PLUGINS set from the manifest and started. When --name refers to an EXISTING managed container, the load OVERWRITES that database's contents and therefore REQUIRES --force; if the existing container is missing a manifest-required plugin the load is refused (plugins cannot be added without recreating the container). Pass --wait to block until Bolt is reachable.
+
+Usage: `neo4j-cli docker load <owner/repo> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--database` | string | neo4j | The target database the dump is loaded into. |
+| `--force` | bool | false | Required to overwrite an EXISTING container's database (the load destroys its current contents). |
+| `--max-size` | int64 | 2147483648 | Maximum dump download size in bytes; the download is refused if exceeded. |
+| `--name` | string | - | (required) Container name. New if it does not exist; existing managed container if it does (requires --force). |
+| `--version` | string | 5 | Neo4j version to resolve the manifest against and use for the container image (e.g. 5, 5.26). Must satisfy the dump's targetNeo4jVersion. |
+| `--wait` | bool | false | Wait until Bolt is reachable before returning (new container only). |
+
+Examples:
+
+```
+# Load the movies dataset into a new container (created automatically)
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw
+
+# Load into a new container and block until Bolt is reachable
+neo4j-cli docker load neo4j-graph-examples/recommendations --name recs --wait --rw
+
+# Overwrite an existing container's data with a dataset (requires --force)
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --force --rw
 ```
 
 ## neo4j-cli docker start

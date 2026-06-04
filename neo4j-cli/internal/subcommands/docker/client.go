@@ -106,6 +106,12 @@ type dockerClient interface {
 	// via /proc/<pid>/cmdline), routing them through /proc/<pid>/environ
 	// instead. Exec is ExecWithEnv with nil env.
 	ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error)
+	// CopyTo shells `docker cp <hostPath> <name>:<containerPath>`, copying a
+	// host file into a running container. Used by `docker load` to stage a
+	// dataset dump into an existing container (a running container can't have a
+	// new volume bind-mounted). hostPath is a local file path; it is NOT a
+	// secret, so passing it via argv is fine.
+	CopyTo(ctx context.Context, hostPath, name, containerPath string) error
 	// ExecAs shells `docker exec -u <user> [-e KEY ...] <name> <args...>`. It is
 	// the user-scoped superset of ExecWithEnv: when user is non-empty the
 	// command runs as that container user (e.g. "neo4j", so neo4j-admin matches
@@ -305,6 +311,11 @@ func (c *execClient) ExecAs(ctx context.Context, name, user string, args []strin
 	return strings.TrimSpace(out), nil
 }
 
+func (c *execClient) CopyTo(ctx context.Context, hostPath, name, containerPath string) error {
+	_, err := c.run(ctx, "cp", hostPath, name+":"+containerPath)
+	return err
+}
+
 func (c *execClient) Inspect(ctx context.Context, name string) (Container, error) {
 	out, err := c.run(ctx, "inspect", name)
 	if err != nil {
@@ -339,6 +350,31 @@ func classifyInspectError(runErr error, name string) error {
 		return fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return runErr
+}
+
+// parseNeo4jPluginsEnv extracts the plugin slugs from a container's env slice
+// (as emitted by `docker inspect .Config.Env`, each entry "KEY=VALUE"). Neo4j
+// expects NEO4J_PLUGINS as a JSON array (e.g. `["apoc","graph-data-science"]`);
+// we decode it leniently and return nil for a missing/empty/unparseable value
+// so `docker load`'s existing-container plugin gate fails closed (treats the
+// plugin as absent) rather than crashing.
+func parseNeo4jPluginsEnv(env []string) []string {
+	const prefix = "NEO4J_PLUGINS="
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			continue
+		}
+		raw := strings.TrimSpace(strings.TrimPrefix(e, prefix))
+		if raw == "" {
+			return nil
+		}
+		var plugins []string
+		if err := json.Unmarshal([]byte(raw), &plugins); err != nil {
+			return nil
+		}
+		return plugins
+	}
+	return nil
 }
 
 // parsePsOutput decodes the output of
@@ -396,6 +432,7 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
+			Env    []string          `json:"Env"`
 		} `json:"Config"`
 	}
 	var shapes []inspectShape
@@ -418,5 +455,6 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 		HTTPPort:  labels[LabelHTTPPort],
 		Ephemeral: labels[LabelEphemeral] == "true",
 		Managed:   labels[LabelManaged] == "true",
+		Plugins:   parseNeo4jPluginsEnv(s.Config.Env),
 	}, nil
 }

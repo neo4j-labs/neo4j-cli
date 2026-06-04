@@ -96,7 +96,7 @@ tasks:
       plugin is missing. Shared flags --name, --database (default neo4j), --max-size,
       --force, --wait, --version. Honor --wait via docker.WaitForBolt. Reuse
       NewDeployClient, the dockerClient iface, create.go port/name helpers, renderEnvFile.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -108,7 +108,7 @@ tasks:
       - "--database overrides the default 'neo4j' target database; --wait uses docker.WaitForBolt"
       - "LoadDumpIntoNewContainer is exported for reuse by the aura loader"
       - "Tests swap the docker client via the clientFactory seam and stub manifest/LFS via httptest"
-    completed_at: null
+    completed_at: 2026-06-04T15:41:10Z
 
   - id: task-006
     title: 'desktopclient.LoadDump method'
