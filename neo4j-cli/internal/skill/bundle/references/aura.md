@@ -836,9 +836,8 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
-| `--instance-password` | string | - | (required) The password of the instance this GraphQL Data API will be connected to |
-| `--instance-username` | string | - | (required) The username of the instance this GraphQL Data API will be connected to |
 | `--name` | string | - | (required) The name of the GraphQL Data API |
+| `--service-account` | string | read_write | The service account type for the instance connection, must be one of: read_only, read_write |
 | `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
 | `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql. Must be of file type .graphql |
 | `--wait` | bool | false | Waits until created GraphQL Data API is ready. |
@@ -847,13 +846,16 @@ Examples:
 
 ```
 # Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw
+
+# Create a GraphQL Data API with read-only service account
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --instance-username neo4j --instance-password secret --type-definitions-file ./typeDefs.graphql --wait --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --wait --rw
 ```
 
 ### neo4j-cli aura graphql delete
@@ -1014,9 +1016,8 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | (required) The ID of the instance to update the Data API for |
-| `--instance-password` | string | - | The password of the instance this GraphQL Data API will be connected to |
-| `--instance-username` | string | - | The username of the instance this GraphQL Data API will be connected to |
 | `--name` | string | - | The name of the GraphQL Data API |
+| `--service-account` | string | - | The service account permission for the instance this GraphQL Data API will be connected to (read_only or read_write) |
 | `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
 | `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql |
 | `--wait` | bool | false | Waits until updated GraphQL Data API is ready again. |
@@ -1027,8 +1028,8 @@ Examples:
 # Rename a GraphQL Data API
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
 
-# Update the underlying instance credentials and wait for the API to be ready
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --instance-username neo4j --instance-password newsecret --wait --rw
+# Update the service account permission and wait for the API to be ready
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --rw
 
 # Replace the type definitions from a local file
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw

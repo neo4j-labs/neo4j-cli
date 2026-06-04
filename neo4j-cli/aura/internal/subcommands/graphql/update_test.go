@@ -66,8 +66,6 @@ func TestUpdateGraphQLDataApiWithTrailingNewline(t *testing.T) {
 func TestUpdateGraphQLDataApiWithResponse(t *testing.T) {
 	instanceId := "2f49c2b3"
 	dataApiId := "75a234b5"
-	instanceUsername := "neo4j"
-	instancePassword := "dfjglhssdopfrow"
 	name := "my-data-api-2"
 	typeDefs := "dHlwZS=="
 
@@ -99,20 +97,10 @@ func TestUpdateGraphQLDataApiWithResponse(t *testing.T) {
 			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --name %s %s --rw", instanceId, name, dataApiId),
 			expectedRequestBody: `{"name":"my-data-api-2"}`,
 			expectedResponse:    expectedResponse,
-		}, "update the password": {
+		}, "update the service account": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --instance-password %s %s --rw", instanceId, instancePassword, dataApiId),
-			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow"}}`,
-			expectedResponse:    expectedResponse,
-		}, "update the username": {
-			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --instance-username %s %s --rw", instanceId, instanceUsername, dataApiId),
-			expectedRequestBody: `{"aura_instance":{"username":"neo4j"}}`,
-			expectedResponse:    expectedResponse,
-		}, "update the password and username": {
-			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --instance-password %s --instance-username %s %s --rw", instanceId, instancePassword, instanceUsername, dataApiId),
-			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"}}`,
+			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --service-account read_only %s --rw", instanceId, dataApiId),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_only"}}`,
 			expectedResponse:    expectedResponse,
 		}, "update the typeDefs": {
 			mockResponse:        mockResponse,
@@ -121,8 +109,8 @@ func TestUpdateGraphQLDataApiWithResponse(t *testing.T) {
 			expectedResponse:    expectedResponse,
 		}, "update all possible values in one request": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --instance-password %s --instance-username %s --type-definitions %s --name %s %s --rw", instanceId, instancePassword, instanceUsername, typeDefs, name, dataApiId),
-			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-2","type_definitions":"dHlwZS=="}`,
+			executeCommand:      fmt.Sprintf("graphql update --format json --instance-id %s --service-account read_write --type-definitions %s --name %s %s --rw", instanceId, typeDefs, name, dataApiId),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_write"},"name":"my-data-api-2","type_definitions":"dHlwZS=="}`,
 			expectedResponse:    expectedResponse,
 		},
 	}

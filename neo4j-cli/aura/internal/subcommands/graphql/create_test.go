@@ -16,8 +16,6 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 	defer helper.Close()
 
 	instanceId := "2f49c2b3"
-	instanceUsername := "neo4j"
-	instancePassword := "dfjglhssdopfrow"
 	name := "my-data-api-1"
 	typeDefs := "dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwp9"
 	invalidBase64TypeDefs := "df"
@@ -28,37 +26,29 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 		executedCommand string
 		expectedError   string
 	}{
-		"missing almost all flags": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --type-definitions %s --rw", instanceId, typeDefs),
-			expectedError:   "Error: required flag(s) \"instance-password\", \"instance-username\", \"name\" not set",
-		},
 		"missing any type defs flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --rw", instanceId, instanceUsername, instancePassword, name),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --rw", instanceId, name),
 			expectedError:   "Error: at least one of the flags in the group [type-definitions type-definitions-file] is required",
 		},
 		"only one type defs flag can be provided": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --type-definitions-file %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefs, typeDefsFile),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --type-definitions-file %s --rw", instanceId, name, typeDefs, typeDefsFile),
 			expectedError:   "Error: if any flags in the group [type-definitions type-definitions-file] are set none of the others can be; [type-definitions type-definitions-file] were all set",
 		},
-		"missing instance password flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, name, typeDefs),
-			expectedError:   "Error: required flag(s) \"instance-password\" not set",
-		},
-		"missing instance username flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instancePassword, name, typeDefs),
-			expectedError:   "Error: required flag(s) \"instance-username\" not set",
-		},
 		"missing name flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, typeDefs),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --type-definitions %s --rw", instanceId, typeDefs),
 			expectedError:   "Error: required flag(s) \"name\" not set",
 		},
 		"invalid base64 for type defs": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, invalidBase64TypeDefs),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --rw", instanceId, name, invalidBase64TypeDefs),
 			expectedError:   "Error: provided type definitions are not valid base64",
 		},
 		"invalid type defs file": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions-file %s --rw", instanceId, instanceUsername, instancePassword, name, invalidTypeDefsFile),
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions-file %s --rw", instanceId, name, invalidTypeDefsFile),
 			expectedError:   "Error: type definitions file '../invalid/typeDefs.graphql' does not exist",
+		},
+		"invalid service account value": {
+			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --service-account bad_value --rw", instanceId, name, typeDefs),
+			expectedError:   `Error: invalid value for --service-account: "bad_value", must be one of: read_only, read_write`,
 		},
 	}
 
@@ -72,8 +62,6 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 
 func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 	instanceId := "2f49c2b3"
-	instanceUsername := "neo4j"
-	instancePassword := "dfjglhssdopfrow"
 	name := "my-data-api-1"
 	typeDefsEncoded := "dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="
 
@@ -133,15 +121,15 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 		expectedRequestBody string
 		expectedResponse    string
 	}{
-		"create with default auth provider": {
+		"create with default service account": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql create --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
-			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
+			executeCommand:      fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_write"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseJson,
-		}, "create with default auth provider and output as table": {
+		}, "create with read_only service account and output as table": {
 			mockResponse:        mockResponse,
-			executeCommand:      fmt.Sprintf("graphql create --format table --instance-id %s --instance-username %s --instance-password %s --name %s --type-definitions %s --rw", instanceId, instanceUsername, instancePassword, name, typeDefsEncoded),
-			expectedRequestBody: `{"aura_instance":{"password":"dfjglhssdopfrow","username":"neo4j"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
+			executeCommand:      fmt.Sprintf("graphql create --format table --instance-id %s --name %s --service-account read_only --type-definitions %s --rw", instanceId, name, typeDefsEncoded),
+			expectedRequestBody: `{"aura_instance":{"service_account":"read_only"},"name":"my-data-api-1","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`,
 			expectedResponse:    expectedResponseTable,
 		},
 	}
@@ -197,7 +185,7 @@ func TestCreateGraphQLDataApi_StdoutIsValidJSON(t *testing.T) {
 
 	helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusAccepted, mockResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql create --instance-id %s --instance-username neo4j --instance-password dfjglhssdopfrow --name my-data-api-1 --type-definitions dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ== --rw --format json", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql create --instance-id %s --name my-data-api-1 --type-definitions dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ== --rw --format json", instanceId))
 
 	helper.AssertOutIsValidJSON()
 }
