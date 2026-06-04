@@ -12,14 +12,14 @@ tasks:
       ({slug, title, description, owner/repo}) sourced from the README of
       neo4j-graph-examples/demo.neo4jlabs.com. Expose a List() accessor. The
       list is only a suggestion set; loading is not constrained to it.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "catalog.go exposes List() returning the curated entries with slug/title/description/owner-repo"
       - "Entries match the demo.neo4jlabs.com README slugs (movies, recommendations, northwind, etc.)"
       - "Package has the Neo4j copyright header and a table-driven catalog_test.go"
       - "No network access in List() — data is embedded in the binary"
-    completed_at: null
+    completed_at: 2026-06-04T15:19:12Z
 
   - id: task-002
     title: 'Manifest resolution: fetch + parse relate.project-install.json + version match'

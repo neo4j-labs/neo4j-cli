@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-04T15:19:12Z
+Created neo4j-cli/internal/dataset support package with embedded curated suggestion catalog (List()) sourced from demo.neo4jlabs.com README; 10 entries, each verified to carry a relate.project-install.json manifest.
+Files: +neo4j-cli/internal/dataset/catalog.go, +neo4j-cli/internal/dataset/catalog_test.go
+Decisions: twitter slug maps to twitter-v2 repo; offshoreleaks -> icij-offshoreleaks; network -> network-management. List returns a defensive copy.
