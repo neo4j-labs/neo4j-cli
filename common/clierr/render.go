@@ -30,6 +30,7 @@ type EnvelopeBody struct {
 	ResourceType string `json:"resource_type,omitempty"`
 	ResourceID   string `json:"resource_id,omitempty"`
 	Suggestion   string `json:"suggestion,omitempty"`
+	TeePath      string `json:"tee_path,omitempty"`
 	Retryable    bool   `json:"retryable"`
 }
 
@@ -45,6 +46,7 @@ func (e *CLIError) BuildEnvelope() Envelope {
 			ResourceType: e.ResourceType,
 			ResourceID:   e.ResourceID,
 			Suggestion:   e.Suggestion,
+			TeePath:      e.TeePath,
 			Retryable:    e.Retryable,
 		},
 	}
@@ -84,6 +86,7 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 			_, _ = stdout.Write(buf)
 			_, _ = io.WriteString(stdout, "\n")
 			_, _ = fmt.Fprintf(stderr, "Error: %s (exit %d)\n", ce.Message, ce.Code)
+			writeTeePath(ce, stderr)
 			return
 		}
 	case "toon":
@@ -91,6 +94,7 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 			_, _ = stdout.Write(buf)
 			_, _ = io.WriteString(stdout, "\n")
 			_, _ = fmt.Fprintf(stderr, "Error: %s (exit %d)\n", ce.Message, ce.Code)
+			writeTeePath(ce, stderr)
 			return
 		}
 	}
@@ -98,6 +102,15 @@ func Render(err error, stdout, stderr io.Writer, format string) {
 	_, _ = fmt.Fprintf(stderr, "Error: %s (exit %d)\n", ce.Message, ce.Code)
 	if ce.Suggestion != "" {
 		_, _ = fmt.Fprintf(stderr, "%s\n", ce.Suggestion)
+	}
+	writeTeePath(ce, stderr)
+}
+
+// writeTeePath emits the `Full output saved: <path>` stderr line when the
+// error carries a tee path. No-op when TeePath is empty.
+func writeTeePath(ce *CLIError, stderr io.Writer) {
+	if ce.TeePath != "" {
+		_, _ = fmt.Fprintf(stderr, "Full output saved: %s\n", ce.TeePath)
 	}
 }
 

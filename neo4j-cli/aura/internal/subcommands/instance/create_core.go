@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -104,6 +105,12 @@ func resolveInstanceName(cfg *clicfg.Config, name, projectID string) (string, er
 func renderInstanceResult(cmd *cobra.Command, cfg *clicfg.Config, instance map[string]any, noCredentialPrint, noCredentialStorage bool, extraFields ...string) {
 	if noCredentialPrint {
 		delete(instance, "password")
+	} else if pw, ok := instance["password"].(string); ok {
+		// The password is printed (once) for the user, but on a later --wait
+		// failure the captured output is teed to disk. Register the literal value
+		// so tee redaction scrubs it from formats the shape-based regexes can't
+		// reach (notably the table-cell layout).
+		clievents.RegisterSecretValue(pw)
 	}
 
 	renamed := utils.RenameResponseField(api.NewSingleValueResponseData(instance), "tenant_id", "project_id")

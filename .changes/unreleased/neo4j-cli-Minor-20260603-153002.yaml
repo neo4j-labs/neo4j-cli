@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Failing commands now save their full redacted output to a tee file under the config directory (neo4j/cli/tee) and expose its path as tee_path in the JSON/toon error envelope; controlled by the new tee-enabled and tee-limit config keys.
+time: 2026-06-03T15:30:02.412694+02:00

@@ -31,6 +31,7 @@ type CLIError struct {
 	ResourceType string
 	ResourceID   string
 	Suggestion   string
+	TeePath      string
 }
 
 func (e *CLIError) Error() string {
@@ -57,6 +58,15 @@ func (e *CLIError) WithResource(resourceType, resourceID string) *CLIError {
 // stderr line in plaintext mode.
 func (e *CLIError) WithSuggestion(s string) *CLIError {
 	e.Suggestion = s
+	return e
+}
+
+// WithTeePath attaches the path of the file holding the command's captured
+// output. Rendered as a `tee_path` field in the JSON/toon envelope (omitempty)
+// and as a `Full output saved: <path>` stderr line in all formats. Mutates the
+// receiver in place and returns it so callers can chain.
+func (e *CLIError) WithTeePath(path string) *CLIError {
+	e.TeePath = path
 	return e
 }
 

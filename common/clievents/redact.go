@@ -5,7 +5,10 @@ package clievents
 
 import (
 	"net/url"
+	"regexp"
+	"sort"
 	"strings"
+	"sync"
 )
 
 // secretFlags is the canonical list of flag names whose values must never be
@@ -28,12 +31,20 @@ var secretFlags = []string{
 // redactedPlaceholder is what the secret value is replaced with in output.
 const redactedPlaceholder = "***"
 
-// secretParamKeyParts are case-insensitive substrings that mark a `--param`
-// bind-parameter key as secret-bearing. A query parameter can legitimately
-// carry a token/password/api-key, so when the key matches we scrub only the
-// value and keep the key visible. The list is intentionally conservative to
-// avoid over-redacting common non-secret params (e.g. `limit`, `name`).
-var secretParamKeyParts = []string{
+// secretWords is the single canonical vocabulary of case-insensitive substrings
+// that mark a key (a `--param` bind-parameter key, a JSON field name, or a
+// key=value LHS) as secret-bearing. Every secret-key heuristic in this file is
+// driven from this one slice — secretParamKeyParts for the argv `--param`
+// matcher, and the assignment/JSON regexes (built at package init) — so the
+// word list lives in exactly one place. The list is intentionally conservative
+// to avoid over-redacting common non-secret keys (e.g. `limit`, `name`).
+//
+// "auth" is deliberately NOT in this list: the assignment regex needs special
+// handling for it (its own `auth(?:[-_]?token|[-_]?key)?` branch in
+// textAssignmentRe) so it does not swallow the HTTP header name "Authorization",
+// and treating "auth" as a generic substring would over-match. It is added back
+// in only where that nuance is encoded.
+var secretWords = []string{
 	"password",
 	"passwd",
 	"pwd",
@@ -45,6 +56,21 @@ var secretParamKeyParts = []string{
 	"access-key",
 	"accesskey",
 	"key",
+}
+
+// secretParamKeyParts are the substrings that mark a `--param` key secret. It
+// is an alias of the canonical vocabulary so the param heuristic and the
+// regex-based passes can never drift apart.
+var secretParamKeyParts = secretWords
+
+// quotedAlternation joins the words into a regex alternation, QuoteMeta'ing
+// each so metacharacters in any future vocabulary entry stay literal.
+func quotedAlternation(words []string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = regexp.QuoteMeta(w)
+	}
+	return strings.Join(quoted, "|")
 }
 
 // RedactArgs renders an argv slice as a single space-separated string with
@@ -108,6 +134,124 @@ func RedactArgs(args []string) string {
 		out = append(out, arg)
 	}
 	return strings.Join(out, " ")
+}
+
+// knownSecrets holds literal secret VALUES (not flag names) registered at
+// runtime that must be scrubbed from captured output regardless of how they are
+// formatted. It exists because the regex passes below are shape-based: they
+// catch `key=value`, JSON fields, URIs, and auth headers, but cannot catch a
+// secret that appears in a layout they don't model — most notably a value cell
+// in a horizontal box-drawing table (`aura instance create --format table`
+// prints the Aura-generated password in its own column, on a different line
+// from the "password" header, offset by dynamic column widths). Registering the
+// exact value lets RedactText scrub it by literal match in any format without
+// over-redacting unrelated output. See RegisterSecretValue.
+var (
+	knownSecretsMu sync.RWMutex
+	knownSecrets   []string
+)
+
+// RegisterSecretValue records a literal secret value so RedactText scrubs every
+// later occurrence of it (any format) to ***. Use it for secrets minted at
+// runtime that are printed in machine-capturable output whose layout the
+// shape-based regexes don't cover (e.g. a generated DB password rendered into a
+// table cell). Empty or very short values are ignored to avoid scrubbing common
+// substrings. Registration is process-local and additive; it is never persisted.
+func RegisterSecretValue(v string) {
+	if len(v) < 4 {
+		return
+	}
+	knownSecretsMu.Lock()
+	defer knownSecretsMu.Unlock()
+	for _, s := range knownSecrets {
+		if s == v {
+			return
+		}
+	}
+	knownSecrets = append(knownSecrets, v)
+}
+
+// redactKnownSecrets replaces every registered literal secret value in s with
+// ***. Longest-first so a secret that is a substring of another is handled
+// before its container.
+func redactKnownSecrets(s string) string {
+	knownSecretsMu.RLock()
+	values := make([]string, len(knownSecrets))
+	copy(values, knownSecrets)
+	knownSecretsMu.RUnlock()
+	if len(values) == 0 {
+		return s
+	}
+	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
+	for _, v := range values {
+		s = strings.ReplaceAll(s, v, redactedPlaceholder)
+	}
+	return s
+}
+
+// textURIUserinfoRe matches a connection URI's userinfo password embedded in
+// free text: scheme://user:password@ with the password rewritten to ***. Only
+// the password segment (group 1 is scheme://user:) is replaced; host/port/path
+// are preserved.
+var textURIUserinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s@]+@`)
+
+// secretWordsAlt is the regex alternation of the canonical vocabulary, each
+// word QuoteMeta'd so any future entry with regex metacharacters stays literal
+// (current words are alnum/dash/underscore — safe — but the quoting fails closed
+// against drift).
+var secretWordsAlt = quotedAlternation(secretWords)
+
+// textAssignmentRe matches a secret key-value assignment (= or :) in free text
+// and rewrites the value to ***. Group 1 captures the key and separator so the
+// replacement keeps them verbatim. The alternation is built from the canonical
+// secretWords vocabulary (with a trailing `\w*` so `MY_PASSWORD`/`api_key2`
+// match) plus the special `auth` branch, which deliberately ends at a
+// `[=:]`-bounded word rather than using `auth\w*` so it does NOT swallow the
+// HTTP header name "Authorization" (handled by the bearer pass) while still
+// matching auth/auth_token/authkey.
+var textAssignmentRe = regexp.MustCompile(`(?i)((?:(?:` + secretWordsAlt + `)\w*|auth(?:[-_]?token|[-_]?key)?)\s*[=:]\s*)(\S+)`)
+
+// textJSONFieldRe matches a quoted JSON key containing a secret-bearing
+// substring followed by a quoted value, rewriting only the value to "***". It
+// exists because textAssignmentRe cannot match the JSON shape: the `"` between
+// the key and the `:` breaks its `key[=:]value` form, so `"password":"x"` would
+// otherwise leak. The key is matched by substring against the canonical
+// vocabulary so `"client_secret"`, `"x-api-key"`, `"current_password"` are all
+// covered, and both `"k":"v"` and `"k": "v"` spacings are handled.
+var textJSONFieldRe = regexp.MustCompile(`(?i)("[^"]*(?:` + secretWordsAlt + `)[^"]*"\s*:\s*)"[^"]*"`)
+
+// textBearerRe matches an Authorization Bearer token or Basic credential blob
+// in free text and rewrites it to ***. Group 1 captures the scheme word
+// (Bearer/Basic) so the replacement keeps the scheme verbatim.
+var textBearerRe = regexp.MustCompile(`(?i)((?:bearer|basic)\s+)\S+`)
+
+// RedactText scrubs secrets from arbitrary multi-line text, the text-level
+// counterpart to RedactArgs (which is argv-only). It applies conservative
+// regexes for (a) URI userinfo passwords in free text, (b) quoted-key JSON
+// secret fields (`"password":"x"`), (c) password/secret/token/api-key/auth
+// key-value assignments, and (d) Bearer/Basic authorization headers, replacing
+// each secret value with ***, plus (e) any literal value registered via
+// RegisterSecretValue. It is the single source of truth for redacting captured
+// command output before it is persisted. Non-secret text (e.g. `limit=10`,
+// ordinary prose) is left intact.
+//
+// Coverage limit: the regex passes are shape-based and fully cover key=value,
+// JSON fields, connection URIs, and auth headers. They do NOT model
+// table-formatted output (horizontal box-drawing tables put a value in a column
+// on a different line from its header, offset by dynamic widths), so a secret
+// printed only as a table cell is caught solely by the RegisterSecretValue
+// literal-match pass — callers that emit a runtime secret into a table must
+// register it (e.g. `aura instance create` registers the generated password).
+func RedactText(s string) string {
+	s = redactKnownSecrets(s)
+	s = textURIUserinfoRe.ReplaceAllString(s, "${1}"+redactedPlaceholder+"@")
+	// JSON pass runs before the bare-assignment pass: it rewrites the value to a
+	// quoted "***", whose trailing `"` is not a valid assignment separator, so
+	// the assignment regex cannot re-process (and double-mangle) the result.
+	s = textJSONFieldRe.ReplaceAllString(s, `${1}"`+redactedPlaceholder+`"`)
+	s = textAssignmentRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
+	s = textBearerRe.ReplaceAllString(s, "${1}"+redactedPlaceholder)
+	return s
 }
 
 // redactByFlag returns the scrubbed value for a known sensitive flag, and

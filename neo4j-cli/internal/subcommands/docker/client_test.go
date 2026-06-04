@@ -32,7 +32,7 @@ func TestRedactArgs(t *testing.T) {
 		{
 			name: "neo4j auth env masked",
 			in:   []string{"run", "-d", "-e", "NEO4J_AUTH=neo4j/hunter2", "neo4j:latest"},
-			want: []string{"run", "-d", "-e", "NEO4J_AUTH=<redacted>", "neo4j:latest"},
+			want: []string{"run", "-d", "-e", "NEO4J_AUTH=***", "neo4j:latest"},
 		},
 		{
 			name: "license env preserved (no AUTH or PASSWORD substring)",
@@ -42,12 +42,12 @@ func TestRedactArgs(t *testing.T) {
 		{
 			name: "arbitrary password env masked via PASSWORD substring",
 			in:   []string{"run", "-e", "MY_PASSWORD=hunter2"},
-			want: []string{"run", "-e", "MY_PASSWORD=<redacted>"},
+			want: []string{"run", "-e", "MY_PASSWORD=***"},
 		},
 		{
 			name: "lowercase auth still masked",
 			in:   []string{"run", "-e", "neo4j_auth=neo4j/x"},
-			want: []string{"run", "-e", "neo4j_auth=<redacted>"},
+			want: []string{"run", "-e", "neo4j_auth=***"},
 		},
 		{
 			name: "non-env arg with equals is preserved (no LHS letters before =)",
@@ -88,12 +88,12 @@ func TestRedactArgs(t *testing.T) {
 }
 
 // TestRedactString covers the stderr-redaction helper used by execClient.run
-// when wrapping captured docker stderr (CLI-162). The helper is the single
-// source of truth shared with redactArgs and must mask any
-// `KEY=VALUE` assignment whose LHS contains AUTH or PASSWORD
-// (case-insensitive, tolerating whitespace around `=`) across multi-line
-// blobs, while leaving operational error sentences untouched. Cases mirror
-// the Oplane verification subset for REQ-F-001 / REQ-NF-004.
+// when wrapping captured docker stderr (CLI-162). redactString now delegates to
+// clievents.RedactText (the CLI's single text-level redactor); these cases pin
+// the docker-relevant behaviour — masking AUTH/PASSWORD KEY=VALUE assignments
+// (case-insensitive, tolerating whitespace around `=`) across multi-line blobs
+// to ***, while leaving operational error sentences untouched. Cases mirror the
+// Oplane verification subset for REQ-F-001 / REQ-NF-004.
 func TestRedactString(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -105,7 +105,7 @@ func TestRedactString(t *testing.T) {
 		{
 			name:           "single-line stderr with NEO4J_AUTH",
 			in:             "docker: Error response from daemon: NEO4J_AUTH=neo4j/hunter2 is invalid",
-			want:           "docker: Error response from daemon: NEO4J_AUTH=<redacted> is invalid",
+			want:           "docker: Error response from daemon: NEO4J_AUTH=*** is invalid",
 			wantNotContain: []string{"hunter2"},
 			wantContain:    []string{"Error response from daemon", "is invalid"},
 		},
@@ -115,22 +115,22 @@ func TestRedactString(t *testing.T) {
 				"  env MY_PASSWORD=hunter2 rejected\n" +
 				"  env OTHER_PASSWORD=swordfish rejected",
 			want: "failed to start container:\n" +
-				"  env MY_PASSWORD=<redacted> rejected\n" +
-				"  env OTHER_PASSWORD=<redacted> rejected",
+				"  env MY_PASSWORD=*** rejected\n" +
+				"  env OTHER_PASSWORD=*** rejected",
 			wantNotContain: []string{"hunter2", "swordfish"},
 			wantContain:    []string{"failed to start container", "rejected"},
 		},
 		{
 			name:           "unicode value masked",
 			in:             "NEO4J_AUTH=neo4j/密码1234 not accepted",
-			want:           "NEO4J_AUTH=<redacted> not accepted",
+			want:           "NEO4J_AUTH=*** not accepted",
 			wantNotContain: []string{"密码1234", "neo4j/密码"},
 			wantContain:    []string{"not accepted"},
 		},
 		{
 			name:           "mixed-case LHS with whitespace around equals",
 			in:             "config rejected: Neo4j_Auth = secret xyz",
-			want:           "config rejected: Neo4j_Auth = <redacted> xyz",
+			want:           "config rejected: Neo4j_Auth = *** xyz",
 			wantNotContain: []string{"secret"},
 			wantContain:    []string{"config rejected", "xyz"},
 		},
@@ -373,7 +373,7 @@ func TestExec_ErrorRedacted(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, out)
 	msg := err.Error()
-	assert.Contains(t, msg, "NEO4J_PASSWORD=<redacted>", "secret env value must be redacted")
+	assert.Contains(t, msg, "NEO4J_PASSWORD=***", "secret env value must be redacted")
 	assert.NotContains(t, msg, "hunter2", "raw secret must not leak into the error")
 	assert.Contains(t, msg, "rejected", "surrounding stderr text must be preserved")
 }

@@ -1,0 +1,62 @@
+## TASK-001 — 2026-06-03T00:00:00Z
+Added tee_path to clierr error envelope: TeePath field + chainable WithTeePath on CLIError, tee_path,omitempty on EnvelopeBody projected in BuildEnvelope, and a writeTeePath helper printing `Full output saved: <path>` to stderr in json/toon/plaintext branches.
+Files: ~common/clierr/error.go, ~common/clierr/render.go, ~common/clierr/render_test.go
+
+## TASK-002 — 2026-06-03T00:00:00Z
+Added clievents.RedactText for multi-line secret scrubbing: three package-level regexes (URI userinfo, password/secret/token/api-key/auth assignments, bearer headers) replacing values with ***; table-driven tests cover positives, no-false-positives, and multi-line.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+Decisions: tightened the `auth` assignment alternative (auth(?:[-_]?token|[-_]?key)?) instead of PRD's literal `auth\w*` so it doesn't swallow the HTTP header name "Authorization" — that case is handled by the bearer pass.
+
+## TASK-003 — 2026-06-03T00:00:00Z
+Added tee-enabled (bool default true) / tee-limit (int default 20) global config keys mirroring history-*: ValidConfigKeys, setDefaultValues, setGlobal validation (bool / non-negative int), GlobalConfig.TeeEnabled()/TeeLimit() accessors. New colocated tee_config_test.go; updated two config-list golden fixtures.
+Files: ~common/clicfg/clicfg.go, ~common/clicfg/tee_config_test.go, ~neo4j-cli/aura/internal/subcommands/config/standalone_config_test.go, ~neo4j-cli/internal/subcommands/config/list_test.go
+Decisions: no bundle regen needed — TestGenerator_RoundTrip passed (config reference doesn't enumerate keys); bundle regen remains task-006's scope.
+
+## TASK-004 — 2026-06-03T00:00:00Z
+Added cobra-free common/tee package: LimitedBuffer (5 MiB head cap + truncation footer, Write never errors), Dir() -> ConfigPrefix/neo4j/cli/tee, Save(cfg,slug,content) redacting via clievents.RedactText, writing 0600 via fileutils.WriteFileErr, rotating per-slug to keep tee-limit files (delete oldest to limit-1 before write).
+Files: +common/tee/tee.go, +common/tee/tee_test.go
+Decisions: rotation runs before the write (to limit-1) so exactly tee-limit remain after; list/remove errors swallowed but write error returns ("",err). Tests assert on Dir()-relative paths (ConfigPrefix empty in tests).
+
+## TASK-005 — 2026-06-03T00:00:00Z
+Wired tee-on-failure into main.go: shared LimitedBuffer fronts os.Stdout/os.Stderr via io.MultiWriter before Execute; on error (after confirm.ErrCancelled exit-0) derive slug via commandSlug helper, tee.Save (best-effort), resolve err to *CLIError (errors.As else NewFatalError), WithTeePath when path non-empty, then Render+exitCodeFor(ce).
+Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: WithTeePath reassigned to ce (returns *CLIError) to satisfy errcheck; commandSlug extracted as unit-testable helper.
+
+## TASK-006 — 2026-06-03T13:35:00Z
+Regenerated skill bundle (no drift), added single Minor changelog entry, README "Tee on failure" section. All gates green (test/fmt-check/lint/license, no bundle drift). E2E smoke: failing `query` writes <ts>_query.log under config tee dir, tee_path in JSON envelope, `Full output saved:` on stderr, 0600, no secret leak. Fixed capture gap: root sets SilenceErrors so failure msg renders after capture (empty buffer -> no tee file); added teeContent helper appending err.Error() before Save, with table-driven test.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260603-153002.yaml, ~README.md, ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: teeContent extracted (mirrors commandSlug/exitCodeFor) so the SilenceErrors-appended error content is unit-testable without invoking main().
+
+## REVIEW — 2026-06-03T00:00:00Z
+Added 4 review tasks (task-007..task-010) from /golang-security audit: JSON redaction gap (HIGH), Basic-auth redaction (LOW), table-format column leak, redaction consolidation.
+
+## TASK-007 — 2026-06-03T14:10:00Z
+Closed RedactText quoted-key JSON leak: added textJSONFieldRe matching a quoted secret-word key + quoted value, rewriting value to "***" (valid JSON preserved); runs before bare-assignment pass so the trailing `"` blocks re-processing. Table-driven JSON positives + non-secret "name" negative added.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+Decisions: JSON pass ordered before textAssignmentRe — quoted "***" trailing quote is not a valid assignment separator, so no double-mangle.
+
+## TASK-008 — 2026-06-03T14:30:00Z
+Extended textBearerRe to (?i)((?:bearer|basic)\s+)\S+ so `Authorization: Basic <base64>` is redacted to *** alongside Bearer; updated regex + RedactText doc comments. Added "basic header" table case.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go
+
+## TASK-009 — 2026-06-03T15:10:00Z
+Closed table-format secret column leak via runtime literal-value redaction: added clievents.RegisterSecretValue + a knownSecrets registry scrubbed (longest-first, literal ReplaceAll) by RedactText; renderInstanceResult registers the generated password before printing so tee redaction catches it in any format.
+Files: ~common/clievents/redact.go, ~common/clievents/redact_test.go, ~neo4j-cli/aura/internal/subcommands/instance/create_core.go
+Decisions: chose source-adjacent literal registration over (A) blanket source mask (breaks "password shown once" success UX) and (B) table-cell regex (horizontal box-drawing layout puts value in a width-offset column on a different line from header — unmatchable without fragile parsing). Literal pass is format-agnostic, never over-redacts (exact match, <4-char guard), preserves UX (value still printed to real stdout, only the captured/teed copy scrubbed). Residual risk: an unregistered runtime secret in a non-regex-modeled layout still leaks — documented in RedactText "Coverage limit" comment.
+
+## TASK-010 — 2026-06-03T16:00:00Z
+Consolidated redaction onto one source: introduced canonical secretWords vocabulary (secretParamKeyParts now aliases it; assignment + JSON regexes built from quotedAlternation(secretWords), each word QuoteMeta'd) so no word list is duplicated; migrated docker.redactString to delegate to clievents.RedactText (removed sensitiveAssignmentRe/regexp import), making RedactText the only text-level redactor.
+Files: ~common/clievents/redact.go, ~neo4j-cli/internal/subcommands/docker/client.go, ~neo4j-cli/internal/subcommands/docker/client_test.go
+Decisions: placeholder unified to *** (docker tests updated from <redacted>) — one placeholder across all surfaces; RedactText verified to cover docker's NEO4J_AUTH=/*PASSWORD* cases before switching. Broadens textAssignment/JSON to also match key/accesskey/access-key words — fail-closed, acceptable per redaction philosophy.
+
+## REVIEW — 2026-06-03T00:00:00Z
+Added 1 review task (task-011): integration test for the tee-on-failure main() wiring via a testable handleFailure helper.
+
+## TASK-011 — 2026-06-03T00:00:00Z
+Extracted handleFailure(cfg,cmd,args,captured,err) *clierr.CLIError from main() (tee.Save + resolve-to-CLIError + WithTeePath); main() stays thin and keeps os.Exit/Render/ErrCancelled guard. Added integration tests asserting a redacted tee file lands on memfs with TeePath set, tee-disabled writes nothing, and exit codes are preserved.
+Files: ~neo4j-cli/main.go, ~neo4j-cli/main_test.go
+Decisions: ErrCancelled exit-0 guard left in main() before handleFailure (covered by existing TestConfirmCancellation_EndToEnd); tee tests hermetic via testfs memfs — file read back through returned TeePath so clicfg.ConfigPrefix never resolves to real home.
+
+## CI-SECURITY-REVIEW — 2026-06-03T00:00:00Z
+CI security-review bot flagged 1 Low: tee.Save did not sanitize path separators in commandSlug (defence-in-depth for the public common/ API). Sanitized slug (/,\ -> -) before filename + rotation; added TestSave_SanitizesSlugPathSeparators.
+Files: ~common/tee/tee.go, ~common/tee/tee_test.go

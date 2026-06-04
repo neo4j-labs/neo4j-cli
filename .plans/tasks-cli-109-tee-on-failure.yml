@@ -1,0 +1,268 @@
+feature: cli-109-tee-on-failure
+prd: ./prd-cli-109-tee-on-failure.md
+created_at: 2026-06-03T00:00:00Z
+updated_at: 2026-06-03T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add tee_path to the clierr error envelope'
+    description: |
+      Extend the structured error envelope to carry the tee file path. Add a
+      TeePath string field to clierr.CLIError with a chainable
+      WithTeePath(string) *CLIError setter, add a
+      `TeePath string `json:"tee_path,omitempty"`` field to EnvelopeBody, and
+      project it in BuildEnvelope(). Update clierr.Render so that, after the
+      `Error: <message> (exit N)` stderr line in every format branch, it prints
+      `Full output saved: <path>` to stderr when TeePath is non-empty.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "CLIError has a TeePath field and a chainable WithTeePath setter returning *CLIError"
+      - "EnvelopeBody has tee_path with omitempty; BuildEnvelope projects e.TeePath"
+      - "JSON and toon envelopes include tee_path when set and omit it when empty"
+      - "Render prints `Full output saved: <path>` to stderr in json/toon/plaintext when TeePath set"
+      - "Existing clierr render tests still pass; new cases cover tee_path present/absent"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-002
+    title: 'Add clievents.RedactText for multi-line secret scrubbing'
+    description: |
+      Add RedactText(s string) string to common/clievents/redact.go as the
+      text-level single source of truth for redacting secrets in arbitrary
+      multi-line output (RedactArgs is argv-only). Apply conservative regexes for
+      URI userinfo passwords in free text, password/secret/token/api-key/auth
+      key-value assignments, and bearer headers, reusing the existing secret
+      vocabulary where practical.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "RedactText scrubs neo4j://user:pw@host to neo4j://user:***@host (userinfo in free text)"
+      - "RedactText scrubs password=/secret=/token=/api-key=/auth= and `Bearer <token>` values to ***"
+      - "Non-secret text (e.g. limit=10, ordinary prose) is left unchanged"
+      - "Multi-line input with multiple secrets has every match redacted"
+      - "Table-driven tests in redact_test.go cover positives and no false positives"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-003
+    title: 'Add tee-enabled / tee-limit global config keys'
+    description: |
+      Mirror the history-enabled/history-limit pattern in
+      common/clicfg/clicfg.go. Add `tee-enabled` (bool, default true) and
+      `tee-limit` (int, default 20) to ValidConfigKeys and setDefaultValues, add
+      validation in setGlobal (bool for tee-enabled, non-negative int for
+      tee-limit), and add GlobalConfig accessors TeeEnabled() bool and
+      TeeLimit() int.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "tee-enabled and tee-limit appear in ValidConfigKeys and have defaults (true / 20)"
+      - "setGlobal rejects non-true/false tee-enabled and negative/non-int tee-limit with usage errors"
+      - "cfg.Global.TeeEnabled() and cfg.Global.TeeLimit() return the configured/default values"
+      - "config set/get/list operate on both keys (Global scope)"
+      - "clicfg validation tests cover valid and invalid values for both keys"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-004
+    title: 'Create common/tee package (LimitedBuffer, Dir, Save, rotation)'
+    description: |
+      Add a cobra-free common/tee package modeled on history/store.go. Provide a
+      LimitedBuffer io.Writer capping at ~5 MiB that keeps the head and appends a
+      truncation footer on overflow; Dir() returning
+      ConfigPrefix/neo4j/cli/tee; and Save(cfg, commandSlug, content) that
+      short-circuits when disabled/limit<=0/fs nil/empty content, redacts via
+      clievents.RedactText, writes <UTC-timestamp>_<slug>.log atomically (0600)
+      via fileutils.WriteFileErr, and rotates to keep at most tee-limit files per
+      slug.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "LimitedBuffer caps at ~5 MiB, keeps head, and Bytes() appends a truncation footer when exceeded"
+      - "Dir() resolves to ConfigPrefix/neo4j/cli/tee; filenames use the FS-safe UTC timestamp + slug"
+      - "Save writes a redacted 0600 file and returns its absolute path on success"
+      - "Save returns empty path/no write when tee disabled, tee-limit<=0, fs nil, or content empty"
+      - "Rotation keeps at most tee-limit files matching *_<slug>.log, independently per slug; tests use afero memfs"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-005
+    title: 'Wire tee-on-failure into main.go'
+    description: |
+      In neo4j-cli/main.go wrap the root command out/err with a single shared
+      LimitedBuffer via io.MultiWriter before cmd.Execute(). On a non-nil error
+      (after the existing confirm.ErrCancelled exit-0 return), derive the command
+      slug via cmd.Find(os.Args[1:]).CommandPath() (root name stripped, spaces to
+      '-', fallback "root"), call tee.Save, resolve the error to a *clierr.CLIError
+      (errors.As else NewFatalError), set WithTeePath when non-empty, and pass it
+      to clierr.Render.
+    status: completed
+    dependencies:
+      - task-001
+      - task-004
+    acceptance_criteria:
+      - "cmd out/err are wrapped with io.MultiWriter(real, buf) before Execute; pass-through unchanged"
+      - "Command slug derived from cmd.Find/CommandPath (e.g. aura-instance-list), fallback root"
+      - "On failure a tee file is written and its path set on the rendered *CLIError via WithTeePath"
+      - "confirm.ErrCancelled still exits 0 with no tee file; exit code is unchanged by tee logic"
+      - "Tee write failure never changes exit code and yields an empty tee_path"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-006
+    title: 'Regenerate skill bundle, add changelog, pass all gates'
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to refresh the skill bundle
+      (config help text embeds ValidConfigKeys) and commit source + regenerated
+      bundle together. Add a user-facing changie Minor entry. Ensure the full gate
+      suite passes.
+    status: completed
+    dependencies:
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... produces a clean git diff (TestGenerator_RoundTrip passes)"
+      - "A single changie Minor entry for neo4j-cli describes the tee-on-failure feature"
+      - "make test, make fmt-check, make lint, and make license-check all pass"
+      - "End-to-end: a failing command writes a redacted tee file and tee_path appears in the JSON envelope"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-007
+    title: 'Redact secrets in JSON output (RedactText quoted-key gap)'
+    description: |
+      SECURITY (HIGH). clievents.RedactText only matches bare `key=value` /
+      `key: value` assignments; it cannot match the quoted-key JSON shape
+      `"password": "..."` because the `"` between the key and the `:` breaks the
+      assignment regex. Empirically confirmed: `{"password":"hunter2"}` and
+      `"token": "..."` pass through unredacted, while connection URIs (caught by
+      the URI regex via `://user:pw@`) are fine. This is a reachable leak on the
+      tee failure path, not theoretical: neo4j-cli/aura/internal/subcommands/instance/create.go
+      RunE prints the new instance INCLUDING the Aura-generated `password`
+      (create_core.go renderInstanceResult, field list includes "password") to
+      stdout at line ~119, THEN `--wait` polls readiness and returns an error at
+      line ~127. So `aura instance create --wait --format json` whose poll times
+      out captures the generated DB admin password in the tee buffer, then
+      tee.Save runs RedactText which misses the JSON field, persisting the live
+      credential to the tee log and advertising its path via tee_path in the
+      error envelope for an agent to read. JSON is the agent-facing format and
+      the file is designed to be read/forwarded by automation, so the 0600 perm
+      is a weak mitigation. Fix: add a JSON-field redaction pass to RedactText
+      that matches a quoted key containing a secret word followed by `:` and a
+      quoted value, rewriting the value to "***" while keeping valid JSON
+      (handle both `"k":"v"` and `"k": "v"`). Match the key by substring (like
+      the existing secretParamKeyParts philosophy) so `"client_secret"`,
+      `"x-api-key"`, `"current_password"` are all covered.
+    status: completed
+    source: review
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "RedactText turns {\"password\":\"x\"} and {\"password\": \"x\"} into ...\"***\" (valid JSON preserved)"
+      - "\"token\":\"...\", \"client_secret\":\"...\", and \"x-api-key\":\"...\" values are redacted"
+      - "A JSON field named \"name\" (non-secret) is left unchanged; bare key=value redaction still works"
+      - "New table-driven RedactText cases cover JSON positives and the non-secret negative; make test/lint/fmt-check pass"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-008
+    title: 'Redact Authorization: Basic credentials in RedactText'
+    description: |
+      SECURITY (LOW). RedactText's bearer pass only handles `Bearer <token>`;
+      `Authorization: Basic <base64 user:pass>` passes through unredacted
+      (verified). neo4j-cli's Aura client uses OAuth Bearer so this is unlikely
+      in real output, but verbose/debug HTTP dumps could include it and the
+      addition is trivial. Extend the bearer regex to also cover the Basic scheme
+      (e.g. `(?i)(bearer\s+|basic\s+)\S+`) so the base64 credential blob is
+      replaced with ***.
+    status: completed
+    source: review
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "RedactText rewrites `Authorization: Basic dXNlcjpwYXNz` to `Authorization: Basic ***`"
+      - "Existing `Bearer` redaction still works"
+      - "New test case added; make test/lint/fmt-check pass"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-009
+    title: 'Address table-format secret column leak'
+    description: |
+      SECURITY (MEDIUM). Same root cause as task-007 but for table output:
+      `password │ <value>` table cells are not matched by RedactText, so
+      `aura instance create --format table` (which prints the generated password
+      column via renderInstanceResult) leaks the credential into the tee file on
+      the same --wait-failure path. Robust generic column-layout redaction is
+      hard, so the realistic remedy is to mask the credential at the source for
+      captured/non-success contexts: evaluate having renderInstanceResult (and
+      similar printers) omit or mask the `password` value, OR add a conservative
+      table-cell redaction pass keyed on a leading secret-word column label. Pick
+      the approach that is robust without over-redacting normal table output, and
+      document the residual risk if full coverage isn't achievable. Coordinate
+      with task-007 so the chosen vocab/source stays consistent.
+    status: completed
+    source: review
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "A generated password is not present in cleartext in the tee output for `instance create --format table` on a post-print failure"
+      - "Normal non-secret table output is not over-redacted"
+      - "Chosen approach + any residual risk documented (code comment or progress note); make test/lint/fmt-check pass"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-010
+    title: 'Consolidate redaction onto a single canonical source'
+    description: |
+      QUALITY. After the fixes above there are overlapping redactors: (a)
+      neo4j-cli/internal/subcommands/docker/client.go redactString (AUTH/PASSWORD
+      env-assignment regex) vs common/clievents.RedactText, and (b) the
+      secret-word vocabulary is duplicated between RedactText's regexes
+      (password/passwd/pwd/secret/token/api-key/auth ...) and the existing
+      secretParamKeyParts slice in the same file. RedactText's doc claims it is
+      "the single source of truth for redacting captured command output" — make
+      that true. Drive the assignment/JSON/Basic regexes off one shared
+      secret-word vocabulary (reuse/extend secretParamKeyParts rather than
+      hardcoding the list in each regex), and migrate docker.redactString to
+      delegate to clievents.RedactText (or a shared helper) so there is one
+      text-level redaction implementation. Preserve docker's existing behaviour
+      (its tests must still pass) — RedactText must cover the env-assignment
+      cases docker relies on before docker is switched over.
+    status: completed
+    source: review
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The secret-word vocabulary lives in one place and feeds the RedactText regexes (no duplicated word lists)"
+      - "docker.redactString delegates to the shared clievents redaction (no separate text-redaction implementation); docker tests still pass"
+      - "RedactText covers all cases docker.redactString previously handled (NEO4J_AUTH=, *PASSWORD* assignments)"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: 2026-06-03T00:00:00Z
+
+  - id: task-011
+    title: 'Add integration test for the tee-on-failure wiring'
+    description: |
+      TEST GAP. main() is not unit-testable (it calls os.Exit), so the
+      composition of the tee feature is currently verified only by manual smoke
+      testing: the MultiWriter capture buffer being installed before
+      cmd.Execute(), tee.Save being called with buf.Bytes(), WithTeePath being
+      attached to the resolved *clierr.CLIError, the process exit code being
+      preserved, and the confirm.ErrCancelled-before-Save ordering (cancellation
+      must NOT tee). Every piece is unit-tested in isolation (common/tee,
+      RedactText, BuildEnvelope/Render tee_path, commandSlug, teeContent) but
+      their integration in main() is not — this is exactly the seam where the
+      iteration-6 SilenceErrors bug hid (caught by code review, not by a test).
+      Extract the failure-handling block from main() into a small testable helper
+      (e.g. handleFailure(cfg, cmd, args, err) *clierr.CLIError that runs
+      tee.Save on the captured+error content, attaches WithTeePath when a path is
+      returned, and returns the resolved *CLIError) and add an integration test
+      that drives it with a memfs-backed config and a synthetic failing error.
+      Keep main() thin (call the helper); do not regress the existing
+      confirm.ErrCancelled exit-0 path or the exit-code behaviour.
+    status: completed
+    source: review
+    dependencies:
+      - task-005
+      - task-009
+    acceptance_criteria:
+      - "The failure-handling logic is in a testable helper called from main(); main() stays thin and behaviour is unchanged"
+      - "An integration test asserts a tee file actually lands on cfg.Aura.Fs() under the tee dir for a synthetic failing error, and the returned *CLIError carries TeePath pointing at it"
+      - "The test asserts the tee file content is redacted (a secret in the captured/error content appears as *** in the file)"
+      - "Tests cover: confirm.ErrCancelled writes no tee file; a tee-disabled config writes no file and yields empty TeePath"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: 2026-06-03T00:00:00Z

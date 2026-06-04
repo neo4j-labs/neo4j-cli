@@ -390,6 +390,12 @@ History recording is **on by default**. Known secret flags are redacted to `***`
 
 Because the history is designed to be read by agents and may be sent to an LLM for distillation or reporting, that flow transmits the recorded commands **off-machine**. Avoid embedding secrets in Cypher, `--param`, or `--uri`; prefer the `--password` TTY prompt or the `NEO4J_PASSWORD` environment variable.
 
+## Tee on failure
+
+When a command fails, `neo4j-cli` saves the command's full emitted output (stdout + stderr, combined and redacted of secrets) to a `<timestamp>_<command>.log` file in the `tee/` subdirectory of the config dir (mode `0600`). The path is surfaced as `tee_path` in the JSON/toon error envelope and as a `Full output saved: <path>` line on stderr, so the captured output can be read after the fact without re-running the command. Output is captured into a bounded ~5 MiB buffer (head kept, footer appended on overflow) and is only persisted on failure — never on success or user cancellation.
+
+Tee is **on by default**. Disable it with `neo4j-cli config set tee-enabled false --rw`, and cap retained files per command type with `neo4j-cli config set tee-limit <n> --rw` (default `20`; `0` disables tee). Writing is best-effort: a tee error never changes the command's exit code and simply omits `tee_path`.
+
 ## Write operations
 
 Write commands are gated by `--rw`. `neo4j-cli query` runs `EXPLAIN` first when `--rw` is absent and blocks mutating Cypher before execution.

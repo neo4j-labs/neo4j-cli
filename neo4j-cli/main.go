@@ -14,8 +14,10 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 )
 
 // recoverPanic prints a redacted "unexpected error" line to w.
@@ -92,6 +94,41 @@ func peekFormatFromArgs(args []string) string {
 	return ""
 }
 
+// commandSlug derives a filesystem-friendly slug for the command cobra
+// resolved from args. The root command name is stripped from the front of the
+// CommandPath so `neo4j-cli aura instance list` becomes `aura-instance-list`
+// rather than `neo4j-cli-aura-instance-list`; remaining spaces become dashes.
+// Returns "root" when no subcommand matched (parse failure or bare invocation).
+func commandSlug(cmd *cobra.Command, args []string) string {
+	matched, _, err := cmd.Find(args)
+	if err != nil || matched == nil {
+		return "root"
+	}
+	path := strings.TrimPrefix(matched.CommandPath(), cmd.Name())
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "root"
+	}
+	return strings.ReplaceAll(path, " ", "-")
+}
+
+// teeContent builds the bytes persisted by tee.Save from the captured
+// stdout+stderr stream plus the failing error. The root command sets
+// SilenceErrors, so the failure message is rendered by clierr.Render (after
+// capture) rather than during Execute; appending err here ensures the tee
+// always reflects the command's full output, including the error itself, even
+// when the command emitted nothing else before failing.
+func teeContent(captured []byte, err error) []byte {
+	if err == nil {
+		return captured
+	}
+	msg := strings.TrimSpace(err.Error())
+	if msg == "" {
+		return captured
+	}
+	return append(append([]byte{}, captured...), []byte(msg+"\n")...)
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -107,8 +144,12 @@ func main() {
 	clievents.Emit(cfg.Events, []string{"startup"}, true)
 
 	cmd := app.NewCmd(cfg)
-	cmd.SetOut(os.Stdout)
-	cmd.SetErr(os.Stderr)
+
+	// Capture emitted output into a shared bounded buffer while passing it
+	// through to the real streams, so a failing command can be teed to disk.
+	buf := &tee.LimitedBuffer{}
+	cmd.SetOut(io.MultiWriter(os.Stdout, buf))
+	cmd.SetErr(io.MultiWriter(os.Stderr, buf))
 
 	// cobra prints the error itself; we only add the hook for errors that bypassed
 	// both RunE and HelpFunc (e.g. unknown top-level command via legacyArgs in Find).
@@ -122,12 +163,35 @@ func main() {
 
 	if err != nil {
 		// Intercept confirm.ErrCancelled before render: cancellation is exit-0,
-		// not exit-1, and the helper already wrote "cancelled." to stderr.
+		// not exit-1, and the helper already wrote "cancelled." to stderr. This
+		// guard stays in main (before handleFailure) so cancellation never tees.
 		if errors.Is(err, confirm.ErrCancelled) {
 			os.Exit(0)
 		}
+
+		ce := handleFailure(cfg, cmd, os.Args[1:], buf.Bytes(), err)
+
 		format := resolveFormatForRender(os.Args[1:], cfg.Global.Format())
-		clierr.Render(err, os.Stdout, os.Stderr, format)
-		os.Exit(exitCodeFor(err))
+		clierr.Render(ce, os.Stdout, os.Stderr, format)
+		os.Exit(exitCodeFor(ce))
 	}
+}
+
+// handleFailure best-effort tees the captured output for a failing command and
+// resolves err to the *clierr.CLIError that Render should print. It saves a
+// redacted tee file (empty path when tee is disabled or the save fails — never
+// affecting the exit code), resolves err to a typed CLIError via errors.As
+// (falling back to a fatal error), and attaches the tee path when one was
+// written. os.Exit and clierr.Render stay in main so this helper is testable.
+func handleFailure(cfg *clicfg.Config, cmd *cobra.Command, args []string, captured []byte, err error) *clierr.CLIError {
+	path, _ := tee.Save(cfg, commandSlug(cmd, args), teeContent(captured, err))
+
+	var ce *clierr.CLIError
+	if !errors.As(err, &ce) {
+		ce = clierr.NewFatalError("%s", err.Error())
+	}
+	if path != "" {
+		ce = ce.WithTeePath(path)
+	}
+	return ce
 }

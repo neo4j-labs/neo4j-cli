@@ -8,17 +8,143 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/neo4j-cli/app"
 	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestCommandSlug covers the slug derivation main.go feeds to tee.Save:
+// CommandPath with the root name stripped and spaces turned into dashes, with a
+// "root" fallback for parse failures / bare invocations.
+func TestCommandSlug(t *testing.T) {
+	fs, err := testfs.GetTestFs("{}", "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "nested leaf", args: []string{"aura", "instance", "list"}, want: "aura-instance-list"},
+		{name: "single subcommand", args: []string{"config"}, want: "config"},
+		{name: "unknown command falls back to root", args: []string{"definitely-not-a-command"}, want: "root"},
+		{name: "no args falls back to root", args: []string{}, want: "root"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := app.NewCmd(cfg)
+			assert.Equal(t, tc.want, commandSlug(cmd, tc.args))
+		})
+	}
+}
+
+// TestTeeContent covers the content main.go feeds to tee.Save: the captured
+// stream with the failing error's message appended. Because the root command
+// sets SilenceErrors, the error is rendered after capture, so a command that
+// emits nothing before failing would otherwise tee an empty buffer — appending
+// the error guarantees the tee reflects the failure.
+func TestTeeContent(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		captured []byte
+		err      error
+		want     string
+	}{
+		{name: "empty buffer falls back to error", captured: nil, err: errors.New("boom"), want: "boom\n"},
+		{name: "captured output keeps error appended", captured: []byte("partial\n"), err: errors.New("boom"), want: "partial\nboom\n"},
+		{name: "nil error returns captured as-is", captured: []byte("partial\n"), err: nil, want: "partial\n"},
+		{name: "blank error message returns captured", captured: []byte("partial\n"), err: errors.New("   "), want: "partial\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, string(teeContent(tc.captured, tc.err)))
+		})
+	}
+}
+
+// TestHandleFailure_TeesRedactedAndAttachesPath exercises the integration of
+// the tee feature wired into main(): handleFailure must run tee.Save on the
+// captured+error content, land a redacted file on cfg.Aura.Fs() under the tee
+// dir, and return a *CLIError carrying that path. Uses a memfs-backed config so
+// nothing touches the real ~/Library/Preferences (Dir() resolves via
+// clicfg.ConfigPrefix, but the file is written to and read back from the same
+// in-memory fs via the returned path).
+func TestHandleFailure_TeesRedactedAndAttachesPath(t *testing.T) {
+	const secret = "hunter2"
+
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	captured := []byte("connecting to neo4j://neo4j:" + secret + "@host\npassword=" + secret + "\n")
+	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, captured, errors.New("boom"))
+
+	require.NotNil(t, ce)
+	require.NotEmpty(t, ce.TeePath, "tee path must be attached to the resolved CLIError")
+	assert.Equal(t, tee.Dir(), filepath.Dir(ce.TeePath))
+	assert.True(t, strings.HasSuffix(ce.TeePath, "_aura-instance-list.log"), "slug-derived filename; got %q", ce.TeePath)
+
+	data, err := afero.ReadFile(fs, ce.TeePath)
+	require.NoError(t, err, "tee file must exist on cfg.Aura.Fs()")
+	got := string(data)
+	assert.NotContains(t, got, secret, "secret must be redacted in the tee file")
+	assert.Contains(t, got, "***", "redacted placeholder must be present")
+	assert.Contains(t, got, "boom", "appended error message must be teed")
+}
+
+// TestHandleFailure_TeeDisabled verifies that a tee-disabled config writes no
+// file and yields an empty TeePath, while still resolving the error to a
+// CLIError that Render can print.
+func TestHandleFailure_TeeDisabled(t *testing.T) {
+	fs, err := testfs.GetTestFs(`{"format":"json","tee-enabled":false}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("password=hunter2\n"), errors.New("boom"))
+
+	require.NotNil(t, ce)
+	assert.Empty(t, ce.TeePath, "tee disabled must yield an empty tee path")
+
+	entries, err := afero.ReadDir(fs, tee.Dir())
+	if err == nil {
+		assert.Empty(t, entries, "no tee file may be written when tee is disabled")
+	}
+}
+
+// TestHandleFailure_PreservesExitCode verifies the tee attach does not change
+// the error's typed code/exit: an existing *CLIError keeps its code (validation
+// → 6) and a plain error is wrapped as fatal (→ 1).
+func TestHandleFailure_PreservesExitCode(t *testing.T) {
+	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cmd := app.NewCmd(cfg)
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "existing CLIError keeps validation exit 6", err: clierr.NewValidationError("bad input"), want: 6},
+		{name: "plain error wraps as fatal exit 1", err: errors.New("boom"), want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ce := handleFailure(cfg, cmd, []string{"aura", "instance", "list"}, []byte("data\n"), tc.err)
+			assert.Equal(t, tc.want, exitCodeFor(ce), "tee attach must not change the exit code")
+		})
+	}
+}
 
 // TestRecoverPanic_RedactsSecretArgs verifies that the panic-recover path in
 // main() never leaks secret-flag values into stdout. The recoverPanic helper

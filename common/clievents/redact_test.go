@@ -196,3 +196,217 @@ func TestRedactArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestRedactText(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		mustNot []string
+	}{
+		{
+			name: "uri userinfo password in free text",
+			in:   "connecting to neo4j://neo4j:s3cret@host:7687 now",
+			want: "connecting to neo4j://neo4j:***@host:7687 now",
+		},
+		{
+			name: "https userinfo password",
+			in:   "https://admin:hunter2@example.com/path",
+			want: "https://admin:***@example.com/path",
+		},
+		{
+			name: "uri without password unchanged",
+			in:   "neo4j://host:7687/db",
+			want: "neo4j://host:7687/db",
+		},
+		{
+			name: "password assignment equals",
+			in:   "password=topsecret",
+			want: "password=***",
+		},
+		{
+			name: "secret assignment colon",
+			in:   "client_secret: abc123",
+			want: "client_secret: ***",
+		},
+		{
+			name: "token assignment",
+			in:   "token=eyJhbGci",
+			want: "token=***",
+		},
+		{
+			name: "api-key assignment",
+			in:   "api-key=sk-live-xyz",
+			want: "api-key=***",
+		},
+		{
+			name: "api_key underscore assignment",
+			in:   "api_key=sk-live-xyz",
+			want: "api_key=***",
+		},
+		{
+			name: "auth assignment",
+			in:   "auth=Zm9vOmJhcg==",
+			want: "auth=***",
+		},
+		{
+			name:    "json password field no space",
+			in:      `{"password":"hunter2"}`,
+			want:    `{"password":"***"}`,
+			mustNot: []string{"hunter2"},
+		},
+		{
+			name:    "json password field with space",
+			in:      `{"password": "hunter2"}`,
+			want:    `{"password": "***"}`,
+			mustNot: []string{"hunter2"},
+		},
+		{
+			name:    "json token field",
+			in:      `{"token": "eyJhbGci.abc.def"}`,
+			want:    `{"token": "***"}`,
+			mustNot: []string{"eyJhbGci"},
+		},
+		{
+			name:    "json client_secret field",
+			in:      `{"client_secret":"abc123"}`,
+			want:    `{"client_secret":"***"}`,
+			mustNot: []string{"abc123"},
+		},
+		{
+			name:    "json x-api-key field",
+			in:      `{"x-api-key":"sk-live-xyz"}`,
+			want:    `{"x-api-key":"***"}`,
+			mustNot: []string{"sk-live-xyz"},
+		},
+		{
+			name: "json non-secret name field unchanged",
+			in:   `{"name":"bob"}`,
+			want: `{"name":"bob"}`,
+		},
+		{
+			name:    "json secret field among non-secret fields",
+			in:      `{"id":"123","password":"p4ss","name":"bob"}`,
+			want:    `{"id":"123","password":"***","name":"bob"}`,
+			mustNot: []string{"p4ss"},
+		},
+		{
+			name: "bearer header",
+			in:   "Authorization: Bearer abc.def.ghi",
+			want: "Authorization: Bearer ***",
+		},
+		{
+			name:    "basic header",
+			in:      "Authorization: Basic dXNlcjpwYXNz",
+			want:    "Authorization: Basic ***",
+			mustNot: []string{"dXNlcjpwYXNz"},
+		},
+		{
+			name: "non-secret assignment unchanged",
+			in:   "limit=10",
+			want: "limit=10",
+		},
+		{
+			name: "ordinary prose unchanged",
+			in:   "the quick brown fox ran 10 miles",
+			want: "the quick brown fox ran 10 miles",
+		},
+		{
+			name: "name assignment unchanged",
+			in:   "name=bob",
+			want: "name=bob",
+		},
+		{
+			name: "empty string",
+			in:   "",
+			want: "",
+		},
+		{
+			name:    "multi-line with multiple secrets",
+			in:      "uri=neo4j://u:p4ss@h:7687\npassword=hunter2\nAuthorization: Bearer tok-123\nlimit=5",
+			want:    "uri=neo4j://u:***@h:7687\npassword=***\nAuthorization: Bearer ***\nlimit=5",
+			mustNot: []string{"p4ss", "hunter2", "tok-123"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := RedactText(tc.in)
+			if got != tc.want {
+				t.Errorf("RedactText(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+			for _, leak := range tc.mustNot {
+				if strings.Contains(got, leak) {
+					t.Errorf("secret %q leaked in output %q", leak, got)
+				}
+			}
+		})
+	}
+}
+
+// resetKnownSecrets clears the process-global registry so a test starts clean
+// and restores it afterward (the registry is package state shared across tests).
+func resetKnownSecrets(t *testing.T) {
+	t.Helper()
+	knownSecretsMu.Lock()
+	saved := knownSecrets
+	knownSecrets = nil
+	knownSecretsMu.Unlock()
+	t.Cleanup(func() {
+		knownSecretsMu.Lock()
+		knownSecrets = saved
+		knownSecretsMu.Unlock()
+	})
+}
+
+func TestRedactText_RegisteredSecretValue(t *testing.T) {
+	const pw = "Abc123-generated-DB-password"
+
+	t.Run("table cell value scrubbed", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue(pw)
+		// A horizontal box-drawing table: the value sits in its own column, on a
+		// different line from the "PASSWORD" header — the shape-based regexes
+		// cannot reach it, only the literal-match pass can.
+		in := "│ PASSWORD                     │ USERNAME │\n│ " + pw + " │ neo4j    │"
+		got := RedactText(in)
+		if strings.Contains(got, pw) {
+			t.Fatalf("registered secret leaked: %q", got)
+		}
+		if !strings.Contains(got, "***") {
+			t.Fatalf("expected *** placeholder, got %q", got)
+		}
+		if !strings.Contains(got, "neo4j") {
+			t.Errorf("non-secret cell over-redacted: %q", got)
+		}
+	})
+
+	t.Run("unregistered output untouched", func(t *testing.T) {
+		resetKnownSecrets(t)
+		in := "│ NAME       │ USERNAME │\n│ Instance01 │ neo4j    │"
+		if got := RedactText(in); got != in {
+			t.Errorf("non-secret table over-redacted: %q", got)
+		}
+	})
+
+	t.Run("short values ignored", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue("abc") // < 4 chars
+		in := "value abc here"
+		if got := RedactText(in); got != in {
+			t.Errorf("short value should not be registered/scrubbed: %q", got)
+		}
+	})
+
+	t.Run("duplicate registration idempotent", func(t *testing.T) {
+		resetKnownSecrets(t)
+		RegisterSecretValue(pw)
+		RegisterSecretValue(pw)
+		knownSecretsMu.RLock()
+		n := len(knownSecrets)
+		knownSecretsMu.RUnlock()
+		if n != 1 {
+			t.Errorf("expected 1 registered secret, got %d", n)
+		}
+	})
+}
