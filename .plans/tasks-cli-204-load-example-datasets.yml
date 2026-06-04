@@ -183,7 +183,7 @@ tasks:
       --format json. Run go generate ./neo4j-cli/internal/skill/... and commit the
       regenerated bundle so TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples
       pass.
-    status: pending
+    status: completed
     dependencies:
       - task-004
       - task-005
@@ -193,7 +193,7 @@ tasks:
       - "All four new leaves have compliant flush-left Example fields"
       - "go generate ./neo4j-cli/internal/skill/... produces no further diff after commit"
       - "TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
-    completed_at: null
+    completed_at: 2026-06-04T22:10:00Z
 
   - id: task-010
     title: 'Changelog, final gates, and security review'
