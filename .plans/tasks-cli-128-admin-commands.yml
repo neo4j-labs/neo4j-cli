@@ -78,7 +78,7 @@ tasks:
       (60s timeout) until currentStatus="online"; stop --wait polls until
       currentStatus="offline". Emit progress messages to stderr during polling
       (follow docker create --wait style). Write colocated tests.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -89,7 +89,7 @@ tasks:
       - "All four commands require --rw; omitting it produces a usage error"
       - "All four have >=2 flush-left Example invocations including --rw"
       - "Unit tests cover happy path, --wait timeout, and --yes/non-TTY error paths"
-    completed_at: null
+    completed_at: "2026-06-04T12:30:00Z"
 
   - id: task-005
     title: "user subtree: list, get, and shared password-prompt helpers"
@@ -122,7 +122,7 @@ tasks:
       the runAdminStatement error translation for the Aura ArgumentError is exercised
       here. All three require --rw. Write colocated tests covering happy paths,
       Community errors, and Aura RENAME USER error translation.
-    status: pending
+    status: completed
     dependencies:
       - task-005
     acceptance_criteria:
@@ -133,7 +133,7 @@ tasks:
       - "'user rename <old> <new> --rw' executes RENAME USER"
       - "'user rename' on an Aura credential returns the translated ArgumentError message"
       - "All three have >=2 flush-left Example invocations with --rw"
-    completed_at: null
+    completed_at: "2026-06-04T12:00:00Z"
 
   - id: task-007
     title: "user subtree: set-password, suspend, activate"
@@ -182,7 +182,7 @@ tasks:
       --user flags (both required). All four are Enterprise-only (Community returns
       UnsupportedAdministrationCommand translated with Enterprise hint). Write
       colocated tests covering happy paths and Community-edition errors.
-    status: pending
+    status: in_progress
     dependencies:
       - task-008
     acceptance_criteria:
