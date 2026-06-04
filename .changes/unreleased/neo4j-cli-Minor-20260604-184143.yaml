@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Added --organization-id and --project-id flags to all graphql commands, supporting workspace-based defaults and instance ownership validation
-time: 2026-06-04T18:41:43.196901+01:00
