@@ -47,6 +47,9 @@ If you lose your API key, you will need to create a new Authentication provider.
 		Example: `# Create a GraphQL Data API from inline type definitions (base64-encoded)
 neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
 
+# Create a GraphQL Data API without specifying a name (auto-generated)
+neo4j-cli aura graphql create --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
+
 # Create a GraphQL Data API from a local type definitions file
 neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw
 
@@ -60,8 +63,13 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-defini
 				return fmt.Errorf("invalid value for --service-account: %q, must be one of: read_only, read_write", serviceAccount)
 			}
 
+			resolvedName, err := resolveGraphQLName(cfg, name, instanceId)
+			if err != nil {
+				return err
+			}
+
 			body := map[string]any{
-				"name": name,
+				"name": resolvedName,
 				"aura_instance": map[string]string{
 					"service_account": serviceAccount,
 				},
@@ -126,8 +134,7 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-defini
 
 	cmd.Flags().StringVar(&serviceAccount, serviceAccountFlag, "read_write", "The service account type for the instance connection, must be one of: read_only, read_write")
 
-	cmd.Flags().StringVar(&name, nameFlag, "", "(required) The name of the GraphQL Data API")
-	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup
+	cmd.Flags().StringVar(&name, nameFlag, "", "The name of the GraphQL Data API (auto-generated if not specified)")
 
 	cmd.Flags().StringVar(&typeDefs, typeDefsFlag, "", "The GraphQL type definitions, NOTE: must be base64 encoded")
 
@@ -138,4 +145,30 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-defini
 	flags.RegisterWait(cmd, &wait, "Waits until created GraphQL Data API is ready.")
 
 	return cmd
+}
+
+// resolveGraphQLName returns the explicit name when non-empty, otherwise it
+// lists the instance's GraphQL data APIs and derives an unused default name
+// (e.g. GraphQL01). Shared by create's auto-naming path.
+func resolveGraphQLName(cfg *clicfg.Config, name, instanceID string) (string, error) {
+	if name != "" {
+		return name, nil
+	}
+
+	listPath := fmt.Sprintf("/instances/%s/data-apis/graphql", instanceID)
+	listBody, _, listErr := api.MakeRequest(cfg, listPath, &api.RequestConfig{
+		Method:  http.MethodGet,
+		Version: api.AuraApiVersionBeta1,
+	})
+	if listErr != nil {
+		return "", listErr
+	}
+	listData := api.ParseBody(listBody)
+	existingNames := make([]string, 0, len(listData.AsArray()))
+	for _, inst := range listData.AsArray() {
+		if n, ok := inst["name"].(string); ok {
+			existingNames = append(existingNames, n)
+		}
+	}
+	return defaultGraphQLName(existingNames), nil
 }

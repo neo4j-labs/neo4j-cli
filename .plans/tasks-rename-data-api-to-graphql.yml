@@ -132,7 +132,7 @@ tasks:
       Call it at the top of `RunE` before the request body is built. Update the
       `--name` flag description to reflect it is now optional. Update `Example` strings
       to include at least one invocation without `--name`.
-    status: pending
+    status: completed
     dependencies:
       - task-006
     acceptance_criteria:
@@ -141,7 +141,7 @@ tasks:
       - "When --name is omitted, a GET to the list endpoint is made and the generated name is used in the POST body"
       - "When --name is provided, no extra GET is made"
       - "Example strings include at least one invocation without --name"
-    completed_at: null
+    completed_at: "2026-06-04T13:00:00Z"
 
   - id: task-008
     title: "Update create_test.go for optional --name and run all quality gates"

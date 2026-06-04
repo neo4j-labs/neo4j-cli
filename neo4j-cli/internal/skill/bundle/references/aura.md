@@ -836,7 +836,7 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--instance-id` | string | - | (required) The ID of the instance to create the GraphQL Data API for |
-| `--name` | string | - | (required) The name of the GraphQL Data API |
+| `--name` | string | - | The name of the GraphQL Data API (auto-generated if not specified) |
 | `--service-account` | string | read_write | The service account type for the instance connection, must be one of: read_only, read_write |
 | `--type-definitions` | string | - | The GraphQL type definitions, NOTE: must be base64 encoded |
 | `--type-definitions-file` | string | - | Path to a local GraphQL type definitions file, e.g. path/to/typeDefs.graphql. Must be of file type .graphql |
@@ -847,6 +847,9 @@ Examples:
 ```
 # Create a GraphQL Data API from inline type definitions (base64-encoded)
 neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+
+# Create a GraphQL Data API without specifying a name (auto-generated)
+neo4j-cli aura graphql create --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API from a local type definitions file
 neo4j-cli aura graphql create --instance-id 00000000 --name my-api --type-definitions-file ./typeDefs.graphql --rw

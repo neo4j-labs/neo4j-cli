@@ -34,10 +34,6 @@ func TestCreateGraphQLDataApiFlagsValidation(t *testing.T) {
 			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --type-definitions-file %s --rw", instanceId, name, typeDefs, typeDefsFile),
 			expectedError:   "Error: if any flags in the group [type-definitions type-definitions-file] are set none of the others can be; [type-definitions type-definitions-file] were all set",
 		},
-		"missing name flag": {
-			executedCommand: fmt.Sprintf("graphql create --instance-id %s --type-definitions %s --rw", instanceId, typeDefs),
-			expectedError:   "Error: required flag(s) \"name\" not set",
-		},
 		"invalid base64 for type defs": {
 			executedCommand: fmt.Sprintf("graphql create --instance-id %s --name %s --type-definitions %s --rw", instanceId, name, invalidBase64TypeDefs),
 			expectedError:   "Error: provided type definitions are not valid base64",

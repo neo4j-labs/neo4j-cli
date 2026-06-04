@@ -1,3 +1,7 @@
+## TASK-007 — 2026-06-04T13:00:00Z
+Made --name optional on graphql create with auto-name resolution. Added resolveGraphQLName (fetches list endpoint, calls defaultGraphQLName when name is empty). Removed MarkFlagRequired for name flag. Updated flag description and Examples. Removed the now-invalid "missing name flag" test case. Regenerated skill bundle. All quality gates pass.
+Files: ~graphql/create.go, ~graphql/create_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+
 ## TASK-006 — 2026-06-04T12:30:00Z
 Added defaultGraphQLName helper and table-driven unit tests mirroring the instance equivalent. All 11 test cases pass; make test and make fmt-check both exit 0.
 Files: +graphql/name_helpers.go, +graphql/name_helpers_test.go
