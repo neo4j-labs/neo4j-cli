@@ -23,14 +23,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of authentication providers of a specific GraphQL Data API",
-		Example: `# List authentication providers of a GraphQL Data API
+		Example: `# List authentication providers of a GraphQL Data API (using flags)
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List authentication providers using a configured default workspace
 neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111
 
 # List authentication providers as JSON for scripting
-neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Show only enabled provider names
-neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[] | select(.enabled) | .name'`,
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)

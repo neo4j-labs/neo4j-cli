@@ -641,14 +641,14 @@ Flags:
 Examples:
 
 ```
-# Create an api-key authentication provider
+# Create an api-key authentication provider (using flags)
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Create an api-key authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --rw
 
 # Create a JWKS authentication provider with a validation URL
-neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --rw
-
-# Create a disabled api-key provider and wait until the GraphQL Data API is ready
-neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --wait --rw
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 #### neo4j-cli aura graphql auth-provider delete
@@ -673,14 +673,14 @@ Flags:
 Examples:
 
 ```
-# Delete an authentication provider
+# Delete an authentication provider (using flags)
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Delete an authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Delete an authentication provider and capture the response as JSON
-neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
-
-# Delete the first authentication provider returned by list
-neo4j-cli aura graphql auth-provider delete $(neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
 ```
 
 #### neo4j-cli aura graphql auth-provider get
@@ -701,14 +701,14 @@ Flags:
 Examples:
 
 ```
-# Get details of an authentication provider
+# Get details of an authentication provider (using flags)
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get details of an authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111
 
 # Get details of an authentication provider as JSON
-neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Extract just the enabled flag for scripting
-neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data.enabled'
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 #### neo4j-cli aura graphql auth-provider list
@@ -727,14 +727,14 @@ Flags:
 Examples:
 
 ```
-# List authentication providers of a GraphQL Data API
+# List authentication providers of a GraphQL Data API (using flags)
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List authentication providers using a configured default workspace
 neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111
 
 # List authentication providers as JSON for scripting
-neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Show only enabled provider names
-neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[] | select(.enabled) | .name'
+neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ### neo4j-cli aura graphql cors-policy
@@ -772,14 +772,14 @@ Flags:
 Examples:
 
 ```
-# Add an allowed origin to the CORS policy
+# Add an allowed origin to the CORS policy (using flags)
+neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Add an allowed origin using a configured default workspace
 neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw
 
 # Add an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw
-
-# Add an allowed origin and capture the response as JSON
-neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --format json
+neo4j-cli aura graphql cors-policy allowed-origin add https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 ##### neo4j-cli aura graphql cors-policy allowed-origin remove
@@ -809,14 +809,14 @@ Flags:
 Examples:
 
 ```
-# Remove an allowed origin from the CORS policy
+# Remove an allowed origin from the CORS policy (using flags)
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Remove an allowed origin using a configured default workspace
 neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Remove an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw --yes --force
-
-# Remove an allowed origin and capture the response as JSON
-neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
 ```
 
 ### neo4j-cli aura graphql create
@@ -848,20 +848,17 @@ Flags:
 Examples:
 
 ```
-# Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+# Create a GraphQL Data API (using flags)
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
-# Create a GraphQL Data API without specifying a name (auto-generated)
+# Create a GraphQL Data API using a configured default workspace (auto-generated name)
 neo4j-cli aura graphql create --instance-id 00000000 --memory 256MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --rw
-
-# Create a GraphQL Data API with read-only service account
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 ### neo4j-cli aura graphql delete
@@ -885,14 +882,14 @@ Flags:
 Examples:
 
 ```
-# Delete a GraphQL Data API
+# Delete a GraphQL Data API (using flags)
+neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Delete a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --rw --yes --force
 
 # Delete a GraphQL Data API and capture the response as JSON
-neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --rw --yes --force --format json
-
-# Delete a GraphQL Data API discovered via list
-neo4j-cli aura graphql delete $(neo4j-cli aura graphql list --instance-id 00000000 --format json | jq -r '.data[0].id') --instance-id 00000000 --rw --yes --force
+neo4j-cli aura graphql delete 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json
 ```
 
 ### neo4j-cli aura graphql get
@@ -912,14 +909,14 @@ Flags:
 Examples:
 
 ```
-# Get details of a GraphQL Data API
+# Get details of a GraphQL Data API (using flags)
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get details of a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql get 11111111 --instance-id 00000000
 
 # Get details of a GraphQL Data API as JSON
-neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json
-
-# Extract just the connection URL for scripting
-neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json | jq -r '.data.url'
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ### neo4j-cli aura graphql list
@@ -937,14 +934,14 @@ Flags:
 Examples:
 
 ```
-# List GraphQL Data APIs of an instance
+# List GraphQL Data APIs of an instance (using flags)
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List GraphQL Data APIs using a configured default workspace
 neo4j-cli aura graphql list --instance-id 00000000
 
 # List GraphQL Data APIs as JSON for scripting
-neo4j-cli aura graphql list --instance-id 00000000 --format json
-
-# Extract just the IDs of every GraphQL Data API for an instance
-neo4j-cli aura graphql list --instance-id 00000000 --format json | jq -r '.data[].id'
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json
 ```
 
 ### neo4j-cli aura graphql pause
@@ -967,14 +964,14 @@ Flags:
 Examples:
 
 ```
-# Pause a GraphQL Data API
+# Pause a GraphQL Data API (using flags)
+neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Pause a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --rw
 
 # Pause a GraphQL Data API and wait until it is paused
-neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --rw
-
-# Pause a GraphQL Data API and capture the response as JSON
-neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --rw --format json
+neo4j-cli aura graphql pause 11111111 --instance-id 00000000 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 ### neo4j-cli aura graphql resume
@@ -997,14 +994,14 @@ Flags:
 Examples:
 
 ```
-# Resume a paused GraphQL Data API
+# Resume a paused GraphQL Data API (using flags)
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Resume a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw
 
 # Resume a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --rw
-
-# Resume a GraphQL Data API and capture the response as JSON
-neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw --format json
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 ### neo4j-cli aura graphql update
@@ -1031,14 +1028,14 @@ Flags:
 Examples:
 
 ```
-# Rename a GraphQL Data API
+# Rename a GraphQL Data API (using flags)
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Rename a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
 
 # Update the service account permission and wait for the API to be ready
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --rw
-
-# Replace the type definitions from a local file
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 ```
 
 ## neo4j-cli aura instance

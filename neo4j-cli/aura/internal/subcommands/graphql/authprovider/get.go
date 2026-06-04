@@ -25,14 +25,14 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Get details of a GraphQL Data API authentication provider",
 		Long:  "This endpoint returns details of a specific GraphQL Data API authentication provider.",
-		Example: `# Get details of an authentication provider
+		Example: `# Get details of an authentication provider (using flags)
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get details of an authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111
 
 # Get details of an authentication provider as JSON
-neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json
-
-# Extract just the enabled flag for scripting
-neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data.enabled'`,
+neo4j-cli aura graphql auth-provider get 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

@@ -219,9 +219,10 @@ tasks:
       `TestGenerator_RoundTrip` passes. Add a changelog entry (kind `Minor`) describing
       the new org/project/workspace support for graphql commands. Then run `make test`,
       `make fmt-check`, `make lint`, and `make license-check` to confirm a clean state.
-    status: todo
+    status: completed
     dependencies:
       - task-009
+    completed_at: "2026-06-04T18:45:00Z"
     acceptance_criteria:
       - "All 13 leaf command Example strings include both explicit-flag and workspace-shorthand invocations"
       - "Tests cover org/project flag path, workspace fallback, and error cases for at least graphql list"

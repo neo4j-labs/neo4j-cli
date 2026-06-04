@@ -29,14 +29,14 @@ func NewResumeCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This command starts the resuming process of an existing GraphQL Data API.
 
 Resuming a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready. Once the status transitions from "resuming" to "ready" you may begin to use your GraphQL Data API.`,
-		Example: `# Resume a paused GraphQL Data API
+		Example: `# Resume a paused GraphQL Data API (using flags)
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Resume a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw
 
 # Resume a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --rw
-
-# Resume a GraphQL Data API and capture the response as JSON
-neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --rw --format json`,
+neo4j-cli aura graphql resume 11111111 --instance-id 00000000 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

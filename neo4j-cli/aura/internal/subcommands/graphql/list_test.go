@@ -47,6 +47,66 @@ func TestListGraphQLDataApis(t *testing.T) {
 	`)
 }
 
+func TestListGraphQLDataApis_WorkspaceFallback(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.SetDefaultProjectInConfig(testOrgID, testProjectID)
+
+	instanceId := "2f49c2b3"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
+	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{
+		"data": [
+			{
+				"id": "7261d20a",
+				"name": "friendly-name",
+				"status": "ready",
+				"url": "https://23423.453489590fdsgs34.test.com/graphql"
+			}
+		]
+	}`)
+
+	helper.ExecuteCommand(fmt.Sprintf("graphql list --instance-id %s", instanceId))
+
+	mockHandler.AssertCalledTimes(1)
+	mockHandler.AssertCalledWithMethod(http.MethodGet)
+
+	helper.AssertOutJson(`{
+		"data": [
+			{
+				"id": "7261d20a",
+				"name": "friendly-name",
+				"status": "ready",
+				"url": "https://23423.453489590fdsgs34.test.com/graphql"
+			}
+		]
+	}
+	`)
+}
+
+func TestListGraphQLDataApis_MissingOrgProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	helper.ExecuteCommand("graphql list --instance-id 2f49c2b3")
+
+	helper.AssertErrContainsStrings([]string{"no organization specified"})
+}
+
+func TestListGraphQLDataApis_InstanceNotInProject(t *testing.T) {
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	instanceId := "2f49c2b3"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, "different-project-id"))
+
+	helper.ExecuteCommand(fmt.Sprintf("graphql list --instance-id %s --organization-id %s --project-id %s", instanceId, testOrgID, testProjectID))
+
+	helper.AssertErrContainsStrings([]string{"could not find instance"})
+}
+
 func TestListGraphQLDataApisWithCredentialFlag(t *testing.T) {
 	instanceId := "2f49c2b3"
 

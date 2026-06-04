@@ -47,20 +47,17 @@ Creating a GraphQL Data API is an asynchronous operation. Use the --wait flag to
 This command returns your GraphQL Data API ID, API key, and connection URL for you to use once the GraphQL Data API is running. It is important to store the API key as it is not currently possible to get this or update it.
 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
-		Example: `# Create a GraphQL Data API from inline type definitions (base64-encoded)
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --rw
+		Example: `# Create a GraphQL Data API (using flags)
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
-# Create a GraphQL Data API without specifying a name (auto-generated)
+# Create a GraphQL Data API using a configured default workspace (auto-generated name)
 neo4j-cli aura graphql create --instance-id 00000000 --memory 256MB --type-definitions-file ./typeDefs.graphql --rw
 
 # Create a GraphQL Data API from a local type definitions file
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --rw
-
-# Create a GraphQL Data API with read-only service account
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --service-account read_only --type-definitions-file ./typeDefs.graphql --rw
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 512MB --type-definitions-file ./typeDefs.graphql --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
 
 # Create a GraphQL Data API and wait until it is ready
-neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --rw`,
+neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256MB --type-definitions-file ./typeDefs.graphql --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if serviceAccount != "read_only" && serviceAccount != "read_write" {
 				return fmt.Errorf("invalid value for --service-account: %q, must be one of: read_only, read_write", serviceAccount)

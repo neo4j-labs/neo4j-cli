@@ -22,14 +22,14 @@ func NewGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <id>",
 		Short: "Get details of a GraphQL Data API",
 		Long:  "This endpoint returns details of a specific GraphQL Data API.",
-		Example: `# Get details of a GraphQL Data API
+		Example: `# Get details of a GraphQL Data API (using flags)
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# Get details of a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql get 11111111 --instance-id 00000000
 
 # Get details of a GraphQL Data API as JSON
-neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json
-
-# Extract just the connection URL for scripting
-neo4j-cli aura graphql get 11111111 --instance-id 00000000 --format json | jq -r '.data.url'`,
+neo4j-cli aura graphql get 11111111 --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

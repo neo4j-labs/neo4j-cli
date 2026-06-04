@@ -48,14 +48,14 @@ Creating a GraphQL Data API authentication provider is an asynchronous operation
 If you create an 'api-key' Authentication provider, an API key will be created. It is important to store the API key as it is not currently possible to get it or update it.
 
 If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.`,
-		Example: `# Create an api-key authentication provider
+		Example: `# Create an api-key authentication provider (using flags)
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Create an api-key authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name my-api-key --rw
 
 # Create a JWKS authentication provider with a validation URL
-neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --rw
-
-# Create a disabled api-key provider and wait until the GraphQL Data API is ready
-neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type api-key --name reserved-key --disabled --wait --rw`,
+neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id 11111111 --type jwks --name my-jwks --url https://example.com/.well-known/jwks.json --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if _type == api.GraphQLDataApiAuthProviderTypeJwks {
 				cmd.MarkFlagRequired(urlFlag) //nolint:errcheck // MarkFlagRequired only errors if the flag name does not exist, which is a programming error caught at startup

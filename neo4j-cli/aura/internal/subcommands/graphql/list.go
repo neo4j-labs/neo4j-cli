@@ -20,14 +20,14 @@ func NewListCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Returns a list of GraphQL Data APIs",
-		Example: `# List GraphQL Data APIs of an instance
+		Example: `# List GraphQL Data APIs of an instance (using flags)
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111
+
+# List GraphQL Data APIs using a configured default workspace
 neo4j-cli aura graphql list --instance-id 00000000
 
 # List GraphQL Data APIs as JSON for scripting
-neo4j-cli aura graphql list --instance-id 00000000 --format json
-
-# Extract just the IDs of every GraphQL Data API for an instance
-neo4j-cli aura graphql list --instance-id 00000000 --format json | jq -r '.data[].id'`,
+neo4j-cli aura graphql list --instance-id 00000000 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)

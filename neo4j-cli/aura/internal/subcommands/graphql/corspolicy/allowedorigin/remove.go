@@ -41,14 +41,14 @@ Updating the CORS policy of a GraphQL Data API is an asynchronous operation. Use
 Removing an allowed origin from the CORS policy of a GraphQL Data API means that most browsers are no longer able to make requests to the GraphQL Data API from a web app that is served from the specified origin.
 
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
-		Example: `# Remove an allowed origin from the CORS policy
+		Example: `# Remove an allowed origin from the CORS policy (using flags)
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Remove an allowed origin using a configured default workspace
 neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Remove an allowed origin and wait until the GraphQL Data API is ready
-neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --rw --yes --force
-
-# Remove an allowed origin and capture the response as JSON
-neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json`,
+neo4j-cli aura graphql cors-policy allowed-origin remove https://app.example.com --instance-id 00000000 --data-api-id 11111111 --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

@@ -29,14 +29,14 @@ func NewDeleteCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `Deletes a GraphQL Data API authentication provider. This action can not be undone.
 
 Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.`,
-		Example: `# Delete an authentication provider
+		Example: `# Delete an authentication provider (using flags)
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force
+
+# Delete an authentication provider using a configured default workspace
 neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force
 
 # Delete an authentication provider and capture the response as JSON
-neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --rw --yes --force --format json
-
-# Delete the first authentication provider returned by list
-neo4j-cli aura graphql auth-provider delete $(neo4j-cli aura graphql auth-provider list --instance-id 00000000 --data-api-id 11111111 --format json | jq -r '.data[0].id') --instance-id 00000000 --data-api-id 11111111 --rw --yes --force`,
+neo4j-cli aura graphql auth-provider delete 22222222 --instance-id 00000000 --data-api-id 11111111 --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw --yes --force --format json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

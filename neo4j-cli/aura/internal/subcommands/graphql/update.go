@@ -41,14 +41,14 @@ func NewUpdateCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: `This endpoint edits a specific GraphQL Data API.
 
 Updating a GraphQL Data API is an asynchronous operation. Use the --wait flag to wait for the GraphQL Data API to be ready again. Once the status transitions from "updating" to "ready" you may continue to use your GraphQL Data API.`,
-		Example: `# Rename a GraphQL Data API
+		Example: `# Rename a GraphQL Data API (using flags)
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw
+
+# Rename a GraphQL Data API using a configured default workspace
 neo4j-cli aura graphql update 11111111 --instance-id 00000000 --name renamed-api --rw
 
 # Update the service account permission and wait for the API to be ready
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --rw
-
-# Replace the type definitions from a local file
-neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions-file ./typeDefs.graphql --rw`,
+neo4j-cli aura graphql update 11111111 --instance-id 00000000 --service-account read_only --wait --organization-id 00000000-0000-0000-0000-000000000000 --project-id 11111111-1111-1111-1111-111111111111 --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			graphqlId := strings.TrimSpace(args[0])
