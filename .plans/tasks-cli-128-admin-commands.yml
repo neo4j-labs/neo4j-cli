@@ -100,7 +100,7 @@ tasks:
       (wrapping golang.org/x/term) and the promptPassword(cmd) helper function,
       copied from neo4j-cli/query/run.go. list and get do not require --rw.
       Write colocated tests.
-    status: in_progress
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -110,7 +110,7 @@ tasks:
       - "passwordReader and stdinIsTTY are package-level vars that tests can override"
       - "promptPassword returns a UsageError on non-TTY when --password is absent"
       - "Unit tests pass; go test ./... clean"
-    completed_at: null
+    completed_at: "2026-06-04T10:30:00Z"
 
   - id: task-006
     title: "user subtree: create, drop, rename"
@@ -162,7 +162,7 @@ tasks:
       (SHOW ROLE <name> PRIVILEGES). Both support --format json|table|toon and do
       not require --rw. Write colocated tests; include >=2 flush-left Example
       invocations per leaf.
-    status: in_progress
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -172,7 +172,7 @@ tasks:
       - "'role get <role-name>' executes SHOW ROLE <name> PRIVILEGES"
       - "Both support --format json|table|toon and do not require --rw"
       - "Both have >=2 flush-left Example invocations including at least one --format json"
-    completed_at: null
+    completed_at: "2026-06-04T11:00:00Z"
 
   - id: task-009
     title: "role subtree: create, drop, grant, revoke"
