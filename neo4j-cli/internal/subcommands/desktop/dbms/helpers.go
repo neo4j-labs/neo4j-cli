@@ -118,7 +118,7 @@ type ListEnrichClient interface {
 }
 
 // DbmsListFields is the default column order for the Local DBMSes table.
-var DbmsListFields = []string{"id", "name", "version", "status", "connectionUri"}
+var DbmsListFields = []string{"id", "name", "version", "status", "connection_uri"}
 
 type preflightClient interface {
 	ListEnrichClient

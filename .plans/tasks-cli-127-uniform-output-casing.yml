@@ -94,7 +94,7 @@ tasks:
       dbms/plugin/list.go, and update their …Fields slices. Verify request bodies
       sent to Desktop still send connectionUri (camelCase). Update the desktop
       connection/dbms/plugin tests (output assertions only).
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "desktopclient/types.go wire tags unchanged (still camelCase)"
@@ -102,7 +102,7 @@ tasks:
       - "Requests sent to Neo4j Desktop still contain connectionUri (camelCase)"
       - "…Fields slices updated to snake_case"
       - "Updated desktop tests pass (output snake, request-body camel)"
-    completed_at: null
+    completed_at: 2026-06-04T00:00:00Z
 
   - id: task-006
     title: 'Add output snake_case AST gate test'

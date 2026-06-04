@@ -28,18 +28,13 @@ func (r listResult) AsArray() []map[string]any { return nil }
 // MarshalJSON emits `{dbmss, connections}` with both slices non-nil so JSON
 // consumers always see an array (possibly empty) under each key, never `null`.
 func (r listResult) MarshalJSON() ([]byte, error) {
-	dbmss := r.Dbmss
-	if dbmss == nil {
-		dbmss = []desktopclient.DbmsInfo{}
-	}
-	conns := r.Connections
-	if conns == nil {
-		conns = []desktopclient.Connection{}
-	}
 	return json.Marshal(struct {
-		Dbmss       []desktopclient.DbmsInfo   `json:"dbmss"`
-		Connections []desktopclient.Connection `json:"connections"`
-	}{Dbmss: dbmss, Connections: conns})
+		Dbmss       []desktopclient.DbmsInfoOutput   `json:"dbmss"`
+		Connections []desktopclient.ConnectionOutput `json:"connections"`
+	}{
+		Dbmss:       desktopclient.DbmsInfoOutputs(r.Dbmss),
+		Connections: desktopclient.ConnectionOutputs(r.Connections),
+	})
 }
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
@@ -49,7 +44,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 		Long: "List local DBMSes and saved remote connections managed by the local Neo4j Desktop 2 install — composed view. " +
 			"Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. " +
 			"For single-resource views use `neo4j-cli desktop dbms list` (DBMSes only) or `neo4j-cli desktop connection list` (connections only). " +
-			"Table format renders two labelled sections: `Local DBMSes` (id, name, version, status, connectionUri) and `Remote connections` (id, name, connectionUri). " +
+			"Table format renders two labelled sections: `Local DBMSes` (id, name, version, status, connection_uri) and `Remote connections` (id, name, connection_uri). " +
 			"`--format json` emits `{\"dbmss\": [...], \"connections\": [...]}` carrying the full wire payload for each. " +
 			"`--format toon` mirrors the JSON shape.",
 		Example: `# List DBMSes and saved remote connections as a two-section table

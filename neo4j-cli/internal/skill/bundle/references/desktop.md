@@ -315,7 +315,7 @@ neo4j-cli desktop dbms plugin install my-dbms-id --plugin apoc --no-restart --rw
 
 List plugins installed on a local Desktop-managed DBMS
 
-List plugins installed on a local Neo4j Desktop 2-managed DBMS. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `<dbms-id>` is the DBMS id (Desktop UUID); see `neo4j-cli desktop dbms list` for the catalog. `--format json` emits a JSON array of full `DbmsPlugin` objects (every wire field Desktop returns). `--format toon` mirrors the JSON shape. A `pendingRestart: true` entry means the plugin JAR is on disk but the running DBMS has not yet been restarted to pick it up — restart the DBMS or pass `--no-restart` to `install`/`uninstall` to defer the restart explicitly.
+List plugins installed on a local Neo4j Desktop 2-managed DBMS. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. `<dbms-id>` is the DBMS id (Desktop UUID); see `neo4j-cli desktop dbms list` for the catalog. `--format json` emits a JSON array of full `DbmsPlugin` objects (every wire field Desktop returns). `--format toon` mirrors the JSON shape. A `pending_restart: true` entry means the plugin JAR is on disk but the running DBMS has not yet been restarted to pick it up — restart the DBMS or pass `--no-restart` to `install`/`uninstall` to defer the restart explicitly.
 
 Usage: `neo4j-cli desktop dbms plugin list <dbms-id>`
 
@@ -509,7 +509,7 @@ neo4j-cli desktop install --dry-run --rw
 
 List local DBMSes and saved remote connections managed by Neo4j Desktop 2
 
-List local DBMSes and saved remote connections managed by the local Neo4j Desktop 2 install — composed view. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. For single-resource views use `neo4j-cli desktop dbms list` (DBMSes only) or `neo4j-cli desktop connection list` (connections only). Table format renders two labelled sections: `Local DBMSes` (id, name, version, status, connectionUri) and `Remote connections` (id, name, connectionUri). `--format json` emits `{"dbmss": [...], "connections": [...]}` carrying the full wire payload for each. `--format toon` mirrors the JSON shape.
+List local DBMSes and saved remote connections managed by the local Neo4j Desktop 2 install — composed view. Talks to Desktop's local relate API on http://localhost:<port>/fastify/api — Desktop must be running. For single-resource views use `neo4j-cli desktop dbms list` (DBMSes only) or `neo4j-cli desktop connection list` (connections only). Table format renders two labelled sections: `Local DBMSes` (id, name, version, status, connection_uri) and `Remote connections` (id, name, connection_uri). `--format json` emits `{"dbmss": [...], "connections": [...]}` carrying the full wire payload for each. `--format toon` mirrors the JSON shape.
 
 Usage: `neo4j-cli desktop list`
 

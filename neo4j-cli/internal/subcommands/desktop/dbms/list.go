@@ -25,11 +25,7 @@ func (r dbmsListResult) AsArray() []map[string]any { return nil }
 // MarshalJSON emits the array directly (not wrapped) so `--format json` returns
 // `[{...}, {...}]`. Empty case marshals to `[]` (never `null`).
 func (r dbmsListResult) MarshalJSON() ([]byte, error) {
-	dbmss := r.Dbmss
-	if dbmss == nil {
-		dbmss = []desktopclient.DbmsInfo{}
-	}
-	return json.Marshal(dbmss)
+	return json.Marshal(desktopclient.DbmsInfoOutputs(r.Dbmss))
 }
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {

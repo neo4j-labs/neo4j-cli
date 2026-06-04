@@ -16,7 +16,7 @@ import (
 
 // ConnectionListFields is the default column order for the Remote connections
 // table; JSON / toon emit the full Connection array.
-var ConnectionListFields = []string{"id", "name", "connectionUri"}
+var ConnectionListFields = []string{"id", "name", "connection_uri"}
 
 // connectionListResult is the payload returned by `desktop connection list`.
 type connectionListResult struct {
@@ -30,11 +30,7 @@ func (r connectionListResult) AsArray() []map[string]any { return nil }
 // MarshalJSON emits the Connection array unwrapped. Empty marshals to `[]`
 // (never `null`) so JSON consumers always see an array.
 func (r connectionListResult) MarshalJSON() ([]byte, error) {
-	conns := r.Connections
-	if conns == nil {
-		conns = []desktopclient.Connection{}
-	}
-	return json.Marshal(conns)
+	return json.Marshal(desktopclient.ConnectionOutputs(r.Connections))
 }
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
