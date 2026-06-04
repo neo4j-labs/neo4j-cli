@@ -1,3 +1,7 @@
+## TASK-008 — 2026-06-04T15:40:00Z
+Added TestCreateGraphQLDataApi_AutoName with two subtests: auto-name path mocks GET list endpoint (returning GraphQL01) + POST create, asserts POST body contains "GraphQL02"; explicit-name path verifies only POST is called. Skill bundle confirmed up-to-date (no regeneration diff). Added changelog entry for optional --name. All quality gates pass.
+Files: ~graphql/create_test.go, +.changes/unreleased/neo4j-cli-Minor-20260604-153719.yaml
+
 ## TASK-007 — 2026-06-04T13:00:00Z
 Made --name optional on graphql create with auto-name resolution. Added resolveGraphQLName (fetches list endpoint, calls defaultGraphQLName when name is empty). Removed MarkFlagRequired for name flag. Updated flag description and Examples. Removed the now-invalid "missing name flag" test case. Regenerated skill bundle. All quality gates pass.
 Files: ~graphql/create.go, ~graphql/create_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md

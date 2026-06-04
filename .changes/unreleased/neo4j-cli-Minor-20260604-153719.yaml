@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: graphql create --name is now optional; a name is auto-generated when omitted
+time: 2026-06-04T15:37:19.744415+01:00

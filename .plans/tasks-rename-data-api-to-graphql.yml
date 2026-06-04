@@ -153,7 +153,7 @@ tasks:
       GET). Regenerate the skill bundle (`go generate ./neo4j-cli/internal/skill/...`),
       add a changelog entry (kind `Minor`), then run `make test`, `make fmt-check`,
       `make lint`, and `make license-check` to confirm a clean state.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -162,4 +162,4 @@ tasks:
       - "TestGenerator_RoundTrip passes (skill bundle regenerated)"
       - "Changelog entry added under .changes/unreleased/"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` all exit 0"
-    completed_at: null
+    completed_at: "2026-06-04T15:40:00Z"

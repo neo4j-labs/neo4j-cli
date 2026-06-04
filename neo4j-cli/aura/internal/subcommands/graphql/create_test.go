@@ -152,6 +152,72 @@ func TestCreateGraphQLDataApiWithResponse(t *testing.T) {
 	}
 }
 
+func TestCreateGraphQLDataApi_AutoName(t *testing.T) {
+	instanceId := "2f49c2b3"
+	typeDefsEncoded := "dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="
+
+	listResponse := `{"data": [{"id": "aaa", "name": "GraphQL01", "status": "ready", "url": "https://example.com"}]}`
+	createResponse := `{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "GraphQL02",
+			"status": "creating",
+			"url": "https://2f49c2b3.28be6e4d8d3e8360197cb6c1fa1d25d1.graphql.neo4j-dev.io/graphql",
+			"authentication_providers": [
+				{
+					"id": "1ad1b794-e40e-41f7-8e8c-5638130317ed",
+					"name": "default",
+					"type": "api-key",
+					"enabled": true,
+					"key": "ublHwKxm2ylsc1HlkuL8NAcMfZnEVP1g"
+				}
+			]
+		}
+	}`
+
+	t.Run("auto-name skips taken name and picks next available", func(t *testing.T) {
+		helper := testutils.NewAuraTestHelper(t)
+		defer helper.Close()
+
+		mockHandler := helper.NewRequestHandlerMock(
+			fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId),
+			http.StatusOK,
+			listResponse,
+		)
+		mockHandler.AddResponse(http.StatusAccepted, createResponse)
+
+		helper.ExecuteCommand(fmt.Sprintf(
+			"graphql create --instance-id %s --type-definitions %s --rw",
+			instanceId, typeDefsEncoded,
+		))
+
+		mockHandler.AssertCalledTimes(2)
+		mockHandler.AssertCalledWithMethod(http.MethodGet)
+		mockHandler.AssertCalledWithMethod(http.MethodPost)
+		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"name":"GraphQL02","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
+	})
+
+	t.Run("explicit --name skips list GET and posts exact name", func(t *testing.T) {
+		helper := testutils.NewAuraTestHelper(t)
+		defer helper.Close()
+
+		mockHandler := helper.NewRequestHandlerMock(
+			fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId),
+			http.StatusAccepted,
+			createResponse,
+		)
+
+		helper.ExecuteCommand(fmt.Sprintf(
+			"graphql create --instance-id %s --name my-api --type-definitions %s --rw",
+			instanceId, typeDefsEncoded,
+		))
+
+		mockHandler.AssertCalledTimes(1)
+		mockHandler.AssertCalledWithMethod(http.MethodPost)
+		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"name":"my-api","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
+	})
+}
+
 // TestCreateGraphQLDataApi_StdoutIsValidJSON is the CLI-82 regression-pin
 // for the banner: pre-fix, the "###" banner was emitted to stdout, which broke
 // `--format json | jq`. Reverting the Pattern C fmt.Fprintln replacements to
