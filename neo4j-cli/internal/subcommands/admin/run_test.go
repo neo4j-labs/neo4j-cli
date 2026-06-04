@@ -6,9 +6,9 @@ package admin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -71,7 +71,7 @@ func TestRunAdminStatement_NoRows(t *testing.T) {
 }
 
 func TestTranslateAdminError_UnsupportedAdmin_EnterpriseHint(t *testing.T) {
-	fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.UnsupportedAdministrationCommand (CREATE DATABASE is not supported)")}
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.Statement.UnsupportedAdministrationCommand", Msg: "CREATE DATABASE is not supported"}}
 	withFakeRunner(t, fake)
 
 	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
@@ -84,7 +84,7 @@ func TestTranslateAdminError_UnsupportedAdmin_EnterpriseHint(t *testing.T) {
 }
 
 func TestTranslateAdminError_UnsupportedAdmin_AuraHint(t *testing.T) {
-	fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.UnsupportedAdministrationCommand (not supported, for more info see https://support.neo4j.com/kb/article)")}
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.Statement.UnsupportedAdministrationCommand", Msg: "not supported, for more info see https://support.neo4j.com/kb/article"}}
 	withFakeRunner(t, fake)
 
 	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "CREATE DATABASE foo", nil)
@@ -99,7 +99,7 @@ func TestTranslateAdminError_UnsupportedAdmin_AuraHint(t *testing.T) {
 func TestTranslateAdminError_ArgumentError_NonNativeAuth(t *testing.T) {
 	for _, msgFragment := range []string{"non-native", "authentication provider apart from native"} {
 		t.Run(msgFragment, func(t *testing.T) {
-			fake := &fakeQueryRunner{err: fmt.Errorf("Neo.ClientError.Statement.ArgumentError (%s)", msgFragment)}
+			fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.Statement.ArgumentError", Msg: msgFragment}}
 			withFakeRunner(t, fake)
 
 			_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "RENAME USER old TO new", nil)
@@ -114,7 +114,7 @@ func TestTranslateAdminError_ArgumentError_NonNativeAuth(t *testing.T) {
 }
 
 func TestTranslateAdminError_SetStatus_CommunityEdition(t *testing.T) {
-	fake := &fakeQueryRunner{err: fmt.Errorf("'SET STATUS' is not available in community edition")}
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.General.UnknownError", Msg: "'SET STATUS' is not available in community edition"}}
 	withFakeRunner(t, fake)
 
 	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET STATUS SUSPENDED", nil)
@@ -128,7 +128,7 @@ func TestTranslateAdminError_SetStatus_CommunityEdition(t *testing.T) {
 }
 
 func TestTranslateAdminError_HomeDatabase_CommunityEdition(t *testing.T) {
-	fake := &fakeQueryRunner{err: fmt.Errorf("'HOME DATABASE' is not available in community edition")}
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.General.UnknownError", Msg: "'HOME DATABASE' is not available in community edition"}}
 	withFakeRunner(t, fake)
 
 	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestCred(), "ALTER USER neo4j SET HOME DATABASE foo", nil)

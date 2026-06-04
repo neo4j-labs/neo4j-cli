@@ -130,24 +130,6 @@ func translateAdminError(err error) error {
 		return translateNeo4jError(ne)
 	}
 
-	// Plain-text path for tests that inject plain errors (e.g. via
-	// errors.New) rather than constructing a real Neo4jError.
-	msg := err.Error()
-	if strings.Contains(msg, unsupportedAdminCode) {
-		return translateUnsupportedAdmin(msg)
-	}
-	if strings.Contains(msg, argumentErrorCode) {
-		if strings.Contains(msg, "non-native") || strings.Contains(msg, "authentication provider apart from native") {
-			return clierr.NewValidationError("renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)")
-		}
-	}
-	if strings.Contains(msg, "SET STATUS") && strings.Contains(msg, "community edition") {
-		return clierr.NewValidationError("%s", msg)
-	}
-	if strings.Contains(msg, "HOME DATABASE") && strings.Contains(msg, "community edition") {
-		return clierr.NewValidationError("%s", msg)
-	}
-
 	return clierr.NewValidationError("%w", err)
 }
 

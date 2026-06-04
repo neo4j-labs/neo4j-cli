@@ -6,6 +6,7 @@ package role
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,7 @@ neo4j-cli admin role drop analyst --credential local --rw --yes --force`,
 			if err := confirm.Require(cmd, name); err != nil {
 				return err
 			}
-			cred, err := resolveCredential(cfg, credential)
+			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}

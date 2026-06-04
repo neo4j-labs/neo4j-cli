@@ -234,7 +234,7 @@ tasks:
       each sub-package's type. The adminutil package must not import database, user,
       or role (no import cycles). Run make test, make fmt-check, make lint to confirm
       all gates pass.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -244,7 +244,7 @@ tasks:
       - "No *Rows type (dbRows, userRows, roleRows) remains in database/, user/, or role/ packages"
       - "make test passes with zero failures"
       - "make fmt-check and make lint pass clean"
-    completed_at: null
+    completed_at: "2026-06-04T19:30:00Z"
 
   - id: task-012
     title: "Fix database/drop and user/drop to use common/confirm instead of bespoke y/N logic"
@@ -286,7 +286,7 @@ tasks:
       of plain errors.New() strings. Once tests use real Neo4jError values, the
       plain-text fallback block in translateAdminError can be deleted. The
       errors.As(err, &ne) path already handles Neo4jError correctly.
-    status: pending
+    status: completed
     dependencies:
       - task-010
     acceptance_criteria:
@@ -295,7 +295,7 @@ tasks:
       - "translateAdminError has a single Neo4jError path via errors.As"
       - "make test passes with zero failures"
       - "make fmt-check and make lint pass clean"
-    completed_at: null
+    completed_at: "2026-06-04T19:30:00Z"
 
   - id: task-014
     title: "Remove RunAdminStatement identity wrapper — export directly"
