@@ -17,6 +17,8 @@ func TestListAuthProviders(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId), http.StatusOK, `{
 		"data": [
 			{
@@ -26,10 +28,10 @@ func TestListAuthProviders(t *testing.T) {
 				"enabled": true,
 				"url": "https://test.com/.well-known/jwks.json"
 			}
-		]	
+		]
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider list --format json --instance-id %s --data-api-id %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider list --format json --instance-id %s --data-api-id %s --organization-id %s --project-id %s", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

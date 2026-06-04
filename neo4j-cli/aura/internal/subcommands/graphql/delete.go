@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +38,14 @@ neo4j-cli aura graphql delete $(neo4j-cli aura graphql list --instance-id 000000
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			graphqlId := strings.TrimSpace(args[0])
+
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+				return err
+			}
 
 			if err := confirm.Require(cmd, graphqlId); err != nil {
 				return err

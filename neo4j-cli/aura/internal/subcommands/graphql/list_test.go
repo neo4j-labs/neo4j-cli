@@ -16,6 +16,8 @@ func TestListGraphQLDataApis(t *testing.T) {
 	defer helper.Close()
 
 	instanceId := "2f49c2b3"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{
 		"data": [
 			{
@@ -27,7 +29,7 @@ func TestListGraphQLDataApis(t *testing.T) {
 		]
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql list --instance-id %s", instanceId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql list --instance-id %s --organization-id %s --project-id %s", instanceId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -78,9 +80,11 @@ func TestListGraphQLDataApisWithCredentialFlag(t *testing.T) {
 				"default-credential": "",
 			})
 
+			registerProjectsMock(&helper)
+			helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusOK, `{"data": []}`)
 
-			helper.ExecuteCommand(tc.command)
+			helper.ExecuteCommand(tc.command + fmt.Sprintf(" --organization-id %s --project-id %s", testOrgID, testProjectID))
 
 			mockHandler.AssertCalledTimes(1)
 			helper.AsssertOk()

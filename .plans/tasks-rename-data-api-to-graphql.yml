@@ -190,7 +190,7 @@ tasks:
 
       The `utils` package is at `"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"`.
       The `auraflags` package is at `auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"`.
-    status: todo
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -198,6 +198,7 @@ tasks:
       - "All 13 leaf commands call ResolveAndValidateOrgProject then FetchAndVerifyInstanceInProject in RunE before their API call"
       - "graphql create calls the ownership check before resolveGraphQLName"
       - "`go build ./...` succeeds with no errors after changes"
+    completed_at: "2026-06-04T18:00:00Z"
 
   - id: task-010
     title: "Update Example strings, add tests, regenerate bundle, add changelog, run quality gates"

@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -69,6 +70,14 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 			case "256MB", "512MB", "1024MB", "2048MB", "4096MB":
 			default:
 				return fmt.Errorf("invalid value for --memory: %q, must be one of: 256MB, 512MB, 1024MB, 2048MB, 4096MB", memory)
+			}
+
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+				return err
 			}
 
 			resolvedName, err := resolveGraphQLName(cfg, name, instanceId)

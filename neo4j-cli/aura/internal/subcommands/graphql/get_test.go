@@ -17,6 +17,8 @@ func TestGetGraphQLDataApi(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, `{
 			"data": {
                 "features": {
@@ -30,7 +32,7 @@ func TestGetGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s --organization-id %s --project-id %s", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -55,6 +57,8 @@ func TestGetGraphQLDataApiWithTrailingNewline(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, `{
 			"data": {
                 "id": "afdb4e9d",
@@ -64,7 +68,7 @@ func TestGetGraphQLDataApiWithTrailingNewline(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s\"\n\"", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s\"\n\" --organization-id %s --project-id %s", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -76,6 +80,8 @@ func TestGetGraphQLDataApiIncludingGraphQLServerErrors(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, `{
 			"data": {
                 "features": {
@@ -99,7 +105,7 @@ func TestGetGraphQLDataApiIncludingGraphQLServerErrors(t *testing.T) {
 			]
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql get --format json --instance-id %s %s --organization-id %s --project-id %s", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

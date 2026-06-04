@@ -72,10 +72,12 @@ func TestRemoveAllowedOriginWithRemainingOrigins(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --organization-id %s --project-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -107,10 +109,12 @@ func TestRemoveAllowedOriginWithNoExistingOrigins(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --organization-id %s --project-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -144,10 +148,12 @@ func TestRemoveAllowedOriginLastAllowedOrigin(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --organization-id %s --project-id %s --rw --yes --force", allowedOrigin, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -187,10 +193,12 @@ func TestRemoveAllowedOriginWithTrailingNewline(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove --instance-id %s --data-api-id %s --rw --yes --force %s\"\n\"", instanceId, dataApiId, allowedOrigin))
+	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove --instance-id %s --data-api-id %s --organization-id %s --project-id %s --rw --yes --force %s\"\n\"", instanceId, dataApiId, testOrgID, testProjectID, allowedOrigin))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -227,10 +235,12 @@ func TestRemoveAllowedOriginWithOutputTable(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 	mockHandler.AddResponse(http.StatusAccepted, mockPatchResponse)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --format table --rw --yes --force", allowedOrigin, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --organization-id %s --project-id %s --format table --rw --yes --force", allowedOrigin, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(2)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -258,7 +268,7 @@ func TestRemoveAllowedOriginConfirmGate(t *testing.T) {
 			}
 		}
 	}`, allowedOrigin)
-	base := fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --rw", allowedOrigin, instanceId, dataApiId)
+	base := fmt.Sprintf("graphql cors-policy allowed-origin remove %s --instance-id %s --data-api-id %s --organization-id %s --project-id %s --rw", allowedOrigin, instanceId, dataApiId, testOrgID, testProjectID)
 	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
 		Name:          "aura graphql cors-policy allowed-origin remove",
 		NoFlagsArgs:   base,
@@ -267,6 +277,8 @@ func TestRemoveAllowedOriginConfirmGate(t *testing.T) {
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
+			registerProjectsMock(&helper)
+			helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusOK, mockGetResponse)
 			mock.AddResponse(http.StatusAccepted, mockPatchResponse)
 			helper.SetStdin(stdin)

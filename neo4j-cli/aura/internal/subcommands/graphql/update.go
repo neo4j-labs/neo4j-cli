@@ -12,6 +12,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -54,6 +55,14 @@ neo4j-cli aura graphql update 11111111 --instance-id 00000000 --type-definitions
 
 			if serviceAccount != "" && serviceAccount != "read_only" && serviceAccount != "read_write" {
 				return fmt.Errorf("invalid --service-account value %q: must be read_only or read_write", serviceAccount)
+			}
+
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+				return err
 			}
 
 			body := map[string]any{}

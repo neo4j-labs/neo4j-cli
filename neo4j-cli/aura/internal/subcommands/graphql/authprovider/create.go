@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
+	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -67,6 +68,14 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)
+			if err != nil {
+				return err
+			}
+			if _, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceId, projectID); err != nil {
+				return err
+			}
+
 			body := map[string]any{
 				"type":    _type,
 				"name":    name,

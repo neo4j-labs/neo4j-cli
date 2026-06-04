@@ -603,6 +603,8 @@ Flags:
 | `--auth-url` | string | - |  |
 | `--base-url` | string | - |  |
 | `-c, --credential` | string | - | Name of a stored Aura credential to use for the command (see 'neo4j-cli credential aura-client list') |
+| `--organization-id` | string | - | ID of the Aura organization |
+| `--project-id` | string | - | ID of the Aura project |
 
 ### neo4j-cli aura graphql auth-provider
 

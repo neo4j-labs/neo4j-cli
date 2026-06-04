@@ -17,6 +17,8 @@ func TestResumeGraphQLDataApi(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/resume", instanceId, dataApiId), http.StatusAccepted, `{
 			"data": {
                 "id": "afdb4e9d",
@@ -26,7 +28,7 @@ func TestResumeGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql resume --format json --instance-id %s %s --rw", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql resume --format json --instance-id %s %s --organization-id %s --project-id %s --rw", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)
@@ -47,6 +49,8 @@ func TestResumeGraphQLDataApiWithTrailingNewline(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/resume", instanceId, dataApiId), http.StatusAccepted, `{
 			"data": {
                 "id": "afdb4e9d",
@@ -56,7 +60,7 @@ func TestResumeGraphQLDataApiWithTrailingNewline(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql resume --format json --instance-id %s %s\"\n\" --rw", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql resume --format json --instance-id %s %s\"\n\" --organization-id %s --project-id %s --rw", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodPost)

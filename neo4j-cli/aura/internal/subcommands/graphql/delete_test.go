@@ -18,6 +18,8 @@ func TestDeleteGraphQLDataApi(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{
 			"data": {
                 "id": "afdb4e9d",
@@ -27,7 +29,7 @@ func TestDeleteGraphQLDataApi(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql delete --format json --instance-id %s %s --rw --yes --force", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql delete --format json --instance-id %s %s --organization-id %s --project-id %s --rw --yes --force", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -48,6 +50,8 @@ func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
 
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{
 			"data": {
                 "id": "afdb4e9d",
@@ -57,7 +61,7 @@ func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
         	}
 		}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql delete --format json --instance-id %s %s\"\n\" --rw --yes --force", instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql delete --format json --instance-id %s %s\"\n\" --organization-id %s --project-id %s --rw --yes --force", instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodDelete)
@@ -66,7 +70,7 @@ func TestDeleteGraphQLDataApiWithTrailingNewline(t *testing.T) {
 func TestDeleteGraphQLDataApiConfirmGate(t *testing.T) {
 	instanceId := "2f49c2b3"
 	dataApiId := "afdb4e9d"
-	base := fmt.Sprintf("graphql delete --instance-id %s %s --rw", instanceId, dataApiId)
+	base := fmt.Sprintf("graphql delete --instance-id %s %s --organization-id %s --project-id %s --rw", instanceId, dataApiId, testOrgID, testProjectID)
 	confirmtest.AssertLeafGate(t, confirmtest.LeafGateCase{
 		Name:          "aura graphql delete",
 		NoFlagsArgs:   base,
@@ -75,6 +79,8 @@ func TestDeleteGraphQLDataApiConfirmGate(t *testing.T) {
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			helper := testutils.NewAuraTestHelper(t)
 			t.Cleanup(helper.Close)
+			registerProjectsMock(&helper)
+			helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 			mock := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s", instanceId, dataApiId), http.StatusAccepted, `{"data": {"id": "afdb4e9d", "status": "deleting"}}`)
 			helper.SetStdin(stdin)
 			err := helper.ExecuteCommandE(args)

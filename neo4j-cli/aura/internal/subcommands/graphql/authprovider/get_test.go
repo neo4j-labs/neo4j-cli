@@ -18,6 +18,8 @@ func TestGetAuthProvider(t *testing.T) {
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	authProviderId := "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId), http.StatusOK, `{
 		"data": {
 			"id": "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f",
@@ -28,7 +30,7 @@ func TestGetAuthProvider(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider get %s --format json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider get %s --format json --instance-id %s --data-api-id %s --organization-id %s --project-id %s", authProviderId, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)
@@ -52,6 +54,8 @@ func TestGetAuthProviderWithTrailingNewline(t *testing.T) {
 	instanceId := "2f49c2b3"
 	dataApiId := "a342b824"
 	authProviderId := "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f"
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 	mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers/%s", instanceId, dataApiId, authProviderId), http.StatusOK, `{
 		"data": {
 			"id": "87d46b4b-3bfb-4ad2-8dac-0e95cf72d39f",
@@ -62,7 +66,7 @@ func TestGetAuthProviderWithTrailingNewline(t *testing.T) {
 		}
 	}`)
 
-	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider get %s\"\n\" --format json --instance-id %s --data-api-id %s", authProviderId, instanceId, dataApiId))
+	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider get %s\"\n\" --format json --instance-id %s --data-api-id %s --organization-id %s --project-id %s", authProviderId, instanceId, dataApiId, testOrgID, testProjectID))
 
 	mockHandler.AssertCalledTimes(1)
 	mockHandler.AssertCalledWithMethod(http.MethodGet)

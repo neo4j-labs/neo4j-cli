@@ -6,10 +6,10 @@ package graphql
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/spf13/cobra"
-
+	auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphql/authprovider"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/graphql/corspolicy"
+	"github.com/spf13/cobra"
 )
 
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
@@ -38,6 +38,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.PersistentFlags().String("base-url", "", "")
 
 	flags.RegisterAuraCredentialFlag(cmd, cfg)
+	auraflags.RegisterOrgProjectFlags(cmd)
 
 	return cmd
 }

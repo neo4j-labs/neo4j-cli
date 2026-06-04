@@ -167,14 +167,18 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 		},
 	}
 
+	orgProjectFlags := fmt.Sprintf("--organization-id %s --project-id %s", testOrgID, testProjectID)
+
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
+			registerProjectsMock(&helper)
+			helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
 			mockHandler := helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId), http.StatusAccepted, tt.mockResponse)
 
-			helper.ExecuteCommand(tt.executeCommand)
+			helper.ExecuteCommand(tt.executeCommand + " " + orgProjectFlags)
 
 			mockHandler.AssertCalledTimes(1)
 			mockHandler.AssertCalledWithMethod(http.MethodPost)
