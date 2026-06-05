@@ -502,7 +502,7 @@ tasks:
       exist on an existing target) and that loading defaults to the latest Neo4j (--version
       accepts 5/5.26/calver/latest). Match the README's existing comment-prefixed
       fenced-block style. Keep it accurate to the shipped flags.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -510,4 +510,4 @@ tasks:
       - "Existing-vs-new shown for docker (--name/--force) and desktop (--dbms-id/--force vs --name); aura noted new-instance-only"
       - "Mentions --database default neo4j (and that the DB must exist on existing targets) and the latest-Neo4j default"
       - "Style matches existing README sections (comment-prefixed fenced blocks)"
-    completed_at: null
+    completed_at: 2026-06-05T16:30:00Z
