@@ -203,7 +203,7 @@ tasks:
       mutate legitimate data). Add a regression test asserting a string cell
       containing \x1b is rendered with the escape stripped through the
       PrintBodyMap table path.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     source: review
@@ -211,4 +211,4 @@ tasks:
       - 'getNestedField applies StripControl to the string-valued cell branch; non-string (JSON-marshaled) branch left unchanged'
       - 'A regression test renders a string cell with an embedded \x1b via PrintBodyMap (table) and asserts the control byte is neutralized'
       - 'No double-strip regression on the JSON-marshaled branch; make test, make fmt-check, make lint pass'
-    completed_at: null
+    completed_at: 2026-06-05T13:05:00Z

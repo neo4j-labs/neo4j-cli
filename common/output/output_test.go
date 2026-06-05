@@ -201,6 +201,26 @@ func TestPrintBodyMaps_ToonControlChars(t *testing.T) {
 	assert.NotContains(t, out, "\x07", "output must not contain raw BEL byte")
 }
 
+func TestPrintBodyMap_TableControlChars(t *testing.T) {
+	// Regression: getNestedField emitted string cells via fmt.Sprintf without
+	// stripping, so an attacker-controlled Aura field value could inject raw
+	// ANSI/terminal escapes into an operator's terminal. The string branch is
+	// now StripControl-ed; the JSON-marshaled (slice/number) branch is not.
+	cmd, cfg, stdout := newOutputCmd(t, "table")
+	data := simpleData{rows: []map[string]any{
+		{"name": "foo\x1b[31mbar", "note": "ring\x07bell", "count": 42},
+	}}
+
+	PrintBodyMap(cmd, cfg, data, []string{"name", "note", "count"})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "string cell must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "string cell must not contain raw BEL byte")
+	// Non-string cell is untouched by StripControl.
+	assert.Contains(t, out, "42", "numeric cell rendered unchanged")
+}
+
 func TestStripControl(t *testing.T) {
 	tests := []struct {
 		name string

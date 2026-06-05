@@ -202,6 +202,11 @@ func getNestedField(v map[string]any, subFields []string) string {
 			marshaledSlice, _ := json.MarshalIndent(value, "", "  ")
 			return string(marshaledSlice)
 		}
+		// Strip control bytes from strings only — the json branch above already
+		// escapes them, and numbers/bools carry none.
+		if s, ok := value.(string); ok {
+			return StripControl(s)
+		}
 		return fmt.Sprintf("%+v", value)
 	}
 	switch val := v[subFields[0]].(type) {
