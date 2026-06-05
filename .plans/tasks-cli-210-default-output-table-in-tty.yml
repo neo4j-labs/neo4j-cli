@@ -79,14 +79,14 @@ tasks:
       common/flags.stdoutIsTerminal deliberately read the global os.Stdout FD, not
       cmd.OutOrStdout(). Also document the default-format precedence: explicit flag
       > agent -> toon > TTY -> table > json.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - 'AGENTS.md note explains the os.Stdout/os.Stderr wrapping guardrail and references CLI-109/CLI-210'
       - 'AGENTS.md states the ResolveOutput default precedence (agent->toon, TTY->table, else json) and the IsAgent/StdoutIsTerminal seams'
       - 'Note placed near the existing Tee-on-failure / output sections'
-    completed_at: null
+    completed_at: 2026-06-05T10:30:00Z
 
   - id: task-005
     title: 'Regenerate skill bundle / agent-context for default-format wording'

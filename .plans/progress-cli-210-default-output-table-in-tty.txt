@@ -13,3 +13,7 @@ Added three regression tests to common/output/output_test.go: (1) wiring guard w
 The wiring guard fails on the pre-fix impl: pre-fix StdoutIsTerminal(w io.Writer) type-asserted *os.File, so the io.MultiWriter wrap reported non-TTY -> "json", failing the "table" assertion. The new parameterless seam reads os.Stdout's FD directly and is immune to the wrap, returning the forced true -> "table".
 make test / fmt-check / lint all green.
 Files: ~common/output/output_test.go
+
+## TASK-004 — 2026-06-05T10:30:00Z
+Added "## Output Format / TTY Detection Notes" to AGENTS.md: os.Stdout/os.Stderr wrapping guardrail (CLI-109 regression / CLI-210 fix), ResolveOutput default precedence (agent->toon, TTY->table, else json), and the IsAgent=false TestMain seeding requirement under agent harnesses.
+Files: ~AGENTS.md
