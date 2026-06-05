@@ -142,12 +142,19 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 	assert.Contains(t, loaderStr, "neo4j-admin database load neo4j --from-path="+loaderImportDir+" --overwrite-destination=true")
 	assert.Contains(t, loaderStr, ":/data")
 	assert.Contains(t, loaderStr, ":"+loaderImportDir+":ro")
+	// The default entrypoint enforces the enterprise license gate, so the loader
+	// must accept it via -e or neo4j-admin never runs.
+	assert.Contains(t, loaderStr, "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval")
 	// The image arg precedes the neo4j-admin command (default entrypoint form).
 	imageIdx := slices.Index(loader, "neo4j:5-enterprise")
 	cmdIdx := slices.Index(loader, "neo4j-admin")
 	require.GreaterOrEqual(t, imageIdx, 0)
 	require.GreaterOrEqual(t, cmdIdx, 0)
 	assert.Less(t, imageIdx, cmdIdx, "image must precede the neo4j-admin command")
+	// The license -e flag must precede the image arg.
+	licenseIdx := slices.Index(loader, "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval")
+	require.GreaterOrEqual(t, licenseIdx, 0)
+	assert.Less(t, licenseIdx, imageIdx, "license -e flag must precede the image arg")
 
 	server := strings.Join(fake.RunCalls[1], " ")
 	assert.Contains(t, server, "--name movies")

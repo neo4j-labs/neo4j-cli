@@ -365,6 +365,7 @@ tasks:
       loader-args assertion to require the NEO4J_ACCEPT_LICENSE_AGREEMENT=eval `-e` flag on
       the loader.
     status: pending
+    status: completed
     dependencies:
       - task-014
     source: review
@@ -372,4 +373,4 @@ tasks:
       - "The loader container args include -e NEO4J_ACCEPT_LICENSE_AGREEMENT=eval (before the image arg)"
       - "docker load_test.go asserts the loader passes the license-acceptance -e flag"
       - "make test, make fmt-check, make lint all clean"
-    completed_at: null
+    completed_at: 2026-06-05T08:00:00Z

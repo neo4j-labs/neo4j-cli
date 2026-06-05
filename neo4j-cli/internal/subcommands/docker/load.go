@@ -375,10 +375,13 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client do
 	// loaded /data/databases/<db> files owned by uid 7474, matching the server
 	// container — otherwise neo4j-admin runs as root and the server (which drops
 	// to neo4j) cannot write the root-owned files, leaving the database offline.
+	// The default entrypoint enforces the enterprise license gate, so the loader
+	// must accept it or neo4j-admin never runs and the database ends up empty.
 	loaderArgs := []string{
 		"--rm",
 		"-v", stageDir + ":" + loaderImportDir + ":ro",
 		"-v", volume + ":/data",
+		"-e", "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval",
 		image,
 		"neo4j-admin", "database", "load", load.Database,
 		"--from-path=" + loaderImportDir,
