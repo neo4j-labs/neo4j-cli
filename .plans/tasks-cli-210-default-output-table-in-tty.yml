@@ -96,14 +96,14 @@ tasks:
       ./neo4j-cli/internal/skill/... and make generate-check; commit any refreshed
       bundle in the same commit. If agentcontext/build.go hand-codes a default
       format, update it to reflect the new precedence.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - 'go generate ./neo4j-cli/internal/skill/... run; any bundle drift committed'
       - 'make generate-check passes (no uncommitted diff after generate)'
       - 'agentcontext/build.go reviewed; updated if it hand-codes a default format'
-    completed_at: null
+    completed_at: 2026-06-05T11:05:00Z
 
   - id: task-006
     title: 'Add Minor changelog entry'

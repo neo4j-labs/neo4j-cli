@@ -17,3 +17,7 @@ Files: ~common/output/output_test.go
 ## TASK-004 — 2026-06-05T10:30:00Z
 Added "## Output Format / TTY Detection Notes" to AGENTS.md: os.Stdout/os.Stderr wrapping guardrail (CLI-109 regression / CLI-210 fix), ResolveOutput default precedence (agent->toon, TTY->table, else json), and the IsAgent=false TestMain seeding requirement under agent harnesses.
 Files: ~AGENTS.md
+
+## TASK-005 — 2026-06-05T11:05:00Z
+`go generate ./neo4j-cli/internal/skill/...` (and full `go generate ./...`) produced NO bundle changes — a no-op. The task-001 change was behavioral (TTY/agent precedence in ResolveOutput); it is not surfaced in bundle help text, so the committed bundle was already in sync. Bundle's --format guidance ("agents: prefer toon", "default to --format toon on read commands") and the agentcontext.go Long ("On a TTY, --format defaults to a degraded flat command-list table") remain accurate under the new precedence (TTY->table, agent->toon, else json) and were left unchanged. agentcontext/build.go does NOT hand-code a default format: OutputFormats derives from clicfg.ValidFormatValues and Flag.Default is the cobra f.DefValue — no update needed. make test / fmt-check / lint all green; generate-check clean (only the .plans YAML status flip diffs, expected).
+Files: none (generate no-op)
