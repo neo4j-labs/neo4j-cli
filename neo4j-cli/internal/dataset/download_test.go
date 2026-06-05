@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -86,7 +87,11 @@ func TestDownload_RawBlobStreamedDirectly(t *testing.T) {
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	// Windows does not honor Unix permission bits — Chmod(0600) only toggles the
+	// read-only flag there, so Perm() reports 0666. The 0600 guarantee is Unix-only.
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
 }
 
 // TestDownload_PointerFallsBackToMedia covers the LFS case: raw serves a
