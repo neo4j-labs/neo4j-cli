@@ -6,7 +6,6 @@ package output
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"strings"
 	"testing"
 
@@ -188,7 +187,7 @@ func TestResolveOutput_Toon(t *testing.T) {
 	// ResolveOutput must return "toon" when cfg.Global.Format() is "toon",
 	// regardless of TTY state.
 	prev := StdoutIsTerminal
-	StdoutIsTerminal = func(_ io.Writer) bool { return false }
+	StdoutIsTerminal = func() bool { return false }
 	t.Cleanup(func() { StdoutIsTerminal = prev })
 
 	cmd, cfg, _ := newOutputCmd(t, "toon")
@@ -199,7 +198,7 @@ func TestResolveOutput_Toon(t *testing.T) {
 func TestResolveOutput_ToonWithTTY(t *testing.T) {
 	// Even when the writer looks like a TTY, an explicit "toon" config wins.
 	prev := StdoutIsTerminal
-	StdoutIsTerminal = func(_ io.Writer) bool { return true }
+	StdoutIsTerminal = func() bool { return true }
 	t.Cleanup(func() { StdoutIsTerminal = prev })
 
 	cmd, cfg, _ := newOutputCmd(t, "toon")

@@ -4,7 +4,6 @@
 package query
 
 import (
-	"io"
 	"os"
 	"testing"
 
@@ -18,7 +17,10 @@ import (
 // *os.File, so without this seed the new auto-detect default would flip them
 // to JSON and break unrelated assertions. Individual tests that want to
 // exercise the non-TTY branch override the seam locally via withStdoutIsTerminal.
+// IsAgent is seeded false because the dev/CI-under-Claude env sets CLAUDECODE,
+// which agent.Detect() reads — left true it would flip defaults to toon.
 func TestMain(m *testing.M) {
-	commonoutput.StdoutIsTerminal = func(io.Writer) bool { return true }
+	commonoutput.StdoutIsTerminal = func() bool { return true }
+	commonoutput.IsAgent = func() bool { return false }
 	os.Exit(m.Run())
 }

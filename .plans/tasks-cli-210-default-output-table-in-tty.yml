@@ -37,7 +37,7 @@ tasks:
       neo4j-cli/query/testseam_test.go, and seed in the desktop doctor_render
       tests. Sites also include query/output_test.go (withStdoutIsTerminal helper)
       and the desktop doctor_render_test stubs.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -46,7 +46,7 @@ tasks:
       - 'neo4j-cli/query TestMain (testseam_test.go) also seeds commonoutput.IsAgent=false'
       - 'desktop doctor_render tests seed IsAgent=false (per-test cleanup or TestMain)'
       - 'go vet ./... clean for touched packages'
-    completed_at: null
+    completed_at: 2026-06-05T09:30:00Z
 
   - id: task-003
     title: 'Regression tests: wrapped-stdout wiring guard + agent->toon default'
