@@ -298,3 +298,46 @@ tasks:
       - "download_test.go reworked to wire BOTH raw and media httptest hosts, with cases for blob-on-raw, pointer-then-media, and pointer-then-media-missing; existing cap/0600/redaction/non-https/non-allowlisted cases still pass"
       - "make test, make fmt-check, make lint all clean"
     completed_at: 2026-06-05T00:00:00Z
+
+  - id: task-014
+    title: 'Fix docker loader: run neo4j-admin via image entrypoint so loaded DB ownership matches the server'
+    description: |
+      The new-container path of LoadDumpIntoNewContainer (neo4j-cli/internal/subcommands/docker/load.go)
+      runs the one-shot loader with `--entrypoint bash -c "<script>"`, bypassing the neo4j
+      image's docker-entrypoint.sh. The neo4j image's default user is root, so the
+      bypassed loader runs neo4j-admin as ROOT and writes /data/databases/<db>/* owned by
+      root (uid 0). The long-lived server container, however, uses the image's entrypoint
+      which drops to the neo4j user (uid 7474) via `su-exec neo4j:neo4j`. The server then
+      cannot write the root-owned database files and the database fails to come online:
+      `quarantine_marker` AccessDeniedException -> database 'neo4j' stays offline ->
+      `docker load ... --wait` times out and queries fail with DatabaseUnavailable, even
+      though Bolt/system db are up. Verified live against neo4j-graph-examples/movies.
+      FIX: run the loader WITHOUT overriding the entrypoint, so docker-entrypoint.sh runs
+      neo4j-admin as the neo4j user (its final dispatch is `exec su-exec neo4j:neo4j "$@"`
+      for any non-`neo4j` command) and sets /data ownership consistently with the server.
+      Concretely: (1) stage the dump as `<stageDir>/<database>.dump` (the loader needs the
+      file named <database>.dump under --from-path); (2) drop `--entrypoint bash` and the
+      `-c` shell script entirely — pass the command directly:
+      `neo4j-admin database load <database> --from-path=/import --overwrite-destination=true`
+      with mounts `-v <stageDir>:/import:ro -v <volume>:/data`; (3) IMPORTANT readability
+      gotcha: because the loader now runs as uid 7474 (not root), it must be able to READ
+      the mounted dump — the staged copy currently lands 0600 owned by the host uid, which
+      uid 7474 inside the container cannot read. Make the staging dir 0755 and the staged
+      <database>.dump 0644 (it is a public example dataset, bind-mounted read-only into a
+      throwaway container, so world-readable on the staging copy is fine; the original
+      0600 download temp in os.TempDir is unaffected). Dropping the bash `-c` script also
+      removes the `%q`-is-not-shell-quoting concern the security review flagged. Leave the
+      existing-container path (which uses `docker exec` ExecAs as the neo4j user inside an
+      already-running container) unchanged. Update docker load_test.go assertions that
+      inspect the loader Run args/script to match the new no-entrypoint-override,
+      named-dump form.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "The loader container runs with the image's default entrypoint (no --entrypoint bash, no -c shell script); the command is neo4j-admin database load <database> --from-path=/import --overwrite-destination=true"
+      - "The dump is staged as <stageDir>/<database>.dump; the staging dir is 0755 and the staged dump is 0644 so the in-container neo4j user (7474) can read it"
+      - "After load, the server container's neo4j database comes online (loaded data owned by the neo4j uid, not root)"
+      - "Existing-container path is unchanged; docker load_test.go updated to the new loader-args shape and passes"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: null
