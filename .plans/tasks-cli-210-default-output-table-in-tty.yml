@@ -16,7 +16,7 @@ tasks:
       "table", else "json". Keep ResolveOutput's now-unused cmd param. Also update
       the only other non-test caller, printSchemaTables in
       neo4j-cli/query/schema.go (~line 340), to call StdoutIsTerminal() with no arg.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - 'StdoutIsTerminal is `var ... = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }`'
@@ -24,7 +24,7 @@ tasks:
       - 'ResolveOutput returns "toon" when IsAgent() and format is non-explicit, before the TTY check; explicit json/table/toon still wins'
       - 'neo4j-cli/query/schema.go printSchemaTables calls commonoutput.StdoutIsTerminal() with no argument'
       - 'go build ./... succeeds; license header preserved on edited files'
-    completed_at: null
+    completed_at: 2026-06-05T08:58:14Z
 
   - id: task-002
     title: 'Migrate test stubs and seed IsAgent=false in default-resolution test packages'

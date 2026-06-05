@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-05T08:58:14Z
+Made StdoutIsTerminal parameterless (reads os.Stdout FD directly so writer wrapping can't affect it), added IsAgent seam defaulting to agent.Detect, and updated ResolveOutput precedence to agent->toon, TTY->table, else json. Updated printSchemaTables caller.
+Files: ~common/output/output.go, ~neo4j-cli/query/schema.go
+Decisions: Removed now-unused io import from output.go; test files will not compile until task-002 migrates the stubs (expected).
