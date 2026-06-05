@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Patch
-body: neo4j-cli history list and telemetry now report invoker "script" for non-TTY, non-agent invocations (piped, CI, cron); these were previously reported as "agent".
-time: 2026-06-04T14:45:53.96079+02:00

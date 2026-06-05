@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add `dataset list` and per-target `load` commands (`docker load`, `desktop dbms load`, `aura instance load`) to load example datasets from neo4j-graph-examples repos.
-time: 2026-06-04T18:01:34.841577+02:00
