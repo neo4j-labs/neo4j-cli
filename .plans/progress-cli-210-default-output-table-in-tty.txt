@@ -25,3 +25,7 @@ Files: none (generate no-op)
 ## TASK-006 — 2026-06-05T11:11:00Z
 Added single Minor changie entry covering the TTY table default regression fix and the new agent->toon default.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260605-111052.yaml
+
+## TASK-007 — 2026-06-05T11:30:00Z
+Final gates in the agent env (CLAUDECODE set), all green: `make test` exit 0; `make fmt-check` exit 0; `make lint` exit 0 (0 issues); `make generate-check` exit 2 BUT diff limited to the .plans task-status flip only (no neo4j-cli/internal/skill/bundle/** or source/generated drift) — classified non-failure per task instructions. No code fixes needed; tasks 002/005 had already seeded IsAgent=false and synced the bundle.
+Files: none (gates green)

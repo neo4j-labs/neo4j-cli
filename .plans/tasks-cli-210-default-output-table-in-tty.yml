@@ -124,7 +124,6 @@ tasks:
       Run all repo gates as the final verification, in the agent environment so the
       CLAUDECODE-driven default-resolution paths are exercised. Fix any package
       that still relies on default resolution by seeding IsAgent=false.
-    status: pending
     dependencies:
       - task-002
       - task-003
@@ -136,4 +135,5 @@ tasks:
       - 'make fmt-check passes'
       - 'make lint passes'
       - 'make generate-check passes'
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-05T11:30:00Z
