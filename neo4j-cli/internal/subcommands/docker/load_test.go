@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -132,11 +133,21 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 
 	// Two Run calls: the one-shot loader, then the server container.
 	require.Len(t, fake.RunCalls, 2)
-	loader := strings.Join(fake.RunCalls[0], " ")
-	assert.Contains(t, loader, "neo4j-admin database load neo4j")
-	assert.Contains(t, loader, "--overwrite-destination=true")
-	assert.Contains(t, loader, ":/data")
-	assert.Contains(t, loader, ":"+loaderImportDir)
+	loader := fake.RunCalls[0]
+	loaderStr := strings.Join(loader, " ")
+	// The loader runs via the image's DEFAULT entrypoint (no --entrypoint
+	// override, no -c shell script) so neo4j-admin runs as the neo4j user.
+	assert.NotContains(t, loader, "--entrypoint")
+	assert.NotContains(t, loader, "-c")
+	assert.Contains(t, loaderStr, "neo4j-admin database load neo4j --from-path="+loaderImportDir+" --overwrite-destination=true")
+	assert.Contains(t, loaderStr, ":/data")
+	assert.Contains(t, loaderStr, ":"+loaderImportDir+":ro")
+	// The image arg precedes the neo4j-admin command (default entrypoint form).
+	imageIdx := slices.Index(loader, "neo4j:5-enterprise")
+	cmdIdx := slices.Index(loader, "neo4j-admin")
+	require.GreaterOrEqual(t, imageIdx, 0)
+	require.GreaterOrEqual(t, cmdIdx, 0)
+	assert.Less(t, imageIdx, cmdIdx, "image must precede the neo4j-admin command")
 
 	server := strings.Join(fake.RunCalls[1], " ")
 	assert.Contains(t, server, "--name movies")
@@ -171,8 +182,7 @@ func TestLoad_NewContainer_DatabaseOverride(t *testing.T) {
 	_, _, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies --database custom")
 	require.NoError(t, err)
 	loader := strings.Join(fake.RunCalls[0], " ")
-	assert.Contains(t, loader, "neo4j-admin database load custom")
-	assert.Contains(t, loader, "custom.dump")
+	assert.Contains(t, loader, "neo4j-admin database load custom --from-path="+loaderImportDir+" --overwrite-destination=true")
 }
 
 func TestLoad_NewContainer_MaxSizeForwarded(t *testing.T) {

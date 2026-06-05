@@ -75,3 +75,9 @@ Decisions: download URL now built from rawBaseURL (raw-first) not mediaBaseURL; 
 
 ## REVIEW — 2026-06-05T07:30:35Z
 Added 1 review task (task-014).
+
+## TASK-014 — 2026-06-05T00:00:00Z
+Fixed docker new-container loader (LoadDumpIntoNewContainer) so the loaded DB comes online. Root cause: loader ran `--entrypoint bash -c "<script>"`, bypassing docker-entrypoint.sh → neo4j-admin ran as ROOT, writing /data/databases/<db>/* owned by uid 0; the server container drops to neo4j (uid 7474 via su-exec) and can't write the root-owned files → quarantine_marker AccessDeniedException → db 'neo4j' stays offline → --wait times out / DatabaseUnavailable (Bolt + system db up).
+Fix: drop the entrypoint override and -c shell script; stage the dump as <stageDir>/<database>.dump (0644) in a 0755 MkdirTemp dir; run the loader via the image DEFAULT entrypoint with the direct command `neo4j-admin database load <db> --from-path=/import --overwrite-destination=true` and mounts `-v <stageDir>:/import:ro -v <volume>:/data` — docker-entrypoint.sh then runs neo4j-admin as the neo4j user so /data ownership matches the server. copyFile now writes 0644 (was 0600) because uid 7474 must read the bind-mounted (:ro) staged dump. Existing-container path (ExecAs as neo4j user inside a running container) untouched. Removed the loaderScript/`/tmp/load` machinery; loaderImportDir="/import" retained.
+Files: M docker/load.go, M docker/load_test.go.
+Decisions: test asserts no `--entrypoint`/`-c` tokens in loader argv, exact `neo4j-admin database load <db> --from-path=/import --overwrite-destination=true` substring, `:ro` /import mount, and image-arg-precedes-command ordering (slices.Index). Dropping the bash `-c %q` string also clears the security-review shell-quoting concern. make test/fmt-check/lint all clean. Live docker verification deferred to orchestrator (neo4j-graph-examples/movies).

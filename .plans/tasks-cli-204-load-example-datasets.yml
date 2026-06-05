@@ -340,4 +340,5 @@ tasks:
       - "After load, the server container's neo4j database comes online (loaded data owned by the neo4j uid, not root)"
       - "Existing-container path is unchanged; docker load_test.go updated to the new loader-args shape and passes"
       - "make test, make fmt-check, make lint all clean"
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-05T00:00:00Z

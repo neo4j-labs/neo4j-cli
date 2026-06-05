@@ -302,8 +302,9 @@ type NewContainerResult struct {
 //
 // Flow:
 //  1. resolve a non-colliding container name + free bolt/http port pair;
-//  2. run a one-shot loader container that bind-mounts the host dump dir at
-//     /import and a fresh named volume at /data, running
+//  2. run a one-shot loader container (via the image's default entrypoint, so
+//     neo4j-admin runs as the neo4j user) that bind-mounts the staged dump dir
+//     read-only at /import and a fresh named volume at /data, running
 //     `neo4j-admin database load <db> --from-path=/import --overwrite-destination=true`;
 //  3. create the long-lived server container reusing that named volume with
 //     NEO4J_PLUGINS from the manifest;
@@ -311,8 +312,8 @@ type NewContainerResult struct {
 //
 // The image is `neo4j:<version>-enterprise` so neo4j-admin can load a dump from
 // any supported source version. neo4j-admin database load requires the dump to
-// be named `<database>.dump` under --from-path, so the loader copy-renames the
-// mounted dump to that name in a writable scratch dir before loading.
+// be named `<database>.dump` under --from-path, so the dump is staged under that
+// name in the bind-mounted dir before loading.
 func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client dockerClient, load NewContainerLoad) (NewContainerResult, error) {
 	if err := validateDatabaseName(load.Database); err != nil {
 		return NewContainerResult{}, err
@@ -346,36 +347,42 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client do
 	image := "neo4j:" + version + "-enterprise"
 	volume := "neo4j-cli-" + chosenName + "-data"
 
-	// Stage the dump in a dedicated dir so the loader container mounts only the
-	// single dump file, not the shared host temp dir (where dataset.Download's
-	// os.CreateTemp places it alongside every other process's temp files).
+	// Stage the dump as <database>.dump in a dedicated dir so the loader
+	// container mounts only the single dump file (not the shared host temp dir
+	// where dataset.Download's os.CreateTemp places it) and neo4j-admin finds
+	// the file named <database>.dump under --from-path. The staging dir is 0755
+	// and the staged dump 0644 because the loader runs as the in-container neo4j
+	// user (uid 7474), which must be able to read the bind-mounted (:ro) copy; it
+	// is a public example dataset in a throwaway container, so world-readable on
+	// this staging copy is fine (the original 0600 download temp is untouched).
 	stageDir, err := os.MkdirTemp("", "neo4j-cli-load-*")
 	if err != nil {
 		return NewContainerResult{}, fmt.Errorf("docker load: create staging dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(stageDir) }()
+	if err := os.Chmod(stageDir, 0o755); err != nil {
+		return NewContainerResult{}, fmt.Errorf("docker load: chmod staging dir: %w", err)
+	}
 
-	dumpFile := filepath.Base(load.DumpPath)
-	stagedDump := filepath.Join(stageDir, dumpFile)
+	stagedDump := filepath.Join(stageDir, load.Database+".dump")
 	if err := copyFile(load.DumpPath, stagedDump); err != nil {
 		return NewContainerResult{}, fmt.Errorf("docker load: stage dump: %w", err)
 	}
-	dumpDir := stageDir
 
-	// One-shot loader container: bind-mount the host dump dir read-only at
-	// /import and the fresh named volume at /data, rename the dump to
-	// <database>.dump in a writable scratch dir, then run neo4j-admin load.
-	loaderScript := fmt.Sprintf(
-		"set -e; mkdir -p /tmp/load && cp %q /tmp/load/%s.dump && neo4j-admin database load %s --from-path=/tmp/load --overwrite-destination=true",
-		loaderImportDir+"/"+dumpFile, load.Database, load.Database,
-	)
+	// Run the loader via the image's DEFAULT entrypoint (no --entrypoint
+	// override) so docker-entrypoint.sh drops to the neo4j user
+	// (exec su-exec neo4j:neo4j "$@") before running neo4j-admin. This makes the
+	// loaded /data/databases/<db> files owned by uid 7474, matching the server
+	// container — otherwise neo4j-admin runs as root and the server (which drops
+	// to neo4j) cannot write the root-owned files, leaving the database offline.
 	loaderArgs := []string{
 		"--rm",
-		"-v", dumpDir + ":" + loaderImportDir + ":ro",
+		"-v", stageDir + ":" + loaderImportDir + ":ro",
 		"-v", volume + ":/data",
-		"--entrypoint", "bash",
 		image,
-		"-c", loaderScript,
+		"neo4j-admin", "database", "load", load.Database,
+		"--from-path=" + loaderImportDir,
+		"--overwrite-destination=true",
 	}
 	if _, err := client.Run(ctx, loaderArgs); err != nil {
 		return NewContainerResult{}, fmt.Errorf("docker load: run loader: %w", err)
@@ -437,8 +444,10 @@ func generatePassword() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-// copyFile copies src to dst, creating dst with 0600 perms. Copying (rather than
-// moving) leaves the original temp file for the caller's cleanup() to remove.
+// copyFile copies src to dst, creating dst with 0644 perms (the in-container
+// neo4j user must read the bind-mounted staged dump; see LoadDumpIntoNewContainer).
+// Copying (rather than moving) leaves the original temp file for the caller's
+// cleanup() to remove.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -446,7 +455,7 @@ func copyFile(src, dst string) error {
 	}
 	defer func() { _ = in.Close() }()
 
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
