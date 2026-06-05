@@ -124,7 +124,7 @@ neo4j-cli docker load neo4j-graph-examples/movies --name movies --force --rw`,
 	cmd.Flags().StringVar(&name, nameFlag, "", "(required) Container name. New if it does not exist; existing managed container if it does (requires --force).")
 	cmd.MarkFlagRequired(nameFlag) //nolint:errcheck // MarkFlagRequired only errors on an unknown flag name, a startup-caught programming error
 	cmd.Flags().StringVar(&database, databaseFlag, "neo4j", "The target database the dump is loaded into.")
-	cmd.Flags().StringVar(&version, versionFlag, "5", "Neo4j version to resolve the manifest against and use for the container image (e.g. 5, 5.26). Must satisfy the dump's targetNeo4jVersion.")
+	cmd.Flags().StringVar(&version, versionFlag, "latest", "Neo4j version to resolve the manifest against and use for the container image. Accepts 5, 5.26, calver (e.g. 2026.04.0), or latest (default). Must satisfy the dump's targetNeo4jVersion.")
 	cmd.Flags().Int64Var(&maxSize, maxSizeFlag, dataset.DefaultMaxDumpBytes, "Maximum dump download size in bytes; the download is refused if exceeded.")
 	cmd.Flags().BoolVar(&force, forceFlag, false, "Required to overwrite an EXISTING container's database (the load destroys its current contents).")
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning (new container only).")
@@ -310,13 +310,17 @@ type NewContainerResult struct {
 //     NEO4J_PLUGINS from the manifest;
 //  4. optionally wait for Bolt.
 //
-// The image is `neo4j:<version>-enterprise` so neo4j-admin can load a dump from
-// any supported source version. neo4j-admin database load requires the dump to
+// The image is the enterprise tag for the requested version (via enterpriseImage:
+// "latest" → neo4j:enterprise, else neo4j:<version>-enterprise) so neo4j-admin can
+// load a dump from any supported source version. neo4j-admin database load requires the dump to
 // be named `<database>.dump` under --from-path, so the dump is staged under that
 // name in the bind-mounted dir before loading.
 func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client dockerClient, load NewContainerLoad) (NewContainerResult, error) {
 	if err := validateDatabaseName(load.Database); err != nil {
 		return NewContainerResult{}, err
+	}
+	if strings.TrimSpace(load.Version) == "" {
+		load.Version = "latest"
 	}
 	version, err := validateVersion(load.Version)
 	if err != nil {
@@ -344,7 +348,7 @@ func LoadDumpIntoNewContainer(ctx context.Context, cfg *clicfg.Config, client do
 		}
 	}
 
-	image := "neo4j:" + version + "-enterprise"
+	image := enterpriseImage(version)
 	volume := "neo4j-cli-" + chosenName + "-data"
 
 	// Stage the dump as <database>.dump in a dedicated dir so the loader

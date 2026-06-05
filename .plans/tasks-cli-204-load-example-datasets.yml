@@ -439,7 +439,7 @@ tasks:
       aura loader's own --version default ("5", which Aura uses as its version token)
       unchanged — this task is scoped to the docker new-container default + image mapping.
       Depends on task-016 (resolver must accept "latest"/calver first).
-    status: pending
+    status: completed
     dependencies:
       - task-016
     source: review
@@ -450,4 +450,4 @@ tasks:
       - "The (possibly \"latest\") version is passed to Resolve so the 5.x dump is selected for the latest image"
       - "--version flag help documents default=latest and the accepted forms (5, 5.26, calver, latest); existing-container path unchanged"
       - "docker load_test.go updated/extended for the new default + image mapping; make test, make fmt-check, make lint clean"
-    completed_at: null
+    completed_at: 2026-06-05T13:30:00Z

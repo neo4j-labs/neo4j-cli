@@ -155,7 +155,7 @@ Flags:
 | `--force` | bool | false | Required to overwrite an EXISTING container's database (the load destroys its current contents). |
 | `--max-size` | int64 | 2147483648 | Maximum dump download size in bytes; the download is refused if exceeded. |
 | `--name` | string | - | (required) Container name. New if it does not exist; existing managed container if it does (requires --force). |
-| `--version` | string | 5 | Neo4j version to resolve the manifest against and use for the container image (e.g. 5, 5.26). Must satisfy the dump's targetNeo4jVersion. |
+| `--version` | string | latest | Neo4j version to resolve the manifest against and use for the container image. Accepts 5, 5.26, calver (e.g. 2026.04.0), or latest (default). Must satisfy the dump's targetNeo4jVersion. |
 | `--wait` | bool | false | Wait until Bolt is reachable before returning (new container only). |
 
 Examples:

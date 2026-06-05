@@ -127,9 +127,9 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 	cfg, stdout, _, err := runLoad(t, fake, deps, "neo4j-graph-examples/movies --name movies")
 	require.NoError(t, err)
 
-	// Resolve uses the default --version 5.
+	// Resolve uses the default --version latest.
 	assert.Equal(t, "neo4j-graph-examples/movies", deps.resolveGot.ownerRepo)
-	assert.Equal(t, "5", deps.resolveGot.version)
+	assert.Equal(t, "latest", deps.resolveGot.version)
 
 	// Two Run calls: the one-shot loader, then the server container.
 	require.Len(t, fake.RunCalls, 2)
@@ -146,7 +146,8 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 	// must accept it via -e or neo4j-admin never runs.
 	assert.Contains(t, loaderStr, "NEO4J_ACCEPT_LICENSE_AGREEMENT=eval")
 	// The image arg precedes the neo4j-admin command (default entrypoint form).
-	imageIdx := slices.Index(loader, "neo4j:5-enterprise")
+	// Default --version latest → enterprise image neo4j:enterprise (NOT neo4j:latest-enterprise).
+	imageIdx := slices.Index(loader, "neo4j:enterprise")
 	cmdIdx := slices.Index(loader, "neo4j-admin")
 	require.GreaterOrEqual(t, imageIdx, 0)
 	require.GreaterOrEqual(t, cmdIdx, 0)
@@ -159,7 +160,7 @@ func TestLoad_NewContainer_LoadsAndCreates(t *testing.T) {
 	server := strings.Join(fake.RunCalls[1], " ")
 	assert.Contains(t, server, "--name movies")
 	assert.Contains(t, server, `NEO4J_PLUGINS=["apoc"]`)
-	assert.Contains(t, server, "neo4j:5-enterprise")
+	assert.Contains(t, server, "neo4j:enterprise")
 
 	// The generated password travels via env, not argv.
 	serverEnv := strings.Join(fake.RunEnvCalls[1].Env, " ")
@@ -190,6 +191,42 @@ func TestLoad_NewContainer_DatabaseOverride(t *testing.T) {
 	require.NoError(t, err)
 	loader := strings.Join(fake.RunCalls[0], " ")
 	assert.Contains(t, loader, "neo4j-admin database load custom --from-path="+loaderImportDir+" --overwrite-destination=true")
+}
+
+func TestLoad_NewContainer_ExplicitVersionImageMapping(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		version   string
+		wantImage string
+	}{
+		{name: "default latest", version: "", wantImage: "neo4j:enterprise"},
+		{name: "explicit latest", version: "latest", wantImage: "neo4j:enterprise"},
+		{name: "minor", version: "5.26", wantImage: "neo4j:5.26-enterprise"},
+		{name: "calver", version: "2026.04.0", wantImage: "neo4j:2026.04.0-enterprise"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := newFakeDockerClient()
+			deps := &loadDeps{resolveSpec: moviesSpec()}
+
+			args := "neo4j-graph-examples/movies --name movies"
+			if tc.version != "" {
+				args += " --version " + tc.version
+			}
+			_, _, _, err := runLoad(t, fake, deps, args)
+			require.NoError(t, err)
+
+			require.Len(t, fake.RunCalls, 2)
+			assert.Contains(t, fake.RunCalls[0], tc.wantImage, "loader image")
+			assert.Contains(t, fake.RunCalls[1], tc.wantImage, "server image")
+
+			// The (possibly defaulted) version is forwarded to Resolve.
+			wantResolveVersion := tc.version
+			if wantResolveVersion == "" {
+				wantResolveVersion = "latest"
+			}
+			assert.Equal(t, wantResolveVersion, deps.resolveGot.version)
+		})
+	}
 }
 
 func TestLoad_NewContainer_MaxSizeForwarded(t *testing.T) {
