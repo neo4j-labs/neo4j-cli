@@ -451,3 +451,63 @@ tasks:
       - "--version flag help documents default=latest and the accepted forms (5, 5.26, calver, latest); existing-container path unchanged"
       - "docker load_test.go updated/extended for the new default + image mapping; make test, make fmt-check, make lint clean"
     completed_at: 2026-06-05T13:30:00Z
+
+  - id: task-018
+    title: 'Make dataset loading discoverable in help text + skill bundle'
+    description: |
+      The three `<target> load` leaves already have good Example blocks, but discovery of
+      HOW to load is thin: the `neo4j-cli dataset` parent signposts the commands in its Long
+      but has no Example block, `dataset list`'s examples only show listing, and the skill
+      trigger (description.txt) doesn't mention datasets at all — so an agent wouldn't fire
+      the neo4j-cli skill on "load the movies dataset". Make dataset loading discoverable:
+      1. dataset/dataset.go — add an Example field to the (non-runnable) parent showing the
+         three load commands loading the same dataset into docker / desktop / aura, each
+         preceded by a # comment, with --rw on the load invocations. (Parent isn't Runnable,
+         so the Examples gate doesn't require it, but cobra renders Example in `dataset -h`.)
+      2. dataset/list.go — keep the existing list examples (incl. the --format json one the
+         read-cmd gate requires) and append a couple of load examples so `dataset list -h`
+         also shows how to load a suggested repo into a target.
+      3. neo4j-cli/internal/skill/description.txt — add dataset discovery + loading to the
+         trigger frontmatter. It is currently 1008/1024 chars — CONDENSE existing wording to
+         make room and stay <=1024, single paragraph, third-person.
+      4. Optionally add a brief Tips note to neo4j-cli/internal/skill/additions.md about
+         dataset loading (addressed by owner/repo; defaults to latest Neo4j; per-target verbs).
+      5. Run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle so
+         TestGenerator_RoundTrip passes.
+      Add a regression test asserting the dataset parent Example references all three load
+      verbs (docker load, desktop dbms load, aura instance load).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "`neo4j-cli dataset -h` prints an Example block with docker load / desktop dbms load / aura instance load invocations (# comments, --rw)"
+      - "`neo4j-cli dataset list -h` shows at least one load example plus the retained --format json list example"
+      - "description.txt mentions dataset discovery + loading and is <=1024 chars"
+      - "Skill bundle regenerated with no leftover diff; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+      - "A test asserts the dataset parent Example references all three load verbs"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: null
+
+  - id: task-019
+    title: 'Document example-dataset loading in README'
+    description: |
+      The README has no mention of example datasets. Add a section (e.g. "## Example
+      datasets", near the Local Neo4j / Aura sections) covering: discovery via
+      `neo4j-cli dataset list`; that datasets are addressed by GitHub <owner>/<repo> (any
+      repo with a relate.project-install.json manifest; suggestions are not a constraint);
+      and the three per-target load commands with copy-pasteable examples — docker load
+      (new or existing container via --name/--force), desktop dbms load (new via --name,
+      existing via --dbms-id --force), and aura instance load (new instance only, with
+      --type/cloud/region/memory). Mention --database (default neo4j; the DB must already
+      exist on an existing target) and that loading defaults to the latest Neo4j (--version
+      accepts 5/5.26/calver/latest). Match the README's existing comment-prefixed
+      fenced-block style. Keep it accurate to the shipped flags.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "README has an example-datasets section covering `dataset list` + all three `<target> load` commands with realistic examples"
+      - "Existing-vs-new shown for docker (--name/--force) and desktop (--dbms-id/--force vs --name); aura noted new-instance-only"
+      - "Mentions --database default neo4j (and that the DB must exist on existing targets) and the latest-Neo4j default"
+      - "Style matches existing README sections (comment-prefixed fenced blocks)"
+    completed_at: null
