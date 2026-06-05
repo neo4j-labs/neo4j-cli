@@ -110,13 +110,13 @@ tasks:
     description: |
       Add a single changie entry of kind Minor covering both the TTY regression fix
       and the new agent->toon default.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - 'changie new --projects neo4j-cli --kind Minor with body about fixing interactive table default + TOON for AI agents'
       - 'Exactly one new file under .changes/unreleased/'
-    completed_at: null
+    completed_at: 2026-06-05T11:11:00Z
 
   - id: task-007
     title: 'Final gates: test, fmt-check, lint, generate-check'
