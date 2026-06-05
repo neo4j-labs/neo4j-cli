@@ -6,11 +6,11 @@ package output
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"reflect"
 	"strings"
 
+	"github.com/neo4j/cli/common/agent"
 	"github.com/neo4j/cli/common/clicfg"
 	toon "github.com/toon-format/toon-go"
 
@@ -53,31 +53,35 @@ func StripControl(s string) string {
 	return b.String()
 }
 
-// StdoutIsTerminal is the package-level test seam for terminal detection.
-// Production initialisation checks whether the writer is an *os.File and, if
-// so, calls term.IsTerminal on its file descriptor. Non-*os.File writers (e.g.
-// a *bytes.Buffer in tests) always return false. Tests may replace this var and
-// restore it via t.Cleanup.
-var StdoutIsTerminal = func(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
-	return term.IsTerminal(int(f.Fd()))
+// StdoutIsTerminal is the package-level test seam for terminal detection. It
+// reads the real os.Stdout file descriptor directly so that wrapping the
+// command's writer (e.g. the tee io.MultiWriter installed in main.go) cannot
+// affect format resolution (CLI-210). Mirrors common/flags.stdoutIsTerminal.
+// Tests may replace this var and restore it via t.Cleanup.
+var StdoutIsTerminal = func() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
+
+// IsAgent is the package-level test seam for agent-harness detection. When it
+// reports true and no explicit --format is given, output defaults to toon.
+// Defaults to common/agent.Detect.
+var IsAgent = agent.Detect
 
 // ResolveOutput returns the effective output mode ("json", "table", or "toon")
 // for the current invocation. When cfg.Global.Format() is "json", "table", or
 // "toon" that value is returned unchanged — an explicit --format flag always
-// wins. For any other value ("default", "", or an unknown value) the mode is
-// auto-detected from cmd.OutOrStdout(): a TTY stdout yields "table", a
-// non-TTY (piped/redirected) stdout yields "json".
+// wins. Otherwise the mode is auto-detected: an agent harness yields "toon", a
+// TTY stdout yields "table", and a non-TTY (piped/redirected) stdout yields
+// "json". The cmd parameter is retained for call-site compatibility.
 func ResolveOutput(cmd *cobra.Command, cfg *clicfg.Config) string {
 	v := cfg.Global.Format()
 	if v == "json" || v == "table" || v == "toon" {
 		return v
 	}
-	if StdoutIsTerminal(cmd.OutOrStdout()) {
+	if IsAgent() {
+		return "toon"
+	}
+	if StdoutIsTerminal() {
 		return "table"
 	}
 	return "json"
@@ -150,11 +154,42 @@ func printToonValue(cmd *cobra.Command, values any) {
 	if err := json.Unmarshal(jsonBytes, &v); err != nil {
 		panic(err)
 	}
+	// toon.Marshal rejects C0 control bytes (e.g. ESC, BEL) in strings — the
+	// json -> any round-trip decodes JSON-escaped control bytes back into raw
+	// bytes, so attacker-stored data would otherwise panic. StripControl
+	// neutralises every control byte toon rejects while preserving the \t \n \r
+	// that toon accepts. The JSON fallback handles any future toon rejection
+	// without crashing on a data-driven condition.
+	v = stripControlDeep(v)
 	toonBytes, err := toon.Marshal(v, toon.WithLengthMarkers(true))
 	if err != nil {
-		panic(err)
+		cmd.Println(string(jsonBytes))
+		return
 	}
 	cmd.Println(string(toonBytes))
+}
+
+// stripControlDeep recursively applies StripControl to every string value and
+// map key in the shapes produced by encoding/json unmarshal-to-any. Numbers,
+// bools and nil are returned unchanged.
+func stripControlDeep(v any) any {
+	switch val := v.(type) {
+	case string:
+		return StripControl(val)
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, item := range val {
+			out[StripControl(k)] = stripControlDeep(item)
+		}
+		return out
+	case []any:
+		for i, item := range val {
+			val[i] = stripControlDeep(item)
+		}
+		return val
+	default:
+		return v
+	}
 }
 
 func getNestedField(v map[string]any, subFields []string) string {
@@ -166,6 +201,11 @@ func getNestedField(v map[string]any, subFields []string) string {
 		if reflect.TypeOf(value).Kind() == reflect.Slice {
 			marshaledSlice, _ := json.MarshalIndent(value, "", "  ")
 			return string(marshaledSlice)
+		}
+		// Strip control bytes from strings only — the json branch above already
+		// escapes them, and numbers/bools carry none.
+		if s, ok := value.(string); ok {
+			return StripControl(s)
 		}
 		return fmt.Sprintf("%+v", value)
 	}

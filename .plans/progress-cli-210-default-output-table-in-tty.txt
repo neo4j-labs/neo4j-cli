@@ -1,0 +1,42 @@
+## TASK-001 — 2026-06-05T08:58:14Z
+Made StdoutIsTerminal parameterless (reads os.Stdout FD directly so writer wrapping can't affect it), added IsAgent seam defaulting to agent.Detect, and updated ResolveOutput precedence to agent->toon, TTY->table, else json. Updated printSchemaTables caller.
+Files: ~common/output/output.go, ~neo4j-cli/query/schema.go
+Decisions: Removed now-unused io import from output.go; test files will not compile until task-002 migrates the stubs (expected).
+
+## TASK-002 — 2026-06-05T09:30:00Z
+Migrated all StdoutIsTerminal test stubs from func(_ io.Writer) bool to func() bool, dropped unused io imports, and seeded IsAgent=false via TestMain in every test package that exercises default-format resolution (CLAUDECODE is set in dev/CI-under-Claude, which would otherwise flip defaults to toon). make test/fmt-check/lint all green.
+Files: ~common/output/output_test.go, +common/output/main_test.go, ~neo4j-cli/query/testseam_test.go, ~neo4j-cli/query/output_test.go, ~neo4j-cli/internal/subcommands/desktop/doctor_render_test.go, +neo4j-cli/internal/subcommands/desktop/main_test.go, +neo4j-cli/aura/internal/subcommands/config/main_test.go, +neo4j-cli/internal/subcommands/config/main_test.go, +neo4j-cli/internal/subcommands/credential/main_test.go
+Decisions: Three extra packages beyond the task's named sites (aura config, neo4j-cli config, credential) also relied on default resolution and failed under CLAUDECODE; each got a TestMain seeding IsAgent=false (none had one, no duplicates).
+
+## TASK-003 — 2026-06-05T10:15:00Z
+Added three regression tests to common/output/output_test.go: (1) wiring guard wrapping stdout/stderr with io.MultiWriter(os.Stdout, &tee.LimitedBuffer{}) per main.go, forcing TTY=true/IsAgent=false on a non-explicit ("default") format, asserting "table"; (2) agent-default asserting IsAgent=true wins over TTY=true -> "toon"; (3) table-driven explicit-override (json/table/toon) with both auto-branches forced true, asserting explicit value returned. All seams restored via t.Cleanup.
+The wiring guard fails on the pre-fix impl: pre-fix StdoutIsTerminal(w io.Writer) type-asserted *os.File, so the io.MultiWriter wrap reported non-TTY -> "json", failing the "table" assertion. The new parameterless seam reads os.Stdout's FD directly and is immune to the wrap, returning the forced true -> "table".
+make test / fmt-check / lint all green.
+Files: ~common/output/output_test.go
+
+## TASK-004 — 2026-06-05T10:30:00Z
+Added "## Output Format / TTY Detection Notes" to AGENTS.md: os.Stdout/os.Stderr wrapping guardrail (CLI-109 regression / CLI-210 fix), ResolveOutput default precedence (agent->toon, TTY->table, else json), and the IsAgent=false TestMain seeding requirement under agent harnesses.
+Files: ~AGENTS.md
+
+## TASK-005 — 2026-06-05T11:05:00Z
+`go generate ./neo4j-cli/internal/skill/...` (and full `go generate ./...`) produced NO bundle changes — a no-op. The task-001 change was behavioral (TTY/agent precedence in ResolveOutput); it is not surfaced in bundle help text, so the committed bundle was already in sync. Bundle's --format guidance ("agents: prefer toon", "default to --format toon on read commands") and the agentcontext.go Long ("On a TTY, --format defaults to a degraded flat command-list table") remain accurate under the new precedence (TTY->table, agent->toon, else json) and were left unchanged. agentcontext/build.go does NOT hand-code a default format: OutputFormats derives from clicfg.ValidFormatValues and Flag.Default is the cobra f.DefValue — no update needed. make test / fmt-check / lint all green; generate-check clean (only the .plans YAML status flip diffs, expected).
+Files: none (generate no-op)
+
+## TASK-006 — 2026-06-05T11:11:00Z
+Added single Minor changie entry covering the TTY table default regression fix and the new agent->toon default.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260605-111052.yaml
+
+## TASK-007 — 2026-06-05T11:30:00Z
+Final gates in the agent env (CLAUDECODE set), all green: `make test` exit 0; `make fmt-check` exit 0; `make lint` exit 0 (0 issues); `make generate-check` exit 2 BUT diff limited to the .plans task-status flip only (no neo4j-cli/internal/skill/bundle/** or source/generated drift) — classified non-failure per task instructions. No code fixes needed; tasks 002/005 had already seeded IsAgent=false and synced the bundle.
+Files: none (gates green)
+
+## REVIEW — 2026-06-05T09:26:31Z
+Added 2 review tasks (task-008..task-009).
+
+## TASK-008 — 2026-06-05T12:10:00Z
+Fixed printToonValue: sanitize-before-toon via new recursive stripControlDeep(any) helper applying StripControl to every string value AND map key of the json->any value before toon.Marshal. Verified toon.Marshal accepts \t \n \r (escapes them) but rejects C0 ESC/BEL — exactly the bytes StripControl neutralizes — so post-sanitize values marshal cleanly. Added a defensive JSON fallback (emit jsonBytes) if toon.Marshal still errors instead of panicking; the genuinely-impossible json.Marshal/Unmarshal still panic. JSON fallback NOT exercised in practice (StripControl covers everything toon rejects) but kept for forward safety. JSON + table paths byte-for-byte unchanged. Added regression tests for single (PrintBodyMap) and multi (PrintBodyMaps) toon paths with \x1b/\x07 input asserting NotPanics + no raw 0x1b/0x07; both fail against the pre-fix panic. make test/fmt-check/lint all green.
+Files: ~common/output/output.go, ~common/output/output_test.go
+
+## TASK-009 — 2026-06-05T13:05:00Z
+Applied StripControl to the string branch of getNestedField (generic printTable path), mirroring query/output.go formatCell; slice (json), number/bool (%+v), and nil branches left unchanged. Added TestPrintBodyMap_TableControlChars rendering a \x1b/\x07 string cell plus a numeric cell through the PrintBodyMap table path, asserting no raw ESC/BEL bytes and the number rendered intact. make test/fmt-check/lint all green.
+Files: ~common/output/output.go, ~common/output/output_test.go

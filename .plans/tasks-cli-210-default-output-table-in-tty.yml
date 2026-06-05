@@ -1,0 +1,214 @@
+feature: cli-210-default-output-table-in-tty
+prd: ./prd-cli-210-default-output-table-in-tty.md
+created_at: 2026-06-05T00:00:00Z
+updated_at: 2026-06-05T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Parameterless StdoutIsTerminal + IsAgent seam + ResolveOutput precedence'
+    description: |
+      Fix the core regression in common/output/output.go. Change StdoutIsTerminal
+      from func(w io.Writer) bool (which type-asserts *os.File and breaks on the
+      tee MultiWriter) to a parameterless func() bool that reads the real
+      os.Stdout FD directly, mirroring common/flags.stdoutIsTerminal. Add an
+      IsAgent seam defaulting to common/agent.Detect. Update ResolveOutput's
+      non-explicit-format branch to precedence: agent -> "toon", else TTY ->
+      "table", else "json". Keep ResolveOutput's now-unused cmd param. Also update
+      the only other non-test caller, printSchemaTables in
+      neo4j-cli/query/schema.go (~line 340), to call StdoutIsTerminal() with no arg.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - 'StdoutIsTerminal is `var ... = func() bool { return term.IsTerminal(int(os.Stdout.Fd())) }`'
+      - 'IsAgent var added, defaulting to common/agent.Detect; common/agent imported with no import cycle'
+      - 'ResolveOutput returns "toon" when IsAgent() and format is non-explicit, before the TTY check; explicit json/table/toon still wins'
+      - 'neo4j-cli/query/schema.go printSchemaTables calls commonoutput.StdoutIsTerminal() with no argument'
+      - 'go build ./... succeeds; license header preserved on edited files'
+    completed_at: 2026-06-05T08:58:14Z
+
+  - id: task-002
+    title: 'Migrate test stubs and seed IsAgent=false in default-resolution test packages'
+    description: |
+      Update every test stub of the seam from func(_ io.Writer) bool to func()
+      bool and drop now-unused io imports. Because agent.Detect() reads CLAUDECODE
+      (set in the dev/agent environment), seed IsAgent = func() bool { return false }
+      so default-resolution tests stay deterministic: add a new TestMain in
+      common/output, extend the existing TestMain in
+      neo4j-cli/query/testseam_test.go, and seed in the desktop doctor_render
+      tests. Sites also include query/output_test.go (withStdoutIsTerminal helper)
+      and the desktop doctor_render_test stubs.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'All StdoutIsTerminal stubs/closures are func() bool; no leftover io.Writer params; unused io imports removed'
+      - 'common/output has a TestMain seeding IsAgent=func() bool { return false }'
+      - 'neo4j-cli/query TestMain (testseam_test.go) also seeds commonoutput.IsAgent=false'
+      - 'desktop doctor_render tests seed IsAgent=false (per-test cleanup or TestMain)'
+      - 'go vet ./... clean for touched packages'
+    completed_at: 2026-06-05T09:30:00Z
+
+  - id: task-003
+    title: 'Regression tests: wrapped-stdout wiring guard + agent->toon default'
+    description: |
+      Add the regression test that would have caught CLI-109: in
+      common/output/output_test.go, build a command, apply the real main.go
+      wrapping cmd.SetOut(io.MultiWriter(os.Stdout, &tee.LimitedBuffer{})) (and
+      SetErr), force StdoutIsTerminal=true and IsAgent=false with a default format,
+      and assert ResolveOutput == "table". Add a positive test asserting
+      IsAgent()==true + default format -> "toon", and confirm explicit --format
+      still overrides both.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - 'Wiring-guard test wraps stdout with io.MultiWriter(os.Stdout, &tee.LimitedBuffer{}) and asserts default resolves to "table" for a TTY'
+      - 'Wiring-guard test fails when run against the pre-fix StdoutIsTerminal implementation (verified mentally/by toggling)'
+      - 'Agent-default test asserts IsAgent()==true + default format -> "toon"'
+      - 'A test asserts explicit --format json/table/toon overrides both agent and TTY branches'
+      - 'go test ./common/output/... passes in the agent environment'
+    completed_at: 2026-06-05T10:15:00Z
+
+  - id: task-004
+    title: 'AGENTS.md guardrail + default-format precedence note'
+    description: |
+      Add a guardrail note to AGENTS.md: any change that wraps or replaces
+      os.Stdout/os.Stderr (tee, capture, pager, color) must be re-checked against
+      TTY detection, because common/output.StdoutIsTerminal and
+      common/flags.stdoutIsTerminal deliberately read the global os.Stdout FD, not
+      cmd.OutOrStdout(). Also document the default-format precedence: explicit flag
+      > agent -> toon > TTY -> table > json.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'AGENTS.md note explains the os.Stdout/os.Stderr wrapping guardrail and references CLI-109/CLI-210'
+      - 'AGENTS.md states the ResolveOutput default precedence (agent->toon, TTY->table, else json) and the IsAgent/StdoutIsTerminal seams'
+      - 'Note placed near the existing Tee-on-failure / output sections'
+    completed_at: 2026-06-05T10:30:00Z
+
+  - id: task-005
+    title: 'Regenerate skill bundle / agent-context for default-format wording'
+    description: |
+      Default-format behaviour may be described in the skill bundle, --format help
+      text, or agentcontext/build.go. Run go generate
+      ./neo4j-cli/internal/skill/... and make generate-check; commit any refreshed
+      bundle in the same commit. If agentcontext/build.go hand-codes a default
+      format, update it to reflect the new precedence.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'go generate ./neo4j-cli/internal/skill/... run; any bundle drift committed'
+      - 'make generate-check passes (no uncommitted diff after generate)'
+      - 'agentcontext/build.go reviewed; updated if it hand-codes a default format'
+    completed_at: 2026-06-05T11:05:00Z
+
+  - id: task-006
+    title: 'Add Minor changelog entry'
+    description: |
+      Add a single changie entry of kind Minor covering both the TTY regression fix
+      and the new agent->toon default.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - 'changie new --projects neo4j-cli --kind Minor with body about fixing interactive table default + TOON for AI agents'
+      - 'Exactly one new file under .changes/unreleased/'
+    completed_at: 2026-06-05T11:11:00Z
+
+  - id: task-007
+    title: 'Final gates: test, fmt-check, lint, generate-check'
+    description: |
+      Run all repo gates as the final verification, in the agent environment so the
+      CLAUDECODE-driven default-resolution paths are exercised. Fix any package
+      that still relies on default resolution by seeding IsAgent=false.
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - 'make test passes (run in the agent env where CLAUDECODE is set)'
+      - 'make fmt-check passes'
+      - 'make lint passes'
+      - 'make generate-check passes'
+    status: completed
+    completed_at: 2026-06-05T11:30:00Z
+
+  - id: task-008
+    title: 'Security HIGH: TOON render must not panic/fail on control characters'
+    description: |
+      Security review finding (HIGH, DREAD ~6.0). common/output/output.go
+      printToonValue panics on toon.Marshal error: toon.Marshal rejects C0 control
+      bytes ("toon: unsupported control character U+001B in string") for ESC, BEL,
+      NUL, etc. The json -> any -> toon round-trip decodes JSON-escaped control
+      bytes () back into raw bytes before handing them to toon, so the
+      marshal fails. CLI-210 makes TOON the DEFAULT for every agent invocation
+      (both the query result path and the aura command path go through
+      PrintBodyMap/PrintBodyMaps -> printToonValue). Before CLI-210 agents
+      defaulted to JSON, which escapes control bytes safely. So now an attacker who
+      stores a control byte in a Neo4j node property (rendered by `query`) or in an
+      Aura field like an instance/tenant/credential name (rendered by list/get)
+      deterministically breaks every agent invocation that returns it: the panic is
+      recovered by main.go into an error exit, producing NO result output where
+      JSON previously succeeded. Trust boundary = DB contents (highest) and Aura
+      API fields. Panicking on a normal data condition is the anti-pattern.
+      Fix: in printToonValue, stop panicking on a data-driven marshal failure and
+      neutralize control characters before marshaling — recursively apply
+      StripControl to all string values AND map keys of the unmarshaled `any`
+      before toon.Marshal (mirror the table path's StripControl defense), and/or
+      fall back to JSON if toon.Marshal still errors. Note StripControl preserves
+      \t \n \r; confirm toon accepts those in strings — if toon also rejects
+      newline/tab in a scalar, ensure the chosen sanitization yields a value
+      toon.Marshal accepts (do NOT reintroduce a panic). Keep the JSON-marshal
+      escaping behavior unchanged. Add regression tests: a value containing
+      \x1b/\x07 rendered with --format toon must (a) not panic and (b) not emit raw
+      control bytes; cover both the single (PrintBodyMap) and multi
+      (PrintBodyMaps) paths.
+    status: completed
+    dependencies:
+      - task-001
+    source: review
+    acceptance_criteria:
+      - 'printToonValue no longer panics on a data-driven toon.Marshal failure; control-char-bearing data renders without panic under --format toon (and agent default)'
+      - 'TOON output for control-char input contains no raw C0 control bytes (0x1b, 0x07, 0x00, ...)'
+      - 'Regression tests cover both PrintBodyMap (single) and PrintBodyMaps (multi) toon paths with control-char input; they fail against the pre-fix panic'
+      - 'JSON and table path behavior unchanged; make test, make fmt-check, make lint pass'
+    completed_at: 2026-06-05T12:10:00Z
+
+  - id: task-009
+    title: 'Security MEDIUM: generic printTable must StripControl string cells'
+    description: |
+      Security review finding (MEDIUM, DREAD ~4.6). common/output/output.go
+      printTable + getNestedField emit cell values via fmt.Sprintf("%+v", value)
+      straight into go-pretty rows with NO StripControl, unlike EVERY sibling table
+      renderer in the repo (query/output.go formatCell line ~215, query/schema.go
+      schema tables, desktop connection/dbms/plugin list.go, desktop
+      doctor_render.go) which all strip per-cell. printTable is the path for ~all
+      aura instance/tenant/credential/config/customermanagedkey/graphanalytics
+      list/get commands (via PrintBodyMap/PrintBodyMaps). CLI-210 restores `table`
+      as the TTY default, so an attacker-controlled Aura field value (e.g. an
+      instance or tenant name in a shared Aura org) renders raw ANSI/terminal
+      escape sequences into an operator's terminal -> output spoofing/hiding,
+      cursor manipulation, OSC sequences (CWE-150). This is pre-existing (table was
+      the pre-CLI-109 default) but the lone-exception asymmetry vs four sibling
+      renderers indicates an oversight, and CLI-210 re-enables the default path —
+      the right moment to close it. Fix: apply commonoutput.StripControl to the
+      STRING branch in getNestedField only (mirror query/output.go formatCell:
+      strip strings, leave the JSON-marshaled slice/number/bool branch untouched
+      since encoding/json already escapes control bytes and double-handling would
+      mutate legitimate data). Add a regression test asserting a string cell
+      containing \x1b is rendered with the escape stripped through the
+      PrintBodyMap table path.
+    status: completed
+    dependencies:
+      - task-001
+    source: review
+    acceptance_criteria:
+      - 'getNestedField applies StripControl to the string-valued cell branch; non-string (JSON-marshaled) branch left unchanged'
+      - 'A regression test renders a string cell with an embedded \x1b via PrintBodyMap (table) and asserts the control byte is neutralized'
+      - 'No double-strip regression on the JSON-marshaled branch; make test, make fmt-check, make lint pass'
+    completed_at: 2026-06-05T13:05:00Z

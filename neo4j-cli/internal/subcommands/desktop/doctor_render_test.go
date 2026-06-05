@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"strings"
 	"testing"
 
@@ -292,7 +291,7 @@ func TestDoctor_FormatExplicit_IdenticalAcrossTTYContexts(t *testing.T) {
 
 			// Force TTY=true.
 			prev := commonoutput.StdoutIsTerminal
-			commonoutput.StdoutIsTerminal = func(_ io.Writer) bool { return true }
+			commonoutput.StdoutIsTerminal = func() bool { return true }
 			ttyOut, err := invokeDoctor(t, cfg, "--format", tc.format)
 			commonoutput.StdoutIsTerminal = prev
 			if err != nil {
@@ -303,7 +302,7 @@ func TestDoctor_FormatExplicit_IdenticalAcrossTTYContexts(t *testing.T) {
 			cfg2 := newDoctorCfg(t)
 			pinAllPassSeams(t)
 			prev2 := commonoutput.StdoutIsTerminal
-			commonoutput.StdoutIsTerminal = func(_ io.Writer) bool { return false }
+			commonoutput.StdoutIsTerminal = func() bool { return false }
 			pipedOut, err := invokeDoctor(t, cfg2, "--format", tc.format)
 			commonoutput.StdoutIsTerminal = prev2
 			if err != nil {
@@ -338,7 +337,7 @@ func TestDoctor_DefaultFormat_TTYIsTable(t *testing.T) {
 	cfg := newDoctorCfgDefaultFormat(t)
 
 	prev := commonoutput.StdoutIsTerminal
-	commonoutput.StdoutIsTerminal = func(_ io.Writer) bool { return true }
+	commonoutput.StdoutIsTerminal = func() bool { return true }
 	t.Cleanup(func() { commonoutput.StdoutIsTerminal = prev })
 
 	out, err := invokeDoctor(t, cfg)
@@ -357,7 +356,7 @@ func TestDoctor_DefaultFormat_NonTTYIsJSON(t *testing.T) {
 	cfg := newDoctorCfgDefaultFormat(t)
 
 	prev := commonoutput.StdoutIsTerminal
-	commonoutput.StdoutIsTerminal = func(_ io.Writer) bool { return false }
+	commonoutput.StdoutIsTerminal = func() bool { return false }
 	t.Cleanup(func() { commonoutput.StdoutIsTerminal = prev })
 
 	out, err := invokeDoctor(t, cfg)

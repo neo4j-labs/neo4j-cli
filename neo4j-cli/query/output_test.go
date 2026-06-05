@@ -6,7 +6,6 @@ package query
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"strings"
 	"testing"
 
@@ -406,7 +405,7 @@ func TestRenderResults_MultiToon(t *testing.T) {
 func withStdoutIsTerminal(t *testing.T, isTTY bool) {
 	t.Helper()
 	prev := commonoutput.StdoutIsTerminal
-	commonoutput.StdoutIsTerminal = func(io.Writer) bool { return isTTY }
+	commonoutput.StdoutIsTerminal = func() bool { return isTTY }
 	t.Cleanup(func() { commonoutput.StdoutIsTerminal = prev })
 }
 

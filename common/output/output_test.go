@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -160,6 +162,65 @@ func TestPrintBodyMaps_Toon(t *testing.T) {
 	assert.Error(t, json.Unmarshal([]byte(out), &v))
 }
 
+func TestPrintBodyMap_ToonControlChars(t *testing.T) {
+	// Regression: toon.Marshal rejects C0 control bytes (ESC, BEL, ...). The
+	// json -> any round-trip decodes JSON-escaped control bytes back into raw
+	// bytes, so before the fix printToonValue panicked on attacker-stored data.
+	// The render must not panic and must not emit raw control bytes.
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	data := simpleData{rows: []map[string]any{
+		{"name": "foo\x1b[31mbar", "note": "ring\x07bell"},
+	}}
+
+	assert.NotPanics(t, func() {
+		PrintBodyMap(cmd, cfg, data, []string{"name", "note"})
+	})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "output must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "output must not contain raw BEL byte")
+}
+
+func TestPrintBodyMaps_ToonControlChars(t *testing.T) {
+	// Same regression for the multi-item path.
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	items := []ResponseData{
+		simpleData{rows: []map[string]any{{"id": "a\x1bb"}}},
+		simpleData{rows: []map[string]any{{"id": "c\x07d"}}},
+	}
+	fields := [][]string{{"id"}, {"id"}}
+
+	assert.NotPanics(t, func() {
+		PrintBodyMaps(cmd, cfg, items, fields)
+	})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "output must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "output must not contain raw BEL byte")
+}
+
+func TestPrintBodyMap_TableControlChars(t *testing.T) {
+	// Regression: getNestedField emitted string cells via fmt.Sprintf without
+	// stripping, so an attacker-controlled Aura field value could inject raw
+	// ANSI/terminal escapes into an operator's terminal. The string branch is
+	// now StripControl-ed; the JSON-marshaled (slice/number) branch is not.
+	cmd, cfg, stdout := newOutputCmd(t, "table")
+	data := simpleData{rows: []map[string]any{
+		{"name": "foo\x1b[31mbar", "note": "ring\x07bell", "count": 42},
+	}}
+
+	PrintBodyMap(cmd, cfg, data, []string{"name", "note", "count"})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "string cell must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "string cell must not contain raw BEL byte")
+	// Non-string cell is untouched by StripControl.
+	assert.Contains(t, out, "42", "numeric cell rendered unchanged")
+}
+
 func TestStripControl(t *testing.T) {
 	tests := []struct {
 		name string
@@ -188,7 +249,7 @@ func TestResolveOutput_Toon(t *testing.T) {
 	// ResolveOutput must return "toon" when cfg.Global.Format() is "toon",
 	// regardless of TTY state.
 	prev := StdoutIsTerminal
-	StdoutIsTerminal = func(_ io.Writer) bool { return false }
+	StdoutIsTerminal = func() bool { return false }
 	t.Cleanup(func() { StdoutIsTerminal = prev })
 
 	cmd, cfg, _ := newOutputCmd(t, "toon")
@@ -199,10 +260,64 @@ func TestResolveOutput_Toon(t *testing.T) {
 func TestResolveOutput_ToonWithTTY(t *testing.T) {
 	// Even when the writer looks like a TTY, an explicit "toon" config wins.
 	prev := StdoutIsTerminal
-	StdoutIsTerminal = func(_ io.Writer) bool { return true }
+	StdoutIsTerminal = func() bool { return true }
 	t.Cleanup(func() { StdoutIsTerminal = prev })
 
 	cmd, cfg, _ := newOutputCmd(t, "toon")
 	got := ResolveOutput(cmd, cfg)
 	assert.Equal(t, "toon", got)
+}
+
+func TestResolveOutput_WrappedStdoutStillTable(t *testing.T) {
+	// CLI-109 regression: main.go wraps the command's writers with a tee
+	// io.MultiWriter. The pre-fix StdoutIsTerminal type-asserted the writer to
+	// *os.File, so wrapping made it report non-TTY and defaults fell back to
+	// "json". The parameterless seam reads the real os.Stdout FD and is immune
+	// to the wrapping, so a TTY default must still resolve to "table".
+	cmd, cfg, _ := newOutputCmd(t, "default")
+	buf := &tee.LimitedBuffer{}
+	cmd.SetOut(io.MultiWriter(os.Stdout, buf))
+	cmd.SetErr(io.MultiWriter(os.Stderr, buf))
+
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	prevAgent := IsAgent
+	IsAgent = func() bool { return false }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	assert.Equal(t, "table", ResolveOutput(cmd, cfg))
+}
+
+func TestResolveOutput_AgentDefaultsToon(t *testing.T) {
+	prevAgent := IsAgent
+	IsAgent = func() bool { return true }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	// Agent wins even over a TTY stdout.
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	cmd, cfg, _ := newOutputCmd(t, "default")
+	assert.Equal(t, "toon", ResolveOutput(cmd, cfg))
+}
+
+func TestResolveOutput_ExplicitOverridesAutoBranches(t *testing.T) {
+	// Explicit --format must win over both the agent and TTY auto-branches.
+	prevAgent := IsAgent
+	IsAgent = func() bool { return true }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	for _, format := range []string{"json", "table", "toon"} {
+		t.Run(format, func(t *testing.T) {
+			cmd, cfg, _ := newOutputCmd(t, format)
+			assert.Equal(t, format, ResolveOutput(cmd, cfg))
+		})
+	}
 }

@@ -337,7 +337,7 @@ func renderSchema(cmd *cobra.Command, cfg *clicfg.Config, r schemaResult) {
 // non-TTY consumer (`--format table | cat`, redirected to a file) gets the
 // table rows only so the output stays cleanly machine-readable. CLI-94.
 func printSchemaTables(cmd *cobra.Command, r schemaResult) {
-	isTTY := commonoutput.StdoutIsTerminal(cmd.OutOrStdout())
+	isTTY := commonoutput.StdoutIsTerminal()
 
 	if isTTY {
 		cmd.Println("## Nodes")
