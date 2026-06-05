@@ -154,11 +154,42 @@ func printToonValue(cmd *cobra.Command, values any) {
 	if err := json.Unmarshal(jsonBytes, &v); err != nil {
 		panic(err)
 	}
+	// toon.Marshal rejects C0 control bytes (e.g. ESC, BEL) in strings — the
+	// json -> any round-trip decodes JSON-escaped control bytes back into raw
+	// bytes, so attacker-stored data would otherwise panic. StripControl
+	// neutralises every control byte toon rejects while preserving the \t \n \r
+	// that toon accepts. The JSON fallback handles any future toon rejection
+	// without crashing on a data-driven condition.
+	v = stripControlDeep(v)
 	toonBytes, err := toon.Marshal(v, toon.WithLengthMarkers(true))
 	if err != nil {
-		panic(err)
+		cmd.Println(string(jsonBytes))
+		return
 	}
 	cmd.Println(string(toonBytes))
+}
+
+// stripControlDeep recursively applies StripControl to every string value and
+// map key in the shapes produced by encoding/json unmarshal-to-any. Numbers,
+// bools and nil are returned unchanged.
+func stripControlDeep(v any) any {
+	switch val := v.(type) {
+	case string:
+		return StripControl(val)
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, item := range val {
+			out[StripControl(k)] = stripControlDeep(item)
+		}
+		return out
+	case []any:
+		for i, item := range val {
+			val[i] = stripControlDeep(item)
+		}
+		return val
+	default:
+		return v
+	}
 }
 
 func getNestedField(v map[string]any, subFields []string) string {

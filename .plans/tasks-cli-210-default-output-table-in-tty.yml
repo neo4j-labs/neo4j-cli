@@ -168,7 +168,7 @@ tasks:
       \x1b/\x07 rendered with --format toon must (a) not panic and (b) not emit raw
       control bytes; cover both the single (PrintBodyMap) and multi
       (PrintBodyMaps) paths.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     source: review
@@ -177,7 +177,7 @@ tasks:
       - 'TOON output for control-char input contains no raw C0 control bytes (0x1b, 0x07, 0x00, ...)'
       - 'Regression tests cover both PrintBodyMap (single) and PrintBodyMaps (multi) toon paths with control-char input; they fail against the pre-fix panic'
       - 'JSON and table path behavior unchanged; make test, make fmt-check, make lint pass'
-    completed_at: null
+    completed_at: 2026-06-05T12:10:00Z
 
   - id: task-009
     title: 'Security MEDIUM: generic printTable must StripControl string cells'

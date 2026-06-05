@@ -162,6 +162,45 @@ func TestPrintBodyMaps_Toon(t *testing.T) {
 	assert.Error(t, json.Unmarshal([]byte(out), &v))
 }
 
+func TestPrintBodyMap_ToonControlChars(t *testing.T) {
+	// Regression: toon.Marshal rejects C0 control bytes (ESC, BEL, ...). The
+	// json -> any round-trip decodes JSON-escaped control bytes back into raw
+	// bytes, so before the fix printToonValue panicked on attacker-stored data.
+	// The render must not panic and must not emit raw control bytes.
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	data := simpleData{rows: []map[string]any{
+		{"name": "foo\x1b[31mbar", "note": "ring\x07bell"},
+	}}
+
+	assert.NotPanics(t, func() {
+		PrintBodyMap(cmd, cfg, data, []string{"name", "note"})
+	})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "output must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "output must not contain raw BEL byte")
+}
+
+func TestPrintBodyMaps_ToonControlChars(t *testing.T) {
+	// Same regression for the multi-item path.
+	cmd, cfg, stdout := newOutputCmd(t, "toon")
+	items := []ResponseData{
+		simpleData{rows: []map[string]any{{"id": "a\x1bb"}}},
+		simpleData{rows: []map[string]any{{"id": "c\x07d"}}},
+	}
+	fields := [][]string{{"id"}, {"id"}}
+
+	assert.NotPanics(t, func() {
+		PrintBodyMaps(cmd, cfg, items, fields)
+	})
+
+	out := stdout.String()
+	assert.NotEmpty(t, out)
+	assert.NotContains(t, out, "\x1b", "output must not contain raw ESC byte")
+	assert.NotContains(t, out, "\x07", "output must not contain raw BEL byte")
+}
+
 func TestStripControl(t *testing.T) {
 	tests := []struct {
 		name string

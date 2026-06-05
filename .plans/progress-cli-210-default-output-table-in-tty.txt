@@ -32,3 +32,7 @@ Files: none (gates green)
 
 ## REVIEW — 2026-06-05T09:26:31Z
 Added 2 review tasks (task-008..task-009).
+
+## TASK-008 — 2026-06-05T12:10:00Z
+Fixed printToonValue: sanitize-before-toon via new recursive stripControlDeep(any) helper applying StripControl to every string value AND map key of the json->any value before toon.Marshal. Verified toon.Marshal accepts \t \n \r (escapes them) but rejects C0 ESC/BEL — exactly the bytes StripControl neutralizes — so post-sanitize values marshal cleanly. Added a defensive JSON fallback (emit jsonBytes) if toon.Marshal still errors instead of panicking; the genuinely-impossible json.Marshal/Unmarshal still panic. JSON fallback NOT exercised in practice (StripControl covers everything toon rejects) but kept for forward safety. JSON + table paths byte-for-byte unchanged. Added regression tests for single (PrintBodyMap) and multi (PrintBodyMaps) toon paths with \x1b/\x07 input asserting NotPanics + no raw 0x1b/0x07; both fail against the pre-fix panic. make test/fmt-check/lint all green.
+Files: ~common/output/output.go, ~common/output/output_test.go
