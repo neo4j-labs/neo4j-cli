@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: 'Rendered output field names are now snake_case across docker (bolt_port, http_port), credential (database_name, embed_credential, base_url, vertex_project, vertex_location), workspace (organization_id, project_id, project_name), and desktop (connection_uri, pending_restart, file_path) commands. BREAKING: scripts parsing JSON/TOON keys or table headers must update to the snake_case names. CLI flags, config keys, and Docker label identifiers are unchanged.'
-time: 2026-06-04T12:58:04.341372+02:00

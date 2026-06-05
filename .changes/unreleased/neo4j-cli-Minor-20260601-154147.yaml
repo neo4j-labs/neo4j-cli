@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Add `neo4j-cli aura instance deploy` to clone a local Neo4j database (from a managed Docker container or a Neo4j Desktop DBMS) into a new Aura instance.
-time: 2026-06-01T15:41:47.647154+02:00

@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: Fix default output reverting to JSON instead of table in interactive terminals; default to TOON when run by an AI agent
-time: 2026-06-05T11:10:52.107062+02:00
