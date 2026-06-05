@@ -58,7 +58,7 @@ tasks:
       and assert ResolveOutput == "table". Add a positive test asserting
       IsAgent()==true + default format -> "toon", and confirm explicit --format
       still overrides both.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -68,7 +68,7 @@ tasks:
       - 'Agent-default test asserts IsAgent()==true + default format -> "toon"'
       - 'A test asserts explicit --format json/table/toon overrides both agent and TTY branches'
       - 'go test ./common/output/... passes in the agent environment'
-    completed_at: null
+    completed_at: 2026-06-05T10:15:00Z
 
   - id: task-004
     title: 'AGENTS.md guardrail + default-format precedence note'

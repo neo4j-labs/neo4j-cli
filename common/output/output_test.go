@@ -6,10 +6,13 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/tee"
 	"github.com/neo4j/cli/test/utils/testfs"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -204,4 +207,58 @@ func TestResolveOutput_ToonWithTTY(t *testing.T) {
 	cmd, cfg, _ := newOutputCmd(t, "toon")
 	got := ResolveOutput(cmd, cfg)
 	assert.Equal(t, "toon", got)
+}
+
+func TestResolveOutput_WrappedStdoutStillTable(t *testing.T) {
+	// CLI-109 regression: main.go wraps the command's writers with a tee
+	// io.MultiWriter. The pre-fix StdoutIsTerminal type-asserted the writer to
+	// *os.File, so wrapping made it report non-TTY and defaults fell back to
+	// "json". The parameterless seam reads the real os.Stdout FD and is immune
+	// to the wrapping, so a TTY default must still resolve to "table".
+	cmd, cfg, _ := newOutputCmd(t, "default")
+	buf := &tee.LimitedBuffer{}
+	cmd.SetOut(io.MultiWriter(os.Stdout, buf))
+	cmd.SetErr(io.MultiWriter(os.Stderr, buf))
+
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	prevAgent := IsAgent
+	IsAgent = func() bool { return false }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	assert.Equal(t, "table", ResolveOutput(cmd, cfg))
+}
+
+func TestResolveOutput_AgentDefaultsToon(t *testing.T) {
+	prevAgent := IsAgent
+	IsAgent = func() bool { return true }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	// Agent wins even over a TTY stdout.
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	cmd, cfg, _ := newOutputCmd(t, "default")
+	assert.Equal(t, "toon", ResolveOutput(cmd, cfg))
+}
+
+func TestResolveOutput_ExplicitOverridesAutoBranches(t *testing.T) {
+	// Explicit --format must win over both the agent and TTY auto-branches.
+	prevAgent := IsAgent
+	IsAgent = func() bool { return true }
+	t.Cleanup(func() { IsAgent = prevAgent })
+
+	prevTTY := StdoutIsTerminal
+	StdoutIsTerminal = func() bool { return true }
+	t.Cleanup(func() { StdoutIsTerminal = prevTTY })
+
+	for _, format := range []string{"json", "table", "toon"} {
+		t.Run(format, func(t *testing.T) {
+			cmd, cfg, _ := newOutputCmd(t, format)
+			assert.Equal(t, format, ResolveOutput(cmd, cfg))
+		})
+	}
 }
