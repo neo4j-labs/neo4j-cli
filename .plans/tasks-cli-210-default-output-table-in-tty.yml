@@ -137,3 +137,78 @@ tasks:
       - 'make generate-check passes'
     status: completed
     completed_at: 2026-06-05T11:30:00Z
+
+  - id: task-008
+    title: 'Security HIGH: TOON render must not panic/fail on control characters'
+    description: |
+      Security review finding (HIGH, DREAD ~6.0). common/output/output.go
+      printToonValue panics on toon.Marshal error: toon.Marshal rejects C0 control
+      bytes ("toon: unsupported control character U+001B in string") for ESC, BEL,
+      NUL, etc. The json -> any -> toon round-trip decodes JSON-escaped control
+      bytes () back into raw bytes before handing them to toon, so the
+      marshal fails. CLI-210 makes TOON the DEFAULT for every agent invocation
+      (both the query result path and the aura command path go through
+      PrintBodyMap/PrintBodyMaps -> printToonValue). Before CLI-210 agents
+      defaulted to JSON, which escapes control bytes safely. So now an attacker who
+      stores a control byte in a Neo4j node property (rendered by `query`) or in an
+      Aura field like an instance/tenant/credential name (rendered by list/get)
+      deterministically breaks every agent invocation that returns it: the panic is
+      recovered by main.go into an error exit, producing NO result output where
+      JSON previously succeeded. Trust boundary = DB contents (highest) and Aura
+      API fields. Panicking on a normal data condition is the anti-pattern.
+      Fix: in printToonValue, stop panicking on a data-driven marshal failure and
+      neutralize control characters before marshaling — recursively apply
+      StripControl to all string values AND map keys of the unmarshaled `any`
+      before toon.Marshal (mirror the table path's StripControl defense), and/or
+      fall back to JSON if toon.Marshal still errors. Note StripControl preserves
+      \t \n \r; confirm toon accepts those in strings — if toon also rejects
+      newline/tab in a scalar, ensure the chosen sanitization yields a value
+      toon.Marshal accepts (do NOT reintroduce a panic). Keep the JSON-marshal
+      escaping behavior unchanged. Add regression tests: a value containing
+      \x1b/\x07 rendered with --format toon must (a) not panic and (b) not emit raw
+      control bytes; cover both the single (PrintBodyMap) and multi
+      (PrintBodyMaps) paths.
+    status: pending
+    dependencies:
+      - task-001
+    source: review
+    acceptance_criteria:
+      - 'printToonValue no longer panics on a data-driven toon.Marshal failure; control-char-bearing data renders without panic under --format toon (and agent default)'
+      - 'TOON output for control-char input contains no raw C0 control bytes (0x1b, 0x07, 0x00, ...)'
+      - 'Regression tests cover both PrintBodyMap (single) and PrintBodyMaps (multi) toon paths with control-char input; they fail against the pre-fix panic'
+      - 'JSON and table path behavior unchanged; make test, make fmt-check, make lint pass'
+    completed_at: null
+
+  - id: task-009
+    title: 'Security MEDIUM: generic printTable must StripControl string cells'
+    description: |
+      Security review finding (MEDIUM, DREAD ~4.6). common/output/output.go
+      printTable + getNestedField emit cell values via fmt.Sprintf("%+v", value)
+      straight into go-pretty rows with NO StripControl, unlike EVERY sibling table
+      renderer in the repo (query/output.go formatCell line ~215, query/schema.go
+      schema tables, desktop connection/dbms/plugin list.go, desktop
+      doctor_render.go) which all strip per-cell. printTable is the path for ~all
+      aura instance/tenant/credential/config/customermanagedkey/graphanalytics
+      list/get commands (via PrintBodyMap/PrintBodyMaps). CLI-210 restores `table`
+      as the TTY default, so an attacker-controlled Aura field value (e.g. an
+      instance or tenant name in a shared Aura org) renders raw ANSI/terminal
+      escape sequences into an operator's terminal -> output spoofing/hiding,
+      cursor manipulation, OSC sequences (CWE-150). This is pre-existing (table was
+      the pre-CLI-109 default) but the lone-exception asymmetry vs four sibling
+      renderers indicates an oversight, and CLI-210 re-enables the default path —
+      the right moment to close it. Fix: apply commonoutput.StripControl to the
+      STRING branch in getNestedField only (mirror query/output.go formatCell:
+      strip strings, leave the JSON-marshaled slice/number/bool branch untouched
+      since encoding/json already escapes control bytes and double-handling would
+      mutate legitimate data). Add a regression test asserting a string cell
+      containing \x1b is rendered with the escape stripped through the
+      PrintBodyMap table path.
+    status: pending
+    dependencies:
+      - task-001
+    source: review
+    acceptance_criteria:
+      - 'getNestedField applies StripControl to the string-valued cell branch; non-string (JSON-marshaled) branch left unchanged'
+      - 'A regression test renders a string cell with an embedded \x1b via PrintBodyMap (table) and asserts the control byte is neutralized'
+      - 'No double-strip regression on the JSON-marshaled branch; make test, make fmt-check, make lint pass'
+    completed_at: null
