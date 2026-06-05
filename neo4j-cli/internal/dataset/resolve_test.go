@@ -5,8 +5,10 @@ package dataset
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -230,4 +232,27 @@ func TestResolve_RejectsBadVersion(t *testing.T) {
 	_, err := Resolve(context.Background(), "owner/repo", "not-a-version")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid neo4j version")
+}
+
+// TestGetCapped_RejectsRedirectToDisallowedHost guards the manifest-fetch path
+// against a redirect that lands on a host other than the raw host: the initial
+// URL is on rawBaseURL, but the final response URL is off-allowlist.
+func TestGetCapped_RejectsRedirectToDisallowedHost(t *testing.T) {
+	origBase, origDo := rawBaseURL, httpDoFn
+	rawBaseURL = "https://raw.githubusercontent.com"
+	httpDoFn = func(req *http.Request) (*http.Response, error) {
+		// Simulate net/http having transparently followed a 302 to another host.
+		final := *req
+		final.URL, _ = url.Parse("https://evil.example.com/owner/repo/main/relate.project-install.json")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("{}")),
+			Request:    &final,
+		}, nil
+	}
+	t.Cleanup(func() { rawBaseURL, httpDoFn = origBase, origDo })
+
+	_, _, err := getCapped(context.Background(), rawBaseURL+"/owner/repo/main/relate.project-install.json", maxManifestBytes)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not allowed for manifest fetch")
 }

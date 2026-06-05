@@ -202,6 +202,11 @@ func assertPathExists(ctx context.Context, owner, repo, branch, dumpPath string)
 		return fmt.Errorf("verify dump path: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.Request != nil && resp.Request.URL != nil {
+		if err := assertRawHostURL(resp.Request.URL); err != nil {
+			return err
+		}
+	}
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
@@ -227,6 +232,15 @@ func getCapped(ctx context.Context, rawURL string, cap int64) ([]byte, int, erro
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Validate the FINAL URL host — net/http follows redirects transparently, so
+	// a 302 away from the raw host would otherwise be invisible (matches
+	// download.go's fetchAndSniff post-redirect guard).
+	if resp.Request != nil && resp.Request.URL != nil {
+		if err := assertRawHostURL(resp.Request.URL); err != nil {
+			return nil, 0, err
+		}
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
 		return nil, resp.StatusCode, nil
@@ -251,6 +265,13 @@ func assertRawHost(rawURL string) error {
 	if err != nil {
 		return fmt.Errorf("parse url: %w", err)
 	}
+	return assertRawHostURL(u)
+}
+
+// assertRawHostURL rejects a parsed URL whose scheme/host differs from
+// rawBaseURL. Called both before dispatch (via assertRawHost) and after the
+// response lands so a redirect away from the raw host is caught.
+func assertRawHostURL(u *url.URL) error {
 	base, err := url.Parse(rawBaseURL)
 	if err != nil {
 		return fmt.Errorf("parse base url: %w", err)
