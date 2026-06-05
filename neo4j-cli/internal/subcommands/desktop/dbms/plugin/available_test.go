@@ -137,7 +137,7 @@ func TestPluginAvailable_Happy_Table(t *testing.T) {
 		t.Fatalf("run: %v (stderr=%s)", err, h.err.String())
 	}
 	out := h.out.String()
-	for _, want := range []string{"NAME", "VERSION", "PENDINGRESTART", "FILEPATH", "apoc", "5.20.0", "/x/apoc.jar"} {
+	for _, want := range []string{"NAME", "VERSION", "PENDING_RESTART", "FILE_PATH", "apoc", "5.20.0", "/x/apoc.jar"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected table output to contain %q, got:\n%s", want, out)
 		}
@@ -160,7 +160,7 @@ func TestPluginAvailable_Empty_RendersEmptyTable(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	out := h.out.String()
-	for _, want := range []string{"NAME", "VERSION", "PENDINGRESTART", "FILEPATH", "(none)"} {
+	for _, want := range []string{"NAME", "VERSION", "PENDING_RESTART", "FILE_PATH", "(none)"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected empty-table output to contain %q, got:\n%s", want, out)
 		}

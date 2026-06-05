@@ -15,8 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// JSON output bypasses this list so `--format json` consumers see every wire field.
-var pluginInstallFields = []string{"name", "version", "pendingRestart", "filePath"}
+// JSON output bypasses this list (full projection via MarshalJSON); it sets the table/toon column order.
+var pluginInstallFields = []string{"name", "version", "pending_restart", "file_path"}
 
 // pluginInstallResult adapts a single `*DbmsPlugin` to the output.ResponseData contract.
 type pluginInstallResult struct {
@@ -29,20 +29,20 @@ func (r pluginInstallResult) AsArray() []map[string]any {
 	}
 	return []map[string]any{
 		{
-			"name":           r.Item.Name,
-			"version":        r.Item.Version,
-			"pendingRestart": r.Item.PendingRestart,
-			"filePath":       r.Item.FilePath,
+			"name":            r.Item.Name,
+			"version":         r.Item.Version,
+			"pending_restart": r.Item.PendingRestart,
+			"file_path":       r.Item.FilePath,
 		},
 	}
 }
 
-// MarshalJSON emits the full DbmsPlugin so `--format json` matches `plugin list` shape.
+// MarshalJSON emits the snake_case DbmsPlugin projection so `--format json` matches `plugin list` shape.
 func (r pluginInstallResult) MarshalJSON() ([]byte, error) {
 	if r.Item == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(r.Item)
+	return json.Marshal(r.Item.ToOutput())
 }
 
 func newInstallCmd(cfg *clicfg.Config) *cobra.Command {

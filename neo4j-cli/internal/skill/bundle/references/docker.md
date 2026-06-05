@@ -100,7 +100,7 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 
 Show details of a Neo4j container managed by neo4j-cli
 
-Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, uri (neo4j://localhost:<bolt-port>), and image. Containers that exist in Docker but lack the managed label are treated as unknown; the error message points at `neo4j-cli docker list` so the operator can see the actual set of managed containers. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error so you can tell a missing container apart from a missing daemon.
+Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. Renders name, status (Docker's human-readable state), edition, version, bolt_port, http_port, ephemeral, uri (neo4j://localhost:<bolt-port>), and image. Containers that exist in Docker but lack the managed label are treated as unknown; the error message points at `neo4j-cli docker list` so the operator can see the actual set of managed containers. Daemon-side errors (Docker not running, socket permission denied, etc.) are surfaced verbatim and are distinct from the unknown-name error so you can tell a missing container apart from a missing daemon.
 
 Usage: `neo4j-cli docker get <name>`
 
@@ -121,7 +121,7 @@ neo4j-cli docker get dev --format toon
 
 List Neo4j containers managed by neo4j-cli
 
-List all Neo4j Docker containers carrying the `org.neo4j.cli.managed=true` label. Renders one row per container with name, status (Docker's human-readable state), edition, version, bolt-port, http-port, and ephemeral. Unmanaged containers (no label) are excluded. An empty result renders as an empty table or empty JSON array (exit 0).
+List all Neo4j Docker containers carrying the `org.neo4j.cli.managed=true` label. Renders one row per container with name, status (Docker's human-readable state), edition, version, bolt_port, http_port, and ephemeral. Unmanaged containers (no label) are excluded. An empty result renders as an empty table or empty JSON array (exit 0).
 
 Usage: `neo4j-cli docker list`
 

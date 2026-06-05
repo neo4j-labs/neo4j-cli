@@ -645,7 +645,7 @@ func TestDesktopConnection_Create(t *testing.T) {
 	}
 	var got struct {
 		Name          string `json:"name"`
-		ConnectionURI string `json:"connectionUri"`
+		ConnectionURI string `json:"connection_uri"`
 	}
 	_ = json.Unmarshal([]byte(stdout), &got)
 	if got.Name != "aura-dev" || got.ConnectionURI != "neo4j+s://xyz.databases.neo4j.io" {
@@ -697,7 +697,7 @@ func TestDesktopConnection_UpdatePartialPatch(t *testing.T) {
 		Connections []struct {
 			ID            string `json:"id"`
 			Name          string `json:"name"`
-			ConnectionURI string `json:"connectionUri"`
+			ConnectionURI string `json:"connection_uri"`
 			Description   string `json:"description"`
 		} `json:"connections"`
 	}
@@ -1356,7 +1356,7 @@ func TestPluginInstall_HappyAutoRestart(t *testing.T) {
 	if len(listGot) != 1 {
 		t.Fatalf("expected 1 installed plugin; got %d (%s)", len(listGot), listOut)
 	}
-	if pr, _ := listGot[0]["pendingRestart"].(bool); pr {
+	if pr, _ := listGot[0]["pending_restart"].(bool); pr {
 		t.Fatalf("expected pendingRestart=false after auto-restart; got %v", listGot[0])
 	}
 }

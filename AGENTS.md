@@ -274,6 +274,28 @@ See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credentia
 
 See [`.agents/agent-context.md`](.agents/agent-context.md) — `neo4j-cli agent-context` reflects the live cobra tree, with hand-coded `schemaVersion` / `exitCodes` / `errorCodes` / `asyncFlag` in `agentcontext/build.go`.
 
+## Output / Input Casing Convention
+
+Single rule for every new command/field:
+
+- **Rendered OUTPUT field names = snake_case** — JSON/TOON keys, table headers, and the `fields []string` slices passed to `output.PrintBodyMap`/`PrintBodyMaps`/`PrintBody`/`PrintRawBody` (e.g. `bolt_port`, `connection_uri`, `database_name`, `project_id`).
+- **Input identifiers = kebab-case** — command `Use` names, command aliases, and flag long names (e.g. `bolt-port`, `--database-name`, `instance snapshot list`). Single-character flag shorthands are exempt.
+
+EXEMPTIONS (intentionally NOT snake_case output — do not "fix" these):
+
+- Wire/parse structs whose tags map to an external payload: `aura/internal/api/.../response.go`, `desktopclient/types.go`, OAuth structs, `update/release.go` (`tag_name`).
+- Config keys (`aura.base-url`, `flag.<area>-<feature>`).
+- Docker label constants (`org.neo4j.cli.bolt-port`, etc.) — persisted identifiers, not rendered output.
+- Enum / status VALUES (the value of a field, not the key).
+
+Both gate tests enforce this: input kebab-case → `agentcontext/casing_input_gate_test.go`; output snake_case → `common/output/casing_gate_test.go`.
+
+## Output/Input Casing Gates
+
+Two hermetic gates enforce CLI-127 casing: input identifiers (command/alias/flag-long names) are kebab-case — `agentcontext/casing_input_gate_test.go`; rendered OUTPUT field names are snake_case — `common/output/casing_gate_test.go`. The output gate checks Print*(`fields`) literals + an enumerated output-struct json-tag allowlist; wire/parse structs (desktopclient/types.go, api/response.go, docker client.go, query schema.go YIELD columns, credentials on-disk kebab tags) and Docker label consts are intentionally NOT output and are excluded. Adding a new output struct/field → add it to the allowlist (or it's covered if its keys flow through a `fields` slice).
+
+Neither gate covers the build-tagged e2e suites under `test/e2e/` (e.g. `-tags=e2e_desktop` → `test/e2e/desktop/desktop_test.go`), which are NOT part of `make test` — they decode CLI stdout into their own local structs/map-keys. When changing any rendered output field name, also update those decoders and run the tagged suite (e.g. `go test -tags=e2e_desktop ./test/e2e/desktop/...`). Leave `test/e2e/desktop_fixture/**` (the fake Desktop server) on camelCase — it mirrors Desktop's wire API.
+
 ## macOS Subprocess Test Isolation Notes
 
 - `common/clicfg/darwin.go` uses `$HOME` env var (not `user.Current().HomeDir`) for the config prefix so that subprocess tests can override HOME to isolate config files. If you add subprocess tests that need config isolation on macOS, pass `HOME=<tempdir>` in the subprocess env and symlink `<real-home>/Library/Keychains/login.keychain-db` into `<tempdir>/Library/Keychains/` — go-keyring resolves keychains relative to `$HOME` but still needs the real login keychain in the search list.

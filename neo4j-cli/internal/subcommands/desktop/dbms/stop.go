@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dbmsStopFields = []string{"id", "name", "version", "status", "connectionUri"}
+var dbmsStopFields = []string{"id", "name", "version", "status", "connection_uri"}
 
 // dbmsStopResult adapts an optional `*DbmsInfo` to output.ResponseData.
 // Without `--wait` the stop reply is opaque to the CLI, so the row carries
@@ -26,22 +26,22 @@ func (r dbmsStopResult) AsArray() []map[string]any {
 	if r.Item != nil {
 		return []map[string]any{
 			{
-				"id":            r.Item.ID,
-				"name":          r.Item.Name,
-				"version":       r.Item.Version,
-				"status":        r.Item.Status,
-				"connectionUri": r.Item.ConnectionURI,
+				"id":             r.Item.ID,
+				"name":           r.Item.Name,
+				"version":        r.Item.Version,
+				"status":         r.Item.Status,
+				"connection_uri": r.Item.ConnectionURI,
 			},
 		}
 	}
 	return []map[string]any{{"id": r.ID}}
 }
 
-// MarshalJSON emits the full DbmsInfo on the --wait path or a minimal
-// `{"id": "..."}` envelope otherwise (stable shape: `id` is always present).
+// MarshalJSON emits the snake_case DbmsInfo projection on the --wait path or a
+// minimal `{"id": "..."}` envelope otherwise (stable shape: `id` is always present).
 func (r dbmsStopResult) MarshalJSON() ([]byte, error) {
 	if r.Item != nil {
-		return json.Marshal(r.Item)
+		return json.Marshal(r.Item.ToOutput())
 	}
 	return json.Marshal(map[string]string{"id": r.ID})
 }

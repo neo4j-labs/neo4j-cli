@@ -265,8 +265,8 @@ func TestCreate_Wait_PollsUntilStarted(t *testing.T) {
 	if got["status"] != "started" {
 		t.Fatalf("expected status=started in output, got %v", got["status"])
 	}
-	if got["connectionUri"] != "neo4j://localhost:7687" {
-		t.Fatalf("expected connectionUri in output, got %v", got["connectionUri"])
+	if got["connection_uri"] != "neo4j://localhost:7687" {
+		t.Fatalf("expected connection_uri in output, got %v", got["connection_uri"])
 	}
 }
 

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dbmsCredentialFields = []string{"name", "username", "database-name", "uri", "embed-credential", "default"}
+var dbmsCredentialFields = []string{"name", "username", "database_name", "uri", "embed_credential", "default"}
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
 	return &cobra.Command{

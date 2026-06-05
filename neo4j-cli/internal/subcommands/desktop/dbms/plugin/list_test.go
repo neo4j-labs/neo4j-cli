@@ -116,8 +116,8 @@ func TestPluginList_Happy_JSON(t *testing.T) {
 	if got[0]["name"] != "apoc" || got[1]["name"] != "gds" {
 		t.Fatalf("unexpected plugin names: %v / %v", got[0]["name"], got[1]["name"])
 	}
-	if got[1]["pendingRestart"] != true {
-		t.Fatalf("expected pendingRestart=true on gds, got %v", got[1]["pendingRestart"])
+	if got[1]["pending_restart"] != true {
+		t.Fatalf("expected pending_restart=true on gds, got %v", got[1]["pending_restart"])
 	}
 }
 
@@ -138,7 +138,7 @@ func TestPluginList_Happy_Table(t *testing.T) {
 	out := h.out.String()
 	// jedib0t/go-pretty uppercases column headers by default; the leaf
 	// registers them lower-case, the renderer casts them at print time.
-	for _, want := range []string{"NAME", "VERSION", "PENDINGRESTART", "FILEPATH", "apoc", "5.20.0", "/x/apoc.jar"} {
+	for _, want := range []string{"NAME", "VERSION", "PENDING_RESTART", "FILE_PATH", "apoc", "5.20.0", "/x/apoc.jar"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected table output to contain %q, got:\n%s", want, out)
 		}
@@ -161,7 +161,7 @@ func TestPluginList_Empty_RendersEmptyTable(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	out := h.out.String()
-	for _, want := range []string{"NAME", "VERSION", "PENDINGRESTART", "FILEPATH", "(none)"} {
+	for _, want := range []string{"NAME", "VERSION", "PENDING_RESTART", "FILE_PATH", "(none)"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected empty-table output to contain %q, got:\n%s", want, out)
 		}

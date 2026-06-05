@@ -18,7 +18,7 @@ import (
 const portFlag = "port"
 
 // JSON/toon output bypasses this list so consumers see every wire field.
-var pluginListFields = []string{"name", "version", "pendingRestart", "filePath"}
+var pluginListFields = []string{"name", "version", "pending_restart", "file_path"}
 
 // pluginListResult is the payload returned by `plugin list` and `plugin available`.
 type pluginListResult struct {
@@ -29,11 +29,7 @@ func (r pluginListResult) AsArray() []map[string]any { return nil }
 
 // MarshalJSON emits the DbmsPlugin array directly; empty case marshals to `[]` (never `null`).
 func (r pluginListResult) MarshalJSON() ([]byte, error) {
-	plugins := r.Plugins
-	if plugins == nil {
-		plugins = []desktopclient.DbmsPlugin{}
-	}
-	return json.Marshal(plugins)
+	return json.Marshal(desktopclient.DbmsPluginOutputs(r.Plugins))
 }
 
 func newListCmd(cfg *clicfg.Config) *cobra.Command {
@@ -45,7 +41,7 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 			"`<dbms-id>` is the DBMS id (Desktop UUID); see `neo4j-cli desktop dbms list` for the catalog. " +
 			"`--format json` emits a JSON array of full `DbmsPlugin` objects (every wire field Desktop returns). " +
 			"`--format toon` mirrors the JSON shape. " +
-			"A `pendingRestart: true` entry means the plugin JAR is on disk but the running DBMS has not yet been restarted to pick it up — restart the DBMS or pass `--no-restart` to `install`/`uninstall` to defer the restart explicitly.",
+			"A `pending_restart: true` entry means the plugin JAR is on disk but the running DBMS has not yet been restarted to pick it up — restart the DBMS or pass `--no-restart` to `install`/`uninstall` to defer the restart explicitly.",
 		Example: `# List installed plugins on a DBMS as a table
 neo4j-cli desktop dbms plugin list my-dbms-id
 

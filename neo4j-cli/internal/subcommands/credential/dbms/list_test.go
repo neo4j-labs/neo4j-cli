@@ -39,7 +39,7 @@ func TestDbmsCredentialList(t *testing.T) {
 				t.Helper()
 				assert.Contains(t, out, `"name": "mydb"`)
 				assert.Contains(t, out, `"username": "neo4j"`)
-				assert.Contains(t, out, `"database-name": "neo4j"`)
+				assert.Contains(t, out, `"database_name": "neo4j"`)
 				assert.Contains(t, out, `"uri": "bolt://localhost:7687"`)
 				assert.Contains(t, out, `"default": true`)
 				assert.NotContains(t, out, "secret")
@@ -61,7 +61,7 @@ func TestDbmsCredentialList(t *testing.T) {
 				assert.Contains(t, out, `"name": "second"`)
 				assert.Contains(t, out, `"username": "neo4j"`)
 				assert.Contains(t, out, `"username": "admin"`)
-				assert.Contains(t, out, `"database-name": "mydb"`)
+				assert.Contains(t, out, `"database_name": "mydb"`)
 				assert.Contains(t, out, `"uri": "neo4j://remotehost:7687"`)
 				// second is default, first is not
 				assert.NotContains(t, out, "secret1")
@@ -81,9 +81,9 @@ func TestDbmsCredentialList(t *testing.T) {
 				t.Helper()
 				assert.Contains(t, out, "NAME")
 				assert.Contains(t, out, "USERNAME")
-				assert.Contains(t, out, "DATABASE-NAME")
+				assert.Contains(t, out, "DATABASE_NAME")
 				assert.Contains(t, out, "URI")
-				assert.Contains(t, out, "EMBED-CREDENTIAL")
+				assert.Contains(t, out, "EMBED_CREDENTIAL")
 				assert.Contains(t, out, "DEFAULT")
 				assert.NotContains(t, out, "INSECURE")
 				assert.Contains(t, out, "mydb")
@@ -102,7 +102,7 @@ func TestDbmsCredentialList(t *testing.T) {
 			command:        "list --format table",
 			wantOut: func(t *testing.T, out string) {
 				t.Helper()
-				assert.Contains(t, out, "EMBED-CREDENTIAL")
+				assert.Contains(t, out, "EMBED_CREDENTIAL")
 				assert.Contains(t, out, "myembed")
 			},
 		},

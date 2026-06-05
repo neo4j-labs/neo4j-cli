@@ -149,6 +149,9 @@ The CLI aims to provide a consistent and reliable experience to the end user. An
     - ✅ `neo4j-cli aura instance list`
     - ❌ `neo4j-cli aura list-instance`
     - ❌ `neo4j-cli aura list instance`
+- Input identifiers (command names, aliases, flag long names) must be kebab-case. Single-character flag shorthands are exempt.
+    - ✅ `--database-name`, `instance snapshot list`
+    - ❌ `--database_name`, `--databaseName`
 
 ### Parameters
 
@@ -174,6 +177,10 @@ To avoid confusion, this guide uses the term **flags** to refer to any named arg
 - Read operations should support the following `--format` options:
     - `json`: Provides the raw JSON output of the API, formatted to be human-readable.
     - `table`: Provides a subset of the output, formatted to be human readable on a table. Try to keep the table output below 120 characters to avoid overflowing the screen.
+- Rendered output field names (JSON/TOON keys, table headers) must be snake_case.
+    - ✅ `bolt_port`, `connection_uri`, `project_id`
+    - ❌ `bolt-port`, `connectionUri`, `projectId`
+    - Exemptions: wire/parse structs (external payloads), config keys (`aura.base-url`), Docker label constants (`org.neo4j.cli.*`), and enum/status values.
 
 > These guidelines are based on https://clig.dev
 

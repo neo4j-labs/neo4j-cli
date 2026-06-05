@@ -26,7 +26,7 @@ func newGetCmd(cfg *clicfg.Config) *cobra.Command {
 		Use:   "get <name>",
 		Short: "Show details of a Neo4j container managed by neo4j-cli",
 		Long: "Show details of a single Neo4j Docker container carrying the `org.neo4j.cli.managed=true` label. " +
-			"Renders name, status (Docker's human-readable state), edition, version, bolt-port, http-port, ephemeral, " +
+			"Renders name, status (Docker's human-readable state), edition, version, bolt_port, http_port, ephemeral, " +
 			"uri (neo4j://localhost:<bolt-port>), and image. " +
 			"Containers that exist in Docker but lack the managed label are treated as unknown; the error message " +
 			"points at `neo4j-cli docker list` so the operator can see the actual set of managed containers. " +
@@ -78,13 +78,13 @@ neo4j-cli docker get dev --format toon`,
 				"status":    container.Status,
 				"edition":   container.Edition,
 				"version":   container.Version,
-				"bolt-port": container.BoltPort,
-				"http-port": container.HTTPPort,
+				"bolt_port": container.BoltPort,
+				"http_port": container.HTTPPort,
 				"ephemeral": container.Ephemeral,
 				"uri":       uri,
 				"image":     container.Image,
 			}
-			fields := []string{"name", "status", "edition", "version", "bolt-port", "http-port", "ephemeral", "uri", "image"}
+			fields := []string{"name", "status", "edition", "version", "bolt_port", "http_port", "ephemeral", "uri", "image"}
 			commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 			return nil
 		},

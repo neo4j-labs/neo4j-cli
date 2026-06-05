@@ -51,23 +51,23 @@ func TestWorkspaceList(t *testing.T) {
 				"data": [
 					{
 						"workspace": "%s/%s",
-						"organizationId": "%s",
-						"projectId": "%s",
-						"projectName": "Project One",
+						"organization_id": "%s",
+						"project_id": "%s",
+						"project_name": "Project One",
 						"default": true
 					},
 					{
 						"workspace": "%s/%s",
-						"organizationId": "%s",
-						"projectId": "%s",
-						"projectName": "Project Two",
+						"organization_id": "%s",
+						"project_id": "%s",
+						"project_name": "Project Two",
 						"default": false
 					},
 					{
 						"workspace": "%s/%s",
-						"organizationId": "%s",
-						"projectId": "%s",
-						"projectName": "Project Three",
+						"organization_id": "%s",
+						"project_id": "%s",
+						"project_name": "Project Three",
 						"default": false
 					}
 				]
@@ -92,9 +92,9 @@ func TestWorkspaceList(t *testing.T) {
 				"data": [
 					{
 						"workspace": "%s/%s",
-						"organizationId": "%s",
-						"projectId": "%s",
-						"projectName": "Project One",
+						"organization_id": "%s",
+						"project_id": "%s",
+						"project_name": "Project One",
 						"default": false
 					}
 				]

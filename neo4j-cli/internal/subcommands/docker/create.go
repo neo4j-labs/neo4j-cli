@@ -426,12 +426,12 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 				"name":      chosenName,
 				"edition":   edition,
 				"version":   version,
-				"bolt-port": boltPort,
-				"http-port": httpPort,
+				"bolt_port": boltPort,
+				"http_port": httpPort,
 				"uri":       uri,
 				"username":  "neo4j",
 			}
-			fields := []string{"name", "edition", "version", "bolt-port", "http-port", "uri", "username"}
+			fields := []string{"name", "edition", "version", "bolt_port", "http_port", "uri", "username"}
 			if !noPrintPassword {
 				row["password"] = resolvedPassword
 				fields = append(fields, "password")

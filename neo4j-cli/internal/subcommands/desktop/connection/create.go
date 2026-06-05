@@ -21,7 +21,7 @@ import (
 
 // connectionCreateFields is the default column order for table / toon output;
 // JSON output emits the full Connection wire payload.
-var connectionCreateFields = []string{"id", "name", "connectionUri"}
+var connectionCreateFields = []string{"id", "name", "connection_uri"}
 
 // newDesktopClientFn is the test seam for desktop client construction.
 var newDesktopClientFn = newDesktopClient
@@ -109,9 +109,9 @@ func (r connectionResult) AsArray() []map[string]any {
 	}
 	return []map[string]any{
 		{
-			"id":            r.Item.ID,
-			"name":          r.Item.Name,
-			"connectionUri": r.Item.ConnectionURI,
+			"id":             r.Item.ID,
+			"name":           r.Item.Name,
+			"connection_uri": r.Item.ConnectionURI,
 		},
 	}
 }
@@ -120,7 +120,7 @@ func (r connectionResult) MarshalJSON() ([]byte, error) {
 	if r.Item == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(r.Item)
+	return json.Marshal(r.Item.ToOutput())
 }
 
 func newCreateCmd(cfg *clicfg.Config) *cobra.Command {

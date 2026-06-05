@@ -320,7 +320,7 @@ func TestList_JSON_SnapshotShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal canonical: %v", err)
 	}
-	want := `{"connections":[{"id":"c1","name":"Remote","connectionUri":"neo4j+s://abc.databases.neo4j.io"}],"dbmss":[{"id":"d1","name":"Local","connectionUri":"neo4j://localhost:7687","status":"started","version":"5.21"}]}`
+	want := `{"connections":[{"id":"c1","name":"Remote","connection_uri":"neo4j+s://abc.databases.neo4j.io"}],"dbmss":[{"id":"d1","name":"Local","connection_uri":"neo4j://localhost:7687","status":"started","version":"5.21"}]}`
 	// JSON unmarshal+marshal alphabetises map keys; build the canonical
 	// reference by the same path.
 	var wantParsed any
@@ -362,7 +362,7 @@ func TestList_Table_TwoSections_BothPopulated(t *testing.T) {
 		t.Fatalf("expected 'Local DBMSes' to appear before 'Remote connections', got: %s", out)
 	}
 	// DBMSes section uses the dbms column set.
-	for _, hdr := range []string{"ID", "NAME", "VERSION", "STATUS", "CONNECTIONURI"} {
+	for _, hdr := range []string{"ID", "NAME", "VERSION", "STATUS", "CONNECTION_URI"} {
 		if !strings.Contains(out, hdr) {
 			t.Fatalf("expected DBMS column header %q in table output, got %s", hdr, out)
 		}
@@ -534,7 +534,7 @@ func TestList_TableHeader_EmptyArrays(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	out := h.out.String()
-	for _, hdr := range []string{"ID", "NAME", "VERSION", "STATUS", "CONNECTIONURI"} {
+	for _, hdr := range []string{"ID", "NAME", "VERSION", "STATUS", "CONNECTION_URI"} {
 		if !strings.Contains(out, hdr) {
 			t.Fatalf("expected header %q on empty table, got %s", hdr, out)
 		}

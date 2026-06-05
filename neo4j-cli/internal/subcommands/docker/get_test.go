@@ -95,8 +95,8 @@ func TestGet_ManagedContainer_RendersAllNineFields(t *testing.T) {
 	assert.Equal(t, "Up 5 minutes", row["status"])
 	assert.Equal(t, "enterprise", row["edition"])
 	assert.Equal(t, "5.20", row["version"])
-	assert.Equal(t, "7687", row["bolt-port"])
-	assert.Equal(t, "7474", row["http-port"])
+	assert.Equal(t, "7687", row["bolt_port"])
+	assert.Equal(t, "7474", row["http_port"])
 	assert.Equal(t, false, row["ephemeral"])
 	assert.Equal(t, "neo4j://localhost:7687", row["uri"])
 	assert.Equal(t, "neo4j:5.20-enterprise", row["image"])
@@ -189,7 +189,7 @@ func TestGet_FormatTable_RendersAllNineColumnsAndRow(t *testing.T) {
 	require.NoError(t, err)
 	// go-pretty/v6 uppercases header text — assert against an uppercased copy.
 	upper := strings.ToUpper(stdout)
-	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT-PORT", "HTTP-PORT", "EPHEMERAL", "URI", "IMAGE"} {
+	for _, col := range []string{"NAME", "STATUS", "EDITION", "VERSION", "BOLT_PORT", "HTTP_PORT", "EPHEMERAL", "URI", "IMAGE"} {
 		assert.Contains(t, upper, col, "table missing column %q in output:\n%s", col, stdout)
 	}
 	for _, val := range []string{"dev", "Up 5 minutes", "enterprise", "5.20", "7687", "7474", "neo4j://localhost:7687", "neo4j:5.20-enterprise"} {
