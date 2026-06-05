@@ -332,10 +332,10 @@ func (c *execClient) Inspect(ctx context.Context, name string) (Container, error
 // classifyInspectError converts the wrapped error returned by c.run when
 // invoking `docker inspect` into either an ErrNotFound wrap (when docker's
 // stderr reported the container is missing) or the original error (for any
-// other failure shape). Docker's stderr wording for missing containers is
-// stable across versions: "Error: No such object: <name>" (modern, since
-// ~2018) or "Error: No such container: <name>" (older). Matching the shared
-// "No such " substring covers both variants.
+// other failure shape). Docker's stderr wording for missing containers varies
+// by engine/version: "Error: No such object: <name>", "No such container:
+// <name>", and newer/rootless+podman engines emit lowercase "no such object:
+// <name>". Matching the "no such " substring case-insensitively covers them all.
 //
 // Note: c.run already wraps the captured docker stderr inside a
 // clierr.UsageError whose message string contains the original stderr text,
@@ -346,7 +346,7 @@ func classifyInspectError(runErr error, name string) error {
 	if runErr == nil {
 		return nil
 	}
-	if strings.Contains(runErr.Error(), "No such ") {
+	if strings.Contains(strings.ToLower(runErr.Error()), "no such ") {
 		return fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return runErr

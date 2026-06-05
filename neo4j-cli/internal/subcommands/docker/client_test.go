@@ -197,6 +197,12 @@ func TestClassifyInspectError(t *testing.T) {
 			wantContainsIn: true,
 		},
 		{
+			name:           "lowercase 'no such object' stderr (newer/rootless/podman)",
+			in:             errors.New("docker inspect ghost: error: no such object: ghost"),
+			wantNotFound:   true,
+			wantContainsIn: true,
+		},
+		{
 			name:         "daemon down error preserved verbatim",
 			in:           errors.New("docker inspect dev: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"),
 			wantNotFound: false,
