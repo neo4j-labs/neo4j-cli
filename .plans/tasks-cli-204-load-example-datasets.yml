@@ -476,7 +476,7 @@ tasks:
          TestGenerator_RoundTrip passes.
       Add a regression test asserting the dataset parent Example references all three load
       verbs (docker load, desktop dbms load, aura instance load).
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -486,7 +486,7 @@ tasks:
       - "Skill bundle regenerated with no leftover diff; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
       - "A test asserts the dataset parent Example references all three load verbs"
       - "make test, make fmt-check, make lint all clean"
-    completed_at: null
+    completed_at: 2026-06-05T15:00:00Z
 
   - id: task-019
     title: 'Document example-dataset loading in README'

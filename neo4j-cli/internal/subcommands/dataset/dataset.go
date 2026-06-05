@@ -28,6 +28,14 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"  neo4j-cli docker load <owner/repo>          — load into a local Docker container\n" +
 			"  neo4j-cli desktop dbms load <owner/repo>    — load into a Neo4j Desktop DBMS\n" +
 			"  neo4j-cli aura instance load <owner/repo>   — load into a new Aura instance",
+		Example: `# Load the movies dataset into a local Docker container
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw
+
+# ... into a Neo4j Desktop DBMS
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --name movies --password <pw> --rw
+
+# ... into a new Aura instance
+neo4j-cli aura instance load neo4j-graph-examples/movies --name movies --type free-db --rw`,
 	}
 
 	cmd.AddCommand(newListCmd(cfg))

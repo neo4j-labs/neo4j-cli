@@ -13,6 +13,19 @@ Loading happens on each target's own command tree:
 
 Usage: `neo4j-cli dataset`
 
+Examples:
+
+```
+# Load the movies dataset into a local Docker container
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw
+
+# ... into a Neo4j Desktop DBMS
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --name movies --password <pw> --rw
+
+# ... into a new Aura instance
+neo4j-cli aura instance load neo4j-graph-examples/movies --name movies --type free-db --rw
+```
+
 ## neo4j-cli dataset list
 
 List curated example dataset suggestions
@@ -29,5 +42,8 @@ neo4j-cli dataset list
 
 # Emit JSON for scripting (e.g. piping into jq)
 neo4j-cli dataset list --format json
+
+# Then load a suggested dataset into a local Docker container
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw
 ```
 

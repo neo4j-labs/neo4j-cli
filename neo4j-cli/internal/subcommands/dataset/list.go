@@ -27,7 +27,10 @@ func newListCmd(cfg *clicfg.Config) *cobra.Command {
 neo4j-cli dataset list
 
 # Emit JSON for scripting (e.g. piping into jq)
-neo4j-cli dataset list --format json`,
+neo4j-cli dataset list --format json
+
+# Then load a suggested dataset into a local Docker container
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rows := make([]map[string]any, 0, len(dataset.List()))
 			for _, s := range dataset.List() {
