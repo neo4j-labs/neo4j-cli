@@ -264,3 +264,37 @@ tasks:
       - "The dedicated staging directory is removed after the load (no temp leak)"
       - "Existing docker load tests pass; make test, make fmt-check, make lint clean"
     completed_at: 2026-06-04T23:45:00Z
+
+  - id: task-013
+    title: 'Downloader must support regular-blob dumps, not just Git-LFS'
+    description: |
+      The dataset dump downloader (neo4j-cli/internal/dataset/download.go) is broken for
+      the common case. It ALWAYS fetches the dump from the Git-LFS media host
+      (media.githubusercontent.com/media/<owner>/<repo>/<branch>/<dumpPath>), assuming
+      every neo4j-graph-examples dump is Git-LFS-tracked. That assumption is wrong:
+      verified live against neo4j-graph-examples/movies, the dump data/movies-50.dump is
+      stored as a REGULAR Git blob — raw.githubusercontent.com/.../data/movies-50.dump
+      returns HTTP 200 with the real binary dump bytes (NOT an LFS pointer), while
+      media.githubusercontent.com/media/.../data/movies-50.dump returns HTTP 404 (the
+      media host only serves LFS-tracked files). So `neo4j-cli docker load
+      neo4j-graph-examples/movies` fails with: download dataset dump: dump
+      "data/movies-50.dump" not found at the media URL. The HEAD existence check in
+      resolve.go (assertPathExists) hit raw and got 200, masking the mismatch. FIX: the
+      downloader must support BOTH storage shapes. Fetch from raw.githubusercontent.com
+      FIRST and sniff the leading bytes; if the body IS a Git-LFS pointer
+      ("version https://git-lfs..."), THEN fall back to the media host and stream that;
+      otherwise raw already returned the real dump bytes, so stream those directly.
+      Preserve all existing protections: HTTPS-only, host allowlist (pre-dispatch and
+      post-redirect), size cap (limit+1 idiom), 0600 temp file, URL redaction in errors,
+      streaming (no io.ReadAll of the dump).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Download fetches raw.githubusercontent.com first; when raw returns real dump bytes (regular blob) it streams those directly without ever calling the media host"
+      - "When raw returns a Git-LFS pointer, Download falls back to media.githubusercontent.com/media/... and streams the real bytes"
+      - "When raw returns a pointer AND media also 404s or returns a pointer, Download fails with a clear error"
+      - "All existing protections preserved: HTTPS-only, host allowlist pre+post-redirect, size cap, 0600 temp file, URL redaction, streamed (no io.ReadAll)"
+      - "download_test.go reworked to wire BOTH raw and media httptest hosts, with cases for blob-on-raw, pointer-then-media, and pointer-then-media-missing; existing cap/0600/redaction/non-https/non-allowlisted cases still pass"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: null
