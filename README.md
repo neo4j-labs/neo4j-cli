@@ -277,6 +277,59 @@ Without `--env-out-file`, the env-file blob (with `NEO4J_URI` / `NEO4J_USERNAME`
 
 `--env-out-file` writes via a temp file in the target's directory and atomically renames it into place; a pre-existing symlink at the path is replaced by a regular file (the symlink is not followed). Use a non-symlink target if you rely on the path being a symlink.
 
+## Example datasets
+
+`neo4j-cli` can load published example Neo4j datasets into a local Docker container, a Neo4j Desktop 2 DBMS, or a new Aura instance. A dataset is any GitHub `<owner>/<repo>` carrying a `relate.project-install.json` manifest — the CLI resolves the manifest, downloads the matching `.dump`, and loads it.
+
+`dataset list` prints a curated set of suggestions, but it's only a suggestion set: any repo with a manifest works. `dataset --help` signposts the three per-target load commands.
+
+```bash
+# Browse the curated suggestions (slug / title / description / repo)
+neo4j-cli dataset list
+
+# Emit JSON for scripting (e.g. piping into jq)
+neo4j-cli dataset list --format json
+```
+
+Datasets are addressed by their `<owner>/<repo>`, e.g. `neo4j-graph-examples/movies`. Loading defaults to the **latest** Neo4j; `--version` accepts `5`, `5.26`, a calver like `2026.04.0`, or `latest`. `--database` (default `neo4j`) selects the target database — on an **existing** target it must already exist, since the load overwrites that database (it does not create it).
+
+### Into a local Docker container
+
+A new container is created automatically when `--name` doesn't match an existing one. Loading into an **existing** managed container overwrites that database and requires `--force`.
+
+```bash
+# Load into a NEW container (created automatically), waiting for Bolt
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --wait --rw
+
+# Overwrite an EXISTING container's database (requires --force)
+neo4j-cli docker load neo4j-graph-examples/movies --name movies --force --rw
+```
+
+### Into a Neo4j Desktop 2 DBMS
+
+Exactly one of `--name` (create a new DBMS) or `--dbms-id` (target an existing one) is required; they are mutually exclusive. Loading into an existing DBMS overwrites its database and requires `--force`. Prefer the interactive TTY password prompt — omit `--password` so the value never lands in argv.
+
+```bash
+# Create a NEW Desktop DBMS and load the dataset into it
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --name movies --rw
+
+# Overwrite an EXISTING DBMS's database (requires --force)
+neo4j-cli desktop dbms load neo4j-graph-examples/movies --dbms-id <uuid> --force --rw
+```
+
+### Into a new Aura instance
+
+`aura instance load` always creates a **new** instance (Aura has no dump-upload API, so the dump is staged through an ephemeral local Docker container and pushed over Bolt — a local Docker daemon is required). It reuses the `instance create` flag set (`--type`, plus `--cloud-provider`/`--region`/`--memory` for paid types). `free-db` is the simplest. Datasets requiring the `graph-data-science` plugin can't be loaded into Aura and are rejected up front.
+
+```bash
+# Load into a new free-db instance (simplest)
+neo4j-cli aura instance load neo4j-graph-examples/movies --name movies-demo --type free-db --rw
+
+# Load into a new professional-db instance on AWS
+neo4j-cli aura instance load neo4j-graph-examples/recommendations --name recs --type professional-db \
+  --cloud-provider aws --region us-east-1 --memory 2GB --rw
+```
+
 ## Querying Neo4j
 
 `neo4j-cli query` runs Cypher against any Neo4j database via the Bolt protocol. Cypher comes from the positional argument or piped stdin.

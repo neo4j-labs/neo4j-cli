@@ -1,6 +1,6 @@
 ---
 name: neo4j-cli
-description: Runs Cypher, inspects the schema / data model via `neo4j-cli query :schema`, manages Neo4j Aura, Neo4j connection (dbms) and embedding-provider credentials, manages local Neo4j Docker containers (create / list / get / start / stop / delete, including ephemeral runs that emit a .env for `query --env`), and installs the embedded self-skill or any curated catalog skill from neo4j-contrib/neo4j-skills into supported AI agents. Use when the user wants to execute or pipe Cypher, inspect/view/introspect the schema or generate a data model (labels, relationship types, properties) via `:schema`, embed text inline as a parameter, list/create/get/delete/provision/resize Aura instances or tenants, manage Aura Agents, manage Aura/dbms/embed credentials, run / start / stop a local Neo4j Docker container, install/remove/list/refresh agent skills (self or catalog), or self-update the neo4j-cli binary via `neo4j-cli update`. Skip for Cypher syntax, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
+description: Neo4j CLI. Runs and pipes Cypher, introspects the schema, generates a data model, and embeds text inline as a query parameter. Discovers and loads example datasets from GitHub repos into local Docker, Neo4j Desktop, or a new Aura instance. Manages local Neo4j Docker containers and Neo4j Desktop DBMSs; Aura instances, projects, and Agents; and Aura, Neo4j connection (dbms), and embedding-provider credentials. Installs, removes, and refreshes agent skills, and self-updates the binary. Skip for Cypher syntax help, Neo4j drivers, Kubernetes, Neo4j Browser, or other databases.
 version: {{VERSION}}
 ---
 
@@ -25,6 +25,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 | [`aura`](references/aura.md) | Allows you to programmatically provision and manage your Aura resources |
 | [`config`](references/config.md) | Manage and view global configuration values |
 | [`credential`](references/credential.md) | Manage and view credential values |
+| [`dataset`](references/dataset.md) | Discover example Neo4j datasets |
 | [`desktop`](references/desktop.md) | Manage DBMSes under a local Neo4j Desktop 2 install |
 | [`docker`](references/docker.md) | Manage local Neo4j containers via Docker |
 | [`history`](references/history.md) | View and manage the local command history log |
@@ -36,6 +37,7 @@ Allows you to manage Neo4j resources. Write operations require --rw.
 
 <!-- Hand-written tips & gotchas inlined into the generated SKILL.md "Tips & Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
 
+- Example datasets: `neo4j-cli dataset list` surfaces a curated suggestion set, but any GitHub `<owner>/<repo>` carrying a `relate.project-install.json` manifest can be loaded — the suggestions are not a constraint. Load with the per-target verbs: `docker load <owner/repo>` (local container), `desktop dbms load <owner/repo>` (Neo4j Desktop), `aura instance load <owner/repo>` (new Aura instance). Loading defaults to the latest Neo4j; `--database` targets a database (default `neo4j`). Loads are writes, so pass `--rw` under an agent.
 - **Before generating ANY Cypher: run `neo4j-cli query :schema --format toon` first to discover the real labels, relationship types, and properties. Do not guess the schema.** Read [query-additions.md](query-additions.md) for the full schema-first workflow, parameters, embeddings, and Cypher 25 vs 5.
 - The `aura` subcommand under neo4j-cli does NOT carry a nested `skill` group — install agent skills via `neo4j-cli skill install` at the top level.
 - `credential` lives at the top level of neo4j-cli (not nested under `aura`) so credentials apply across every subcommand that talks to Aura.

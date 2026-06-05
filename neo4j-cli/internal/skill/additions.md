@@ -1,5 +1,6 @@
 <!-- Hand-written tips & gotchas inlined into the generated SKILL.md "Tips & Gotchas" section. Edit this file (not bundle/SKILL.md) and re-run `go generate ./...`. -->
 
+- Example datasets: `neo4j-cli dataset list` surfaces a curated suggestion set, but any GitHub `<owner>/<repo>` carrying a `relate.project-install.json` manifest can be loaded — the suggestions are not a constraint. Load with the per-target verbs: `docker load <owner/repo>` (local container), `desktop dbms load <owner/repo>` (Neo4j Desktop), `aura instance load <owner/repo>` (new Aura instance). Loading defaults to the latest Neo4j; `--database` targets a database (default `neo4j`). Loads are writes, so pass `--rw` under an agent.
 - **Before generating ANY Cypher: run `neo4j-cli query :schema --format toon` first to discover the real labels, relationship types, and properties. Do not guess the schema.** Read [query-additions.md](query-additions.md) for the full schema-first workflow, parameters, embeddings, and Cypher 25 vs 5.
 - The `aura` subcommand under neo4j-cli does NOT carry a nested `skill` group — install agent skills via `neo4j-cli skill install` at the top level.
 - `credential` lives at the top level of neo4j-cli (not nested under `aura`) so credentials apply across every subcommand that talks to Aura.

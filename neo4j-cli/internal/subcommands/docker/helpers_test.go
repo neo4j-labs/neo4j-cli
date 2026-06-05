@@ -22,6 +22,7 @@ type fakeDockerClient struct {
 	PsAllCalls       [][]string
 	InspectCalls     []string
 	ExecCalls        []ExecCall
+	CopyToCalls      []CopyToCall
 
 	// Optional behaviour overrides.
 	RunFn         func(ctx context.Context, args []string) (string, error)
@@ -31,6 +32,7 @@ type fakeDockerClient struct {
 	PsAllFn       func(ctx context.Context, filters []string) ([]PsEntry, error)
 	InspectFn     func(ctx context.Context, name string) (Container, error)
 	ExecFn        func(ctx context.Context, name string, args []string) (string, error)
+	CopyToFn      func(ctx context.Context, hostPath, name, containerPath string) error
 
 	// Stored state for default behaviours.
 	Containers map[string]Container
@@ -43,6 +45,13 @@ type fakeDockerClient struct {
 type RunCall struct {
 	Args []string
 	Env  []string
+}
+
+// CopyToCall records a single fakeDockerClient.CopyTo invocation.
+type CopyToCall struct {
+	HostPath      string
+	Name          string
+	ContainerPath string
 }
 
 // ExecCall records the arguments of a single fakeDockerClient.Exec /
@@ -125,6 +134,14 @@ func (f *fakeDockerClient) Inspect(ctx context.Context, name string) (Container,
 		return Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return c, nil
+}
+
+func (f *fakeDockerClient) CopyTo(ctx context.Context, hostPath, name, containerPath string) error {
+	f.CopyToCalls = append(f.CopyToCalls, CopyToCall{HostPath: hostPath, Name: name, ContainerPath: containerPath})
+	if f.CopyToFn != nil {
+		return f.CopyToFn(ctx, hostPath, name, containerPath)
+	}
+	return nil
 }
 
 func (f *fakeDockerClient) Exec(ctx context.Context, name string, args []string) (string, error) {

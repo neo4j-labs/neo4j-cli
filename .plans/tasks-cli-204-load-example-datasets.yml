@@ -1,0 +1,513 @@
+feature: cli-204-load-example-datasets
+prd: ./prd-cli-204-load-example-datasets.md
+created_at: 2026-06-04T00:00:00Z
+updated_at: 2026-06-04T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Embedded dataset catalog (suggestions) in internal/dataset'
+    description: |
+      Create the non-cobra support package neo4j-cli/internal/dataset with
+      catalog.go holding an embedded curated list of suggested datasets
+      ({slug, title, description, owner/repo}) sourced from the README of
+      neo4j-graph-examples/demo.neo4jlabs.com. Expose a List() accessor. The
+      list is only a suggestion set; loading is not constrained to it.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "catalog.go exposes List() returning the curated entries with slug/title/description/owner-repo"
+      - "Entries match the demo.neo4jlabs.com README slugs (movies, recommendations, northwind, etc.)"
+      - "Package has the Neo4j copyright header and a table-driven catalog_test.go"
+      - "No network access in List() — data is embedded in the binary"
+    completed_at: 2026-06-04T15:19:12Z
+
+  - id: task-002
+    title: 'Manifest resolution: fetch + parse relate.project-install.json + version match'
+    description: |
+      Add resolve.go to neo4j-cli/internal/dataset. Resolve(ctx, owner/repo,
+      neo4jVersion) fetches relate.project-install.json from raw.githubusercontent
+      (branch main, then master), parses dbms[], and selects the entry whose
+      targetNeo4jVersion semver range matches the target version (newest compatible
+      on ambiguity). Returns a Spec {DumpPath, Plugins, MatchedVersionRange}. Verify
+      the selected dumpFile path exists in the repo and error clearly if not.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "Resolve tries branch main then falls back to master"
+      - "Selects the dbms[] entry whose targetNeo4jVersion range matches; picks newest compatible when several match"
+      - "Returns Spec with DumpPath, Plugins, MatchedVersionRange"
+      - "Errors clearly when no compatible entry exists or the dump path is missing in the repo"
+      - "Tests stub the manifest fetch via httptest (no real network)"
+    completed_at: 2026-06-04T16:08:00Z
+
+  - id: task-003
+    title: 'Secure, LFS-aware dump downloader (streamed, capped, allowlisted)'
+    description: |
+      Add download.go to neo4j-cli/internal/dataset. Download(ctx, spec, maxSize)
+      fetches the dump from the Git-LFS media host
+      (media.githubusercontent.com/media/...), HTTPS-only, against a host allowlist
+      (media./raw.githubusercontent.com, github.com, codeload.github.com), streamed
+      to a 0600 temp file (no io.ReadAll), capped at maxSize (default 2GiB), with a
+      cleanup func. Detect an LFS pointer payload and fail loudly. Model on
+      update/swap.go (assertAllowedHost, redactURL).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "Downloads from media.githubusercontent.com, not raw. (which returns an LFS pointer)"
+      - "Rejects non-HTTPS and non-allowlisted hosts; redacts URLs in any error/log"
+      - "Streams to a 0600 temp file and returns a cleanup func; never reads the whole dump into memory"
+      - "Enforces the size cap and errors when exceeded"
+      - "Detects an LFS pointer ('version https://git-lfs...') and fails with a clear error"
+      - "Tests stub the media host via httptest and cover pointer-detection + cap paths"
+    completed_at: 2026-06-04T17:05:00Z
+
+  - id: task-004
+    title: 'dataset discovery command: parent help signpost + list leaf'
+    description: |
+      Create the cobra package neo4j-cli/internal/subcommands/dataset (dataset.go,
+      list.go, list_test.go) following the one-file-per-leaf layout. The dataset
+      parent registers --format and its Long/help signposts the three per-target load
+      commands (docker load, desktop dbms load, aura instance load). dataset list
+      renders the curated suggestions honoring --format. Mount dataset.NewCmd(cfg) in
+      neo4j-cli/app/app.go. No load leaf under dataset.
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli dataset --help describes the three per-target load commands"
+      - "neo4j-cli dataset list renders slug/title/description/repo in json, table, and toon"
+      - "dataset.NewCmd is mounted in app.go and reachable as 'neo4j-cli dataset'"
+      - "dataset list has a flush-left Example with >=2 invocations incl. one --format json"
+      - "No load leaf exists under dataset"
+    status: completed
+    completed_at: 2026-06-04T18:05:00Z
+
+  - id: task-005
+    title: 'Docker loader helper + docker load leaf (new/existing container)'
+    description: |
+      Add neo4j-cli/internal/subcommands/docker/load.go and register 'docker load' in
+      docker.go. New container: download dump, run a one-shot loader container on a
+      named volume (neo4j-admin database load <db> --from-path=/import
+      --overwrite-destination=true), then create the server container reusing that
+      volume with NEO4J_PLUGINS from the manifest, image version satisfying the dump's
+      targetNeo4jVersion; expose this as a reusable LoadDumpIntoNewContainer helper.
+      Existing container (--force required): Bolt STOP DATABASE <db> -> docker exec
+      neo4j-admin database load -> START DATABASE <db>; refuse if a manifest-required
+      plugin is missing. Shared flags --name, --database (default neo4j), --max-size,
+      --force, --wait, --version. Honor --wait via docker.WaitForBolt. Reuse
+      NewDeployClient, the dockerClient iface, create.go port/name helpers, renderEnvFile.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "New container loads the dump on a named volume and starts with NEO4J_PLUGINS from the manifest"
+      - "Image version is chosen to satisfy the dump's targetNeo4jVersion"
+      - "Existing container is refused without --force; with --force it overwrites via STOP/load/START"
+      - "Existing container missing a manifest plugin is refused with a clear error"
+      - "--database overrides the default 'neo4j' target database; --wait uses docker.WaitForBolt"
+      - "LoadDumpIntoNewContainer is exported for reuse by the aura loader"
+      - "Tests swap the docker client via the clientFactory seam and stub manifest/LFS via httptest"
+    completed_at: 2026-06-04T15:41:10Z
+
+  - id: task-006
+    title: 'desktopclient.LoadDump method'
+    description: |
+      Add LoadDump(ctx, dbmsID, db, sourceFilePath, overwrite) to
+      neo4j-cli/internal/desktopclient (client.go + any types in types.go), calling
+      POST /fastify/api/dbmss/:id/databases/:db/load-dump (synchronous; DBMS must be
+      stopped), mirroring the existing UploadDatabase method shape.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "LoadDump issues POST /fastify/api/dbmss/:id/databases/:db/load-dump with {sourceFilePath, overwrite}"
+      - "Signature and error handling mirror the existing UploadDatabase method"
+      - "Unit test exercises the call against the desktop test fixture/handlers"
+      - "Copyright header present"
+    completed_at: 2026-06-04T19:05:00Z
+
+  - id: task-007
+    title: 'desktop dbms load leaf (existing via --dbms-id, new via --name)'
+    description: |
+      Add neo4j-cli/internal/subcommands/desktop/dbms/load.go and register 'dbms load'
+      in dbms/dbms.go. Existing DBMS (--dbms-id <uuid>, requires --force): stop if
+      running, LoadDump into --database, install each manifest plugin via InstallPlugin,
+      start. New DBMS (--name): create+load via POST /fastify/api/desktop/dbmss with
+      dumpOrBackupPath, install plugins, start, choosing the newest compatible Neo4j
+      version when the manifest spans ranges. --dbms-id and --name are mutually
+      exclusive and exactly one is required.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-006
+    acceptance_criteria:
+      - "--dbms-id and --name are mutually exclusive; exactly one required (usage error otherwise)"
+      - "Existing DBMS requires --force; loads via stop -> LoadDump -> InstallPlugin -> start"
+      - "New DBMS is created+loaded via dumpOrBackupPath then plugins installed and started"
+      - "--database selects the target database; default neo4j"
+      - "Tests use the desktop client seam; no afero.NewOsFs in query-adjacent tests"
+    completed_at: 2026-06-04T20:30:00Z
+
+  - id: task-008
+    title: 'aura instance load leaf (new instance via ephemeral docker staging)'
+    description: |
+      Add neo4j-cli/aura/internal/subcommands/instance/load.go and register
+      'instance load' in instance.go, reusing the aura instance create flag set
+      (--name, --cloud-provider, --region, --memory, --type, org/project). Error early
+      (before creating the instance) if no local Docker daemon is available, and
+      hard-error before any work if the manifest plugins include graph-data-science.
+      Otherwise: create a new Aura instance (create_core.go), stage the dump into an
+      ephemeral docker neo4j via docker.LoadDumpIntoNewContainer, docker.PushToAura to
+      the new instance, tear down the ephemeral container. Resolve org/project via
+      utils/resolve.go.
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-005
+    acceptance_criteria:
+      - "Errors early (before instance creation) when no local Docker daemon is available"
+      - "Hard-errors before any work when manifest plugins include graph-data-science"
+      - "Creates a new instance, stages via ephemeral docker, pushes with docker.PushToAura, then tears down"
+      - "Reuses the instance create flag set and utils/resolve.go for org/project"
+      - "Tests cover the GDS hard-error and docker-absent early-error paths"
+    completed_at: 2026-06-04T21:30:00Z
+
+  - id: task-009
+    title: 'Examples on all leaves + regenerate skill bundle'
+    description: |
+      Ensure every new runnable leaf (dataset list, docker load, desktop dbms load,
+      aura instance load) has a flush-left Example with >=2 invocations, each preceded
+      by a # comment, writes using --rw where applicable and reads including one
+      --format json. Run go generate ./neo4j-cli/internal/skill/... and commit the
+      regenerated bundle so TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples
+      pass.
+    status: completed
+    dependencies:
+      - task-004
+      - task-005
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "All four new leaves have compliant flush-left Example fields"
+      - "go generate ./neo4j-cli/internal/skill/... produces no further diff after commit"
+      - "TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+    completed_at: 2026-06-04T22:10:00Z
+
+  - id: task-010
+    title: 'Changelog, final gates, and security review'
+    description: |
+      Add a user-facing changelog entry via changie (kind Minor). Run the full gates
+      (make test, make fmt-check, make lint) until clean. Run the golang-security skill
+      as a final gate over the risky code (network download, LFS handling, neo4j-admin
+      exec, temp files), addressing the allowlist, LFS-pointer detection, 0600 perms,
+      and URL/secret redaction.
+    status: completed
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "A Minor changelog entry is added via changie for the new load commands"
+      - "make test, make fmt-check, and make lint all pass"
+      - "golang-security gate run with findings addressed (allowlist, pointer detection, 0600, redaction)"
+    completed_at: 2026-06-04T18:05:00Z
+
+  - id: task-011
+    title: 'Remove desktop load test-only exported setters; test in-package'
+    description: |
+      The `desktop dbms load` leaf (neo4j-cli/internal/subcommands/desktop/dbms/load.go)
+      exports SetResolveDatasetFnForTest / SetDownloadDatasetFnForTest purely because its
+      test lives in the external `package dbms_test`. The two sibling load leaves —
+      `docker load` (package docker) and `aura instance load` (package instance) — test
+      in-package and swap the unexported `resolveDatasetFn`/`downloadDatasetFn` vars
+      directly, with no exported test-only API. This ships two test-only functions in the
+      package's exported surface and diverges from both its siblings and the documented
+      local-seam idiom in AGENTS.md (each consumer owns a local `var fooFn = pkg.Foo`
+      seam, overridden from its own in-package _test.go). Fix: add an in-package
+      `load_test.go` (`package dbms`) — or move the dataset-seam swapping portion of the
+      existing test into one — that assigns the unexported `resolveDatasetFn` /
+      `downloadDatasetFn` vars directly (saving/restoring via t.Cleanup), and delete both
+      exported `Set...ForTest` functions. Go allows `dbms` and `dbms_test` test files to
+      coexist in the same directory, so the rest of the external test file can stay as-is
+      if convenient. Keep all existing test coverage green.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "SetResolveDatasetFnForTest and SetDownloadDatasetFnForTest no longer exist in the dbms package"
+      - "The desktop load tests swap the unexported resolveDatasetFn/downloadDatasetFn vars from an in-package (package dbms) test, restoring via t.Cleanup"
+      - "Existing desktop load test coverage is preserved and passes; make test, make fmt-check, make lint clean"
+    completed_at: 2026-06-04T23:10:00Z
+
+  - id: task-012
+    title: 'Scope docker loader bind-mount to a dedicated temp subdir'
+    description: |
+      The docker new-container loader in LoadDumpIntoNewContainer
+      (neo4j-cli/internal/subcommands/docker/load.go) bind-mounts the dump's parent
+      directory into the one-shot loader container via `-v <dumpDir>:/import:ro`, where
+      `dumpDir = filepath.Dir(load.DumpPath)`. Because dataset.Download creates the dump
+      with os.CreateTemp("", ...), dumpDir is the whole host temp directory (os.TempDir()),
+      so the ephemeral loader container can read every file currently in the host temp dir
+      (read-only). The exposure is limited (read-only, the user's own ephemeral container,
+      the user's own files), hence Low severity, but it is broader than necessary. Fix:
+      stage the dump in a dedicated per-load directory (e.g. os.MkdirTemp) and bind-mount
+      only that directory, so the loader sees just the one dump file. This likely means
+      having Download (or the loader) place the file in an isolated subdir, or copying the
+      single dump into a fresh MkdirTemp dir before constructing the mount; ensure the
+      dedicated dir is cleaned up alongside the existing cleanup. Keep behavior identical
+      otherwise.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "The loader container bind-mounts a directory containing only the dump file, not the shared host temp dir"
+      - "The dedicated staging directory is removed after the load (no temp leak)"
+      - "Existing docker load tests pass; make test, make fmt-check, make lint clean"
+    completed_at: 2026-06-04T23:45:00Z
+
+  - id: task-013
+    title: 'Downloader must support regular-blob dumps, not just Git-LFS'
+    description: |
+      The dataset dump downloader (neo4j-cli/internal/dataset/download.go) is broken for
+      the common case. It ALWAYS fetches the dump from the Git-LFS media host
+      (media.githubusercontent.com/media/<owner>/<repo>/<branch>/<dumpPath>), assuming
+      every neo4j-graph-examples dump is Git-LFS-tracked. That assumption is wrong:
+      verified live against neo4j-graph-examples/movies, the dump data/movies-50.dump is
+      stored as a REGULAR Git blob — raw.githubusercontent.com/.../data/movies-50.dump
+      returns HTTP 200 with the real binary dump bytes (NOT an LFS pointer), while
+      media.githubusercontent.com/media/.../data/movies-50.dump returns HTTP 404 (the
+      media host only serves LFS-tracked files). So `neo4j-cli docker load
+      neo4j-graph-examples/movies` fails with: download dataset dump: dump
+      "data/movies-50.dump" not found at the media URL. The HEAD existence check in
+      resolve.go (assertPathExists) hit raw and got 200, masking the mismatch. FIX: the
+      downloader must support BOTH storage shapes. Fetch from raw.githubusercontent.com
+      FIRST and sniff the leading bytes; if the body IS a Git-LFS pointer
+      ("version https://git-lfs..."), THEN fall back to the media host and stream that;
+      otherwise raw already returned the real dump bytes, so stream those directly.
+      Preserve all existing protections: HTTPS-only, host allowlist (pre-dispatch and
+      post-redirect), size cap (limit+1 idiom), 0600 temp file, URL redaction in errors,
+      streaming (no io.ReadAll of the dump).
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Download fetches raw.githubusercontent.com first; when raw returns real dump bytes (regular blob) it streams those directly without ever calling the media host"
+      - "When raw returns a Git-LFS pointer, Download falls back to media.githubusercontent.com/media/... and streams the real bytes"
+      - "When raw returns a pointer AND media also 404s or returns a pointer, Download fails with a clear error"
+      - "All existing protections preserved: HTTPS-only, host allowlist pre+post-redirect, size cap, 0600 temp file, URL redaction, streamed (no io.ReadAll)"
+      - "download_test.go reworked to wire BOTH raw and media httptest hosts, with cases for blob-on-raw, pointer-then-media, and pointer-then-media-missing; existing cap/0600/redaction/non-https/non-allowlisted cases still pass"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: 2026-06-05T00:00:00Z
+
+  - id: task-014
+    title: 'Fix docker loader: run neo4j-admin via image entrypoint so loaded DB ownership matches the server'
+    description: |
+      The new-container path of LoadDumpIntoNewContainer (neo4j-cli/internal/subcommands/docker/load.go)
+      runs the one-shot loader with `--entrypoint bash -c "<script>"`, bypassing the neo4j
+      image's docker-entrypoint.sh. The neo4j image's default user is root, so the
+      bypassed loader runs neo4j-admin as ROOT and writes /data/databases/<db>/* owned by
+      root (uid 0). The long-lived server container, however, uses the image's entrypoint
+      which drops to the neo4j user (uid 7474) via `su-exec neo4j:neo4j`. The server then
+      cannot write the root-owned database files and the database fails to come online:
+      `quarantine_marker` AccessDeniedException -> database 'neo4j' stays offline ->
+      `docker load ... --wait` times out and queries fail with DatabaseUnavailable, even
+      though Bolt/system db are up. Verified live against neo4j-graph-examples/movies.
+      FIX: run the loader WITHOUT overriding the entrypoint, so docker-entrypoint.sh runs
+      neo4j-admin as the neo4j user (its final dispatch is `exec su-exec neo4j:neo4j "$@"`
+      for any non-`neo4j` command) and sets /data ownership consistently with the server.
+      Concretely: (1) stage the dump as `<stageDir>/<database>.dump` (the loader needs the
+      file named <database>.dump under --from-path); (2) drop `--entrypoint bash` and the
+      `-c` shell script entirely — pass the command directly:
+      `neo4j-admin database load <database> --from-path=/import --overwrite-destination=true`
+      with mounts `-v <stageDir>:/import:ro -v <volume>:/data`; (3) IMPORTANT readability
+      gotcha: because the loader now runs as uid 7474 (not root), it must be able to READ
+      the mounted dump — the staged copy currently lands 0600 owned by the host uid, which
+      uid 7474 inside the container cannot read. Make the staging dir 0755 and the staged
+      <database>.dump 0644 (it is a public example dataset, bind-mounted read-only into a
+      throwaway container, so world-readable on the staging copy is fine; the original
+      0600 download temp in os.TempDir is unaffected). Dropping the bash `-c` script also
+      removes the `%q`-is-not-shell-quoting concern the security review flagged. Leave the
+      existing-container path (which uses `docker exec` ExecAs as the neo4j user inside an
+      already-running container) unchanged. Update docker load_test.go assertions that
+      inspect the loader Run args/script to match the new no-entrypoint-override,
+      named-dump form.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "The loader container runs with the image's default entrypoint (no --entrypoint bash, no -c shell script); the command is neo4j-admin database load <database> --from-path=/import --overwrite-destination=true"
+      - "The dump is staged as <stageDir>/<database>.dump; the staging dir is 0755 and the staged dump is 0644 so the in-container neo4j user (7474) can read it"
+      - "After load, the server container's neo4j database comes online (loaded data owned by the neo4j uid, not root)"
+      - "Existing-container path is unchanged; docker load_test.go updated to the new loader-args shape and passes"
+      - "make test, make fmt-check, make lint all clean"
+    status: completed
+    completed_at: 2026-06-05T00:00:00Z
+
+  - id: task-015
+    title: 'Pass NEO4J_ACCEPT_LICENSE_AGREEMENT to the docker loader container'
+    description: |
+      After task-014 the one-shot loader runs via the neo4j image's DEFAULT entrypoint
+      (docker-entrypoint.sh). For the enterprise image that entrypoint enforces the
+      license gate: if NEO4J_ACCEPT_LICENSE_AGREEMENT is not set it prints the license
+      notice and never execs the requested command — so neo4j-admin database load never
+      runs and the resulting database is EMPTY (verified live: `docker load
+      neo4j-graph-examples/movies` produced an online but 0-node database). The old
+      bash-override loader bypassed the entrypoint, so it never hit this gate (but ran as
+      root — the task-014 bug). The server container already passes
+      `-e NEO4J_ACCEPT_LICENSE_AGREEMENT=eval`; the loader container must too. FIX: add
+      `-e`, `NEO4J_ACCEPT_LICENSE_AGREEMENT=eval` to the loaderArgs in
+      LoadDumpIntoNewContainer (neo4j-cli/internal/subcommands/docker/load.go), before the
+      image arg. License acceptance is not a secret, so passing it as an argv `-e KEY=VALUE`
+      flag (rather than via process env) is acceptable and matches the server container.
+      Verified manually end-to-end: with the license env the loader reports `Done: 83
+      files, 1.134MiB processed`, the loaded files are owned by uid 7474, and a server on
+      that volume returns 171 nodes for the movies dataset. Update the docker load_test.go
+      loader-args assertion to require the NEO4J_ACCEPT_LICENSE_AGREEMENT=eval `-e` flag on
+      the loader.
+    status: pending
+    status: completed
+    dependencies:
+      - task-014
+    source: review
+    acceptance_criteria:
+      - "The loader container args include -e NEO4J_ACCEPT_LICENSE_AGREEMENT=eval (before the image arg)"
+      - "docker load_test.go asserts the loader passes the license-acceptance -e flag"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: 2026-06-05T08:00:00Z
+
+  - id: task-016
+    title: 'Resolver: treat 5.x dumps as compatible with calver (>=2025.0) and "latest" targets'
+    description: |
+      Neo4j 5 was renamed to calendar versioning (2025.x.y, 2026.x.y) — calver is the
+      continuation of the 5.x line. The neo4j-graph-examples manifests still declare 5.x
+      dumps with ranges like targetNeo4jVersion ">=5.0.0 <6.0.0". Our resolver matches the
+      target Neo4j version against those ranges with pure semver (golang.org/x/mod/semver),
+      so a calver target like "2026.05.0" sorts far above "6.0.0" and matches NOTHING ->
+      "no dump entry compatible with neo4j 2026.x" — even though a v5 dump loads and runs
+      perfectly on the latest neo4j (verified live: movies-50.dump loaded into neo4j
+      2026.05.0 -> database online, 171 nodes). We want people on the latest Neo4j, so a
+      "5" dumpfile must be selectable for targets that are 5.x OR calver (>=2025.0) OR the
+      literal "latest".
+      FIX (neo4j-cli/internal/dataset, resolve.go + version.go):
+      1. Resolve must accept the literal target "latest" (today canonicalVersion("latest")
+         is not valid semver and Resolve rejects it). Treat "latest" as "newest neo4j"
+         (calver-equivalent) for matching.
+      2. Define a 5.x-line dump entry as one whose range lower bound is >= 5.0.0 (and the
+         existing 4.x/3.5 entries have lower bounds < 5.0.0). When the target is calver
+         (semver major year >= 2025, i.e. semver.Compare(target, "v2025.0.0") >= 0) OR
+         "latest", an entry MATCHES if its lower bound >= 5.0.0 — i.e. a 5.x-or-newer dump
+         applies to calver/latest. Concrete (non-calver) targets keep the existing exact
+         range matching unchanged.
+      3. Keep the newest-lower-bound tie-break so that if a manifest later adds an explicit
+         calver entry (e.g. ">=2025.0.0"), a calver/latest target prefers it over the 5.x
+         entry (2025.0.0 > 5.0.0), while a concrete "5.26" target still picks the 5.x entry.
+      This also unblocks the desktop new-DBMS path, which auto-picks Desktop's latest stable
+      enterprise version (a calver string) and passes it to Resolve — today that would fail.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Resolve accepts target \"latest\" (no longer rejected as invalid semver) and selects the newest 5.x-or-later dump"
+      - "Calver targets (e.g. 2025.01.0, 2026.05.0) select the 5.x dump entry from a movies-style manifest (3.5/4.0/4.3/5.0 entries)"
+      - "Concrete targets still match exactly: 5 / 5.26 / 5.26.0 -> 5.x entry; 4.4 -> 4.3 entry; 3.5.1 -> 3.5 entry"
+      - "With a manifest containing BOTH a 5.x entry and an explicit >=2025.0.0 entry, a calver/latest target picks the calver entry (newest lower bound), while 5.26 picks the 5.x entry"
+      - "A manifest whose only entry is <5.0.0 yields a clear 'no dump entry compatible' error for calver/latest targets"
+      - "Table-driven tests cover all the above; make test, make fmt-check, make lint clean"
+    status: completed
+    completed_at: 2026-06-05T12:00:00Z
+
+  - id: task-017
+    title: 'Docker load: default to latest Neo4j; map "latest" image to neo4j:enterprise'
+    description: |
+      Per the product decision, loading a dataset should default to the LATEST Neo4j (not a
+      pinned 5.x), so users don't run old versions. Change docker load's --version default
+      from "5" to "latest" in LoadDumpIntoNewContainer / the docker load leaf
+      (neo4j-cli/internal/subcommands/docker/load.go). Two things must be handled:
+      1. Image mapping: the loader currently hardcodes `image := "neo4j:" + version +
+         "-enterprise"`, which for version "latest" yields the UNPUBLISHED tag
+         `neo4j:latest-enterprise`. create.go already has the correct mapping (enterprise +
+         "latest" -> `neo4j:enterprise`; enterprise + explicit version -> `neo4j:<v>-enterprise`,
+         create.go lines ~299-307). Factor that into a small shared helper in the docker
+         package (e.g. enterpriseImage(version string) string) and use it from BOTH create.go
+         and LoadDumpIntoNewContainer so the mapping can't drift.
+      2. Manifest resolution: pass the version (which may be "latest") to resolveDatasetFn;
+         task-016 makes Resolve accept "latest" and select the 5.x dump. The server/loader
+         image for "latest" is `neo4j:enterprise` (the latest calver, currently 2026.05.0),
+         and a 5.x dump loads + auto-migrates on it (verified live).
+      Update the --version flag help to state the default is "latest" and that it accepts
+      5, 5.26, calver (e.g. 2026.04.0), or latest. Leave the existing-container path and the
+      aura loader's own --version default ("5", which Aura uses as its version token)
+      unchanged — this task is scoped to the docker new-container default + image mapping.
+      Depends on task-016 (resolver must accept "latest"/calver first).
+    status: completed
+    dependencies:
+      - task-016
+    source: review
+    acceptance_criteria:
+      - "docker load --version defaults to \"latest\"; with no --version the loader/server image is exactly neo4j:enterprise (NOT neo4j:latest-enterprise)"
+      - "A shared docker-package helper builds the enterprise image and is used by both create.go and LoadDumpIntoNewContainer (no duplicated mapping)"
+      - "Explicit --version 5.26 -> neo4j:5.26-enterprise; --version 2026.04.0 -> neo4j:2026.04.0-enterprise"
+      - "The (possibly \"latest\") version is passed to Resolve so the 5.x dump is selected for the latest image"
+      - "--version flag help documents default=latest and the accepted forms (5, 5.26, calver, latest); existing-container path unchanged"
+      - "docker load_test.go updated/extended for the new default + image mapping; make test, make fmt-check, make lint clean"
+    completed_at: 2026-06-05T13:30:00Z
+
+  - id: task-018
+    title: 'Make dataset loading discoverable in help text + skill bundle'
+    description: |
+      The three `<target> load` leaves already have good Example blocks, but discovery of
+      HOW to load is thin: the `neo4j-cli dataset` parent signposts the commands in its Long
+      but has no Example block, `dataset list`'s examples only show listing, and the skill
+      trigger (description.txt) doesn't mention datasets at all — so an agent wouldn't fire
+      the neo4j-cli skill on "load the movies dataset". Make dataset loading discoverable:
+      1. dataset/dataset.go — add an Example field to the (non-runnable) parent showing the
+         three load commands loading the same dataset into docker / desktop / aura, each
+         preceded by a # comment, with --rw on the load invocations. (Parent isn't Runnable,
+         so the Examples gate doesn't require it, but cobra renders Example in `dataset -h`.)
+      2. dataset/list.go — keep the existing list examples (incl. the --format json one the
+         read-cmd gate requires) and append a couple of load examples so `dataset list -h`
+         also shows how to load a suggested repo into a target.
+      3. neo4j-cli/internal/skill/description.txt — add dataset discovery + loading to the
+         trigger frontmatter. It is currently 1008/1024 chars — CONDENSE existing wording to
+         make room and stay <=1024, single paragraph, third-person.
+      4. Optionally add a brief Tips note to neo4j-cli/internal/skill/additions.md about
+         dataset loading (addressed by owner/repo; defaults to latest Neo4j; per-target verbs).
+      5. Run `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated bundle so
+         TestGenerator_RoundTrip passes.
+      Add a regression test asserting the dataset parent Example references all three load
+      verbs (docker load, desktop dbms load, aura instance load).
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "`neo4j-cli dataset -h` prints an Example block with docker load / desktop dbms load / aura instance load invocations (# comments, --rw)"
+      - "`neo4j-cli dataset list -h` shows at least one load example plus the retained --format json list example"
+      - "description.txt mentions dataset discovery + loading and is <=1024 chars"
+      - "Skill bundle regenerated with no leftover diff; TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples pass"
+      - "A test asserts the dataset parent Example references all three load verbs"
+      - "make test, make fmt-check, make lint all clean"
+    completed_at: 2026-06-05T15:00:00Z
+
+  - id: task-019
+    title: 'Document example-dataset loading in README'
+    description: |
+      The README has no mention of example datasets. Add a section (e.g. "## Example
+      datasets", near the Local Neo4j / Aura sections) covering: discovery via
+      `neo4j-cli dataset list`; that datasets are addressed by GitHub <owner>/<repo> (any
+      repo with a relate.project-install.json manifest; suggestions are not a constraint);
+      and the three per-target load commands with copy-pasteable examples — docker load
+      (new or existing container via --name/--force), desktop dbms load (new via --name,
+      existing via --dbms-id --force), and aura instance load (new instance only, with
+      --type/cloud/region/memory). Mention --database (default neo4j; the DB must already
+      exist on an existing target) and that loading defaults to the latest Neo4j (--version
+      accepts 5/5.26/calver/latest). Match the README's existing comment-prefixed
+      fenced-block style. Keep it accurate to the shipped flags.
+    status: completed
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "README has an example-datasets section covering `dataset list` + all three `<target> load` commands with realistic examples"
+      - "Existing-vs-new shown for docker (--name/--force) and desktop (--dbms-id/--force vs --name); aura noted new-instance-only"
+      - "Mentions --database default neo4j (and that the DB must exist on existing targets) and the latest-Neo4j default"
+      - "Style matches existing README sections (comment-prefixed fenced blocks)"
+    completed_at: 2026-06-05T16:30:00Z

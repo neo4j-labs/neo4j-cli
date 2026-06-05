@@ -301,11 +301,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			//   - enterprise + "latest" → neo4j:enterprise        (Docker Hub does NOT publish neo4j:latest-enterprise)
 			image := "neo4j:" + version
 			if edition == "enterprise" {
-				if version == "latest" {
-					image = "neo4j:enterprise"
-				} else {
-					image = "neo4j:" + version + "-enterprise"
-				}
+				image = enterpriseImage(version)
 			}
 
 			// Build the docker run argv. Order matters for tests asserting
@@ -460,6 +456,17 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 	flags.RegisterWait(cmd, &wait, "Wait until Bolt is reachable before returning.")
 
 	return cmd
+}
+
+// enterpriseImage maps a Neo4j version token to the enterprise Docker image tag.
+// "latest" → neo4j:enterprise (Docker Hub does NOT publish neo4j:latest-enterprise);
+// any explicit version → neo4j:<version>-enterprise. Shared by docker create and the
+// docker load loader so the tag scheme cannot drift between them.
+func enterpriseImage(version string) string {
+	if version == "latest" {
+		return "neo4j:enterprise"
+	}
+	return "neo4j:" + version + "-enterprise"
 }
 
 // renderEnvFile builds the .env blob consumed by `neo4j-cli query --env <path>`

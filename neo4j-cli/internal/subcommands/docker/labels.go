@@ -38,6 +38,12 @@ type Container struct {
 	URI       string `json:"uri,omitempty"`
 	Image     string `json:"image,omitempty"`
 	Managed   bool   `json:"-"`
+	// Plugins mirrors the container's NEO4J_PLUGINS env var (parsed from the
+	// JSON array Neo4j expects). Consumed by `docker load` to refuse loading
+	// into an existing container that is missing a manifest-required plugin —
+	// plugins cannot be added without recreating the container. Like Managed
+	// this is a per-call control bit and not serialised into rendered output.
+	Plugins []string `json:"-"`
 	// Running mirrors `docker inspect <name>` top-level `.State.Running` bool
 	// — true while the container is up, false once it has exited. Consumed by
 	// `docker stop --wait` (task-011) to decide when the daemon-side stop has

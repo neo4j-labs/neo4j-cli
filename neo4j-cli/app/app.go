@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/dataset"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/docker"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/history"
@@ -91,6 +92,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd.AddCommand(auraCmd)
 	cmd.AddCommand(credential.NewCredentialCmd(cfg))
 	cmd.AddCommand(config.NewCmd(cfg))
+	cmd.AddCommand(dataset.NewCmd(cfg))
 	cmd.AddCommand(history.NewCmd(cfg))
 	cmd.AddCommand(desktop.NewCmd(cfg))
 	cmd.AddCommand(query.NewCmd(cfg))

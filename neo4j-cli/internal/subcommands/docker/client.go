@@ -106,6 +106,12 @@ type dockerClient interface {
 	// via /proc/<pid>/cmdline), routing them through /proc/<pid>/environ
 	// instead. Exec is ExecWithEnv with nil env.
 	ExecWithEnv(ctx context.Context, name string, args []string, env []string) (string, error)
+	// CopyTo shells `docker cp <hostPath> <name>:<containerPath>`, copying a
+	// host file into a running container. Used by `docker load` to stage a
+	// dataset dump into an existing container (a running container can't have a
+	// new volume bind-mounted). hostPath is a local file path; it is NOT a
+	// secret, so passing it via argv is fine.
+	CopyTo(ctx context.Context, hostPath, name, containerPath string) error
 	// ExecAs shells `docker exec -u <user> [-e KEY ...] <name> <args...>`. It is
 	// the user-scoped superset of ExecWithEnv: when user is non-empty the
 	// command runs as that container user (e.g. "neo4j", so neo4j-admin matches
@@ -305,6 +311,11 @@ func (c *execClient) ExecAs(ctx context.Context, name, user string, args []strin
 	return strings.TrimSpace(out), nil
 }
 
+func (c *execClient) CopyTo(ctx context.Context, hostPath, name, containerPath string) error {
+	_, err := c.run(ctx, "cp", hostPath, name+":"+containerPath)
+	return err
+}
+
 func (c *execClient) Inspect(ctx context.Context, name string) (Container, error) {
 	out, err := c.run(ctx, "inspect", name)
 	if err != nil {
@@ -321,10 +332,10 @@ func (c *execClient) Inspect(ctx context.Context, name string) (Container, error
 // classifyInspectError converts the wrapped error returned by c.run when
 // invoking `docker inspect` into either an ErrNotFound wrap (when docker's
 // stderr reported the container is missing) or the original error (for any
-// other failure shape). Docker's stderr wording for missing containers is
-// stable across versions: "Error: No such object: <name>" (modern, since
-// ~2018) or "Error: No such container: <name>" (older). Matching the shared
-// "No such " substring covers both variants.
+// other failure shape). Docker's stderr wording for missing containers varies
+// by engine/version: "Error: No such object: <name>", "No such container:
+// <name>", and newer/rootless+podman engines emit lowercase "no such object:
+// <name>". Matching the "no such " substring case-insensitively covers them all.
 //
 // Note: c.run already wraps the captured docker stderr inside a
 // clierr.UsageError whose message string contains the original stderr text,
@@ -335,10 +346,35 @@ func classifyInspectError(runErr error, name string) error {
 	if runErr == nil {
 		return nil
 	}
-	if strings.Contains(runErr.Error(), "No such ") {
+	if strings.Contains(strings.ToLower(runErr.Error()), "no such ") {
 		return fmt.Errorf("%w: %s", ErrNotFound, name)
 	}
 	return runErr
+}
+
+// parseNeo4jPluginsEnv extracts the plugin slugs from a container's env slice
+// (as emitted by `docker inspect .Config.Env`, each entry "KEY=VALUE"). Neo4j
+// expects NEO4J_PLUGINS as a JSON array (e.g. `["apoc","graph-data-science"]`);
+// we decode it leniently and return nil for a missing/empty/unparseable value
+// so `docker load`'s existing-container plugin gate fails closed (treats the
+// plugin as absent) rather than crashing.
+func parseNeo4jPluginsEnv(env []string) []string {
+	const prefix = "NEO4J_PLUGINS="
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			continue
+		}
+		raw := strings.TrimSpace(strings.TrimPrefix(e, prefix))
+		if raw == "" {
+			return nil
+		}
+		var plugins []string
+		if err := json.Unmarshal([]byte(raw), &plugins); err != nil {
+			return nil
+		}
+		return plugins
+	}
+	return nil
 }
 
 // parsePsOutput decodes the output of
@@ -396,6 +432,7 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
+			Env    []string          `json:"Env"`
 		} `json:"Config"`
 	}
 	var shapes []inspectShape
@@ -418,5 +455,6 @@ func parseInspectOutput(name, stdout string) (Container, error) {
 		HTTPPort:  labels[LabelHTTPPort],
 		Ephemeral: labels[LabelEphemeral] == "true",
 		Managed:   labels[LabelManaged] == "true",
+		Plugins:   parseNeo4jPluginsEnv(s.Config.Env),
 	}, nil
 }

@@ -72,6 +72,61 @@ func TestClient_UploadDatabase_SendsBodyAndAuthHeaders(t *testing.T) {
 	}
 }
 
+func TestClient_LoadDump_SendsBodyAndAuthHeaders(t *testing.T) {
+	const salt, clientID = "salt", "cid"
+	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
+
+	var seenBody map[string]any
+	srv, probe := newAuthedServer(t, salt, clientID, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/fastify/api/dbmss/dbms-1/databases/neo4j/load-dump" {
+			t.Errorf("got %s %s, want POST /fastify/api/dbmss/dbms-1/databases/neo4j/load-dump", r.Method, r.URL.Path)
+		}
+		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+			t.Errorf("Content-Type = %q, want application/json", ct)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&seenBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	})
+	_ = srv
+
+	cl, err := NewClient(probe, salt)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if err := cl.LoadDump(context.Background(), "dbms-1", "neo4j", "/tmp/movies.dump", true); err != nil {
+		t.Fatalf("LoadDump: %v", err)
+	}
+
+	if seenBody["sourceFilePath"] != "/tmp/movies.dump" {
+		t.Errorf("sourceFilePath = %v, want /tmp/movies.dump", seenBody["sourceFilePath"])
+	}
+	if seenBody["overwrite"] != true {
+		t.Errorf("overwrite = %v, want true", seenBody["overwrite"])
+	}
+}
+
+func TestClient_LoadDump_PropagatesServerError(t *testing.T) {
+	const salt, clientID = "salt", "cid"
+	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
+
+	srv, probe := newAuthedServer(t, salt, clientID, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"message":"dbms must be stopped"}`))
+	})
+	_ = srv
+
+	cl, err := NewClient(probe, salt)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if err := cl.LoadDump(context.Background(), "dbms-1", "neo4j", "/tmp/movies.dump", false); err == nil {
+		t.Fatalf("expected error on 500 response, got nil")
+	}
+}
+
 func TestClient_ListTasks_DecodesTasks(t *testing.T) {
 	const salt, clientID = "salt", "cid"
 	pinClientSeams(t, clientID, time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC))
