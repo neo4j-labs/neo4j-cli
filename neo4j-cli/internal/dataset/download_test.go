@@ -16,24 +16,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// startMediaServer wires mediaBaseURL, httpDoFn, the host allowlist, and the
-// https guard at the httptest server so Download can be exercised over plain
-// HTTP without touching the network. It returns a teardown func.
-func startMediaServer(t *testing.T, h http.HandlerFunc) func() {
+// startHosts wires BOTH the raw and the media hosts at a single httptest server
+// (raw requests under /<owner>/..., media under /media/<owner>/...) so Download
+// can be exercised over plain HTTP without touching the network. The handler
+// receives the full request and routes on r.URL.Path. It returns a teardown
+// func. rawBaseURL and mediaBaseURL both point at the server; the host is added
+// to the allowlist and the https guard is disabled for the duration.
+func startHosts(t *testing.T, h http.HandlerFunc) func() {
 	t.Helper()
 	srv := httptest.NewServer(h)
 
 	u, err := url.Parse(srv.URL)
 	require.NoError(t, err)
 
-	origBase, origDo, origHTTPS := mediaBaseURL, httpDoFn, requireHTTPS
+	origRaw, origMedia, origDo, origHTTPS := rawBaseURL, mediaBaseURL, httpDoFn, requireHTTPS
+	rawBaseURL = srv.URL
 	mediaBaseURL = srv.URL
 	httpDoFn = srv.Client().Do
 	requireHTTPS = false
 	allowedDownloadHosts[u.Hostname()] = struct{}{}
 
 	return func() {
-		mediaBaseURL, httpDoFn, requireHTTPS = origBase, origDo, origHTTPS
+		rawBaseURL, mediaBaseURL, httpDoFn, requireHTTPS = origRaw, origMedia, origDo, origHTTPS
 		delete(allowedDownloadHosts, u.Hostname())
 		srv.Close()
 	}
@@ -43,17 +47,38 @@ func testSpec() Spec {
 	return Spec{Owner: "neo4j-graph-examples", Repo: "movies", Branch: "main", DumpPath: "data/movies-50.dump"}
 }
 
-func TestDownload_StreamsToTempFile(t *testing.T) {
+const (
+	rawPath   = "/neo4j-graph-examples/movies/main/data/movies-50.dump"
+	mediaPath = "/media/neo4j-graph-examples/movies/main/data/movies-50.dump"
+)
+
+func lfsPointer() string {
+	return "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 123\n"
+}
+
+// TestDownload_RawBlobStreamedDirectly covers the common case: raw serves the
+// real dump bytes (regular blob), so media is never hit.
+func TestDownload_RawBlobStreamedDirectly(t *testing.T) {
 	want := []byte("not-an-lfs-pointer: these are dump bytes")
-	defer startMediaServer(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/media/neo4j-graph-examples/movies/main/data/movies-50.dump", r.URL.Path)
-		_, _ = w.Write(want)
+	mediaHit := false
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case rawPath:
+			_, _ = w.Write(want)
+		case mediaPath:
+			mediaHit = true
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
 	})()
 
 	path, cleanup, err := Download(context.Background(), testSpec(), 0)
 	require.NoError(t, err)
 	require.NotNil(t, cleanup)
 	defer cleanup()
+
+	assert.False(t, mediaHit, "media host must not be hit for a regular blob")
 
 	got, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -64,10 +89,57 @@ func TestDownload_StreamsToTempFile(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
-func TestDownload_DetectsLFSPointer(t *testing.T) {
-	pointer := "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 123\n"
-	defer startMediaServer(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(pointer))
+// TestDownload_PointerFallsBackToMedia covers the LFS case: raw serves a
+// pointer, so the real bytes are streamed from the media host.
+func TestDownload_PointerFallsBackToMedia(t *testing.T) {
+	want := []byte("real dump bytes from the media host")
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case rawPath:
+			_, _ = w.Write([]byte(lfsPointer()))
+		case mediaPath:
+			_, _ = w.Write(want)
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+	})()
+
+	path, cleanup, err := Download(context.Background(), testSpec(), 0)
+	require.NoError(t, err)
+	require.NotNil(t, cleanup)
+	defer cleanup()
+
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+// TestDownload_PointerThenMediaMissing covers raw pointer + media 404: clear
+// error, cleanup nil.
+func TestDownload_PointerThenMediaMissing(t *testing.T) {
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case rawPath:
+			_, _ = w.Write([]byte(lfsPointer()))
+		case mediaPath:
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+	})()
+
+	path, cleanup, err := Download(context.Background(), testSpec(), 0)
+	require.Error(t, err)
+	assert.Nil(t, cleanup)
+	assert.Empty(t, path)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+// TestDownload_PointerThenMediaPointer covers raw pointer + media also a
+// pointer: clear error, cleanup nil.
+func TestDownload_PointerThenMediaPointer(t *testing.T) {
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(lfsPointer()))
 	})()
 
 	path, cleanup, err := Download(context.Background(), testSpec(), 0)
@@ -79,7 +151,7 @@ func TestDownload_DetectsLFSPointer(t *testing.T) {
 
 func TestDownload_EnforcesSizeCap(t *testing.T) {
 	big := strings.Repeat("x", 5000)
-	defer startMediaServer(t, func(w http.ResponseWriter, r *http.Request) {
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(big))
 	})()
 
@@ -92,7 +164,7 @@ func TestDownload_EnforcesSizeCap(t *testing.T) {
 
 func TestDownload_AtCapSucceeds(t *testing.T) {
 	body := strings.Repeat("y", 1000)
-	defer startMediaServer(t, func(w http.ResponseWriter, r *http.Request) {
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(body))
 	})()
 
@@ -106,7 +178,7 @@ func TestDownload_AtCapSucceeds(t *testing.T) {
 }
 
 func TestDownload_NotFound(t *testing.T) {
-	defer startMediaServer(t, func(w http.ResponseWriter, r *http.Request) {
+	defer startHosts(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	})()
 
@@ -117,9 +189,9 @@ func TestDownload_NotFound(t *testing.T) {
 }
 
 func TestDownload_RejectsNonAllowlistedHost(t *testing.T) {
-	orig := mediaBaseURL
-	mediaBaseURL = "https://evil.example.com"
-	defer func() { mediaBaseURL = orig }()
+	orig := rawBaseURL
+	rawBaseURL = "https://evil.example.com"
+	defer func() { rawBaseURL = orig }()
 
 	_, cleanup, err := Download(context.Background(), testSpec(), 0)
 	require.Error(t, err)
@@ -128,9 +200,9 @@ func TestDownload_RejectsNonAllowlistedHost(t *testing.T) {
 }
 
 func TestDownload_RejectsNonHTTPS(t *testing.T) {
-	orig := mediaBaseURL
-	mediaBaseURL = "http://media.githubusercontent.com"
-	defer func() { mediaBaseURL = orig }()
+	orig := rawBaseURL
+	rawBaseURL = "http://raw.githubusercontent.com"
+	defer func() { rawBaseURL = orig }()
 
 	_, cleanup, err := Download(context.Background(), testSpec(), 0)
 	require.Error(t, err)

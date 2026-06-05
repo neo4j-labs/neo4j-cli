@@ -246,6 +246,7 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 ## dataset Subsystem Notes
 
 - `neo4j-cli/internal/dataset/` has no semver-range lib (go.mod only ships `golang.org/x/mod/semver`, compare-only). `version.go` hand-rolls the npm-style comparator-set matcher (`>=`,`<=`,`>`,`<`,`=` whitespace-ANDed) the `relate.project-install.json` `targetNeo4jVersion` field uses; reuse `rangeMatches`/`canonicalVersion` rather than adding a dependency. `rawBaseURL`/`httpDoFn` are package-var seams tests override to point at an httptest server.
+- neo4j-graph-examples dumps come in TWO storage shapes: a REGULAR Git blob (raw.githubusercontent.com serves the real bytes, media host 404s — e.g. neo4j-graph-examples/movies) OR a Git-LFS-tracked file (raw serves a small pointer, bytes on media.githubusercontent.com). `download.go` fetches RAW first and sniffs the leading bytes: if it's an LFS pointer (`version https://git-lfs`) it falls back to media; otherwise it streams the raw bytes directly. Do NOT revert to media-only — that breaks the regular-blob case. `resolve.go`'s `assertPathExists` HEADs raw and accepts 200 even for a pointer, so it can't distinguish the two shapes; the byte-retrieval branch lives only in `Download`.
 
 ## query Subsystem Notes
 

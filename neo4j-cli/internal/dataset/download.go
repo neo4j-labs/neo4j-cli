@@ -24,9 +24,10 @@ var mediaBaseURL = "https://media.githubusercontent.com"
 // rejecting an unbounded adversarial body.
 const DefaultMaxDumpBytes int64 = 2 << 30 // 2 GiB
 
-// lfsPointerPrefix is the leading text of a Git-LFS pointer file. If the media
-// host (mis)serves a pointer instead of the dump bytes we must fail loudly
-// rather than write a pointer to disk and feed it to neo4j-admin.
+// lfsPointerPrefix is the leading text of a Git-LFS pointer file. raw. serves a
+// pointer for LFS-tracked files (triggering the media-host fallback) and the
+// real bytes for regular blobs; if the media host also serves a pointer we must
+// fail loudly rather than write a pointer to disk and feed it to neo4j-admin.
 const lfsPointerPrefix = "version https://git-lfs"
 
 // lfsSniffBytes is how many leading bytes we inspect to decide whether the body
@@ -44,11 +45,17 @@ var allowedDownloadHosts = map[string]struct{}{
 	"codeload.github.com":         {},
 }
 
-// Download fetches the dataset dump for spec from the Git-LFS media host,
-// streaming it to a freshly created 0600 temp file. It never reads the whole
-// dump into memory. maxBytes caps the download (DefaultMaxDumpBytes when <= 0);
-// exceeding the cap is an error. The first bytes are sniffed for an LFS pointer
-// payload and rejected if found.
+// Download fetches the dataset dump for spec and streams it to a freshly
+// created 0600 temp file. It never reads the whole dump into memory. maxBytes
+// caps the download (DefaultMaxDumpBytes when <= 0); exceeding the cap is an
+// error.
+//
+// neo4j-graph-examples dumps are stored in two shapes: as a regular Git blob
+// (raw.githubusercontent.com returns the real bytes) or as a Git-LFS-tracked
+// file (raw returns a small pointer, the bytes live on the media host). So we
+// fetch raw FIRST and sniff: if raw served the real bytes we stream those
+// directly and never touch the media host; only when raw served an LFS pointer
+// do we fall back to media.githubusercontent.com.
 //
 // On success it returns the temp file path and a cleanup func that removes it;
 // the caller MUST invoke cleanup once the dump has been loaded. On error the
@@ -58,38 +65,28 @@ func Download(ctx context.Context, spec Spec, maxBytes int64) (path string, clea
 		maxBytes = DefaultMaxDumpBytes
 	}
 
-	rawURL := fmt.Sprintf("%s/media/%s/%s/%s/%s", mediaBaseURL, spec.Owner, spec.Repo, spec.Branch, spec.DumpPath)
-	if err := assertAllowedHost(rawURL); err != nil {
+	rawURL := fmt.Sprintf("%s/%s/%s/%s/%s", rawBaseURL, spec.Owner, spec.Repo, spec.Branch, spec.DumpPath)
+	resp, sniff, err := fetchAndSniff(ctx, rawURL)
+	if err != nil {
 		return "", nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return "", nil, fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("User-Agent", "neo4j-cli-dataset")
-
-	resp, err := httpDoFn(req)
-	if err != nil {
-		return "", nil, fmt.Errorf("download dump from %s: %w", redactURL(rawURL), err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Validate the FINAL URL host — net/http follows redirects transparently
-	// so an upstream 302 to another host would otherwise be invisible.
-	if resp.Request != nil && resp.Request.URL != nil {
-		if err := assertAllowedHostURL(resp.Request.URL); err != nil {
+	srcURL := rawURL
+	if isLFSPointer(sniff) {
+		// raw served a pointer — the real bytes are on the media host.
+		_ = resp.Body.Close()
+		mediaURL := fmt.Sprintf("%s/media/%s/%s/%s/%s", mediaBaseURL, spec.Owner, spec.Repo, spec.Branch, spec.DumpPath)
+		resp, sniff, err = fetchAndSniff(ctx, mediaURL)
+		if err != nil {
 			return "", nil, err
 		}
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
-		if resp.StatusCode == http.StatusNotFound {
-			return "", nil, fmt.Errorf("dump %q not found at %s", spec.DumpPath, redactURL(rawURL))
+		if isLFSPointer(sniff) {
+			_ = resp.Body.Close()
+			return "", nil, fmt.Errorf("%s also returned a Git-LFS pointer, not the dump bytes; the dataset may be misconfigured", redactURL(mediaURL))
 		}
-		return "", nil, fmt.Errorf("status %d for %s", resp.StatusCode, redactURL(rawURL))
+		srcURL = mediaURL
 	}
+	defer func() { _ = resp.Body.Close() }()
 
 	f, err := os.CreateTemp("", "neo4j-cli-dataset-*.dump")
 	if err != nil {
@@ -109,28 +106,13 @@ func Download(ctx context.Context, spec Spec, maxBytes int64) (path string, clea
 		_ = os.Remove(tmpPath)
 	}
 
-	// Sniff the leading bytes for an LFS pointer before committing to the
-	// stream. raw. returns a pointer; the media host should return the real
-	// bytes, but a misconfigured repo or host fallback could still serve one.
-	sniff := make([]byte, lfsSniffBytes)
-	n, err := io.ReadFull(resp.Body, sniff)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		removeTmp()
-		return "", nil, fmt.Errorf("read dump from %s: %w", redactURL(rawURL), err)
-	}
-	sniff = sniff[:n]
-	if strings.HasPrefix(strings.TrimSpace(string(sniff)), lfsPointerPrefix) {
-		removeTmp()
-		return "", nil, fmt.Errorf("%s returned a Git-LFS pointer, not the dump bytes; the dataset may not be LFS-tracked as expected", redactURL(rawURL))
-	}
-
 	// Stream sniffed bytes + remaining body to disk under the cap. limit+1 lets
 	// us detect an over-cap body: a full read of limit+1 bytes means the source
 	// had more than limit to give.
 	written, err := io.Copy(f, io.MultiReader(strings.NewReader(string(sniff)), io.LimitReader(resp.Body, maxBytes+1)))
 	if err != nil {
 		removeTmp()
-		return "", nil, fmt.Errorf("write dump to disk: %w", err)
+		return "", nil, fmt.Errorf("write dump from %s to disk: %w", redactURL(srcURL), err)
 	}
 	if written > maxBytes {
 		removeTmp()
@@ -142,6 +124,61 @@ func Download(ctx context.Context, spec Spec, maxBytes int64) (path string, clea
 	}
 
 	return tmpPath, func() { _ = os.Remove(tmpPath) }, nil
+}
+
+// fetchAndSniff issues a GET for rawURL, validating the host both pre-dispatch
+// and post-redirect, asserting a 200 status, and reading the leading
+// lfsSniffBytes so the caller can decide whether the body is a real dump or an
+// LFS pointer. The returned response body still holds whatever follows the
+// sniffed prefix; the caller owns closing it. On any error the body is closed
+// here and a nil response returned.
+func fetchAndSniff(ctx context.Context, rawURL string) (*http.Response, []byte, error) {
+	if err := assertAllowedHost(rawURL); err != nil {
+		return nil, nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("User-Agent", "neo4j-cli-dataset")
+
+	resp, err := httpDoFn(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("download dump from %s: %w", redactURL(rawURL), err)
+	}
+
+	// Validate the FINAL URL host — net/http follows redirects transparently
+	// so an upstream 302 to another host would otherwise be invisible.
+	if resp.Request != nil && resp.Request.URL != nil {
+		if err := assertAllowedHostURL(resp.Request.URL); err != nil {
+			_ = resp.Body.Close()
+			return nil, nil, err
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.CopyN(io.Discard, resp.Body, 1<<10)
+		_ = resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, nil, fmt.Errorf("dump not found at %s", redactURL(rawURL))
+		}
+		return nil, nil, fmt.Errorf("status %d for %s", resp.StatusCode, redactURL(rawURL))
+	}
+
+	sniff := make([]byte, lfsSniffBytes)
+	n, err := io.ReadFull(resp.Body, sniff)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		_ = resp.Body.Close()
+		return nil, nil, fmt.Errorf("read dump from %s: %w", redactURL(rawURL), err)
+	}
+	return resp, sniff[:n], nil
+}
+
+// isLFSPointer reports whether the sniffed prefix begins with the Git-LFS
+// pointer preamble.
+func isLFSPointer(sniff []byte) bool {
+	return strings.HasPrefix(strings.TrimSpace(string(sniff)), lfsPointerPrefix)
 }
 
 // assertAllowedHost validates that rawURL's host is on the pinned allowlist and
