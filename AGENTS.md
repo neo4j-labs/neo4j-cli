@@ -252,6 +252,10 @@ See [`.agents/credentials.md`](.agents/credentials.md) — `load()` re-wiring of
 
 See [`.agents/query.md`](.agents/query.md) for Bolt driver, execution, credential integration, embedding-provider plumbing, and local verification gotchas.
 
+## Dataset Resolver Notes
+
+`neo4j-cli/internal/dataset` resolves which manifest dump applies to a target Neo4j version. Calver (2025.x/2026.x) is the CONTINUATION of the 5.x line, so `Resolve` treats a calver target (`semver.Compare(target, "v2025.0.0") >= 0`) OR the literal `"latest"` as matching any dump whose range lower bound is `>=5.0.0` — pure semver would sort `2026.x` above the `<6.0.0` upper bound and match nothing. Concrete targets (5, 5.26, 4.4, 3.5.1) keep exact range matching. `canonicalVersion` strips leading zeros from all-digit components because calver months are zero-padded (`2026.05.0`) and `golang.org/x/mod/semver` rejects leading zeros.
+
 ## desktopclient mDNS Notes
 
 `hashicorp/mdns` gotchas (used in `neo4j-cli/internal/desktopclient/discovery_mdns.go`): `mdns.QueryContext` honors the caller-supplied `params.Entries` channel (the channel reassignment is only inside `Lookup`/`Query`, NOT `QueryContext`). The library logs socket-bind warnings via `log.Default()` (stderr) — set `params.Logger = log.New(io.Discard, "", 0)` to keep them out of CLI output. All mDNS imports + the macOS `dns-sd` exec are intentionally isolated to `discovery_mdns.go`; keep them there.

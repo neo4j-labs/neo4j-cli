@@ -87,6 +87,80 @@ func TestResolve_SelectsMatchingEntry(t *testing.T) {
 	assert.Equal(t, ">=5.0.0 <6.0.0", spec.MatchedVersionRange)
 }
 
+func TestResolve_ConcreteAndCalverTargets(t *testing.T) {
+	// Manifest with 3.5 / 4.3 / 5.0 dump entries, plus a script entry.
+	for _, tc := range []struct {
+		name     string
+		target   string
+		wantDump string
+	}{
+		{name: "5 picks 5.x", target: "5", wantDump: "data/movies-50.dump"},
+		{name: "5.26 picks 5.x", target: "5.26", wantDump: "data/movies-50.dump"},
+		{name: "5.26.0 picks 5.x", target: "5.26.0", wantDump: "data/movies-50.dump"},
+		{name: "4.4 picks 4.3 entry", target: "4.4", wantDump: "data/movies-43.dump"},
+		{name: "3.5.1 picks 3.5 entry", target: "3.5.1", wantDump: "data/movies-35.dump"},
+		{name: "calver 2025.01.0 picks 5.x", target: "2025.01.0", wantDump: "data/movies-50.dump"},
+		{name: "calver 2026.05.0 picks 5.x", target: "2026.05.0", wantDump: "data/movies-50.dump"},
+		{name: "latest picks 5.x", target: "latest", wantDump: "data/movies-50.dump"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeServer{
+				manifests: map[string]string{"main": moviesManifest},
+				dumps:     map[string]bool{"main/" + tc.wantDump: true},
+			}
+			defer f.start(t)()
+
+			spec, err := Resolve(context.Background(), "neo4j-graph-examples/movies", tc.target)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDump, spec.DumpPath)
+		})
+	}
+}
+
+func TestResolve_CalverPrefersExplicitCalverEntry(t *testing.T) {
+	mixed := `{"dbms": [
+		{"dumpFile": "data/v5.dump", "targetNeo4jVersion": ">=5.0.0 <6.0.0"},
+		{"dumpFile": "data/calver.dump", "targetNeo4jVersion": ">=2025.0.0"}
+	]}`
+	for _, tc := range []struct {
+		name     string
+		target   string
+		wantDump string
+	}{
+		{name: "calver prefers newest lower bound", target: "2026.05.0", wantDump: "data/calver.dump"},
+		{name: "latest prefers newest lower bound", target: "latest", wantDump: "data/calver.dump"},
+		{name: "5.26 still picks 5.x entry", target: "5.26", wantDump: "data/v5.dump"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeServer{
+				manifests: map[string]string{"main": mixed},
+				dumps:     map[string]bool{"main/" + tc.wantDump: true},
+			}
+			defer f.start(t)()
+
+			spec, err := Resolve(context.Background(), "owner/repo", tc.target)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDump, spec.DumpPath)
+		})
+	}
+}
+
+func TestResolve_CalverNoCompatibleWhenOnlyPre5(t *testing.T) {
+	pre5 := `{"dbms": [
+		{"dumpFile": "data/v4.dump", "targetNeo4jVersion": ">=4.0.0 <5.0.0"}
+	]}`
+	for _, target := range []string{"2026.05.0", "latest"} {
+		t.Run(target, func(t *testing.T) {
+			f := &fakeServer{manifests: map[string]string{"main": pre5}}
+			defer f.start(t)()
+
+			_, err := Resolve(context.Background(), "owner/repo", target)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "no dump entry compatible")
+		})
+	}
+}
+
 func TestResolve_FallsBackToMaster(t *testing.T) {
 	f := &fakeServer{
 		manifests: map[string]string{"master": moviesManifest},

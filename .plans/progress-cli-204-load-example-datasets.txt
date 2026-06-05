@@ -92,3 +92,8 @@ Decisions: only production change is the single loaderArgs entry; no cobra-tree 
 
 ## REVIEW — 2026-06-05T08:59:03Z
 Added 2 review tasks (task-016..task-017): calver/latest dump compatibility + docker latest default.
+
+## TASK-016 — 2026-06-05T12:00:00Z
+Resolver now treats calver (>=2025.0) and literal "latest" targets as the 5.x-line continuation: a dump entry whose range lower bound is >=5.0.0 matches. Concrete (non-calver) targets keep exact range matching unchanged.
+Files: M neo4j-cli/internal/dataset/resolve.go (Resolve accepts "latest" + isCalver branch; selectEntry takes calver bool; new entryMatches dispatches exact-vs-lower-bound), M version.go (isCalver, rangeLowerBound, stripLeadingZeros/allDigits), M resolve_test.go + version_test.go (table-driven calver/latest/tie-break/no-compat cases).
+Decisions: calver months are zero-padded (2026.05.0) but golang.org/x/mod/semver forbids leading zeros in numeric components, so canonicalVersion strips leading zeros from all-digit dot components before Sscanf — non-numeric components untouched. Newest-lower-bound tie-break reused as-is so an explicit ">=2025.0.0" manifest entry wins over the 5.x entry for calver/latest while concrete 5.26 still picks the 5.x entry. "no dump entry compatible" error preserved (pre-5-only manifest + calver/latest). No cobra-tree change → no skill regen. Gates: dataset 71 passed, make test clean, make fmt-check ok, make lint 0 issues.

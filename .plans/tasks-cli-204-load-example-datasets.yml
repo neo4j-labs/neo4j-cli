@@ -413,7 +413,8 @@ tasks:
       - "With a manifest containing BOTH a 5.x entry and an explicit >=2025.0.0 entry, a calver/latest target picks the calver entry (newest lower bound), while 5.26 picks the 5.x entry"
       - "A manifest whose only entry is <5.0.0 yields a clear 'no dump entry compatible' error for calver/latest targets"
       - "Table-driven tests cover all the above; make test, make fmt-check, make lint clean"
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-05T12:00:00Z
 
   - id: task-017
     title: 'Docker load: default to latest Neo4j; map "latest" image to neo4j:enterprise'

@@ -76,9 +76,15 @@ func Resolve(ctx context.Context, ownerRepo, neo4jVersion string) (Spec, error) 
 		return Spec{}, fmt.Errorf("invalid dataset %q: want owner/repo", ownerRepo)
 	}
 
+	// "latest" means newest neo4j, which is calver — the 5.x line continues as
+	// 2025.x/2026.x, so a 5.x-or-newer dump applies. Treat it as calver below.
+	calver := strings.EqualFold(strings.TrimSpace(neo4jVersion), "latest")
 	target := canonicalVersion(neo4jVersion)
-	if !semver.IsValid(target) {
-		return Spec{}, fmt.Errorf("invalid neo4j version %q", neo4jVersion)
+	if !calver {
+		if !semver.IsValid(target) {
+			return Spec{}, fmt.Errorf("invalid neo4j version %q", neo4jVersion)
+		}
+		calver = isCalver(target)
 	}
 
 	m, branch, err := fetchManifest(ctx, owner, repo)
@@ -86,7 +92,7 @@ func Resolve(ctx context.Context, ownerRepo, neo4jVersion string) (Spec, error) 
 		return Spec{}, err
 	}
 
-	entry, err := selectEntry(m, target)
+	entry, err := selectEntry(m, target, calver)
 	if err != nil {
 		return Spec{}, fmt.Errorf("%s/%s: %w", owner, repo, err)
 	}
@@ -135,8 +141,11 @@ func fetchManifest(ctx context.Context, owner, repo string) (manifest, string, e
 
 // selectEntry picks the dbms[] dump entry whose range matches target, choosing
 // the newest compatible (highest lower bound) when several match. scriptFile
-// entries and entries without a dumpFile are skipped.
-func selectEntry(m manifest, target string) (manifestEntry, error) {
+// entries and entries without a dumpFile are skipped. When calver is true the
+// target is a calver/latest neo4j (the 5.x line's continuation), so any entry
+// whose range lower bound is >= 5.0.0 applies rather than requiring the calver
+// string to fall inside the (5.x-style) range.
+func selectEntry(m manifest, target string, calver bool) (manifestEntry, error) {
 	var (
 		best    manifestEntry
 		bestLow string
@@ -146,7 +155,7 @@ func selectEntry(m manifest, target string) (manifestEntry, error) {
 		if e.DumpFile == "" {
 			continue
 		}
-		ok, low, err := rangeMatches(e.TargetNeo4jVersion, target)
+		ok, low, err := entryMatches(e.TargetNeo4jVersion, target, calver)
 		if err != nil {
 			return manifestEntry{}, err
 		}
@@ -161,6 +170,21 @@ func selectEntry(m manifest, target string) (manifestEntry, error) {
 		return manifestEntry{}, fmt.Errorf("no dump entry compatible with neo4j %s", strings.TrimPrefix(target, "v"))
 	}
 	return best, nil
+}
+
+// entryMatches reports whether a manifest entry's range applies to target and
+// returns the range lower bound for tie-breaking. For concrete (non-calver)
+// targets it is exact semver range matching. For calver/latest targets it
+// matches any 5.x-or-newer dump (lower bound >= 5.0.0).
+func entryMatches(expr, target string, calver bool) (bool, string, error) {
+	low, err := rangeLowerBound(expr)
+	if err != nil {
+		return false, "", err
+	}
+	if calver {
+		return semver.Compare(low, "v5.0.0") >= 0, low, nil
+	}
+	return rangeMatches(expr, target)
 }
 
 // assertPathExists verifies the selected dump file actually exists in the repo

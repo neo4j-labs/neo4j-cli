@@ -47,6 +47,48 @@ func TestRangeMatches(t *testing.T) {
 	}
 }
 
+func TestRangeLowerBound(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		expr    string
+		want    string
+		wantErr bool
+	}{
+		{name: "ge and lt", expr: ">=5.0.0 <6.0.0", want: "v5.0.0"},
+		{name: "upper only", expr: "<=4.4.0", want: "v0.0.0"},
+		{name: "open lower", expr: ">=4.0.0", want: "v4.0.0"},
+		{name: "exclusive lower", expr: ">3.5.0", want: "v3.5.0"},
+		{name: "bare equals", expr: "5.0.0", want: "v5.0.0"},
+		{name: "explicit calver", expr: ">=2025.0.0", want: "v2025.0.0"},
+		{name: "empty", expr: "", wantErr: true},
+		{name: "bad version", expr: ">=abc", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := rangeLowerBound(tc.expr)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestIsCalver(t *testing.T) {
+	for _, tc := range []struct {
+		target string
+		want   bool
+	}{
+		{target: "v5.26.0", want: false},
+		{target: "v6.0.0", want: false},
+		{target: "v2025.0.0", want: true},
+		{target: "v2026.5.0", want: true},
+	} {
+		assert.Equal(t, tc.want, isCalver(tc.target), tc.target)
+	}
+}
+
 func TestCanonicalVersion(t *testing.T) {
 	for _, tc := range []struct {
 		in, want string
