@@ -89,3 +89,6 @@ Added 1 review task (task-015).
 Pass NEO4J_ACCEPT_LICENSE_AGREEMENT=eval to the docker one-shot loader. After task-014 the loader runs via the image DEFAULT entrypoint (docker-entrypoint.sh), which on the enterprise image enforces the license gate: without the env it prints the notice and never execs neo4j-admin → loaded DB ends up online but EMPTY (verified live: docker load movies = 0 nodes). Fix: added `-e NEO4J_ACCEPT_LICENSE_AGREEMENT=eval` to loaderArgs in LoadDumpIntoNewContainer, placed before the image arg (alongside the -v mounts), matching the server container; license acceptance is not a secret so argv -e KEY=VALUE is fine.
 Files: M docker/load.go (one line + short WHY clause), M docker/load_test.go (assert license -e flag present + precedes image arg), M AGENTS.md (terse license-gate clause on the loader note).
 Decisions: only production change is the single loaderArgs entry; no cobra-tree change → no skill regen. Gates: docker pkg 242 passed; make test (no FAIL/panic), make fmt-check ok, make lint 0 issues. Live e2e (movies = 171 nodes, files owned uid 7474) verified manually per task desc — orchestrator re-verifies.
+
+## REVIEW — 2026-06-05T08:59:03Z
+Added 2 review tasks (task-016..task-017): calver/latest dump compatibility + docker latest default.

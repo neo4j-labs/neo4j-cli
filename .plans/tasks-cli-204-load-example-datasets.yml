@@ -374,3 +374,79 @@ tasks:
       - "docker load_test.go asserts the loader passes the license-acceptance -e flag"
       - "make test, make fmt-check, make lint all clean"
     completed_at: 2026-06-05T08:00:00Z
+
+  - id: task-016
+    title: 'Resolver: treat 5.x dumps as compatible with calver (>=2025.0) and "latest" targets'
+    description: |
+      Neo4j 5 was renamed to calendar versioning (2025.x.y, 2026.x.y) — calver is the
+      continuation of the 5.x line. The neo4j-graph-examples manifests still declare 5.x
+      dumps with ranges like targetNeo4jVersion ">=5.0.0 <6.0.0". Our resolver matches the
+      target Neo4j version against those ranges with pure semver (golang.org/x/mod/semver),
+      so a calver target like "2026.05.0" sorts far above "6.0.0" and matches NOTHING ->
+      "no dump entry compatible with neo4j 2026.x" — even though a v5 dump loads and runs
+      perfectly on the latest neo4j (verified live: movies-50.dump loaded into neo4j
+      2026.05.0 -> database online, 171 nodes). We want people on the latest Neo4j, so a
+      "5" dumpfile must be selectable for targets that are 5.x OR calver (>=2025.0) OR the
+      literal "latest".
+      FIX (neo4j-cli/internal/dataset, resolve.go + version.go):
+      1. Resolve must accept the literal target "latest" (today canonicalVersion("latest")
+         is not valid semver and Resolve rejects it). Treat "latest" as "newest neo4j"
+         (calver-equivalent) for matching.
+      2. Define a 5.x-line dump entry as one whose range lower bound is >= 5.0.0 (and the
+         existing 4.x/3.5 entries have lower bounds < 5.0.0). When the target is calver
+         (semver major year >= 2025, i.e. semver.Compare(target, "v2025.0.0") >= 0) OR
+         "latest", an entry MATCHES if its lower bound >= 5.0.0 — i.e. a 5.x-or-newer dump
+         applies to calver/latest. Concrete (non-calver) targets keep the existing exact
+         range matching unchanged.
+      3. Keep the newest-lower-bound tie-break so that if a manifest later adds an explicit
+         calver entry (e.g. ">=2025.0.0"), a calver/latest target prefers it over the 5.x
+         entry (2025.0.0 > 5.0.0), while a concrete "5.26" target still picks the 5.x entry.
+      This also unblocks the desktop new-DBMS path, which auto-picks Desktop's latest stable
+      enterprise version (a calver string) and passes it to Resolve — today that would fail.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "Resolve accepts target \"latest\" (no longer rejected as invalid semver) and selects the newest 5.x-or-later dump"
+      - "Calver targets (e.g. 2025.01.0, 2026.05.0) select the 5.x dump entry from a movies-style manifest (3.5/4.0/4.3/5.0 entries)"
+      - "Concrete targets still match exactly: 5 / 5.26 / 5.26.0 -> 5.x entry; 4.4 -> 4.3 entry; 3.5.1 -> 3.5 entry"
+      - "With a manifest containing BOTH a 5.x entry and an explicit >=2025.0.0 entry, a calver/latest target picks the calver entry (newest lower bound), while 5.26 picks the 5.x entry"
+      - "A manifest whose only entry is <5.0.0 yields a clear 'no dump entry compatible' error for calver/latest targets"
+      - "Table-driven tests cover all the above; make test, make fmt-check, make lint clean"
+    completed_at: null
+
+  - id: task-017
+    title: 'Docker load: default to latest Neo4j; map "latest" image to neo4j:enterprise'
+    description: |
+      Per the product decision, loading a dataset should default to the LATEST Neo4j (not a
+      pinned 5.x), so users don't run old versions. Change docker load's --version default
+      from "5" to "latest" in LoadDumpIntoNewContainer / the docker load leaf
+      (neo4j-cli/internal/subcommands/docker/load.go). Two things must be handled:
+      1. Image mapping: the loader currently hardcodes `image := "neo4j:" + version +
+         "-enterprise"`, which for version "latest" yields the UNPUBLISHED tag
+         `neo4j:latest-enterprise`. create.go already has the correct mapping (enterprise +
+         "latest" -> `neo4j:enterprise`; enterprise + explicit version -> `neo4j:<v>-enterprise`,
+         create.go lines ~299-307). Factor that into a small shared helper in the docker
+         package (e.g. enterpriseImage(version string) string) and use it from BOTH create.go
+         and LoadDumpIntoNewContainer so the mapping can't drift.
+      2. Manifest resolution: pass the version (which may be "latest") to resolveDatasetFn;
+         task-016 makes Resolve accept "latest" and select the 5.x dump. The server/loader
+         image for "latest" is `neo4j:enterprise` (the latest calver, currently 2026.05.0),
+         and a 5.x dump loads + auto-migrates on it (verified live).
+      Update the --version flag help to state the default is "latest" and that it accepts
+      5, 5.26, calver (e.g. 2026.04.0), or latest. Leave the existing-container path and the
+      aura loader's own --version default ("5", which Aura uses as its version token)
+      unchanged — this task is scoped to the docker new-container default + image mapping.
+      Depends on task-016 (resolver must accept "latest"/calver first).
+    status: pending
+    dependencies:
+      - task-016
+    source: review
+    acceptance_criteria:
+      - "docker load --version defaults to \"latest\"; with no --version the loader/server image is exactly neo4j:enterprise (NOT neo4j:latest-enterprise)"
+      - "A shared docker-package helper builds the enterprise image and is used by both create.go and LoadDumpIntoNewContainer (no duplicated mapping)"
+      - "Explicit --version 5.26 -> neo4j:5.26-enterprise; --version 2026.04.0 -> neo4j:2026.04.0-enterprise"
+      - "The (possibly \"latest\") version is passed to Resolve so the 5.x dump is selected for the latest image"
+      - "--version flag help documents default=latest and the accepted forms (5, 5.26, calver, latest); existing-container path unchanged"
+      - "docker load_test.go updated/extended for the new default + image mapping; make test, make fmt-check, make lint clean"
+    completed_at: null
