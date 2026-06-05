@@ -165,14 +165,14 @@ func loadIntoNewContainerLeaf(cmd *cobra.Command, cfg *clicfg.Config, client doc
 		"name":      result.Name,
 		"database":  database,
 		"version":   version,
-		"bolt-port": result.BoltPort,
-		"http-port": result.HTTPPort,
+		"bolt_port": result.BoltPort,
+		"http_port": result.HTTPPort,
 		"uri":       result.URI,
 		"username":  "neo4j",
 		"password":  result.Password,
 		"plugins":   pluginsForOutput(spec.Plugins),
 	}
-	fields := []string{"name", "database", "version", "bolt-port", "http-port", "uri", "username", "password", "plugins"}
+	fields := []string{"name", "database", "version", "bolt_port", "http_port", "uri", "username", "password", "plugins"}
 	commonoutput.PrintBodyMap(cmd, cfg, singleRow{row: row}, fields)
 	return nil
 }

@@ -27,7 +27,7 @@ var (
 	downloadDatasetFn = dataset.Download
 )
 
-var dbmsLoadFields = []string{"id", "name", "version", "status", "connectionUri"}
+var dbmsLoadFields = []string{"id", "name", "version", "status", "connection_uri"}
 
 // dbmsLoadResult adapts a `*DbmsInfo` to output.ResponseData, matching the
 // shape `desktop dbms create`/`list` emit so scripts can key off the same
@@ -42,11 +42,11 @@ func (r dbmsLoadResult) AsArray() []map[string]any {
 	}
 	return []map[string]any{
 		{
-			"id":            r.Item.ID,
-			"name":          r.Item.Name,
-			"version":       r.Item.Version,
-			"status":        r.Item.Status,
-			"connectionUri": r.Item.ConnectionURI,
+			"id":             r.Item.ID,
+			"name":           r.Item.Name,
+			"version":        r.Item.Version,
+			"status":         r.Item.Status,
+			"connection_uri": r.Item.ConnectionURI,
 		},
 	}
 }
