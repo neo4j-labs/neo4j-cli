@@ -28,7 +28,6 @@ import (
 const (
 	defaultURI      = "neo4j://localhost:7687"
 	defaultUsername = "neo4j"
-	defaultDatabase = "neo4j"
 
 	envURI      = "NEO4J_URI"
 	envUsername = "NEO4J_USERNAME"
@@ -369,14 +368,15 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 	}
 
 	// Apply built-in defaults for any param still empty after all sources.
+	// Database is intentionally NOT defaulted: when left empty the session is
+	// opened with no DatabaseName so the server resolves the connecting user's
+	// home database. Forcing "neo4j" here breaks instances whose home database
+	// is named something else (e.g. AuraDB Free, where it is the instance DBID).
 	if uri == "" {
 		uri = defaultURI
 	}
 	if username == "" {
 		username = defaultUsername
-	}
-	if database == "" {
-		database = defaultDatabase
 	}
 
 	rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
@@ -661,6 +661,8 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 		return nil, errors.New("query: connection driver not opened (call openDriver first)")
 	}
 
+	// An empty c.database leaves DatabaseName unset so the server resolves the
+	// connecting user's home database
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
 	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
 

@@ -83,7 +83,7 @@ neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bo
 	cmd.PersistentFlags().String("uri", "", "Neo4j Bolt URI [env: NEO4J_URI]. http://<host>[:p][/...] is auto-rewritten to neo4j://<host>:7687; https://<host>[:p][/...] is auto-rewritten to neo4j+s://<host>:7687. (default \"neo4j://localhost:7687\")")
 	cmd.PersistentFlags().StringP("username", "u", "", "Neo4j username [env: NEO4J_USERNAME] (default \"neo4j\")")
 	cmd.PersistentFlags().StringP("password", "p", "", "Neo4j password [env: NEO4J_PASSWORD]; prompted on TTY if unset")
-	cmd.PersistentFlags().StringP("database", "d", "", "Target database name [env: NEO4J_DATABASE] (default \"neo4j\")")
+	cmd.PersistentFlags().StringP("database", "d", "", "Target database name; defaults to the connecting user's home database when unset - typically \"neo4j\", but can vary by deployment (e.g. the instance DBID on Aura Free) [env: NEO4J_DATABASE]")
 	cmd.PersistentFlags().String("env", "", "Path to a .env file (auto-discovered by walking up from cwd if unset)")
 	cmd.PersistentFlags().StringArray("param", nil, "Query parameter as key=value (repeatable); JSON-typed when value parses as JSON, otherwise treated as a string. Use `key:embed=<text>` to embed text via the configured provider and bind the resulting vector to $key (see `query :embed`).")
 	cmd.PersistentFlags().Int("max-rows", 100, "Maximum rows to print (0 = unlimited); when capped, prints a stderr warning and sets truncated=true in JSON")

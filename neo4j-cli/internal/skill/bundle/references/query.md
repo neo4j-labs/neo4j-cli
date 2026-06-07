@@ -18,7 +18,7 @@ Flags:
 | `--atomic` | bool | false | Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast) |
 | `--continue-on-error` | bool | false | Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic) |
 | `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
-| `-d, --database` | string | - | Target database name [env: NEO4J_DATABASE] (default "neo4j") |
+| `-d, --database` | string | - | Target database name; defaults to the connecting user's home database when unset - typically "neo4j", but can vary by deployment (e.g. the instance DBID on Aura Free) [env: NEO4J_DATABASE] |
 | `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
 | `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
 | `--embed-credential` | string | - | Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list') |

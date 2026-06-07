@@ -155,7 +155,9 @@ func TestResolveConn_Defaults(t *testing.T) {
 	assert.Equal(t, defaultURI, c.uri)
 	assert.Equal(t, defaultUsername, c.username)
 	assert.Equal(t, "", c.password)
-	assert.Equal(t, defaultDatabase, c.database)
+	// Database is left unset so the server resolves the user's home database
+	// (CLI-211): no built-in "neo4j" default is applied.
+	assert.Equal(t, "", c.database)
 	// resolveConn does not eagerly open the driver — that happens via
 	// c.openDriver() once the password has been prompted (when needed).
 	assert.Nil(t, c.driver)
@@ -485,7 +487,38 @@ func TestResolveConn_NoStoredCredential_FallsBackToDefaults(t *testing.T) {
 	assert.Equal(t, defaultURI, c.uri)
 	assert.Equal(t, defaultUsername, c.username)
 	assert.Equal(t, "", c.password)
-	assert.Equal(t, defaultDatabase, c.database)
+	// Database left unset → server resolves the home database (CLI-211).
+	assert.Equal(t, "", c.database)
+}
+
+// TestResolveConn_RawConnFlags_DatabaseLeftUnset is the CLI-211 regression: a
+// user connecting with raw --uri/--username/--password flags (no --database, no
+// stored credential, no NEO4J_DATABASE) must get an EMPTY database so the
+// session resolves the connecting user's home database. Forcing "neo4j" here
+// broke AuraDB Free, whose home database is the instance DBID, not "neo4j".
+func TestResolveConn_RawConnFlags_DatabaseLeftUnset(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Chdir(t.TempDir())
+
+	// No stored credential.
+	cmd, cfg := newTestCmdWithCreds(t, "{}")
+	require.NoError(t, cmd.ParseFlags([]string{
+		"--uri=neo4j+s://f8284f2d.databases.neo4j.io",
+		"--username=f8284f2d",
+		"--password=secret",
+	}))
+
+	c, err := resolveConn(cmd, cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "neo4j+s://f8284f2d.databases.neo4j.io", c.uri)
+	assert.Equal(t, "f8284f2d", c.username)
+	assert.Equal(t, "secret", c.password)
+	// Crucially NOT "neo4j": left empty so the driver/server picks the home DB.
+	assert.Equal(t, "", c.database)
 }
 
 // namedCredJSON returns a credentials.json body with one named credential
