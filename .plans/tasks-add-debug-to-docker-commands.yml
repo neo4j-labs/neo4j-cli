@@ -122,3 +122,30 @@ tasks:
       - "Changelog file added under .changes/unreleased for project neo4j-cli, kind Minor"
       - "make test, make fmt-check, make lint all pass"
     completed_at: 2026-06-08T14:10:00Z
+
+  - id: task-007
+    title: "Fix TestSmoke_DebugEmitsToStderr to capture via debugW seam"
+    description: |
+      CI on PR #218 failed: TestSmoke_DebugEmitsToStderr (smoke_test.go) asserts
+      empty output ("" does not contain "[docker-debug] > docker run"). Root cause:
+      the test captures cobra's command stderr via runDockerSubcommand
+      (root.SetErr(&errBuf)), but the docker debug trace is written to the
+      package-global debugW seam (var debugW io.Writer = os.Stderr), NOT to
+      cmd.ErrOrStderr(). This is intentional and aura-consistent (runEnv has no
+      *cobra.Command), so the trace reaches the real os.Stderr while errBuf stays
+      empty. Fix is test-only: redirect the debug seam into a buffer with
+      SetDebugWriterForTest(t, &debugBuf) before invoking the real-docker create
+      --debug, and assert the [docker-debug] invocation/result lines and the
+      NEO4J_AUTH env name against debugBuf. Keep the real-docker create so runEnv
+      actually fires, and keep the password-absence assertion against debugBuf.
+      Do NOT change production code.
+    status: pending
+    source: review
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "TestSmoke_DebugEmitsToStderr captures the trace via SetDebugWriterForTest(t, &buf), not cobra stderr"
+      - "Asserts [docker-debug] > docker run, [docker-debug] < exit 0 elapsed, and NEO4J_AUTH name against the buffer"
+      - "Password-absence assertion preserved against the buffer; no production code changed"
+      - "go build -tags=smoke ./neo4j-cli/internal/subcommands/docker/... compiles; make test, make fmt-check, make lint pass"
+    completed_at: null

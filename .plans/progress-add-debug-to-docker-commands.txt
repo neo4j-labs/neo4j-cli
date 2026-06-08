@@ -25,3 +25,6 @@ Verify: go test ./.../docker/... 254 pass; go build/vet -tags=smoke compile clea
 ## TASK-006 — 2026-06-08T14:10:00Z
 Regenerated skill bundle (go generate ./neo4j-cli/internal/skill/...): only references/docker.md drifted, adding the new --debug persistent flag row. go generate ./... confirms no other drift; agent-context reflects the live cobra tree at runtime (no golden snapshot to regenerate). Added changelog via changie new --projects neo4j-cli --kind Minor. ALL gates pass: TestGenerator_RoundTrip PASSES, make test green, fmt-check ok, lint 0 issues, license-check ok.
 Files: ~neo4j-cli/internal/skill/bundle/references/docker.md, +.changes/unreleased/neo4j-cli-Minor-20260608-160814.yaml
+
+## REVIEW — 2026-06-08T14:37:16Z
+Added 1 review task (task-007): fix TestSmoke_DebugEmitsToStderr capture via debugW seam.
