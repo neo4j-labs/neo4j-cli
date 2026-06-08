@@ -40,3 +40,8 @@ Decisions: pre-existing aura-cli-Minor-20260506 unreleased entry is unrelated (d
 
 ## REVIEW — 2026-06-08T11:40:00Z
 Added 2 review tasks (task-009..task-010) from golang-security review: F1 strip control/ANSI escapes in --debug output (Medium), F2 document residual opaque-JSON redaction gap (Low).
+
+## TASK-009 — 2026-06-08T17:30:00Z
+Added scrub() (RedactText then output.StripControl) in debug.go; every --debug write (URL, body, header key+value, debugInfo lines) now neutralises C0/ANSI escapes while preserving \t\n\r. Closes the stored-injection terminal-tampering vector (Medium).
+Files: ~neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/control_strip_debug_test.go
+Decisions: header-VALUE control bytes can't be exercised end-to-end (net/http server rejects control chars in header values, breaks conn) — test drives the strip surface via the response body; writeHeaders shares scrub()/StripControl so it's covered.

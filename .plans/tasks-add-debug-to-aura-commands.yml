@@ -172,7 +172,6 @@ tasks:
       (response.go), so wrap the redacted strings in output.StripControl in
       debug.go — apply to the body, each header value, the URL, and the debugInfo
       format result. Keep RedactText first, then StripControl on the result.
-    status: pending
     dependencies:
       - task-003
       - task-004
@@ -182,7 +181,8 @@ tasks:
       - "A test asserts a response field / header value containing \\x1b (and other C0 control bytes) renders with the escape neutralised (e.g. as \"?\") in the captured debug output, while \\t/\\n/\\r are preserved"
       - "No new import beyond the already-present common/output; no import cycle"
       - "make test, make fmt-check, make lint pass clean"
-    completed_at: null
+    status: completed
+    completed_at: 2026-06-08T17:30:00Z
     source: review
 
   - id: task-010

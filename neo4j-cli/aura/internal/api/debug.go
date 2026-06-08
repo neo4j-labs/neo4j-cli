@@ -12,7 +12,15 @@ import (
 	"time"
 
 	"github.com/neo4j/cli/common/clievents"
+	"github.com/neo4j/cli/common/output"
 )
+
+// scrub redacts secrets (RedactText) then neutralises terminal control/ANSI
+// escapes (StripControl) before any string is written to the operator's
+// terminal. Order matters: redact first, strip on the result.
+func scrub(s string) string {
+	return output.StripControl(clievents.RedactText(s))
+}
 
 // debugW is the destination for --debug diagnostics from the api package
 // (MakeRequest/getToken/Poll). It defaults to os.Stderr and is overridable in
@@ -27,10 +35,10 @@ const (
 
 // debugRequest emits the method, URL, headers, and body of an outgoing request.
 func debugRequest(method, url string, header http.Header, body []byte) {
-	_, _ = fmt.Fprintf(debugW, "%s%s %s\n", debugReqPrefix, method, clievents.RedactText(url))
+	_, _ = fmt.Fprintf(debugW, "%s%s %s\n", debugReqPrefix, method, scrub(url))
 	writeHeaders(debugReqPrefix, header)
 	if len(body) > 0 {
-		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugReqPrefix, clievents.RedactText(string(body)))
+		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugReqPrefix, scrub(string(body)))
 	}
 }
 
@@ -40,7 +48,7 @@ func debugResponse(statusCode int, header http.Header, body []byte, elapsed time
 	_, _ = fmt.Fprintf(debugW, "%s%d %s\n", debugRespPrefix, statusCode, http.StatusText(statusCode))
 	writeHeaders(debugRespPrefix, header)
 	if len(body) > 0 {
-		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugRespPrefix, clievents.RedactText(string(body)))
+		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugRespPrefix, scrub(string(body)))
 	}
 	_, _ = fmt.Fprintf(debugW, "%selapsed %s\n", debugInfoPrefix, elapsed)
 }
@@ -48,7 +56,7 @@ func debugResponse(statusCode int, header http.Header, body []byte, elapsed time
 // debugInfo emits a single redacted [aura-debug] line for loop/credential-level
 // context (token acquisition, poll attempts).
 func debugInfo(format string, args ...any) {
-	_, _ = fmt.Fprintf(debugW, "%s%s\n", debugInfoPrefix, clievents.RedactText(fmt.Sprintf(format, args...)))
+	_, _ = fmt.Fprintf(debugW, "%s%s\n", debugInfoPrefix, scrub(fmt.Sprintf(format, args...)))
 }
 
 func writeHeaders(prefix string, header http.Header) {
@@ -59,7 +67,7 @@ func writeHeaders(prefix string, header http.Header) {
 	sort.Strings(keys)
 	for _, k := range keys {
 		for _, v := range header[k] {
-			_, _ = fmt.Fprintf(debugW, "%s%s: %s\n", prefix, k, clievents.RedactText(v))
+			_, _ = fmt.Fprintf(debugW, "%s%s: %s\n", prefix, output.StripControl(k), scrub(v))
 		}
 	}
 }
