@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add --debug to desktop commands (also via NEO4J_DEBUG=1) that routes Neo4j Desktop discovery and relate API request/response activity to stderr with secrets redacted
+time: 2026-06-08T17:48:02.819646+02:00

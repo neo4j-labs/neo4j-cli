@@ -32,3 +32,7 @@ Decisions: moved SetDebugWriterForTest/SetDebugForTest from export_test.go to pr
 ## TASK-008 — 2026-06-08T19:05:00Z
 Regenerated skill bundle for the new desktop persistent --debug flag; only neo4j-cli/internal/skill/bundle/references/desktop.md drifted (+1 flag row). Full make test now green (TestGenerator_RoundTrip passes); fmt-check, lint, generate-check all clean.
 Files: ~neo4j-cli/internal/skill/bundle/references/desktop.md
+
+## TASK-009 — 2026-06-08T17:50:00Z
+Added user-facing changelog entry (changie, kind Minor) for the desktop --debug flag. All final gates passed: make test, make fmt-check, make lint, make license-check green; go generate produced no bundle drift (generate-check clean).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260608-174802.yaml

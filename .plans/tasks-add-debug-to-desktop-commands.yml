@@ -180,7 +180,7 @@ tasks:
       the CLI-197/CLI-198 --debug entries). Then run and pass all final gates:
       make test, make fmt-check, make lint, make license-check (the new debug.go
       needs the Neo4j header), and make generate-check.
-    status: pending
+    status: completed
     dependencies:
       - task-007
       - task-008
@@ -188,4 +188,4 @@ tasks:
       - "Changelog entry added under .changes/unreleased for neo4j-cli, kind Minor"
       - "make test, make fmt-check, make lint, make license-check all pass"
       - "make generate-check is clean"
-    completed_at: null
+    completed_at: 2026-06-08T17:50:00Z
