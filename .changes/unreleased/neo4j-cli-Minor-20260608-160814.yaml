@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add --debug to docker commands to echo underlying docker invocations (secrets redacted) to stderr
+time: 2026-06-08T16:08:14.61072+02:00

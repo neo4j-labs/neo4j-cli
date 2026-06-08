@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clicfg/credentials"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/spf13/cobra"
 )
@@ -71,7 +72,7 @@ neo4j-cli docker start dev --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers

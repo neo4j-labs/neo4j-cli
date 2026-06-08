@@ -16,6 +16,12 @@ Manage local Neo4j Docker containers (create, list, get, start, stop, delete). S
 
 Usage: `neo4j-cli docker`
 
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--debug` | bool | false | Route docker CLI activity (the docker commands neo4j-cli shells out to, their env var names — never values — and exit status/timing) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
+
 ## neo4j-cli docker create
 
 Create a local Neo4j Docker container

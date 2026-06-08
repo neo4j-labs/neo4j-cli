@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/confirm"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +54,7 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 			cmd.SilenceUsage = true
 
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers

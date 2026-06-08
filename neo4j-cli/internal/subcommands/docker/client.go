@@ -10,13 +10,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/clievents"
+	"github.com/neo4j/cli/common/debug"
 )
 
 // lookPathFn is the injectable seam used by altRuntimeHint to detect
@@ -139,12 +142,13 @@ type execClient struct {
 	once       sync.Once
 	dockerPath string
 	lookupErr  error
+	debug      bool
 }
 
-// newClient returns the default exec-backed client. Wired by the docker
-// parent and each leaf in later tasks.
-func newClient() dockerClient {
-	return &execClient{}
+// newClient returns the default exec-backed client. When debug is true each
+// docker invocation echoes a redacted [docker-debug] trace to debugW.
+func newClient(debug bool) dockerClient {
+	return &execClient{debug: debug}
 }
 
 // NewDeployClient returns the default exec-backed dockerClient for callers
@@ -153,7 +157,51 @@ func newClient() dockerClient {
 // only this constructor and the dockerClient methods are reachable, preserving
 // the package's existing test seam.
 func NewDeployClient() dockerClient {
-	return newClient()
+	return newClient(false)
+}
+
+// debugW is the destination for --debug diagnostics from the docker package.
+// It defaults to os.Stderr and is overridable in tests via the export_test.go
+// SetDebugWriterForTest seam, mirroring the aura api package.
+var debugW io.Writer = os.Stderr
+
+const (
+	debugReqPrefix  = "[docker-debug] > "
+	debugRespPrefix = "[docker-debug] < "
+)
+
+// debugInvocation emits the redacted argv about to be exec'd, plus — when env
+// is non-empty — a single line of env var NAMES only. Env VALUES are NEVER
+// emitted: secrets travel through the docker process environment, so echoing a
+// value would defeat the whole reason for keeping it out of argv.
+func debugInvocation(args, env []string) {
+	_, _ = fmt.Fprintf(debugW, "%sdocker %s\n", debugReqPrefix, debug.Scrub(strings.Join(redactArgs(args), " ")))
+	if len(env) == 0 {
+		return
+	}
+	names := make([]string, len(env))
+	for i, kv := range env {
+		key := kv
+		if j := strings.IndexByte(kv, '='); j >= 0 {
+			key = kv[:j]
+		}
+		names[i] = debug.Scrub(key)
+	}
+	_, _ = fmt.Fprintf(debugW, "%senv %s\n", debugReqPrefix, strings.Join(names, " "))
+}
+
+// debugResult emits the process exit code and elapsed duration. A nil err is
+// exit 0; an *exec.ExitError carries the real code; any other error (e.g.
+// failure to start the process) falls back to -1.
+func debugResult(err error, elapsed time.Duration) {
+	code := -1
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		code = ee.ExitCode()
+	} else if err == nil {
+		code = 0
+	}
+	_, _ = fmt.Fprintf(debugW, "%sexit %d elapsed %s\n", debugRespPrefix, code, elapsed)
 }
 
 // resolve performs the cached exec.LookPath("docker") and converts a miss
@@ -201,7 +249,15 @@ func (c *execClient) runEnv(ctx context.Context, env []string, args ...string) (
 	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if c.debug {
+		debugInvocation(args, env)
+	}
+	start := time.Now()
+	runErr := cmd.Run()
+	if c.debug {
+		debugResult(runErr, time.Since(start))
+	}
+	if err := runErr; err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()

@@ -38,7 +38,7 @@ func runGet(t *testing.T, args string, containers map[string]Container) (*fakeDo
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	cmd := NewCmd(cfg)
@@ -208,7 +208,7 @@ func TestGet_DaemonError_Propagated(t *testing.T) {
 		return Container{}, fmt.Errorf("Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?")
 	}
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	fs, fsErr := testfs.GetTestFs(`{}`, `{

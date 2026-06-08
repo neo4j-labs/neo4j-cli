@@ -45,7 +45,7 @@ func newDeleteSetup(t *testing.T, containers map[string]Container, creds map[str
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	for name, pass := range creds {

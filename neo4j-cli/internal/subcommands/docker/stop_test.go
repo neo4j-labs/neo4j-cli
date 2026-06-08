@@ -43,7 +43,7 @@ func newStopSetup(t *testing.T, containers map[string]Container) *stopSetup {
 		fake.Containers[name] = c
 	}
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	out := bytes.NewBuffer(nil)

@@ -272,6 +272,63 @@ func TestSmoke_PortFallback(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(resolvedHTTP), labels[LabelHTTPPort], "label %s desync", LabelHTTPPort)
 }
 
+// TestSmoke_DebugEmitsToStderr exercises `docker <leaf> --debug` against a
+// REAL docker daemon and asserts the [docker-debug] trace reaches stderr.
+// Gated identically to the other smokes (build tag + LookPath skip).
+//
+// It creates a container with --debug, then asserts (against the debugW seam,
+// not cobra's command stderr — runEnv writes the trace to the package-global
+// debugW, not cmd.ErrOrStderr()):
+//   - the trace carries the `[docker-debug] > docker run ...` invocation line
+//     and a `[docker-debug] < exit 0 elapsed ...` result line;
+//   - the explicit container password never appears in the trace (env values
+//     travel via the docker process environment, never the debug trace).
+func TestSmoke_DebugEmitsToStderr(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not on PATH; skipping live smoke")
+	}
+
+	name := fmt.Sprintf("neo4j-cli-smoke-debug-%d", time.Now().UnixNano())
+	boltPort := pickFreePort(t)
+	httpPort := pickFreePort(t)
+	require.NotEqual(t, boltPort, httpPort, "free-port helper handed out the same port twice")
+
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "rm", "-f", name).Run()
+	})
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+
+	// runEnv writes the trace to the package-global debugW seam (no
+	// *cobra.Command in scope), NOT cmd.ErrOrStderr(); capture it here.
+	const password = "smoke-pw-do-not-leak"
+	var debugBuf bytes.Buffer
+	SetDebugWriterForTest(t, &debugBuf)
+
+	_, stderr, err := runDockerSubcommand(t, cfg, "create",
+		"--name", name,
+		"--password", password,
+		"--no-store-credential",
+		"--bolt-port", strconv.Itoa(boltPort),
+		"--http-port", strconv.Itoa(httpPort),
+		"--debug",
+		"--rw",
+	)
+	require.NoError(t, err, "create --debug failed; stderr=%s", stderr)
+
+	debugOut := debugBuf.String()
+	assert.Contains(t, debugOut, debugReqPrefix+"docker run", "trace missing docker invocation; trace=%s", debugOut)
+	assert.Contains(t, debugOut, debugRespPrefix+"exit 0 elapsed", "trace missing exit/elapsed; trace=%s", debugOut)
+	// env line lists the injected NAME; the value must never appear.
+	assert.Contains(t, debugOut, "NEO4J_AUTH", "trace missing env name; trace=%s", debugOut)
+	assert.NotContains(t, debugOut, password, "secret password leaked into debug trace; trace=%s", debugOut)
+}
+
 // pickFreePort allocates and immediately releases a TCP port on 127.0.0.1.
 // The tiny TOCTOU window between Close and `docker run -p` claiming the
 // port is acceptable for a dev-only smoke test; the OS rarely re-uses an

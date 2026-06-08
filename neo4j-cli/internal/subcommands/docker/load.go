@@ -18,6 +18,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/flags"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dataset"
@@ -103,7 +104,7 @@ neo4j-cli docker load neo4j-graph-examples/movies --name movies --force --rw`,
 				return clierr.NewUsageError("resolve dataset %q: %s", ownerRepo, err.Error())
 			}
 
-			client := clientFactory()
+			client := clientFactory(debug.Resolve(cmd))
 
 			// Decide new-vs-existing by inspecting the requested name. A
 			// missing container (ErrNotFound) takes the new path; any other

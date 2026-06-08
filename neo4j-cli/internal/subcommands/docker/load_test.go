@@ -56,7 +56,7 @@ func runLoad(t *testing.T, fake *fakeDockerClient, deps *loadDeps, args string) 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -285,7 +285,7 @@ func TestLoad_ExistingContainer_ForceLoadsWithCredential(t *testing.T) {
 	require.NoError(t, cfg.Credentials.Dbms.Add("movies", "neo4j", "pw", "neo4j", "neo4j://localhost:7687"))
 
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 	stubListenerFactory(t)
 

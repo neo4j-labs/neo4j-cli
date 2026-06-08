@@ -1,0 +1,151 @@
+feature: add-debug-to-docker-commands
+prd: ./prd-add-debug-to-docker-commands.md
+created_at: 2026-06-08T13:52:57Z
+updated_at: 2026-06-08T13:52:57Z
+
+tasks:
+  - id: task-001
+    title: "Centralize Scrub in common/debug; aura scrub delegates"
+    description: |
+      Add exported `func Scrub(s string) string { return output.StripControl(clievents.RedactText(s)) }`
+      to common/debug/debug.go with imports of common/clievents and common/output.
+      Refactor the local `scrub` in neo4j-cli/aura/internal/api/debug.go to a
+      one-line delegate `return debug.Scrub(s)`, leaving the debugW seam,
+      SetDebugWriterForTest, and [aura-debug] prefixes untouched.
+    status: completed
+    completed_at: 2026-06-08T13:55:38Z
+    dependencies: []
+    acceptance_criteria:
+      - "common/debug.Scrub exists and returns output.StripControl(clievents.RedactText(s))"
+      - "No import cycle: package compiles (go build ./common/debug/...)"
+      - "aura api scrub delegates to debug.Scrub; aura api tests still pass unchanged"
+      - "go test ./common/debug/... ./neo4j-cli/aura/internal/api/... passes"
+
+  - id: task-002
+    title: "Docker client: debug field, newClient(bool), debugW seam, emit in runEnv"
+    description: |
+      In neo4j-cli/internal/subcommands/docker/client.go add a `debug bool` field to
+      execClient; change newClient() to newClient(debug bool) setting the field; keep
+      NewDeployClient() no-arg returning newClient(false). Add `var debugW io.Writer =
+      os.Stderr` plus standalone emit helpers (writing via debug.Scrub) using prefixes
+      "[docker-debug] > " and "[docker-debug] < ": invocation line (scrubbed+redacted
+      argv) then env var NAMES only (split each KEY=VALUE on first '=', never the value);
+      result line "exit <code> elapsed <dur>" with code via errors.As(*exec.ExitError)
+      else -1. Capture start time before cmd.Run() and wire the guarded (`if c.debug`)
+      emit calls before/after cmd.Run() in runEnv. Add `time` import. Add an
+      export_test.go exposing SetDebugWriterForTest(t, w) mirroring aura.
+    status: completed
+    completed_at: 2026-06-08T13:58:44Z
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "newClient(debug bool) sets execClient.debug; NewDeployClient() -> newClient(false)"
+      - "runEnv emits invocation + env-key-names + exit/elapsed only when c.debug is true"
+      - "Env VALUES never emitted; only names; argv passes through redactArgs + debug.Scrub"
+      - "debugW seam defaults to os.Stderr and is overridable via SetDebugWriterForTest"
+      - "Package compiles; off-path (debug=false) emits nothing"
+
+  - id: task-003
+    title: "Register --debug persistent flag on docker parent"
+    description: |
+      In neo4j-cli/internal/subcommands/docker/docker.go NewCmd, register a persistent
+      bool flag `--debug` (default false) with a description mirroring aura's style and
+      docker semantics, including the "[env: NEO4J_DEBUG (set to 1 to enable)]" suffix.
+      No PersistentPreRunE — resolution happens at each leaf's client construction.
+    status: completed
+    completed_at: 2026-06-08T14:05:00Z
+    dependencies: []
+    acceptance_criteria:
+      - "cmd.PersistentFlags() registers a bool --debug default false on the docker parent"
+      - "Flag help text mentions NEO4J_DEBUG and that secrets/env values are redacted"
+      - "No PersistentPreRunE added to the docker parent"
+
+  - id: task-004
+    title: "Leaves pass debug.Resolve(cmd); update test factory overrides"
+    description: |
+      In all 7 docker leaves (create, delete, get, list, load, start, stop) change
+      clientFactory() to clientFactory(debug.Resolve(cmd)) and add the common/debug
+      import where missing. Update the `var clientFactory = newClient` declaration to
+      match the new func(bool) dockerClient signature. Update every
+      `clientFactory = func() dockerClient { return fake }` override across the docker
+      *_test.go files (~15 sites) to `func(bool) dockerClient { return fake }`.
+    status: completed
+    completed_at: 2026-06-08T14:03:13Z
+    dependencies:
+      - task-002
+      - task-003
+    acceptance_criteria:
+      - "All 7 leaves call clientFactory(debug.Resolve(cmd))"
+      - "clientFactory var has signature func(bool) dockerClient"
+      - "All test clientFactory overrides updated to accept and discard the bool"
+      - "go build ./neo4j-cli/... and existing docker tests compile"
+
+  - id: task-005
+    title: "Tests: debug emit unit tests + smoke assertion"
+    description: |
+      Add neo4j-cli/internal/subcommands/docker/debug_test.go unit-testing the emit
+      helpers against a bytes.Buffer via SetDebugWriterForTest: argv scrubbed; env keys
+      only with no values (assert a secret value such as a generated password never
+      appears, only the key name); exit/elapsed line shape; off-path (debug=false)
+      emits nothing. Extend the -tags=smoke suite with an assertion that [docker-debug]
+      lines reach stderr when running a real docker command with --debug.
+    status: completed
+    completed_at: 2026-06-08T14:12:00Z
+    dependencies:
+      - task-002
+      - task-004
+    acceptance_criteria:
+      - "Unit tests assert argv is scrubbed and env shows names only, no values"
+      - "Unit test asserts a secret value never appears in emitted output"
+      - "Unit test asserts off-path emits nothing and exit/elapsed line shape"
+      - "Smoke test (-tags=smoke) asserts [docker-debug] lines on stderr with real docker"
+      - "go test ./neo4j-cli/internal/subcommands/docker/... passes"
+
+  - id: task-006
+    title: "Regenerate skill bundle + agent-context; add changelog"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` (or make generate) to regenerate
+      bundle/references/docker.md and any agent-context snapshot drift from the new
+      persistent flag, and commit the regenerated artifacts. Add a changelog entry via
+      `changie new --projects neo4j-cli --kind Minor --body "Add --debug to docker
+      commands to echo underlying docker invocations (secrets redacted) to stderr"`.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "go generate produces an updated references/docker.md reflecting --debug"
+      - "make generate-check passes on a clean tree (no residual drift)"
+      - "Changelog file added under .changes/unreleased for project neo4j-cli, kind Minor"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: 2026-06-08T14:10:00Z
+
+  - id: task-007
+    title: "Fix TestSmoke_DebugEmitsToStderr to capture via debugW seam"
+    description: |
+      CI on PR #218 failed: TestSmoke_DebugEmitsToStderr (smoke_test.go) asserts
+      empty output ("" does not contain "[docker-debug] > docker run"). Root cause:
+      the test captures cobra's command stderr via runDockerSubcommand
+      (root.SetErr(&errBuf)), but the docker debug trace is written to the
+      package-global debugW seam (var debugW io.Writer = os.Stderr), NOT to
+      cmd.ErrOrStderr(). This is intentional and aura-consistent (runEnv has no
+      *cobra.Command), so the trace reaches the real os.Stderr while errBuf stays
+      empty. Fix is test-only: redirect the debug seam into a buffer with
+      SetDebugWriterForTest(t, &debugBuf) before invoking the real-docker create
+      --debug, and assert the [docker-debug] invocation/result lines and the
+      NEO4J_AUTH env name against debugBuf. Keep the real-docker create so runEnv
+      actually fires, and keep the password-absence assertion against debugBuf.
+      Do NOT change production code.
+    status: completed
+    source: review
+    dependencies:
+      - task-005
+    acceptance_criteria:
+      - "TestSmoke_DebugEmitsToStderr captures the trace via SetDebugWriterForTest(t, &buf), not cobra stderr"
+      - "Asserts [docker-debug] > docker run, [docker-debug] < exit 0 elapsed, and NEO4J_AUTH name against the buffer"
+      - "Password-absence assertion preserved against the buffer; no production code changed"
+      - "go build -tags=smoke ./neo4j-cli/internal/subcommands/docker/... compiles; make test, make fmt-check, make lint pass"
+    completed_at: 2026-06-08T15:02:00Z

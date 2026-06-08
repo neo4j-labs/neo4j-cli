@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/debug"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ neo4j-cli docker get dev --format toon`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 
 			container, err := client.Inspect(ctx, name)

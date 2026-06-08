@@ -132,7 +132,7 @@ func runCreateWithOccupiedPortsAndStderr(t *testing.T, args string, occupiedPort
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t, occupiedPorts...)
@@ -469,7 +469,7 @@ func TestCreate_PortPreflight_ProbesBoltThenHTTP_OnSuccess(t *testing.T) {
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	probed := stubListenerFactory(t)
@@ -590,7 +590,7 @@ func runCreateWithSeed(t *testing.T, args string, dockerNames []string, credenti
 		fake.PsEntries = append(fake.PsEntries, PsEntry{Names: n})
 	}
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -750,7 +750,7 @@ func TestCreate_Wait_HappyPath_SucceedsAndNarrates(t *testing.T) {
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -806,7 +806,7 @@ func TestCreate_Wait_Timeout_ReturnsErrorAndLeavesContainerRunning(t *testing.T)
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -869,7 +869,7 @@ func runCreateForEphemeral(t *testing.T, args string) (*fakeDockerClient, *clicf
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -1013,7 +1013,7 @@ func TestCreate_Ephemeral_EnvOutFile_ChmodsPreexistingFileTo0600(t *testing.T) {
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
@@ -1063,7 +1063,7 @@ func TestCreate_PortPreflight_EqualPorts_SkipsListenCalls(t *testing.T) {
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	probed := stubListenerFactory(t)
@@ -1396,7 +1396,7 @@ func TestCreate_DataDir_PreexistingDir_NoCreatedInfoLine(t *testing.T) {
 	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 	stubListenerFactory(t)
 
@@ -1529,7 +1529,7 @@ func TestCreate_Ephemeral_EnvOutFile_RenameFailure_NoTempLeftover(t *testing.T) 
 
 	fake := newFakeDockerClient()
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	stubListenerFactory(t)
