@@ -58,7 +58,7 @@ tasks:
       Discover logs which tier resolved; FetchAppInfo emits debugRequest/
       debugResponse around its httpDoFn call. All emission is gated by the
       shared debugEnabled flag (helpers already no-op when off).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -66,7 +66,7 @@ tasks:
       - "mDNS/dns-sd discovery outcome and the resolved Discover tier are logged"
       - "FetchAppInfo emits request/response debug lines around its HTTP call"
       - "No discovery behavior (return values, error mapping) changes when debug is off"
-    completed_at: null
+    completed_at: 2026-06-08T15:05:00Z
 
   - id: task-004
     title: 'Add --debug persistent flag + PersistentPreRunE on desktop root'

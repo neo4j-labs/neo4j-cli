@@ -6,3 +6,7 @@ Decisions: emit helpers re-exported as Debug*ForTest in export_test.go (not //no
 ## TASK-002 — 2026-06-08T14:05:00Z
 Wired desktopclient doRaw into the debug seam: capture marshalled rawBody (request unchanged), debugRequest before httpDoFn (start time), debugResponse after body read with elapsed, debugInfo("transport error after %s: ...") on the transport-error path before canonical mapping. NewClient now calls clievents.RegisterSecretValue(token) so the X-API-Token JWT is scrubbed everywhere. All three emit helpers now have production callers; trimmed the stale "rooting" note in export_test.go (kept the re-exports as genuine test drivers).
 Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopclient/export_test.go
+
+## TASK-003 — 2026-06-08T15:05:00Z
+Traced the discovery wire: probeOne emits "probe GET <url>" then "-> <status>"/"-> miss: <err>"; advertisedPort distinguishes mdns-multicast vs dns-sd advertised port and emits "mdns no responder" on miss; Discover logs the resolved tier (pinned/mdns/port scan) with origin; FetchAppInfo mirrors doRaw (debugRequest before httpDoFn, debugResponse after body read, transport-error debugInfo). All emit helpers no-op when off; return values/error mapping/e2e overrides untouched.
+Files: ~neo4j-cli/internal/desktopclient/discovery.go
