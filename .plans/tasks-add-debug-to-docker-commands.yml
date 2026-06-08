@@ -109,7 +109,7 @@ tasks:
       persistent flag, and commit the regenerated artifacts. Add a changelog entry via
       `changie new --projects neo4j-cli --kind Minor --body "Add --debug to docker
       commands to echo underlying docker invocations (secrets redacted) to stderr"`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -121,4 +121,4 @@ tasks:
       - "make generate-check passes on a clean tree (no residual drift)"
       - "Changelog file added under .changes/unreleased for project neo4j-cli, kind Minor"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: 2026-06-08T14:10:00Z

@@ -21,3 +21,7 @@ Verify: go build ./... ok; docker tests 247 pass; fmt-check ok; lint 0 issues. m
 Added unit tests for the debug emit helpers (debug_test.go, package docker, NOT smoke-tagged): debugInvocation scrubs argv (NEO4J_AUTH=***), emits env NAMES only (assert secret values s3cr3t/p4ssw0rd and env =VALUE halves absent); no-env case omits the env line; table-driven debugResult exercises exit 0 / 2 / -1 fallback + elapsed shape; off-path test asserts newClient(false).debug==false and buffer empty. Extended -tags=smoke suite with TestSmoke_DebugEmitsToStderr: creates a real container with --debug, asserts `[docker-debug] > docker run` and `< exit 0 elapsed` reach stderr and the password never appears.
 Files: +debug_test.go, ~smoke_test.go
 Verify: go test ./.../docker/... 254 pass; go build/vet -tags=smoke compile clean; fmt-check ok; lint 0 issues. make test fails ONLY on TestGenerator_RoundTrip — expected, deferred to task-006.
+
+## TASK-006 — 2026-06-08T14:10:00Z
+Regenerated skill bundle (go generate ./neo4j-cli/internal/skill/...): only references/docker.md drifted, adding the new --debug persistent flag row. go generate ./... confirms no other drift; agent-context reflects the live cobra tree at runtime (no golden snapshot to regenerate). Added changelog via changie new --projects neo4j-cli --kind Minor. ALL gates pass: TestGenerator_RoundTrip PASSES, make test green, fmt-check ok, lint 0 issues, license-check ok.
+Files: ~neo4j-cli/internal/skill/bundle/references/docker.md, +.changes/unreleased/neo4j-cli-Minor-20260608-160814.yaml
