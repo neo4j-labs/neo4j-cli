@@ -149,3 +149,69 @@ tasks:
       - "A changie Minor entry describing aura --debug is added"
       - "make test, make fmt-check, and make lint all pass clean"
     completed_at: 2026-06-08T11:25:00Z
+
+  - id: task-009
+    title: 'Strip terminal control/ANSI escapes from --debug output'
+    description: |
+      Security finding (Medium, DREAD ~4.0, STRIDE Tampering): the aura --debug
+      dump in neo4j-cli/aura/internal/api/debug.go writes RedactText'd request/
+      response bodies, header values, and URLs straight to the operator's
+      terminal via fmt.Fprintf. RedactText performs regex secret-redaction only —
+      it does NOT strip control characters. Aura data is attacker-influenceable
+      (resource names, DB properties can carry C0 control bytes — this is exactly
+      why the TOON output path stripControlDeeps and the table path StripControls
+      every cell, per AGENTS.md). The --debug path is currently the ONLY output
+      surface in the codebase that bypasses that protection, so an Aura
+      instance/agent/key named with an embedded escape (\x1b[2J, cursor moves,
+      OSC title/hyperlink sequences) renders into the terminal of anyone running
+      an aura read command with --debug — enabling terminal corruption, forged
+      status-line/output spoofing, and clickable-link spoofing (not RCE on modern
+      terminals, but a real stored-injection terminal-tampering vector). Fix:
+      common/output.StripControl already exists (preserves \t \n \r, replaces
+      other C0 + DEL with "?") and the api package already imports common/output
+      (response.go), so wrap the redacted strings in output.StripControl in
+      debug.go — apply to the body, each header value, the URL, and the debugInfo
+      format result. Keep RedactText first, then StripControl on the result.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "Every string written by debugRequest/debugResponse/debugInfo/writeHeaders (body, header values, URL, info lines) is passed through output.StripControl after RedactText"
+      - "A test asserts a response field / header value containing \\x1b (and other C0 control bytes) renders with the escape neutralised (e.g. as \"?\") in the captured debug output, while \\t/\\n/\\r are preserved"
+      - "No new import beyond the already-present common/output; no import cycle"
+      - "make test, make fmt-check, make lint pass clean"
+    completed_at: null
+    source: review
+
+  - id: task-010
+    title: 'Document residual redaction gap in --debug (opaque JSON secrets)'
+    description: |
+      Security finding (Low): clievents.RedactText is shape-based — it scrubs
+      secrets whose JSON keys contain a secretWords substring (password, secret,
+      token, key, apikey, ...), URI userinfo passwords, and Bearer/Basic headers,
+      plus literal RegisterSecretValue values. It cannot redact secrets nested
+      under custom/opaque keys that lack a vocabulary substring. The --debug dump
+      emits the FULL raw request/response bodies, which is broader than the
+      PrintBody-filtered fields a command displays. The clearest exposure is
+      `agent create --tools <JSON>`, which accepts arbitrary user JSON that may
+      embed auth material under non-vocabulary keys (e.g. an MCP tool's
+      {"headers":{"X-Auth":"raw"}}). This is the user's own secret in their own
+      terminal, so the residual risk is mainly pasting --debug output into a bug
+      report — but the broadened surface warrants an explicit, reviewable note so
+      future audits don't treat it as an oversight. Fix: add a concise
+      `// security:` comment at the dump site in debug.go documenting that the
+      dump is best-effort-redacted and may surface secrets under custom JSON keys,
+      and extend the --debug flag help text (neo4j-cli/aura/aura.go) to note that
+      output may include request/response bodies. No functional redaction change.
+    status: pending
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "A `// security:` comment at the debug dump site documents the shape-based RedactText limitation and the residual opaque-JSON-secret risk"
+      - "The --debug flag help text mentions that output may include (best-effort-redacted) request/response bodies"
+      - "If the help-text change touches generated bundle docs, go generate ./neo4j-cli/internal/skill/... is run and TestGenerator_RoundTrip stays green"
+      - "make test, make fmt-check, make lint pass clean"
+    completed_at: null
+    source: review

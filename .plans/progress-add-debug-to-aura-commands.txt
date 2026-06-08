@@ -37,3 +37,6 @@ Decisions: written in package api_test (external test pkg) so it can call SetDeb
 Final task. go generate produced no bundle drift (task-002 already regenerated references/aura.md for the --debug row). Added changie Minor entry for the user-facing aura --debug flag. Full gate set green: make test, make fmt-check, make lint, generate-check (bundle clean), license-check; TestAllLeafCommands_HaveExamples + both casing gates pass. Note: progress-log's earlier TestOutputFields_AreSnakeCase stale-worktree failure did NOT reproduce here — clean.
 Files: +.changes/unreleased/neo4j-cli-Minor-20260608-112201.yaml
 Decisions: pre-existing aura-cli-Minor-20260506 unreleased entry is unrelated (different project key) — left untouched.
+
+## REVIEW — 2026-06-08T11:40:00Z
+Added 2 review tasks (task-009..task-010) from golang-security review: F1 strip control/ANSI escapes in --debug output (Medium), F2 document residual opaque-JSON redaction gap (Low).
