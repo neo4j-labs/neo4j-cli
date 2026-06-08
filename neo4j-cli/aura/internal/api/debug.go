@@ -1,0 +1,59 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package api
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"sort"
+	"time"
+
+	"github.com/neo4j/cli/common/clievents"
+)
+
+// debugW is the destination for --debug diagnostics from the api package
+// (MakeRequest/getToken/Poll). It defaults to os.Stderr and is overridable in
+// tests, following the existing var-seam pattern (e.g. driverOpener).
+var debugW io.Writer = os.Stderr
+
+const (
+	debugReqPrefix  = "[aura-debug] > "
+	debugRespPrefix = "[aura-debug] < "
+	debugInfoPrefix = "[aura-debug] "
+)
+
+// debugRequest emits the method, URL, headers, and body of an outgoing request.
+func debugRequest(method, url string, header http.Header, body []byte) {
+	_, _ = fmt.Fprintf(debugW, "%s%s %s\n", debugReqPrefix, method, clievents.RedactText(url))
+	writeHeaders(debugReqPrefix, header)
+	if len(body) > 0 {
+		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugReqPrefix, clievents.RedactText(string(body)))
+	}
+}
+
+// debugResponse emits the status, headers, body, and elapsed duration of a
+// response.
+func debugResponse(statusCode int, header http.Header, body []byte, elapsed time.Duration) {
+	_, _ = fmt.Fprintf(debugW, "%s%d %s\n", debugRespPrefix, statusCode, http.StatusText(statusCode))
+	writeHeaders(debugRespPrefix, header)
+	if len(body) > 0 {
+		_, _ = fmt.Fprintf(debugW, "%s%s\n", debugRespPrefix, clievents.RedactText(string(body)))
+	}
+	_, _ = fmt.Fprintf(debugW, "%selapsed %s\n", debugInfoPrefix, elapsed)
+}
+
+func writeHeaders(prefix string, header http.Header) {
+	keys := make([]string, 0, len(header))
+	for k := range header {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		for _, v := range header[k] {
+			_, _ = fmt.Fprintf(debugW, "%s%s: %s\n", prefix, k, clievents.RedactText(v))
+		}
+	}
+}

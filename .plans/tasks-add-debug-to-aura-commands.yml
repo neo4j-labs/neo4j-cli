@@ -48,7 +48,7 @@ tasks:
       response status, headers, body, and elapsed duration. Request/response
       lines are distinguishable (prefix or tag). All output passes through
       clievents.RedactText. Work is fully guarded so the off-path is unchanged.
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -57,7 +57,7 @@ tasks:
       - "All emitted text is passed through clievents.RedactText before writing"
       - "A package-level writer seam defaults to os.Stderr and is overridable in tests"
       - "When debug is off, no debug output is produced and the redact/format work is skipped"
-    completed_at: null
+    completed_at: 2026-06-08T12:00:00Z
 
   - id: task-004
     title: 'Emit token-acquisition diagnostics in getToken'

@@ -7,3 +7,8 @@ Decisions: debug state lives on AuraConfig mirroring activeCredential per-invoca
 Registered persistent --debug flag on aura root + chained PersistentPreRunE that resolves via debug.Resolve and stores on cfg.Aura.SetDebug. Regenerated skill bundle (one --debug row in references/aura.md).
 Files: ~neo4j-cli/aura/aura.go, +neo4j-cli/aura/debug_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
 Decisions: aura-root hook reaches the mounted `neo4j-cli aura ...` surface only because the neo4j-cli root sets cobra.EnableTraverseRunHooks=true (subcommands like instance define their own PersistentPreRunE which would otherwise shadow it). Test mirrors this by mounting under a stub root with EnableTraverseRunHooks=true.
+
+## TASK-003 — 2026-06-08T12:00:00Z
+MakeRequest emits redacted request/response wire + elapsed to a package-level debugW seam (default os.Stderr) when cfg.Aura.Debug() is on; [aura-debug] >/< prefixes. createBody->marshalBody returns []byte so the body can be dumped and re-read. Error path reads/restores res.Body so handleResponseError is unaffected.
+Files: +neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/debug_test.go, ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/export_test.go
+Decisions: debugf/getToken/Poll diagnostics deferred to task-004/005 (left no unused helpers — lint gate is strict).
