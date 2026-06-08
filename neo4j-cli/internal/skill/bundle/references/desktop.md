@@ -34,6 +34,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `--debug` | bool | false | Route Neo4j Desktop relate API activity (discovery probes, mDNS, the local HTTP request/response wire) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
 | `--port` | int | 0 | Pin the Desktop relate API to a specific port instead of probing 44222..44232 |
 
 ## neo4j-cli desktop connection

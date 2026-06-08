@@ -163,14 +163,14 @@ tasks:
       `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated
       bundle alongside the source so TestGenerator_RoundTrip / make
       generate-check pass.
-    status: pending
+    status: completed
     dependencies:
       - task-004
     acceptance_criteria:
       - "go generate ./neo4j-cli/internal/skill/... run and regenerated bundle committed"
       - "TestGenerator_RoundTrip passes"
       - "make generate-check is clean on a committed tree"
-    completed_at: null
+    completed_at: 2026-06-08T19:05:00Z
 
   - id: task-009
     title: 'Add changelog entry and pass all final gates'
