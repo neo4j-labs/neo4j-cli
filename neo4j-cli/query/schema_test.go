@@ -108,6 +108,9 @@ func TestSchema_HappyPath_JSON(t *testing.T) {
 	err := h.execute(t,
 		"--uri=neo4j://example:7687",
 		"--password=pw",
+		// Explicit --database so the rendered database.name is asserted; with no
+		// --database the server resolves the home DB and name is left unset.
+		"--database=neo4j",
 		":schema",
 	)
 	require.NoError(t, err)
@@ -159,6 +162,8 @@ func TestSchema_DefaultOutputNonTTYIsJSON(t *testing.T) {
 	err := h.execute(t,
 		"--uri=neo4j://example:7687",
 		"--password=pw",
+		// Explicit --database so the rendered database.name is asserted below.
+		"--database=neo4j",
 		":schema",
 	)
 	require.NoError(t, err)
@@ -322,6 +327,8 @@ func TestSchema_OptionalQueryFailureSwallowed(t *testing.T) {
 	err := h.execute(t,
 		"--uri=neo4j://example:7687",
 		"--password=pw",
+		// Explicit --database so database.name is set from the connection.
+		"--database=neo4j",
 		":schema",
 	)
 	require.NoError(t, err)
@@ -329,8 +336,8 @@ func TestSchema_OptionalQueryFailureSwallowed(t *testing.T) {
 	var got schemaResult
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &got))
 
-	// Database section is present (we always set Name from the connection)
-	// but versions/edition/default_language are empty since both probes failed.
+	// Database section is present (Name comes from the explicit --database) but
+	// versions/edition/default_language are empty since both probes failed.
 	require.NotNil(t, got.Database)
 	assert.Equal(t, "neo4j", got.Database.Name)
 	assert.Empty(t, got.Database.Versions)

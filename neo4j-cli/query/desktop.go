@@ -198,11 +198,12 @@ func buildConnFromDesktopMatch(m *desktopMatch, cfg *clicfg.Config, cmd *cobra.C
 		}
 		password = m.creds.Password
 	}
+	// database is intentionally left unset (zero value "") so the session
+	// resolves the user's home database; see resolveConn for the rationale.
 	return &conn{
 		uri:       uri,
 		username:  username,
 		password:  password,
-		database:  defaultDatabase,
 		userAgent: "neo4j-cli/v" + version,
 		debug:     resolveDebug(cmd),
 	}

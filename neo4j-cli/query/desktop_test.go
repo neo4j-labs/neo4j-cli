@@ -94,7 +94,8 @@ func TestResolveConn_DesktopActive_Resolves(t *testing.T) {
 	assert.Equal(t, "neo4j://localhost:7690", c.uri)
 	assert.Equal(t, "neo4j", c.username)
 	assert.Equal(t, "running-pw", c.password)
-	assert.Equal(t, defaultDatabase, c.database)
+	// Database left unset → server resolves the home database (CLI-211).
+	assert.Equal(t, "", c.database)
 }
 
 // TestResolveConn_DesktopActive_NullCreds_TTYPrompts verifies REQ-F-028 on
