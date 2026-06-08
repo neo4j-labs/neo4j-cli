@@ -78,7 +78,7 @@ tasks:
       desktopclient.SetDebug(debug.Resolve(cmd)). Rely on the neo4j-cli root's
       cobra.EnableTraverseRunHooks=true so it runs for every nested leaf; confirm
       no leaf/subtree shadows it with its own PersistentPreRunE.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -86,7 +86,7 @@ tasks:
       - "PersistentPreRunE calls desktopclient.SetDebug(debug.Resolve(cmd))"
       - "Flag is inherited by all leaves across dbms, dbms/plugin, connection, list, doctor, install"
       - "Flag description mirrors aura/docker style with the NEO4J_DEBUG env suffix"
-    completed_at: null
+    completed_at: 2026-06-08T16:05:00Z
 
   - id: task-005
     title: 'Register write-command passwords as secret values'

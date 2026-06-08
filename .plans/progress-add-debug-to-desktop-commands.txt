@@ -10,3 +10,8 @@ Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopc
 ## TASK-003 — 2026-06-08T15:05:00Z
 Traced the discovery wire: probeOne emits "probe GET <url>" then "-> <status>"/"-> miss: <err>"; advertisedPort distinguishes mdns-multicast vs dns-sd advertised port and emits "mdns no responder" on miss; Discover logs the resolved tier (pinned/mdns/port scan) with origin; FetchAppInfo mirrors doRaw (debugRequest before httpDoFn, debugResponse after body read, transport-error debugInfo). All emit helpers no-op when off; return values/error mapping/e2e overrides untouched.
 Files: ~neo4j-cli/internal/desktopclient/discovery.go
+
+## TASK-004 — 2026-06-08T16:05:00Z
+Registered persistent --debug Bool on desktop NewCmd (aura/docker wording + NEO4J_DEBUG env suffix) and wrapped PersistentPreRunE (defensive prev capture, aura shape) to call desktopclient.SetDebug(debug.Resolve(cmd)); relies on root EnableTraverseRunHooks so it fires for every nested leaf. Confirmed no production PersistentPreRunE shadows the desktop subtree (only a comment in plugin/install_test.go).
+Files: ~neo4j-cli/internal/subcommands/desktop/desktop.go
+Decisions: bundle drift (references/*.md) deferred to task-008 — make test fails ONLY on TestGenerator_RoundTrip as expected; all other gates green.
