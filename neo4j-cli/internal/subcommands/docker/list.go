@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/debug"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +39,7 @@ neo4j-cli docker list --format json
 # Emit TOON for token-efficient ingestion by agents
 neo4j-cli docker list --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client := clientFactory(false)
+			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 
 			entries, err := client.PsAll(ctx, []string{"label=" + LabelManaged + "=true"})

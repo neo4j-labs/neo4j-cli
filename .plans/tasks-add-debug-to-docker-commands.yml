@@ -69,7 +69,8 @@ tasks:
       match the new func(bool) dockerClient signature. Update every
       `clientFactory = func() dockerClient { return fake }` override across the docker
       *_test.go files (~15 sites) to `func(bool) dockerClient { return fake }`.
-    status: pending
+    status: completed
+    completed_at: 2026-06-08T14:03:13Z
     dependencies:
       - task-002
       - task-003

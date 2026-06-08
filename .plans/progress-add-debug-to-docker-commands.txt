@@ -11,3 +11,8 @@ Decisions: Minimal compile-fix only — leaf clientFactory() → clientFactory(f
 Registered persistent bool --debug (default false) on the docker parent NewCmd, placed after the cmd struct literal before AddCommand calls. Description mirrors aura/query style + NEO4J_DEBUG suffix; emphasizes env var NAMES only (never values). No PersistentPreRunE (resolution happens per-leaf in task-004).
 Files: ~neo4j-cli/internal/subcommands/docker/docker.go
 Decisions: go build / docker tests / fmt-check / lint all green. Skill-bundle regeneration (references/docker.md drift from the new flag) is deferred to task-006 — confirmed via go generate that docker.md is the only drift; reverted here.
+
+## TASK-004 — 2026-06-08T14:03:13Z
+Wired real debug resolution: replaced placeholder clientFactory(false) with clientFactory(debug.Resolve(cmd)) in all 7 leaves (RunE param is `cmd` in each); added common/debug import where missing. var clientFactory = newClient already func(bool); test overrides already func(bool) from task-002 — left intact. NewDeployClient unaffected.
+Files: ~create.go,~delete.go,~get.go,~list.go,~load.go,~start.go,~stop.go
+Verify: go build ./... ok; docker tests 247 pass; fmt-check ok; lint 0 issues. make test fails ONLY on TestGenerator_RoundTrip (references/docker.md drift) — expected, deferred to task-006.

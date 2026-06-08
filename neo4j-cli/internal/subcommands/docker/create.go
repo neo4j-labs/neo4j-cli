@@ -20,6 +20,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/flags"
 	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/spf13/afero"
@@ -272,7 +273,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// names from docker (managed or not — docker enforces global name
 			// uniqueness) AND every stored dbms credential name. Pick the
 			// requested name when free; otherwise try <name>-1 … <name>-99.
-			client := clientFactory(false)
+			client := clientFactory(debug.Resolve(cmd))
 			ctx := cmd.Context()
 			chosenName, err := resolveContainerName(ctx, client, cfg, name)
 			if err != nil {
