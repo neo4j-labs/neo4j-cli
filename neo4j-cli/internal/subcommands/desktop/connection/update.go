@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/spf13/cobra"
@@ -92,6 +93,10 @@ neo4j-cli desktop connection update f4e2f3c0-1111-2222-3333-444455556666 --descr
 			client, err := newDesktopClientFn(ctx, fs, port)
 			if err != nil {
 				return err
+			}
+
+			if passwordSet && password != "" {
+				clievents.RegisterSecretValue(password)
 			}
 
 			updateArgs := desktopclient.ConnectionUpdateArgs{}

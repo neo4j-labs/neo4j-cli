@@ -12,6 +12,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/spf13/afero"
@@ -192,6 +193,8 @@ neo4j-cli desktop connection create --name aura-dev --uri neo4j+s://xyz789.datab
 			if cmd.Flag(descriptionFlag).Changed {
 				args2.Description = description
 			}
+
+			clievents.RegisterSecretValue(password)
 
 			created, err := client.CreateConnection(ctx, args2)
 			if err != nil {

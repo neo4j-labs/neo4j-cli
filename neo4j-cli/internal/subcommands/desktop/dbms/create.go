@@ -14,6 +14,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/spf13/cobra"
@@ -216,6 +217,8 @@ neo4j-cli desktop dbms create --name my-dbms --version 5.21.0 --password superse
 				}
 			}
 
+			// The relate body keys the password under "credentials", which RedactText does not catch — register it explicitly.
+			clievents.RegisterSecretValue(password)
 			created, err := client.CreateDbms(ctx, desktopclient.CreateDbmsRequest{
 				Name:     name,
 				Version:  version,

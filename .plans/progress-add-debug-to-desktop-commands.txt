@@ -15,3 +15,7 @@ Files: ~neo4j-cli/internal/desktopclient/discovery.go
 Registered persistent --debug Bool on desktop NewCmd (aura/docker wording + NEO4J_DEBUG env suffix) and wrapped PersistentPreRunE (defensive prev capture, aura shape) to call desktopclient.SetDebug(debug.Resolve(cmd)); relies on root EnableTraverseRunHooks so it fires for every nested leaf. Confirmed no production PersistentPreRunE shadows the desktop subtree (only a comment in plugin/install_test.go).
 Files: ~neo4j-cli/internal/subcommands/desktop/desktop.go
 Decisions: bundle drift (references/*.md) deferred to task-008 — make test fails ONLY on TestGenerator_RoundTrip as expected; all other gates green.
+
+## TASK-005 — 2026-06-08T17:05:00Z
+Registered the resolved password via clievents.RegisterSecretValue before the client call in all three write leaves so the --debug request-body trace is redacted. dbms/create.go is the load-bearing one (relate keys it under "credentials", which RedactText misses); connection update.go guards on passwordSet && non-empty.
+Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/update.go

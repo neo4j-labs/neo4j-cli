@@ -98,7 +98,7 @@ tasks:
       before client.CreateDbms, connection/create.go before
       client.CreateConnection, and connection/update.go before
       client.UpdateConnection (only when a password is set).
-    status: pending
+    status: completed
     dependencies:
       - task-002
     acceptance_criteria:
@@ -106,7 +106,7 @@ tasks:
       - "connection/create.go registers the password before CreateConnection"
       - "connection/update.go registers the password before UpdateConnection when set"
       - "No change to command behavior or output when debug is off"
-    completed_at: null
+    completed_at: 2026-06-08T17:05:00Z
 
   - id: task-006
     title: 'Wire query --desktop path into the desktop debug seam'
