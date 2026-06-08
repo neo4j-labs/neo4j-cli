@@ -30,7 +30,7 @@ tasks:
       ([env: NEO4J_DEBUG (set to 1 to enable)], stderr-only, stdout unaffected).
       Add a PersistentPreRunE that resolves debug via task-001 and stores it on
       cfg, ensuring it runs for the mounted `neo4j-cli aura ...` surface.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -38,7 +38,7 @@ tasks:
       - "PersistentPreRunE resolves and stores debug state before any subcommand RunE executes, on the mounted neo4j-cli aura surface"
       - "Any pre-existing PersistentPreRunE on the tree is preserved (chained, not clobbered)"
       - "Help text mentions NEO4J_DEBUG env toggle and that output goes to stderr"
-    completed_at: null
+    completed_at: 2026-06-08T00:00:00Z
 
   - id: task-003
     title: 'Emit redacted HTTP request/response wire + timing in MakeRequest'

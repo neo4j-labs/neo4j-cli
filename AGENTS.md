@@ -10,6 +10,8 @@ TEST: `make test` · BUILD: `make build`, `make run-neo4j` · LINT: `make lint` 
 
 **Final gates before done: `make test`, `make fmt-check`, `make lint` — all must pass.** `fmt-check` runs `gofmt -l .` (fails on output); CI's golangci-lint v2 also gofmt-gates. `make fmt` rewrites but is not a gate.
 
+The aura root's `PersistentPreRunE` (resolves `--debug` onto `cfg.Aura`) only runs on the mounted `neo4j-cli aura ...` surface because the neo4j-cli root sets `cobra.EnableTraverseRunHooks = true` — several aura subcommands (instance/project/…) define their own `PersistentPreRunE` that would otherwise shadow it. Mirror that flag in tests that exercise the aura-root hook through a subcommand.
+
 ## Project Overview
 
 PRIMARY LANGUAGES: [Go]

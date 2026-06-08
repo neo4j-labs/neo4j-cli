@@ -10,6 +10,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/agent"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/credential"
@@ -27,6 +28,24 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Short:   "Allows you to programmatically provision and manage your Aura resources",
 		Long:    "Allows you to programmatically provision and manage your Aura resources. Write operations require --rw.",
 		Version: cfg.Version,
+	}
+
+	cmd.PersistentFlags().Bool("debug", false, "Route Aura API activity (HTTP request/response wire, token acquisition, polling) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+
+	// Resolve --debug once at startup and carry it on cfg so the api package
+	// (MakeRequest/getToken/Poll, which take *clicfg.Config not *cobra.Command)
+	// can read it. cobra.EnableTraverseRunHooks (set on the neo4j-cli root) runs
+	// every PersistentPreRunE up the ancestry, so this fires alongside the root
+	// hook on the mounted `neo4j-cli aura ...` surface.
+	prev := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if prev != nil {
+			if err := prev(cmd, args); err != nil {
+				return err
+			}
+		}
+		cfg.Aura.SetDebug(debug.Resolve(cmd))
+		return nil
 	}
 
 	cmd.AddCommand(workspace.NewCmd(cfg))

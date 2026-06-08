@@ -2,3 +2,8 @@
 Added shared common/debug.Resolve (single source for --debug/NEO4J_DEBUG semantics); query's resolveDebug now delegates to it. Added AuraConfig.Debug()/SetDebug() seam so api pkg reads resolved debug from *Config.
 Files: +common/debug/debug.go, +common/debug/debug_test.go, ~common/clicfg/clicfg.go, ~neo4j-cli/query/connect.go
 Decisions: debug state lives on AuraConfig mirroring activeCredential per-invocation pattern (never persisted). Pre-existing make test failure (TestOutputFields_AreSnakeCase) is stale .claude/worktrees/ tripping the repo-walking gate — unrelated to this task, fails identically on clean HEAD.
+
+## TASK-002 — 2026-06-08T00:00:00Z
+Registered persistent --debug flag on aura root + chained PersistentPreRunE that resolves via debug.Resolve and stores on cfg.Aura.SetDebug. Regenerated skill bundle (one --debug row in references/aura.md).
+Files: ~neo4j-cli/aura/aura.go, +neo4j-cli/aura/debug_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+Decisions: aura-root hook reaches the mounted `neo4j-cli aura ...` surface only because the neo4j-cli root sets cobra.EnableTraverseRunHooks=true (subcommands like instance define their own PersistentPreRunE which would otherwise shadow it). Test mirrors this by mounting under a stub root with EnableTraverseRunHooks=true.

@@ -52,6 +52,12 @@ Allows you to programmatically provision and manage your Aura resources. Write o
 
 Usage: `neo4j-cli aura`
 
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--debug` | bool | false | Route Aura API activity (HTTP request/response wire, token acquisition, polling) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
+
 ## neo4j-cli aura agent
 
 Relates to Aura Agents
