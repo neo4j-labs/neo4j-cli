@@ -30,7 +30,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 		Version: cfg.Version,
 	}
 
-	cmd.PersistentFlags().Bool("debug", false, "Route Aura API activity (HTTP request/response wire, token acquisition, polling) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+	cmd.PersistentFlags().Bool("debug", false, "Route Aura API activity (HTTP request/response wire, token acquisition, polling) to stderr; stdout is unaffected. Output may include the (best-effort-redacted) request/response bodies [env: NEO4J_DEBUG (set to 1 to enable)]")
 
 	// Resolve --debug once at startup and carry it on cfg so the api package
 	// (MakeRequest/getToken/Poll, which take *clicfg.Config not *cobra.Command)

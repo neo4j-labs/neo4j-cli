@@ -18,6 +18,16 @@ import (
 // scrub redacts secrets (RedactText) then neutralises terminal control/ANSI
 // escapes (StripControl) before any string is written to the operator's
 // terminal. Order matters: redact first, strip on the result.
+//
+// security: redaction here is best-effort. clievents.RedactText is shape-based
+// (Authorization Bearer/Basic headers, URI userinfo passwords, and JSON/kv keys
+// whose name contains a secretWords substring, plus literal RegisterSecretValue
+// values). The --debug dump emits the FULL raw request/response bodies, which is
+// broader than the PrintBody-filtered fields a command normally shows, so a
+// secret nested under a custom/opaque key with no secretWords substring (e.g.
+// `agent create --tools` JSON carrying {"headers":{"X-Auth":"..."}}) can surface
+// here in the clear. This is the user's own secret in their own terminal; the
+// residual risk is mainly pasting --debug output into a bug report.
 func scrub(s string) string {
 	return output.StripControl(clievents.RedactText(s))
 }

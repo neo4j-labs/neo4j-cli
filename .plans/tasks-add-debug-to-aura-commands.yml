@@ -205,7 +205,7 @@ tasks:
       dump is best-effort-redacted and may surface secrets under custom JSON keys,
       and extend the --debug flag help text (neo4j-cli/aura/aura.go) to note that
       output may include request/response bodies. No functional redaction change.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
@@ -213,5 +213,5 @@ tasks:
       - "The --debug flag help text mentions that output may include (best-effort-redacted) request/response bodies"
       - "If the help-text change touches generated bundle docs, go generate ./neo4j-cli/internal/skill/... is run and TestGenerator_RoundTrip stays green"
       - "make test, make fmt-check, make lint pass clean"
-    completed_at: null
+    completed_at: 2026-06-08T18:30:00Z
     source: review
