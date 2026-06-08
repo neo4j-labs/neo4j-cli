@@ -4,9 +4,20 @@
 package api
 
 import (
+	"io"
 	"testing"
 	"time"
 )
+
+// SetDebugWriterForTest overrides the package-level debug seam (debugW) for the
+// duration of the test, restoring the previous value via t.Cleanup. Lets tests
+// capture --debug diagnostics instead of writing to os.Stderr.
+func SetDebugWriterForTest(t *testing.T, w io.Writer) {
+	t.Helper()
+	prev := debugW
+	debugW = w
+	t.Cleanup(func() { debugW = prev })
+}
 
 // SetHTTPClientTimeoutForTest overrides the package-level httpClientTimeout
 // for the duration of the test. Restores the previous value via t.Cleanup.

@@ -10,6 +10,8 @@ TEST: `make test` · BUILD: `make build`, `make run-neo4j` · LINT: `make lint` 
 
 **Final gates before done: `make test`, `make fmt-check`, `make lint` — all must pass.** `fmt-check` runs `gofmt -l .` (fails on output); CI's golangci-lint v2 also gofmt-gates. `make fmt` rewrites but is not a gate.
 
+The aura root's `PersistentPreRunE` (resolves `--debug` onto `cfg.Aura`) only runs on the mounted `neo4j-cli aura ...` surface because the neo4j-cli root sets `cobra.EnableTraverseRunHooks = true` — several aura subcommands (instance/project/…) define their own `PersistentPreRunE` that would otherwise shadow it. Mirror that flag in tests that exercise the aura-root hook through a subcommand.
+
 ## Project Overview
 
 PRIMARY LANGUAGES: [Go]
@@ -42,6 +44,7 @@ TESTING FRAMEWORKS: [Go testing, testify, afero in-memory FS]. See [`.agents/tes
 - Prefer table-driven tests. Name test files per command (`get_test.go`, not one big `config_test.go`); shared helpers in `helpers_test.go`.
 - **Never `afero.NewOsFs()` in query-package tests** — dev machine has real creds at `~/Library/Preferences/neo4j/cli/credentials.json`. Use `testfs.GetTestFs(...)` (empty creds); for dotenv walk-up write `.env` into memFs + `t.Chdir(tmp)`.
 - `afero.MemMapFs` quirks: no symlink support; `OpenFile` auto-creates missing parent dirs (unlike `OsFs`). Symlink + missing-dir error paths must use `OsFs` + `t.TempDir()`.
+- An EXTERNAL test pkg (e.g. `package api_test`) can import a parent that depends on its package-under-test (`api_test` importing `neo4j-cli/aura`, which imports `aura/internal/api`) — no cycle, external test pkgs compile separately. Lets you drive a full aura command end-to-end while still calling the api pkg's `*_test.go`-only seam (`SetDebugWriterForTest`). Mount the aura tree under a stub `neo4j-cli` root with `cobra.EnableTraverseRunHooks=true`, `--format`/`ComposeRootPersistentPreRunE` on the root (mirrors `app.go`).
 
 ## Architecture
 
@@ -122,6 +125,8 @@ DEPLOYMENT STRATEGY: GitHub Releases via GoReleaser, triggered by `CHANGELOG.md`
 - `common/clievents/RedactArgs` is the SINGLE source of truth for secret scrubbing (telemetry + panic/error msgs + on-disk history). Scrubs `secretFlags` allow-list (incl. `-p`) + `--uri` userinfo. Add secret-bearing flags THERE.
 - `clievents.RedactText` (tee redactor) is shape-based (key=value, JSON, URIs, auth headers) — NOT table cells. Runtime secret printed only in a table → `clievents.RegisterSecretValue(value)` BEFORE printing (see `instance/create_core.go`). Secret-word vocab single-sourced as `secretWords` in `redact.go`. `docker.redactString` delegates to `RedactText`.
 - See [`.agents/credentials.md`](.agents/credentials.md) for Aura/Dbms/Embed credential types.
+- When emitting free-text debug/log lines through `RedactText`, do NOT start a line with a `<secretword>:` prefix (`token:`, `auth:`, `secret:`, `password:`, `key:`) — its assignment regex treats `<secretword>[:=] <word>` as a secret assignment and scrubs the next word to `***`. Word prose so no secret word immediately precedes a `:`/`=` (see aura api `debugInfo`).
+- Aura `--debug` diagnostics in `neo4j-cli/aura/internal/api/` route through the package-level `debugW` seam (default `os.Stderr`, overridable via `SetDebugWriterForTest`); guard all emit/redact work behind `cfg.Aura.Debug()` so the off-path is untouched. Every emitted line passes through `RedactText` then `output.StripControl` (the `scrub` helper) so secrets are redacted AND control/ANSI bytes neutralised. Use the `[aura-debug] > `/`[aura-debug] < ` prefixes (helpers in `debug.go`).
 
 ## Tee-on-failure
 

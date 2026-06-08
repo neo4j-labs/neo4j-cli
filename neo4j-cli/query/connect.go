@@ -23,6 +23,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/debug"
 )
 
 const (
@@ -468,17 +469,10 @@ func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Co
 	}
 }
 
-// resolveDebug merges the `--debug` flag with the `NEO4J_DEBUG` env var. Flag
-// precedence: when `--debug` is explicitly set on the command line, its boolean
-// value wins (so `--debug=false` overrides `NEO4J_DEBUG=1`). Otherwise debug is
-// enabled iff `NEO4J_DEBUG == "1"` (strict — any other value, including `true`
-// / `yes` / `on` / `0`, leaves debug OFF). Dotenv is intentionally not
-// consulted; only `os.Getenv` is read.
+// resolveDebug delegates to the shared debug.Resolve so the query and aura
+// trees share one source of truth for the `--debug` / NEO4J_DEBUG semantics.
 func resolveDebug(cmd *cobra.Command) bool {
-	if f := cmd.Flag("debug"); f != nil && f.Changed {
-		return f.Value.String() == "true"
-	}
-	return os.Getenv("NEO4J_DEBUG") == "1"
+	return debug.Resolve(cmd)
 }
 
 // openDriver opens a Bolt driver using the resolved connection params and

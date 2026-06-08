@@ -64,7 +64,11 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		warnW = os.Stderr
 	}
 
-	body := createBody(config.PostBody)
+	bodyBytes := marshalBody(config.PostBody)
+	var body io.Reader
+	if bodyBytes != nil {
+		body = bytes.NewReader(bodyBytes)
+	}
 
 	baseUrl := cfg.Aura.BaseUrl()
 	if err := urlcheck.ValidateRemoteURL(baseUrl); err != nil {
@@ -106,6 +110,12 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 		return responseBody, 0, err
 	}
 
+	debug := cfg.Aura.Debug()
+	if debug {
+		debugRequest(method, urlString, req.Header, bodyBytes)
+	}
+
+	start := time.Now()
 	res, err := client.Do(req)
 	if err != nil {
 		panic(err)
@@ -124,12 +134,22 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 			panic(err)
 		}
 
+		if debug {
+			debugResponse(res.StatusCode, res.Header, responseBody, time.Since(start))
+		}
+
 		if msgs := extractEmbeddedErrors(responseBody); len(msgs) > 0 {
 			resourceType, resourceID := parseResourceFromRequest(req)
 			return responseBody, res.StatusCode, clierr.NewNotFoundError("%s", formatBracketedMessages(msgs)).WithResource(resourceType, resourceID).WithSuggestion(suggestionForResource(resourceType))
 		}
 
 		return responseBody, res.StatusCode, nil
+	}
+
+	if debug {
+		errBody, _ := io.ReadAll(res.Body)
+		debugResponse(res.StatusCode, res.Header, errBody, time.Since(start))
+		res.Body = io.NopCloser(bytes.NewReader(errBody))
 	}
 
 	return responseBody, res.StatusCode, handleResponseError(res, credential, cfg)
@@ -151,18 +171,17 @@ func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
 	}
 }
 
-func createBody(data map[string]any) io.Reader {
+func marshalBody(data map[string]any) []byte {
 	if data == nil {
 		return nil
-	} else {
-		jsonData, err := json.Marshal(data)
-
-		if err != nil {
-			panic(err)
-		}
-
-		return bytes.NewBuffer(jsonData)
 	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+
+	return jsonData
 }
 
 func addQueryParams(u *url.URL, params map[string]string) {

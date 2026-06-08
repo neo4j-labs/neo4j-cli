@@ -1,0 +1,52 @@
+## TASK-001 — 2026-06-08T00:00:00Z
+Added shared common/debug.Resolve (single source for --debug/NEO4J_DEBUG semantics); query's resolveDebug now delegates to it. Added AuraConfig.Debug()/SetDebug() seam so api pkg reads resolved debug from *Config.
+Files: +common/debug/debug.go, +common/debug/debug_test.go, ~common/clicfg/clicfg.go, ~neo4j-cli/query/connect.go
+Decisions: debug state lives on AuraConfig mirroring activeCredential per-invocation pattern (never persisted). Pre-existing make test failure (TestOutputFields_AreSnakeCase) is stale .claude/worktrees/ tripping the repo-walking gate — unrelated to this task, fails identically on clean HEAD.
+
+## TASK-002 — 2026-06-08T00:00:00Z
+Registered persistent --debug flag on aura root + chained PersistentPreRunE that resolves via debug.Resolve and stores on cfg.Aura.SetDebug. Regenerated skill bundle (one --debug row in references/aura.md).
+Files: ~neo4j-cli/aura/aura.go, +neo4j-cli/aura/debug_test.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+Decisions: aura-root hook reaches the mounted `neo4j-cli aura ...` surface only because the neo4j-cli root sets cobra.EnableTraverseRunHooks=true (subcommands like instance define their own PersistentPreRunE which would otherwise shadow it). Test mirrors this by mounting under a stub root with EnableTraverseRunHooks=true.
+
+## TASK-003 — 2026-06-08T12:00:00Z
+MakeRequest emits redacted request/response wire + elapsed to a package-level debugW seam (default os.Stderr) when cfg.Aura.Debug() is on; [aura-debug] >/< prefixes. createBody->marshalBody returns []byte so the body can be dumped and re-read. Error path reads/restores res.Body so handleResponseError is unaffected.
+Files: +neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/debug_test.go, ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/export_test.go
+Decisions: debugf/getToken/Poll diagnostics deferred to task-004/005 (left no unused helpers — lint gate is strict).
+
+## TASK-004 — 2026-06-08T13:00:00Z
+getToken emits cached-reuse vs fresh-fetch decision, auth URL, and token-request response status via a new debugInfo helper (routes through RedactText). Client secret/basic-auth header and returned access token are never logged.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/token_debug_test.go
+Decisions: debugInfo lines avoid a `<secretword>:` prefix (e.g. "token:"/"auth:") because clievents.RedactText's assignment regex treats `token:`/`auth:` as a secret assignment and would scrub the following word.
+
+## TASK-005 — 2026-06-08T14:00:00Z
+Poll emits one debugInfo line per attempt when debug on: attempt i+1/MaxRetries, polled path, status code, observed Data.Status (200 branch) + interval; non-200 branch omits observed. Result/return values unchanged.
+Files: ~neo4j-cli/aura/internal/api/poll.go, +neo4j-cli/aura/internal/api/poll_debug_test.go
+Decisions: test sets SetPollingConfig(N,0) — default interval is 20s so Poll would otherwise block. Reuses debugTestCredJSON + buildTestConfig (testfs in-mem). Field words (path/status/observed/interval) aren't secretWords so RedactText leaves them.
+
+## TASK-006 — 2026-06-08T15:00:00Z
+Verified RedactText/secretWords already cover the full debug surface: Authorization Bearer/Basic header (textBearerRe), grant access_token (token substring -> textJSONFieldRe), body password/secret JSON fields, client-secret (never debug-dumped — token req basic-auth header is not emitted, only status). NO secretWords change needed; everything required was already single-sourced. Added one locking no-leak test across token+request+response paths.
+Files: +neo4j-cli/aura/internal/api/redaction_noleak_test.go
+Decisions: token path on fresh fetch puts the freshly-fetched grant token in the request's Authorization: Bearer header — test asserts that line is scrubbed too, not just JSON bodies. Asserts debug-ran markers (fetching new one / > POST / < 200 / ***) so the no-leak isn't a vacuous no-op.
+
+## TASK-007 — 2026-06-08T16:00:00Z
+Added aura analog of query's stdout-invariance test: drives `aura organization list` end-to-end (single GET, v2 /v2beta1/organizations) across json/table/toon, asserting byte-identical stdout under --debug=false vs --debug=true + debug seam carries wire dump on, empty off.
+Files: +neo4j-cli/aura/internal/api/stdout_invariance_debug_test.go
+Decisions: written in package api_test (external test pkg) so it can call SetDebugWriterForTest AND import neo4j-cli/aura (no cycle for external test pkgs). Mounts aura under stub neo4j-cli root with EnableTraverseRunHooks=true; --format + ComposeRootPersistentPreRunE on root, --debug hook on aura root — both fire via traversal (mirrors app.go). org list chosen over instance list: single GET, no validateProjectInOrg side call. Far-future token in debugTestCredJSON avoids /oauth/token round-trip → one endpoint. Explicit --format wins ResolveOutput so no IsAgent seeding needed.
+
+## TASK-008 — 2026-06-08T11:25:00Z
+Final task. go generate produced no bundle drift (task-002 already regenerated references/aura.md for the --debug row). Added changie Minor entry for the user-facing aura --debug flag. Full gate set green: make test, make fmt-check, make lint, generate-check (bundle clean), license-check; TestAllLeafCommands_HaveExamples + both casing gates pass. Note: progress-log's earlier TestOutputFields_AreSnakeCase stale-worktree failure did NOT reproduce here — clean.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260608-112201.yaml
+Decisions: pre-existing aura-cli-Minor-20260506 unreleased entry is unrelated (different project key) — left untouched.
+
+## REVIEW — 2026-06-08T11:40:00Z
+Added 2 review tasks (task-009..task-010) from golang-security review: F1 strip control/ANSI escapes in --debug output (Medium), F2 document residual opaque-JSON redaction gap (Low).
+
+## TASK-009 — 2026-06-08T17:30:00Z
+Added scrub() (RedactText then output.StripControl) in debug.go; every --debug write (URL, body, header key+value, debugInfo lines) now neutralises C0/ANSI escapes while preserving \t\n\r. Closes the stored-injection terminal-tampering vector (Medium).
+Files: ~neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/control_strip_debug_test.go
+Decisions: header-VALUE control bytes can't be exercised end-to-end (net/http server rejects control chars in header values, breaks conn) — test drives the strip surface via the response body; writeHeaders shares scrub()/StripControl so it's covered.
+
+## TASK-010 — 2026-06-08T18:30:00Z
+F2 doc task (no functional change). Added `// security:` comment on scrub() in debug.go (the funnel for every --debug write) documenting RedactText's shape-based limit + residual opaque-JSON-secret risk (full raw bodies broader than PrintBody; e.g. `agent create --tools` JSON under non-vocab keys). Extended aura --debug help text to note output may include best-effort-redacted request/response bodies; regenerated bundle (references/aura.md 1-line).
+Files: ~neo4j-cli/aura/internal/api/debug.go, ~neo4j-cli/aura/aura.go, ~neo4j-cli/internal/skill/bundle/references/aura.md
+Decisions: comment placed on scrub (not each call site) since all debug writes funnel through it. Gates green: make test/fmt-check/lint, generate-check clean.
