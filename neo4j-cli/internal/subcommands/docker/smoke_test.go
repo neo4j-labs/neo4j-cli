@@ -276,10 +276,12 @@ func TestSmoke_PortFallback(t *testing.T) {
 // REAL docker daemon and asserts the [docker-debug] trace reaches stderr.
 // Gated identically to the other smokes (build tag + LookPath skip).
 //
-// It creates a container with --debug, then asserts:
-//   - stderr carries the `[docker-debug] > docker run ...` invocation line
+// It creates a container with --debug, then asserts (against the debugW seam,
+// not cobra's command stderr — runEnv writes the trace to the package-global
+// debugW, not cmd.ErrOrStderr()):
+//   - the trace carries the `[docker-debug] > docker run ...` invocation line
 //     and a `[docker-debug] < exit 0 elapsed ...` result line;
-//   - the generated container password never appears in stderr (env values
+//   - the explicit container password never appears in the trace (env values
 //     travel via the docker process environment, never the debug trace).
 func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
@@ -302,8 +304,15 @@ func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 	require.NoError(t, err)
 	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
 
+	// runEnv writes the trace to the package-global debugW seam (no
+	// *cobra.Command in scope), NOT cmd.ErrOrStderr(); capture it here.
+	const password = "smoke-pw-do-not-leak"
+	var debugBuf bytes.Buffer
+	SetDebugWriterForTest(t, &debugBuf)
+
 	_, stderr, err := runDockerSubcommand(t, cfg, "create",
 		"--name", name,
+		"--password", password,
 		"--no-store-credential",
 		"--bolt-port", strconv.Itoa(boltPort),
 		"--http-port", strconv.Itoa(httpPort),
@@ -312,10 +321,12 @@ func TestSmoke_DebugEmitsToStderr(t *testing.T) {
 	)
 	require.NoError(t, err, "create --debug failed; stderr=%s", stderr)
 
-	assert.Contains(t, stderr, debugReqPrefix+"docker run", "stderr missing docker invocation trace; stderr=%s", stderr)
-	assert.Contains(t, stderr, debugRespPrefix+"exit 0 elapsed", "stderr missing exit/elapsed trace; stderr=%s", stderr)
+	debugOut := debugBuf.String()
+	assert.Contains(t, debugOut, debugReqPrefix+"docker run", "trace missing docker invocation; trace=%s", debugOut)
+	assert.Contains(t, debugOut, debugRespPrefix+"exit 0 elapsed", "trace missing exit/elapsed; trace=%s", debugOut)
 	// env line lists the injected NAME; the value must never appear.
-	assert.Contains(t, stderr, "NEO4J_AUTH", "stderr missing env name; stderr=%s", stderr)
+	assert.Contains(t, debugOut, "NEO4J_AUTH", "trace missing env name; trace=%s", debugOut)
+	assert.NotContains(t, debugOut, password, "secret password leaked into debug trace; trace=%s", debugOut)
 }
 
 // pickFreePort allocates and immediately releases a TCP port on 127.0.0.1.

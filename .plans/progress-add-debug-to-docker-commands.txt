@@ -28,3 +28,7 @@ Files: ~neo4j-cli/internal/skill/bundle/references/docker.md, +.changes/unreleas
 
 ## REVIEW — 2026-06-08T14:37:16Z
 Added 1 review task (task-007): fix TestSmoke_DebugEmitsToStderr capture via debugW seam.
+
+## TASK-007 — 2026-06-08T15:02:00Z
+Test-only fix: TestSmoke_DebugEmitsToStderr now redirects the package-global debugW seam into a bytes.Buffer via SetDebugWriterForTest before the real-docker create --debug, and asserts the [docker-debug] invocation/exit lines + NEO4J_AUTH name against that buffer (runEnv writes to debugW, not cobra's cmd stderr — errBuf stayed empty, the CI failure). Switched to an explicit --password "smoke-pw-do-not-leak" + assert.NotContains for a clear no-leak proof. No production code changed. Verified: go build/vet -tags=smoke clean, make test green, fmt-check ok, lint 0 issues; smoke test passes against real docker locally.
+Files: ~neo4j-cli/internal/subcommands/docker/smoke_test.go

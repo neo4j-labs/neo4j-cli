@@ -139,7 +139,7 @@ tasks:
       NEO4J_AUTH env name against debugBuf. Keep the real-docker create so runEnv
       actually fires, and keep the password-absence assertion against debugBuf.
       Do NOT change production code.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-005
@@ -148,4 +148,4 @@ tasks:
       - "Asserts [docker-debug] > docker run, [docker-debug] < exit 0 elapsed, and NEO4J_AUTH name against the buffer"
       - "Password-absence assertion preserved against the buffer; no production code changed"
       - "go build -tags=smoke ./neo4j-cli/internal/subcommands/docker/... compiles; make test, make fmt-check, make lint pass"
-    completed_at: null
+    completed_at: 2026-06-08T15:02:00Z
