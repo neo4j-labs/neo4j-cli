@@ -26,6 +26,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"throwaway container plus an env-file consumable by `query --env <path>`.",
 	}
 
+	cmd.PersistentFlags().Bool("debug", false, "Route docker CLI activity (the docker commands neo4j-cli shells out to, their env var names — never values — and exit status/timing) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+
 	cmd.AddCommand(newCreateCmd(cfg))
 	cmd.AddCommand(newDeleteCmd(cfg))
 	cmd.AddCommand(newGetCmd(cfg))

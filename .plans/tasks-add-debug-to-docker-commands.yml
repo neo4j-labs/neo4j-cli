@@ -52,7 +52,8 @@ tasks:
       bool flag `--debug` (default false) with a description mirroring aura's style and
       docker semantics, including the "[env: NEO4J_DEBUG (set to 1 to enable)]" suffix.
       No PersistentPreRunE — resolution happens at each leaf's client construction.
-    status: pending
+    status: completed
+    completed_at: 2026-06-08T14:05:00Z
     dependencies: []
     acceptance_criteria:
       - "cmd.PersistentFlags() registers a bool --debug default false on the docker parent"
