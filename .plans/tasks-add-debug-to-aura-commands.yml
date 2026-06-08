@@ -119,7 +119,7 @@ tasks:
       proving stdout under --debug=true equals stdout under --debug=false for an
       aura command against a stubbed API response, in json, table, and toon
       formats. Confirms all debug output lands on stderr only.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -127,7 +127,7 @@ tasks:
       - "The invariance holds for --format json, table, and toon"
       - "Tests use the mock HTTP server / in-memory fs helpers, never afero.NewOsFs in credential-touching packages"
       - "Debug content is asserted present on the captured stderr/seam (so the test proves debug ran, not that it was a no-op)"
-    completed_at: null
+    completed_at: 2026-06-08T16:00:00Z
 
   - id: task-008
     title: 'Regenerate skill bundle, changelog, and pass final gates'
