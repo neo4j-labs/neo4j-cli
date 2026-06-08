@@ -215,7 +215,7 @@ tasks:
       `t.Cleanup(desktopclient.SetDebugWriterForTest(&buf))` or `defer …()`. Leave
       the DebugEnabled() production getter in place (it is symmetric with the
       production SetDebug and harmless).
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -224,4 +224,4 @@ tasks:
       - "All call sites updated (external desktop_test + in-package tests) and use the restore closure (t.Cleanup or defer)"
       - "make test, make fmt-check, make lint, make license-check, make generate-check all pass"
     source: review
-    completed_at: null
+    completed_at: 2026-06-08T20:15:00Z

@@ -39,3 +39,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260608-174802.yaml
 
 ## REVIEW — 2026-06-08T15:51:57Z
 Added 1 review task (task-010).
+
+## TASK-010 — 2026-06-08T20:15:00Z
+Aligned desktopclient debug seams with the package's closure convention: SetDebugWriterForTest/SetDebugForTest now return a restore func() (no *testing.T), dropping the "testing" import from production debug.go. Updated all desktop-scope call sites to t.Cleanup(...) form. All gates green.
+Files: ~neo4j-cli/internal/desktopclient/debug.go, ~neo4j-cli/internal/desktopclient/debug_test.go, ~neo4j-cli/internal/desktopclient/discovery_debug_test.go, ~neo4j-cli/internal/subcommands/desktop/debug_test.go

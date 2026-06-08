@@ -84,7 +84,7 @@ func runDesktopDbmsList(t *testing.T, srvURL, format, debugArg string) (stdout, 
 	t.Helper()
 
 	var debugBuf bytes.Buffer
-	desktopclient.SetDebugWriterForTest(t, &debugBuf)
+	t.Cleanup(desktopclient.SetDebugWriterForTest(&debugBuf))
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestDbmsCreate_DebugRedactsPassword(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	var debugBuf bytes.Buffer
-	desktopclient.SetDebugWriterForTest(t, &debugBuf)
+	t.Cleanup(desktopclient.SetDebugWriterForTest(&debugBuf))
 
 	fs, err := testfs.GetTestFs(`{"format":"json"}`, "{}")
 	require.NoError(t, err)

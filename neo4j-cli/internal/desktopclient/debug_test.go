@@ -20,8 +20,8 @@ func TestDebugRequest_EmitsPrefixesHeadersAndRedactsBody(t *testing.T) {
 	clievents.RegisterSecretValue("s3cr3t")
 
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	header := http.Header{}
 	header.Set(HeaderClientID, "client-1")
@@ -40,8 +40,8 @@ func TestDebugRequest_EmitsPrefixesHeadersAndRedactsBody(t *testing.T) {
 
 func TestDebugRequest_RedactsPasswordBody(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	DebugRequestForTest(http.MethodPost, "http://localhost:44222/fastify/api/connections", http.Header{},
 		[]byte(`{"name":"c","password":"hunter2"}`))
@@ -56,8 +56,8 @@ func TestDebugRequest_RedactsRegisteredTokenInHeader(t *testing.T) {
 	clievents.RegisterSecretValue(token)
 
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	header := http.Header{}
 	header.Set(HeaderAPIToken, token)
@@ -73,8 +73,8 @@ func TestDebugRequest_RedactsRegisteredTokenInHeader(t *testing.T) {
 
 func TestDebugResponse_EmitsStatusBodyAndElapsed(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	DebugResponseForTest(http.StatusOK, http.Header{"Content-Type": []string{"application/json"}},
 		[]byte(`{"id":"abc"}`), 12*time.Millisecond)
@@ -87,8 +87,8 @@ func TestDebugResponse_EmitsStatusBodyAndElapsed(t *testing.T) {
 
 func TestDebugInfo_StripsControlBytes(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	DebugInfoForTest("probe \x1b[31mGET\x07 %s", "http://localhost:44222/fastify/api-docs")
 
@@ -101,8 +101,8 @@ func TestDebugInfo_StripsControlBytes(t *testing.T) {
 
 func TestDebugHelpers_OffPathEmitNothing(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, false)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(false))
 
 	DebugRequestForTest(http.MethodGet, "http://localhost:44222/fastify/api/dbmss",
 		http.Header{HeaderAPIToken: []string{"tok"}}, []byte(`{"password":"x"}`))

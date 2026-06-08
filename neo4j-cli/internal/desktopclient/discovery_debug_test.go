@@ -29,8 +29,8 @@ func hostPortOf(t *testing.T, raw string) (string, int) {
 
 func TestProbeOne_DebugTracesProbeTargetAndStatus(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == ProbePath {
@@ -58,8 +58,8 @@ func TestProbeOne_DebugTracesProbeTargetAndStatus(t *testing.T) {
 
 func TestDiscover_DebugTracesMDNSAndResolvedTier(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	// Pin mDNS to answer with a port so Discover resolves via the mDNS tier
 	// without touching the real network or the port scan.
@@ -76,8 +76,8 @@ func TestDiscover_DebugTracesMDNSAndResolvedTier(t *testing.T) {
 
 func TestFetchAppInfo_DebugTracesRequestAndResponse(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, true)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(true))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, infoAppPath, r.URL.Path)
@@ -99,8 +99,8 @@ func TestFetchAppInfo_DebugTracesRequestAndResponse(t *testing.T) {
 
 func TestDiscovery_OffPathEmitsNothing(t *testing.T) {
 	var buf bytes.Buffer
-	SetDebugWriterForTest(t, &buf)
-	SetDebugForTest(t, false)
+	t.Cleanup(SetDebugWriterForTest(&buf))
+	t.Cleanup(SetDebugForTest(false))
 
 	t.Cleanup(SetMDNSBrowseFnForTest(func(_ context.Context) (int, bool) { return 44225, true }))
 

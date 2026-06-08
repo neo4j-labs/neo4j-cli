@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"sort"
-	"testing"
 	"time"
 
 	commondebug "github.com/neo4j/cli/common/debug"
@@ -54,25 +53,23 @@ func DebugEnabled() bool {
 	return debugEnabled
 }
 
-// SetDebugWriterForTest overrides the package-level debug seam (debugW) for the
-// duration of the test, restoring the previous value via t.Cleanup. It is
-// exported (not export_test.go) so the external desktop command tests can
-// capture this package's --debug diagnostics. The package-global debugEnabled
-// gate is a process-global; tests sharing it must reset between cases.
-func SetDebugWriterForTest(t *testing.T, w io.Writer) {
-	t.Helper()
+// SetDebugWriterForTest overrides the package-level debug seam (debugW) and
+// returns a restore func that resets the previous value. It is exported (not
+// export_test.go) so the external desktop command tests can capture this
+// package's --debug diagnostics. The package-global debugEnabled gate is a
+// process-global; tests sharing it must reset between cases.
+func SetDebugWriterForTest(w io.Writer) func() {
 	prev := debugW
 	debugW = w
-	t.Cleanup(func() { debugW = prev })
+	return func() { debugW = prev }
 }
 
-// SetDebugForTest toggles the package-level debugEnabled gate for the duration
-// of the test, restoring the previous value via t.Cleanup.
-func SetDebugForTest(t *testing.T, enabled bool) {
-	t.Helper()
+// SetDebugForTest toggles the package-level debugEnabled gate and returns a
+// restore func that resets the previous value.
+func SetDebugForTest(enabled bool) func() {
 	prev := debugEnabled
 	debugEnabled = enabled
-	t.Cleanup(func() { debugEnabled = prev })
+	return func() { debugEnabled = prev }
 }
 
 const (
