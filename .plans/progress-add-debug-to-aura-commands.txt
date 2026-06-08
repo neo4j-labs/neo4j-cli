@@ -22,3 +22,8 @@ Decisions: debugInfo lines avoid a `<secretword>:` prefix (e.g. "token:"/"auth:"
 Poll emits one debugInfo line per attempt when debug on: attempt i+1/MaxRetries, polled path, status code, observed Data.Status (200 branch) + interval; non-200 branch omits observed. Result/return values unchanged.
 Files: ~neo4j-cli/aura/internal/api/poll.go, +neo4j-cli/aura/internal/api/poll_debug_test.go
 Decisions: test sets SetPollingConfig(N,0) — default interval is 20s so Poll would otherwise block. Reuses debugTestCredJSON + buildTestConfig (testfs in-mem). Field words (path/status/observed/interval) aren't secretWords so RedactText leaves them.
+
+## TASK-006 — 2026-06-08T15:00:00Z
+Verified RedactText/secretWords already cover the full debug surface: Authorization Bearer/Basic header (textBearerRe), grant access_token (token substring -> textJSONFieldRe), body password/secret JSON fields, client-secret (never debug-dumped — token req basic-auth header is not emitted, only status). NO secretWords change needed; everything required was already single-sourced. Added one locking no-leak test across token+request+response paths.
+Files: +neo4j-cli/aura/internal/api/redaction_noleak_test.go
+Decisions: token path on fresh fetch puts the freshly-fetched grant token in the request's Authorization: Bearer header — test asserts that line is scrubbed too, not just JSON bodies. Asserts debug-ran markers (fetching new one / > POST / < 200 / ***) so the no-leak isn't a vacuous no-op.

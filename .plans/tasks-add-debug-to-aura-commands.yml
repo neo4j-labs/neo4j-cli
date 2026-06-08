@@ -101,7 +101,7 @@ tasks:
       to ***. Add any missing Aura-specific secret field to the single-sourced
       secretWords vocabulary in redact.go (not at call sites). Lock with a test
       asserting no raw token/secret substring appears in captured debug output.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -110,7 +110,7 @@ tasks:
       - "Any newly-needed secret field is added to secretWords in redact.go, not redacted at the call site"
       - "A test seeds a known token/secret and asserts the raw value never appears in captured debug output across request, response, and token paths"
       - "Existing clievents redaction tests still pass"
-    completed_at: null
+    completed_at: 2026-06-08T15:00:00Z
 
   - id: task-007
     title: 'stdout byte-identical invariance tests across formats'
