@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-08T13:05:00Z
+Added desktopclient debug seam mirroring aura api/debug.go: debugW/os.Stderr writer, debugEnabled gate + exported SetDebug, [desktop-debug] >/</  prefixes, scrub→common/debug.Scrub, debugRequest/debugResponse/debugInfo/writeHeaders. Gate lives INSIDE each emit helper (not call site) so client.go/discovery.go can call unconditionally.
+Files: +neo4j-cli/internal/desktopclient/debug.go, +neo4j-cli/internal/desktopclient/export_test.go
+Decisions: emit helpers re-exported as Debug*ForTest in export_test.go (not //nolint:unused) — roots them in the usage graph until tasks 002/003 wire production call sites, and gives task-007 unit tests a direct driver.

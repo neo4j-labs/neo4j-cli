@@ -16,7 +16,7 @@ tasks:
       emit helper early-returns when !debugEnabled so call sites stay
       unconditional. Add SetDebugWriterForTest and SetDebugForTest (both restore
       via t.Cleanup) in an export_test.go. Include the Neo4j copyright header.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "debug.go defines debugW (os.Stderr default), debugEnabled, and exported SetDebug(bool)"
@@ -24,7 +24,7 @@ tasks:
       - "scrub delegates to common/debug.Scrub (StripControl(RedactText)); helpers no-op when debugEnabled is false"
       - "export_test.go exposes SetDebugWriterForTest and SetDebugForTest, each restoring via t.Cleanup"
       - "File has the Neo4j copyright header; package compiles"
-    completed_at: null
+    completed_at: 2026-06-08T13:05:00Z
 
   - id: task-002
     title: 'Trace authenticated relate-API wire in client.go doRaw'
