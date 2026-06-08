@@ -19,3 +19,7 @@ Decisions: bundle drift (references/*.md) deferred to task-008 — make test fai
 ## TASK-005 — 2026-06-08T17:05:00Z
 Registered the resolved password via clievents.RegisterSecretValue before the client call in all three write leaves so the --debug request-body trace is redacted. dbms/create.go is the load-bearing one (relate keys it under "credentials", which RedactText misses); connection update.go guards on passwordSet && non-empty.
 Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/update.go
+
+## TASK-006 — 2026-06-08T18:05:00Z
+Wired query --desktop into the desktop debug seam: call desktopclient.SetDebug(resolveDebug(cmd)) inside both --credential desktop branches (active DBMS + desktop-connection:<uuid>) in resolveConn, before the resolver fires. Non-desktop paths never touch the seam; query stdout unchanged.
+Files: ~neo4j-cli/query/connect.go

@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/debug"
+	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 )
 
 const (
@@ -250,6 +251,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			if ctx == nil {
 				ctx = context.Background()
 			}
+			desktopclient.SetDebug(resolveDebug(cmd))
 			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Aura.Fs())
 			if err != nil {
 				return nil, err
@@ -266,6 +268,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 			if ctx == nil {
 				ctx = context.Background()
 			}
+			desktopclient.SetDebug(resolveDebug(cmd))
 			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Aura.Fs(), raw)
 			if err != nil {
 				return nil, err

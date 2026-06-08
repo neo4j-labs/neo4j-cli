@@ -117,14 +117,14 @@ tasks:
       once before resolving so query --desktop --debug traces desktop discovery
       and credential fetch through the same seam. resolveDebug already delegates
       to common/debug.Resolve.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "query --desktop resolution calls desktopclient.SetDebug(resolveDebug(cmd)) before constructing the fallthrough client"
       - "query --desktop --debug emits [desktop-debug] discovery lines"
       - "query stdout and non-desktop query behavior are unchanged"
-    completed_at: null
+    completed_at: 2026-06-08T18:05:00Z
 
   - id: task-007
     title: 'Tests: unit, end-to-end, resolution, discovery, redaction'
