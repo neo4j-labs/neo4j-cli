@@ -16,3 +16,8 @@ Decisions: go build / docker tests / fmt-check / lint all green. Skill-bundle re
 Wired real debug resolution: replaced placeholder clientFactory(false) with clientFactory(debug.Resolve(cmd)) in all 7 leaves (RunE param is `cmd` in each); added common/debug import where missing. var clientFactory = newClient already func(bool); test overrides already func(bool) from task-002 — left intact. NewDeployClient unaffected.
 Files: ~create.go,~delete.go,~get.go,~list.go,~load.go,~start.go,~stop.go
 Verify: go build ./... ok; docker tests 247 pass; fmt-check ok; lint 0 issues. make test fails ONLY on TestGenerator_RoundTrip (references/docker.md drift) — expected, deferred to task-006.
+
+## TASK-005 — 2026-06-08T14:12:00Z
+Added unit tests for the debug emit helpers (debug_test.go, package docker, NOT smoke-tagged): debugInvocation scrubs argv (NEO4J_AUTH=***), emits env NAMES only (assert secret values s3cr3t/p4ssw0rd and env =VALUE halves absent); no-env case omits the env line; table-driven debugResult exercises exit 0 / 2 / -1 fallback + elapsed shape; off-path test asserts newClient(false).debug==false and buffer empty. Extended -tags=smoke suite with TestSmoke_DebugEmitsToStderr: creates a real container with --debug, asserts `[docker-debug] > docker run` and `< exit 0 elapsed` reach stderr and the password never appears.
+Files: +debug_test.go, ~smoke_test.go
+Verify: go test ./.../docker/... 254 pass; go build/vet -tags=smoke compile clean; fmt-check ok; lint 0 issues. make test fails ONLY on TestGenerator_RoundTrip — expected, deferred to task-006.

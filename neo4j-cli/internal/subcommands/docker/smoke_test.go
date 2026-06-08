@@ -272,6 +272,52 @@ func TestSmoke_PortFallback(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(resolvedHTTP), labels[LabelHTTPPort], "label %s desync", LabelHTTPPort)
 }
 
+// TestSmoke_DebugEmitsToStderr exercises `docker <leaf> --debug` against a
+// REAL docker daemon and asserts the [docker-debug] trace reaches stderr.
+// Gated identically to the other smokes (build tag + LookPath skip).
+//
+// It creates a container with --debug, then asserts:
+//   - stderr carries the `[docker-debug] > docker run ...` invocation line
+//     and a `[docker-debug] < exit 0 elapsed ...` result line;
+//   - the generated container password never appears in stderr (env values
+//     travel via the docker process environment, never the debug trace).
+func TestSmoke_DebugEmitsToStderr(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not on PATH; skipping live smoke")
+	}
+
+	name := fmt.Sprintf("neo4j-cli-smoke-debug-%d", time.Now().UnixNano())
+	boltPort := pickFreePort(t)
+	httpPort := pickFreePort(t)
+	require.NotEqual(t, boltPort, httpPort, "free-port helper handed out the same port twice")
+
+	t.Cleanup(func() {
+		_ = exec.Command("docker", "rm", "-f", name).Run()
+	})
+
+	fs, err := testfs.GetTestFs(`{}`, `{
+		"dbms": {"credentials": [], "default-credential": ""},
+		"embed": {"credentials": [], "default-credential": ""}
+	}`)
+	require.NoError(t, err)
+	cfg := clicfg.NewConfig(fs, "smoke-test", clicfg.GlobalScope)
+
+	_, stderr, err := runDockerSubcommand(t, cfg, "create",
+		"--name", name,
+		"--no-store-credential",
+		"--bolt-port", strconv.Itoa(boltPort),
+		"--http-port", strconv.Itoa(httpPort),
+		"--debug",
+		"--rw",
+	)
+	require.NoError(t, err, "create --debug failed; stderr=%s", stderr)
+
+	assert.Contains(t, stderr, debugReqPrefix+"docker run", "stderr missing docker invocation trace; stderr=%s", stderr)
+	assert.Contains(t, stderr, debugRespPrefix+"exit 0 elapsed", "stderr missing exit/elapsed trace; stderr=%s", stderr)
+	// env line lists the injected NAME; the value must never appear.
+	assert.Contains(t, stderr, "NEO4J_AUTH", "stderr missing env name; stderr=%s", stderr)
+}
+
 // pickFreePort allocates and immediately releases a TCP port on 127.0.0.1.
 // The tiny TOCTOU window between Close and `docker run -p` claiming the
 // port is acceptable for a dev-only smoke test; the OS rarely re-uses an

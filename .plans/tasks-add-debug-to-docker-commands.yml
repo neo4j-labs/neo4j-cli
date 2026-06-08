@@ -89,7 +89,8 @@ tasks:
       appears, only the key name); exit/elapsed line shape; off-path (debug=false)
       emits nothing. Extend the -tags=smoke suite with an assertion that [docker-debug]
       lines reach stderr when running a real docker command with --debug.
-    status: pending
+    status: completed
+    completed_at: 2026-06-08T14:12:00Z
     dependencies:
       - task-002
       - task-004
