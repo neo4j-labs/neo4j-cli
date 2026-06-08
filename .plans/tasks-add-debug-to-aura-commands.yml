@@ -13,14 +13,14 @@ tasks:
       the resolved boolean to the api package via *clicfg.Config (e.g. an
       Aura.Debug()/SetDebug seam), since MakeRequest/getToken/Poll take cfg not
       cmd. Respect the common/* cannot-import neo4j-cli/internal/* rule.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "A shared resolver enforces: flag.Changed wins (--debug=false overrides NEO4J_DEBUG=1), else ON iff NEO4J_DEBUG==1 strictly"
       - "A test locks parity with query's existing resolveDebug semantics (env values true/yes/on/0 leave debug OFF)"
       - "cfg exposes a way to read the resolved debug bool from the api package without changing MakeRequest call sites"
       - "Package builds; no common/* -> neo4j-cli/internal/* import introduced"
-    completed_at: null
+    completed_at: 2026-06-08T00:00:00Z
 
   - id: task-002
     title: 'Register persistent --debug flag + PersistentPreRunE on aura root'

@@ -253,6 +253,7 @@ type AuraConfig struct {
 	pollingOverride  PollingConfig
 	ValidConfigKeys  []string
 	activeCredential *credentials.AuraCredential
+	debug            bool
 }
 
 type PollingConfig struct {
@@ -347,6 +348,19 @@ func (config *AuraConfig) SetActiveCredential(cred *credentials.AuraCredential) 
 // or nil when no override has been set.
 func (config *AuraConfig) ActiveCredential() *credentials.AuraCredential {
 	return config.activeCredential
+}
+
+// SetDebug stores the resolved --debug state for this invocation. The value is
+// never persisted; it is set once by the Aura root PersistentPreRunE and read
+// by the api package (MakeRequest/getToken/Poll), which receive *Config rather
+// than *cobra.Command.
+func (config *AuraConfig) SetDebug(enabled bool) {
+	config.debug = enabled
+}
+
+// Debug reports whether debug output is enabled for this invocation.
+func (config *AuraConfig) Debug() bool {
+	return config.debug
 }
 
 // DefaultWorkspace returns the raw value of aura.default-workspace (e.g. "{orgId}/{projectId}").
