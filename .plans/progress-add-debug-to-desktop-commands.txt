@@ -36,3 +36,6 @@ Files: ~neo4j-cli/internal/skill/bundle/references/desktop.md
 ## TASK-009 — 2026-06-08T17:50:00Z
 Added user-facing changelog entry (changie, kind Minor) for the desktop --debug flag. All final gates passed: make test, make fmt-check, make lint, make license-check green; go generate produced no bundle drift (generate-check clean).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260608-174802.yaml
+
+## REVIEW — 2026-06-08T15:51:57Z
+Added 1 review task (task-010).

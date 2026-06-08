@@ -189,3 +189,39 @@ tasks:
       - "make test, make fmt-check, make lint, make license-check all pass"
       - "make generate-check is clean"
     completed_at: 2026-06-08T17:50:00Z
+
+  - id: task-010
+    title: 'Align desktopclient debug test seams with package convention (drop testing import)'
+    description: |
+      debug.go imports "testing" into a production (non-_test.go) file and exposes
+      SetDebugWriterForTest(t *testing.T, w io.Writer) and SetDebugForTest(t
+      *testing.T, enabled bool) that take a *testing.T and self-register
+      t.Cleanup. This is now the ONLY production file in the desktopclient package
+      that imports testing, which links the testing package into the production
+      binary and diverges from the package's own established seam convention. All
+      seven existing seams (SetHTTPDoFnForTest, SetUUIDFnForTest, SetNowFnForTest,
+      SetHomeDirFnForTest, SetGOOSFnForTest, SetHTTPClientFnForTest,
+      SetProbeHostFnForTest) return a restore func() and take no *testing.T, so
+      they never import testing. The external desktop_test package genuinely
+      cannot see export_test.go symbols, so the seam must live in production — but
+      the fix is to follow the package's existing closure style, not to import
+      testing. (aura/docker get away with *testing.T only because their seams live
+      in export_test.go consumed by a same-dir _test package.) Change
+      SetDebugWriterForTest to `SetDebugWriterForTest(w io.Writer) func()` and
+      SetDebugForTest to `SetDebugForTest(enabled bool) func()`, each returning a
+      restore closure that resets the previous value; remove the "testing" import
+      from debug.go. Update all call sites (the external desktop_test tests and any
+      in-package tests) to use the closure, e.g.
+      `t.Cleanup(desktopclient.SetDebugWriterForTest(&buf))` or `defer …()`. Leave
+      the DebugEnabled() production getter in place (it is symmetric with the
+      production SetDebug and harmless).
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "debug.go no longer imports \"testing\"; no production (non-_test.go) file in desktopclient imports testing"
+      - "SetDebugWriterForTest and SetDebugForTest return a restore func() and take no *testing.T, matching the package's existing seam style"
+      - "All call sites updated (external desktop_test + in-package tests) and use the restore closure (t.Cleanup or defer)"
+      - "make test, make fmt-check, make lint, make license-check, make generate-check all pass"
+    source: review
+    completed_at: null
