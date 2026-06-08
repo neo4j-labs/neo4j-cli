@@ -66,7 +66,7 @@ tasks:
       was reused vs a new token fetched, the auth URL, and the token request
       response status — never the client secret or the returned token. Reuses
       the same redacted debug emit seam from task-003.
-    status: pending
+    status: completed
     dependencies:
       - task-003
     acceptance_criteria:
@@ -74,7 +74,7 @@ tasks:
       - "Token request response status is shown; client id/secret (basic auth) and returned access token are never printed in the clear"
       - "Output routes through the same redacted stderr seam as MakeRequest"
       - "Off-path behaviour of getToken is unchanged"
-    completed_at: null
+    completed_at: 2026-06-08T13:00:00Z
 
   - id: task-005
     title: 'Emit poll-loop diagnostics in Poll'

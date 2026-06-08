@@ -45,6 +45,12 @@ func debugResponse(statusCode int, header http.Header, body []byte, elapsed time
 	_, _ = fmt.Fprintf(debugW, "%selapsed %s\n", debugInfoPrefix, elapsed)
 }
 
+// debugInfo emits a single redacted [aura-debug] line for loop/credential-level
+// context (token acquisition, poll attempts).
+func debugInfo(format string, args ...any) {
+	_, _ = fmt.Fprintf(debugW, "%s%s\n", debugInfoPrefix, clievents.RedactText(fmt.Sprintf(format, args...)))
+}
+
 func writeHeaders(prefix string, header http.Header) {
 	keys := make([]string, 0, len(header))
 	for k := range header {

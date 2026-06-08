@@ -12,3 +12,8 @@ Decisions: aura-root hook reaches the mounted `neo4j-cli aura ...` surface only 
 MakeRequest emits redacted request/response wire + elapsed to a package-level debugW seam (default os.Stderr) when cfg.Aura.Debug() is on; [aura-debug] >/< prefixes. createBody->marshalBody returns []byte so the body can be dumped and re-read. Error path reads/restores res.Body so handleResponseError is unaffected.
 Files: +neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/debug_test.go, ~neo4j-cli/aura/internal/api/api.go, ~neo4j-cli/aura/internal/api/export_test.go
 Decisions: debugf/getToken/Poll diagnostics deferred to task-004/005 (left no unused helpers — lint gate is strict).
+
+## TASK-004 — 2026-06-08T13:00:00Z
+getToken emits cached-reuse vs fresh-fetch decision, auth URL, and token-request response status via a new debugInfo helper (routes through RedactText). Client secret/basic-auth header and returned access token are never logged.
+Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/token_debug_test.go
+Decisions: debugInfo lines avoid a `<secretword>:` prefix (e.g. "token:"/"auth:") because clievents.RedactText's assignment regex treats `token:`/`auth:` as a secret assignment and would scrub the following word.
