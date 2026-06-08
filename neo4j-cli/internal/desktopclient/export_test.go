@@ -11,8 +11,7 @@ import (
 )
 
 // Test-only re-exports of the emit helpers so package tests (debug_test.go) can
-// drive them directly. They also keep the helpers rooted in the usage graph
-// until the production call sites in client.go/discovery.go are wired up.
+// drive them directly (production call sites live in client.go/discovery.go).
 func DebugRequestForTest(method, url string, header http.Header, body []byte) {
 	debugRequest(method, url, header, body)
 }

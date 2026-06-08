@@ -2,3 +2,7 @@
 Added desktopclient debug seam mirroring aura api/debug.go: debugW/os.Stderr writer, debugEnabled gate + exported SetDebug, [desktop-debug] >/</  prefixes, scrub→common/debug.Scrub, debugRequest/debugResponse/debugInfo/writeHeaders. Gate lives INSIDE each emit helper (not call site) so client.go/discovery.go can call unconditionally.
 Files: +neo4j-cli/internal/desktopclient/debug.go, +neo4j-cli/internal/desktopclient/export_test.go
 Decisions: emit helpers re-exported as Debug*ForTest in export_test.go (not //nolint:unused) — roots them in the usage graph until tasks 002/003 wire production call sites, and gives task-007 unit tests a direct driver.
+
+## TASK-002 — 2026-06-08T14:05:00Z
+Wired desktopclient doRaw into the debug seam: capture marshalled rawBody (request unchanged), debugRequest before httpDoFn (start time), debugResponse after body read with elapsed, debugInfo("transport error after %s: ...") on the transport-error path before canonical mapping. NewClient now calls clievents.RegisterSecretValue(token) so the X-API-Token JWT is scrubbed everywhere. All three emit helpers now have production callers; trimmed the stale "rooting" note in export_test.go (kept the re-exports as genuine test drivers).
+Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopclient/export_test.go

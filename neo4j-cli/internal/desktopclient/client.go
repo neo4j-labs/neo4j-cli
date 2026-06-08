@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/clievents"
 )
 
 // Header names required by Desktop's relate API auth middleware on every
@@ -127,6 +128,9 @@ func NewClient(probe ProbeResult, salt string) (*Client, error) {
 	if err != nil {
 		return nil, clierr.NewFatalError("desktop: failed to sign auth token: %s", err.Error())
 	}
+	// Register the signed JWT so the X-API-Token header is scrubbed anywhere it
+	// surfaces (notably the --debug request dump in doRaw).
+	clievents.RegisterSecretValue(token)
 	return &Client{
 		origin:   probe.Origin,
 		salt:     salt,
@@ -184,12 +188,14 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any, timeo
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	var rawBody []byte
 	var reqBody io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
 		if err != nil {
 			return 0, nil, clierr.NewFatalError("desktop: failed to encode request body: %s", err.Error())
 		}
+		rawBody = buf
 		reqBody = bytes.NewReader(buf)
 	}
 
@@ -205,8 +211,12 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any, timeo
 	}
 	req.Header.Set("Accept", "application/json")
 
+	start := time.Now()
+	debugRequest(method, url, req.Header, rawBody)
+
 	resp, err := httpDoFn(req)
 	if err != nil {
+		debugInfo("transport error after %s: %s", time.Since(start), err.Error())
 		// Disambiguate "took too long" (Desktop is there, just busy) from
 		// "Desktop isn't there" (probe miss, connection refused, EOF, reset).
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -221,6 +231,7 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any, timeo
 		// Mid-read EOF means Desktop dropped the socket — treat as unreachable.
 		return 0, nil, clierr.NewFatalError("%s", canonicalUnreachable)
 	}
+	debugResponse(resp.StatusCode, resp.Header, respBody, time.Since(start))
 	return resp.StatusCode, respBody, nil
 }
 

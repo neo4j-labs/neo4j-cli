@@ -38,7 +38,7 @@ tasks:
       canonical unreachable/timeout errors. In NewClient, register the signed
       JWT via clievents.RegisterSecretValue(token) so the X-API-Token header is
       always redacted.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -47,7 +47,7 @@ tasks:
       - "rawBody is captured without changing the request that is actually sent"
       - "NewClient calls clievents.RegisterSecretValue(token)"
       - "Stdout/return values of all Client methods are unchanged when debug is off"
-    completed_at: null
+    completed_at: 2026-06-08T14:05:00Z
 
   - id: task-003
     title: 'Trace discovery wire in discovery.go'
