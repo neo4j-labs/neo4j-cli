@@ -1,3 +1,8 @@
 ## TASK-001 — 2026-06-08T13:55:38Z
 Added exported common/debug.Scrub (StripControl(RedactText)); aura api scrub now delegates to it. No import cycle; aura tests unchanged.
 Files: ~common/debug/debug.go, ~neo4j-cli/aura/internal/api/debug.go
+
+## TASK-002 — 2026-06-08T13:58:44Z
+Docker execClient gained a `debug bool` field; newClient(bool) sets it (NewDeployClient stays no-arg → newClient(false)). Added debugW seam (os.Stderr), [docker-debug] > / < prefixes, debugInvocation (redacted argv + env NAMES only, never values) and debugResult (exit code via errors.As(*exec.ExitError) else -1, elapsed); wired guarded emits around cmd.Run() in runEnv. Added export_test.go SetDebugWriterForTest mirroring aura.
+Files: ~neo4j-cli/internal/subcommands/docker/client.go, +neo4j-cli/internal/subcommands/docker/export_test.go, ~docker/{create,delete,get,list,load,start,stop}.go, ~docker/{create,delete,get,list,load,start,stop}_test.go
+Decisions: Minimal compile-fix only — leaf clientFactory() → clientFactory(false) (7 sites) and test overrides func() → func(bool) dockerClient (18 sites) to keep build+tests green. Real wiring (clientFactory(debug.Resolve(cmd))) deferred to task-004.

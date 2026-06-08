@@ -53,7 +53,7 @@ neo4j-cli docker delete dev --yes --force --rw && neo4j-cli docker list --format
 			cmd.SilenceUsage = true
 
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(false)
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers

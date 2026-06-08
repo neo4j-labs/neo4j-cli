@@ -34,7 +34,8 @@ tasks:
       else -1. Capture start time before cmd.Run() and wire the guarded (`if c.debug`)
       emit calls before/after cmd.Run() in runEnv. Add `time` import. Add an
       export_test.go exposing SetDebugWriterForTest(t, w) mirroring aura.
-    status: pending
+    status: completed
+    completed_at: 2026-06-08T13:58:44Z
     dependencies:
       - task-001
     acceptance_criteria:

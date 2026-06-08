@@ -33,7 +33,7 @@ func runList(t *testing.T, args string, entries []PsEntry) (*fakeDockerClient, s
 	fake := newFakeDockerClient()
 	fake.PsEntries = entries
 	origFactory := clientFactory
-	clientFactory = func() dockerClient { return fake }
+	clientFactory = func(bool) dockerClient { return fake }
 	t.Cleanup(func() { clientFactory = origFactory })
 
 	cmd := NewCmd(cfg)

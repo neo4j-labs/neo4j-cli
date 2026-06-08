@@ -103,7 +103,7 @@ neo4j-cli docker load neo4j-graph-examples/movies --name movies --force --rw`,
 				return clierr.NewUsageError("resolve dataset %q: %s", ownerRepo, err.Error())
 			}
 
-			client := clientFactory()
+			client := clientFactory(false)
 
 			// Decide new-vs-existing by inspecting the requested name. A
 			// missing container (ErrNotFound) takes the new path; any other

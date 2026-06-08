@@ -272,7 +272,7 @@ neo4j-cli docker create --name licensed --edition enterprise --accept-license --
 			// names from docker (managed or not — docker enforces global name
 			// uniqueness) AND every stored dbms credential name. Pick the
 			// requested name when free; otherwise try <name>-1 … <name>-99.
-			client := clientFactory()
+			client := clientFactory(false)
 			ctx := cmd.Context()
 			chosenName, err := resolveContainerName(ctx, client, cfg, name)
 			if err != nil {

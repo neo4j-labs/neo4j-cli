@@ -38,7 +38,7 @@ neo4j-cli docker list --format json
 # Emit TOON for token-efficient ingestion by agents
 neo4j-cli docker list --format toon`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client := clientFactory()
+			client := clientFactory(false)
 			ctx := cmd.Context()
 
 			entries, err := client.PsAll(ctx, []string{"label=" + LabelManaged + "=true"})

@@ -43,7 +43,7 @@ neo4j-cli docker get dev --format toon`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(false)
 			ctx := cmd.Context()
 
 			container, err := client.Inspect(ctx, name)

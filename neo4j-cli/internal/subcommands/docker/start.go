@@ -71,7 +71,7 @@ neo4j-cli docker start dev --wait --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			client := clientFactory()
+			client := clientFactory(false)
 			ctx := cmd.Context()
 
 			// Inspect first so we can refuse non-managed / missing containers
