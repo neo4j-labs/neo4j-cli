@@ -23,3 +23,8 @@ Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/intern
 ## TASK-006 — 2026-06-08T18:05:00Z
 Wired query --desktop into the desktop debug seam: call desktopclient.SetDebug(resolveDebug(cmd)) inside both --credential desktop branches (active DBMS + desktop-connection:<uuid>) in resolveConn, before the resolver fires. Non-desktop paths never touch the seam; query stdout unchanged.
 Files: ~neo4j-cli/query/connect.go
+
+## TASK-007 — 2026-06-08T15:45:00Z
+Added all five test groups: unit (desktopclient/debug_test.go — request/response/info prefixes, password+credentials+registered-JWT redaction, control-strip, off-path silence), discovery-trace (desktopclient/discovery_debug_test.go — probeOne, Discover mDNS tier, FetchAppInfo, off-path), and external e2e (desktop/debug_test.go — `dbms list` stdout byte-invariance across json/table/toon + wire trace, root flag/env precedence table, create-redaction). make test green except the expected TestGenerator_RoundTrip drift (task-008).
+Files: +neo4j-cli/internal/desktopclient/debug_test.go, +neo4j-cli/internal/desktopclient/discovery_debug_test.go, +neo4j-cli/internal/subcommands/desktop/debug_test.go, ~neo4j-cli/internal/desktopclient/debug.go, ~neo4j-cli/internal/desktopclient/export_test.go
+Decisions: moved SetDebugWriterForTest/SetDebugForTest from export_test.go to production debug.go (added DebugEnabled() getter too) — the external desktop_test package can't see export_test.go symbols of an imported package; production *ForTest seams (testing import) follow the common/confirm/confirm.go precedent. debugEnabled is a process-global; resolution cases reset via SetDebug(false) and run serial.

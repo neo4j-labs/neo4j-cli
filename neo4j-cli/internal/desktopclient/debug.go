@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"testing"
 	"time"
 
 	commondebug "github.com/neo4j/cli/common/debug"
@@ -44,6 +45,34 @@ var debugEnabled bool
 // package. It is wired from the desktop command's PersistentPreRunE.
 func SetDebug(enabled bool) {
 	debugEnabled = enabled
+}
+
+// DebugEnabled reports whether --debug diagnostics are currently enabled. It
+// lets callers (and tests asserting the desktop-root PersistentPreRunE
+// resolution) read the package-global gate that SetDebug toggles.
+func DebugEnabled() bool {
+	return debugEnabled
+}
+
+// SetDebugWriterForTest overrides the package-level debug seam (debugW) for the
+// duration of the test, restoring the previous value via t.Cleanup. It is
+// exported (not export_test.go) so the external desktop command tests can
+// capture this package's --debug diagnostics. The package-global debugEnabled
+// gate is a process-global; tests sharing it must reset between cases.
+func SetDebugWriterForTest(t *testing.T, w io.Writer) {
+	t.Helper()
+	prev := debugW
+	debugW = w
+	t.Cleanup(func() { debugW = prev })
+}
+
+// SetDebugForTest toggles the package-level debugEnabled gate for the duration
+// of the test, restoring the previous value via t.Cleanup.
+func SetDebugForTest(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := debugEnabled
+	debugEnabled = enabled
+	t.Cleanup(func() { debugEnabled = prev })
 }
 
 const (

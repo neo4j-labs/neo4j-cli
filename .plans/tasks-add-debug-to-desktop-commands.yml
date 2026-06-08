@@ -140,7 +140,7 @@ tasks:
       --debug, NEO4J_DEBUG=1, =true leaves off, --debug=false overrides env=1), a
       discovery-trace test (probe/mDNS lines appear), and a create-redaction test
       (known password absent from trace).
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -153,7 +153,7 @@ tasks:
       - "Root resolution table covers flag/env precedence incl. NEO4J_DEBUG=true left off and --debug=false overriding env=1"
       - "Discovery-trace and create-redaction tests pass"
       - "All new tests pass under make test"
-    completed_at: null
+    completed_at: 2026-06-08T15:45:00Z
 
   - id: task-008
     title: 'Regenerate skill bundle for the new --debug flag'
