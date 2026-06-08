@@ -32,3 +32,8 @@ Decisions: token path on fresh fetch puts the freshly-fetched grant token in the
 Added aura analog of query's stdout-invariance test: drives `aura organization list` end-to-end (single GET, v2 /v2beta1/organizations) across json/table/toon, asserting byte-identical stdout under --debug=false vs --debug=true + debug seam carries wire dump on, empty off.
 Files: +neo4j-cli/aura/internal/api/stdout_invariance_debug_test.go
 Decisions: written in package api_test (external test pkg) so it can call SetDebugWriterForTest AND import neo4j-cli/aura (no cycle for external test pkgs). Mounts aura under stub neo4j-cli root with EnableTraverseRunHooks=true; --format + ComposeRootPersistentPreRunE on root, --debug hook on aura root — both fire via traversal (mirrors app.go). org list chosen over instance list: single GET, no validateProjectInOrg side call. Far-future token in debugTestCredJSON avoids /oauth/token round-trip → one endpoint. Explicit --format wins ResolveOutput so no IsAgent seeding needed.
+
+## TASK-008 — 2026-06-08T11:25:00Z
+Final task. go generate produced no bundle drift (task-002 already regenerated references/aura.md for the --debug row). Added changie Minor entry for the user-facing aura --debug flag. Full gate set green: make test, make fmt-check, make lint, generate-check (bundle clean), license-check; TestAllLeafCommands_HaveExamples + both casing gates pass. Note: progress-log's earlier TestOutputFields_AreSnakeCase stale-worktree failure did NOT reproduce here — clean.
+Files: +.changes/unreleased/neo4j-cli-Minor-20260608-112201.yaml
+Decisions: pre-existing aura-cli-Minor-20260506 unreleased entry is unrelated (different project key) — left untouched.

@@ -136,7 +136,7 @@ tasks:
       affected by the new persistent flag and confirm TestGenerator_RoundTrip is
       green. Add a changie Minor changelog entry for the user-facing aura --debug
       flag. Run make test, make fmt-check, and make lint as final gates.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -148,4 +148,4 @@ tasks:
       - "TestAllLeafCommands_HaveExamples and the casing gates pass with the new flag"
       - "A changie Minor entry describing aura --debug is added"
       - "make test, make fmt-check, and make lint all pass clean"
-    completed_at: null
+    completed_at: 2026-06-08T11:25:00Z

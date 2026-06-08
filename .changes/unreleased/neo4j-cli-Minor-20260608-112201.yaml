@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Aura commands now accept a --debug flag (also via NEO4J_DEBUG=1) that routes Aura API request/response activity to stderr with secrets redacted.
+time: 2026-06-08T11:22:01.241419+02:00
