@@ -11,13 +11,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/neo4j/cli/common/clievents"
+	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/common/output"
 )
 
-// scrub redacts secrets (RedactText) then neutralises terminal control/ANSI
-// escapes (StripControl) before any string is written to the operator's
-// terminal. Order matters: redact first, strip on the result.
+// scrub delegates to debug.Scrub (StripControl(RedactText)).
 //
 // security: redaction here is best-effort. clievents.RedactText is shape-based
 // (Authorization Bearer/Basic headers, URI userinfo passwords, and JSON/kv keys
@@ -29,7 +27,7 @@ import (
 // here in the clear. This is the user's own secret in their own terminal; the
 // residual risk is mainly pasting --debug output into a bug report.
 func scrub(s string) string {
-	return output.StripControl(clievents.RedactText(s))
+	return debug.Scrub(s)
 }
 
 // debugW is the destination for --debug diagnostics from the api package

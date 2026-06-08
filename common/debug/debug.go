@@ -10,6 +10,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/neo4j/cli/common/clievents"
+	"github.com/neo4j/cli/common/output"
 )
 
 // EnvVar is the environment variable consulted when `--debug` was not
@@ -27,4 +30,12 @@ func Resolve(cmd *cobra.Command) bool {
 		return f.Value.String() == "true"
 	}
 	return os.Getenv(EnvVar) == "1"
+}
+
+// Scrub redacts secrets (RedactText) then neutralises terminal control/ANSI
+// escapes (StripControl) before any string is written to the operator's
+// terminal. Order matters: redact first, strip on the result. It is the shared
+// primitive for the aura and docker --debug diagnostics.
+func Scrub(s string) string {
+	return output.StripControl(clievents.RedactText(s))
 }

@@ -12,7 +12,8 @@ tasks:
       Refactor the local `scrub` in neo4j-cli/aura/internal/api/debug.go to a
       one-line delegate `return debug.Scrub(s)`, leaving the debugW seam,
       SetDebugWriterForTest, and [aura-debug] prefixes untouched.
-    status: pending
+    status: completed
+    completed_at: 2026-06-08T13:55:38Z
     dependencies: []
     acceptance_criteria:
       - "common/debug.Scrub exists and returns output.StripControl(clievents.RedactText(s))"
