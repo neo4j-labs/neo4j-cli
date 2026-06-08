@@ -83,7 +83,7 @@ tasks:
       index / max retries, the polled path, observed status, and the sleep
       interval, so a slow/hanging async op is diagnosable. Per-attempt wire
       detail still comes from the underlying MakeRequest dump (task-003).
-    status: pending
+    status: in_progress
     dependencies:
       - task-003
     acceptance_criteria:
@@ -91,7 +91,7 @@ tasks:
       - "Lines route through the same redacted stderr seam"
       - "Polling result/return values are unchanged with debug on or off"
       - "Off-path Poll behaviour is unchanged"
-    completed_at: null
+    completed_at: 2026-06-08T14:00:00Z
 
   - id: task-006
     title: 'Full secret redaction + no-leak test'

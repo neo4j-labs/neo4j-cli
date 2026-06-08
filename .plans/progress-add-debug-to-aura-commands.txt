@@ -17,3 +17,8 @@ Decisions: debugf/getToken/Poll diagnostics deferred to task-004/005 (left no un
 getToken emits cached-reuse vs fresh-fetch decision, auth URL, and token-request response status via a new debugInfo helper (routes through RedactText). Client secret/basic-auth header and returned access token are never logged.
 Files: ~neo4j-cli/aura/internal/api/token.go, ~neo4j-cli/aura/internal/api/debug.go, +neo4j-cli/aura/internal/api/token_debug_test.go
 Decisions: debugInfo lines avoid a `<secretword>:` prefix (e.g. "token:"/"auth:") because clievents.RedactText's assignment regex treats `token:`/`auth:` as a secret assignment and would scrub the following word.
+
+## TASK-005 — 2026-06-08T14:00:00Z
+Poll emits one debugInfo line per attempt when debug on: attempt i+1/MaxRetries, polled path, status code, observed Data.Status (200 branch) + interval; non-200 branch omits observed. Result/return values unchanged.
+Files: ~neo4j-cli/aura/internal/api/poll.go, +neo4j-cli/aura/internal/api/poll_debug_test.go
+Decisions: test sets SetPollingConfig(N,0) — default interval is 20s so Poll would otherwise block. Reuses debugTestCredJSON + buildTestConfig (testfs in-mem). Field words (path/status/observed/interval) aren't secretWords so RedactText leaves them.

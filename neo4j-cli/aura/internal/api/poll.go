@@ -57,6 +57,7 @@ func PollGraphAnalyticsSessionReady(cfg *clicfg.Config, sessionId string, waitin
 }
 
 func Poll(cfg *clicfg.Config, url string, cond func(status string) bool) (*PollResponse, error) {
+	debug := cfg.Aura.Debug()
 	pollingConfig := cfg.Aura.PollingConfig()
 	for i := 0; i < pollingConfig.MaxRetries; i++ {
 		time.Sleep(time.Second * time.Duration(pollingConfig.Interval))
@@ -73,10 +74,16 @@ func Poll(cfg *clicfg.Config, url string, cond func(status string) bool) (*PollR
 				return nil, clierr.NewUpstreamError("cannot retrieve response polling: %w", err)
 			}
 
+			if debug {
+				debugInfo("poll attempt %d/%d path %s status %d observed %q interval %ds", i+1, pollingConfig.MaxRetries, url, statusCode, response.Data.Status, pollingConfig.Interval)
+			}
+
 			// Successful poll, return last response
 			if cond(response.Data.Status) {
 				return &response, nil
 			}
+		} else if debug {
+			debugInfo("poll attempt %d/%d path %s status %d interval %ds", i+1, pollingConfig.MaxRetries, url, statusCode, pollingConfig.Interval)
 		}
 	}
 
