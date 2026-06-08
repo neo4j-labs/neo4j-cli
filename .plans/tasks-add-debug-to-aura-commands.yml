@@ -1,0 +1,151 @@
+feature: add-debug-to-aura-commands
+prd: ./prd-add-debug-to-aura-commands.md
+created_at: 2026-06-08T00:00:00Z
+updated_at: 2026-06-08T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Shared --debug resolver + debug state on cfg'
+    description: |
+      Provide a single resolver matching query's resolveDebug semantics
+      (explicit --debug flag Changed wins; otherwise ON iff NEO4J_DEBUG==1,
+      strict) reusable by both the query and aura trees. Add a place to carry
+      the resolved boolean to the api package via *clicfg.Config (e.g. an
+      Aura.Debug()/SetDebug seam), since MakeRequest/getToken/Poll take cfg not
+      cmd. Respect the common/* cannot-import neo4j-cli/internal/* rule.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "A shared resolver enforces: flag.Changed wins (--debug=false overrides NEO4J_DEBUG=1), else ON iff NEO4J_DEBUG==1 strictly"
+      - "A test locks parity with query's existing resolveDebug semantics (env values true/yes/on/0 leave debug OFF)"
+      - "cfg exposes a way to read the resolved debug bool from the api package without changing MakeRequest call sites"
+      - "Package builds; no common/* -> neo4j-cli/internal/* import introduced"
+    completed_at: null
+
+  - id: task-002
+    title: 'Register persistent --debug flag + PersistentPreRunE on aura root'
+    description: |
+      Register a persistent --debug bool flag (default false) on the Aura root
+      command in neo4j-cli/aura/aura.go NewCmd, with help text mirroring query's
+      ([env: NEO4J_DEBUG (set to 1 to enable)], stderr-only, stdout unaffected).
+      Add a PersistentPreRunE that resolves debug via task-001 and stores it on
+      cfg, ensuring it runs for the mounted `neo4j-cli aura ...` surface.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "--debug appears in help for the aura root and is inherited by every aura subcommand (instance/project/organization/credential/agent/cmk/dataapi/graphanalytics/workspace)"
+      - "PersistentPreRunE resolves and stores debug state before any subcommand RunE executes, on the mounted neo4j-cli aura surface"
+      - "Any pre-existing PersistentPreRunE on the tree is preserved (chained, not clobbered)"
+      - "Help text mentions NEO4J_DEBUG env toggle and that output goes to stderr"
+    completed_at: null
+
+  - id: task-003
+    title: 'Emit redacted HTTP request/response wire + timing in MakeRequest'
+    description: |
+      When debug is on, MakeRequest writes to a package-level writer seam
+      (default os.Stderr) the request method, full URL, headers, body, then the
+      response status, headers, body, and elapsed duration. Request/response
+      lines are distinguishable (prefix or tag). All output passes through
+      clievents.RedactText. Work is fully guarded so the off-path is unchanged.
+    status: pending
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "With debug on, a request emits method, URL, headers, body, response status, headers, body, and duration to the seam writer"
+      - "Request vs response lines are visually distinguishable (e.g. >/< prefix or [aura-debug] tag)"
+      - "All emitted text is passed through clievents.RedactText before writing"
+      - "A package-level writer seam defaults to os.Stderr and is overridable in tests"
+      - "When debug is off, no debug output is produced and the redact/format work is skipped"
+    completed_at: null
+
+  - id: task-004
+    title: 'Emit token-acquisition diagnostics in getToken'
+    description: |
+      When debug is on, getToken (token.go) emits whether a cached valid token
+      was reused vs a new token fetched, the auth URL, and the token request
+      response status — never the client secret or the returned token. Reuses
+      the same redacted debug emit seam from task-003.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Debug output shows cached-token-reuse vs new-fetch decision and the auth URL"
+      - "Token request response status is shown; client id/secret (basic auth) and returned access token are never printed in the clear"
+      - "Output routes through the same redacted stderr seam as MakeRequest"
+      - "Off-path behaviour of getToken is unchanged"
+    completed_at: null
+
+  - id: task-005
+    title: 'Emit poll-loop diagnostics in Poll'
+    description: |
+      When debug is on, Poll (poll.go) emits one line per attempt: attempt
+      index / max retries, the polled path, observed status, and the sleep
+      interval, so a slow/hanging async op is diagnosable. Per-attempt wire
+      detail still comes from the underlying MakeRequest dump (task-003).
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Each poll attempt emits attempt index/max, polled path, observed status, and interval"
+      - "Lines route through the same redacted stderr seam"
+      - "Polling result/return values are unchanged with debug on or off"
+      - "Off-path Poll behaviour is unchanged"
+    completed_at: null
+
+  - id: task-006
+    title: 'Full secret redaction + no-leak test'
+    description: |
+      Ensure clievents.RedactText scrubs the Authorization: Bearer header, the
+      getToken basic-auth client id/secret, and any password/secret body fields
+      to ***. Add any missing Aura-specific secret field to the single-sourced
+      secretWords vocabulary in redact.go (not at call sites). Lock with a test
+      asserting no raw token/secret substring appears in captured debug output.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+    acceptance_criteria:
+      - "Authorization/Bearer header and basic-auth credentials render as *** in debug output"
+      - "Any newly-needed secret field is added to secretWords in redact.go, not redacted at the call site"
+      - "A test seeds a known token/secret and asserts the raw value never appears in captured debug output across request, response, and token paths"
+      - "Existing clievents redaction tests still pass"
+    completed_at: null
+
+  - id: task-007
+    title: 'stdout byte-identical invariance tests across formats'
+    description: |
+      Add tests (analog of query's TestRunQuery_DebugFlagDoesNotChangeStdout)
+      proving stdout under --debug=true equals stdout under --debug=false for an
+      aura command against a stubbed API response, in json, table, and toon
+      formats. Confirms all debug output lands on stderr only.
+    status: pending
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "A test runs an aura command with --debug=false and --debug=true against the same stubbed response and asserts byte-identical stdout"
+      - "The invariance holds for --format json, table, and toon"
+      - "Tests use the mock HTTP server / in-memory fs helpers, never afero.NewOsFs in credential-touching packages"
+      - "Debug content is asserted present on the captured stderr/seam (so the test proves debug ran, not that it was a no-op)"
+    completed_at: null
+
+  - id: task-008
+    title: 'Regenerate skill bundle, changelog, and pass final gates'
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to refresh any bundle docs
+      affected by the new persistent flag and confirm TestGenerator_RoundTrip is
+      green. Add a changie Minor changelog entry for the user-facing aura --debug
+      flag. Run make test, make fmt-check, and make lint as final gates.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... produces no uncommitted drift and TestGenerator_RoundTrip passes"
+      - "TestAllLeafCommands_HaveExamples and the casing gates pass with the new flag"
+      - "A changie Minor entry describing aura --debug is added"
+      - "make test, make fmt-check, and make lint all pass clean"
+    completed_at: null
