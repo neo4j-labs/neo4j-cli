@@ -561,6 +561,27 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			wantErrContains: []string{"--credential", "--username"},
 		},
 		{
+			name:            "conflicts with --uri",
+			credsJSON:       namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB"),
+			flags:           []string{"--credential=mydb", "--uri=neo4j://other:7687"},
+			wantErrContains: []string{"--credential", "--uri"},
+		},
+		{
+			name:            "conflicts with --password",
+			credsJSON:       namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB"),
+			flags:           []string{"--credential=mydb", "--password=other"},
+			wantErrContains: []string{"--credential", "--password"},
+		},
+		{
+			name:         "--database combinable, overrides stored database",
+			credsJSON:    namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB"),
+			flags:        []string{"--credential=mydb", "--database=flagdb"},
+			wantURI:      "neo4j://named:7687",
+			wantUsername: "namedUser",
+			wantPassword: "namedPass",
+			wantDatabase: "flagdb",
+		},
+		{
 			name:            "unknown credential errors with helpful message",
 			credsJSON:       "{}",
 			flags:           []string{"--credential=unknown"},
@@ -614,6 +635,62 @@ func TestResolveConn_CredentialFlag(t *testing.T) {
 			assert.Equal(t, tc.wantDatabase, c.database)
 		})
 	}
+}
+
+// TestResolveConn_CredentialFlag_DatabaseOverridePrecedence verifies CLI-212
+// on the persisted-credential path: explicit --database (even explicitly
+// empty) > NEO4J_DATABASE env > the credential's stored DatabaseName.
+func TestResolveConn_CredentialFlag_DatabaseOverridePrecedence(t *testing.T) {
+	tests := []struct {
+		name         string
+		flags        []string
+		envDB        string
+		wantDatabase string
+	}{
+		{name: "flag overrides stored", flags: []string{"--database=flagdb"}, wantDatabase: "flagdb"},
+		{name: "env overrides stored", envDB: "envdb", wantDatabase: "envdb"},
+		{name: "flag beats env", flags: []string{"--database=flagdb"}, envDB: "envdb", wantDatabase: "flagdb"},
+		{name: "explicit empty flag beats env and stored", flags: []string{"--database="}, envDB: "envdb", wantDatabase: ""},
+		{name: "no override keeps stored", wantDatabase: "namedDB"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envURI, "")
+			t.Setenv(envUsername, "")
+			t.Setenv(envPassword, "")
+			t.Setenv(envDatabase, tc.envDB)
+			t.Chdir(t.TempDir())
+
+			credsJSON := namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB")
+			cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+			require.NoError(t, cmd.ParseFlags(append([]string{"--credential=mydb"}, tc.flags...)))
+
+			c, err := resolveConn(cmd, cfg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDatabase, c.database)
+		})
+	}
+}
+
+// TestResolveConn_CredentialConflict_DatabaseNotListed verifies the conflict
+// error for --credential no longer mentions --database: only the params that
+// constitute the credential itself (--uri/--username/--password) are listed.
+func TestResolveConn_CredentialConflict_DatabaseNotListed(t *testing.T) {
+	t.Setenv(envURI, "")
+	t.Setenv(envUsername, "")
+	t.Setenv(envPassword, "")
+	t.Setenv(envDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := namedCredJSON("mydb", "neo4j://named:7687", "namedUser", "namedPass", "namedDB")
+	cmd, cfg := newTestCmdWithCreds(t, credsJSON)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=mydb", "--username=other", "--database=flagdb"}))
+
+	_, err := resolveConn(cmd, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--username")
+	assert.NotContains(t, err.Error(), "--database")
 }
 
 // TestResolveDebug_FlagAndEnvPrecedence locks the six precedence cases for the

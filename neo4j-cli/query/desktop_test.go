@@ -98,6 +98,53 @@ func TestResolveConn_DesktopActive_Resolves(t *testing.T) {
 	assert.Equal(t, "", c.database)
 }
 
+// TestResolveConn_DesktopActive_DatabaseOverride verifies CLI-212 on the
+// `desktop` prefix: --database / NEO4J_DATABASE override the (empty)
+// desktop-supplied database with flag > env > none precedence.
+func TestResolveConn_DesktopActive_DatabaseOverride(t *testing.T) {
+	tests := []struct {
+		name         string
+		flags        []string
+		envDB        string
+		wantDatabase string
+	}{
+		{name: "flag overrides", flags: []string{"--database=movies"}, wantDatabase: "movies"},
+		{name: "env applies when flag unset", envDB: "envdb", wantDatabase: "envdb"},
+		{name: "flag beats env", flags: []string{"--database=movies"}, envDB: "envdb", wantDatabase: "movies"},
+		{name: "no override leaves home DB resolution", wantDatabase: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envURI, "")
+			t.Setenv(envUsername, "")
+			t.Setenv(envPassword, "")
+			t.Setenv(envDatabase, tc.envDB)
+			t.Chdir(t.TempDir())
+
+			restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
+				return &desktopMatch{
+					dbms: &desktopclient.DbmsInfo{
+						ID:            "running-dbms",
+						Name:          "running",
+						Status:        "started",
+						ConnectionURI: "neo4j://localhost:7690",
+					},
+					creds: &desktopclient.Credentials{Username: "neo4j", Password: "running-pw"},
+				}, nil
+			})
+			defer restore()
+
+			cmd, cfg := newTestCmdWithCreds(t, "{}")
+			require.NoError(t, cmd.ParseFlags(append([]string{"--credential=desktop"}, tc.flags...)))
+
+			c, err := resolveConn(cmd, cfg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDatabase, c.database)
+		})
+	}
+}
+
 // TestResolveConn_DesktopActive_NullCreds_TTYPrompts verifies REQ-F-028 on
 // the `desktop` prefix: Desktop returned a DBMS but no creds; on a TTY we
 // prompt and assemble the conn with the prompted password.
@@ -265,6 +312,54 @@ func TestResolveConn_DesktopConnection_Resolves(t *testing.T) {
 	assert.Equal(t, "neo4j+s://example.databases.neo4j.io", c.uri)
 	assert.Equal(t, "aura-user", c.username)
 	assert.Equal(t, "aura-pw", c.password)
+}
+
+// TestResolveConn_DesktopConnection_DatabaseOverride verifies CLI-212 on the
+// `desktop-connection:<uuid>` prefix: --database / NEO4J_DATABASE override
+// the (empty) connection-supplied database with flag > env > none precedence.
+func TestResolveConn_DesktopConnection_DatabaseOverride(t *testing.T) {
+	const validUUID = "11111111-2222-3333-4444-555555555555"
+
+	tests := []struct {
+		name         string
+		flags        []string
+		envDB        string
+		wantDatabase string
+	}{
+		{name: "flag overrides", flags: []string{"--database=movies"}, wantDatabase: "movies"},
+		{name: "env applies when flag unset", envDB: "envdb", wantDatabase: "envdb"},
+		{name: "flag beats env", flags: []string{"--database=movies"}, envDB: "envdb", wantDatabase: "movies"},
+		{name: "no override leaves home DB resolution", wantDatabase: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(envURI, "")
+			t.Setenv(envUsername, "")
+			t.Setenv(envPassword, "")
+			t.Setenv(envDatabase, tc.envDB)
+			t.Chdir(t.TempDir())
+
+			restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, _ string) (*desktopMatch, error) {
+				return &desktopMatch{
+					connection: &desktopclient.Connection{
+						ID:            validUUID,
+						Name:          "prod-aura",
+						ConnectionURI: "neo4j+s://example.databases.neo4j.io",
+					},
+					creds: &desktopclient.Credentials{Username: "aura-user", Password: "aura-pw"},
+				}, nil
+			})
+			defer restore()
+
+			cmd, cfg := newTestCmdWithCreds(t, "{}")
+			require.NoError(t, cmd.ParseFlags(append([]string{"--credential=desktop-connection:" + validUUID}, tc.flags...)))
+
+			c, err := resolveConn(cmd, cfg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantDatabase, c.database)
+		})
+	}
 }
 
 // TestResolveConn_DesktopConnection_MalformedUUID_UsageError verifies
