@@ -1,0 +1,227 @@
+feature: add-debug-to-desktop-commands
+prd: ./prd-add-debug-to-desktop-commands.md
+created_at: 2026-06-08T12:00:00Z
+updated_at: 2026-06-08T12:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'Add desktopclient debug seam (debug.go + export_test.go)'
+    description: |
+      Create neo4j-cli/internal/desktopclient/debug.go mirroring
+      neo4j-cli/aura/internal/api/debug.go. Define the package-level writer seam
+      (var debugW io.Writer = os.Stderr), the enabled flag (var debugEnabled
+      bool) with exported SetDebug(bool), the prefixes ([desktop-debug] > / < /
+      info), a scrub helper delegating to common/debug.Scrub, and the emit
+      helpers debugRequest / debugResponse / debugInfo plus writeHeaders. Each
+      emit helper early-returns when !debugEnabled so call sites stay
+      unconditional. Add SetDebugWriterForTest and SetDebugForTest (both restore
+      via t.Cleanup) in an export_test.go. Include the Neo4j copyright header.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "debug.go defines debugW (os.Stderr default), debugEnabled, and exported SetDebug(bool)"
+      - "Prefixes are exactly '[desktop-debug] > ', '[desktop-debug] < ', '[desktop-debug] '"
+      - "scrub delegates to common/debug.Scrub (StripControl(RedactText)); helpers no-op when debugEnabled is false"
+      - "export_test.go exposes SetDebugWriterForTest and SetDebugForTest, each restoring via t.Cleanup"
+      - "File has the Neo4j copyright header; package compiles"
+    completed_at: 2026-06-08T13:05:00Z
+
+  - id: task-002
+    title: 'Trace authenticated relate-API wire in client.go doRaw'
+    description: |
+      In neo4j-cli/internal/desktopclient/client.go, retain the marshalled
+      request body bytes in doRaw (currently only wrapped in a reader) and emit
+      debugRequest(method, url, req.Header, rawBody) before httpDoFn, recording
+      a start time. On a successful round-trip emit debugResponse(status,
+      resp.Header, respBody, elapsed) after the body read; on transport error
+      emit a debugInfo line with the error and elapsed before mapping to the
+      canonical unreachable/timeout errors. In NewClient, register the signed
+      JWT via clievents.RegisterSecretValue(token) so the X-API-Token header is
+      always redacted.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "doRaw emits request line + headers + body before httpDoFn and response line + headers + body + elapsed after"
+      - "Transport-error path emits a [desktop-debug] line with elapsed before returning the canonical error"
+      - "rawBody is captured without changing the request that is actually sent"
+      - "NewClient calls clievents.RegisterSecretValue(token)"
+      - "Stdout/return values of all Client methods are unchanged when debug is off"
+    completed_at: 2026-06-08T14:05:00Z
+
+  - id: task-003
+    title: 'Trace discovery wire in discovery.go'
+    description: |
+      In neo4j-cli/internal/desktopclient/discovery.go emit [desktop-debug]
+      lines for the discovery path: probeOne logs each port probe target and
+      result; DiscoverViaMDNS/advertisedPort log the mDNS/dns-sd outcome and
+      Discover logs which tier resolved; FetchAppInfo emits debugRequest/
+      debugResponse around its httpDoFn call. All emission is gated by the
+      shared debugEnabled flag (helpers already no-op when off).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "probeOne emits a [desktop-debug] line per probed port (target + status/miss)"
+      - "mDNS/dns-sd discovery outcome and the resolved Discover tier are logged"
+      - "FetchAppInfo emits request/response debug lines around its HTTP call"
+      - "No discovery behavior (return values, error mapping) changes when debug is off"
+    completed_at: 2026-06-08T15:05:00Z
+
+  - id: task-004
+    title: 'Add --debug persistent flag + PersistentPreRunE on desktop root'
+    description: |
+      In neo4j-cli/internal/subcommands/desktop/desktop.go register a persistent
+      Bool --debug flag on the desktop parent (NewCmd) with wording mirroring
+      aura/docker incl. the '[env: NEO4J_DEBUG (set to 1 to enable)]' suffix and
+      noting discovery is traced. Set cmd.PersistentPreRunE to call
+      desktopclient.SetDebug(debug.Resolve(cmd)). Rely on the neo4j-cli root's
+      cobra.EnableTraverseRunHooks=true so it runs for every nested leaf; confirm
+      no leaf/subtree shadows it with its own PersistentPreRunE.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "Persistent --debug Bool flag registered on the desktop parent command"
+      - "PersistentPreRunE calls desktopclient.SetDebug(debug.Resolve(cmd))"
+      - "Flag is inherited by all leaves across dbms, dbms/plugin, connection, list, doctor, install"
+      - "Flag description mirrors aura/docker style with the NEO4J_DEBUG env suffix"
+    completed_at: 2026-06-08T16:05:00Z
+
+  - id: task-005
+    title: 'Register write-command passwords as secret values'
+    description: |
+      Before the client call, register the password via
+      clievents.RegisterSecretValue in the three write leaves so the raw request
+      body is redacted in the trace (RedactText catches the connections
+      "password" key but NOT the CreateDbms "credentials" key): dbms/create.go
+      before client.CreateDbms, connection/create.go before
+      client.CreateConnection, and connection/update.go before
+      client.UpdateConnection (only when a password is set).
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "dbms/create.go registers the password before CreateDbms"
+      - "connection/create.go registers the password before CreateConnection"
+      - "connection/update.go registers the password before UpdateConnection when set"
+      - "No change to command behavior or output when debug is off"
+    completed_at: 2026-06-08T17:05:00Z
+
+  - id: task-006
+    title: 'Wire query --desktop path into the desktop debug seam'
+    description: |
+      In the query desktop-resolution path (the caller of
+      newDesktopFallthroughClient where the *cobra.Command is available, in
+      neo4j-cli/query/connect.go), call desktopclient.SetDebug(resolveDebug(cmd))
+      once before resolving so query --desktop --debug traces desktop discovery
+      and credential fetch through the same seam. resolveDebug already delegates
+      to common/debug.Resolve.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "query --desktop resolution calls desktopclient.SetDebug(resolveDebug(cmd)) before constructing the fallthrough client"
+      - "query --desktop --debug emits [desktop-debug] discovery lines"
+      - "query stdout and non-desktop query behavior are unchanged"
+    completed_at: 2026-06-08T18:05:00Z
+
+  - id: task-007
+    title: 'Tests: unit, end-to-end, resolution, discovery, redaction'
+    description: |
+      Add desktopclient/debug_test.go (unit: debugRequest/debugResponse/
+      debugInfo redact a password body and the X-API-Token JWT, strip control
+      chars, emit nothing when debugEnabled=false). Add desktop/debug_test.go:
+      drive `desktop dbms list --debug` end-to-end under a stub neo4j-cli root
+      with EnableTraverseRunHooks=true (mirror app.go), mock HTTP via
+      SetHTTPDoFnForTest, capture via SetDebugWriterForTest; assert the wire is
+      traced AND stdout is byte-identical with/without --debug across
+      json/table/toon. Add a root flag/env precedence table (default off,
+      --debug, NEO4J_DEBUG=1, =true leaves off, --debug=false overrides env=1), a
+      discovery-trace test (probe/mDNS lines appear), and a create-redaction test
+      (known password absent from trace).
+    status: completed
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "Unit tests assert body+JWT redaction, control-strip, and off-path silence"
+      - "End-to-end test asserts [desktop-debug] > GET .../dbmss and < 200 and stdout invariance across json/table/toon"
+      - "Root resolution table covers flag/env precedence incl. NEO4J_DEBUG=true left off and --debug=false overriding env=1"
+      - "Discovery-trace and create-redaction tests pass"
+      - "All new tests pass under make test"
+    completed_at: 2026-06-08T15:45:00Z
+
+  - id: task-008
+    title: 'Regenerate skill bundle for the new --debug flag'
+    description: |
+      The new persistent --debug flag changes desktop command help, so the
+      generated skill bundle references drift. Run
+      `go generate ./neo4j-cli/internal/skill/...` and commit the regenerated
+      bundle alongside the source so TestGenerator_RoundTrip / make
+      generate-check pass.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... run and regenerated bundle committed"
+      - "TestGenerator_RoundTrip passes"
+      - "make generate-check is clean on a committed tree"
+    completed_at: 2026-06-08T19:05:00Z
+
+  - id: task-009
+    title: 'Add changelog entry and pass all final gates'
+    description: |
+      Add a user-facing changelog entry via
+      `changie new --projects neo4j-cli --kind Minor --body "..."` (Minor, matching
+      the CLI-197/CLI-198 --debug entries). Then run and pass all final gates:
+      make test, make fmt-check, make lint, make license-check (the new debug.go
+      needs the Neo4j header), and make generate-check.
+    status: completed
+    dependencies:
+      - task-007
+      - task-008
+    acceptance_criteria:
+      - "Changelog entry added under .changes/unreleased for neo4j-cli, kind Minor"
+      - "make test, make fmt-check, make lint, make license-check all pass"
+      - "make generate-check is clean"
+    completed_at: 2026-06-08T17:50:00Z
+
+  - id: task-010
+    title: 'Align desktopclient debug test seams with package convention (drop testing import)'
+    description: |
+      debug.go imports "testing" into a production (non-_test.go) file and exposes
+      SetDebugWriterForTest(t *testing.T, w io.Writer) and SetDebugForTest(t
+      *testing.T, enabled bool) that take a *testing.T and self-register
+      t.Cleanup. This is now the ONLY production file in the desktopclient package
+      that imports testing, which links the testing package into the production
+      binary and diverges from the package's own established seam convention. All
+      seven existing seams (SetHTTPDoFnForTest, SetUUIDFnForTest, SetNowFnForTest,
+      SetHomeDirFnForTest, SetGOOSFnForTest, SetHTTPClientFnForTest,
+      SetProbeHostFnForTest) return a restore func() and take no *testing.T, so
+      they never import testing. The external desktop_test package genuinely
+      cannot see export_test.go symbols, so the seam must live in production — but
+      the fix is to follow the package's existing closure style, not to import
+      testing. (aura/docker get away with *testing.T only because their seams live
+      in export_test.go consumed by a same-dir _test package.) Change
+      SetDebugWriterForTest to `SetDebugWriterForTest(w io.Writer) func()` and
+      SetDebugForTest to `SetDebugForTest(enabled bool) func()`, each returning a
+      restore closure that resets the previous value; remove the "testing" import
+      from debug.go. Update all call sites (the external desktop_test tests and any
+      in-package tests) to use the closure, e.g.
+      `t.Cleanup(desktopclient.SetDebugWriterForTest(&buf))` or `defer …()`. Leave
+      the DebugEnabled() production getter in place (it is symmetric with the
+      production SetDebug and harmless).
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "debug.go no longer imports \"testing\"; no production (non-_test.go) file in desktopclient imports testing"
+      - "SetDebugWriterForTest and SetDebugForTest return a restore func() and take no *testing.T, matching the package's existing seam style"
+      - "All call sites updated (external desktop_test + in-package tests) and use the restore closure (t.Cleanup or defer)"
+      - "make test, make fmt-check, make lint, make license-check, make generate-check all pass"
+    source: review
+    completed_at: 2026-06-08T20:15:00Z

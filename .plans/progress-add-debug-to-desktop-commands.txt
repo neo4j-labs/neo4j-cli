@@ -1,0 +1,45 @@
+## TASK-001 — 2026-06-08T13:05:00Z
+Added desktopclient debug seam mirroring aura api/debug.go: debugW/os.Stderr writer, debugEnabled gate + exported SetDebug, [desktop-debug] >/</  prefixes, scrub→common/debug.Scrub, debugRequest/debugResponse/debugInfo/writeHeaders. Gate lives INSIDE each emit helper (not call site) so client.go/discovery.go can call unconditionally.
+Files: +neo4j-cli/internal/desktopclient/debug.go, +neo4j-cli/internal/desktopclient/export_test.go
+Decisions: emit helpers re-exported as Debug*ForTest in export_test.go (not //nolint:unused) — roots them in the usage graph until tasks 002/003 wire production call sites, and gives task-007 unit tests a direct driver.
+
+## TASK-002 — 2026-06-08T14:05:00Z
+Wired desktopclient doRaw into the debug seam: capture marshalled rawBody (request unchanged), debugRequest before httpDoFn (start time), debugResponse after body read with elapsed, debugInfo("transport error after %s: ...") on the transport-error path before canonical mapping. NewClient now calls clievents.RegisterSecretValue(token) so the X-API-Token JWT is scrubbed everywhere. All three emit helpers now have production callers; trimmed the stale "rooting" note in export_test.go (kept the re-exports as genuine test drivers).
+Files: ~neo4j-cli/internal/desktopclient/client.go, ~neo4j-cli/internal/desktopclient/export_test.go
+
+## TASK-003 — 2026-06-08T15:05:00Z
+Traced the discovery wire: probeOne emits "probe GET <url>" then "-> <status>"/"-> miss: <err>"; advertisedPort distinguishes mdns-multicast vs dns-sd advertised port and emits "mdns no responder" on miss; Discover logs the resolved tier (pinned/mdns/port scan) with origin; FetchAppInfo mirrors doRaw (debugRequest before httpDoFn, debugResponse after body read, transport-error debugInfo). All emit helpers no-op when off; return values/error mapping/e2e overrides untouched.
+Files: ~neo4j-cli/internal/desktopclient/discovery.go
+
+## TASK-004 — 2026-06-08T16:05:00Z
+Registered persistent --debug Bool on desktop NewCmd (aura/docker wording + NEO4J_DEBUG env suffix) and wrapped PersistentPreRunE (defensive prev capture, aura shape) to call desktopclient.SetDebug(debug.Resolve(cmd)); relies on root EnableTraverseRunHooks so it fires for every nested leaf. Confirmed no production PersistentPreRunE shadows the desktop subtree (only a comment in plugin/install_test.go).
+Files: ~neo4j-cli/internal/subcommands/desktop/desktop.go
+Decisions: bundle drift (references/*.md) deferred to task-008 — make test fails ONLY on TestGenerator_RoundTrip as expected; all other gates green.
+
+## TASK-005 — 2026-06-08T17:05:00Z
+Registered the resolved password via clievents.RegisterSecretValue before the client call in all three write leaves so the --debug request-body trace is redacted. dbms/create.go is the load-bearing one (relate keys it under "credentials", which RedactText misses); connection update.go guards on passwordSet && non-empty.
+Files: ~neo4j-cli/internal/subcommands/desktop/dbms/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/create.go, ~neo4j-cli/internal/subcommands/desktop/connection/update.go
+
+## TASK-006 — 2026-06-08T18:05:00Z
+Wired query --desktop into the desktop debug seam: call desktopclient.SetDebug(resolveDebug(cmd)) inside both --credential desktop branches (active DBMS + desktop-connection:<uuid>) in resolveConn, before the resolver fires. Non-desktop paths never touch the seam; query stdout unchanged.
+Files: ~neo4j-cli/query/connect.go
+
+## TASK-007 — 2026-06-08T15:45:00Z
+Added all five test groups: unit (desktopclient/debug_test.go — request/response/info prefixes, password+credentials+registered-JWT redaction, control-strip, off-path silence), discovery-trace (desktopclient/discovery_debug_test.go — probeOne, Discover mDNS tier, FetchAppInfo, off-path), and external e2e (desktop/debug_test.go — `dbms list` stdout byte-invariance across json/table/toon + wire trace, root flag/env precedence table, create-redaction). make test green except the expected TestGenerator_RoundTrip drift (task-008).
+Files: +neo4j-cli/internal/desktopclient/debug_test.go, +neo4j-cli/internal/desktopclient/discovery_debug_test.go, +neo4j-cli/internal/subcommands/desktop/debug_test.go, ~neo4j-cli/internal/desktopclient/debug.go, ~neo4j-cli/internal/desktopclient/export_test.go
+Decisions: moved SetDebugWriterForTest/SetDebugForTest from export_test.go to production debug.go (added DebugEnabled() getter too) — the external desktop_test package can't see export_test.go symbols of an imported package; production *ForTest seams (testing import) follow the common/confirm/confirm.go precedent. debugEnabled is a process-global; resolution cases reset via SetDebug(false) and run serial.
+
+## TASK-008 — 2026-06-08T19:05:00Z
+Regenerated skill bundle for the new desktop persistent --debug flag; only neo4j-cli/internal/skill/bundle/references/desktop.md drifted (+1 flag row). Full make test now green (TestGenerator_RoundTrip passes); fmt-check, lint, generate-check all clean.
+Files: ~neo4j-cli/internal/skill/bundle/references/desktop.md
+
+## TASK-009 — 2026-06-08T17:50:00Z
+Added user-facing changelog entry (changie, kind Minor) for the desktop --debug flag. All final gates passed: make test, make fmt-check, make lint, make license-check green; go generate produced no bundle drift (generate-check clean).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260608-174802.yaml
+
+## REVIEW — 2026-06-08T15:51:57Z
+Added 1 review task (task-010).
+
+## TASK-010 — 2026-06-08T20:15:00Z
+Aligned desktopclient debug seams with the package's closure convention: SetDebugWriterForTest/SetDebugForTest now return a restore func() (no *testing.T), dropping the "testing" import from production debug.go. Updated all desktop-scope call sites to t.Cleanup(...) form. All gates green.
+Files: ~neo4j-cli/internal/desktopclient/debug.go, ~neo4j-cli/internal/desktopclient/debug_test.go, ~neo4j-cli/internal/desktopclient/discovery_debug_test.go, ~neo4j-cli/internal/subcommands/desktop/debug_test.go

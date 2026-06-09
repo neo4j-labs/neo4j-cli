@@ -100,8 +100,12 @@ func FetchAppInfo(ctx context.Context, probe ProbeResult) (AppInfo, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 
+	start := time.Now()
+	debugRequest(http.MethodGet, url, req.Header, nil)
+
 	resp, err := httpDoFn(req)
 	if err != nil {
+		debugInfo("transport error after %s: %s", time.Since(start), err.Error())
 		// Same disambiguation as Client.doRaw — deadline-exceeded means
 		// "Desktop is there but slow", everything else means "Desktop isn't
 		// there" (probe miss, connection refused, EOF, reset).
@@ -116,6 +120,7 @@ func FetchAppInfo(ctx context.Context, probe ProbeResult) (AppInfo, error) {
 	if readErr != nil {
 		return AppInfo{}, clierr.NewFatalError("%s", canonicalUnreachable)
 	}
+	debugResponse(resp.StatusCode, resp.Header, respBody, time.Since(start))
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
@@ -229,6 +234,7 @@ var ErrNoDesktop = errors.New("desktop: no relate server found on ports 44222..4
 // outbound HTTP request body — same as Desktop's own UI client.
 func probeOne(ctx context.Context, port int) bool {
 	url := origin(port) + ProbePath
+	debugInfo("probe GET %s", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return false
@@ -236,9 +242,11 @@ func probeOne(ctx context.Context, port int) bool {
 	client := httpClientFn()
 	resp, err := client.Do(req)
 	if err != nil {
+		debugInfo("probe %s -> miss: %s", url, err.Error())
 		return false
 	}
 	defer resp.Body.Close() //nolint:errcheck // probe response body is unused; close errors are not actionable
+	debugInfo("probe %s -> %d", url, resp.StatusCode)
 	return resp.StatusCode == http.StatusOK
 }
 
@@ -270,11 +278,16 @@ func mdnsOrigin(port int) string {
 // multicast first, then the macOS dns-sd fallback. (0,false) when none answers.
 func advertisedPort(ctx context.Context) (int, bool) {
 	if port, ok := mdnsBrowseFn(ctx); ok {
+		debugInfo("mdns multicast advertised port %d", port)
 		return port, true
 	}
 	if goosFn() == "darwin" {
-		return dnssdLookupFn(ctx)
+		if port, ok := dnssdLookupFn(ctx); ok {
+			debugInfo("dns-sd advertised port %d", port)
+			return port, true
+		}
 	}
+	debugInfo("mdns no responder")
 	return 0, false
 }
 
@@ -288,12 +301,21 @@ func Discover(ctx context.Context, pinned int) (ProbeResult, error) {
 		return ProbeResult{Port: e2ePortOverride, Origin: origin(e2ePortOverride)}, nil
 	}
 	if pinned != 0 {
-		return discoverPinned(ctx, pinned)
+		res, err := discoverPinned(ctx, pinned)
+		if err == nil {
+			debugInfo("discover: resolved pinned port origin %s", res.Origin)
+		}
+		return res, err
 	}
 	if res, err := DiscoverViaMDNS(ctx); err == nil {
+		debugInfo("discover: resolved via mdns origin %s", res.Origin)
 		return res, nil
 	}
-	return ProbePort(ctx, 0)
+	res, err := ProbePort(ctx, 0)
+	if err == nil {
+		debugInfo("discover: resolved via port scan origin %s", res.Origin)
+	}
+	return res, err
 }
 
 // DiscoverViaMDNS resolves the relate API via mDNS — in-process multicast then

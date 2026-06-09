@@ -6,6 +6,8 @@ package desktop
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/debug"
+	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop/connection"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/desktop/dbms"
 	"github.com/spf13/cobra"
@@ -25,6 +27,22 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	}
 
 	cmd.PersistentFlags().Int(portFlag, 0, "Pin the Desktop relate API to a specific port instead of probing 44222..44232")
+	cmd.PersistentFlags().Bool("debug", false, "Route Neo4j Desktop relate API activity (discovery probes, mDNS, the local HTTP request/response wire) to stderr; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)]")
+
+	// Resolve --debug once at startup and toggle the desktopclient package seam
+	// (its emit helpers take no *cobra.Command). cobra.EnableTraverseRunHooks
+	// (set on the neo4j-cli root) runs every PersistentPreRunE up the ancestry,
+	// so this fires for every nested leaf.
+	prev := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if prev != nil {
+			if err := prev(cmd, args); err != nil {
+				return err
+			}
+		}
+		desktopclient.SetDebug(debug.Resolve(cmd))
+		return nil
+	}
 
 	cmd.AddCommand(dbms.NewCmd(cfg))
 	cmd.AddCommand(connection.NewCmd(cfg))
