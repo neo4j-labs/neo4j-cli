@@ -216,7 +216,9 @@ var runStatementsResponseFn = runStatementsResponseImpl
 // running Desktop DBMS; `desktop-connection:<uuid>` resolves a saved
 // Desktop connection by UUID; any other value is a persisted-store lookup
 // (no implicit Desktop fallthrough). Passing any of
-// --uri/--username/--password/--database alongside --credential is an error.
+// --uri/--username/--password alongside --credential is an error; --database
+// (or the NEO4J_DATABASE OS env var, flag winning) may be combined with
+// --credential to override the credential-supplied database.
 // When none of the four connection params (uri, username, password,
 // database) are explicitly provided, the stored default database credential
 // (if any) is used instead. Partial explicit overrides (some but not all of
@@ -225,16 +227,17 @@ var runStatementsResponseFn = runStatementsResponseImpl
 // (prompt if needed) and then call c.openDriver(ctx) before issuing
 // queries, and defer c.driver.Close(ctx) for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
-	// --credential: when set, dispatch on the value's prefix. Dotenv / env
-	// vars are skipped entirely. None of --uri/--username/--password/
-	// --database may be set alongside it.
+	// --credential: when set, dispatch on the value's prefix. Dotenv is
+	// skipped entirely. None of --uri/--username/--password may be set
+	// alongside it; --database / NEO4J_DATABASE override the
+	// credential-supplied database.
 	if f := cmd.Flag("credential"); f != nil && f.Changed {
 		credName := f.Value.String()
 
-		// Conflict check: --credential is mutually exclusive with the four
-		// individual connection params.
+		// Conflict check: --credential is mutually exclusive with the
+		// params that constitute the credential itself.
 		conflicting := []string{}
-		for _, name := range []string{"uri", "username", "password", "database"} {
+		for _, name := range []string{"uri", "username", "password"} {
 			if cf := cmd.Flag(name); cf != nil && cf.Changed {
 				conflicting = append(conflicting, "--"+name)
 			}
@@ -286,7 +289,7 @@ func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
 				credName)
 		}
 
-		return buildConnFromPersistedCred(cred, cfg, cmd), nil
+		return applyDatabaseOverride(cmd, buildConnFromPersistedCred(cred, cfg, cmd)), nil
 	}
 
 	// --credential not set: load dotenv and use the standard resolution path.
@@ -416,7 +419,7 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMa
 		return nil, clierr.NewFatalError("query: internal: desktop resolver returned nil match without error")
 	}
 	if match.creds != nil {
-		return buildConnFromDesktopMatch(match, cfg, cmd), nil
+		return applyDatabaseOverride(cmd, buildConnFromDesktopMatch(match, cfg, cmd)), nil
 	}
 	// Desktop knows the resource but has no stored credentials (legacy DBMS
 	// / safeStorage unavailable). On a TTY prompt for the password; on a
@@ -436,7 +439,20 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMa
 		return nil, perr
 	}
 	c.password = pw
-	return c, nil
+	return applyDatabaseOverride(cmd, c), nil
+}
+
+// applyDatabaseOverride layers the database override onto a credential-built
+// conn: explicit --database flag (even explicitly empty) > NEO4J_DATABASE OS
+// env var > the credential-supplied database. Dotenv is intentionally not
+// consulted in the credential path.
+func applyDatabaseOverride(cmd *cobra.Command, c *conn) *conn {
+	if f := cmd.Flag("database"); f != nil && f.Changed {
+		c.database = f.Value.String()
+	} else if v := os.Getenv(envDatabase); v != "" {
+		c.database = v
+	}
+	return c
 }
 
 // buildConnFromPersistedCred turns a persisted DbmsCredential into the *conn
