@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'query: --database flag and NEO4J_DATABASE env var can now be combined with --credential to target a specific database'
+time: 2026-06-09T22:47:35.34683+02:00
