@@ -17,8 +17,8 @@ Flags:
 |------|------|---------|-------------|
 | `--atomic` | bool | false | Run all statements in a single transaction; roll back on any failure (default: each statement in its own transaction, fail-fast) |
 | `--continue-on-error` | bool | false | Keep running after a statement fails: report each failure and execute the rest, then exit non-zero (non-atomic only; mutually exclusive with --atomic) |
-| `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list') |
-| `-d, --database` | string | - | Target database name; defaults to the connecting user's home database when unset - typically "neo4j", but can vary by deployment (e.g. the instance DBID on Aura Free) [env: NEO4J_DATABASE] |
+| `-c, --credential` | string | - | Credential to use for the connection. Forms: 'desktop' (the single running Neo4j Desktop 2 DBMS), 'desktop-connection:<uuid>' (a saved Neo4j Desktop 2 connection; see 'neo4j-cli desktop list'), or '<name>' (a persisted dbms credential; see 'neo4j-cli credential dbms list'). Combine with --database/NEO4J_DATABASE to target a specific database |
+| `-d, --database` | string | - | Target database name; defaults to the connecting user's home database when unset - typically "neo4j", but can vary by deployment (e.g. the instance DBID on Aura Free). Also applies with --credential, overriding the credential-supplied database [env: NEO4J_DATABASE] |
 | `--debug` | bool | false | Route Neo4j driver activity (connection, auth, routing, retries) to stderr at DEBUG level; stdout is unaffected [env: NEO4J_DEBUG (set to 1 to enable)] |
 | `--embed-base-url` | string | - | Embedding provider base URL [env: NEO4J_EMBED_BASE_URL] |
 | `--embed-credential` | string | - | Name of a stored embed credential to seed embedding config (see 'neo4j-cli credential embed list') |
@@ -57,6 +57,9 @@ neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop --format json
 
 # Route to a saved Neo4j Desktop 2 remote connection by uuid (see 'neo4j-cli desktop list')
 neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop-connection:f4e2f3c0-1111-2222-3333-444455556666 --format json
+
+# Target a specific database on the running Neo4j Desktop 2 DBMS
+neo4j-cli query "MATCH (n) RETURN count(n)" --credential desktop --database movies --format json
 
 # Use a persisted dbms credential by name (see 'neo4j-cli credential dbms list')
 neo4j-cli query "MATCH (n) RETURN count(n)" --credential local --format json
