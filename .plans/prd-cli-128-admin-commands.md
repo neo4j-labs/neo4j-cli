@@ -157,7 +157,7 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 
 **Cross-cutting**
 
-- REQ-F-030: All `admin` subcommands accept `--credential <name>` (same as `query`) to select the target DBMS.
+- REQ-F-030: All `admin` subcommands accept `--credential <name>` (same as `query`) to select the target DBMS. The value is dispatched on its prefix: `"desktop"` resolves the running Desktop DBMS, `"desktop-connection:<uuid>"` resolves a saved Desktop connection, any other value is a persisted-store lookup (see REQ-F-038 / REQ-F-039).
 - REQ-F-031: ~~Blanket Aura block — removed.~~ Individual commands execute against Aura connections without a pre-execution guard; errors from the Aura platform surface naturally per REQ-F-037.
 - REQ-F-032: `UnsupportedAdministrationCommand` errors from Neo4j are caught and re-surfaced with an appended hint: `(requires Enterprise edition)`. Exception: if the error message contains Aura-specific text (e.g. `"not supported, for more info see https://support.neo4j.com"`), append `(not supported on Aura — use the Aura Console or API)` instead.
 - REQ-F-033: Errors containing `'SET STATUS' is not available in community edition` or `'HOME DATABASE' is not available in community edition` are caught and re-surfaced with a clear Community-limitation message.
@@ -165,6 +165,15 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 - REQ-F-035: All list/get commands support `--format json|table|toon`.
 - REQ-F-036: All mutating commands that affect critical resources (`drop`, `delete`) require `--yes` to skip the interactive confirmation prompt.
 - REQ-F-037: `user rename` translates `Neo.ClientError.Statement.ArgumentError` with text "Changing username is not supported when using an authentication or authentication provider apart from native" to: `"renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)"`. Other `ArgumentError` variants from `RENAME USER` are surfaced as-is.
+- REQ-F-038: `admin --credential desktop` resolves the single running Desktop DBMS (via the Desktop local API), using the same lookup logic as `query --credential desktop`. Errors (no Desktop running, multiple running DBMSes, Desktop unreachable) surface the same messages as `query`.
+- REQ-F-039: `admin --credential desktop-connection:<uuid>` resolves a saved Desktop connection by UUID, using the same lookup logic as `query --credential desktop-connection:<uuid>`. A non-UUID value or unknown UUID surfaces a clear error matching `query`'s behavior.
+- REQ-F-040: When a Desktop DBMS or connection match has no stored credentials (null-creds case — legacy DBMS / safeStorage unavailable), admin commands prompt for a password when stdin is a TTY (printing `"Password: "` to stderr, no echo), and fatal with the 3-option hint ("Pass --password explicitly, run 'credential dbms add' to register a connection, or open Desktop and use 'Reset password'") when stdin is not a TTY. This mirrors `query`'s `finishDesktopMatch` behavior exactly.
+- REQ-F-041: Admin registers `--uri` (env: `NEO4J_URI`), `--username/-u` (env: `NEO4J_USERNAME`), and `--password/-p` (env: `NEO4J_PASSWORD`) as persistent flags on the `admin` parent command, with identical semantics to the same flags on `query`. These constitute the "direct connection" path and are mutually exclusive with `--credential`.
+- REQ-F-042: Admin registers `--env` as a persistent flag and supports dotenv auto-discovery (walking up from the current working directory) when `--credential` is not set — same logic as `query`. Dotenv values have lower precedence than OS env vars and explicit flags. Dotenv is skipped entirely when `--credential` is set.
+- REQ-F-043: Admin connection resolution follows the same full precedence chain as `query`'s `resolveConn`: dotenv < OS env var < explicit flag; stored default credential when no params are explicitly provided; built-in defaults (`neo4j://localhost:7687`, user `neo4j`) when nothing else resolves; URI normalization (rewriting `http://` → `neo4j://` and `https://` → `neo4j+s://` with an info message to stderr). Partial-override rejection (some but not all of `--uri/--username/--password` supplied without `--credential`) mirrors `query`.
+- REQ-F-044: Passing `--uri`, `--username`, or `--password` alongside `--credential` is an error on admin, matching `query`'s conflict check. `--database` and `NEO4J_DATABASE` are not exposed on admin — admin always targets the `system` database regardless of env content.
+- REQ-F-045: When the resolved password is empty after all sources (no flag, no env var, no dotenv, no stored credential), admin prompts for a password on TTY (printing `"Password: "` to stderr, no echo) and returns a usage error on non-TTY — same as `query`'s post-resolution password check in `runQuery`.
+- REQ-F-046: Admin registers `--debug` (env: `NEO4J_DEBUG=1`) as a persistent flag on the `admin` parent, routing Bolt driver wire activity to stderr at DEBUG level — same as `query`.
 
 ### Non-Functional Requirements
 
@@ -174,6 +183,7 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 - REQ-NF-004: Run `go generate ./neo4j-cli/internal/skill/...` after adding the command tree to keep the skill bundle current.
 - REQ-NF-005: All new `.go` files carry the Neo4j copyright header.
 - REQ-NF-006: Changelog entry via `changie new --projects neo4j-cli --kind Minor --body "..."`.
+- REQ-NF-007: The full connection resolution logic (credential dispatch, Desktop prefix handling, dotenv loading, env var/flag merging, default credential fallback, URI normalization) must not be reimplemented from scratch in admin. Extract `resolveConn` (or the subset admin needs) into a shared `neo4j-cli/internal/dbconn/` package that both `query` and `admin` import. Admin's connection surface omits `--database` / `NEO4J_DATABASE`; all other behavior is identical to `query`.
 
 ---
 
@@ -245,6 +255,44 @@ go generate ./neo4j-cli/internal/skill/...
 ```
 This is gated by `TestGenerator_RoundTrip`. Run it after the full command tree is wired.
 
+### Full Connection Parity with `query`
+
+Admin commands must have the same connection surface as `query`, minus `--database`. The implementation approach is to extract `resolveConn` (and `desktop.go`) from `neo4j-cli/query/` into a new shared `neo4j-cli/internal/dbconn/` package, then have both `query` and `admin` import from it.
+
+**Recommended extraction target: `neo4j-cli/internal/dbconn/`**
+
+Move from `query/` into `dbconn/`:
+- `resolveConn` → `dbconn.ResolveConn(cmd, cfg, opts)` where `opts` controls whether `--database` is active (query: yes; admin: no)
+- `desktopMatch`, `resolveDesktopActiveDbmsCredential`, `resolveDesktopConnectionCredential`, `newDesktopFallthroughClient`, `buildConnFromDesktopMatch`, related helpers → `dbconn` package with the same exported test seam setters
+- `conn` struct → `dbconn.Conn` (exported), with `URI`, `Username`, `Password`, `Database`, `UserAgent`, `Debug` fields
+- `openDriver`, `driverOpener` test seam, URI normalization → `dbconn`
+- `loadEnvFile`, `overlay`, `flagString` helpers → `dbconn`
+
+`query/connect.go` becomes a thin wrapper: imports `dbconn`, registers flags, calls `dbconn.ResolveConn`, opens the driver. `query/desktop.go` is either removed or becomes re-exports.
+
+**Admin wiring:**
+
+`admin.go` registers the same persistent flags as `query` minus `--database`:
+- `--uri`, `--username/-u`, `--password/-p`, `--env`, `--credential/-c`, `--debug`
+
+After resolving the connection via `dbconn.ResolveConn`, admin extracts `(URI, Username, Password)` to open its own Bolt session targeting `system`. The `Database` field from `dbconn.Conn` is intentionally ignored.
+
+**Connection model in admin:**
+
+`boltAdminRunner.run()` and the `queryRunner` interface currently take `*credentials.DbmsCredential`. Replace with `*dbconn.Conn` (or a minimal `AdminConnParams` struct in `adminutil` mirroring `dbconn.Conn`'s URI/Username/Password). All leaf callers and `fakeQueryRunner` fakes must be updated.
+
+**Password prompt at connection time:**
+
+After `dbconn.ResolveConn`, if `conn.Password == ""`:
+- On TTY: print `"Password: "` to stderr, read without echo, store on `conn`
+- On non-TTY: return a usage error
+
+The `stdinIsTTY` and `passwordReader` test seams used by `admin/user/helpers.go` (for user-create/set-password prompts) should live in a common location (e.g., `dbconn` or `adminutil`) so they can also be overridden in connection-level tests. Alternatively, define separate seam vars at the admin-root level.
+
+**`--database` / `NEO4J_DATABASE`:**
+
+Admin does not register `--database`. `dbconn.ResolveConn` should accept an option to skip database resolution entirely; admin passes this option so `NEO4J_DATABASE` is never consulted. The returned `conn.Database` is ignored by admin regardless.
+
 ### Example Fields
 
 Every leaf command must have a non-empty flush-left `Example:` field with ≥2 invocations (enforced by `TestAllLeafCommands_HaveExamples`). Mutating commands (`create`, `drop`, `rename`, `set-password`, `suspend`, `activate`, `grant`, `revoke`) must include `--rw` in their examples, consistent with all other write-capable commands in the CLI. Read-only commands (`list`, `get`) do not include `--rw`.
@@ -271,6 +319,21 @@ Every leaf command must have a non-empty flush-left `Example:` field with ≥2 i
 - [ ] `make test`, `make fmt-check`, `make lint` all pass clean.
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff (passes `TestGenerator_RoundTrip`).
 - [ ] Changelog entry added.
+- [ ] `neo4j-cli admin user list --credential desktop` resolves the active Desktop DBMS and executes `SHOW USERS`.
+- [ ] `neo4j-cli admin user list --credential desktop-connection:<uuid>` resolves the named Desktop connection.
+- [ ] When the Desktop DBMS has no stored credentials on a TTY, admin prompts for a password and proceeds.
+- [ ] When the Desktop DBMS has no stored credentials on a non-TTY, admin fatals with the 3-option hint.
+- [ ] Passing `--credential desktop` when no Desktop DBMS is running produces the same error message as `query --credential desktop`.
+- [ ] Unit tests cover the `desktop` and `desktop-connection:` paths in admin credential resolution (no live Desktop required — resolver seams are mocked).
+- [ ] All previously-passing admin tests continue to pass after the connection-model refactor.
+- [ ] `neo4j-cli admin user list --uri neo4j://localhost:7687 --username neo4j --password pass` connects without `--credential`.
+- [ ] `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` env vars resolve for admin commands.
+- [ ] A `.env` file in or above the current directory is loaded by admin when `--credential` is not set.
+- [ ] `neo4j-cli admin user list --uri ... --credential mydb` returns a conflict error.
+- [ ] Admin with no flags, no env vars, and no default stored credential connects to `neo4j://localhost:7687` with user `neo4j` (same built-in defaults as `query`).
+- [ ] When resolved password is empty and stdin is a TTY, admin prompts for a password before opening the Bolt connection.
+- [ ] `--debug` on admin routes driver wire activity to stderr (same as `query --debug`).
+- [ ] `--database` is not a recognized flag on `neo4j-cli admin`; `NEO4J_DATABASE` env var is ignored.
 
 ---
 

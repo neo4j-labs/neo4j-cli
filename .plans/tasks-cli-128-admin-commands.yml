@@ -1,7 +1,7 @@
 feature: cli-128-admin-commands
 prd: ./prd-cli-128-admin-commands.md
 created_at: "2026-06-04T08:15:00Z"
-updated_at: "2026-06-04T08:15:00Z"
+updated_at: "2026-06-10T10:00:00Z"
 
 tasks:
   - id: task-001
@@ -316,3 +316,139 @@ tasks:
       - "make test passes with zero failures"
       - "make fmt-check and make lint pass clean"
     completed_at: "2026-06-04T18:00:00Z"
+
+  - id: task-015
+    title: "Extract dbconn shared package; give admin full query-equivalent connection surface"
+    description: |
+      This task has two halves: (1) extract query's connection resolution into a
+      shared package, and (2) wire that package into admin with the full connection
+      flag surface. See PRD Technical Considerations > Full Connection Parity with
+      query for the design.
+
+      === HALF 1: Extract neo4j-cli/internal/dbconn/ ===
+
+      Create neo4j-cli/internal/dbconn/ and move into it from neo4j-cli/query/:
+        - resolveConn  → dbconn.ResolveConn(cmd, cfg, skipDatabase bool) (*Conn, error)
+          The skipDatabase bool controls whether --database / NEO4J_DATABASE are
+          consulted. query passes false; admin passes true (admin never consults them).
+        - conn struct   → dbconn.Conn { URI, Username, Password, Database, UserAgent,
+          Debug string/bool } — exported fields, no unexported Bolt driver on this type
+        - desktopMatch + all desktop.go functions + seam vars + SetXxxForTest exported
+          setters → dbconn (delete query/desktop.go or reduce to thin re-exports)
+        - loadEnvFile, overlay, flagString, normalizeURI helpers → dbconn
+        - driverOpener seam var → dbconn (or leave in query — query still opens its
+          own driver; admin opens its own separately)
+        - stdinIsTTY and passwordReader seam vars → dbconn (both query/run.go and
+          admin will use them from here)
+        - finishDesktopMatch → dbconn (handles the null-creds TTY/non-TTY split)
+        - applyDatabaseOverride → dbconn (called when skipDatabase=false)
+
+      query/connect.go becomes a thin wrapper: registers flags, calls
+      dbconn.ResolveConn(cmd, cfg, false), opens Bolt driver via dbconn helper.
+      query/run.go's post-resolution password prompt moves to use dbconn.StdinIsTTY
+      and dbconn.PasswordReader seam vars.
+
+      All existing query tests must pass unchanged after the extraction.
+
+      === HALF 2: Wire dbconn into admin ===
+
+      admin.go: add persistent flags to the admin parent:
+        --uri             (env: NEO4J_URI)
+        --username / -u   (env: NEO4J_USERNAME)
+        --password / -p   (env: NEO4J_PASSWORD)
+        --env             (dotenv path)
+        --credential / -c (existing; update Long to mention desktop prefixes)
+        --debug           (env: NEO4J_DEBUG=1)
+      Do NOT add --database.
+
+      Replace adminutil.ResolveCredential with a call to
+      dbconn.ResolveConn(cmd, cfg, true) (skipDatabase=true).
+      Delete adminutil.ResolveCredential entirely — its callers now call
+      dbconn.ResolveConn at the admin-root level (or pass the resolved *Conn down).
+
+      Adapt the connection model:
+        - Introduce adminutil.AdminConnParams { URI, Username, Password string }
+          (or use *dbconn.Conn directly if the import is clean)
+        - Update boltAdminRunner.run() and the queryRunner interface to accept
+          *adminutil.AdminConnParams (or *dbconn.Conn)
+        - Update all leaf callers and fakeQueryRunner fakes
+
+      Post-resolution password prompt in admin:
+        After dbconn.ResolveConn, if conn.Password == "":
+          - TTY: print "Password: " to stderr, read via dbconn.PasswordReader(), store
+          - non-TTY: return a usage error ("--password is required or run interactively")
+
+      URI normalization is handled inside dbconn.ResolveConn (already present in
+      the extracted code); admin gets it for free.
+
+      All new .go files must carry the Neo4j copyright header.
+      Run go build ./... to confirm no import cycles and clean compilation.
+    status: not_started
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "neo4j-cli/internal/dbconn/ package exists with ResolveConn, Conn, desktopMatch helpers, seam vars, and SetXxxForTest exported setters"
+      - "query/connect.go is a thin wrapper over dbconn.ResolveConn; all query tests pass unchanged"
+      - "admin.go registers --uri, --username/-u, --password/-p, --env, --credential/-c, --debug persistent flags"
+      - "admin.go does NOT register --database"
+      - "admin calls dbconn.ResolveConn(cmd, cfg, true) for connection resolution"
+      - "adminutil.ResolveCredential is removed; boltAdminRunner.run() and queryRunner accept AdminConnParams or *dbconn.Conn"
+      - "All leaf callers and fakeQueryRunner fakes updated to the new signature"
+      - "Post-resolution password prompt in admin: TTY prompts, non-TTY returns usage error"
+      - "go build ./... produces no errors and no import cycles"
+      - "All new .go files carry the Neo4j copyright header"
+
+  - id: task-016
+    title: "Tests for full admin connection surface; skill bundle regen; final gates"
+    description: |
+      Add unit tests for the full connection surface introduced in task-015. Use the
+      dbconn package's exported SetXxxForTest seam setters for Desktop paths.
+
+      Test categories to add or extend:
+        - Direct-flag path: --uri/--username/--password resolve correctly
+        - Env var path: NEO4J_URI/NEO4J_USERNAME/NEO4J_PASSWORD resolve
+        - Dotenv path: .env file loaded when --credential not set
+        - Conflict: --uri + --credential returns error
+        - Default credential fallback: no flags/env → stored default used
+        - Built-in defaults: no flags/env/credential → neo4j://localhost:7687 + neo4j
+        - Partial override rejection: only some of uri/user/pass → error
+        - --database absent: NEO4J_DATABASE env var does NOT affect the connection
+        - Desktop paths (carry over from previous task-015 plan):
+            'desktop' happy-path (creds present)
+            'desktop' null-creds TTY → password prompted
+            'desktop' null-creds non-TTY → fatal 3-option hint
+            'desktop' unreachable error
+            'desktop-connection:<uuid>' happy-path
+            'desktop-connection:<uuid>' non-UUID value → error
+            'desktop-connection:<uuid>' unknown UUID → error
+        - Post-resolution password prompt: empty password on TTY prompts;
+          empty password on non-TTY returns usage error
+        - --debug flag wires to Bolt driver debug mode
+        - All previously-passing admin tests continue to pass
+
+      After tests pass:
+        Run go generate ./neo4j-cli/internal/skill/... (admin Long/Example fields
+        on admin.go changed with new flag descriptions; bundle will drift).
+        Commit updated bundle files.
+
+      Add a Minor changelog entry for the connection parity feature:
+        changie new --projects neo4j-cli --kind Minor --body \
+          "admin commands now support the same connection flags as query \
+          (--uri, --username, --password, --env, --debug, desktop credentials)"
+
+      Run final gates:
+        make test       (zero failures)
+        make fmt-check  (no files need gofmt)
+        make lint       (clean)
+    status: not_started
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "Unit tests cover all connection paths listed above (direct flags, env vars, dotenv, conflicts, defaults, desktop, password prompt)"
+      - "NEO4J_DATABASE env var does not influence admin connection (test confirms)"
+      - "All existing admin tests pass (no regressions)"
+      - "go generate produces no git diff in bundle/ files"
+      - "Changelog entry added"
+      - "make test passes with zero failures"
+      - "make fmt-check passes (no files need gofmt)"
+      - "make lint passes clean"
