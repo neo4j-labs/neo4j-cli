@@ -1,7 +1,7 @@
 feature: cli-128-admin-commands
 prd: ./prd-cli-128-admin-commands.md
 created_at: "2026-06-04T08:15:00Z"
-updated_at: "2026-06-10T10:00:00Z"
+updated_at: "2026-06-10T11:30:00Z"
 
 tasks:
   - id: task-001
@@ -449,6 +449,138 @@ tasks:
       - "All existing admin tests pass (no regressions)"
       - "go generate produces no git diff in bundle/ files"
       - "Changelog entry added"
+      - "make test passes with zero failures"
+      - "make fmt-check passes (no files need gofmt)"
+      - "make lint passes clean"
+
+  - id: task-017
+    title: "privilege subtree: list (SHOW PRIVILEGES / SHOW ROLE|USER <x> PRIVILEGES)"
+    description: |
+      Create neo4j-cli/internal/subcommands/admin/privilege/privilege.go (parent) and
+      list.go. Register privilege.NewCmd in admin.go alongside database, user, and role.
+
+      list.go:
+        - Default (no filter): execute SHOW PRIVILEGES
+        - --role <name>: execute SHOW ROLE $name PRIVILEGES
+        - --user <name>: execute SHOW USER $name PRIVILEGES
+        - --role and --user are mutually exclusive; specifying both is a usage error
+        - Supports --format json|table|toon via RegisterOutputFlag
+        - Read-only; no --rw required
+        - Enterprise-only — surfaces UnsupportedAdministrationCommand per REQ-F-032
+
+      Write colocated tests using the fakeExecFn pattern (same as role/grant_test.go).
+      Include >=2 flush-left Example invocations in both list and the parent (if parent
+      has its own help text). All new .go files must carry the Neo4j copyright header.
+    status: not_started
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "'privilege list' executes SHOW PRIVILEGES and renders output"
+      - "'privilege list --role analyst' executes SHOW ROLE analyst PRIVILEGES"
+      - "'privilege list --user alice' executes SHOW USER alice PRIVILEGES"
+      - "--role and --user are mutually exclusive; both together returns a usage error"
+      - "list supports --format json|table|toon and does not require --rw"
+      - "list has >=2 flush-left Example invocations including at least one --format json"
+      - "Unit tests pass with fakeExecFn; go test ./... clean"
+      - "All new .go files carry the Neo4j copyright header"
+
+  - id: task-018
+    title: "privilege subtree: grant, deny, revoke"
+    description: |
+      Create grant.go, deny.go, and revoke.go under the privilege subtree, plus a
+      shared helpers.go containing buildPrivilegeCypher.
+
+      buildPrivilegeCypher(action, resource, qualifiers) constructs the ON-resource
+      clause and entity+property qualifiers:
+        - Action: uppercase + replace _ with space (e.g. all_graph_privileges → ALL GRAPH PRIVILEGES)
+        - Resource: --on-dbms → "ON DBMS"; --on-database <n> → "ON DATABASE <n>";
+          default/--on-graph <n> → "ON GRAPH <n>" + entity + property clause
+        - Property clause: {*} when --property absent; {p1, p2, ...} when --property set
+        - Entity clause: ELEMENTS * (neither flag); NODES l1, l2 (--node-label only);
+          RELATIONSHIPS t1, t2 (--relationship-type only)
+        - --node-label and --relationship-type together → usage error
+        - --on-graph, --on-database, --on-dbms together → usage error
+        - Graph-scoped qualifiers (--node-label, --relationship-type, --property) with
+          --on-database or --on-dbms → usage error
+
+      Validation:
+        - Unknown --action value → usage error listing valid action keywords
+        - DBMS-level actions (create_role, user_management, etc.) combined with
+          --property / --node-label / --relationship-type → usage error
+
+      grant.go: GRANT <action> ON <resource> TO <role>. Flags: --action (required),
+        --role (required), --on-graph, --on-database, --on-dbms, --node-label
+        (repeatable), --relationship-type (repeatable), --property (repeatable).
+        Requires --rw.
+
+      deny.go: DENY <action> ON <resource> TO <role>. Same flags as grant.go.
+        Requires --rw.
+
+      revoke.go: REVOKE [GRANT|DENY] <action> ON <resource> FROM <role>. Same flags
+        as grant.go plus --revoke-type grant|deny (optional; when absent emits bare
+        REVOKE). Requires --rw.
+
+      All three are Enterprise-only (Community returns UnsupportedAdministrationCommand
+      per REQ-F-032). Write colocated tests covering:
+        - Happy path (wildcard and scoped grant/deny/revoke)
+        - --revoke-type grant and --revoke-type deny variants
+        - All mutual-exclusion and unknown-action error paths
+        - Community-edition error translation
+      Include >=2 flush-left Example invocations with --rw per leaf.
+      All new .go files must carry the Neo4j copyright header.
+    status: not_started
+    dependencies:
+      - task-017
+    acceptance_criteria:
+      - "'privilege grant --action read --on-graph * --role analyst --rw' executes 'GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst'"
+      - "'privilege grant --action read --on-graph neo4j --node-label Person --property name --role analyst --rw' executes 'GRANT READ {name} ON GRAPH neo4j NODES Person TO analyst'"
+      - "'privilege grant --action access --on-database neo4j --role analyst --rw' executes 'GRANT ACCESS ON DATABASE neo4j TO analyst'"
+      - "'privilege grant --action create_role --on-dbms --role analyst --rw' executes 'GRANT CREATE ROLE ON DBMS TO analyst'"
+      - "'privilege deny --action write --on-graph * --role readonly --rw' executes 'DENY WRITE {*} ON GRAPH * ELEMENTS * TO readonly'"
+      - "'privilege revoke --action read --on-graph * --role analyst --rw' executes 'REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst'"
+      - "'privilege revoke ... --revoke-type grant' emits 'REVOKE GRANT ...'"
+      - "'privilege revoke ... --revoke-type deny' emits 'REVOKE DENY ...'"
+      - "--on-graph + --on-database together returns a usage error"
+      - "--node-label + --relationship-type together returns a usage error"
+      - "--node-label with --on-database returns a usage error"
+      - "DBMS-level action with --property returns a usage error"
+      - "Unknown --action returns a usage error"
+      - "All three commands return '(requires Enterprise edition)' on Community"
+      - "All three have >=2 flush-left Example invocations with --rw"
+      - "Unit tests pass for all three leaves; go test ./... clean"
+      - "All new .go files carry the Neo4j copyright header"
+
+  - id: task-019
+    title: "Final gates for privilege subtree: skill bundle regen, TestAllLeafCommands_HaveExamples, changelog update"
+    description: |
+      Run 'go generate ./neo4j-cli/internal/skill/...' to regenerate the skill bundle
+      after the privilege command tree is wired into admin.go. Verify
+      TestGenerator_RoundTrip and TestAllLeafCommands_HaveExamples both pass.
+
+      Update the existing changie entry for this feature (or add a supplementary entry
+      if the existing one is already batched) to mention privilege management:
+        changie new --projects neo4j-cli --kind Minor --body \
+          "admin privilege grant/deny/revoke commands for fine-grained RBAC privilege management"
+
+      Do NOT add a new changelog entry if a suitable Minor entry already covers the
+      admin feature — instead amend the body of the existing unreleased entry, since
+      the branch is not yet merged.
+
+      Run final gates:
+        make test       (zero failures)
+        make fmt-check  (no files need gofmt)
+        make lint       (clean)
+
+      This task should run after task-018. If task-016 (connection parity tests) is
+      also complete, run its final gates together with this one rather than twice.
+    status: not_started
+    dependencies:
+      - task-018
+    acceptance_criteria:
+      - "'go generate ./neo4j-cli/internal/skill/...' produces no git diff in bundle/ files"
+      - "TestGenerator_RoundTrip passes"
+      - "TestAllLeafCommands_HaveExamples passes (all privilege leaves have non-empty flush-left Example fields)"
+      - "Changelog entry covers privilege management commands"
       - "make test passes with zero failures"
       - "make fmt-check passes (no files need gofmt)"
       - "make lint passes clean"

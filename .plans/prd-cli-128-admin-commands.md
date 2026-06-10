@@ -107,7 +107,7 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 
 ## Goals
 
-1. Expose database lifecycle, user management, and role/permission management as named admin subcommands rather than raw Cypher.
+1. Expose database lifecycle, user management, role management, and fine-grained privilege assignment (GRANT/DENY/REVOKE) as named admin subcommands rather than raw Cypher.
 2. Work uniformly against self-managed Neo4j deployments (Docker, Desktop, on-prem) via stored dbms credentials.
 3. Work against Aura Pro connections for operations the platform supports (user management, database read, role assignment).
 4. Provide clear, actionable error messages for unsupported operations (Community edition, Aura platform restrictions).
@@ -116,7 +116,7 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 ## Non-Goals
 
 - Aura database lifecycle management (`database create/drop/start/stop`) — blocked by the Aura platform; planned for the Aura v2 multi-DB API when available.
-- Fine-grained privilege management beyond role assignment (e.g. `GRANT READ {prop} ON GRAPH * NODE Label`). The `role` subtree covers role CRUD and role-to-user assignment only.
+- Database alias management (`CREATE ALIAS`) and composite database management (`CREATE COMPOSITE DATABASE`).
 - neo4j-admin binary integration (backup, restore, import — separate concern).
 - Desktop-specific integration beyond standard Bolt credential resolution.
 
@@ -175,6 +175,16 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 - REQ-F-045: When the resolved password is empty after all sources (no flag, no env var, no dotenv, no stored credential), admin prompts for a password on TTY (printing `"Password: "` to stderr, no echo) and returns a usage error on non-TTY — same as `query`'s post-resolution password check in `runQuery`.
 - REQ-F-046: Admin registers `--debug` (env: `NEO4J_DEBUG=1`) as a persistent flag on the `admin` parent, routing Bolt driver wire activity to stderr at DEBUG level — same as `query`.
 
+**Privilege subcommand (Enterprise-only — fine-grained GRANT/DENY/REVOKE)**
+
+- REQ-F-047: `neo4j-cli admin privilege list` — execute `SHOW PRIVILEGES`, output all privilege records. Supports `--format json|table|toon`. Optional mutually exclusive filters: `--role <name>` (executes `SHOW ROLE <name> PRIVILEGES`) or `--user <name>` (executes `SHOW USER <name> PRIVILEGES`). Read-only; no `--rw`. Enterprise-only (`UnsupportedAdministrationCommand` translated per REQ-F-032).
+
+- REQ-F-048: `neo4j-cli admin privilege grant` — execute `GRANT <action> ON <resource> TO <role>`. Required flags: `--action <action>`, `--role <name>`. Resource target: exactly one of `--on-graph <name>` (default `*`), `--on-database <name>` (default `*`), or `--on-dbms` (boolean). Graph-scoped qualifiers (only valid with `--on-graph`): `--node-label <label>` (repeatable; omitting means all node labels), `--relationship-type <type>` (repeatable; omitting means all relationship types), `--property <prop>` (repeatable; omitting means all properties `{*}`). When both `--node-label` and `--relationship-type` are absent, the Cypher uses `ELEMENTS *`; when only `--node-label` is set, uses `NODES <labels>`; when only `--relationship-type` is set, uses `RELATIONSHIPS <types>`. Specifying `--on-graph`, `--on-database`, and `--on-dbms` together is a usage error. Graph-scoped qualifiers alongside `--on-database` or `--on-dbms` are a usage error. The `--action` flag accepts the Neo4j privilege keyword string, case-insensitive, with `_` accepted as a word separator (e.g. `all_graph_privileges` or `ALL GRAPH PRIVILEGES`). Requires `--rw`. Enterprise-only.
+
+- REQ-F-049: `neo4j-cli admin privilege deny` — execute `DENY <action> ON <resource> TO <role>`. Same flag surface as `privilege grant` (REQ-F-048). Requires `--rw`. Enterprise-only.
+
+- REQ-F-050: `neo4j-cli admin privilege revoke` — execute `REVOKE [GRANT|DENY] <action> ON <resource> FROM <role>`. Same resource and action flags as `privilege grant`. Additional optional flag: `--revoke-type grant|deny` — when set, emits `REVOKE GRANT ...` or `REVOKE DENY ...` respectively; when absent, emits `REVOKE ...` (revoking both GRANT and DENY). Requires `--rw`. Enterprise-only.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command with a `fakeQueryRunner` test seam (analogous to `fakeDockerClient` in the docker subsystem).
@@ -213,6 +223,13 @@ neo4j-cli/internal/subcommands/admin/
   role/
     role.go             # parent
     list.go get.go create.go drop.go grant.go revoke.go
+    *_test.go helpers_test.go
+  privilege/
+    privilege.go        # parent; registers list/grant/deny/revoke
+    list.go             # SHOW [ROLE/USER <x>] PRIVILEGES
+    grant.go            # GRANT <action> ON <resource> TO <role>
+    deny.go             # DENY <action> ON <resource> TO <role>
+    revoke.go           # REVOKE [GRANT|DENY] <action> ON <resource> FROM <role>
     *_test.go helpers_test.go
 ```
 
@@ -293,6 +310,22 @@ The `stdinIsTTY` and `passwordReader` test seams used by `admin/user/helpers.go`
 
 Admin does not register `--database`. `dbconn.ResolveConn` should accept an option to skip database resolution entirely; admin passes this option so `NEO4J_DATABASE` is never consulted. The returned `conn.Database` is ignored by admin regardless.
 
+### Privilege Cypher Construction
+
+The `privilege grant/deny/revoke` commands build the Cypher string from flags. The action value is uppercased and `_` is replaced with space before embedding. Resource construction:
+
+- `--on-dbms` → `ON DBMS`
+- `--on-database <name>` → `ON DATABASE <name>`
+- `--on-graph <name>` (default, implicit if neither `--on-database` nor `--on-dbms` is set) → `ON GRAPH <name>`, followed by entity + property qualifiers:
+  - Properties: `{*}` when `--property` absent; `{p1, p2}` when `--property` used (one or more times)
+  - Entity: `ELEMENTS *` when neither `--node-label` nor `--relationship-type` is set; `NODES l1, l2` when only `--node-label`; `RELATIONSHIPS t1, t2` when only `--relationship-type`; usage error when both are set together (ambiguous element target)
+
+Not all actions accept property or entity qualifiers. If the user passes graph-scoped qualifier flags with a DBMS-level action (e.g. `--action create_role --property name`), the CLI emits a usage error listing incompatible flags rather than generating invalid Cypher.
+
+`privilege revoke` builds `REVOKE [GRANT|DENY] <cypher>` where the optional prefix comes from `--revoke-type`.
+
+All three commands (`grant`, `deny`, `revoke`) share a common `buildPrivilegeCypher` helper in `privilege/helpers.go` for the ON-resource and qualifier construction.
+
 ### Example Fields
 
 Every leaf command must have a non-empty flush-left `Example:` field with ≥2 invocations (enforced by `TestAllLeafCommands_HaveExamples`). Mutating commands (`create`, `drop`, `rename`, `set-password`, `suspend`, `activate`, `grant`, `revoke`) must include `--rw` in their examples, consistent with all other write-capable commands in the CLI. Read-only commands (`list`, `get`) do not include `--rw`.
@@ -334,16 +367,33 @@ Every leaf command must have a non-empty flush-left `Example:` field with ≥2 i
 - [ ] When resolved password is empty and stdin is a TTY, admin prompts for a password before opening the Bolt connection.
 - [ ] `--debug` on admin routes driver wire activity to stderr (same as `query --debug`).
 - [ ] `--database` is not a recognized flag on `neo4j-cli admin`; `NEO4J_DATABASE` env var is ignored.
+- [ ] `neo4j-cli admin privilege list` executes `SHOW PRIVILEGES` and renders privilege records.
+- [ ] `neo4j-cli admin privilege list --role analyst` executes `SHOW ROLE analyst PRIVILEGES`.
+- [ ] `neo4j-cli admin privilege list --user alice` executes `SHOW USER alice PRIVILEGES`.
+- [ ] `--role` and `--user` filters on `privilege list` are mutually exclusive; specifying both returns a usage error.
+- [ ] `neo4j-cli admin privilege grant --action read --on-graph * --role analyst --rw` executes `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst`.
+- [ ] `neo4j-cli admin privilege grant --action read --on-graph neo4j --node-label Person --property name --role analyst --rw` executes `GRANT READ {name} ON GRAPH neo4j NODES Person TO analyst`.
+- [ ] `neo4j-cli admin privilege grant --action traverse --on-graph * --node-label Movie --role analyst --rw` executes `GRANT TRAVERSE ON GRAPH * NODES Movie TO analyst` (no property qualifier for TRAVERSE).
+- [ ] `neo4j-cli admin privilege grant --action access --on-database neo4j --role analyst --rw` executes `GRANT ACCESS ON DATABASE neo4j TO analyst`.
+- [ ] `neo4j-cli admin privilege grant --action create_role --on-dbms --role analyst --rw` executes `GRANT CREATE ROLE ON DBMS TO analyst`.
+- [ ] `neo4j-cli admin privilege deny --action write --on-graph * --role readonly --rw` executes `DENY WRITE {*} ON GRAPH * ELEMENTS * TO readonly`.
+- [ ] `neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --rw` executes `REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst`.
+- [ ] `neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --revoke-type grant --rw` executes `REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM analyst`.
+- [ ] `neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --revoke-type deny --rw` executes `REVOKE DENY READ {*} ON GRAPH * ELEMENTS * FROM analyst`.
+- [ ] `--on-graph`, `--on-database`, and `--on-dbms` are mutually exclusive; specifying more than one returns a usage error.
+- [ ] Passing `--node-label` or `--relationship-type` alongside `--on-database` or `--on-dbms` returns a usage error.
+- [ ] Passing `--node-label` and `--relationship-type` together returns a usage error.
+- [ ] An unknown `--action` value returns a usage error listing valid action keywords.
+- [ ] A DBMS-level action (e.g. `create_role`) combined with graph-scoped qualifier flags (`--property`, `--node-label`) returns a usage error.
+- [ ] All privilege commands return `(requires Enterprise edition)` error on Community.
+- [ ] All privilege leaf commands have non-empty `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
 
 ---
 
 ## Out of Scope
 
 - Aura database lifecycle management (`database create/drop/start/stop`) — planned for the Aura v2 multi-DB API when available. User management and role assignment work on Aura Pro via Cypher today.
-- Fine-grained privilege management (e.g. `GRANT READ {prop} ON GRAPH * NODE Label`) — too complex for MVP; roles cover the most common access-control use cases.
-- `DENY` privilege (Enterprise-only nuance; defer to a follow-on).
-- Database alias management (`CREATE ALIAS`).
-- Composite database management (`CREATE COMPOSITE DATABASE`).
+- Database alias management (`CREATE ALIAS`) and composite database management (`CREATE COMPOSITE DATABASE`).
 - neo4j-admin operations (backup, restore, import, copy).
 
 ---
