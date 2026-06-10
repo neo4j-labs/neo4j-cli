@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: 'Introduced `aura graphql` commands for managing GraphQL Data APIs: create, get, list, update, delete, pause, resume, auth-provider, and cors-policy allowed-origin.'
+time: 2026-05-29T13:15:04.490963+01:00

@@ -1,0 +1,232 @@
+feature: rename-data-api-to-graphql
+prd: ./prd-rename-data-api-to-graphql.md
+created_at: 2026-06-04T00:00:00Z
+updated_at: 2026-06-04T16:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Move subcommands/dataapi/graphql/ to subcommands/graphql/ and fix imports"
+    description: |
+      Create the new `neo4j-cli/aura/internal/subcommands/graphql/` directory tree and move
+      all 34 files from `subcommands/dataapi/graphql/` into it, preserving the
+      `authprovider/` and `corspolicy/allowedorigin/` subdirectory structure.
+      Update every import path inside the moved files that referenced
+      `dataapi/graphql/authprovider` or `dataapi/graphql/corspolicy` to use the new
+      `graphql/authprovider` / `graphql/corspolicy` paths. Package-level `package` declarations
+      are unchanged (they stay `graphql`, `authprovider`, `corspolicy`, `allowedorigin`).
+      Do not yet touch `aura.go`, `data_api.go`, or the flags in `graphql.go`.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "All files previously under subcommands/dataapi/graphql/ now exist under subcommands/graphql/ with identical names"
+      - "subcommands/dataapi/graphql/ directory is gone (only data_api.go remains under subcommands/dataapi/)"
+      - "Import paths inside the moved files reference the new graphql/ location (e.g. .../subcommands/graphql/authprovider)"
+      - "Package declarations in all moved files are unchanged"
+    completed_at: "2026-06-04T12:00:00Z"
+
+  - id: task-002
+    title: "Merge data_api.go flags into graphql.go, remove dataapi/, update aura.go"
+    description: |
+      Edit the new `subcommands/graphql/graphql.go` so its `NewCmd` function adds the
+      `--auth-url` and `--base-url` persistent flags and calls
+      `flags.RegisterAuraCredentialFlag(cmd, cfg)`, and includes the `PersistentPreRunE`
+      hook that binds both URL flags (exactly as in `data_api.go`). Then delete
+      `neo4j-cli/aura/internal/subcommands/dataapi/data_api.go` and the now-empty
+      `dataapi/` directory. Finally, update `neo4j-cli/aura/aura.go` to remove the
+      `dataapi` import, add a `graphql` import pointing to the new path, and replace
+      `cmd.AddCommand(dataapi.NewCmd(cfg))` with `cmd.AddCommand(graphql.NewCmd(cfg))`.
+      After this task the project must compile cleanly.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "graphql.NewCmd registers --auth-url, --base-url persistent flags and RegisterAuraCredentialFlag"
+      - "graphql.NewCmd has a PersistentPreRunE that calls cfg.Aura.BindBaseUrl and cfg.Aura.BindAuthUrl"
+      - "neo4j-cli/aura/internal/subcommands/dataapi/ directory no longer exists"
+      - "aura.go mounts graphql.NewCmd(cfg) and has no reference to the dataapi package"
+      - "`go build ./...` succeeds with no errors"
+    completed_at: "2026-06-04T12:00:00Z"
+
+  - id: task-003
+    title: "Update Short/Long/Example strings across all affected commands"
+    description: |
+      Update every `Short`, `Long`, and `Example` field in the moved graphql command tree.
+      In `graphql.go` update Short to describe managing GraphQL data APIs. In every leaf
+      command (`create.go`, `get.go`, `list.go`, `update.go`, `delete.go`, `pause.go`,
+      `resume.go`) and in `authprovider/` and `corspolicy/allowedorigin/` commands, change
+      all `Example` strings so the command path reads `aura graphql` instead of
+      `aura data-api graphql`. Also update any Short/Long descriptions that still say
+      "Data APIs" to say "GraphQL data APIs". Every runnable leaf must retain at least two
+      example invocations as required by TestAllLeafCommands_HaveExamples.
+    status: completed
+    dependencies:
+      - task-002
+    acceptance_criteria:
+      - "No Example field in the graphql subtree contains the string 'data-api'"
+      - "graphql.go Short describes managing GraphQL data APIs"
+      - "All leaf commands retain valid Example fields with >= 2 invocations using the neo4j-cli prefix"
+      - "`make test` passes TestAllLeafCommands_HaveExamples with no failures"
+    completed_at: "2026-06-04T12:00:00Z"
+
+  - id: task-004
+    title: "Regenerate skill bundle and add changelog entry"
+    description: |
+      Run `go generate ./neo4j-cli/internal/skill/...` to regenerate the skill bundle so
+      that reference docs reflect the renamed command tree and `TestGenerator_RoundTrip`
+      passes. Then add a changelog entry using changie with kind `Minor` describing the
+      rename (e.g. "Renamed `aura data-api graphql` commands to `aura graphql`").
+    status: completed
+    dependencies:
+      - task-003
+    acceptance_criteria:
+      - "Skill bundle files under neo4j-cli/internal/skill/bundle/ are regenerated and committed"
+      - "TestGenerator_RoundTrip passes (included in `make test`)"
+      - "A new .yaml file exists under .changes/unreleased/ with project: neo4j-cli and kind: Minor"
+      - "The changelog body mentions the graphql command rename"
+    completed_at: "2026-06-04T12:00:00Z"
+
+  - id: task-005
+    title: "Run all quality gates and verify clean state"
+    description: |
+      Execute `make test`, `make fmt-check`, `make lint`, and `make license-check` in
+      sequence and confirm all pass with zero errors. Fix any residual issues (import
+      formatting, missing copyright headers, lint warnings) before marking complete. This
+      is the final gate before the feature branch is ready for review.
+    status: completed
+    dependencies:
+      - task-004
+    acceptance_criteria:
+      - "`make test` exits 0 with no failing tests"
+      - "`make fmt-check` exits 0 (no files need gofmt)"
+      - "`make lint` exits 0 with no lint errors"
+      - "`make license-check` exits 0 (all files have the Neo4j copyright header)"
+    completed_at: "2026-06-04T12:00:00Z"
+
+  - id: task-006
+    title: "Add defaultGraphQLName helper and name_helpers_test.go"
+    description: |
+      Create `neo4j-cli/aura/internal/subcommands/graphql/name_helpers.go` containing
+      `defaultGraphQLName(existingNames []string) string` — the same zero-padding logic
+      as the instance equivalent (`GraphQL01`…`GraphQL99`, then `GraphQL100`, …) with
+      case-insensitive collision avoidance. Create a colocated
+      `name_helpers_test.go` with table-driven unit tests covering: empty list returns
+      `GraphQL01`; collision skipping; zero-padding boundary at 99→100.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "name_helpers.go exists with defaultGraphQLName(existingNames []string) string"
+      - "Returns GraphQL01 when no existing names"
+      - "Skips taken names case-insensitively and returns next available"
+      - "Zero-pads 1–99, uses full decimal for 100+"
+      - "name_helpers_test.go table-driven tests cover empty list, collision, and padding boundary"
+    completed_at: "2026-06-04T12:30:00Z"
+
+  - id: task-007
+    title: "Make --name optional on graphql create with auto-name resolution"
+    description: |
+      In `create.go`, remove `cmd.MarkFlagRequired(nameFlag)`. Add a
+      `resolveGraphQLName(cfg *clicfg.Config, name, instanceID string) (string, error)`
+      function that returns `name` unchanged when non-empty; otherwise fetches
+      `GET /instances/{instanceID}/data-apis/graphql`, collects the `name` field from
+      each entry in the response array, and returns `defaultGraphQLName(existingNames)`.
+      Call it at the top of `RunE` before the request body is built. Update the
+      `--name` flag description to reflect it is now optional. Update `Example` strings
+      to include at least one invocation without `--name`.
+    status: completed
+    dependencies:
+      - task-006
+    acceptance_criteria:
+      - "MarkFlagRequired is removed for the name flag in create.go"
+      - "resolveGraphQLName is called in RunE before building the request body"
+      - "When --name is omitted, a GET to the list endpoint is made and the generated name is used in the POST body"
+      - "When --name is provided, no extra GET is made"
+      - "Example strings include at least one invocation without --name"
+    completed_at: "2026-06-04T13:00:00Z"
+
+  - id: task-008
+    title: "Update create_test.go for optional --name and run all quality gates"
+    description: |
+      Add test coverage in `create_test.go` for the auto-name path: mock the list
+      endpoint (`GET /instances/{id}/data-apis/graphql`) returning one existing data API
+      named `GraphQL01`, then assert the POST body contains `"name":"GraphQL02"`. Also
+      verify the existing-name path still sends the explicit name unchanged (no extra
+      GET). Regenerate the skill bundle (`go generate ./neo4j-cli/internal/skill/...`),
+      add a changelog entry (kind `Minor`), then run `make test`, `make fmt-check`,
+      `make lint`, and `make license-check` to confirm a clean state.
+    status: completed
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "create_test.go has a test case where --name is omitted and the POST body contains an auto-generated name"
+      - "The auto-name test mocks the list endpoint and asserts collision avoidance"
+      - "TestGenerator_RoundTrip passes (skill bundle regenerated)"
+      - "Changelog entry added under .changes/unreleased/"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all exit 0"
+    completed_at: "2026-06-04T15:40:00Z"
+
+  - id: task-009
+    title: "Register org/project flags on graphql parent and add ownership validation to all leaf commands"
+    description: |
+      Add `auraflags.RegisterOrgProjectFlags(cmd)` to `graphql.go`'s `NewCmd` (after
+      `flags.RegisterAuraCredentialFlag`) so `--organization-id` and `--project-id` are
+      available as persistent flags on the whole graphql subtree.
+
+      Then update all 13 graphql leaf commands that take `--instance-id` to call, at the
+      top of their `RunE`:
+        1. `_, projectID, err := utils.ResolveAndValidateOrgProject(cmd, cfg)` — resolves
+           org+project from flags or the configured default workspace; returns a usage error
+           when neither is available.
+        2. `_, err = utils.FetchAndVerifyInstanceInProject(cfg, instanceID, projectID)` —
+           verifies the instance belongs to the resolved project; returns a not-found error
+           otherwise. The returned response body is discarded.
+
+      For `create`, the ownership check must come before `resolveGraphQLName`.
+
+      Affected files:
+        - graphql/graphql.go (flag registration)
+        - graphql/list.go, get.go, create.go, update.go, delete.go, pause.go, resume.go
+        - graphql/authprovider/list.go, get.go, create.go, delete.go
+        - graphql/corspolicy/allowedorigin/add.go, remove.go
+
+      The `utils` package is at `"github.com/neo4j/cli/neo4j-cli/aura/internal/subcommands/utils"`.
+      The `auraflags` package is at `auraflags "github.com/neo4j/cli/neo4j-cli/aura/internal/flags"`.
+    status: completed
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "graphql.go calls auraflags.RegisterOrgProjectFlags(cmd)"
+      - "All 13 leaf commands call ResolveAndValidateOrgProject then FetchAndVerifyInstanceInProject in RunE before their API call"
+      - "graphql create calls the ownership check before resolveGraphQLName"
+      - "`go build ./...` succeeds with no errors after changes"
+    completed_at: "2026-06-04T18:00:00Z"
+
+  - id: task-010
+    title: "Update Example strings, add tests, regenerate bundle, add changelog, run quality gates"
+    description: |
+      Update Example strings on all 13 affected leaf commands to include:
+        - At least one invocation with explicit `--organization-id`/`--project-id` flags.
+        - At least one invocation that omits them (workspace-based), mirroring `instance list`.
+        - Write commands must retain `--rw` in all write-operation examples.
+
+      Add or update test coverage:
+        - For at least one representative command (e.g. `graphql list`), add table-driven
+          test cases covering: (a) flags provided explicitly, (b) workspace fallback
+          (set `aura.default-workspace` in test config), (c) missing org/project error,
+          (d) instance not in project error (mock FetchAndVerifyInstanceInProject 404).
+        - Confirm all write commands retain `Annotations: map[string]string{"write": "true"}`.
+
+      Regenerate the skill bundle (`go generate ./neo4j-cli/internal/skill/...`) so
+      `TestGenerator_RoundTrip` passes. Add a changelog entry (kind `Minor`) describing
+      the new org/project/workspace support for graphql commands. Then run `make test`,
+      `make fmt-check`, `make lint`, and `make license-check` to confirm a clean state.
+    status: completed
+    dependencies:
+      - task-009
+    completed_at: "2026-06-04T18:45:00Z"
+    acceptance_criteria:
+      - "All 13 leaf command Example strings include both explicit-flag and workspace-shorthand invocations"
+      - "Tests cover org/project flag path, workspace fallback, and error cases for at least graphql list"
+      - "All write commands retain Annotations: map[string]string{\"write\": \"true\"}"
+      - "TestGenerator_RoundTrip passes (skill bundle regenerated)"
+      - "Changelog entry added under .changes/unreleased/ for org/project/workspace support"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` all exit 0"

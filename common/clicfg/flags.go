@@ -45,7 +45,7 @@ var Registry = map[string]Flag{
 		Name:             "flag.aura-beta",
 		Default:          false,
 		Owner:            "aura-cli team",
-		Gates:            "aura {dataapi, import, deployment} subcommands; v1beta5 API path",
+		Gates:            "v1beta5 API path routing for AuraApiVersion1 requests",
 		IntroducedIn:     "1.4.0",
 		RemovalCondition: "Aura beta features ship to GA",
 		LegacyKey:        "aura.beta-enabled",
