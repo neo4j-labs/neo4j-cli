@@ -4,10 +4,12 @@
 package authprovider
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -104,6 +106,11 @@ neo4j-cli aura graphql auth-provider create --instance-id 00000000 --data-api-id
 					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
 					fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
 					fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
+
+					var resp struct{ Data struct{ Key string } }
+					if json.Unmarshal(resBody, &resp) == nil && resp.Data.Key != "" {
+						clievents.RegisterSecretValue(resp.Data.Key)
+					}
 				}
 
 				output.PrintBody(cmd, cfg, resBody, []string{"id", "name", "type", "enabled", "key", "url"})

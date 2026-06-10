@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/api"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/flags"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/output"
@@ -118,6 +119,15 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 
 			// NOTE: GraphQL Data API create should not return OK (200), it always returns 202, checking both just in case
 			if statusCode == http.StatusAccepted || statusCode == http.StatusOK {
+				var response api.CreateGraphQLDataApiResponse
+				if err := json.Unmarshal(resBody, &response); err != nil {
+					return err
+				}
+				for _, p := range response.Data.AuthenticationProviders {
+					if p.Key != "" {
+						clievents.RegisterSecretValue(p.Key)
+					}
+				}
 
 				fmt.Fprintln(cmd.ErrOrStderr(), "###############################")                                                                                                                                            //nolint:errcheck // narration to stderr; write errors are not actionable
 				fmt.Fprintln(cmd.ErrOrStderr(), "# It is important to store the created API key! If you lose your API key, you will need to create a new Authentication provider. This will not result in any loss of data.") //nolint:errcheck // narration to stderr; write errors are not actionable
@@ -127,11 +137,6 @@ neo4j-cli aura graphql create --instance-id 00000000 --name my-api --memory 256M
 
 				if wait {
 					fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for GraphQL Data API to be ready...") //nolint:errcheck // narration to stderr; write errors are not actionable
-					var response api.CreateGraphQLDataApiResponse
-					if err := json.Unmarshal(resBody, &response); err != nil {
-						return err
-					}
-
 					pollResponse, err := api.PollGraphQLDataApi(cfg, instanceId, response.Data.Id, api.GraphQLDataApiStatusCreating)
 					if err != nil {
 						return err

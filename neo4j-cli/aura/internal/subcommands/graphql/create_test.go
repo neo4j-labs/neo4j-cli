@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -242,6 +243,46 @@ func TestCreateGraphQLDataApi_AutoName(t *testing.T) {
 		mockHandler.AssertCalledWithMethod(http.MethodPost)
 		mockHandler.AssertCalledWithBody(`{"aura_instance":{"service_account":"read_write"},"memory":"256MB","name":"my-api","security":{"authentication_providers":[{"enabled":true,"name":"default","type":"api-key"}]},"type_definitions":"dHlwZSBNb3ZpZSB7CiAgdGl0bGU6IFN0cmluZwkKfQ=="}`)
 	})
+}
+
+func TestCreateGraphQLDataApi_RegistersApiKeySecrets(t *testing.T) {
+	instanceId := "2f49c2b3"
+	apiKey := "secretKeyValueForTeeRedactionGraphQL"
+
+	mockResponse := fmt.Sprintf(`{
+		"data": {
+			"id": "2f49c2b3",
+			"name": "my-data-api",
+			"status": "creating",
+			"url": "https://2f49c2b3.example.graphql.neo4j.io/graphql",
+			"authentication_providers": [
+				{
+					"id": "1ad1b794-e40e-41f7-8e8c-5638130317ed",
+					"name": "default",
+					"type": "api-key",
+					"enabled": true,
+					"key": %q
+				}
+			]
+		}
+	}`, apiKey)
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	orgProjectFlags := fmt.Sprintf("--organization-id %s --project-id %s", testOrgID, testProjectID)
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql", instanceId), http.StatusAccepted, mockResponse)
+
+	helper.ExecuteCommand(fmt.Sprintf(
+		"graphql create --instance-id %s --name my-data-api --memory 256MB --type-definitions dHlwZSBNb3ZpZSB7IHRpdGxlOiBTdHJpbmcgfQ== %s --rw",
+		instanceId, orgProjectFlags,
+	))
+
+	if clievents.RedactText(apiKey) != "***" {
+		t.Errorf("expected API key to be registered as a secret value for tee redaction, but RedactText(%q) did not return ***", apiKey)
+	}
 }
 
 // TestCreateGraphQLDataApi_StdoutIsValidJSON is the CLI-82 regression-pin

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/neo4j/cli/common/clievents"
 	"github.com/neo4j/cli/neo4j-cli/aura/internal/test/testutils"
 )
 
@@ -191,5 +192,35 @@ func TestCreateAuthProviderWithResponse(t *testing.T) {
 				helper.AssertErr("")
 			}
 		})
+	}
+}
+
+func TestCreateAuthProvider_RegistersApiKeySecret(t *testing.T) {
+	instanceId := "2f49c2b3"
+	dataApiId := "23ea345a"
+	apiKey := "secretKeyValueForTeeRedaction01"
+
+	mockResponse := fmt.Sprintf(`{
+		"data": {
+			"id": "1ad1b794-e40e-41f7-8e8c-5638130317ed",
+			"name": "my-key",
+			"type": "api-key",
+			"enabled": true,
+			"key": %q
+		}
+	}`, apiKey)
+
+	helper := testutils.NewAuraTestHelper(t)
+	defer helper.Close()
+
+	orgProjectFlags := fmt.Sprintf("--organization-id %s --project-id %s", testOrgID, testProjectID)
+	registerProjectsMock(&helper)
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1/instances/%s", instanceId), http.StatusOK, instanceGetBody(instanceId, testProjectID))
+	helper.NewRequestHandlerMock(fmt.Sprintf("/v1beta5/instances/%s/data-apis/graphql/%s/auth-providers", instanceId, dataApiId), http.StatusAccepted, mockResponse)
+
+	helper.ExecuteCommand(fmt.Sprintf("graphql auth-provider create --instance-id %s --data-api-id %s --name my-key --type api-key %s --rw", instanceId, dataApiId, orgProjectFlags))
+
+	if clievents.RedactText(apiKey) != "***" {
+		t.Errorf("expected API key to be registered as a secret value for tee redaction, but RedactText(%q) did not return ***", apiKey)
 	}
 }
