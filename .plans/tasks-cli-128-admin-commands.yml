@@ -1,7 +1,7 @@
 feature: cli-128-admin-commands
 prd: ./prd-cli-128-admin-commands.md
 created_at: "2026-06-04T08:15:00Z"
-updated_at: "2026-06-10T11:30:00Z"
+updated_at: "2026-06-10T15:30:00Z"
 
 tasks:
   - id: task-001
@@ -584,3 +584,182 @@ tasks:
       - "make test passes with zero failures"
       - "make fmt-check passes (no files need gofmt)"
       - "make lint passes clean"
+
+  - id: task-020
+    title: "Fix user rename to use --new-name flag (REQ-F-051)"
+    source: qa
+    description: |
+      user/rename.go was implemented with two positional args (ExactArgs(2)),
+      violating the project convention of one positional argument maximum.
+      Change to a single positional arg <old-name> plus a required --new-name flag.
+
+      Changes:
+        - rename.go: Use="rename <old-name>", Args=cobra.ExactArgs(1), add
+          --new-name string flag (MarkFlagRequired). Update RunE to read args[0]
+          as oldName and cmd.Flags().GetString("new-name") as newName.
+        - rename_test.go: update all test cases to pass --new-name flag instead
+          of a second positional arg; add a test that the old two-arg form fails.
+        - Update Example fields to use the --new-name form.
+        - Run go generate ./neo4j-cli/internal/skill/... (Use/Example changed).
+
+      Run make test, make fmt-check, make lint as final gates.
+    status: not_started
+    dependencies:
+      - task-014
+    acceptance_criteria:
+      - "rename.go accepts 'user rename <old-name> --new-name <new-name> --rw'"
+      - "old two-positional-arg form fails with an args error"
+      - "--new-name is a required flag; omitting it returns a usage error"
+      - "RENAME USER Cypher is emitted with correct old/new name values"
+      - "Example fields use the --new-name form with --rw"
+      - "go generate produces no bundle diff"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-021
+    title: "Fix role get to check existence before querying privileges (REQ-F-052)"
+    source: qa
+    description: |
+      role/get.go treats an empty result from SHOW ROLE $name PRIVILEGES as
+      "role not found". A freshly created role with no granted privileges returns
+      an empty privilege set — not a not-found condition — so the current code
+      gives a false not_found (exit 3) for any empty role.
+
+      Fix: before querying privileges, call roleExecFn with
+        SHOW ROLES WHERE name = $name
+      If that returns zero rows, return clierr.NewNotFoundError("role %q not found", name).
+      Otherwise call SHOW ROLE $name PRIVILEGES; if that returns zero rows,
+      return an empty result (exit 0, empty array) rather than not_found.
+
+      Update get_test.go to cover:
+        - existing role with privileges → returns privilege rows (existing test)
+        - existing role with no privileges → empty list (exit 0)
+        - nonexistent role → not_found (exit 3)
+
+      Run make test, make fmt-check, make lint.
+    status: not_started
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "'role get <new-empty-role>' returns an empty JSON array (exit 0), not not_found"
+      - "'role get <nonexistent>' returns not_found (exit 3)"
+      - "get_test.go covers empty-privilege and not-found cases"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-022
+    title: "Normalize not-found errors from drop commands (REQ-F-053)"
+    source: qa
+    description: |
+      database/drop.go, user/drop.go, and role/drop.go surface raw Neo4j error
+      strings when the target resource doesn't exist, while the corresponding get
+      commands return a clean not_found (exit 3). Unify the behaviour.
+
+      In each drop RunE, after calling RunAdminStatement, check whether the returned
+      error is a *neo4j.Neo4jError whose Code indicates resource-not-found:
+        - Database: "Neo.ClientError.Database.DatabaseNotFound"
+        - User: check the actual code returned by DROP USER on a nonexistent user
+        - Role: check the actual code returned by DROP ROLE on a nonexistent role
+      If matched, return clierr.NewNotFoundError("<resource> %q not found", name)
+      so callers see exit 3 with a clean message.
+
+      Because translateAdminError doesn't receive the resource name as a parameter,
+      handle the translation locally in each drop RunE rather than in run.go.
+
+      Add test cases in drop_test.go for each resource covering the not-found path.
+
+      Run make test, make fmt-check, make lint.
+    status: not_started
+    dependencies:
+      - task-012
+    acceptance_criteria:
+      - "'database drop <nonexistent> --yes --force' returns not_found (exit 3), not validation_error"
+      - "'user drop <nonexistent> --yes --force' returns not_found (exit 3)"
+      - "'role drop <nonexistent> --yes --force' returns not_found (exit 3)"
+      - "Test cases cover the not-found drop path for database, user, and role"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-023
+    title: "Fix suspend/activate community-edition error to validation_error (REQ-F-054)"
+    source: qa
+    description: |
+      user/suspend and user/activate on Community edition return upstream_error
+      (exit 8, retryable:true) because Neo4j emits Neo.DatabaseError.Statement.
+      ExecutionFailed. This is a deterministic edition mismatch and must be
+      classified as validation_error (exit 6, retryable:false) to match the
+      treatment of UnsupportedAdministrationCommand errors.
+
+      Fix in translateAdminError (run.go): add a typed check for
+        ne.Code == "Neo.DatabaseError.Statement.ExecutionFailed"
+        && strings.Contains(ne.Msg, "not available in community edition")
+      and translate to the same validation_error shape as UnsupportedAdministrationCommand.
+
+      Background: task-013 removed the plain-text fallback that previously handled
+      this via string matching on plain errors.New() values. The typed errors.As path
+      now needs to handle this code+message combination explicitly.
+
+      Update run_test.go with a new test case injecting:
+        *neo4j.Neo4jError{Code: "Neo.DatabaseError.Statement.ExecutionFailed",
+          Msg: "Failed to alter the specified user 'x': 'SET STATUS' is not available in community edition."}
+      Assert the result is validation_error, retryable:false, exit 6.
+
+      Run make test, make fmt-check, make lint.
+    status: not_started
+    dependencies:
+      - task-013
+    acceptance_criteria:
+      - "suspend on Community returns validation_error (exit 6, retryable:false)"
+      - "activate on Community returns validation_error (exit 6, retryable:false)"
+      - "run_test.go has a test case for ExecutionFailed + community-edition message text"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-024
+    title: "Write commands emit updated resource after mutation (REQ-F-055)"
+    source: qa
+    description: |
+      All non-drop mutating commands currently exit 0 with no output, requiring
+      callers to issue a follow-up get to observe the mutation. Per REQ-F-055,
+      write commands should emit the affected resource using the same --format
+      path as the corresponding read command.
+
+      After each mutation, run the appropriate follow-up query using the same
+      package-level execFn seam and pass the result through commonoutput.PrintBodyMap
+      with the same field list as the read command. Mapping:
+
+        database create/start/stop  → SHOW DATABASE $name        (fields from get.go)
+        user create/set-password/
+          suspend/activate          → SHOW USERS WHERE user=$name (fields from get.go)
+        user rename                 → SHOW USERS WHERE user=$newName
+        role create                 → SHOW ROLES WITH USERS WHERE role=$name
+        role grant/revoke           → SHOW USERS WHERE user=$user
+
+      Drop commands produce no output on success (resource is gone); no change needed.
+
+      Implementation notes:
+        - Each command already has the execFn seam in scope; reuse it for the follow-up.
+        - Factor out a shared outputUser / outputDatabase / outputRoleMember helper in
+          each package's helpers.go if needed to avoid duplicating the PrintBodyMap call.
+        - The follow-up query for role create is a list query (SHOW ROLES WITH USERS
+          WHERE role=$name) which may return zero rows if the role has no members yet;
+          emit an empty array in that case (do not error).
+
+      Update tests for each affected command to assert that the follow-up execFn call
+      is made with the correct Cypher and that the result is printed. Add a stub
+      follow-up result to each test's fakeExecFn sequence.
+
+      Run go generate ./neo4j-cli/internal/skill/... after (Long descriptions may
+      change). Run make test, make fmt-check, make lint.
+    status: not_started
+    dependencies:
+      - task-020
+      - task-023
+    acceptance_criteria:
+      - "'database create testdb --rw --format json' emits the created database record"
+      - "'database stop testdb --rw --format table' emits the stopped database status record"
+      - "'user create alice --rw --password x --format json' emits alice's user record"
+      - "'user suspend alice --rw --format json' emits alice's updated user record (suspended:true)"
+      - "'user rename alice --new-name bob --rw --format json' emits the renamed user record for bob"
+      - "'role create testrole --rw --format json' emits the role's member record (empty array if no members)"
+      - "'role grant --role r --user u --rw --format json' emits the user's updated role assignment"
+      - "Drop commands continue to produce no output on success"
+      - "Tests verify follow-up execFn is called with correct Cypher and params"
+      - "go generate produces no bundle diff"
+      - "make test passes; make fmt-check and make lint pass clean"

@@ -185,6 +185,14 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 
 - REQ-F-050: `neo4j-cli admin privilege revoke` — execute `REVOKE [GRANT|DENY] <action> ON <resource> FROM <role>`. Same resource and action flags as `privilege grant`. Additional optional flag: `--revoke-type grant|deny` — when set, emits `REVOKE GRANT ...` or `REVOKE DENY ...` respectively; when absent, emits `REVOKE ...` (revoking both GRANT and DENY). Requires `--rw`. Enterprise-only.
 
+**QA-identified bug fixes and improvements (live testing 2026-06-10)**
+
+- REQ-F-051: `user rename` uses a single positional arg `<old-name>` and a required `--new-name <new-name>` flag, superseding REQ-F-014's two-positional-arg form. The current implementation violates the project convention of one positional argument maximum and must be corrected before merge.
+- REQ-F-052: `role get <role>` validates role existence via `SHOW ROLES WHERE name = $name` before querying `SHOW ROLE $name PRIVILEGES`. If the role does not exist, return a `not_found` error (exit 3). If the role exists but has zero granted privileges, return an empty result set — not a `not_found` error. (Current bug: `SHOW ROLE $name PRIVILEGES` returning an empty set is misclassified as not-found, making every freshly created role appear nonexistent.)
+- REQ-F-053: `database drop`, `user drop`, and `role drop` translate Neo4j's resource-not-found errors from DROP statements — `Neo.ClientError.Database.DatabaseNotFound` for databases, equivalent user/role not-found codes for users and roles — into clean `not_found` CLI errors (exit 3), consistent with the corresponding `get` commands. Currently these surface as raw `validation_error` (exit 6) with the full Neo4j error string.
+- REQ-F-054: `user suspend` and `user activate` on Community edition classify the resulting error as `validation_error` (exit 6, `retryable: false`), not `upstream_error` (exit 8, `retryable: true`). Neo4j returns `Neo.DatabaseError.Statement.ExecutionFailed` for these operations on Community, but this is a deterministic edition mismatch, not a transient failure. `translateAdminError` must detect `ExecutionFailed` errors whose message contains `"not available in community edition"` and reclassify them accordingly.
+- REQ-F-055: All mutating non-drop admin commands emit the updated resource record on success, formatted via the `--format` flag using the same output path as the corresponding `get`/`list` command. Mapping: `database create/start/stop` → `SHOW DATABASE $name`; `user create/set-password/suspend/activate/rename` → `SHOW USERS WHERE user = $name`; `role create` → `SHOW ROLES WITH USERS WHERE role = $name`; `role grant/revoke` → `SHOW USERS WHERE user = $user`. Drop commands (which destroy the resource) continue to produce no output on success.
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: Unit tests for every leaf command with a `fakeQueryRunner` test seam (analogous to `fakeDockerClient` in the docker subsystem).
@@ -326,6 +334,21 @@ Not all actions accept property or entity qualifiers. If the user passes graph-s
 
 All three commands (`grant`, `deny`, `revoke`) share a common `buildPrivilegeCypher` helper in `privilege/helpers.go` for the ON-resource and qualifier construction.
 
+### QA Fix Implementation Notes
+
+**REQ-F-051 — `user rename` convention fix:** Change `rename.go` from `cobra.ExactArgs(2)` + two `args[0]`/`args[1]` reads to `cobra.ExactArgs(1)` + a required `--new-name` string flag. Update `rename_test.go` and Examples accordingly. Regenerate skill bundle after.
+
+**REQ-F-052 — `role get` existence check:** Execute `SHOW ROLES WHERE name = $name` as a first query using the same `roleExecFn` seam. Zero rows → `clierr.NewNotFoundError`. Non-zero rows → proceed to `SHOW ROLE $name PRIVILEGES`. Zero privilege rows → return empty list (valid, not an error). Two round-trips per `role get`; acceptable since this is a read command not in a hot path.
+
+**REQ-F-053 — drop not-found errors:** Add translation cases in `translateAdminError` (or locally in each drop `RunE`) for:
+- `Neo.ClientError.Database.DatabaseNotFound` → `clierr.NewNotFoundError("database %q not found", name)`
+- Neo4j user/role not-found error codes returned by `DROP USER` / `DROP ROLE` on a nonexistent target
+Because `translateAdminError` doesn't receive the resource name as a parameter, the simplest approach is a local `errors.As` check in each drop `RunE` after calling `RunAdminStatement`, extracting the name from the positional arg already in scope.
+
+**REQ-F-054 — suspend/activate error classification:** In `translateAdminError`, add a check for `ne.Code == "Neo.DatabaseError.Statement.ExecutionFailed"` where `ne.Msg` contains `"not available in community edition"`. Translate to the same `validation_error` shape as `UnsupportedAdministrationCommand`. Note: task-013 removed the plain-text fallback that previously handled this via string matching on non-typed errors; the typed `errors.As` path must now cover this code+message combination explicitly.
+
+**REQ-F-055 — write command output:** After each mutation, call `execFn` with the corresponding SHOW query and pass the result through `commonoutput.PrintBodyMap` using the same field list as the corresponding read command. The follow-up query uses the same package-level `execFn` seam so tests can stub both the mutation and the read in sequence. For commands where the resource name changes (e.g. `user rename`), use the new name for the follow-up query.
+
 ### Example Fields
 
 Every leaf command must have a non-empty flush-left `Example:` field with ≥2 invocations (enforced by `TestAllLeafCommands_HaveExamples`). Mutating commands (`create`, `drop`, `rename`, `set-password`, `suspend`, `activate`, `grant`, `revoke`) must include `--rw` in their examples, consistent with all other write-capable commands in the CLI. Read-only commands (`list`, `get`) do not include `--rw`.
@@ -348,6 +371,20 @@ Every leaf command must have a non-empty flush-left `Example:` field with ≥2 i
 - [ ] `neo4j-cli admin user rename` returns `"renaming users is not supported on Aura connections"` when run against an Aura credential.
 - [ ] `neo4j-cli admin role list/grant/revoke` work against Aura Pro credentials.
 - [ ] `database drop`, `user drop`, `role drop` require `--yes` when not interactive.
+- [ ] `neo4j-cli admin user rename alice --new-name alice2 --credential local --rw` succeeds; old two-positional-arg form `user rename alice alice2` fails.
+- [ ] `neo4j-cli admin role get <newly-created-empty-role>` returns an empty list (exit 0), not a `not_found` error.
+- [ ] `neo4j-cli admin role get <nonexistent>` continues to return `not_found` (exit 3).
+- [ ] `neo4j-cli admin database drop <nonexistent> --yes --force` returns `not_found` (exit 3), not a raw `Neo4jError` string.
+- [ ] `neo4j-cli admin user drop <nonexistent> --yes --force` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin role drop <nonexistent> --yes --force` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin user suspend <name> --rw` on Community returns `validation_error` (exit 6, `retryable: false`).
+- [ ] `neo4j-cli admin user activate <name> --rw` on Community returns `validation_error` (exit 6, `retryable: false`).
+- [ ] `neo4j-cli admin database create testdb --rw --format json` emits the created database record.
+- [ ] `neo4j-cli admin user create alice --rw --password x --format json` emits alice's user record.
+- [ ] `neo4j-cli admin user suspend alice --rw --format json` emits alice's updated user record.
+- [ ] `neo4j-cli admin user rename alice --new-name bob --rw --format json` emits the renamed user record for bob.
+- [ ] `neo4j-cli admin role create testrole --rw --format json` emits the created role's member record.
+- [ ] Drop commands continue to produce no output on success.
 - [ ] All leaf commands have non-empty `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
 - [ ] `make test`, `make fmt-check`, `make lint` all pass clean.
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff (passes `TestGenerator_RoundTrip`).
