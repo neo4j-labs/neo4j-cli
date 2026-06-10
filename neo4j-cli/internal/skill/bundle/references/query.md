@@ -3,11 +3,12 @@
 ## Contents
 
 - [neo4j-cli query :embed](#neo4j-cli-query-embed)
+- [neo4j-cli query :lint](#neo4j-cli-query-lint)
 - [neo4j-cli query :schema](#neo4j-cli-query-schema)
 
-Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol
+Run Cypher, inspect the database schema (:schema), lint Cypher offline (:lint), and embed text against a Neo4j database via the Bolt protocol
 
-Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. Multiple statements may be passed in a single string: they are split on a `;` at the end of a line (a mid-line `;` is kept verbatim; the terminating `;` is stripped). By default each statement runs in its own transaction, in order, failing fast on the first error; pass `--atomic` to run them all in one transaction that rolls back if any statement fails, or `--continue-on-error` (non-atomic only) to report each failure and keep going, exiting non-zero at the end. Multiple result sets render as a JSON array with `--format json` or as stacked blocks with `--format table`/`toon`. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
+Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. Run a Cypher statement against a Neo4j database via the Bolt protocol. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. Use `--param NAME:embed=<text>` to inject an embedding vector inline (text is sent to the configured embedding provider, the resulting vector is bound to $NAME for both EXPLAIN preflight and the real run). The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection. The sibling `query :lint [cypher]` leaf checks Cypher for syntax and semantic errors offline, also without opening a Bolt connection. Multiple statements may be passed in a single string: they are split on a `;` at the end of a line (a mid-line `;` is kept verbatim; the terminating `;` is stripped). By default each statement runs in its own transaction, in order, failing fast on the first error; pass `--atomic` to run them all in one transaction that rolls back if any statement fails, or `--continue-on-error` (non-atomic only) to report each failure and keep going, exiting non-zero at the end. Multiple result sets render as a JSON array with `--format json` or as stacked blocks with `--format table`/`toon`. Write operations require `--rw`; without `--rw`, an EXPLAIN preflight runs first and statements classified as writes are blocked.
 
 Usage: `neo4j-cli query [cypher]`
 
@@ -96,6 +97,33 @@ echo "hello world" | neo4j-cli query :embed --format toon
 
 # Override the embed provider and model inline (no stored credential needed)
 neo4j-cli query :embed "hello" --embed-provider openai --embed-model text-embedding-3-small --format json
+```
+
+## neo4j-cli query :lint
+
+Lint Cypher offline: report syntax and semantic errors without a database connection
+
+Check Cypher for syntax and semantic problems using the same semantic analysis that powers Neo4j's language tooling, fully offline — no Bolt connection is opened and no credentials are needed. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. `--cypher-version` selects the language dialect (5 or 25; default 5). Each diagnostic renders as one row with a severity of `error` or `warning`, a message, and 1-indexed line/column plus 0-indexed character offsets. Exit code is 6 when any error-severity diagnostic is found; a clean or warnings-only result exits 0. The first call in a process takes a few seconds to initialize the analysis engine.
+
+Usage: `neo4j-cli query :lint [cypher] [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cypher-version` | string | 5 | Cypher language version to lint against: 5 or 25 |
+
+Examples:
+
+```
+# Lint a Cypher statement offline; diagnostics as JSON, exit code 6 on errors
+neo4j-cli query :lint "MATCH (n) RETURN m" --format json
+
+# Pipe Cypher from stdin and lint against Cypher 25 semantics
+cat query.cypher | neo4j-cli query :lint --cypher-version 25 --format json
+
+# Human-readable diagnostics table
+neo4j-cli query :lint "MATCH (n) RETURN n" --format table
 ```
 
 ## neo4j-cli query :schema

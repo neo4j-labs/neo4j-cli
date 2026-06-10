@@ -61,6 +61,16 @@ neo4j-cli query --param name=Alice --param age=30 \
 
 Always pass `--format toon` on read commands — TOON is ~40% smaller than JSON for the same data, so it's the agent-friendly default. Switch to `--format json` only when piping into a JSON-aware tool.
 
+## Lint generated Cypher before executing
+
+`query :lint` checks Cypher for syntax and semantic errors **offline** — no database connection, no credentials, no cost. Lint any Cypher you generated before running it against the database; it catches undefined variables, typos in clauses, and dialect mistakes up front:
+
+```bash
+neo4j-cli query :lint "MATCH (n) RETURN m" --format toon
+```
+
+Exit code 6 means error-severity diagnostics were found (each row has `severity`, `message`, 1-indexed `line`/`column`). Pass `--cypher-version 25` to lint against Cypher 25 semantics (match the server's `default_language` from `:schema`).
+
 ## Multiple statements
 
 Pass several statements in one string — they're split on a `;` at the **end of a line** (a mid-line `;` is kept verbatim; the terminating `;` is stripped):

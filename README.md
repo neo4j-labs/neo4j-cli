@@ -388,6 +388,15 @@ Schema introspection:
 neo4j-cli query :schema
 ```
 
+### Offline linting
+
+`query :lint` checks Cypher for syntax and semantic errors using the same semantic analysis that powers Neo4j's language tooling — fully offline, no database connection or credentials needed. `--cypher-version` selects the dialect (`5`, the default, or `25`). Each diagnostic renders as one row (`severity`, `message`, 1-indexed `line`/`column`, 0-indexed offsets). The command exits with code 6 when any error-severity diagnostic is found; warnings alone exit 0.
+
+```bash
+neo4j-cli query :lint 'MATCH (n) RETURN m' --format json
+cat query.cypher | neo4j-cli query :lint --cypher-version 25
+```
+
 ### Embedding parameters
 
 Bind a vector parameter inline by passing `--param NAME:embed=<text>` — the text is sent to the configured embedding provider and the resulting `[]float32` is bound to `$NAME` for both the EXPLAIN preflight and the real run. The sibling `query :embed [text]` leaf computes a vector standalone without opening a Bolt connection.

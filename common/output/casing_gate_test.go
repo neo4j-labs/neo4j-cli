@@ -44,6 +44,7 @@ var outputStructAllowlist = map[string][]string{
 	"neo4j-cli/aura/internal/subcommands/workspace/list.go": {"workspaceEntry"},
 	"common/clierr/render.go":                               {"Envelope", "EnvelopeBody"},
 	"neo4j-cli/internal/subcommands/agentcontext/build.go":  {"Context", "Command", "Flag"},
+	"neo4j-cli/query/lint.go":                               {"lintDiagnostic"},
 }
 
 // fieldsSliceFileSkip lists output-rendering files whose Print* `fields` argument
