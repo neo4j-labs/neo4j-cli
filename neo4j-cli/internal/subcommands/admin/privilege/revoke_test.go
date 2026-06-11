@@ -5,12 +5,14 @@ package privilege
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +22,7 @@ import (
 func runRevoke(t *testing.T, args string, rows []map[string]any, execErr error) (string, string, error) {
 	t.Helper()
 
-	withFakeExecFn(t, rows, execErr)
+	withSequencedMutationFn(t, rows, execErr, []map[string]any{})
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
@@ -268,4 +270,31 @@ func TestRevoke_HasWriteAnnotation(t *testing.T) {
 	}
 	require.NotNil(t, revokeCmd)
 	assert.Equal(t, "true", revokeCmd.Annotations["write"])
+}
+
+// TestRevoke_EmitsRolePrivilegeListOnSuccess verifies that a successful revoke
+// call results in the analyst role's updated privilege list being emitted to
+// stdout (the emitRolePrivileges follow-up).
+func TestRevoke_EmitsRolePrivilegeListOnSuccess(t *testing.T) {
+	followUpRows := []map[string]any{
+		{"access": "GRANTED", "action": "access", "resource": "database", "graph": "*", "segment": "database", "role": "analyst"},
+	}
+	withSequencedMutationFn(t, nil, nil, followUpRows)
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"revoke", "--action", "access", "--role", "analyst", "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "analyst", got[0]["role"])
 }

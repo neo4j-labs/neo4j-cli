@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
@@ -291,6 +292,20 @@ func validActionsHelp() string {
 	return strings.Join(validActions, ", ")
 }
 
+// emitRolePrivileges fetches SHOW ROLE $name PRIVILEGES via privilegeExecFn
+// and prints the result through commonoutput.PrintBodyMap using the same field
+// list as privilege list. Called by grant, deny, and revoke after a successful
+// mutation to show the role's updated privilege set.
+func emitRolePrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, role string) error {
+	rows, err := privilegeExecFn(cmd.Context(), cfg, conn, "SHOW ROLE $name PRIVILEGES", map[string]any{"name": role})
+	if err != nil {
+		return err
+	}
+	fields := privilegeFields(rows)
+	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), fields)
+	return nil
+}
+
 // newPrivilegeMutationCmd is the shared constructor for grant and deny. verb is
 // "GRANT" or "DENY" and drives the Cypher prefix, help text, and examples.
 func newPrivilegeMutationCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb, short, long, example string) *cobra.Command {
@@ -322,7 +337,10 @@ func newPrivilegeMutationCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb, short
 
 			cypher := fmt.Sprintf("%s %s TO $role", verb, clause)
 			_, err = privilegeExecFn(cmd.Context(), cfg, *conn, cypher, map[string]any{"role": roleFlag})
-			return err
+			if err != nil {
+				return err
+			}
+			return emitRolePrivileges(cmd, cfg, *conn, roleFlag)
 		},
 	}
 

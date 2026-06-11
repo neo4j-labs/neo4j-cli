@@ -1055,7 +1055,8 @@ tasks:
   - id: task-033
     title: "privilege grant/deny/revoke emit updated role privilege list on success (REQ-F-059)"
     source: qa
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T22:00:00Z"
     description: |
       privilege grant, deny, and revoke currently exit 0 with no output on success.
       For consistency with role grant/revoke (which emit the user's updated record),
@@ -1136,7 +1137,8 @@ tasks:
   - id: task-035
     title: "Wire --debug to Bolt driver and add Cypher trace logging in boltAdminRunner (REQ-F-046, REQ-F-063)"
     source: security-review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T22:00:00Z"
     description: |
       `--debug` / `NEO4J_DEBUG=1` is currently a silent no-op for admin commands.
       `dbconn.ResolveConn` sets `conn.Debug = true` when the flag or env var is active,

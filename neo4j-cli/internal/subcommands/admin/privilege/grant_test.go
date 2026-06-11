@@ -5,12 +5,14 @@ package privilege
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -19,10 +21,12 @@ import (
 
 // runMutation builds the `admin privilege` parent command and executes the
 // subcommand named by sub (e.g. "grant" or "deny") with the given args.
+// rows and execErr apply to the mutation call; the follow-up emitRolePrivileges
+// call always returns empty rows.
 func runMutation(t *testing.T, sub, args string, rows []map[string]any, execErr error) (string, string, error) {
 	t.Helper()
 
-	withFakeExecFn(t, rows, execErr)
+	withSequencedMutationFn(t, rows, execErr, []map[string]any{})
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
@@ -516,6 +520,38 @@ func TestGrantDeny_HasWriteAnnotation(t *testing.T) {
 			}
 			require.NotNil(t, found)
 			assert.Equal(t, "true", found.Annotations["write"])
+		})
+	}
+}
+
+// TestGrantDeny_EmitsRolePrivilegeListOnSuccess verifies that a successful
+// grant/deny call results in the analyst role's updated privilege list being
+// emitted to stdout (the emitRolePrivileges follow-up).
+func TestGrantDeny_EmitsRolePrivilegeListOnSuccess(t *testing.T) {
+	followUpRows := []map[string]any{
+		{"access": "GRANTED", "action": "access", "resource": "database", "graph": "*", "segment": "database", "role": "analyst"},
+	}
+
+	for _, sub := range []string{"grant", "deny"} {
+		t.Run(sub, func(t *testing.T) {
+			withSequencedMutationFn(t, nil, nil, followUpRows)
+
+			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+			conn := testConn()
+			cmd := NewCmd(cfg, &conn, privilegeExecFn)
+			flags.RegisterOutputFlag(cmd, cfg)
+
+			out := bytes.NewBuffer(nil)
+			cmd.SetOut(out)
+			cmd.SetErr(bytes.NewBuffer(nil))
+			cmd.SetArgs([]string{sub, "--action", "access", "--role", "analyst", "--format", "json"})
+
+			require.NoError(t, cmd.Execute())
+
+			var got []map[string]any
+			require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+			require.Len(t, got, 1)
+			assert.Equal(t, "analyst", got[0]["role"])
 		})
 	}
 }

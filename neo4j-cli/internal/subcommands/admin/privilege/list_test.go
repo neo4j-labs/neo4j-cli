@@ -32,7 +32,9 @@ func testConn() *dbconn.Conn {
 }
 
 // withFakeExecFn replaces privilegeExecFn for the duration of t with a fake
-// that returns the supplied rows or error.
+// that returns the supplied rows or error. For list tests only — mutation
+// tests should use withSequencedMutationFn instead to handle the follow-up
+// emitRolePrivileges call.
 func withFakeExecFn(t *testing.T, rows []map[string]any, execErr error) {
 	t.Helper()
 	orig := privilegeExecFn
@@ -42,20 +44,46 @@ func withFakeExecFn(t *testing.T, rows []map[string]any, execErr error) {
 	t.Cleanup(func() { privilegeExecFn = orig })
 }
 
-// captureExecFn replaces privilegeExecFn for the duration of t with a fake
-// that records the cypher and params it receives, and returns the supplied rows.
-func captureExecFn(t *testing.T, rows []map[string]any) (gotCypher *string, gotParams *map[string]any) {
+// captureExecFn replaces privilegeExecFn for the duration of t with a
+// sequenced fake: the FIRST call (the mutation) records its cypher and params
+// and returns empty rows/nil. Subsequent calls (the emitRolePrivileges
+// follow-up) return the supplied followUpRows.
+func captureExecFn(t *testing.T, followUpRows []map[string]any) (gotCypher *string, gotParams *map[string]any) {
 	t.Helper()
 	orig := privilegeExecFn
 	var cypher string
 	var params map[string]any
+	callIdx := 0
 	privilegeExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, q string, p map[string]any) ([]map[string]any, error) {
-		cypher = q
-		params = p
-		return rows, nil
+		if callIdx == 0 {
+			cypher = q
+			params = p
+			callIdx++
+			return nil, nil
+		}
+		callIdx++
+		return followUpRows, nil
 	}
 	t.Cleanup(func() { privilegeExecFn = orig })
 	return &cypher, &params
+}
+
+// withSequencedMutationFn installs a sequenced exec-fn: first call returns
+// mutationErr, subsequent calls return followUpRows/nil. Used by runMutation
+// and runRevoke to handle the emitRolePrivileges follow-up call.
+func withSequencedMutationFn(t *testing.T, mutationRows []map[string]any, mutationErr error, followUpRows []map[string]any) {
+	t.Helper()
+	orig := privilegeExecFn
+	callIdx := 0
+	privilegeExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
+		if callIdx == 0 {
+			callIdx++
+			return mutationRows, mutationErr
+		}
+		callIdx++
+		return followUpRows, nil
+	}
+	t.Cleanup(func() { privilegeExecFn = orig })
 }
 
 // runList builds the `admin privilege list` command tree with a fake conn and

@@ -76,7 +76,10 @@ neo4j-cli admin privilege revoke --action create_role --on-dbms --role limited -
 
 			cypher := fmt.Sprintf("%s %s FROM $role", verb, clause)
 			_, err = privilegeExecFn(cmd.Context(), cfg, *conn, cypher, map[string]any{"role": roleFlag})
-			return err
+			if err != nil {
+				return err
+			}
+			return emitRolePrivileges(cmd, cfg, *conn, roleFlag)
 		},
 	}
 
