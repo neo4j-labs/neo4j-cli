@@ -1,0 +1,8 @@
+## TASK-002 — 2026-06-11T00:00:00Z
+Added config migration v1 to `common/configmigrate/migrations.go` using `sjson.DeleteBytes` with escaped dot (`flag\.aura-beta`) for the flat key and unescaped dot (`aura.beta-enabled`) for the nested path. Also fixed a latent panic in `configmigrate.go` where `fileutils.WriteFile` (which panics on error) was called — switched to `WriteFileErr` with warn-and-continue, consistent with the engine's error policy; this was exposed by the docker test's `renameFailFs`.
+Files: ~common/configmigrate/migrations.go, ~common/configmigrate/configmigrate_test.go, ~common/configmigrate/configmigrate.go
+Decisions: sjson dot-escaping is non-obvious; comments were added to document the difference between the two key paths. The `WriteFile`→`WriteFileErr` change was necessary to prevent panics in any test that wraps the fs with a rename-failing implementation.
+
+## TASK-001 — 2026-06-11T00:00:00Z
+Removed the `flag.aura-beta` Registry entry from `common/clicfg/flags.go`, deleted the `BetaPathV1`/`BetaPathV2` methods from `common/clicfg/clicfg.go`, and simplified `getVersionPath` in `neo4j-cli/aura/internal/api/api.go` to drop the `cfg` parameter and use inline string literals. Build passes cleanly; test failures are pre-existing references to the removed flag scoped to tasks 003-005.
+Files: ~common/clicfg/flags.go, ~common/clicfg/clicfg.go, ~neo4j-cli/aura/internal/api/api.go

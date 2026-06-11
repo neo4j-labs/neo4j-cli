@@ -76,6 +76,9 @@ func runWith(fs afero.Fs, configPath string, stderr io.Writer, ms []Migration) (
 		return false, nil
 	}
 
-	fileutils.WriteFile(fs, configPath, data)
+	if err := fileutils.WriteFileErr(fs, configPath, data); err != nil {
+		fmt.Fprintf(stderr, "Warning: config migration write failed: %v; continuing with un-migrated config\n", err) //nolint:errcheck // warning to stderr; write errors are not actionable
+		return false, nil
+	}
 	return true, nil
 }

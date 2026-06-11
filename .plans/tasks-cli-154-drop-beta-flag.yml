@@ -14,7 +14,7 @@ tasks:
       (so it always returns "v1"), and inline "v1beta5" and "v2beta1" as literal strings in the
       AuraApiVersionBeta1 and AuraApiVersion2 cases respectively. Update all call sites of
       getVersionPath to drop the cfg argument.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "var Registry in common/clicfg/flags.go contains no \"flag.aura-beta\" entry"
@@ -23,7 +23,7 @@ tasks:
       - "getVersionPath contains no reference to Flags.Enabled or flag.aura-beta"
       - "AuraApiVersion1 case returns \"v1\" unconditionally; AuraApiVersionBeta1 returns \"v1beta5\"; AuraApiVersion2 returns \"v2beta1\""
       - "Code compiles: go build ./... succeeds"
-    completed_at: null
+    completed_at: "2026-06-11T00:00:00Z"
 
   - id: task-002
     title: "Add config migration v1 to delete retired flag.aura-beta and aura.beta-enabled keys"
@@ -35,7 +35,7 @@ tasks:
       matching the {"aura": {"beta-enabled": true}} shape). Add the tidwall/sjson import
       if it is not already present in the file. The migration must be a no-op (no error,
       unchanged bytes) when neither key is present in the input.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "migrations slice has exactly one entry with Version=1"
@@ -43,7 +43,7 @@ tasks:
       - "Apply deletes aura.beta-enabled from a config JSON that contains {\"aura\":{\"beta-enabled\":true}}"
       - "Apply is a no-op (returns same bytes, no error) when neither key is present"
       - "go test ./common/configmigrate/... passes"
-    completed_at: null
+    completed_at: "2026-06-11T00:00:00Z"
 
   - id: task-003
     title: "Delete stale project_test.go and remove flag.aura-beta from neo4j-cli config tests"
