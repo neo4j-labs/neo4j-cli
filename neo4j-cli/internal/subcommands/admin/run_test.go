@@ -180,3 +180,50 @@ func TestTranslateAdminError_GenericError_MappedToValidation(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 6, ce.Code) // validation_error
 }
+
+func TestRedactParams(t *testing.T) {
+	tests := []struct {
+		key      string
+		value    any
+		redacted bool
+	}{
+		{key: "password", value: "secret123", redacted: true},
+		{key: "Password", value: "secret123", redacted: true},
+		{key: "user_password", value: "secret123", redacted: true},
+		{key: "passwd", value: "secret123", redacted: true},
+		{key: "PASSWD", value: "secret123", redacted: true},
+		{key: "secret", value: "topsecret", redacted: true},
+		{key: "mySecret", value: "topsecret", redacted: true},
+		{key: "token", value: "tok123", redacted: true},
+		{key: "accessToken", value: "tok123", redacted: true},
+		{key: "key", value: "keyval", redacted: true},
+		{key: "apiKey", value: "keyval", redacted: true},
+		{key: "credential", value: "cred", redacted: true},
+		{key: "myCredential", value: "cred", redacted: true},
+		{key: "name", value: "alice", redacted: false},
+		{key: "role", value: "admin", redacted: false},
+		{key: "database", value: "neo4j", redacted: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.key, func(t *testing.T) {
+			params := map[string]any{tc.key: tc.value}
+			result := redactParams(params)
+			if tc.redacted {
+				assert.Equal(t, "***", result[tc.key], "expected value for key %q to be redacted", tc.key)
+			} else {
+				assert.Equal(t, tc.value, result[tc.key], "expected value for key %q to pass through unchanged", tc.key)
+			}
+		})
+	}
+}
+
+func TestRedactParams_EmptyMap(t *testing.T) {
+	result := redactParams(map[string]any{})
+	assert.Empty(t, result)
+}
+
+func TestRedactParams_NilMap(t *testing.T) {
+	result := redactParams(nil)
+	assert.Nil(t, result)
+}

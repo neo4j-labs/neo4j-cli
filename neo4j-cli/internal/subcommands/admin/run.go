@@ -6,6 +6,8 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -26,6 +28,30 @@ const (
 	executionFailedCode  = "Neo.DatabaseError.Statement.ExecutionFailed"
 )
 
+// adminStderrLogger routes all Bolt driver log output to stderr so it doesn't
+// contaminate stdout (which carries the CLI's machine-readable output).
+type adminStderrLogger struct{}
+
+const adminLogTimeFormat = "2006-01-02 15:04:05.000"
+
+func newAdminStderrLogger() *adminStderrLogger { return &adminStderrLogger{} }
+
+func (l *adminStderrLogger) Error(name, id string, err error) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s  ERROR  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, err.Error())
+}
+
+func (l *adminStderrLogger) Warnf(name, id, msg string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s   WARN  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
+func (l *adminStderrLogger) Infof(name, id, msg string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s   INFO  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
+func (l *adminStderrLogger) Debugf(name, id, msg string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s  DEBUG  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
 // queryRunner is the test seam for the admin execution path. Production code
 // uses boltAdminRunner; tests substitute a fakeQueryRunner.
 type queryRunner interface {
@@ -44,14 +70,26 @@ var adminRunnerFn = func(_ *clicfg.Config) queryRunner {
 }
 
 func (r *boltAdminRunner) run(ctx context.Context, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
-	driver, err := neo4j.NewDriver(
-		conn.URI,
-		neo4j.BasicAuth(conn.Username, conn.Password, ""),
+	driverOpts := []func(*config.Config){
 		func(c *config.Config) {
 			c.UserAgent = conn.UserAgent
 			c.ConnectionAcquisitionTimeout = 10 * time.Second
 			c.MaxTransactionRetryTime = 10 * time.Second
 		},
+	}
+	if conn.Debug {
+		driverOpts = append(driverOpts, func(c *config.Config) {
+			c.Log = newAdminStderrLogger()
+		})
+		fmt.Fprintf(os.Stderr, "[debug] admin cypher: %s\n", cypher)
+		if len(params) > 0 {
+			fmt.Fprintf(os.Stderr, "[debug] admin params: %v\n", redactParams(params))
+		}
+	}
+	driver, err := neo4j.NewDriver(
+		conn.URI,
+		neo4j.BasicAuth(conn.Username, conn.Password, ""),
+		driverOpts...,
 	)
 	if err != nil {
 		return nil, clierr.NewUpstreamError("admin: open driver: %w", err)
@@ -94,6 +132,27 @@ func (r *boltAdminRunner) run(ctx context.Context, conn *dbconn.Conn, cypher str
 		return nil, clierr.NewFatalError("admin: unexpected nil response from managed transaction")
 	}
 	return rows, nil
+}
+
+// redactParams returns a copy of params with values redacted for any key that
+// matches a known secret word (password, passwd, secret, token, key, credential).
+// The comparison is case-insensitive.
+func redactParams(params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return params
+	}
+	out := make(map[string]any, len(params))
+	for k, v := range params {
+		lower := strings.ToLower(k)
+		if strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
+			strings.Contains(lower, "secret") || strings.Contains(lower, "token") ||
+			strings.Contains(lower, "key") || strings.Contains(lower, "credential") {
+			out[k] = "***"
+		} else {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // RunAdminStatement executes a Cypher statement against the system database
