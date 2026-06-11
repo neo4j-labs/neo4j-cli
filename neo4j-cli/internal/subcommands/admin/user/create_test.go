@@ -12,11 +12,11 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func captureExecFn(t *testing.T, execErr error) (fn adminutil.ExecFn, getCypher 
 	var lastCypher string
 	var lastParams map[string]any
 
-	fn = func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
+	fn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
 		lastCypher = cypher
 		lastParams = params
 		return nil, execErr
@@ -44,16 +44,10 @@ func captureExecFn(t *testing.T, execErr error) (fn adminutil.ExecFn, getCypher 
 func runCreate(t *testing.T, args string, execErr error) (string, string, string, map[string]any, error) {
 	t.Helper()
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := "local"
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
 	captureFn, getCypher, getParams := captureExecFn(t, execErr)
-	cmd := NewCmd(cfg, &credential, captureFn)
+	cmd := NewCmd(cfg, &conn, captureFn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -144,14 +138,9 @@ func TestCreate_ExecError_PropagatesError(t *testing.T) {
 }
 
 func TestCreate_WriteAnnotation(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, nil, nil))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, nil, nil))
 	for _, sub := range cmd.Commands() {
 		if sub.Name() == "create" {
 			assert.Equal(t, "true", sub.Annotations["write"], "create must be annotated write=true")
@@ -162,14 +151,9 @@ func TestCreate_WriteAnnotation(t *testing.T) {
 }
 
 func TestCreate_NoArgs_CobraUsageError(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, nil, nil))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, nil, nil))
 	flags.RegisterOutputFlag(cmd, cfg)
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)

@@ -6,19 +6,19 @@ package database
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
 var listFields = []string{"name", "type", "currentStatus", "access", "default"}
 
-func newListCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newListCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all databases",
 		Long: "List all databases visible from the system database. " +
-			"Renders name, type, currentStatus, access, and default columns. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Renders name, type, currentStatus, access, and default columns.",
 		Example: `# List all databases as a table
 neo4j-cli admin database list --credential local
 
@@ -27,11 +27,7 @@ neo4j-cli admin database list --credential local --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			rows, err := dbExecFn(cmd.Context(), cfg, cred, "SHOW DATABASES", nil)
+			rows, err := dbExecFn(cmd.Context(), cfg, *conn, "SHOW DATABASES", nil)
 			if err != nil {
 				return err
 			}

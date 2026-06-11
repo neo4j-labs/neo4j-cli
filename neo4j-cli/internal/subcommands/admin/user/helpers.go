@@ -5,12 +5,12 @@ package user
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+	"os"
 )
 
 // passwordReader is the test seam for the no-echo TTY password prompt.

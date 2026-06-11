@@ -13,8 +13,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 const (
@@ -28,32 +28,26 @@ const (
 // queryRunner is the test seam for the admin execution path. Production code
 // uses boltAdminRunner; tests substitute a fakeQueryRunner.
 type queryRunner interface {
-	run(ctx context.Context, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error)
+	run(ctx context.Context, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error)
 }
 
 // boltAdminRunner is the default queryRunner. It opens a Bolt driver using
-// the supplied credential, executes the Cypher via ExecuteWrite targeting the
-// system database, and returns the result rows.
-type boltAdminRunner struct {
-	userAgent string
-}
+// the supplied connection params, executes the Cypher via ExecuteWrite targeting
+// the system database, and returns the result rows.
+type boltAdminRunner struct{}
 
 // adminRunnerFn is the package-level test seam. Tests replace it to inject a
 // fakeQueryRunner without opening a real Bolt connection.
-var adminRunnerFn = func(cfg *clicfg.Config) queryRunner {
-	v := cfg.Version
-	if v == "" {
-		v = "dev"
-	}
-	return &boltAdminRunner{userAgent: "neo4j-cli/v" + v}
+var adminRunnerFn = func(_ *clicfg.Config) queryRunner {
+	return &boltAdminRunner{}
 }
 
-func (r *boltAdminRunner) run(ctx context.Context, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
+func (r *boltAdminRunner) run(ctx context.Context, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
 	driver, err := neo4j.NewDriver(
-		cred.URI,
-		neo4j.BasicAuth(cred.Username, cred.Password, ""),
+		conn.URI,
+		neo4j.BasicAuth(conn.Username, conn.Password, ""),
 		func(c *config.Config) {
-			c.UserAgent = r.userAgent
+			c.UserAgent = conn.UserAgent
 			c.ConnectionAcquisitionTimeout = 10 * time.Second
 			c.MaxTransactionRetryTime = 10 * time.Second
 		},
@@ -103,9 +97,9 @@ func (r *boltAdminRunner) run(ctx context.Context, cred *credentials.DbmsCredent
 
 // RunAdminStatement executes a Cypher statement against the system database
 // and translates well-known Neo4j errors into actionable CLI errors.
-func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, cred *credentials.DbmsCredential, cypher string, params map[string]any) ([]map[string]any, error) {
+func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
 	runner := adminRunnerFn(cfg)
-	rows, err := runner.run(ctx, cred, cypher, params)
+	rows, err := runner.run(ctx, conn, cypher, params)
 	if err != nil {
 		return nil, translateAdminError(err)
 	}

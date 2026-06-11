@@ -11,7 +11,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,15 +21,9 @@ func runRevoke(t *testing.T, args string, rows []map[string]any, execErr error) 
 
 	withFakeExecFn(t, rows, execErr)
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, roleExecFn)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, roleExecFn)
 
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)

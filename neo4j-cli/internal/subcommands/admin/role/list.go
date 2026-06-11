@@ -6,13 +6,14 @@ package role
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
 var listFields = []string{"role", "member"}
 
-func newListCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newListCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	var roleFilter string
 	var userFilter string
 
@@ -21,8 +22,7 @@ func newListCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
 		Short: "List all roles and their members",
 		Long: "List all roles and their member users. " +
 			"Executes SHOW ROLES WITH USERS against the system database. " +
-			"Use --role to filter by role name or --user to filter by user name. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Use --role to filter by role name or --user to filter by user name.",
 		Example: `# List all roles and their members as a table
 neo4j-cli admin role list --credential local
 
@@ -37,11 +37,7 @@ neo4j-cli admin role list --credential local --user alice`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			rows, err := roleExecFn(cmd.Context(), cfg, cred, "SHOW ROLES WITH USERS", nil)
+			rows, err := roleExecFn(cmd.Context(), cfg, *conn, "SHOW ROLES WITH USERS", nil)
 			if err != nil {
 				return err
 			}

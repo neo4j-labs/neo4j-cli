@@ -28,7 +28,7 @@
 
 Manage Neo4j databases, users, and roles
 
-Manage Neo4j databases, users, and roles via the system database. All subcommands connect over Bolt using the dbms credential named by --credential (see `neo4j-cli credential dbms list`). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke — Enterprise only).
+Manage Neo4j databases, users, and roles via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke — Enterprise only).
 
 Usage: `neo4j-cli admin`
 
@@ -36,13 +36,18 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--credential` | string | - | Name of the stored dbms credential to use (see `neo4j-cli credential dbms list`) |
+| `-c, --credential` | string | - | Name of a stored dbms credential, 'desktop' for a running Neo4j Desktop 2 DBMS, or 'desktop-connection:<uuid>' for a saved connection |
+| `--debug` | bool | false | Enable Bolt driver debug logging to stderr (env: NEO4J_DEBUG=1) |
+| `--env` | string | - | Path to a .env file with NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD (walks up from cwd when unset) |
+| `-p, --password` | string | - | Neo4j password (env: NEO4J_PASSWORD) |
+| `--uri` | string | - | Neo4j server URI (env: NEO4J_URI) |
+| `-u, --username` | string | - | Neo4j username (env: NEO4J_USERNAME) |
 
 ## neo4j-cli admin database
 
 Manage Neo4j databases via the system database
 
-Manage Neo4j databases. Read commands (list, get) do not require --rw. Write commands (create, drop, start, stop) require --rw and use the dbms credential named by --credential on the parent `admin` command.
+Manage Neo4j databases. Read commands (list, get) do not require --rw. Write commands (create, drop, start, stop) require --rw.
 
 Usage: `neo4j-cli admin database`
 
@@ -60,7 +65,7 @@ neo4j-cli admin database list --credential local --format json
 
 Create a database
 
-Create a database via CREATE DATABASE <name> IF NOT EXISTS against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Pass --wait to block until the database status is online (polls every 1 second, 60-second timeout).
+Create a database via CREATE DATABASE <name> IF NOT EXISTS against the system database. Pass --wait to block until the database status is online (polls every 1 second, 60-second timeout).
 
 Usage: `neo4j-cli admin database create <name> [flags]`
 
@@ -84,7 +89,7 @@ neo4j-cli admin database create mydb --credential local --wait --rw
 
 Drop a database
 
-Drop a database via DROP DATABASE <name> against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
+Drop a database via DROP DATABASE <name> against the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
 Usage: `neo4j-cli admin database drop <name> [flags]`
 
@@ -109,7 +114,7 @@ neo4j-cli admin database drop mydb --credential local --rw --yes --force
 
 Get details of a database
 
-Get the full record for a single database by name. Executes SHOW DATABASE $name against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+Get the full record for a single database by name. Executes SHOW DATABASE $name against the system database.
 
 Usage: `neo4j-cli admin database get <name>`
 
@@ -127,7 +132,7 @@ neo4j-cli admin database get neo4j --credential local --format json
 
 List all databases
 
-List all databases visible from the system database. Renders name, type, currentStatus, access, and default columns. Uses the dbms credential named by --credential on the parent `admin` command.
+List all databases visible from the system database. Renders name, type, currentStatus, access, and default columns.
 
 Usage: `neo4j-cli admin database list`
 
@@ -145,7 +150,7 @@ neo4j-cli admin database list --credential local --format json
 
 Start a database
 
-Start a database via START DATABASE <name> against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Pass --wait to block until the database status is online (polls every 1 second, 60-second timeout).
+Start a database via START DATABASE <name> against the system database. Pass --wait to block until the database status is online (polls every 1 second, 60-second timeout).
 
 Usage: `neo4j-cli admin database start <name> [flags]`
 
@@ -169,7 +174,7 @@ neo4j-cli admin database start mydb --credential local --wait --rw
 
 Stop a database
 
-Stop a database via STOP DATABASE <name> against the system database. Uses the dbms credential named by --credential on the parent `admin` command. Pass --wait to block until the database status is offline (polls every 1 second, 60-second timeout).
+Stop a database via STOP DATABASE <name> against the system database. Pass --wait to block until the database status is offline (polls every 1 second, 60-second timeout).
 
 Usage: `neo4j-cli admin database stop <name> [flags]`
 
@@ -193,7 +198,7 @@ neo4j-cli admin database stop mydb --credential local --wait --rw
 
 Manage Neo4j roles via the system database
 
-Manage Neo4j roles (Enterprise edition only). Read commands (list, get) do not require --rw. Write commands (create, drop, grant, revoke) require --rw and use the dbms credential named by --credential on the parent `admin` command.
+Manage Neo4j roles (Enterprise edition only). Read commands (list, get) do not require --rw. Write commands (create, drop, grant, revoke) require --rw.
 
 Usage: `neo4j-cli admin role`
 
@@ -211,7 +216,7 @@ neo4j-cli admin role list --credential local --format json
 
 Create a role (Enterprise only)
 
-Create a new role in the system database. Executes CREATE ROLE $name against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Uses the dbms credential named by --credential on the parent `admin` command.
+Create a new role in the system database. Executes CREATE ROLE $name against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.
 
 Usage: `neo4j-cli admin role create <name>`
 
@@ -229,7 +234,7 @@ neo4j-cli admin role create analyst --credential local --rw && neo4j-cli admin r
 
 Drop a role (Enterprise only)
 
-Drop an existing role from the system database. Executes DROP ROLE $name against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively. Uses the dbms credential named by --credential on the parent `admin` command.
+Drop an existing role from the system database. Executes DROP ROLE $name against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
 Usage: `neo4j-cli admin role drop <name> [flags]`
 
@@ -254,7 +259,7 @@ neo4j-cli admin role drop analyst --credential local --rw --yes --force
 
 Get privileges for a role
 
-Get the full privileges record for a single role by name. Executes SHOW ROLE $name PRIVILEGES against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+Get the full privileges record for a single role by name. Executes SHOW ROLE $name PRIVILEGES against the system database.
 
 Usage: `neo4j-cli admin role get <role>`
 
@@ -272,7 +277,7 @@ neo4j-cli admin role get admin --credential local --format json
 
 Grant a role to a user (Enterprise only)
 
-Grant a role to a user in the system database. Executes GRANT ROLE $role TO $user against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Uses the dbms credential named by --credential on the parent `admin` command.
+Grant a role to a user in the system database. Executes GRANT ROLE $role TO $user against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.
 
 Usage: `neo4j-cli admin role grant [flags]`
 
@@ -297,7 +302,7 @@ neo4j-cli admin role grant --role reader --user bob --credential local --rw
 
 List all roles and their members
 
-List all roles and their member users. Executes SHOW ROLES WITH USERS against the system database. Use --role to filter by role name or --user to filter by user name. Uses the dbms credential named by --credential on the parent `admin` command.
+List all roles and their member users. Executes SHOW ROLES WITH USERS against the system database. Use --role to filter by role name or --user to filter by user name.
 
 Usage: `neo4j-cli admin role list [flags]`
 
@@ -328,7 +333,7 @@ neo4j-cli admin role list --credential local --user alice
 
 Revoke a role from a user (Enterprise only)
 
-Revoke a role from a user in the system database. Executes REVOKE ROLE $role FROM $user against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Uses the dbms credential named by --credential on the parent `admin` command.
+Revoke a role from a user in the system database. Executes REVOKE ROLE $role FROM $user against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.
 
 Usage: `neo4j-cli admin role revoke [flags]`
 
@@ -353,7 +358,7 @@ neo4j-cli admin role revoke --role reader --user bob --credential local --rw
 
 Manage Neo4j users via the system database
 
-Manage Neo4j users. Read commands (list, get) do not require --rw. Write commands (create, drop, rename, set-password, suspend, activate) require --rw and use the dbms credential named by --credential on the parent `admin` command.
+Manage Neo4j users. Read commands (list, get) do not require --rw. Write commands (create, drop, rename, set-password, suspend, activate) require --rw.
 
 Usage: `neo4j-cli admin user`
 
@@ -371,7 +376,7 @@ neo4j-cli admin user list --credential local --format json
 
 Activate (unsuspend) a Neo4j user (Enterprise edition only)
 
-Activate (unsuspend) an existing user in the system database, allowing them to log in again. Requires Enterprise edition (Community edition returns an error). Uses the dbms credential named by --credential on the parent `admin` command.
+Activate (unsuspend) an existing user in the system database, allowing them to log in again. Requires Enterprise edition (Community edition returns an error).
 
 Usage: `neo4j-cli admin user activate <username>`
 
@@ -389,7 +394,7 @@ neo4j-cli admin user activate bob --credential local --rw && neo4j-cli admin use
 
 Create a Neo4j user
 
-Create a new user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default true) controls whether the user must change their password on first login. --home-database sets the user's default database (Enterprise edition only). Uses the dbms credential named by --credential on the parent `admin` command.
+Create a new user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default true) controls whether the user must change their password on first login. --home-database sets the user's default database (Enterprise edition only).
 
 Usage: `neo4j-cli admin user create <username> [flags]`
 
@@ -418,7 +423,7 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 
 Drop a Neo4j user
 
-Drop (delete) a user from the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively. Uses the dbms credential named by --credential on the parent `admin` command.
+Drop (delete) a user from the system database. Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.
 
 Usage: `neo4j-cli admin user drop <username> [flags]`
 
@@ -443,7 +448,7 @@ neo4j-cli admin user drop alice --credential local --rw --yes --force
 
 Get details of a user
 
-Get the full record for a single user by name. Executes 'SHOW USERS WHERE user = $name' against the system database. Uses the dbms credential named by --credential on the parent `admin` command.
+Get the full record for a single user by name. Executes 'SHOW USERS WHERE user = $name' against the system database.
 
 Usage: `neo4j-cli admin user get <username>`
 
@@ -461,7 +466,7 @@ neo4j-cli admin user get neo4j --credential local --format json
 
 List all users
 
-List all users visible from the system database. Renders user, roles, passwordChangeRequired, and suspended columns. Uses the dbms credential named by --credential on the parent `admin` command.
+List all users visible from the system database. Renders user, roles, passwordChangeRequired, and suspended columns.
 
 Usage: `neo4j-cli admin user list`
 
@@ -479,7 +484,7 @@ neo4j-cli admin user list --credential local --format json
 
 Rename a Neo4j user
 
-Rename an existing user in the system database. Not supported on Aura connections (Aura uses a non-native authentication provider). Uses the dbms credential named by --credential on the parent `admin` command.
+Rename an existing user in the system database. Not supported on Aura connections (Aura uses a non-native authentication provider).
 
 Usage: `neo4j-cli admin user rename <old-name> <new-name>`
 
@@ -497,7 +502,7 @@ neo4j-cli admin user rename bob bob-renamed --credential local --rw && neo4j-cli
 
 Set the password for a Neo4j user
 
-Set the password for an existing user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default false) controls whether the user must change their password on next login. Uses the dbms credential named by --credential on the parent `admin` command.
+Set the password for an existing user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default false) controls whether the user must change their password on next login.
 
 Usage: `neo4j-cli admin user set-password <username> [flags]`
 
@@ -522,7 +527,7 @@ neo4j-cli admin user set-password bob --password newsecret --password-change-req
 
 Suspend a Neo4j user (Enterprise edition only)
 
-Suspend an existing user in the system database, preventing them from logging in. Requires Enterprise edition (Community edition returns an error). Uses the dbms credential named by --credential on the parent `admin` command.
+Suspend an existing user in the system database, preventing them from logging in. Requires Enterprise edition (Community edition returns an error).
 
 Usage: `neo4j-cli admin user suspend <username>`
 

@@ -319,6 +319,8 @@ tasks:
 
   - id: task-015
     title: "Extract dbconn shared package; give admin full query-equivalent connection surface"
+    status: completed
+    completed_at: "2026-06-11T12:00:00Z"
     description: |
       This task has two halves: (1) extract query's connection resolution into a
       shared package, and (2) wire that package into admin with the full connection
@@ -383,7 +385,6 @@ tasks:
 
       All new .go files must carry the Neo4j copyright header.
       Run go build ./... to confirm no import cycles and clean compilation.
-    status: not_started
     dependencies:
       - task-014
     acceptance_criteria:

@@ -7,17 +7,17 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
-func newGetCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newGetCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <name>",
 		Short: "Get details of a database",
 		Long: "Get the full record for a single database by name. " +
-			"Executes SHOW DATABASE $name against the system database. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Executes SHOW DATABASE $name against the system database.",
 		Example: `# Get a database record as a table
 neo4j-cli admin database get neo4j --credential local
 
@@ -27,11 +27,7 @@ neo4j-cli admin database get neo4j --credential local --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			rows, err := dbExecFn(cmd.Context(), cfg, cred, "SHOW DATABASE $name", map[string]any{"name": name})
+			rows, err := dbExecFn(cmd.Context(), cfg, *conn, "SHOW DATABASE $name", map[string]any{"name": name})
 			if err != nil {
 				return err
 			}

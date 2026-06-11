@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
 
-func newCreateCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newCreateCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	var password string
 	var passwordChangeRequired bool
 	var homeDatabase string
@@ -23,8 +23,7 @@ func newCreateCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
 		Long: "Create a new user in the system database. " +
 			"If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
 			"--password-change-required (default true) controls whether the user must change their password on first login. " +
-			"--home-database sets the user's default database (Enterprise edition only). " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"--home-database sets the user's default database (Enterprise edition only).",
 		Example: `# Create a user interactively (password will be prompted)
 neo4j-cli admin user create alice --credential local --rw
 
@@ -39,11 +38,6 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 			name := args[0]
 
 			pw, err := promptPassword(cmd)
-			if err != nil {
-				return err
-			}
-
-			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}
@@ -67,7 +61,7 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 				params["homeDatabase"] = homeDatabase
 			}
 
-			_, err = userExecFn(cmd.Context(), cfg, cred, cypher, params)
+			_, err = userExecFn(cmd.Context(), cfg, *conn, cypher, params)
 			return err
 		},
 	}

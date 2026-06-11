@@ -8,11 +8,11 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
 
-func newStartCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newStartCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	var wait bool
 
 	cmd := &cobra.Command{
@@ -20,7 +20,6 @@ func newStartCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
 		Short:       "Start a database",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Start a database via START DATABASE <name> against the system database. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command. " +
 			"Pass --wait to block until the database status is online (polls every 1 second, 60-second timeout).",
 		Example: `# Start a database
 neo4j-cli admin database start mydb --credential local --rw
@@ -31,16 +30,12 @@ neo4j-cli admin database start mydb --credential local --wait --rw`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			if _, err := dbExecFn(cmd.Context(), cfg, cred, "START DATABASE $name", map[string]any{"name": name}); err != nil {
+			if _, err := dbExecFn(cmd.Context(), cfg, *conn, "START DATABASE $name", map[string]any{"name": name}); err != nil {
 				return err
 			}
 			if wait {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Waiting for database to come online...\n")
-				if err := pollDatabaseStatus(cmd, cfg, cred, name, "online"); err != nil {
+				if err := pollDatabaseStatus(cmd, cfg, *conn, name, "online"); err != nil {
 					return err
 				}
 			}

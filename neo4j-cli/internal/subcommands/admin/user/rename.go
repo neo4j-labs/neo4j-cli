@@ -5,18 +5,17 @@ package user
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
 
-func newRenameCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newRenameCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:         "rename <old-name> <new-name>",
 		Short:       "Rename a Neo4j user",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Rename an existing user in the system database. " +
-			"Not supported on Aura connections (Aura uses a non-native authentication provider). " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Not supported on Aura connections (Aura uses a non-native authentication provider).",
 		Example: `# Rename a user
 neo4j-cli admin user rename alice alice2 --credential local --rw
 
@@ -28,12 +27,7 @@ neo4j-cli admin user rename bob bob-renamed --credential local --rw && neo4j-cli
 			oldName := args[0]
 			newName := args[1]
 
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-
-			_, err = userExecFn(cmd.Context(), cfg, cred,
+			_, err := userExecFn(cmd.Context(), cfg, *conn,
 				"RENAME USER $oldName TO $newName",
 				map[string]any{"oldName": oldName, "newName": newName},
 			)
