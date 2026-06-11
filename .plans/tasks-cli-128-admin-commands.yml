@@ -577,7 +577,8 @@ tasks:
 
       This task should run after task-018. If task-016 (connection parity tests) is
       also complete, run its final gates together with this one rather than twice.
-    status: not_started
+    status: completed
+    completed_at: "2026-06-11T10:47:00Z"
     dependencies:
       - task-018
     acceptance_criteria:

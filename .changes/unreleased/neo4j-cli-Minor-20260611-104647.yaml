@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: admin privilege grant/deny/revoke commands for fine-grained RBAC privilege management
+time: 2026-06-11T10:46:47.713098+01:00
