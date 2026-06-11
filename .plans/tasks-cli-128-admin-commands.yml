@@ -777,7 +777,8 @@ tasks:
   - id: task-025
     title: "Remove private user TTY/password seams; use canonical dbconn exports"
     source: review
-    status: in_progress
+    status: completed
+    completed_at: "2026-06-11T17:00:00Z"
     description: |
       user/helpers.go defines two private package-level vars — passwordReader and
       stdinIsTTY — that are near-identical clones of the exported dbconn.PasswordReader

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,9 +26,9 @@ func TestPromptPassword_FlagSet_ReturnsFlagValue(t *testing.T) {
 }
 
 func TestPromptPassword_NoFlagNoTTY_ReturnsUsageError(t *testing.T) {
-	origTTY := stdinIsTTY
-	stdinIsTTY = func() bool { return false }
-	t.Cleanup(func() { stdinIsTTY = origTTY })
+	origTTY := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return false }
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
 	cmd := &cobra.Command{}
 	cmd.Flags().String("password", "", "password flag")
@@ -43,13 +44,13 @@ func TestPromptPassword_NoFlagNoTTY_ReturnsUsageError(t *testing.T) {
 }
 
 func TestPromptPassword_TTY_ReadsFromPasswordReader(t *testing.T) {
-	origTTY := stdinIsTTY
-	stdinIsTTY = func() bool { return true }
-	t.Cleanup(func() { stdinIsTTY = origTTY })
+	origTTY := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return true }
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
-	origReader := passwordReader
-	passwordReader = func() (string, error) { return "fromtty", nil }
-	t.Cleanup(func() { passwordReader = origReader })
+	origReader := dbconn.PasswordReader
+	dbconn.PasswordReader = func() (string, error) { return "fromtty", nil }
+	t.Cleanup(func() { dbconn.PasswordReader = origReader })
 
 	errBuf := bytes.NewBuffer(nil)
 	cmd := &cobra.Command{}
@@ -62,13 +63,13 @@ func TestPromptPassword_TTY_ReadsFromPasswordReader(t *testing.T) {
 }
 
 func TestPromptPassword_TTY_ReaderError_PropagatesError(t *testing.T) {
-	origTTY := stdinIsTTY
-	stdinIsTTY = func() bool { return true }
-	t.Cleanup(func() { stdinIsTTY = origTTY })
+	origTTY := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return true }
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
-	origReader := passwordReader
-	passwordReader = func() (string, error) { return "", errors.New("read error") }
-	t.Cleanup(func() { passwordReader = origReader })
+	origReader := dbconn.PasswordReader
+	dbconn.PasswordReader = func() (string, error) { return "", errors.New("read error") }
+	t.Cleanup(func() { dbconn.PasswordReader = origReader })
 
 	cmd := &cobra.Command{}
 	cmd.Flags().String("password", "", "password flag")
