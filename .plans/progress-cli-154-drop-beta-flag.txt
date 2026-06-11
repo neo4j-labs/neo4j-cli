@@ -1,3 +1,7 @@
+## TASK-006 — 2026-06-11T00:00:00Z
+All final gates pass: make test, make fmt-check, make lint. Skill bundle unchanged (no command-tree drift). No changelog entry added (flag was never user-facing).
+Files: (no code changes)
+
 ## TASK-005 — 2026-06-11T00:00:00Z
 Deleted `TestRegistry_AuraBetaEntry` from `common/clicfg/flags_test.go` and replaced all `flag.aura-beta` hardcodes in `flags_test.go` and `clicfg_test.go` with a `flag.test-sentinel` seeded via a `registerTestFlag` helper that swaps Registry for the test duration. `TestFlagNameToEnv`'s `aura-beta` row was replaced with a `multi-word-feature` case since that function is purely a string transform needing no Registry entry.
 Files: ~common/clicfg/flags_test.go, ~common/clicfg/clicfg_test.go
