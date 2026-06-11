@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
@@ -90,6 +92,20 @@ func TestDrop_ExecError_PropagatesError(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "bolt connection refused")
+}
+
+func TestDrop_NotFound_ReturnsNotFoundError(t *testing.T) {
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+	notFoundErr := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Database.DatabaseNotFound",
+		Msg:  "Database 'ghost' does not exist.",
+	}
+	_, _, err := runDrop(t, "ghost --yes --force", "", nil, notFoundErr)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Contains(t, ce.Message, `"ghost"`)
 }
 
 func TestDrop_NoArgs_CobraUsageError(t *testing.T) {

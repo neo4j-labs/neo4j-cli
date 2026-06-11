@@ -4,7 +4,12 @@
 package database
 
 import (
+	"errors"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
@@ -30,6 +35,10 @@ neo4j-cli admin database drop mydb --credential local --rw --yes --force`,
 				return err
 			}
 			if _, err := dbExecFn(cmd.Context(), cfg, *conn, "DROP DATABASE $name", map[string]any{"name": name}); err != nil {
+				var ne *neo4j.Neo4jError
+				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Database.DatabaseNotFound" {
+					return clierr.NewNotFoundError("database %q not found", name)
+				}
 				return err
 			}
 			return nil

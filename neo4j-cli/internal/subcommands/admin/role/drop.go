@@ -4,7 +4,13 @@
 package role
 
 import (
+	"errors"
+	"strings"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
@@ -31,8 +37,15 @@ neo4j-cli admin role drop analyst --credential local --rw --yes --force`,
 			if err := confirm.Require(cmd, name); err != nil {
 				return err
 			}
-			_, err := roleExecFn(cmd.Context(), cfg, *conn, "DROP ROLE $name", map[string]any{"name": name})
-			return err
+			if _, err := roleExecFn(cmd.Context(), cfg, *conn, "DROP ROLE $name", map[string]any{"name": name}); err != nil {
+				var ne *neo4j.Neo4jError
+				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Security.InvalidArguments" &&
+					strings.Contains(ne.Msg, "does not exist") {
+					return clierr.NewNotFoundError("role %q not found", name)
+				}
+				return err
+			}
+			return nil
 		},
 	}
 
