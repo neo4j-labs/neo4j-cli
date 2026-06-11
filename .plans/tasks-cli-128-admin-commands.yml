@@ -531,7 +531,8 @@ tasks:
         - Community-edition error translation
       Include >=2 flush-left Example invocations with --rw per leaf.
       All new .go files must carry the Neo4j copyright header.
-    status: not_started
+    status: completed
+    completed_at: "2026-06-11T14:30:00Z"
     dependencies:
       - task-017
     acceptance_criteria:
