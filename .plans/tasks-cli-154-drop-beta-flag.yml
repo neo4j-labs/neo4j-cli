@@ -53,7 +53,7 @@ tasks:
       In neo4j-cli/internal/subcommands/config/get_test.go, remove the two test cases that
       get flag.aura-beta (lines ~108-121). In set_test.go in the same package, remove the
       test cases that set flag.aura-beta to true or an invalid value (lines ~115-124).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -61,7 +61,7 @@ tasks:
       - "get_test.go contains no reference to flag.aura-beta"
       - "set_test.go contains no reference to flag.aura-beta"
       - "go test ./neo4j-cli/internal/subcommands/config/... passes"
-    completed_at: null
+    completed_at: "2026-06-11T00:00:00Z"
 
   - id: task-004
     title: "Remove flag.aura-beta references from all aura subcommand test files"
@@ -75,7 +75,7 @@ tasks:
       (line ~66) while preserving the assertion that beta-enabled is rejected as an invalid
       argument. The aura/config/list_test.go and set_test.go assertions about beta-enabled
       being rejected remain unchanged.
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -94,13 +94,13 @@ tasks:
       entry no longer exists. If a test is parameterised over all Registry entries via range,
       no source change is needed beyond confirming the loop still works with an empty (or
       future-populated) Registry.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
       - "flags_test.go contains no hardcoded \"flag.aura-beta\" string in non-comment lines"
       - "go test ./common/clicfg/... passes"
-    completed_at: null
+    completed_at: "2026-06-11T00:00:00Z"
 
   - id: task-006
     title: "Verify skill bundle and run final gates"
