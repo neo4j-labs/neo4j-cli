@@ -30,11 +30,13 @@ neo4j-cli admin user rename bob --new-name bob-renamed --credential local --rw &
 				return err
 			}
 
-			_, err = userExecFn(cmd.Context(), cfg, *conn,
+			if _, err = userExecFn(cmd.Context(), cfg, *conn,
 				"RENAME USER $oldName TO $newName",
 				map[string]any{"oldName": oldName, "newName": newName},
-			)
-			return err
+			); err != nil {
+				return err
+			}
+			return outputUser(cmd, cfg, *conn, newName)
 		},
 	}
 	cmd.Flags().String("new-name", "", "The new name for the user")

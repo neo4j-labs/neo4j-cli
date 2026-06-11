@@ -756,7 +756,8 @@ tasks:
 
       Run go generate ./neo4j-cli/internal/skill/... after (Long descriptions may
       change). Run make test, make fmt-check, make lint.
-    status: not_started
+    status: completed
+    completed_at: "2026-06-11T16:30:00Z"
     dependencies:
       - task-020
       - task-023

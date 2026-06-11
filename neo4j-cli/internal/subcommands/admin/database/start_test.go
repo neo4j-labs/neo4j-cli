@@ -6,6 +6,7 @@ package database
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -59,8 +60,22 @@ func runStart(t *testing.T, args string, execResponses []execResponse) (string, 
 func TestStart_HappyPath(t *testing.T) {
 	_, _, err := runStart(t, "mydb", []execResponse{
 		{rows: nil, err: nil},
+		{rows: sampleDBRow, err: nil},
 	})
 	require.NoError(t, err)
+}
+
+func TestStart_EmitsFollowUpRecord(t *testing.T) {
+	stdout, _, err := runStart(t, "mydb --format json", []execResponse{
+		{rows: nil, err: nil},
+		{rows: sampleDBRow, err: nil},
+	})
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "mydb", got[0]["name"])
 }
 
 func TestStart_ExecError_PropagatesError(t *testing.T) {
@@ -82,6 +97,7 @@ func TestStart_Wait_HappyPath(t *testing.T) {
 	_, stderr, err := runStart(t, "mydb --wait", []execResponse{
 		{rows: nil, err: nil},
 		{rows: []map[string]any{{"currentStatus": "online"}}, err: nil},
+		{rows: sampleDBRow, err: nil},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "Waiting for database to come online")

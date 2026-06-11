@@ -26,8 +26,10 @@ neo4j-cli admin role create analyst --credential local --rw && neo4j-cli admin r
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			_, err := roleExecFn(cmd.Context(), cfg, *conn, "CREATE ROLE $name", map[string]any{"name": name})
-			return err
+			if _, err := roleExecFn(cmd.Context(), cfg, *conn, "CREATE ROLE $name", map[string]any{"name": name}); err != nil {
+				return err
+			}
+			return outputRoleMembers(cmd, cfg, *conn, name)
 		},
 	}
 }

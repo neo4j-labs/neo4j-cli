@@ -6,6 +6,7 @@ package database
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -62,11 +63,29 @@ type execResponse struct {
 	err  error
 }
 
+var sampleDBRow = []map[string]any{
+	{"name": "mydb", "type": "standard", "currentStatus": "online", "access": "read-write", "default": false},
+}
+
 func TestCreate_HappyPath(t *testing.T) {
 	_, _, err := runCreate(t, "mydb", []execResponse{
 		{rows: nil, err: nil},
+		{rows: sampleDBRow, err: nil},
 	})
 	require.NoError(t, err)
+}
+
+func TestCreate_EmitsFollowUpRecord(t *testing.T) {
+	stdout, _, err := runCreate(t, "mydb --format json", []execResponse{
+		{rows: nil, err: nil},
+		{rows: sampleDBRow, err: nil},
+	})
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "mydb", got[0]["name"])
 }
 
 func TestCreate_ExecError_PropagatesError(t *testing.T) {
@@ -81,6 +100,19 @@ func TestCreate_ExecError_PropagatesError(t *testing.T) {
 	assert.Contains(t, ce.Message, "bolt connection refused")
 }
 
+func TestCreate_FollowUpExecError_PropagatesError(t *testing.T) {
+	followUpErr := clierr.NewValidationError("show database failed")
+
+	_, _, err := runCreate(t, "mydb", []execResponse{
+		{rows: nil, err: nil},
+		{rows: nil, err: followUpErr},
+	})
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Contains(t, ce.Message, "show database failed")
+}
+
 func TestCreate_Wait_HappyPath(t *testing.T) {
 	orig := dbWaitInterval
 	dbWaitInterval = 0
@@ -89,6 +121,7 @@ func TestCreate_Wait_HappyPath(t *testing.T) {
 	_, stderr, err := runCreate(t, "mydb --wait", []execResponse{
 		{rows: nil, err: nil},
 		{rows: []map[string]any{{"currentStatus": "online"}}, err: nil},
+		{rows: sampleDBRow, err: nil},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "Waiting for database to come online")

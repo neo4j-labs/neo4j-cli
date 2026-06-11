@@ -26,11 +26,13 @@ neo4j-cli admin user activate bob --credential local --rw && neo4j-cli admin use
 			cmd.SilenceUsage = true
 			name := args[0]
 
-			_, err := userExecFn(cmd.Context(), cfg, *conn,
+			if _, err := userExecFn(cmd.Context(), cfg, *conn,
 				"ALTER USER $name SET STATUS ACTIVE",
 				map[string]any{"name": name},
-			)
-			return err
+			); err != nil {
+				return err
+			}
+			return outputUser(cmd, cfg, *conn, name)
 		},
 	}
 }
