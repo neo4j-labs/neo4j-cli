@@ -1,3 +1,7 @@
+## TASK-021 — 2026-06-11T15:30:00Z
+Fixed `role get` to check role existence before querying privileges. Added a first `SHOW ROLES WHERE name = $name` call; if it returns zero rows, returns `not_found` (exit 3). The subsequent `SHOW ROLE $name PRIVILEGES` call now returns an empty array (exit 0) when a role exists but has no privileges, instead of false not_found. Updated `get_test.go` with a sequenced-exec-fn helper (`withSequencedExecFn`) that dispatches a queue of responses to support two-call tests. Added `existsResponse`/`notFoundResponse` builder helpers and new test `TestGet_ExistingRole_NoPrivileges_ReturnsEmptyList`. All gates pass: make test, make fmt-check, make lint.
+Files: ~neo4j-cli/internal/subcommands/admin/role/get.go, ~neo4j-cli/internal/subcommands/admin/role/get_test.go
+
 ## TASK-023 — 2026-06-11T15:00:00Z
 Added typed handling for `Neo.DatabaseError.Statement.ExecutionFailed` errors containing "not available in community edition" in `translateNeo4jError`. Previously these fell through to `NewUpstreamError` (exit 8, retryable:true); they now map to `NewValidationError` (exit 6, retryable:false), matching the treatment of `UnsupportedAdministrationCommand`. Added `executionFailedCode` constant and a new `case executionFailedCode:` branch in the switch. Added `TestTranslateAdminError_ExecutionFailed_CommunityEdition` test. All gates pass: make test, make fmt-check, make lint.
 Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcommands/admin/run_test.go
