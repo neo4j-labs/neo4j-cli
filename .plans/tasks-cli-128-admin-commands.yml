@@ -1239,7 +1239,7 @@ tasks:
   - id: task-037
     title: "Fix normalizeUserRow: preserve roles array for JSON, comma-join only for table"
     source: review
-    status: pending
+    status: in_progress
     description: |
       normalizeUserRow in user/helpers.go unconditionally converts a []any roles value
       to a comma-joined string before PrintBodyMap runs. This means --format json now
@@ -1321,7 +1321,8 @@ tasks:
   - id: task-039
     title: "Extract shared stderrLogger from dbconn; remove adminStderrLogger duplication"
     source: review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T23:30:00Z"
     description: |
       run.go defines adminStderrLogger, a 30-line neo4j/log.Logger adapter that is a
       near-copy of stderrLogger in query/connect.go. Both implement the same four-method

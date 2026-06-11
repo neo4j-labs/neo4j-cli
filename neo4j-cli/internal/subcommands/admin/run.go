@@ -13,6 +13,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -30,30 +31,6 @@ const (
 
 	cypher25Prefix = "CYPHER 25 "
 )
-
-// adminStderrLogger routes all Bolt driver log output to stderr so it doesn't
-// contaminate stdout (which carries the CLI's machine-readable output).
-type adminStderrLogger struct{}
-
-const adminLogTimeFormat = "2006-01-02 15:04:05.000"
-
-func newAdminStderrLogger() *adminStderrLogger { return &adminStderrLogger{} }
-
-func (l *adminStderrLogger) Error(name, id string, err error) {
-	_, _ = fmt.Fprintf(os.Stderr, "%s  ERROR  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, err.Error())
-}
-
-func (l *adminStderrLogger) Warnf(name, id, msg string, args ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "%s   WARN  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
-func (l *adminStderrLogger) Infof(name, id, msg string, args ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "%s   INFO  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
-func (l *adminStderrLogger) Debugf(name, id, msg string, args ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, "%s  DEBUG  [%s %s] %s\n", time.Now().Format(adminLogTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
 
 // queryRunner is the test seam for the admin execution path. Production code
 // uses boltAdminRunner; tests substitute a fakeQueryRunner.
@@ -82,7 +59,7 @@ func (r *boltAdminRunner) run(ctx context.Context, conn *dbconn.Conn, cypher str
 	}
 	if conn.Debug {
 		driverOpts = append(driverOpts, func(c *config.Config) {
-			c.Log = newAdminStderrLogger()
+			c.Log = dbconn.NewStderrLogger(log.DEBUG)
 		})
 		fmt.Fprintf(os.Stderr, "[debug] admin cypher: %s\n", cypher)
 		if len(params) > 0 {

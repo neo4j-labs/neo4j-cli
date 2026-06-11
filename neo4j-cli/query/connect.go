@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/debug"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 )
 
@@ -120,66 +121,19 @@ type queryResponse struct {
 	Counters  neo4j.Counters
 }
 
-// stderrLogger is an in-package adapter implementing the neo4j/log.Logger
-// interface that routes ALL four levels (Error / Warnf / Infof / Debugf) to
-// stderr (default: os.Stderr). The driver-shipped log.ToConsole writes
-// DEBUG / INFO / WARN to stdout, which would corrupt the query command's
-// machine-readable output streams (--format json, --format toon); routing
-// everything to stderr keeps stdout reserved for the rendered result.
-type stderrLogger struct {
-	w     io.Writer
-	level log.Level
-}
-
-// newStderrLogger constructs a stderrLogger writing to os.Stderr filtered to
-// the supplied level (DEBUG enables all levels). Tests that need to capture
-// writes construct a stderrLogger literal pointing at a bytes.Buffer.
-func newStderrLogger(level log.Level) *stderrLogger {
-	return &stderrLogger{w: os.Stderr, level: level}
-}
-
-const stderrLoggerTimeFormat = "2006-01-02 15:04:05.000"
-
-func (l *stderrLogger) Error(name, id string, err error) {
-	if l.level < log.ERROR {
-		return
-	}
-	_, _ = fmt.Fprintf(l.w, "%s  ERROR  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, err.Error())
-}
-
-func (l *stderrLogger) Warnf(name, id, msg string, args ...any) {
-	if l.level < log.WARNING {
-		return
-	}
-	_, _ = fmt.Fprintf(l.w, "%s   WARN  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
-func (l *stderrLogger) Infof(name, id, msg string, args ...any) {
-	if l.level < log.INFO {
-		return
-	}
-	_, _ = fmt.Fprintf(l.w, "%s   INFO  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
-func (l *stderrLogger) Debugf(name, id, msg string, args ...any) {
-	if l.level < log.DEBUG {
-		return
-	}
-	_, _ = fmt.Fprintf(l.w, "%s  DEBUG  [%s %s] %s\n", time.Now().Format(stderrLoggerTimeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
 // buildDriverConfigurer returns the closure neo4j.NewDriver applies to its
-// default *config.Config. Sets UserAgent when non-empty; attaches the in-package
-// stderrLogger at DEBUG level when debug is true; otherwise leaves c.Log nil so
-// the driver stays silent. Extracted from driverOpener so tests can exercise
-// the wiring against a synthetic *config.Config without touching neo4j.NewDriver.
+// default *config.Config. Sets UserAgent when non-empty; attaches the shared
+// dbconn.NewStderrLogger at DEBUG level when debug is true; otherwise leaves
+// c.Log nil so the driver stays silent. Extracted from driverOpener so tests
+// can exercise the wiring against a synthetic *config.Config without touching
+// neo4j.NewDriver.
 func buildDriverConfigurer(userAgent string, debug bool) func(*config.Config) {
 	return func(c *config.Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
 		}
 		if debug {
-			c.Log = newStderrLogger(log.DEBUG)
+			c.Log = dbconn.NewStderrLogger(log.DEBUG)
 		}
 		// interactive CLI fails fast; the driver's 1m default reads as a hang
 		c.ConnectionAcquisitionTimeout = 10 * time.Second
@@ -190,9 +144,9 @@ func buildDriverConfigurer(userAgent string, debug bool) func(*config.Config) {
 
 // driverOpener is the test seam used to construct the Bolt driver. Production
 // calls neo4j.NewDriver; tests can swap in a fake to bypass the real bolt://
-// connection. When debug is true the configurer attaches an in-package
-// stderrLogger at DEBUG level so the driver's wire activity goes to stderr;
-// when false c.Log is left at its nil default.
+// connection. When debug is true the configurer attaches dbconn.NewStderrLogger
+// at DEBUG level so the driver's wire activity goes to stderr; when false
+// c.Log is left at its nil default.
 var driverOpener = func(target string, username, password, userAgent string, debug bool) (neo4j.Driver, error) {
 	return neo4j.NewDriver(target, neo4j.BasicAuth(username, password, ""), buildDriverConfigurer(userAgent, debug))
 }
