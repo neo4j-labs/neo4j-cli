@@ -173,7 +173,8 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 - REQ-F-043: Admin connection resolution follows the same full precedence chain as `query`'s `resolveConn`: dotenv < OS env var < explicit flag; stored default credential when no params are explicitly provided; built-in defaults (`neo4j://localhost:7687`, user `neo4j`) when nothing else resolves; URI normalization (rewriting `http://` → `neo4j://` and `https://` → `neo4j+s://` with an info message to stderr). Partial-override rejection (some but not all of `--uri/--username/--password` supplied without `--credential`) mirrors `query`.
 - REQ-F-044: Passing `--uri`, `--username`, or `--password` alongside `--credential` is an error on admin, matching `query`'s conflict check. `--database` and `NEO4J_DATABASE` are not exposed on admin — admin always targets the `system` database regardless of env content.
 - REQ-F-045: When the resolved password is empty after all sources (no flag, no env var, no dotenv, no stored credential), admin prompts for a password on TTY (printing `"Password: "` to stderr, no echo) and returns a usage error on non-TTY — same as `query`'s post-resolution password check in `runQuery`.
-- REQ-F-046: Admin registers `--debug` (env: `NEO4J_DEBUG=1`) as a persistent flag on the `admin` parent, routing Bolt driver wire activity to stderr at DEBUG level — same as `query`.
+- REQ-F-046: Admin registers `--debug` (env: `NEO4J_DEBUG=1`) as a persistent flag on the `admin` parent, routing Bolt driver wire activity to stderr at DEBUG level — same as `query`. **Implementation gap:** `Conn.Debug` is currently populated by `dbconn.ResolveConn` but is never read by `boltAdminRunner.run()`, making `--debug` a silent no-op for admin commands. This must be fixed (see REQ-F-063).
+- REQ-F-063: When `--debug` is active (`conn.Debug == true`), `boltAdminRunner.run()` must (a) configure the neo4j-go-driver with debug-level logging routed to stderr, and (b) emit a trace line to stderr for each Cypher statement immediately before execution, in the format `[debug] admin cypher: <cypher>` with params rendered as `params=map[key:value ...]`. The trace line uses `cmd.ErrOrStderr()` (or `os.Stderr` at the runner layer where `cmd` is not in scope — consistent with how the Bolt driver log writer is wired). Params must be redacted before logging: any key whose name matches a known secret key word (`password`, `passwd`, `secret`, `token`, `key`, `credential`) must have its value replaced with `***`.
 
 **Privilege subcommand (Enterprise-only — fine-grained GRANT/DENY/REVOKE)**
 
@@ -188,10 +189,34 @@ Tests run against a `free-db` instance (`neo4j+s://c533afa0.databases.neo4j.io`)
 **QA-identified bug fixes and improvements (live testing 2026-06-10)**
 
 - REQ-F-051: `user rename` uses a single positional arg `<old-name>` and a required `--new-name <new-name>` flag, superseding REQ-F-014's two-positional-arg form. The current implementation violates the project convention of one positional argument maximum and must be corrected before merge.
-- REQ-F-052: `role get <role>` validates role existence via `SHOW ROLES WHERE name = $name` before querying `SHOW ROLE $name PRIVILEGES`. If the role does not exist, return a `not_found` error (exit 3). If the role exists but has zero granted privileges, return an empty result set — not a `not_found` error. (Current bug: `SHOW ROLE $name PRIVILEGES` returning an empty set is misclassified as not-found, making every freshly created role appear nonexistent.)
-- REQ-F-053: `database drop`, `user drop`, and `role drop` translate Neo4j's resource-not-found errors from DROP statements — `Neo.ClientError.Database.DatabaseNotFound` for databases, equivalent user/role not-found codes for users and roles — into clean `not_found` CLI errors (exit 3), consistent with the corresponding `get` commands. Currently these surface as raw `validation_error` (exit 6) with the full Neo4j error string.
+- REQ-F-052: `role get <role>` validates role existence via `SHOW ROLES WITH USERS WHERE role = $name` before querying `SHOW ROLE $name PRIVILEGES`. If the role does not exist, return a `not_found` error (exit 3). If the role exists but has zero granted privileges, return an empty result set — not a `not_found` error. (Current bug: `SHOW ROLE $name PRIVILEGES` returning an empty set is misclassified as not-found, making every freshly created role appear nonexistent. Secondary bug identified in live testing: the existence-check query erroneously used `WHERE name = $name`; the correct column name in `SHOW ROLES` is `role`, not `name`.)
+- REQ-F-053: `database drop`, `user drop`, and `role drop` translate Neo4j's resource-not-found errors from DROP statements — `Neo.ClientError.Database.DatabaseNotFound` for databases, and `Neo.ClientError.Statement.ArgumentError` with message containing `"does not exist"` for users and roles — into clean `not_found` CLI errors (exit 3), consistent with the corresponding `get` commands. Currently these surface as raw `validation_error` (exit 6) with the full Neo4j error string. (Live testing revealed task-022's implementation used the wrong error code `Neo.ClientError.Security.InvalidArguments`; the real codes returned by DROP USER / DROP ROLE on nonexistent targets are `Neo.ClientError.Statement.ArgumentError`.)
 - REQ-F-054: `user suspend` and `user activate` on Community edition classify the resulting error as `validation_error` (exit 6, `retryable: false`), not `upstream_error` (exit 8, `retryable: true`). Neo4j returns `Neo.DatabaseError.Statement.ExecutionFailed` for these operations on Community, but this is a deterministic edition mismatch, not a transient failure. `translateAdminError` must detect `ExecutionFailed` errors whose message contains `"not available in community edition"` and reclassify them accordingly.
 - REQ-F-055: All mutating non-drop admin commands emit the updated resource record on success, formatted via the `--format` flag using the same output path as the corresponding `get`/`list` command. Mapping: `database create/start/stop` → `SHOW DATABASE $name`; `user create/set-password/suspend/activate/rename` → `SHOW USERS WHERE user = $name`; `role create` → `SHOW ROLES WITH USERS WHERE role = $name`; `role grant/revoke` → `SHOW USERS WHERE user = $user`. Drop commands (which destroy the resource) continue to produce no output on success.
+
+**QA-identified bug fixes and improvements (live testing 2026-06-11)**
+
+- REQ-F-056: `user create --set-password` and `user set-password --new-password` — rename the leaf-level password flags to avoid shadowing the parent persistent `--password` connection flag. `user create` renames `--password` → `--set-password`; `user set-password` renames `--password` → `--new-password`. The root cause: cobra resolves the leaf's local `--password` flag before the parent's persistent `--password` when `ResolveConn` calls `cmd.Flag("password")`, making it impossible to use `--credential <name> --set-password <pw>` or supply a new-user password different from the admin connection password in non-TTY contexts. The existing help-text examples showing `--credential ... --password ...` are all currently broken. Update `promptPassword` in `user/helpers.go` to look up the renamed flag; update all `user create` and `user set-password` tests and Examples accordingly. Run `go generate` after.
+
+- REQ-F-057: Fix `role get` existence-check Cypher: change `"SHOW ROLES WHERE name = $name"` to `"SHOW ROLES WITH USERS WHERE role = $name"`. The column name in `SHOW ROLES` output is `role`, not `name`; using `name` causes a Neo4j syntax error (`Variable name not defined`) that makes every `role get` invocation fail against a real database. Task-021 was marked complete based on mocked tests that never validated the actual Cypher; the live-testing regression surfaces the bug.
+
+- REQ-F-058: Fix privilege Cypher generator for per-action property-qualifier and resource-scope awareness. The current `buildPrivilegeCypher` always emits `{*}` for graph-scoped actions; only `READ`, `MATCH`, `SET PROPERTY`, and `MERGE` accept a `{properties}` qualifier — all other graph actions (`TRAVERSE`, `WRITE`, `CREATE`, `DELETE`, `LOAD`, `SET LABEL`, `REMOVE LABEL`, `ALL GRAPH PRIVILEGES`) fail with Cypher syntax errors. Database-scoped actions (`ACCESS`, `START`, `STOP`, `CREATE INDEX`, `DROP INDEX`, etc.) must use `ON DATABASE` not `ON GRAPH`. DBMS-level actions must add client-side validation that `--on-dbms` is required (currently they default to the graph template and fail at Neo4j). Remove `FIND` from `validActions` — it is not a valid Neo4j 5.x privilege keyword. Concretely:
+  - Introduce an `actionCategory` classification (propertyBearer, graphOnly, databaseScope, dbmsScope) for every entry in `validActions`.
+  - `propertyBearer` actions: generate `{props} ON GRAPH <name> <entity>` (existing behaviour — correct for READ/MATCH/SET PROPERTY/MERGE).
+  - `graphOnly` actions (TRAVERSE, WRITE, CREATE, DELETE, LOAD, SET LABEL, REMOVE LABEL, ALL GRAPH PRIVILEGES): generate `ON GRAPH <name> <entity>` without a property clause; client-side usage error if `--property` is supplied.
+  - `databaseScope` actions (ACCESS, START, STOP, CREATE INDEX, DROP INDEX, SHOW INDEX, INDEX MANAGEMENT, CREATE CONSTRAINT, DROP CONSTRAINT, SHOW CONSTRAINT, CONSTRAINT MANAGEMENT, CREATE NEW NODE LABEL, CREATE NEW RELATIONSHIP TYPE, CREATE NEW PROPERTY NAME, NAME MANAGEMENT, ALL DATABASE PRIVILEGES, SHOW TRANSACTION, TERMINATE TRANSACTION, TRANSACTION MANAGEMENT): require `--on-database` (default `*`); usage error if `--on-graph` or `--on-dbms` is supplied; no property/entity qualifiers.
+  - `dbmsScope` actions (all entries currently in `dbmsActions` map): require `--on-dbms`; client-side usage error if `--on-dbms` is absent; no property/entity qualifiers.
+  - `SET LABEL` / `REMOVE LABEL` emit `GRANT SET LABEL <label> ON GRAPH <name>` using the `--node-label` flag value as the label; usage error if `--node-label` is absent.
+
+- REQ-F-059: `privilege grant`, `privilege deny`, and `privilege revoke` emit the updated privilege list for the target role on success, using the same output path as `privilege list --role <name>`. This brings them in line with `role grant`/`role revoke` (which emit the user's updated record) and addresses the silent-success inconsistency found in live testing.
+
+- REQ-F-060: `role create` uses `CREATE ROLE $name IF NOT EXISTS` for idempotency, consistent with `database create` which uses `CREATE DATABASE $name IF NOT EXISTS`. Currently `role create` fails with `"Role already exists."` when run twice.
+
+- REQ-F-061: `user list` and `user get` table output renders the `roles` array as a comma-joined string (e.g. `admin, PUBLIC`) rather than as multi-line JSON. The current table rendering passes the raw `[]any` value to the table cell, producing an unreadable multi-line fragment.
+
+- REQ-F-062: `role list` and `role create` normalize a `null` `member` column to an empty string in all output formats. `user list` and `user get` normalize `null` `roles` and `null` `suspended` to `[]` and `false` respectively when returned by Community edition (Community does not populate RBAC columns).
+
+- REQ-F-064: All Cypher statements executed by admin commands are prefixed with `CYPHER 25 ` to pin the language version and eliminate cross-version syntax ambiguity. The prefix is injected in `boltAdminRunner.run()` (or in `RunAdminStatement`) immediately before the statement is sent to the driver, so all commands — read and write, all subcommands — benefit automatically without per-call changes. When the server returns a syntax error whose message indicates the `CYPHER` keyword or version is not recognised (e.g. contains `"Invalid input 'CYPHER'"` or `"Unsupported language version"`), `translateAdminError` translates it to a clear validation error: `"admin commands require Neo4j 2025.x or later (CYPHER 25 language version is not supported by this server)"`. Support for older Cypher versions (e.g. emitting `CYPHER 5 ...` as a fallback) is explicitly out of scope; a future enhancement can add version negotiation when needed.
 
 ### Non-Functional Requirements
 
@@ -318,6 +343,31 @@ The `stdinIsTTY` and `passwordReader` test seams used by `admin/user/helpers.go`
 
 Admin does not register `--database`. `dbconn.ResolveConn` should accept an option to skip database resolution entirely; admin passes this option so `NEO4J_DATABASE` is never consulted. The returned `conn.Database` is ignored by admin regardless.
 
+### `--debug` Wiring in `boltAdminRunner`
+
+`boltAdminRunner.run()` currently ignores `conn.Debug`. The fix has two parts:
+
+**1. Bolt driver log config:**
+Pass a `config.Log` writer to `neo4j.NewDriver` when `conn.Debug` is true:
+```go
+if conn.Debug {
+    c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+}
+```
+`neo4j.ConsoleLogger` writes to `os.Stderr`; this is the same mechanism `query` uses.
+
+**2. Cypher trace line:**
+Before calling `tx.Run(ctx, cypher, params)`, when `conn.Debug` is true, write to stderr:
+```
+[debug] admin cypher: SHOW USERS
+[debug] admin cypher: ALTER USER $name SET PASSWORD $password  params=map[name:alice password:***]
+```
+Secret-key detection: any param key that case-insensitively contains `password`, `passwd`, `secret`, `token`, `key`, or `credential` has its value replaced with `***`. Use `fmt.Fprintf(os.Stderr, ...)` at the runner layer (no `cmd` reference in scope).
+
+**Why `os.Stderr` and not `cmd.ErrOrStderr()`:** `boltAdminRunner` has no reference to `cobra.Command`. Using `os.Stderr` directly is consistent with `neo4j.ConsoleLogger`'s output destination and is correct here.
+
+**Test seam:** `boltAdminRunner` already has a package-level `adminRunnerFn` seam; the debug-trace path can be unit-tested by injecting a `fakeQueryRunner` that asserts on the Cypher string — no change to seam shape needed. The Bolt driver log config is not unit-testable without a real driver; verify via integration or leave covered by the `--debug` acceptance criterion.
+
 ### Privilege Cypher Construction
 
 The `privilege grant/deny/revoke` commands build the Cypher string from flags. The action value is uppercased and `_` is replaced with space before embedding. Resource construction:
@@ -338,16 +388,36 @@ All three commands (`grant`, `deny`, `revoke`) share a common `buildPrivilegeCyp
 
 **REQ-F-051 — `user rename` convention fix:** Change `rename.go` from `cobra.ExactArgs(2)` + two `args[0]`/`args[1]` reads to `cobra.ExactArgs(1)` + a required `--new-name` string flag. Update `rename_test.go` and Examples accordingly. Regenerate skill bundle after.
 
-**REQ-F-052 — `role get` existence check:** Execute `SHOW ROLES WHERE name = $name` as a first query using the same `roleExecFn` seam. Zero rows → `clierr.NewNotFoundError`. Non-zero rows → proceed to `SHOW ROLE $name PRIVILEGES`. Zero privilege rows → return empty list (valid, not an error). Two round-trips per `role get`; acceptable since this is a read command not in a hot path.
+**REQ-F-052 / REQ-F-057 — `role get` existence check:** Execute `SHOW ROLES WITH USERS WHERE role = $name` as a first query using the same `roleExecFn` seam (note: the column name is `role`, not `name` — using `name` causes a Neo4j syntax error). Zero rows → `clierr.NewNotFoundError`. Non-zero rows → proceed to `SHOW ROLE $name PRIVILEGES`. Zero privilege rows → return empty list (valid, not an error). Two round-trips per `role get`; acceptable since this is a read command not in a hot path.
 
-**REQ-F-053 — drop not-found errors:** Add translation cases in `translateAdminError` (or locally in each drop `RunE`) for:
-- `Neo.ClientError.Database.DatabaseNotFound` → `clierr.NewNotFoundError("database %q not found", name)`
-- Neo4j user/role not-found error codes returned by `DROP USER` / `DROP ROLE` on a nonexistent target
-Because `translateAdminError` doesn't receive the resource name as a parameter, the simplest approach is a local `errors.As` check in each drop `RunE` after calling `RunAdminStatement`, extracting the name from the positional arg already in scope.
+**REQ-F-053 — drop not-found errors:** Add translation cases locally in each drop `RunE` after calling `RunAdminStatement`:
+- Database: `Neo.ClientError.Database.DatabaseNotFound` → `clierr.NewNotFoundError("database %q not found", name)`
+- User and Role: `Neo.ClientError.Statement.ArgumentError` with message containing `"does not exist"` → `clierr.NewNotFoundError("<resource> %q not found", name)`
+(Task-022 used the wrong code `Neo.ClientError.Security.InvalidArguments`; the actual codes returned by DROP USER / DROP ROLE on nonexistent targets are `Neo.ClientError.Statement.ArgumentError`. The existing tests passed because they use fakes and do not validate the matched error code.)
 
 **REQ-F-054 — suspend/activate error classification:** In `translateAdminError`, add a check for `ne.Code == "Neo.DatabaseError.Statement.ExecutionFailed"` where `ne.Msg` contains `"not available in community edition"`. Translate to the same `validation_error` shape as `UnsupportedAdministrationCommand`. Note: task-013 removed the plain-text fallback that previously handled this via string matching on non-typed errors; the typed `errors.As` path must now cover this code+message combination explicitly.
 
 **REQ-F-055 — write command output:** After each mutation, call `execFn` with the corresponding SHOW query and pass the result through `commonoutput.PrintBodyMap` using the same field list as the corresponding read command. The follow-up query uses the same package-level `execFn` seam so tests can stub both the mutation and the read in sequence. For commands where the resource name changes (e.g. `user rename`), use the new name for the follow-up query.
+
+**REQ-F-056 — `--password` flag rename:** In `user/create.go`, change `cmd.Flags().StringVar(&password, "password", ...)` to `"set-password"`. In `user/set_password.go`, change it to `"new-password"`. Update `promptPassword` in `user/helpers.go` to look up the renamed flag: `cmd.Flags().Lookup("set-password")` in create, `cmd.Flags().Lookup("new-password")` in set-password (or accept the flag name as a parameter). Update all tests, Examples, and the `Long` description for both commands. Run `go generate ./neo4j-cli/internal/skill/...` after.
+
+**REQ-F-058 — privilege Cypher per-action categories:** Introduce a `privilegeCategory` type (or `actionCategory` map) in `privilege/helpers.go` and classify every entry in `validActions` into one of:
+- `catPropertyBearer`: READ, MATCH, SET PROPERTY, MERGE — emit `{props} ON GRAPH <g> <entity>`
+- `catGraphOnly`: TRAVERSE, WRITE, CREATE, DELETE, LOAD, ALL GRAPH PRIVILEGES — emit `ON GRAPH <g> <entity>` (no property clause); usage error if `--property` is set
+- `catSetLabel` / `catRemoveLabel`: SET LABEL, REMOVE LABEL — emit `GRANT SET LABEL <label> ON GRAPH <g>` using the first `--node-label` value; usage error if `--node-label` is absent
+- `catDatabase`: ACCESS, START, STOP, CREATE INDEX … TRANSACTION MANAGEMENT — emit `ON DATABASE <name>` (default `*` if `--on-database` absent and `--on-graph`/`--on-dbms` not set); usage error if `--on-graph` or `--on-dbms` is supplied
+- `catDbms`: all entries currently in `dbmsActions` map — emit `ON DBMS`; client-side usage error if `--on-dbms` is absent
+Remove `FIND` from `validActions` (not a valid Neo4j 5.x privilege keyword). Remove the `dbmsActions` map and replace its two usage sites with category lookups.
+
+**REQ-F-059 — privilege mutation output:** After `GRANT`/`DENY`/`REVOKE` succeeds, call `SHOW ROLE $role PRIVILEGES` via the same `privilegeExecFn` seam and print the result using the same field list as `privilege list`. Update tests to assert the follow-up call.
+
+**REQ-F-060 — `role create` idempotency:** Change `"CREATE ROLE $name"` to `"CREATE ROLE $name IF NOT EXISTS"` in `role/create.go`. Update the Long description and tests.
+
+**REQ-F-061 — roles array table rendering:** In `user/helpers.go` (or in the table rendering path), when the `roles` field value is a `[]any`, join its string elements with `", "` before passing to `PrintBodyMap`. Apply the same treatment to other array-valued columns if they appear.
+
+**REQ-F-062 — null normalization:** In `outputUser` and `outputRoleMembers`, walk the returned rows and replace `nil` values with their zero counterparts: `roles: nil` → `[]any{}`, `suspended: nil` → `false`, `member: nil` → `""`. This ensures consistent output across Community/Enterprise and roles with no members.
+
+**REQ-F-064 — CYPHER 25 prefix:** In `boltAdminRunner.run()` (or directly in `RunAdminStatement` before it calls the runner), prepend `"CYPHER 25 "` to every incoming `cypher` string. No per-command change is needed. In `translateNeo4jError` (or `translateAdminError`), add a check for `ne.Code == "Neo.ClientError.Statement.SyntaxError"` where `ne.Msg` contains `"Invalid input 'CYPHER'"` or `"not supported"` (with a conservative match that doesn't swallow unrelated syntax errors), and translate to: `clierr.NewValidationError("admin commands require Neo4j 2025.x or later (CYPHER 25 language version is not supported by this server)")`. The existing `--debug` trace line (REQ-F-063) should show the prefixed Cypher string (so users can verify the prefix is present). Update all unit tests that assert on exact Cypher strings to include the `"CYPHER 25 "` prefix. If the prefix changes the debug trace output, update those expectations too.
 
 ### Example Fields
 
@@ -388,6 +458,25 @@ Every leaf command must have a non-empty flush-left `Example:` field with ≥2 i
 - [ ] All leaf commands have non-empty `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
 - [ ] `make test`, `make fmt-check`, `make lint` all pass clean.
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff (passes `TestGenerator_RoundTrip`).
+- [ ] `neo4j-cli admin user create alice --set-password secret --credential local --rw` succeeds (flag renamed; old `--password` form returns "unknown flag").
+- [ ] `neo4j-cli admin user set-password alice --new-password newsecret --credential local --rw` succeeds.
+- [ ] `neo4j-cli admin role get analyst` succeeds (no Cypher syntax error from wrong column name).
+- [ ] `neo4j-cli admin role get <nonexistent>` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin privilege grant --action traverse --on-graph neo4j --role analyst --rw` generates `GRANT TRAVERSE ON GRAPH neo4j ELEMENTS * TO analyst` (no `{*}`).
+- [ ] `neo4j-cli admin privilege grant --action access --on-database neo4j --role analyst --rw` generates `GRANT ACCESS ON DATABASE neo4j TO analyst`.
+- [ ] `neo4j-cli admin privilege grant --action create_role --on-dbms --role analyst --rw` generates `GRANT CREATE ROLE ON DBMS TO analyst`.
+- [ ] `neo4j-cli admin privilege grant --action create_role --role analyst --rw` (without `--on-dbms`) returns a usage error "action requires --on-dbms".
+- [ ] `neo4j-cli admin privilege grant --action traverse --property name --role analyst --rw` returns a usage error "TRAVERSE does not accept a property qualifier".
+- [ ] `neo4j-cli admin privilege grant --action find --role analyst --rw` returns an unknown-action usage error (`FIND` removed from `validActions`).
+- [ ] `neo4j-cli admin privilege grant --action read --role analyst --rw` emits the analyst role's updated privilege list on success.
+- [ ] `neo4j-cli admin privilege deny --action write --role analyst --rw` emits the analyst role's updated privilege list on success.
+- [ ] `neo4j-cli admin privilege revoke --action read --role analyst --rw` emits the analyst role's updated privilege list on success.
+- [ ] `neo4j-cli admin role create analyst --rw` succeeds when the role already exists (idempotent; `IF NOT EXISTS`).
+- [ ] `neo4j-cli admin user list --format table` shows roles as a comma-joined string (`admin, PUBLIC`), not multi-line JSON.
+- [ ] `neo4j-cli admin user list --format json` against Community edition shows `"roles": []` and `"suspended": false`, not `null`.
+- [ ] `neo4j-cli admin role list --format json` shows `"member": ""` for roles with no members, not `null`.
+- [ ] Every admin Cypher statement sent to the driver is prefixed with `CYPHER 25 ` (verified via `--debug` trace output and unit test Cypher string assertions).
+- [ ] Running any admin command against a Neo4j server that does not support `CYPHER 25` returns `validation_error` with message containing `"admin commands require Neo4j 2025.x or later"`.
 - [ ] Changelog entry added.
 - [ ] `neo4j-cli admin user list --credential desktop` resolves the active Desktop DBMS and executes `SHOW USERS`.
 - [ ] `neo4j-cli admin user list --credential desktop-connection:<uuid>` resolves the named Desktop connection.
@@ -402,7 +491,10 @@ Every leaf command must have a non-empty flush-left `Example:` field with ≥2 i
 - [ ] `neo4j-cli admin user list --uri ... --credential mydb` returns a conflict error.
 - [ ] Admin with no flags, no env vars, and no default stored credential connects to `neo4j://localhost:7687` with user `neo4j` (same built-in defaults as `query`).
 - [ ] When resolved password is empty and stdin is a TTY, admin prompts for a password before opening the Bolt connection.
-- [ ] `--debug` on admin routes driver wire activity to stderr (same as `query --debug`).
+- [ ] `--debug` on admin routes Bolt driver wire activity to stderr (same as `query --debug`).
+- [ ] `neo4j-cli admin user list --debug` emits at least one `[debug] admin cypher: SHOW USERS` line on stderr before the result.
+- [ ] `neo4j-cli admin user create alice --set-password secret --debug --rw` emits a cypher trace line where the password value is redacted as `***`.
+- [ ] `NEO4J_DEBUG=1 neo4j-cli admin database list` produces the same debug output as `--debug`.
 - [ ] `--database` is not a recognized flag on `neo4j-cli admin`; `NEO4J_DATABASE` env var is ignored.
 - [ ] `neo4j-cli admin privilege list` executes `SHOW PRIVILEGES` and renders privilege records.
 - [ ] `neo4j-cli admin privilege list --role analyst` executes `SHOW ROLE analyst PRIVILEGES`.

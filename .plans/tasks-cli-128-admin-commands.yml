@@ -1,7 +1,7 @@
 feature: cli-128-admin-commands
 prd: ./prd-cli-128-admin-commands.md
 created_at: "2026-06-04T08:15:00Z"
-updated_at: "2026-06-10T15:30:00Z"
+updated_at: "2026-06-11T12:30:00Z"
 
 tasks:
   - id: task-001
@@ -868,4 +868,362 @@ tasks:
     acceptance_criteria:
       - "The NormalizeURI call + stderr-print pattern appears exactly once in conn.go (inside the new helper)"
       - "ResolveConn and buildConnFromPersistedCred both call the helper"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-029
+    title: "Fix --password flag conflict: rename leaf flags to --set-password / --new-password (REQ-F-056)"
+    source: qa
+    status: pending
+    description: |
+      user/create.go and user/set_password.go register a local --password flag for the
+      new user's password. This shadows the parent persistent --password connection flag
+      in cobra's flag resolution: when ResolveConn calls cmd.Flag("password") it finds
+      the leaf's local flag first and uses it as the connection password, making
+      --credential + --password combinations always fail with "cannot use together" and
+      preventing any non-TTY scripted use where the new-user password differs from the
+      admin connection password. The help-text examples showing --credential ... --password
+      are all currently broken.
+
+      Fix:
+        - user/create.go: rename --password → --set-password. Update the StringVar binding,
+          promptPassword call (look up "set-password"), Long description, and all Examples.
+        - user/set_password.go: rename --password → --new-password. Same updates.
+        - user/helpers.go: update promptPassword to accept the flag name as a parameter
+          (or duplicate the lookup) so each command can pass its own flag name.
+        - Update create_test.go and set_password_test.go: replace --password with the
+          new flag name in all test args.
+        - Run go generate ./neo4j-cli/internal/skill/... (Long/Use changed).
+
+      Run make test, make fmt-check, make lint as final gates.
+    dependencies:
+      - task-025
+    acceptance_criteria:
+      - "'user create alice --set-password secret --credential qa-enterprise --rw' succeeds"
+      - "'user create alice --password secret' returns 'unknown flag: --password'"
+      - "'user set-password alice --new-password newsecret --credential qa-enterprise --rw' succeeds"
+      - "'user set-password alice --password newsecret' returns 'unknown flag: --password'"
+      - "promptPassword in helpers.go resolves the correct flag name for each calling command"
+      - "All create and set-password tests updated to use new flag names"
+      - "go generate produces no bundle diff"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-030
+    title: "Fix role get existence-check Cypher: SHOW ROLES WHERE name → SHOW ROLES WITH USERS WHERE role (REQ-F-057)"
+    source: qa
+    status: pending
+    description: |
+      role/get.go line 33 runs:
+        SHOW ROLES WHERE name = $name
+      But SHOW ROLES returns columns (role, immutable), not (name, ...). Using 'name'
+      causes a Cypher syntax error: "Variable name not defined". Every 'role get'
+      invocation against a real database fails. The mocked unit tests pass because
+      they never validate the actual Cypher string.
+
+      Fix: change the existence-check query from
+        "SHOW ROLES WHERE name = $name"
+      to
+        "SHOW ROLES WITH USERS WHERE role = $name"
+      (matching the working query already used in role/helpers.go:outputRoleMembers).
+
+      Update the comment in get.go and in get_test.go (existsResponse helper comment
+      references the wrong query). Run make test, make fmt-check, make lint.
+    dependencies:
+      - task-021
+    acceptance_criteria:
+      - "role/get.go existence check uses 'SHOW ROLES WITH USERS WHERE role = $name'"
+      - "'role get analyst' succeeds against a live Enterprise database (no Cypher syntax error)"
+      - "'role get <nonexistent>' still returns not_found (exit 3)"
+      - "get_test.go comment updated to reference the correct query"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-031
+    title: "Fix privilege Cypher generator: per-action category awareness, remove FIND (REQ-F-058)"
+    source: qa
+    status: pending
+    description: |
+      buildPrivilegeCypher in privilege/helpers.go always emits {*} ON GRAPH for all
+      actions, but only READ, MATCH, SET PROPERTY, and MERGE accept property qualifiers.
+      TRAVERSE, WRITE, CREATE, DELETE, ALL GRAPH PRIVILEGES, LOAD all fail with Cypher
+      syntax errors in production. Database-scoped actions (ACCESS, START, STOP, index/
+      constraint management, etc.) need ON DATABASE not ON GRAPH. DBMS-level actions
+      without --on-dbms generate invalid Cypher instead of a client-side error. FIND is
+      not a valid Neo4j 5.x privilege keyword.
+
+      Changes to privilege/helpers.go:
+        1. Define an actionCategory type and a map from action string to category:
+             catPropertyBearer: READ, MATCH, SET PROPERTY, MERGE
+             catGraphOnly: TRAVERSE, WRITE, CREATE, DELETE, LOAD, ALL GRAPH PRIVILEGES
+             catSetLabel: SET LABEL
+             catRemoveLabel: REMOVE LABEL
+             catDatabase: ACCESS, START, STOP, CREATE INDEX, DROP INDEX, SHOW INDEX,
+               INDEX MANAGEMENT, CREATE CONSTRAINT, DROP CONSTRAINT, SHOW CONSTRAINT,
+               CONSTRAINT MANAGEMENT, CREATE NEW NODE LABEL, CREATE NEW RELATIONSHIP TYPE,
+               CREATE NEW PROPERTY NAME, NAME MANAGEMENT, ALL DATABASE PRIVILEGES,
+               SHOW TRANSACTION, TERMINATE TRANSACTION, TRANSACTION MANAGEMENT
+             catDbms: CREATE ROLE, DROP ROLE, ASSIGN ROLE, REMOVE ROLE, SHOW ROLE,
+               RENAME ROLE, ROLE MANAGEMENT, CREATE USER, DROP USER, SHOW USER,
+               SET USER STATUS, SET PASSWORDS, SET USER HOME DATABASE, ALTER USER,
+               RENAME USER, USER MANAGEMENT, CREATE DATABASE, DROP DATABASE,
+               DATABASE MANAGEMENT, SHOW PRIVILEGE, ASSIGN PRIVILEGE, REMOVE PRIVILEGE,
+               PRIVILEGE MANAGEMENT, EXECUTE PROCEDURE, EXECUTE BOOSTED PROCEDURE,
+               EXECUTE ADMIN PROCEDURES, EXECUTE FUNCTION, EXECUTE BOOSTED FUNCTION,
+               ALL ON PROCEDURES, ALL ON FUNCTIONS, IMPERSONATE, ALL DBMS PRIVILEGES,
+               SERVER MANAGEMENT, COMPOSITE DATABASE MANAGEMENT, ALIAS MANAGEMENT
+        2. Remove FIND from validActions.
+        3. Remove the dbmsActions map (replace with category lookups).
+        4. In buildPrivilegeCypher:
+             - catPropertyBearer: existing behaviour (property clause + entity + ON GRAPH)
+             - catGraphOnly: no property clause; usage error if --property is set;
+               entity clause and ON GRAPH as before
+             - catSetLabel: generate "SET LABEL <label> ON GRAPH <name>" using --node-label
+               value; usage error if --node-label is absent; --property not allowed
+             - catRemoveLabel: same as catSetLabel but "REMOVE LABEL"
+             - catDatabase: generate "ON DATABASE <name>" where <name> comes from
+               --on-database (default "*"); usage error if --on-graph or --on-dbms set;
+               no property/entity qualifiers allowed
+             - catDbms: generate "ON DBMS"; usage error if --on-dbms is absent;
+               no property/entity qualifiers
+        5. Update the existing DBMS-action + graph-qualifier usage-error check to use
+           the new category map.
+
+      Update all grant/deny/revoke tests and the buildPrivilegeCypher unit tests
+      to cover each category. Remove tests that relied on the (now-removed) FIND action.
+
+      Run go generate ./neo4j-cli/internal/skill/... (validActionsHelp output changes).
+      Run make test, make fmt-check, make lint.
+    dependencies:
+      - task-026
+      - task-027
+    acceptance_criteria:
+      - "'privilege grant --action traverse --on-graph neo4j --role r --rw' generates 'GRANT TRAVERSE ON GRAPH neo4j ELEMENTS * TO r' (no {*})"
+      - "'privilege grant --action write --on-graph * --role r --rw' generates 'GRANT WRITE ON GRAPH * ELEMENTS * TO r'"
+      - "'privilege grant --action access --on-database neo4j --role r --rw' generates 'GRANT ACCESS ON DATABASE neo4j TO r'"
+      - "'privilege grant --action create_role --on-dbms --role r --rw' generates 'GRANT CREATE ROLE ON DBMS TO r'"
+      - "'privilege grant --action create_role --role r --rw' (no --on-dbms) returns a usage error"
+      - "'privilege grant --action traverse --property name --role r --rw' returns a usage error (TRAVERSE does not accept --property)"
+      - "'privilege grant --action set_label --node-label Person --on-graph neo4j --role r --rw' generates 'GRANT SET LABEL Person ON GRAPH neo4j TO r'"
+      - "'privilege grant --action set_label --role r --rw' (no --node-label) returns a usage error"
+      - "'privilege grant --action find --role r --rw' returns unknown-action usage error (FIND removed)"
+      - "FIND no longer appears in the valid-actions error list"
+      - "All grant/deny/revoke tests pass with the new category-aware logic"
+      - "go generate produces no bundle diff"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-032
+    title: "Fix user/role drop not-found error code (REQ-F-053 implementation correction)"
+    source: qa
+    status: pending
+    description: |
+      task-022 was marked complete but live testing shows 'user drop <nonexistent>'
+      and 'role drop <nonexistent>' still return validation_error (exit 6) instead of
+      not_found (exit 3). The implementation in user/drop.go and role/drop.go checks for
+        ne.Code == "Neo.ClientError.Security.InvalidArguments"
+      but the actual error code returned by DROP USER / DROP ROLE on a nonexistent
+      target is:
+        Neo.ClientError.Statement.ArgumentError
+      The existing tests pass because fakeQueryRunner returns the error directly and
+      the test asserts on the final error but not on which error code matched.
+
+      Fix user/drop.go:
+        Change the errors.As check from
+          ne.Code == "Neo.ClientError.Security.InvalidArguments" && strings.Contains(ne.Msg, "does not exist")
+        to
+          ne.Code == "Neo.ClientError.Statement.ArgumentError" && strings.Contains(ne.Msg, "does not exist")
+
+      Fix role/drop.go: same correction.
+
+      Update drop_test.go for each package: inject a *neo4j.Neo4jError with Code
+      "Neo.ClientError.Statement.ArgumentError" and Msg "... does not exist" and assert
+      not_found (exit 3). Add a complementary test that a *neo4j.Neo4jError with
+      Code "Neo.ClientError.Security.InvalidArguments" does NOT produce not_found
+      (to prevent regression to the old wrong code).
+
+      Run make test, make fmt-check, make lint.
+    dependencies:
+      - task-022
+    acceptance_criteria:
+      - "'user drop <nonexistent> --yes --force' returns not_found (exit 3)"
+      - "'role drop <nonexistent> --yes --force' returns not_found (exit 3)"
+      - "user/drop_test.go injects *neo4j.Neo4jError with ArgumentError code for the not-found path"
+      - "role/drop_test.go injects *neo4j.Neo4jError with ArgumentError code for the not-found path"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-033
+    title: "privilege grant/deny/revoke emit updated role privilege list on success (REQ-F-059)"
+    source: qa
+    status: pending
+    description: |
+      privilege grant, deny, and revoke currently exit 0 with no output on success.
+      For consistency with role grant/revoke (which emit the user's updated record),
+      these commands should emit the affected role's updated privilege list after the
+      mutation.
+
+      After the GRANT / DENY / REVOKE statement succeeds, call
+        SHOW ROLE $role PRIVILEGES
+      via privilegeExecFn (the same seam) and print the result through
+      commonoutput.PrintBodyMap using the same field list as privilege list.
+
+      The follow-up query uses the same privilegeExecFn seam so tests can provide
+      a sequenced fake (mutation response + list response).
+
+      The shared constructor newPrivilegeMutationCmd (task-026) should gain a
+      follow-up step: extract a helper emitRolePrivileges(cmd, cfg, conn, role) in
+      privilege/helpers.go, analogous to outputUser/outputRoleMembers in user/role.
+
+      revoke.go has a separate RunE; apply the same follow-up there.
+
+      Update grant_test.go and revoke_test.go to assert the follow-up execFn call.
+      Run make test, make fmt-check, make lint.
+    dependencies:
+      - task-031
+    acceptance_criteria:
+      - "'privilege grant --action read --role analyst --rw' emits the analyst role's updated privilege list"
+      - "'privilege deny --action write --role readonly --rw' emits the readonly role's updated privilege list"
+      - "'privilege revoke --action read --role analyst --rw' emits the analyst role's updated privilege list"
+      - "Tests verify the follow-up SHOW ROLE $role PRIVILEGES call is made"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-034
+    title: "role create: use IF NOT EXISTS for idempotency; fix user/role drop error code; output polish (REQ-F-060, REQ-F-061, REQ-F-062)"
+    source: qa
+    status: pending
+    description: |
+      Bundle three small polish tasks that share no file-level conflicts:
+
+      1. REQ-F-060 — role create idempotency:
+         Change role/create.go from
+           CREATE ROLE $name
+         to
+           CREATE ROLE $name IF NOT EXISTS
+         Update the Long description and the create_test.go test that currently asserts
+         the bare CREATE ROLE query.
+
+      2. REQ-F-061 — user list table roles column:
+         When rendering user records in table format, the roles column contains a []any
+         slice that gets serialized as multi-line JSON. In adminutil or user/helpers.go,
+         add a normalizeUserRow(row map[string]any) helper that replaces the roles value
+         with a comma-joined string of the role names before passing to PrintBodyMap.
+         Apply this normalization in outputUser and in user list's RunE.
+         Test: user list --format table shows "admin, PUBLIC" not multi-line JSON.
+
+      3. REQ-F-062 — null normalization:
+         In normalizeUserRow (from step 2), also replace nil roles with []any{} (renders
+         as "[]" in JSON, "" in table) and nil suspended with false. In outputRoleMembers
+         and role list, replace nil member with "".
+         Test: user list --format json on Community shows "roles":[] and "suspended":false.
+         Test: role list --format json shows "" not null for member on empty-member roles.
+
+      Run go generate ./neo4j-cli/internal/skill/... if any Long descriptions change.
+      Run make test, make fmt-check, make lint.
+    dependencies:
+      - task-024
+    acceptance_criteria:
+      - "'role create analyst --rw' succeeds when analyst already exists (IF NOT EXISTS)"
+      - "'role create analyst --rw' run twice exits 0 both times"
+      - "'user list --format table' shows roles as 'admin, PUBLIC', not multi-line JSON"
+      - "'user list --format json' on Community shows \"roles\":[] and \"suspended\":false, not null"
+      - "'role list --format json' shows \"member\":\"\" for roles with no members, not null"
+      - "normalizeUserRow helper exists and is used by both outputUser and user list"
+      - "role/create.go sends CREATE ROLE $name IF NOT EXISTS"
+      - "create_test.go asserts the IF NOT EXISTS form"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-035
+    title: "Wire --debug to Bolt driver and add Cypher trace logging in boltAdminRunner (REQ-F-046, REQ-F-063)"
+    source: security-review
+    status: pending
+    description: |
+      `--debug` / `NEO4J_DEBUG=1` is currently a silent no-op for admin commands.
+      `dbconn.ResolveConn` sets `conn.Debug = true` when the flag or env var is active,
+      but `boltAdminRunner.run()` in `admin/run.go` never reads `conn.Debug`.
+
+      Two changes to `boltAdminRunner.run()` in `neo4j-cli/internal/subcommands/admin/run.go`:
+
+      1. **Bolt driver debug logging:** When `conn.Debug` is true, configure the driver
+         with debug-level logging inside the `func(c *config.Config)` closure:
+           if conn.Debug {
+               c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+           }
+
+      2. **Cypher trace line:** Immediately before calling `tx.Run(ctx, cypher, params)`,
+         when `conn.Debug` is true, write to `os.Stderr`:
+           fmt.Fprintf(os.Stderr, "[debug] admin cypher: %s\n", cypher)
+           if len(params) > 0 {
+               fmt.Fprintf(os.Stderr, "[debug] admin params: %s\n", redactParams(params))
+           }
+         `redactParams` is a new unexported helper in `run.go` that renders the params
+         map as a string, replacing the value of any key that case-insensitively contains
+         "password", "passwd", "secret", "token", "key", or "credential" with "***".
+         Example output: `map[name:alice password:***]`.
+
+      Add a unit test `TestRedactParams` in `run_test.go` that calls `redactParams`
+      directly and asserts password/secret keys are scrubbed while non-secret keys
+      (e.g. "name") pass through unchanged.
+
+      No change to the `queryRunner` interface or `fakeQueryRunner` seam — the debug
+      path lives inside `boltAdminRunner.run()` which tests never exercise directly.
+
+      Run make test, make fmt-check, make lint as final gates.
+    dependencies:
+      - task-015
+    acceptance_criteria:
+      - "boltAdminRunner.run() reads conn.Debug and passes neo4j.ConsoleLogger(neo4j.DEBUG) to the driver config when true"
+      - "boltAdminRunner.run() writes '[debug] admin cypher: <cypher>' to os.Stderr before tx.Run when conn.Debug is true"
+      - "boltAdminRunner.run() writes '[debug] admin params: <redacted>' to os.Stderr when conn.Debug is true and params is non-empty"
+      - "redactParams replaces values of keys matching password/passwd/secret/token/key/credential (case-insensitive) with '***'"
+      - "redactParams passes through non-secret keys unchanged"
+      - "TestRedactParams covers redactParams with a table of secret and non-secret keys"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-036
+    title: "Prefix all admin Cypher with CYPHER 25; translate unsupported-version error (REQ-F-064)"
+    source: qa
+    status: pending
+    description: |
+      All admin Cypher statements should be prefixed with "CYPHER 25 " to pin the
+      Cypher language version. This eliminates cross-version syntax ambiguity and
+      removes the need to worry about syntax differences when targeting Neo4j 2025.x.
+      Servers that do not support CYPHER 25 (older Neo4j versions) will return a
+      SyntaxError; that error must be translated into a clear, actionable message.
+
+      Changes to neo4j-cli/internal/subcommands/admin/run.go:
+
+      1. In RunAdminStatement (or boltAdminRunner.run()), prepend "CYPHER 25 " to
+         the cypher string before passing it to tx.Run:
+           cypher = "CYPHER 25 " + cypher
+         This applies universally — all admin commands gain the prefix without any
+         per-leaf change.
+
+      2. In translateNeo4jError, add a new case for the unsupported-version error.
+         Neo4j servers that don't support CYPHER 25 return SyntaxError with a message
+         containing "Invalid input 'CYPHER'" (or similar). Add a check:
+           ne.Code == "Neo.ClientError.Statement.SyntaxError" &&
+           (strings.Contains(ne.Msg, "Invalid input 'CYPHER'") ||
+            strings.Contains(ne.Msg, "version") && strings.Contains(ne.Msg, "not supported"))
+         Translate to:
+           clierr.NewValidationError("admin commands require Neo4j 2025.x or later " +
+             "(CYPHER 25 language version is not supported by this server)")
+         Place this check BEFORE the generic ClientError fallthrough so it takes
+         priority.
+
+      3. Update all unit tests in run_test.go and in every leaf *_test.go that asserts
+         on the exact Cypher string passed to fakeQueryRunner: prepend "CYPHER 25 "
+         to all expected Cypher strings. Also add a test in run_test.go for the new
+         error translation path: inject a *neo4j.Neo4jError with Code
+         "Neo.ClientError.Statement.SyntaxError" and Msg containing
+         "Invalid input 'CYPHER'" and assert the result is a validation_error with
+         the expected message.
+
+      The --debug trace line (REQ-F-063) shows the cypher after prefixing; no
+      separate change needed there if the prefix is added before tx.Run is called.
+
+      Run make test, make fmt-check, make lint as final gates.
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "RunAdminStatement (or boltAdminRunner.run()) prepends 'CYPHER 25 ' to every cypher string"
+      - "All leaf command tests updated: expected Cypher strings include the 'CYPHER 25 ' prefix"
+      - "translateNeo4jError translates SyntaxError with 'Invalid input CYPHER' to the version-requirement message"
+      - "run_test.go has a test case for the unsupported-version SyntaxError path"
+      - "The version-error translation takes priority over the generic SyntaxError ClientError path"
       - "make test passes; make fmt-check and make lint pass clean"
