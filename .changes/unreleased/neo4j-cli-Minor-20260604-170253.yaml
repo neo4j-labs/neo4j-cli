@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: Add `neo4j-cli admin` commands for database, user, and role management (enterprise features require Enterprise)
+body: Add `neo4j-cli admin database` commands for database lifecycle management (list, get, create, drop, start, stop) with full connection flag parity with `query`
 time: 2026-06-04T17:02:53.992675+01:00

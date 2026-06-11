@@ -1,4 +1,0 @@
-project: neo4j-cli
-kind: Minor
-body: admin commands now support the same connection flags as query (--uri, --username, --password, --env, --debug, desktop credentials)
-time: 2026-06-11T10:13:14.760053+01:00
