@@ -24,6 +24,20 @@ func newTestConfig(t *testing.T, scope clicfg.ConfigScope) *clicfg.Config {
 }
 
 func TestResolveConfigKey(t *testing.T) {
+	const testFlagKey = "flag.test-sentinel"
+	orig := clicfg.Registry
+	clicfg.Registry = map[string]clicfg.Flag{
+		testFlagKey: {
+			Name:             testFlagKey,
+			Default:          false,
+			Owner:            "test",
+			Gates:            "test gate",
+			IntroducedIn:     "0.0.0",
+			RemovalCondition: "when tests are removed",
+		},
+	}
+	t.Cleanup(func() { clicfg.Registry = orig })
+
 	tests := []struct {
 		name          string
 		key           string
@@ -79,11 +93,11 @@ func TestResolveConfigKey(t *testing.T) {
 			wantErr: `invalid config key: "unknown"`,
 		},
 		{
-			name:          "registered flag.aura-beta resolves to flag namespace with full key preserved",
-			key:           "flag.aura-beta",
+			name:          "registered flag resolves to flag namespace with full key preserved",
+			key:           testFlagKey,
 			scope:         clicfg.GlobalScope,
 			wantNamespace: clicfg.FlagScope,
-			wantKey:       "flag.aura-beta",
+			wantKey:       testFlagKey,
 		},
 		{
 			name:    "unknown flag.* key is rejected as unrecognised",

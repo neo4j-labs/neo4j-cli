@@ -7,7 +7,11 @@
 // first time a config-shape change actually needs one.
 package configmigrate
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tidwall/sjson"
+)
 
 // Migration is one forward-only transform of the raw config.json bytes.
 // Version is a monotonic integer (1-indexed); Description is a short human
@@ -19,11 +23,26 @@ type Migration struct {
 	Apply       func([]byte) ([]byte, error)
 }
 
-// migrations is the package-level registry. Ships empty — first concrete
-// entry lands when a config-shape change actually needs one (e.g. removing
-// a graduated feature-flag key). Each new entry must be appended (never
-// inserted) so the contiguous-ascending invariant enforced by init() holds.
-var migrations = []Migration{}
+// migrations is the package-level registry. Each new entry must be appended
+// (never inserted) so the contiguous-ascending invariant enforced by init()
+// holds.
+var migrations = []Migration{
+	{
+		Version:     1,
+		Description: "remove retired flag.aura-beta and aura.beta-enabled keys",
+		Apply: func(data []byte) ([]byte, error) {
+			// flag\.aura-beta: backslash-escapes the dot so sjson treats it as a
+			// literal key named "flag.aura-beta", not a nested path.
+			data, err := sjson.DeleteBytes(data, `flag\.aura-beta`)
+			if err != nil {
+				return nil, err
+			}
+			// aura.beta-enabled: dot IS the path separator here — matches
+			// {"aura": {"beta-enabled": ...}} in the JSON.
+			return sjson.DeleteBytes(data, "aura.beta-enabled")
+		},
+	},
+}
 
 func init() {
 	if err := validateMigrations(migrations); err != nil {

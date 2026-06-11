@@ -67,8 +67,7 @@ func buildTestConfig(t *testing.T, serverURL, extraCfg string) *clicfg.Config {
 		"format": "json",
 		"aura": {
 			"auth-url": "%s/oauth/token",
-			"base-url": "%s",
-			"beta-enabled": true
+			"base-url": "%s"
 			%s
 		}
 	}`, serverURL, serverURL, extraCfg)
@@ -84,7 +83,6 @@ func buildTestConfig(t *testing.T, serverURL, extraCfg string) *clicfg.Config {
 	require.NoError(t, err)
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Flags.SetForTest("flag.aura-beta", true)
 	return cfg
 }
 
@@ -306,7 +304,7 @@ func buildResourceServer(t *testing.T, resourcePath, tenantID string) *httptest.
 
 func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
 	const instanceID = "inst-xyz"
-	srv := buildResourceServer(t, "/v1beta5/instances/"+instanceID, "other-project")
+	srv := buildResourceServer(t, "/v1/instances/"+instanceID, "other-project")
 	cfg := buildTestConfig(t, srv.URL, "")
 
 	_, err := utils.FetchAndVerifyInstanceInProject(cfg, instanceID, testProjectID)
@@ -323,7 +321,7 @@ func TestFetchAndVerifyInstanceInProject_OwnershipMismatch(t *testing.T) {
 
 func TestFetchAndVerifySessionInProject_OwnershipMismatch(t *testing.T) {
 	const sessionID = "sess-xyz"
-	srv := buildResourceServer(t, "/v1beta5/graph-analytics/sessions/"+sessionID, "other-project")
+	srv := buildResourceServer(t, "/v1/graph-analytics/sessions/"+sessionID, "other-project")
 	cfg := buildTestConfig(t, srv.URL, "")
 
 	_, err := utils.FetchAndVerifySessionInProject(cfg, sessionID, testProjectID)
@@ -340,7 +338,7 @@ func TestFetchAndVerifySessionInProject_OwnershipMismatch(t *testing.T) {
 
 func TestFetchAndVerifyCMKInProject_OwnershipMismatch(t *testing.T) {
 	const cmkID = "cmk-xyz"
-	srv := buildResourceServer(t, "/v1beta5/customer-managed-keys/"+cmkID, "other-project")
+	srv := buildResourceServer(t, "/v1/customer-managed-keys/"+cmkID, "other-project")
 	cfg := buildTestConfig(t, srv.URL, "")
 
 	_, err := utils.FetchAndVerifyCMKInProject(cfg, cmkID, testProjectID)

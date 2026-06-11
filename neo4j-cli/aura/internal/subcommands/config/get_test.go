@@ -63,8 +63,6 @@ func TestGetConfigBetaEnabled(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	helper.ExecuteCommand("config get beta-enabled")
 
 	helper.AssertErr("Error: invalid argument \"beta-enabled\" for \"aura-cli config get\"")

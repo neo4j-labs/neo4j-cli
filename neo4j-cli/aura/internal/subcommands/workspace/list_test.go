@@ -111,7 +111,6 @@ func TestWorkspaceList(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("flag.aura-beta", true)
 			if tc.defaultWorkspace != "" {
 				helper.SetConfigValue("aura.default-workspace", tc.defaultWorkspace)
 			}
@@ -152,8 +151,6 @@ func TestWorkspaceListAPIError(t *testing.T) {
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
 
-	helper.SetConfigValue("flag.aura-beta", true)
-
 	helper.NewRequestHandlerMock(
 		"/v2beta1/organizations",
 		http.StatusInternalServerError,
@@ -170,8 +167,6 @@ func TestWorkspaceListProjectsAPIError(t *testing.T) {
 
 	helper := testutils.NewAuraTestHelper(t)
 	defer helper.Close()
-
-	helper.SetConfigValue("flag.aura-beta", true)
 
 	helper.NewRequestHandlerMock(
 		"/v2beta1/organizations",

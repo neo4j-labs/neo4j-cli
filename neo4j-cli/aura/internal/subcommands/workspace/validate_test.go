@@ -42,7 +42,6 @@ func buildValidateTestConfig(t *testing.T, serverURL string) *clicfg.Config {
 	require.NoError(t, err)
 
 	cfg := clicfg.NewConfig(fs, "test", clicfg.AuraScope)
-	cfg.Flags.SetForTest("flag.aura-beta", true)
 	return cfg
 }
 

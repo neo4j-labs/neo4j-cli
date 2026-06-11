@@ -1,0 +1,127 @@
+feature: cli-154-drop-beta-flag
+prd: ./prd-cli-154-drop-beta-flag.md
+created_at: 2026-06-10T00:00:00Z
+updated_at: 2026-06-10T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Remove flag.aura-beta registry entry, BetaPath methods, and simplify getVersionPath"
+    description: |
+      Delete the "flag.aura-beta" entry from var Registry in common/clicfg/flags.go.
+      Remove the BetaPathV1() and BetaPathV2() methods from common/clicfg/clicfg.go (lines ~317-321).
+      Simplify getVersionPath in neo4j-cli/aura/internal/api/api.go: drop the cfg parameter,
+      remove the cfg.Flags.Enabled("flag.aura-beta") branch from the AuraApiVersion1 case
+      (so it always returns "v1"), and inline "v1beta5" and "v2beta1" as literal strings in the
+      AuraApiVersionBeta1 and AuraApiVersion2 cases respectively. Update all call sites of
+      getVersionPath to drop the cfg argument.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "var Registry in common/clicfg/flags.go contains no \"flag.aura-beta\" entry"
+      - "BetaPathV1() and BetaPathV2() methods no longer exist in clicfg.go"
+      - "getVersionPath takes only an AuraApiVersion parameter (no *clicfg.Config)"
+      - "getVersionPath contains no reference to Flags.Enabled or flag.aura-beta"
+      - "AuraApiVersion1 case returns \"v1\" unconditionally; AuraApiVersionBeta1 returns \"v1beta5\"; AuraApiVersion2 returns \"v2beta1\""
+      - "Code compiles: go build ./... succeeds"
+    completed_at: "2026-06-11T00:00:00Z"
+
+  - id: task-002
+    title: "Add config migration v1 to delete retired flag.aura-beta and aura.beta-enabled keys"
+    description: |
+      Append the first Migration entry to the empty migrations slice in
+      common/configmigrate/migrations.go. The Apply function must use sjson.DeleteBytes
+      to delete "flag\.aura-beta" (dot-escaped so sjson treats the dot as literal) and
+      "aura.beta-enabled" (which sjson interprets as nested path aura -> beta-enabled,
+      matching the {"aura": {"beta-enabled": true}} shape). Add the tidwall/sjson import
+      if it is not already present in the file. The migration must be a no-op (no error,
+      unchanged bytes) when neither key is present in the input.
+    status: completed
+    dependencies: []
+    acceptance_criteria:
+      - "migrations slice has exactly one entry with Version=1"
+      - "Apply deletes flag.aura-beta from a config JSON that contains it"
+      - "Apply deletes aura.beta-enabled from a config JSON that contains {\"aura\":{\"beta-enabled\":true}}"
+      - "Apply is a no-op (returns same bytes, no error) when neither key is present"
+      - "go test ./common/configmigrate/... passes"
+    completed_at: "2026-06-11T00:00:00Z"
+
+  - id: task-003
+    title: "Delete stale project_test.go and remove flag.aura-beta from neo4j-cli config tests"
+    description: |
+      Delete neo4j-cli/internal/subcommands/config/project_test.go entirely — it tests a
+      'neo4j config project' command that has no source file and was never shipped.
+      In neo4j-cli/internal/subcommands/config/get_test.go, remove the two test cases that
+      get flag.aura-beta (lines ~108-121). In set_test.go in the same package, remove the
+      test cases that set flag.aura-beta to true or an invalid value (lines ~115-124).
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "neo4j-cli/internal/subcommands/config/project_test.go does not exist"
+      - "get_test.go contains no reference to flag.aura-beta"
+      - "set_test.go contains no reference to flag.aura-beta"
+      - "go test ./neo4j-cli/internal/subcommands/config/... passes"
+    completed_at: "2026-06-11T00:00:00Z"
+
+  - id: task-004
+    title: "Remove flag.aura-beta references from all aura subcommand test files"
+    description: |
+      Remove SetConfigValue("flag.aura-beta", true) and SetForTest("flag.aura-beta", true)
+      calls from organization/get_test.go, organization/list_test.go, workspace/use_test.go,
+      workspace/list_test.go, workspace/validate_test.go, project/list_test.go, and
+      utils/resolve_test.go. In utils/resolve_test.go also remove the "beta-enabled": true
+      literal from the inline config JSON and the cfg.Flags.SetForTest call. In
+      aura/internal/subcommands/config/get_test.go remove only the SetConfigValue setup line
+      (line ~66) while preserving the assertion that beta-enabled is rejected as an invalid
+      argument. The aura/config/list_test.go and set_test.go assertions about beta-enabled
+      being rejected remain unchanged.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "grep -r \"flag.aura-beta\" neo4j-cli/aura/internal/subcommands returns no results"
+      - "utils/resolve_test.go contains no beta-enabled literal in config JSON fixtures"
+      - "The aura config get_test.go assertion that beta-enabled is an invalid argument is preserved"
+      - "go test ./neo4j-cli/aura/internal/subcommands/... passes"
+    completed_at: "2026-06-11T00:00:00Z"
+
+  - id: task-005
+    title: "Remove TestRegistry_AuraBetaEntry and any flag.aura-beta hardcodes from flags_test.go"
+    description: |
+      Inspect common/clicfg/flags_test.go for any test that hardcodes "flag.aura-beta" as a
+      test input or expected value (e.g. TestRegistry_AuraBetaEntry). Delete or update such
+      tests — if a test validates the registry entry shape it can be deleted outright since the
+      entry no longer exists. If a test is parameterised over all Registry entries via range,
+      no source change is needed beyond confirming the loop still works with an empty (or
+      future-populated) Registry.
+    status: completed
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "flags_test.go contains no hardcoded \"flag.aura-beta\" string in non-comment lines"
+      - "go test ./common/clicfg/... passes"
+    completed_at: "2026-06-11T00:00:00Z"
+
+  - id: task-006
+    title: "Verify skill bundle and run final gates"
+    description: |
+      Run go generate ./neo4j-cli/internal/skill/... to confirm the committed skill bundle
+      hasn't drifted (no command-tree or Long/Example changes in this PR, but the
+      TestGenerator_RoundTrip gate must pass). No changelog entry is needed — the beta flag
+      was never user-facing. Run make test, make fmt-check, and make lint as final gates;
+      all three must be green before the task is complete.
+    status: completed
+    dependencies:
+      - task-001
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+    acceptance_criteria:
+      - "go generate ./neo4j-cli/internal/skill/... produces no diff in the skill bundle"
+      - "TestGenerator_RoundTrip passes as part of make test"
+      - "No changelog entry is added"
+      - "make test passes (all packages, all OS targets as applicable locally)"
+      - "make fmt-check passes (no unformatted files)"
+      - "make lint passes (no golangci-lint errors)"
+    completed_at: "2026-06-11T00:00:00Z"

@@ -304,3 +304,66 @@ func TestValidateMigrations(t *testing.T) {
 func setJSONString(data []byte, key, value string) ([]byte, error) {
 	return sjson.SetBytes(data, key, value)
 }
+
+// TestMigrationV1 exercises the concrete migration v1 (remove retired
+// flag.aura-beta and aura.beta-enabled keys).
+func TestMigrationV1(t *testing.T) {
+	v1 := migrations[0]
+
+	cases := []struct {
+		name        string
+		seedConfig  string
+		wantAbsent  []string // gjson paths that must return no result
+		wantPresent map[string]string
+	}{
+		{
+			name:       "deletes flag.aura-beta when present",
+			seedConfig: `{"flag.aura-beta":true,"other":"keep"}`,
+			wantAbsent: []string{"flag\\.aura-beta"},
+			wantPresent: map[string]string{
+				"other": "keep",
+			},
+		},
+		{
+			name:       "deletes aura.beta-enabled when present",
+			seedConfig: `{"aura":{"beta-enabled":true},"other":"keep"}`,
+			wantAbsent: []string{"aura.beta-enabled"},
+			wantPresent: map[string]string{
+				"other": "keep",
+			},
+		},
+		{
+			name:        "no-op when neither key is present",
+			seedConfig:  `{"unrelated":"value"}`,
+			wantAbsent:  []string{"flag\\.aura-beta", "aura.beta-enabled"},
+			wantPresent: map[string]string{"unrelated": "value"},
+		},
+		{
+			name:       "deletes both keys when both are present",
+			seedConfig: `{"flag.aura-beta":true,"aura":{"beta-enabled":true},"keep":"me"}`,
+			wantAbsent: []string{"flag\\.aura-beta", "aura.beta-enabled"},
+			wantPresent: map[string]string{
+				"keep": "me",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fs := seedTestFs(t, c.seedConfig)
+			var stderr bytes.Buffer
+			_, err := runWith(fs, configPath(), &stderr, []Migration{v1})
+			assert.Nil(t, err)
+			assert.Equal(t, "", stderr.String())
+
+			got := readConfig(t, fs)
+
+			for _, path := range c.wantAbsent {
+				assert.False(t, gjson.GetBytes(got, path).Exists(), "key %q must be absent", path)
+			}
+			for path, want := range c.wantPresent {
+				assert.Equal(t, want, gjson.GetBytes(got, path).String(), "key %q must equal %q", path, want)
+			}
+		})
+	}
+}

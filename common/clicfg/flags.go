@@ -16,10 +16,10 @@ import (
 )
 
 // Flag describes a single registered feature flag. The dotted Name
-// (e.g. "flag.aura-beta") is the canonical config-file key and the source of
-// truth for the derived env-var (see FlagNameToEnv).
+// (e.g. "flag.<area>-<feature>") is the canonical config-file key and the
+// source of truth for the derived env-var (see FlagNameToEnv).
 type Flag struct {
-	// Name is the full dotted key, e.g. "flag.aura-beta".
+	// Name is the full dotted key, e.g. "flag.<area>-<feature>".
 	Name string
 	// Default is the value returned when no override, env var, config-file
 	// value, or legacy alias is present.
@@ -40,17 +40,7 @@ type Flag struct {
 // Registry is the source of truth for all registered feature flags. Add a new
 // entry here to introduce a flag; callers gate behaviour via
 // (*Config).Flags.Enabled("flag.<area>-<feature>").
-var Registry = map[string]Flag{
-	"flag.aura-beta": {
-		Name:             "flag.aura-beta",
-		Default:          false,
-		Owner:            "aura-cli team",
-		Gates:            "v1beta5 API path routing for AuraApiVersion1 requests",
-		IntroducedIn:     "1.4.0",
-		RemovalCondition: "Aura beta features ship to GA",
-		LegacyKey:        "aura.beta-enabled",
-	},
-}
+var Registry = map[string]Flag{}
 
 // FlagSet wraps the runtime override surface (env vars + config file via viper)
 // with an in-process override map for tests and a per-legacy-key sync.Once that

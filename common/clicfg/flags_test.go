@@ -28,7 +28,34 @@ func newFlagSetForTest(t *testing.T) (*FlagSet, *viper.Viper) {
 	return &FlagSet{viper: v}, v
 }
 
+// registerTestFlag seeds a sentinel flag into Registry for the duration of
+// the test and restores the original Registry on cleanup. All test cases that
+// require a registered key use "flag.test-sentinel" / "test.legacy-key".
+func registerTestFlag(t *testing.T) {
+	t.Helper()
+	const testKey = "flag.test-sentinel"
+	const legacyKey = "test.legacy-key"
+	orig := Registry
+	Registry = map[string]Flag{
+		testKey: {
+			Name:             testKey,
+			Default:          false,
+			Owner:            "test",
+			Gates:            "test gate",
+			IntroducedIn:     "0.0.0",
+			RemovalCondition: "when tests are removed",
+			LegacyKey:        legacyKey,
+		},
+	}
+	t.Cleanup(func() { Registry = orig })
+}
+
 func TestFlagSet_Enabled_Precedence(t *testing.T) {
+	registerTestFlag(t)
+
+	const key = "flag.test-sentinel"
+	const legacyKey = "test.legacy-key"
+
 	tests := []struct {
 		name  string
 		setup func(t *testing.T, fs *FlagSet, v *viper.Viper)
@@ -38,24 +65,24 @@ func TestFlagSet_Enabled_Precedence(t *testing.T) {
 		{
 			name:  "default (nothing set) returns spec default false",
 			setup: func(t *testing.T, fs *FlagSet, v *viper.Viper) {},
-			key:   "flag.aura-beta",
+			key:   key,
 			want:  false,
 		},
 		{
 			name: "legacy alias only — returns legacy value and is one-shot logged",
 			setup: func(t *testing.T, fs *FlagSet, v *viper.Viper) {
-				v.Set("aura.beta-enabled", true)
+				v.Set(legacyKey, true)
 			},
-			key:  "flag.aura-beta",
+			key:  key,
 			want: true,
 		},
 		{
 			name: "config file (primary key) takes precedence over legacy alias",
 			setup: func(t *testing.T, fs *FlagSet, v *viper.Viper) {
-				v.Set("aura.beta-enabled", false)
-				v.Set("flag.aura-beta", true)
+				v.Set(legacyKey, false)
+				v.Set(key, true)
 			},
-			key:  "flag.aura-beta",
+			key:  key,
 			want: true,
 		},
 		{
@@ -63,19 +90,19 @@ func TestFlagSet_Enabled_Precedence(t *testing.T) {
 			setup: func(t *testing.T, fs *FlagSet, v *viper.Viper) {
 				// Bind a process env var by setting via viper directly —
 				// IsSet for that key now returns true.
-				v.Set("flag.aura-beta", true)
+				v.Set(key, true)
 			},
-			key:  "flag.aura-beta",
+			key:  key,
 			want: true,
 		},
 		{
 			name: "SetForTest override beats everything",
 			setup: func(t *testing.T, fs *FlagSet, v *viper.Viper) {
-				v.Set("flag.aura-beta", false)
-				v.Set("aura.beta-enabled", false)
-				fs.SetForTest("flag.aura-beta", true)
+				v.Set(key, false)
+				v.Set(legacyKey, false)
+				fs.SetForTest(key, true)
 			},
-			key:  "flag.aura-beta",
+			key:  key,
 			want: true,
 		},
 		{
@@ -109,15 +136,16 @@ func captureDebugLogs(t *testing.T) *bytes.Buffer {
 }
 
 func TestFlagSet_LegacyDebugLogIsOneShot(t *testing.T) {
+	registerTestFlag(t)
 	buf := captureDebugLogs(t)
 
 	fs, v := newFlagSetForTest(t)
-	v.Set("aura.beta-enabled", true)
+	v.Set("test.legacy-key", true)
 
 	// Call Enabled multiple times — the deprecated-key debug log must fire
 	// exactly once for this FlagSet instance.
 	for i := 0; i < 5; i++ {
-		assert.True(t, fs.Enabled("flag.aura-beta"))
+		assert.True(t, fs.Enabled("flag.test-sentinel"))
 	}
 
 	occurrences := bytes.Count(buf.Bytes(), []byte("feature flag read from deprecated key"))
@@ -144,9 +172,9 @@ func TestFlagNameToEnv(t *testing.T) {
 		in   string
 		want string
 	}{
-		{name: "aura-beta", in: "flag.aura-beta", want: "NEO4J_CLI_FLAG_AURA_BETA"},
 		{name: "docker-command", in: "flag.docker-command", want: "NEO4J_CLI_FLAG_DOCKER_COMMAND"},
 		{name: "secrets-os-keystore", in: "flag.secrets-os-keystore", want: "NEO4J_CLI_FLAG_SECRETS_OS_KEYSTORE"},
+		{name: "multi-word-feature", in: "flag.multi-word-feature", want: "NEO4J_CLI_FLAG_MULTI_WORD_FEATURE"},
 	}
 
 	for _, tc := range tests {
@@ -157,6 +185,10 @@ func TestFlagNameToEnv(t *testing.T) {
 }
 
 func TestFlagSet_SetFromConfigCmd(t *testing.T) {
+	registerTestFlag(t)
+
+	const testKey = "flag.test-sentinel"
+
 	tests := []struct {
 		name        string
 		key         string
@@ -167,15 +199,15 @@ func TestFlagSet_SetFromConfigCmd(t *testing.T) {
 	}{
 		{
 			name:        "accepted true writes JSON value",
-			key:         "flag.aura-beta",
+			key:         testKey,
 			value:       "true",
-			wantWritten: `{"flag.aura-beta":true}`,
+			wantWritten: `{"flag.test-sentinel":true}`,
 		},
 		{
 			name:        "accepted false writes JSON value",
-			key:         "flag.aura-beta",
+			key:         testKey,
 			value:       "false",
-			wantWritten: `{"flag.aura-beta":false}`,
+			wantWritten: `{"flag.test-sentinel":false}`,
 		},
 		{
 			name:     "unknown key rejected as usage error",
@@ -186,9 +218,9 @@ func TestFlagSet_SetFromConfigCmd(t *testing.T) {
 		},
 		{
 			name:     "invalid value rejected as usage error",
-			key:      "flag.aura-beta",
+			key:      testKey,
 			value:    "maybe",
-			wantErr:  `invalid value for "flag.aura-beta": maybe (valid values: true, false)`,
+			wantErr:  `invalid value for "flag.test-sentinel": maybe (valid values: true, false)`,
 			wantExit: 2,
 		},
 	}
@@ -220,16 +252,4 @@ func TestFlagSet_SetFromConfigCmd(t *testing.T) {
 			assert.JSONEq(t, tc.wantWritten, string(got))
 		})
 	}
-}
-
-func TestRegistry_AuraBetaEntry(t *testing.T) {
-	entry, ok := Registry["flag.aura-beta"]
-	require.True(t, ok, "Registry must contain flag.aura-beta entry")
-	assert.Equal(t, "flag.aura-beta", entry.Name)
-	assert.False(t, entry.Default)
-	assert.Equal(t, "aura.beta-enabled", entry.LegacyKey)
-	assert.NotEmpty(t, entry.Owner)
-	assert.NotEmpty(t, entry.Gates)
-	assert.NotEmpty(t, entry.IntroducedIn)
-	assert.NotEmpty(t, entry.RemovalCondition)
 }
