@@ -829,7 +829,8 @@ tasks:
   - id: task-027
     title: "Remove duplicate ACCESS entry from validActions"
     source: review
-    status: in_progress
+    status: completed
+    completed_at: "2026-06-11T18:00:00Z"
     description: |
       privilege/helpers.go validActions slice contains "ACCESS" twice: once in the
       graph-privileges section (line 25) and again in the database-privileges section

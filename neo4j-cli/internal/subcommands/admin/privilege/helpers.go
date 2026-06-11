@@ -52,7 +52,6 @@ var validActions = []string{
 	"CREATE NEW PROPERTY NAME",
 	"NAME MANAGEMENT",
 	"ALL DATABASE PRIVILEGES",
-	"ACCESS",
 	"SHOW TRANSACTION",
 	"TERMINATE TRANSACTION",
 	"TRANSACTION MANAGEMENT",
@@ -253,14 +252,5 @@ func buildPrivilegeCypher(action string, f privilegeFlags) (string, error) {
 // validActionsHelp returns a comma-separated list of valid action names for
 // inclusion in usage error messages.
 func validActionsHelp() string {
-	// De-duplicate (validActions has ACCESS twice due to graph + database scopes)
-	seen := make(map[string]bool)
-	unique := make([]string, 0, len(validActions))
-	for _, a := range validActions {
-		if !seen[a] {
-			seen[a] = true
-			unique = append(unique, a)
-		}
-	}
-	return strings.Join(unique, ", ")
+	return strings.Join(validActions, ", ")
 }
