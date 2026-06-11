@@ -5,9 +5,10 @@
 [`cypher-language-support`](https://github.com/neo4j/cypher-language-support)'s
 `@neo4j-cypher/language-support` package. The bundle contains the antlr4-based
 Cypher parser, the TypeScript-side schema-aware checks (unknown
-label/relationship-type warnings, path-directionality warnings), and the
-TeaVM-compiled semantic-analysis engine (Neo4j's parser + semantic checks,
-written in Java/Scala, compiled to JavaScript). It runs here inside
+label/relationship-type warnings, path-directionality warnings, unknown and
+deprecated procedure/function diagnostics), and the TeaVM-compiled
+semantic-analysis engine (Neo4j's parser + semantic checks, written in
+Java/Scala, compiled to JavaScript). It runs here inside
 [goja](https://github.com/dop251/goja), a pure-Go JavaScript engine — no CGo,
 no node dependency, cross-compiles with the normal release matrix.
 
@@ -20,16 +21,15 @@ activates the schema-aware checks each populated key enables — see the
 
 Built from the published npm package
 `@neo4j-cypher/language-support@2.0.0-next.34` (includes #681/#685
-schema-based linting and #688 `isNotParamError`) with esbuild 0.27.1 — pin
-both when rebuilding: minified identifier names (which `exportMarker`
-depends on) can change across esbuild versions. Reproducible anywhere, no
-monorepo checkout needed:
+schema-based linting and #688 `isNotParamError`) with esbuild 0.27.1 (pinned
+for reproducibility). Reproducible anywhere, no monorepo checkout needed:
 
 ```sh
 mkdir lint-bundle && cd lint-bundle && npm init -y
 npm install @neo4j-cypher/language-support@2.0.0-next.34
 printf "export { lintCypherQuery, isNotParamError } from '@neo4j-cypher/language-support';\n" > entry.ts
-npx esbuild@0.27.1 entry.ts --bundle --platform=browser --format=esm \
+npx esbuild@0.27.1 entry.ts --bundle --platform=browser \
+    --format=iife --global-name=cypherLint \
     --minify --target=es2017 \
     --outfile=<neo4j-cli>/neo4j-cli/query/linter/cypherLint.js
 ```
@@ -45,17 +45,17 @@ Flag rationale (all three matter for goja):
   and iterator `forEach` that `labelTreeWalking.ts` uses. A refresh that
   trips a `TypeError: Object has no member '...'` at lint time means upstream
   started using another post-ES2017 builtin: add it to the prelude.
-- `--format=esm` — the trailing `export{...}` statement is rewritten into
-  `globalThis` assignments by `rewriteExports`.
+- `--format=iife --global-name=cypherLint` — the bundle evaluates to a single
+  `cypherLint` global carrying the exports, which the glue in `linter.go`
+  calls. No postprocessing of the artifact is needed; the global's name is
+  stable across esbuild versions and rebuilds (engine init fails loudly if
+  the global is missing).
 
 After copying (keep it LF — it is `go:embed`-ed and LF-pinned in
 `.gitattributes`):
 
-1. Update `exportMarker`/`exportReplacement` in `linter.go`: the minified
-   identifier names in the final `export{...}` statement change on every
-   rebuild. `rewriteExports` fails loudly if you forget.
-2. Run `go test ./neo4j-cli/query/...`.
-3. Record the new upstream commit hash above.
+1. Run `go test ./neo4j-cli/query/...`.
+2. Record the new upstream version above.
 
 ## Measurements (macOS arm64, 2026-06-11)
 
@@ -88,8 +88,9 @@ autocomplete, …) forces the question of whether to unify them:
 | consumer | humans/agents (rendered output) | `lintCypherQuery` (wire input) |
 | labels/relTypes | implicit in property rows | flat name lists, capped at 1000 |
 | properties | names + types + mandatory per label-set | names only (no diagnostic uses them yet) |
-| graph shape | exact per-relType `MATCH` scans, **multi-label arrays** | one sampled `db.schema.visualization()` call, **single-label triples**, skipped at ≥200 labels+relTypes |
+| graph shape | exact per-relType `MATCH` scans, **multi-label arrays** | one sampled `db.schema.visualization()` call, **single-label triples**, always fetched (CLS skips at ≥200 labels+relTypes — a one-shot fetch is deliberately less defensive than a poll loop) |
 | default language | DBMS-wide `SHOW SETTINGS` probe | per-database `SHOW DATABASES` column |
+| procedures/functions | no | raw `SHOW PROCEDURES`/`SHOW FUNCTIONS` rows, one unprefixed fetch keyed under both dialects |
 | indexes/constraints | yes | no |
 | key casing | snake_case output rule | camelCase (pinned to upstream's `DbSchema` wire shape) |
 
@@ -116,10 +117,16 @@ Issues to resolve before adding `--schema-file` or a shared schema model:
 - **Staleness/caching**: any persisted schema needs an identity (URI +
   database) and an invalidation story; the CLI has so far avoided caches.
 - **Upstream drift**: `linter.DbSchema` is pinned to upstream's wire shape
-  and will grow (`parameters` from `--param`, `procedures`/`functions`
-  registries for unknown-procedure errors — deliberately not fetched yet;
-  absent keys are skipped upstream). A CLI-common model would need a mapping
-  layer that tracks that evolution.
+  and will grow. A CLI-common model would need a mapping layer that tracks
+  that evolution.
+- **Per-dialect registries**: CLS fetches procedures/functions once per
+  Cypher dialect (`CYPHER 5`/`CYPHER 25` query prologues); this package runs
+  ONE unprefixed fetch and keys it under both dialects, because the prologues
+  error on older servers and a registry missing a dialect key would flag
+  every call in queries resolving to that dialect as unknown. The cost: a
+  procedure that exists in only one dialect's catalog is misjudged when the
+  linted dialect differs from the server's default. Going per-dialect needs a
+  server-capability probe first.
 
 Until that thinking happens, keep the two representations separate and keep
 `lint_schema.go` as the only place that knows how to build a

@@ -15,7 +15,9 @@ import (
 )
 
 // lintFields drives the column set and order for table/json rendering of
-// lint diagnostics.
+// lint diagnostics. The field set is listed by hand in three places that
+// must stay in sync: this slice, lintDiagnostic's json tags, and the
+// AsArray map keys below.
 var lintFields = []string{"severity", "message", "line", "column", "offset", "end_line", "end_column", "end_offset"}
 
 // lintFn is the test seam over the real linter engine: policy paths (engine
@@ -82,12 +84,15 @@ func newLintCmd(cfg *clicfg.Config) *cobra.Command {
 			"analysis that powers Neo4j's language tooling. Offline by " +
 			"default: no Bolt connection is opened and no credentials are " +
 			"needed. With `--fetch-schema` the database schema (labels, " +
-			"relationship types, property keys, graph shape, default Cypher " +
-			"version) is fetched first — connection resolved like the other " +
-			"query commands — enabling additional schema-aware warnings: " +
-			"unknown labels or relationship types, and relationship patterns " +
-			"that contradict the graph's actual direction. Schema warnings " +
-			"never affect the exit code. Declaring parameters with `--param` " +
+			"relationship types, property keys, graph shape, procedures, " +
+			"functions, default Cypher version) is fetched first — connection " +
+			"resolved like the other query commands — enabling additional " +
+			"schema-aware checks: unknown labels or relationship types and " +
+			"relationship patterns that contradict the graph's actual " +
+			"direction are warnings; calling a procedure or function not " +
+			"present in the database is an error (it would fail at run time), " +
+			"and calling a deprecated one is a warning. " +
+			"Declaring parameters with `--param` " +
 			"switches parameter checking on: any $parameter not declared is " +
 			"an error; without `--param` parameter checks are skipped. " +
 			"Cypher is taken from the positional " +
@@ -122,7 +127,7 @@ neo4j-cli query :lint "MATCH (n) RETURN n" --format table`,
 		},
 	}
 	cmd.Flags().String("cypher-version", "5", "Cypher language version to lint against: 5 or 25")
-	cmd.Flags().Bool("fetch-schema", false, "Fetch the schema from the database before linting, enabling schema-aware warnings (unknown labels/relationship types, path directionality)")
+	cmd.Flags().Bool("fetch-schema", false, "Fetch the schema from the database before linting, enabling schema-aware checks (unknown labels/relationship types, path directionality, unknown or deprecated procedures/functions)")
 	return cmd
 }
 
@@ -154,8 +159,9 @@ func runLint(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		if err != nil {
 			return err
 		}
-		// An explicit --cypher-version beats the database's default language;
-		// a CYPHER prologue in the query itself beats both (resolved by the
+		// An explicit --cypher-version beats the database's default language
+		// (the SHOW DATABASES probe is skipped entirely in that case); a
+		// CYPHER prologue in the query itself beats both (resolved by the
 		// analyzer).
 		if cmd.Flags().Changed("cypher-version") {
 			schema.DefaultLanguage = string(version)
@@ -235,5 +241,7 @@ func fetchSchemaForLint(cmd *cobra.Command, cfg *clicfg.Config) (*linter.DbSchem
 	}
 	ctx := cmd.Context()
 	defer c.driver.Close(ctx) //nolint:errcheck // driver close error not actionable in defer
-	return fetchLintSchema(ctx, c)
+	// No point probing the default language when an explicit --cypher-version
+	// will overwrite it anyway (see runLint).
+	return fetchLintSchema(ctx, c, !cmd.Flags().Changed("cypher-version"))
 }

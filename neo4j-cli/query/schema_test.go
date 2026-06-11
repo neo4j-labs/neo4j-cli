@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,8 +17,11 @@ import (
 
 // schemaSeam wires a per-statement response/error map for :schema tests via
 // the runStatementResponseFn seam. Statements are matched by exact string
-// (the schema queries are constants in schema.go).
+// (the schema queries are constants in schema.go). The mutex guards calls:
+// fetchLintSchema issues its probes from concurrent goroutines. resp/err are
+// read-only once installed and need no locking.
 type schemaSeam struct {
+	mu    sync.Mutex
 	calls []string
 	resp  map[string]*queryResponse
 	err   map[string]error
@@ -31,7 +35,9 @@ func newSchemaSeam() *schemaSeam {
 }
 
 func (s *schemaSeam) handle(_ context.Context, _ *conn, statement string, _ map[string]any, _ bool) (*queryResponse, error) {
+	s.mu.Lock()
 	s.calls = append(s.calls, statement)
+	s.mu.Unlock()
 	if e, ok := s.err[statement]; ok {
 		return nil, e
 	}

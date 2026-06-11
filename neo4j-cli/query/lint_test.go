@@ -276,6 +276,20 @@ func lintFetchSeam() *schemaSeam {
 		[]string{"defaultLanguage"},
 		[][]any{{"CYPHER 5"}},
 	)
+	s.resp[lintProceduresQuery] = makeQueryResponse(
+		[]string{"name", "description", "mode", "worksOnSystem", "argumentDescription", "returnDescription", "signature", "admin", "option"},
+		[][]any{{
+			"db.labels", "lists labels", "READ", false, []any{},
+			[]any{map[string]any{"name": "label", "description": "", "type": "STRING", "isDeprecated": false}},
+			"db.labels() :: (label :: STRING)", false, map[string]any{"deprecated": false},
+		}},
+	)
+	s.resp[lintFunctionsQuery] = makeQueryResponse(
+		[]string{"name", "category", "description", "signature", "isBuiltIn", "argumentDescription", "returnDescription", "aggregating", "isDeprecated"},
+		[][]any{{
+			"pi", "Numeric", "pi", "pi() :: FLOAT", true, []any{}, "FLOAT", false, false,
+		}},
+	)
 	return s
 }
 
@@ -356,7 +370,8 @@ func TestQueryLint_FetchSchema_FetchedDefaultLanguageApplies(t *testing.T) {
 }
 
 // TestQueryLint_FetchSchema_ExplicitVersionBeatsFetched verifies an explicit
-// --cypher-version overrides the fetched default language.
+// --cypher-version overrides the database's default language — and that the
+// SHOW DATABASES probe is not even issued (its result would be overwritten).
 func TestQueryLint_FetchSchema_ExplicitVersionBeatsFetched(t *testing.T) {
 	s := lintFetchSeam()
 	s.resp["SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage"] = makeQueryResponse(
@@ -372,6 +387,9 @@ func TestQueryLint_FetchSchema_ExplicitVersionBeatsFetched(t *testing.T) {
 		":lint", "RETURN 0123", "--fetch-schema", "--cypher-version", "5",
 	)
 	require.Error(t, err)
+
+	assert.NotContains(t, s.calls, "SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage",
+		"the default-language probe must be skipped when --cypher-version is explicit")
 
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
@@ -425,10 +443,11 @@ func TestQueryLint_FetchSchema_SummaryFailureFails(t *testing.T) {
 	assert.Empty(t, h.stdout.String(), "no diagnostics must print when the fetch fails")
 }
 
-// TestQueryLint_FetchSchema_LargeSchemaSkipsVisualization verifies the CLS
-// threshold heuristic: at >=200 labels+relTypes the visualization query is
-// not issued at all.
-func TestQueryLint_FetchSchema_LargeSchemaSkipsVisualization(t *testing.T) {
+// TestQueryLint_FetchSchema_LargeSchemaStillFetchesVisualization locks the
+// deliberate departure from CLS: no >=200 labels+relTypes threshold — the
+// visualization query is issued regardless of schema size (one-shot fetch,
+// not a poll loop; see the note in fetchLintSchema).
+func TestQueryLint_FetchSchema_LargeSchemaStillFetchesVisualization(t *testing.T) {
 	labels := make([]any, 200)
 	for i := range labels {
 		labels[i] = fmt.Sprintf("Label%03d", i)
@@ -447,8 +466,74 @@ func TestQueryLint_FetchSchema_LargeSchemaSkipsVisualization(t *testing.T) {
 		":lint", "MATCH (n:Label000) RETURN n", "--fetch-schema",
 	)
 	require.NoError(t, err)
-	assert.NotContains(t, s.calls, lintGraphSchemaQuery,
-		"visualization must be skipped above the threshold")
+	assert.Contains(t, s.calls, lintGraphSchemaQuery,
+		"visualization must be fetched even for large schemas")
+}
+
+// TestQueryLint_FetchSchema_UnknownProcedureError verifies the fetched
+// procedure registry makes a misspelled CALL an error-severity diagnostic
+// (exit 6) — unlike label/relType problems, an unknown procedure would fail
+// at run time.
+func TestQueryLint_FetchSchema_UnknownProcedureError(t *testing.T) {
+	s := lintFetchSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "CALL db.lables()", "--fetch-schema",
+	)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
+	assert.Equal(t, 6, ce.Code)
+	assert.Contains(t, s.calls, lintProceduresQuery)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.NotEmpty(t, rows)
+	assert.Equal(t, "error", rows[0]["severity"])
+	assert.Contains(t, rows[0]["message"], "db.lables")
+	assert.Contains(t, rows[0]["message"], "not present in the database")
+}
+
+// TestQueryLint_FetchSchema_KnownProcedureYieldClean verifies a registry
+// procedure lints clean including YIELD column resolution (the fetched rows
+// reached the analyzer's signature resolver intact).
+func TestQueryLint_FetchSchema_KnownProcedureYieldClean(t *testing.T) {
+	s := lintFetchSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "CALL db.labels() YIELD label RETURN label", "--fetch-schema",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "[]", strings.TrimSpace(h.stdout.String()))
+}
+
+// TestQueryLint_FetchSchema_RegistryProbeFailureSwallowed verifies failing
+// SHOW PROCEDURES/FUNCTIONS probes (restricted role, old server) leave the
+// procedure/function checks inactive without failing the command — no false
+// "not present" errors from a half-fetched schema.
+func TestQueryLint_FetchSchema_RegistryProbeFailureSwallowed(t *testing.T) {
+	s := lintFetchSeam()
+	delete(s.resp, lintProceduresQuery)
+	delete(s.resp, lintFunctionsQuery)
+	s.err[lintProceduresQuery] = errors.New("Neo.ClientError.Security.Forbidden: no SHOW PROCEDURES for you")
+	s.err[lintFunctionsQuery] = errors.New("Neo.ClientError.Security.Forbidden: no SHOW FUNCTIONS for you")
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "CALL db.lables()", "--fetch-schema",
+	)
+	require.NoError(t, err, "registry probe failures must not fail the command")
+	assert.Equal(t, "[]", strings.TrimSpace(h.stdout.String()))
 }
 
 // TestQueryLint_ParamDeclarationsEnableChecking verifies --param switches

@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/dop251/goja"
@@ -45,14 +44,36 @@ const (
 // Parameters switches the analyzer's parameter checking on: when set, every
 // $param absent from the map is an error; when nil, parameter errors are
 // suppressed entirely (parameters are assumed to be supplied externally).
+//
+// Procedures and Functions are upstream's ScopedRegistry shape: Cypher
+// dialect ("CYPHER 5"/"CYPHER 25") → name → the raw SHOW PROCEDURES/SHOW
+// FUNCTIONS row. Their presence makes unknown procedures/functions errors
+// and deprecated ones warnings, and feeds CALL/YIELD signature resolution.
+// Two sharp edges, both upstream:
+//   - The existence check consults only the resolved dialect's key. A
+//     populated Procedures/Functions map that is missing a dialect key makes
+//     EVERY procedure/function "unknown" for queries resolving to that
+//     dialect — populate both keys or neither.
+//   - The semantic-analysis wrapper swallows all exceptions, so registry
+//     entries the TeaVM signature resolver cannot digest silently disable
+//     every semantic check. Pass complete SHOW ... YIELD * rows through
+//     verbatim (as cypher-language-support's metadata poller does), never a
+//     hand-built subset.
 type DbSchema struct {
-	Labels            []string         `json:"labels,omitempty"`
-	RelationshipTypes []string         `json:"relationshipTypes,omitempty"`
-	PropertyKeys      []string         `json:"propertyKeys,omitempty"`
-	GraphSchema       []GraphSchemaRel `json:"graphSchema,omitempty"`
-	DefaultLanguage   string           `json:"defaultLanguage,omitempty"`
-	Parameters        map[string]any   `json:"parameters,omitempty"`
+	Labels            []string            `json:"labels,omitempty"`
+	RelationshipTypes []string            `json:"relationshipTypes,omitempty"`
+	PropertyKeys      []string            `json:"propertyKeys,omitempty"`
+	GraphSchema       []GraphSchemaRel    `json:"graphSchema,omitempty"`
+	DefaultLanguage   string              `json:"defaultLanguage,omitempty"`
+	Parameters        map[string]any      `json:"parameters,omitempty"`
+	Procedures        map[string]Registry `json:"procedures,omitempty"`
+	Functions         map[string]Registry `json:"functions,omitempty"`
 }
+
+// Registry maps a procedure/function name to its raw SHOW PROCEDURES / SHOW
+// FUNCTIONS row (driver-coerced, JSON-marshalable). Rows pass through to the
+// analyzer untouched — see the DbSchema doc for why subsetting is unsafe.
+type Registry map[string]map[string]any
 
 // GraphSchemaRel is one (from)-[relType]->(to) triple from
 // `CALL db.schema.visualization()`, the shape findPathIssues expects.
@@ -80,24 +101,13 @@ type Diagnostic struct {
 	End      Position
 }
 
-// The vendored artifact is an ES module; goja evaluates scripts only, so the
-// trailing export statement is rewritten into globalThis assignments before
-// evaluation. The marker is the artifact's exact final statement — its
-// minified identifiers change on every artifact rebuild, so a refresh must
-// update both constants; rewriteExports fails loudly and the README
-// documents the fix.
-const (
-	exportMarker      = "export{sWr as isNotParamError,cWr as lintCypherQuery};"
-	exportReplacement = "globalThis.isNotParamError=sWr;globalThis.lintCypherQuery=cWr;"
-)
-
-func rewriteExports(src string) (string, error) {
-	if !strings.Contains(src, exportMarker) {
-		return "", fmt.Errorf(
-			"cypherLint.js export marker not found: vendored artifact shape changed (see neo4j-cli/query/linter/README.md)")
-	}
-	return strings.Replace(src, exportMarker, exportReplacement, 1), nil
-}
+// The vendored artifact is an esbuild IIFE bundle (--format=iife
+// --global-name=cypherLint): evaluating it defines a single `cypherLint`
+// global object carrying the exports. goja evaluates scripts only (no ES
+// modules), and the global-name form needs no postprocessing — unlike the
+// minified identifiers inside the bundle, the global's name and its export
+// keys are stable across esbuild versions and rebuilds.
+const artifactGlobal = "cypherLint"
 
 // prelude shims the handful of browser/node globals and post-ES2017
 // built-ins the bundle expects that goja does not provide. WeakRef is a
@@ -156,8 +166,8 @@ const glue = `
 globalThis.lintJson = function(query, version, schemaJson) {
     const schema = schemaJson ? JSON.parse(schemaJson) : {};
     if (!schema.defaultLanguage) schema.defaultLanguage = version;
-    const r = lintCypherQuery(query, schema, { consoleCommandsEnabled: false });
-    const diags = schema.parameters ? r.diagnostics : r.diagnostics.filter(isNotParamError);
+    const r = cypherLint.lintCypherQuery(query, schema, { consoleCommandsEnabled: false });
+    const diags = schema.parameters ? r.diagnostics : r.diagnostics.filter(cypherLint.isNotParamError);
     const elem = (d) => ({
         message: d.message,
         start: { offset: d.offsets.start, line: d.range.start.line, column: d.range.start.character },
@@ -190,20 +200,21 @@ func getEngine() (*engine, error) {
 }
 
 func newEngine() (*engine, error) {
-	code, err := rewriteExports(cypherLintJS)
-	if err != nil {
-		return nil, fmt.Errorf("linter: %w", err)
-	}
 	vm := goja.New()
 	if _, err := vm.RunString(prelude); err != nil {
 		return nil, fmt.Errorf("linter: prelude: %w", err)
 	}
-	prog, err := goja.Compile("cypherLint.js", code, false)
+	prog, err := goja.Compile("cypherLint.js", cypherLintJS, false)
 	if err != nil {
 		return nil, fmt.Errorf("linter: compile cypherLint.js: %w", err)
 	}
 	if _, err := vm.RunProgram(prog); err != nil {
 		return nil, fmt.Errorf("linter: evaluate cypherLint.js: %w", err)
+	}
+	if v := vm.Get(artifactGlobal); v == nil || goja.IsUndefined(v) || goja.IsNull(v) {
+		return nil, fmt.Errorf(
+			"linter: %s global missing after artifact evaluation: vendored artifact not built with --global-name=%s (see neo4j-cli/query/linter/README.md)",
+			artifactGlobal, artifactGlobal)
 	}
 	if _, err := vm.RunString(glue); err != nil {
 		return nil, fmt.Errorf("linter: glue: %w", err)
@@ -262,6 +273,8 @@ func Lint(query string, version Version, schema *DbSchema) ([]Diagnostic, error)
 		return nil, fmt.Errorf("linter: decode analysis result: %w", err)
 	}
 
+	// Append order is load-bearing: errors go in before warnings so the
+	// stable sort below resolves equal-offset ties errors-first.
 	diags := make([]Diagnostic, 0, len(raw.Errors)+len(raw.Notifications))
 	for _, el := range raw.Errors {
 		diags = append(diags, Diagnostic{Severity: "error", Message: el.Message, Start: el.Start, End: el.End})
