@@ -13,6 +13,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,9 +67,9 @@ func TestSetPassword_DefaultPasswordChangeRequired_IsFalse(t *testing.T) {
 }
 
 func TestSetPassword_NoPassword_NoTTY_ReturnsUsageError(t *testing.T) {
-	origTTY := stdinIsTTY
-	stdinIsTTY = func() bool { return false }
-	t.Cleanup(func() { stdinIsTTY = origTTY })
+	origTTY := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return false }
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
 	_, _, _, _, err := runSetPassword(t, "alice", nil)
 	require.Error(t, err)
@@ -80,13 +81,13 @@ func TestSetPassword_NoPassword_NoTTY_ReturnsUsageError(t *testing.T) {
 }
 
 func TestSetPassword_NoPassword_TTY_PromptsViaPasswordReader(t *testing.T) {
-	origTTY := stdinIsTTY
-	stdinIsTTY = func() bool { return true }
-	t.Cleanup(func() { stdinIsTTY = origTTY })
+	origTTY := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return true }
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
-	origReader := passwordReader
-	passwordReader = func() (string, error) { return "prompted-pw", nil }
-	t.Cleanup(func() { passwordReader = origReader })
+	origReader := dbconn.PasswordReader
+	dbconn.PasswordReader = func() (string, error) { return "prompted-pw", nil }
+	t.Cleanup(func() { dbconn.PasswordReader = origReader })
 
 	_, _, _, params, err := runSetPassword(t, "alice", nil)
 	require.NoError(t, err)
