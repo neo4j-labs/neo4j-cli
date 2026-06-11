@@ -4,6 +4,7 @@
 package user
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,28 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
+
+// roleList wraps a []any slice of role names so that:
+//   - Table rendering calls String() → comma-joined string ("admin, PUBLIC")
+//   - JSON marshaling calls MarshalJSON() → array (["admin","PUBLIC"])
+type roleList []any
+
+func (r roleList) String() string {
+	parts := make([]string, 0, len(r))
+	for _, v := range r {
+		if s, ok := v.(string); ok {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func (r roleList) MarshalJSON() ([]byte, error) {
+	if r == nil {
+		return []byte("[]"), nil
+	}
+	return json.Marshal([]any(r))
+}
 
 // userExecFn is the package-level test seam. It is set by NewCmd in production
 // and replaced by tests to inject fake results without a real Bolt connection.
@@ -42,8 +65,8 @@ func promptPassword(cmd *cobra.Command, flagName string) (string, error) {
 }
 
 // normalizeUserRow normalizes a user record row for rendering:
-//   - nil roles → []any{} (renders as [] in JSON, "" in table)
-//   - []any roles → comma-joined string (renders cleanly in table format)
+//   - nil roles → roleList(nil) (renders as [] in JSON, "" in table)
+//   - []any roles → roleList (renders as array in JSON, comma-joined in table)
 //   - nil suspended → false
 func normalizeUserRow(row map[string]any) map[string]any {
 	out := make(map[string]any, len(row))
@@ -51,15 +74,9 @@ func normalizeUserRow(row map[string]any) map[string]any {
 		out[k] = v
 	}
 	if out["roles"] == nil {
-		out["roles"] = []any{}
+		out["roles"] = roleList(nil)
 	} else if slice, ok := out["roles"].([]any); ok {
-		parts := make([]string, 0, len(slice))
-		for _, r := range slice {
-			if s, ok := r.(string); ok {
-				parts = append(parts, s)
-			}
-		}
-		out["roles"] = strings.Join(parts, ", ")
+		out["roles"] = roleList(slice)
 	}
 	if out["suspended"] == nil {
 		out["suspended"] = false

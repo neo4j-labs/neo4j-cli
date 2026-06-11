@@ -1239,7 +1239,8 @@ tasks:
   - id: task-037
     title: "Fix normalizeUserRow: preserve roles array for JSON, comma-join only for table"
     source: review
-    status: in_progress
+    status: completed
+    completed_at: "2026-06-11T23:45:00Z"
     description: |
       normalizeUserRow in user/helpers.go unconditionally converts a []any roles value
       to a comma-joined string before PrintBodyMap runs. This means --format json now

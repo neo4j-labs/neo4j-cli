@@ -198,6 +198,9 @@ func getNestedField(v map[string]any, subFields []string) string {
 		if value == nil {
 			return ""
 		}
+		if s, ok := value.(fmt.Stringer); ok {
+			return s.String()
+		}
 		if reflect.TypeOf(value).Kind() == reflect.Slice {
 			marshaledSlice, _ := json.MarshalIndent(value, "", "  ")
 			return string(marshaledSlice)

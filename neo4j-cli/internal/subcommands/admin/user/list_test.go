@@ -82,6 +82,26 @@ func TestList_HappyPath_FormatJson(t *testing.T) {
 	assert.Equal(t, "alice", got[1]["user"])
 }
 
+func TestList_RolesArray_PreservedAsArray_InJson(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "neo4j", "roles": []any{"admin", "PUBLIC"}, "passwordChangeRequired": false, "suspended": false},
+	}
+
+	stdout, _, err := runList(t, "--format json", rows, nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	rolesRaw, ok := got[0]["roles"]
+	require.True(t, ok, "roles field must be present")
+	rolesSlice, ok := rolesRaw.([]any)
+	require.True(t, ok, "roles must be a JSON array ([]any), got %T: %v", rolesRaw, rolesRaw)
+	require.Len(t, rolesSlice, 2)
+	assert.Equal(t, "admin", rolesSlice[0])
+	assert.Equal(t, "PUBLIC", rolesSlice[1])
+}
+
 func TestList_HappyPath_FormatTable(t *testing.T) {
 	rows := []map[string]any{
 		{"user": "neo4j", "roles": []any{"admin"}, "passwordChangeRequired": false, "suspended": false},

@@ -5,6 +5,7 @@ package user
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -15,16 +16,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeUserRow_NilRoles_ReplacedWithEmptySlice(t *testing.T) {
+func TestNormalizeUserRow_NilRoles_ReplacedWithRoleListNil(t *testing.T) {
 	row := map[string]any{"user": "neo4j", "roles": nil, "suspended": false}
 	got := normalizeUserRow(row)
-	assert.Equal(t, []any{}, got["roles"])
+	rl, ok := got["roles"].(roleList)
+	require.True(t, ok, "expected roleList, got %T", got["roles"])
+	assert.Empty(t, rl, "nil roles must normalize to empty roleList")
+
+	jsonBytes, err := json.Marshal(rl)
+	require.NoError(t, err)
+	assert.Equal(t, "[]", string(jsonBytes), "nil roleList must marshal to JSON array")
 }
 
-func TestNormalizeUserRow_SliceRoles_ReplacedWithCommaString(t *testing.T) {
+func TestNormalizeUserRow_SliceRoles_ReplacedWithRoleList(t *testing.T) {
 	row := map[string]any{"user": "neo4j", "roles": []any{"admin", "PUBLIC"}, "suspended": false}
 	got := normalizeUserRow(row)
-	assert.Equal(t, "admin, PUBLIC", got["roles"])
+	rl, ok := got["roles"].(roleList)
+	require.True(t, ok, "expected roleList, got %T", got["roles"])
+	assert.Equal(t, "admin, PUBLIC", rl.String(), "roleList.String() must return comma-joined roles")
+
+	jsonBytes, err := json.Marshal(rl)
+	require.NoError(t, err)
+	assert.Equal(t, `["admin","PUBLIC"]`, string(jsonBytes), "roleList must marshal to JSON array")
 }
 
 func TestNormalizeUserRow_NilSuspended_ReplacedWithFalse(t *testing.T) {
