@@ -26,6 +26,9 @@ const (
 	unsupportedAdminCode = "Neo.ClientError.Statement.UnsupportedAdministrationCommand"
 	argumentErrorCode    = "Neo.ClientError.Statement.ArgumentError"
 	executionFailedCode  = "Neo.DatabaseError.Statement.ExecutionFailed"
+	syntaxErrorCode      = "Neo.ClientError.Statement.SyntaxError"
+
+	cypher25Prefix = "CYPHER 25 "
 )
 
 // adminStderrLogger routes all Bolt driver log output to stderr so it doesn't
@@ -157,9 +160,11 @@ func redactParams(params map[string]any) map[string]any {
 
 // RunAdminStatement executes a Cypher statement against the system database
 // and translates well-known Neo4j errors into actionable CLI errors.
+// All statements are automatically prefixed with "CYPHER 25 " to pin the
+// language version to Neo4j 2025.x syntax.
 func RunAdminStatement(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
 	runner := adminRunnerFn(cfg)
-	rows, err := runner.run(ctx, conn, cypher, params)
+	rows, err := runner.run(ctx, conn, cypher25Prefix+cypher, params)
 	if err != nil {
 		return nil, translateAdminError(err)
 	}
@@ -200,6 +205,12 @@ func translateNeo4jError(ne *neo4j.Neo4jError) error {
 		if strings.Contains(ne.Msg, "not available in community edition") {
 			return clierr.NewValidationError("%s", ne.Msg)
 		}
+	case syntaxErrorCode:
+		if strings.Contains(ne.Msg, "Invalid input 'CYPHER'") ||
+			(strings.Contains(ne.Msg, "version") && strings.Contains(ne.Msg, "not supported")) {
+			return clierr.NewValidationError("admin commands require Neo4j 2025.x or later (CYPHER 25 language version is not supported by this server)")
+		}
+		return clierr.NewValidationError("%w", ne)
 	}
 
 	if ne.Classification() == "ClientError" {

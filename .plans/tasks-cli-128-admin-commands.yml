@@ -1185,7 +1185,8 @@ tasks:
   - id: task-036
     title: "Prefix all admin Cypher with CYPHER 25; translate unsupported-version error (REQ-F-064)"
     source: qa
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T23:00:00Z"
     description: |
       All admin Cypher statements should be prefixed with "CYPHER 25 " to pin the
       Cypher language version. This eliminates cross-version syntax ambiguity and

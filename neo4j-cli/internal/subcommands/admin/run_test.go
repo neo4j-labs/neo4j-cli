@@ -156,6 +156,45 @@ func TestTranslateAdminError_ExecutionFailed_CommunityEdition(t *testing.T) {
 	assert.Contains(t, ce.Message, "not available in community edition")
 }
 
+func TestTranslateAdminError_SyntaxError_UnsupportedCypherVersion(t *testing.T) {
+	for _, msg := range []string{
+		"Invalid input 'CYPHER': expected ...",
+		"Cypher version not supported",
+	} {
+		t.Run(msg, func(t *testing.T) {
+			fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+				Code: "Neo.ClientError.Statement.SyntaxError",
+				Msg:  msg,
+			}}
+			withFakeRunner(t, fake)
+
+			_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestConn(), "SHOW DATABASES", nil)
+			require.Error(t, err)
+
+			var ce *clierr.CLIError
+			require.True(t, errors.As(err, &ce))
+			assert.Equal(t, 6, ce.Code) // validation_error
+			assert.Contains(t, ce.Message, "admin commands require Neo4j 2025.x or later")
+		})
+	}
+}
+
+func TestTranslateAdminError_SyntaxError_Generic_MappedToValidation(t *testing.T) {
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.SyntaxError",
+		Msg:  "Invalid input 'WRONG': expected something else",
+	}}
+	withFakeRunner(t, fake)
+
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestConn(), "INVALID CYPHER", nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code)                 // validation_error
+	assert.NotContains(t, ce.Message, "2025.x") // generic syntax error, not version error
+}
+
 func TestTranslateAdminError_AlreadyCLIError_PassThrough(t *testing.T) {
 	original := clierr.NewNotFoundError("something not found")
 	fake := &fakeQueryRunner{err: original}
