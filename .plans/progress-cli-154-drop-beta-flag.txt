@@ -2,6 +2,10 @@
 Deleted `TestRegistry_AuraBetaEntry` from `common/clicfg/flags_test.go` and replaced all `flag.aura-beta` hardcodes in `flags_test.go` and `clicfg_test.go` with a `flag.test-sentinel` seeded via a `registerTestFlag` helper that swaps Registry for the test duration. `TestFlagNameToEnv`'s `aura-beta` row was replaced with a `multi-word-feature` case since that function is purely a string transform needing no Registry entry.
 Files: ~common/clicfg/flags_test.go, ~common/clicfg/clicfg_test.go
 
+## TASK-004 — 2026-06-11T00:00:00Z
+Removed all `SetConfigValue("flag.aura-beta", true)` and `SetForTest("flag.aura-beta", true)` setup lines from aura subcommand test files; also removed the `"beta-enabled": true` field from the inline config JSON in `utils/resolve_test.go` and updated `buildResourceServer` call-site paths from `v1beta5` to `v1` to reflect the now-unconditional version routing. The beta-enabled-rejection assertions in `aura/config/set_test.go`, `aura/config/list_test.go`, and the `TestGetConfigBetaEnabled` assertion in `aura/config/get_test.go` are preserved.
+Files: ~neo4j-cli/aura/internal/subcommands/organization/get_test.go, ~organization/list_test.go, ~workspace/use_test.go, ~workspace/list_test.go, ~workspace/validate_test.go, ~project/list_test.go, ~utils/resolve_test.go, ~config/get_test.go, ~config/set_test.go
+
 ## TASK-002 — 2026-06-11T00:00:00Z
 Added config migration v1 to `common/configmigrate/migrations.go` using `sjson.DeleteBytes` with escaped dot (`flag\.aura-beta`) for the flat key and unescaped dot (`aura.beta-enabled`) for the nested path. Also fixed a latent panic in `configmigrate.go` where `fileutils.WriteFile` (which panics on error) was called — switched to `WriteFileErr` with warn-and-continue, consistent with the engine's error policy; this was exposed by the docker test's `renameFailFs`.
 Files: ~common/configmigrate/migrations.go, ~common/configmigrate/configmigrate_test.go, ~common/configmigrate/configmigrate.go

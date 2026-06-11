@@ -75,7 +75,7 @@ tasks:
       (line ~66) while preserving the assertion that beta-enabled is rejected as an invalid
       argument. The aura/config/list_test.go and set_test.go assertions about beta-enabled
       being rejected remain unchanged.
-    status: in_progress
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -83,7 +83,7 @@ tasks:
       - "utils/resolve_test.go contains no beta-enabled literal in config JSON fixtures"
       - "The aura config get_test.go assertion that beta-enabled is an invalid argument is preserved"
       - "go test ./neo4j-cli/aura/internal/subcommands/... passes"
-    completed_at: null
+    completed_at: "2026-06-11T00:00:00Z"
 
   - id: task-005
     title: "Remove TestRegistry_AuraBetaEntry and any flag.aura-beta hardcodes from flags_test.go"

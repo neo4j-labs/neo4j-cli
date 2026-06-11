@@ -137,8 +137,6 @@ func TestSetDefaultWorkspace(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("flag.aura-beta", true)
-
 			if tc.status != 0 {
 				mockHandler := helper.NewRequestHandlerMock(
 					fmt.Sprintf("/v2beta1/organizations/%s/projects", orgID),

@@ -53,8 +53,6 @@ func TestListOrganizations(t *testing.T) {
 			helper := testutils.NewAuraTestHelper(t)
 			defer helper.Close()
 
-			helper.SetConfigValue("flag.aura-beta", true)
-
 			mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations", tc.status, tc.body)
 
 			helper.ExecuteCommand("organization list")
@@ -105,8 +103,6 @@ func TestListOrganizationsWithCredentialFlag(t *testing.T) {
 				},
 				"default-credential": "",
 			})
-
-			helper.SetConfigValue("flag.aura-beta", true)
 
 			mockHandler := helper.NewRequestHandlerMock("/v2beta1/organizations", http.StatusOK, `{"data": []}`)
 
