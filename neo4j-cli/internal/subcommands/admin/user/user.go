@@ -6,6 +6,7 @@ package user
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
@@ -13,16 +14,16 @@ import (
 // NewCmd returns the `admin user` parent cobra command. execFn is the Cypher
 // execution function injected by the parent (admin.RunAdminStatement in
 // production); passing it here avoids an import cycle between the user and
-// admin packages.
-func NewCmd(cfg *clicfg.Config, credential *string, execFn adminutil.ExecFn) *cobra.Command {
+// admin packages. conn is a pointer to the connection resolved by admin's
+// PersistentPreRunE and shared with all leaf commands.
+func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command {
 	userExecFn = execFn
 
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Manage Neo4j users via the system database",
 		Long: "Manage Neo4j users. Read commands (list, get) do not require --rw. " +
-			"Write commands (create, drop, rename, set-password, suspend, activate) require --rw and use the " +
-			"dbms credential named by --credential on the parent `admin` command.",
+			"Write commands (create, drop, rename, set-password, suspend, activate) require --rw.",
 		Example: `# Show help for the user subcommands
 neo4j-cli admin user --help
 
@@ -30,14 +31,14 @@ neo4j-cli admin user --help
 neo4j-cli admin user list --credential local --format json`,
 	}
 
-	cmd.AddCommand(newListCmd(cfg, credential))
-	cmd.AddCommand(newGetCmd(cfg, credential))
-	cmd.AddCommand(newCreateCmd(cfg, credential))
-	cmd.AddCommand(newDropCmd(cfg, credential))
-	cmd.AddCommand(newRenameCmd(cfg, credential))
-	cmd.AddCommand(newSetPasswordCmd(cfg, credential))
-	cmd.AddCommand(newSuspendCmd(cfg, credential))
-	cmd.AddCommand(newActivateCmd(cfg, credential))
+	cmd.AddCommand(newListCmd(cfg, conn))
+	cmd.AddCommand(newGetCmd(cfg, conn))
+	cmd.AddCommand(newCreateCmd(cfg, conn))
+	cmd.AddCommand(newDropCmd(cfg, conn))
+	cmd.AddCommand(newRenameCmd(cfg, conn))
+	cmd.AddCommand(newSetPasswordCmd(cfg, conn))
+	cmd.AddCommand(newSuspendCmd(cfg, conn))
+	cmd.AddCommand(newActivateCmd(cfg, conn))
 
 	return cmd
 }

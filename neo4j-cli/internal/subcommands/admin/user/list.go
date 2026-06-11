@@ -6,19 +6,19 @@ package user
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 )
 
 var listFields = []string{"user", "roles", "passwordChangeRequired", "suspended"}
 
-func newListCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newListCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all users",
 		Long: "List all users visible from the system database. " +
-			"Renders user, roles, passwordChangeRequired, and suspended columns. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Renders user, roles, passwordChangeRequired, and suspended columns.",
 		Example: `# List all users as a table
 neo4j-cli admin user list --credential local
 
@@ -27,11 +27,7 @@ neo4j-cli admin user list --credential local --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			rows, err := userExecFn(cmd.Context(), cfg, cred, "SHOW USERS", nil)
+			rows, err := userExecFn(cmd.Context(), cfg, *conn, "SHOW USERS", nil)
 			if err != nil {
 				return err
 			}

@@ -13,7 +13,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,16 +21,10 @@ import (
 func runActivate(t *testing.T, args string, execErr error) (string, string, string, map[string]any, error) {
 	t.Helper()
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := "local"
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
 	captureFn, getCypher, getParams := captureExecFn(t, execErr)
-	cmd := NewCmd(cfg, &credential, captureFn)
+	cmd := NewCmd(cfg, &conn, captureFn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -76,14 +70,9 @@ func TestActivate_ExecError_PropagatesError(t *testing.T) {
 }
 
 func TestActivate_WriteAnnotation(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, nil, nil))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, nil, nil))
 	for _, sub := range cmd.Commands() {
 		if sub.Name() == "activate" {
 			assert.Equal(t, "true", sub.Annotations["write"], "activate must be annotated write=true")
@@ -94,14 +83,9 @@ func TestActivate_WriteAnnotation(t *testing.T) {
 }
 
 func TestActivate_NoArgs_CobraUsageError(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, nil, nil))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, nil, nil))
 	flags.RegisterOutputFlag(cmd, cfg)
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)

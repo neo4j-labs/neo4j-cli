@@ -12,12 +12,12 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
 	"github.com/neo4j/cli/common/confirm/confirmtest"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,19 +25,14 @@ import (
 func buildDropCmd(t *testing.T, stdin string) (*bytes.Buffer, *bytes.Buffer, func(args string) error) {
 	t.Helper()
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 
 	out := bytes.NewBuffer(nil)
 	errBuf := bytes.NewBuffer(nil)
 
-	credential := "local"
+	conn := testConn()
 	run := func(args string) error {
-		cmd := NewCmd(cfg, &credential, userExecFn)
+		cmd := NewCmd(cfg, &conn, userExecFn)
 		flags.RegisterOutputFlag(cmd, cfg)
 		cmd.SetOut(out)
 		cmd.SetErr(errBuf)
@@ -54,7 +49,7 @@ func runDrop(t *testing.T, args string, execErr error) (string, string, error) {
 	t.Helper()
 
 	orig := userExecFn
-	userExecFn = func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, _ string, _ map[string]any) ([]map[string]any, error) {
+	userExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
 		return nil, execErr
 	}
 	t.Cleanup(func() { userExecFn = orig })
@@ -73,7 +68,7 @@ func TestDrop_ConfirmGate(t *testing.T) {
 		Run: func(t *testing.T, args, stdin string) confirmtest.GateRunResult {
 			var invoked bool
 			orig := userExecFn
-			userExecFn = func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, _ string, _ map[string]any) ([]map[string]any, error) {
+			userExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
 				invoked = true
 				return []map[string]any{}, nil
 			}
@@ -104,14 +99,9 @@ func TestDrop_ExecError_PropagatesError(t *testing.T) {
 }
 
 func TestDrop_WriteAnnotation(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, nil, nil))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, nil, nil))
 	for _, sub := range cmd.Commands() {
 		if sub.Name() == "drop" {
 			assert.Equal(t, "true", sub.Annotations["write"], "drop must be annotated write=true")

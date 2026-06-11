@@ -13,10 +13,10 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ func runStart(t *testing.T, args string, execResponses []execResponse) (string, 
 
 	idx := 0
 	orig := dbExecFn
-	dbExecFn = func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, _ string, _ map[string]any) ([]map[string]any, error) {
+	dbExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
 		if idx >= len(execResponses) {
 			return nil, nil
 		}
@@ -38,15 +38,9 @@ func runStart(t *testing.T, args string, execResponses []execResponse) (string, 
 	}
 	t.Cleanup(func() { dbExecFn = orig })
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, dbExecFn)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, dbExecFn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -122,15 +116,9 @@ func TestStart_NoArgs_CobraUsageError(t *testing.T) {
 }
 
 func TestStart_HasWriteAnnotation(t *testing.T) {
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [], "default-credential": ""},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := ""
-	cmd := NewCmd(cfg, &credential, dbExecFn)
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, dbExecFn)
 
 	var found bool
 	for _, c := range cmd.Commands() {

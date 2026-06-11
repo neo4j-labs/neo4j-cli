@@ -6,18 +6,17 @@ package user
 import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/confirm"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
 
-func newDropCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newDropCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "drop <username>",
 		Short:       "Drop a Neo4j user",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Drop (delete) a user from the system database. " +
-			"Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"Destructive: requires --yes --force (or a y answer at the TTY prompt) when invoked non-interactively.",
 		Example: `# Drop a user with confirmation prompt (TTY only)
 neo4j-cli admin user drop alice --credential local --rw
 
@@ -30,11 +29,7 @@ neo4j-cli admin user drop alice --credential local --rw --yes --force`,
 			if err := confirm.Require(cmd, name); err != nil {
 				return err
 			}
-			cred, err := adminutil.ResolveCredential(cfg, credential)
-			if err != nil {
-				return err
-			}
-			_, err = userExecFn(cmd.Context(), cfg, cred, "DROP USER $name", map[string]any{"name": name})
+			_, err := userExecFn(cmd.Context(), cfg, *conn, "DROP USER $name", map[string]any{"name": name})
 			return err
 		},
 	}

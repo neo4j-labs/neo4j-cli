@@ -13,14 +13,24 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
-	"github.com/neo4j/cli/test/utils/testfs"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testConn returns a *dbconn.Conn for use in tests. The connection params are
+// never used because tests always override userExecFn with a fake.
+func testConn() *dbconn.Conn {
+	return &dbconn.Conn{
+		URI:      "neo4j://localhost:7687",
+		Username: "neo4j",
+		Password: "test",
+	}
+}
 
 // fakeExecFn returns an adminutil.ExecFn that returns the supplied rows or error.
 // It also registers a cleanup that restores userExecFn to its original value.
@@ -28,26 +38,19 @@ func fakeExecFn(t *testing.T, rows []map[string]any, execErr error) adminutil.Ex
 	t.Helper()
 	orig := userExecFn
 	t.Cleanup(func() { userExecFn = orig })
-	return func(_ context.Context, _ *clicfg.Config, _ *credentials.DbmsCredential, _ string, _ map[string]any) ([]map[string]any, error) {
+	return func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
 		return rows, execErr
 	}
 }
 
-// runList builds the `admin user list` command tree with a fake credential and
-// the supplied exec-fn rows, then executes it with args. Returns stdout, stderr,
-// and the execution error.
+// runList builds the `admin user list` command tree with a fake conn and
+// the supplied exec-fn rows, then executes it with args.
 func runList(t *testing.T, args string, rows []map[string]any, execErr error) (string, string, error) {
 	t.Helper()
 
-	fs, err := testfs.GetTestFs(`{}`, `{
-		"dbms": {"credentials": [{"name":"local","uri":"neo4j://localhost:7687","username":"neo4j","password":"pw","databaseName":"neo4j"}], "default-credential": "local"},
-		"embed": {"credentials": [], "default-credential": ""}
-	}`)
-	require.NoError(t, err)
-	cfg := clicfg.NewConfig(fs, "test", clicfg.GlobalScope)
-
-	credential := "local"
-	cmd := NewCmd(cfg, &credential, fakeExecFn(t, rows, execErr))
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, fakeExecFn(t, rows, execErr))
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)

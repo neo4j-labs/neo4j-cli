@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
 
-func newSetPasswordCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
+func newSetPasswordCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	var password string
 	var passwordChangeRequired bool
 
@@ -21,8 +21,7 @@ func newSetPasswordCmd(cfg *clicfg.Config, credential *string) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Long: "Set the password for an existing user in the system database. " +
 			"If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
-			"--password-change-required (default false) controls whether the user must change their password on next login. " +
-			"Uses the dbms credential named by --credential on the parent `admin` command.",
+			"--password-change-required (default false) controls whether the user must change their password on next login.",
 		Example: `# Set a user's password interactively (password will be prompted)
 neo4j-cli admin user set-password alice --credential local --rw
 
@@ -34,11 +33,6 @@ neo4j-cli admin user set-password bob --password newsecret --password-change-req
 			name := args[0]
 
 			pw, err := promptPassword(cmd)
-			if err != nil {
-				return err
-			}
-
-			cred, err := adminutil.ResolveCredential(cfg, credential)
 			if err != nil {
 				return err
 			}
@@ -57,7 +51,7 @@ neo4j-cli admin user set-password bob --password newsecret --password-change-req
 				"password": pw,
 			}
 
-			_, err = userExecFn(cmd.Context(), cfg, cred, cypher, params)
+			_, err = userExecFn(cmd.Context(), cfg, *conn, cypher, params)
 			return err
 		},
 	}
