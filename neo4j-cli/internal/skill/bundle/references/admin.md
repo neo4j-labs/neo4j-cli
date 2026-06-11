@@ -10,7 +10,10 @@
 - [neo4j-cli admin database start](#neo4j-cli-admin-database-start)
 - [neo4j-cli admin database stop](#neo4j-cli-admin-database-stop)
 - [neo4j-cli admin privilege](#neo4j-cli-admin-privilege)
+- [neo4j-cli admin privilege deny](#neo4j-cli-admin-privilege-deny)
+- [neo4j-cli admin privilege grant](#neo4j-cli-admin-privilege-grant)
 - [neo4j-cli admin privilege list](#neo4j-cli-admin-privilege-list)
+- [neo4j-cli admin privilege revoke](#neo4j-cli-admin-privilege-revoke)
 - [neo4j-cli admin role](#neo4j-cli-admin-role)
 - [neo4j-cli admin role create](#neo4j-cli-admin-role-create)
 - [neo4j-cli admin role drop](#neo4j-cli-admin-role-drop)
@@ -214,6 +217,80 @@ neo4j-cli admin privilege --help
 neo4j-cli admin privilege list --credential local --format json
 ```
 
+### neo4j-cli admin privilege deny
+
+Deny a privilege to a role (Enterprise only)
+
+Deny a privilege to a role in the system database. Executes DENY <action> ON <resource> TO <role>. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. The --action flag accepts Neo4j privilege keywords (case-insensitive; use _ or space as word separator). Resource target is controlled by --on-graph (default), --on-database, or --on-dbms (mutually exclusive). Graph-scoped qualifiers --node-label, --relationship-type, and --property are only valid with --on-graph.
+
+Usage: `neo4j-cli admin privilege deny [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--action` | string | - | Privilege action keyword (required; e.g. read, write, access, create_role) |
+| `--node-label` | stringArray | [] | Node label qualifier (repeatable; only valid with --on-graph) |
+| `--on-database` | string | - | Target a specific database by name |
+| `--on-dbms` | bool | false | Target the DBMS (for DBMS-level privileges) |
+| `--on-graph` | string | - | Target a specific graph by name (default: * when no resource flag is set) |
+| `--property` | stringArray | [] | Property name qualifier (repeatable; only valid with --on-graph; default: all properties) |
+| `--relationship-type` | stringArray | [] | Relationship type qualifier (repeatable; only valid with --on-graph) |
+| `--role` | string | - | Role name to deny the privilege to (required) |
+
+Examples:
+
+```
+# Deny WRITE on all graphs to the readonly role
+neo4j-cli admin privilege deny --action write --on-graph '*' --role readonly --credential local --rw
+
+# Deny ACCESS on a specific database to a role
+neo4j-cli admin privilege deny --action access --on-database restricted --role readonly --credential local --rw
+
+# Deny a DBMS-level privilege to a role
+neo4j-cli admin privilege deny --action create_user --on-dbms --role limited --credential local --rw
+
+# Deny READ on specific nodes to a role
+neo4j-cli admin privilege deny --action read --on-graph neo4j --node-label Secret --role analyst --credential local --rw
+```
+
+### neo4j-cli admin privilege grant
+
+Grant a privilege to a role (Enterprise only)
+
+Grant a privilege to a role in the system database. Executes GRANT <action> ON <resource> TO <role>. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. The --action flag accepts Neo4j privilege keywords (case-insensitive; use _ or space as word separator). Resource target is controlled by --on-graph (default), --on-database, or --on-dbms (mutually exclusive). Graph-scoped qualifiers --node-label, --relationship-type, and --property are only valid with --on-graph.
+
+Usage: `neo4j-cli admin privilege grant [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--action` | string | - | Privilege action keyword (required; e.g. read, write, access, create_role) |
+| `--node-label` | stringArray | [] | Node label qualifier (repeatable; only valid with --on-graph) |
+| `--on-database` | string | - | Target a specific database by name |
+| `--on-dbms` | bool | false | Target the DBMS (for DBMS-level privileges) |
+| `--on-graph` | string | - | Target a specific graph by name (default: * when no resource flag is set) |
+| `--property` | stringArray | [] | Property name qualifier (repeatable; only valid with --on-graph; default: all properties) |
+| `--relationship-type` | stringArray | [] | Relationship type qualifier (repeatable; only valid with --on-graph) |
+| `--role` | string | - | Role name to grant the privilege to (required) |
+
+Examples:
+
+```
+# Grant READ on all graphs to the analyst role
+neo4j-cli admin privilege grant --action read --on-graph '*' --role analyst --credential local --rw
+
+# Grant ACCESS on a specific database to a role
+neo4j-cli admin privilege grant --action access --on-database neo4j --role analyst --credential local --rw
+
+# Grant a DBMS-level privilege to a role
+neo4j-cli admin privilege grant --action create_role --on-dbms --role admin --credential local --rw
+
+# Grant READ on specific nodes and property to a role
+neo4j-cli admin privilege grant --action read --on-graph neo4j --node-label Person --property name --role analyst --credential local --rw
+```
+
 ### neo4j-cli admin privilege list
 
 List privileges (Enterprise only)
@@ -243,6 +320,44 @@ neo4j-cli admin privilege list --credential local --role analyst --format json
 
 # List privileges for a specific user
 neo4j-cli admin privilege list --credential local --user alice
+```
+
+### neo4j-cli admin privilege revoke
+
+Revoke a privilege from a role (Enterprise only)
+
+Revoke a privilege from a role in the system database. Executes REVOKE [GRANT|DENY] <action> ON <resource> FROM <role>. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error. Use --revoke-type grant to revoke only a GRANT, --revoke-type deny to revoke only a DENY, or omit --revoke-type to revoke both. The --action flag accepts Neo4j privilege keywords (case-insensitive; use _ or space as word separator). Resource target is controlled by --on-graph (default), --on-database, or --on-dbms (mutually exclusive). Graph-scoped qualifiers --node-label, --relationship-type, and --property are only valid with --on-graph.
+
+Usage: `neo4j-cli admin privilege revoke [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--action` | string | - | Privilege action keyword (required; e.g. read, write, access, create_role) |
+| `--node-label` | stringArray | [] | Node label qualifier (repeatable; only valid with --on-graph) |
+| `--on-database` | string | - | Target a specific database by name |
+| `--on-dbms` | bool | false | Target the DBMS (for DBMS-level privileges) |
+| `--on-graph` | string | - | Target a specific graph by name (default: * when no resource flag is set) |
+| `--property` | stringArray | [] | Property name qualifier (repeatable; only valid with --on-graph; default: all properties) |
+| `--relationship-type` | stringArray | [] | Relationship type qualifier (repeatable; only valid with --on-graph) |
+| `--revoke-type` | string | - | Revoke only a GRANT or DENY: grant\|deny (default: revoke both) |
+| `--role` | string | - | Role name to revoke the privilege from (required) |
+
+Examples:
+
+```
+# Revoke READ on all graphs from the analyst role (revokes both GRANT and DENY)
+neo4j-cli admin privilege revoke --action read --on-graph '*' --role analyst --credential local --rw
+
+# Revoke only a GRANT of WRITE from a role
+neo4j-cli admin privilege revoke --action write --on-graph '*' --role analyst --revoke-type grant --credential local --rw
+
+# Revoke only a DENY of ACCESS from a role on a specific database
+neo4j-cli admin privilege revoke --action access --on-database neo4j --role readonly --revoke-type deny --credential local --rw
+
+# Revoke a DBMS-level privilege from a role
+neo4j-cli admin privilege revoke --action create_role --on-dbms --role limited --credential local --rw
 ```
 
 ## neo4j-cli admin role
