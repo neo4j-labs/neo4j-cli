@@ -37,7 +37,7 @@ neo4j-cli admin user drop alice --credential local --rw --yes --force`,
 			}
 			if _, err := userExecFn(cmd.Context(), cfg, *conn, "DROP USER $name", map[string]any{"name": name}); err != nil {
 				var ne *neo4j.Neo4jError
-				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Security.InvalidArguments" &&
+				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
 					strings.Contains(ne.Msg, "does not exist") {
 					return clierr.NewNotFoundError("user %q not found", name)
 				}

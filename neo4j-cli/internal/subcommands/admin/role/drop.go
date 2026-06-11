@@ -39,7 +39,7 @@ neo4j-cli admin role drop analyst --credential local --rw --yes --force`,
 			}
 			if _, err := roleExecFn(cmd.Context(), cfg, *conn, "DROP ROLE $name", map[string]any{"name": name}); err != nil {
 				var ne *neo4j.Neo4jError
-				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Security.InvalidArguments" &&
+				if errors.As(err, &ne) && ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
 					strings.Contains(ne.Msg, "does not exist") {
 					return clierr.NewNotFoundError("role %q not found", name)
 				}

@@ -103,8 +103,8 @@ func TestDrop_ExecError_PropagatesError(t *testing.T) {
 func TestDrop_NotFound_ReturnsNotFoundError(t *testing.T) {
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 	notFoundErr := &neo4j.Neo4jError{
-		Code: "Neo.ClientError.Security.InvalidArguments",
-		Msg:  "User 'ghost' does not exist.",
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "Failed to delete the specified user 'ghost': User does not exist.",
 	}
 	_, _, err := runDrop(t, "ghost --yes --force", notFoundErr)
 	require.Error(t, err)
@@ -112,6 +112,26 @@ func TestDrop_NotFound_ReturnsNotFoundError(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 3, ce.Code)
 	assert.Contains(t, ce.Message, `"ghost"`)
+}
+
+func TestDrop_InvalidArguments_DoesNotReturnNotFound(t *testing.T) {
+	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
+	// The old wrong code; must NOT trigger not_found to prevent regression.
+	invalidArgsErr := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Security.InvalidArguments",
+		Msg:  "Some other security error does not exist.",
+	}
+	_, _, err := runDrop(t, "ghost --yes --force", invalidArgsErr)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	if errors.As(err, &ce) {
+		assert.NotEqual(t, 3, ce.Code, "InvalidArguments must not produce not_found exit code")
+	}
+	// The raw Neo4jError is returned (not translated) confirming it was not matched
+	// as a not-found condition.
+	var ne *neo4j.Neo4jError
+	require.True(t, errors.As(err, &ne), "expect the raw Neo4jError to propagate unchanged")
+	assert.Equal(t, "Neo.ClientError.Security.InvalidArguments", ne.Code)
 }
 
 func TestDrop_WriteAnnotation(t *testing.T) {
