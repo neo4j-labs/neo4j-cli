@@ -139,6 +139,23 @@ func TestTranslateAdminError_HomeDatabase_CommunityEdition(t *testing.T) {
 	assert.Contains(t, ce.Message, "community edition")
 }
 
+func TestTranslateAdminError_ExecutionFailed_CommunityEdition(t *testing.T) {
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+		Code: "Neo.DatabaseError.Statement.ExecutionFailed",
+		Msg:  "Failed to alter the specified user 'x': 'SET STATUS' is not available in community edition.",
+	}}
+	withFakeRunner(t, fake)
+
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestConn(), "ALTER USER x SET STATUS SUSPENDED", nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code)
+	assert.False(t, ce.Retryable)
+	assert.Contains(t, ce.Message, "not available in community edition")
+}
+
 func TestTranslateAdminError_AlreadyCLIError_PassThrough(t *testing.T) {
 	original := clierr.NewNotFoundError("something not found")
 	fake := &fakeQueryRunner{err: original}

@@ -607,7 +607,7 @@ tasks:
         - Run go generate ./neo4j-cli/internal/skill/... (Use/Example changed).
 
       Run make test, make fmt-check, make lint as final gates.
-    status: not_started
+    status: in_progress
     dependencies:
       - task-014
     acceptance_criteria:
@@ -640,7 +640,7 @@ tasks:
         - nonexistent role → not_found (exit 3)
 
       Run make test, make fmt-check, make lint.
-    status: not_started
+    status: in_progress
     dependencies:
       - task-009
     acceptance_criteria:
@@ -671,7 +671,7 @@ tasks:
       Add test cases in drop_test.go for each resource covering the not-found path.
 
       Run make test, make fmt-check, make lint.
-    status: not_started
+    status: in_progress
     dependencies:
       - task-012
     acceptance_criteria:
@@ -706,7 +706,8 @@ tasks:
       Assert the result is validation_error, retryable:false, exit 6.
 
       Run make test, make fmt-check, make lint.
-    status: not_started
+    status: completed
+    completed_at: "2026-06-11T15:00:00Z"
     dependencies:
       - task-013
     acceptance_criteria:
