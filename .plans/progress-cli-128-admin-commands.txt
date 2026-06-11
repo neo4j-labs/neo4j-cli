@@ -165,3 +165,6 @@ Files: ~role/create.go, ~role/create_test.go, ~user/helpers.go, ~user/list.go, ~
 ## task-035 — 2026-06-11T22:00:00Z
 Wire conn.Debug to Bolt driver ConsoleLogger and add Cypher trace logging with redactParams in boltAdminRunner. Added `adminStderrLogger` type implementing `log.Logger` interface (routes all driver log levels to stderr). Updated `boltAdminRunner.run()` to build driver opts as a slice: base config func plus optional debug func (`c.Log = newAdminStderrLogger()`) when `conn.Debug == true`. Wrote `[debug] admin cypher: <cypher>` and (if params non-empty) `[debug] admin params: <redacted>` to `os.Stderr` before `tx.Run`. Added `redactParams()` helper (case-insensitive substring match on password/passwd/secret/token/key/credential → "***", other keys pass through). Added `TestRedactParams` table (16 cases: 12 secret keys × case variants, 3 non-secret keys) and `TestRedactParams_EmptyMap`, `TestRedactParams_NilMap`. All gates pass: make test (zero failures), make fmt-check (clean), make lint (0 issues).
 Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcommands/admin/run_test.go
+
+## REVIEW — 2026-06-11T14:00:00Z
+Added 4 review tasks (task-037..task-040).

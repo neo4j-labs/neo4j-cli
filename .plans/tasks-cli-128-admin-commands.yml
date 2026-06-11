@@ -1,7 +1,7 @@
 feature: cli-128-admin-commands
 prd: ./prd-cli-128-admin-commands.md
 created_at: "2026-06-04T08:15:00Z"
-updated_at: "2026-06-11T12:30:00Z"
+updated_at: "2026-06-11T14:00:00Z"
 
 tasks:
   - id: task-001
@@ -1234,4 +1234,161 @@ tasks:
       - "translateNeo4jError translates SyntaxError with 'Invalid input CYPHER' to the version-requirement message"
       - "run_test.go has a test case for the unsupported-version SyntaxError path"
       - "The version-error translation takes priority over the generic SyntaxError ClientError path"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-037
+    title: "Fix normalizeUserRow: preserve roles array for JSON, comma-join only for table"
+    source: review
+    status: pending
+    description: |
+      normalizeUserRow in user/helpers.go unconditionally converts a []any roles value
+      to a comma-joined string before PrintBodyMap runs. This means --format json now
+      returns "roles": "admin, PUBLIC" instead of "roles": ["admin", "PUBLIC"], breaking
+      the JSON output contract for any script parsing the output. The intent of REQ-F-061
+      was to fix the table rendering, not the JSON output.
+
+      The fix: remove the []any → string conversion from normalizeUserRow. Instead, make
+      table rendering handle the join natively. Two options:
+
+      Option A (preferred): In normalizeUserRow, leave []any roles as-is. In user/list.go
+      and user/get.go (and outputUser), pass a custom column-formatter to PrintBodyMap that
+      joins string slices for table format but leaves them alone for JSON. Look at how
+      commonoutput.PrintBodyMap accepts its field list and whether it supports per-column
+      formatters. If not, wrap the value in a fmt.Stringer that returns the comma-joined
+      string — the table renderer will call String(), JSON marshaling will use the raw value.
+
+      Option B (simpler): Keep normalizeUserRow for the nil→[] and nil→false normalization
+      only. Add a separate normalizeUserRowForTable helper that additionally does the
+      []any → string join, and call it only inside the table-specific code path. Check if
+      cfg.Aura.Format (or equivalent) tells us the output format, and branch there.
+
+      The nil→[]any{} and nil→false normalizations for roles and suspended are correct for
+      all formats and must be preserved.
+
+      Update list_test.go and helpers_test.go to assert:
+        - --format json returns "roles": ["admin", "PUBLIC"] (array), not the string
+        - --format table returns "admin, PUBLIC" (comma-joined string)
+        - nil roles → [] in JSON, "" in table
+    dependencies:
+      - task-034
+    acceptance_criteria:
+      - "'user list --format json' returns \"roles\": [\"admin\", \"PUBLIC\"] (JSON array, not string) for Enterprise users"
+      - "'user list --format table' renders roles as 'admin, PUBLIC' comma-joined string in the cell"
+      - "nil roles → [] in JSON, '' in table"
+      - "nil suspended → false in all formats"
+      - "Tests verify both JSON and table rendering for non-nil and nil roles"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-038
+    title: "Apply normalization in user get RunE (consistency with list and write commands)"
+    source: review
+    status: pending
+    description: |
+      user/get.go's RunE calls PrintBodyMap directly on raw rows without applying
+      normalizeUserRow, while user list (via list.go RunE loop) and all write commands
+      (via outputUser) do normalize. This means 'user get' is inconsistent:
+        - --format table still shows multi-line JSON for roles on Enterprise
+        - --format json still returns null for roles and suspended on Community
+
+      The fix is simple: apply the same normalization loop inside get.go's RunE, or
+      route through outputUser (which already normalizes). Since outputUser is called
+      with a name and fetches the record itself, get.go can either:
+        (a) Apply the normalizeUserRow loop inline (same pattern as list.go uses), or
+        (b) Delegate to outputUser after the not-found check.
+
+      Option (b) is cleaner — outputUser already does the fetch+normalize+print cycle.
+      But get.go currently does the fetch AND the not-found check before printing;
+      outputUser doesn't do the not-found check. The cleanest fix is to normalize inline:
+
+        normalized := make([]map[string]any, len(rows))
+        for i, row := range rows {
+            normalized[i] = normalizeUserRow(row)
+        }
+        commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
+
+      Update get_test.go to assert normalized output (consistent with the fix in task-037).
+      After task-037 lands, the normalization here must match whatever format-aware approach
+      task-037 chooses.
+    dependencies:
+      - task-037
+    acceptance_criteria:
+      - "'user get neo4j --format table' renders roles as comma-joined string"
+      - "'user get neo4j --format json' returns roles as [] on Community (not null)"
+      - "'user get neo4j --format json' returns roles as an array on Enterprise (not string)"
+      - "get_test.go asserts normalized output"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-039
+    title: "Extract shared stderrLogger from dbconn; remove adminStderrLogger duplication"
+    source: review
+    status: pending
+    description: |
+      run.go defines adminStderrLogger, a 30-line neo4j/log.Logger adapter that is a
+      near-copy of stderrLogger in query/connect.go. Both implement the same four-method
+      interface and both write timestamped lines to os.Stderr. query/connect.go's version
+      has a level-filter field; adminStderrLogger always logs all levels. Both define an
+      identical time-format constant ("2006-01-02 15:04:05.000").
+
+      Fix: move the logger to neo4j-cli/internal/dbconn/ as an exported type (or a
+      constructor function returning a neo4j/log.Logger). Both query/connect.go and
+      admin/run.go then import it from dbconn. The dbconn version should support a
+      level parameter (DEBUG enables all four levels, matching admin's current behaviour
+      when conn.Debug is true).
+
+      Steps:
+        1. Add dbconn/logger.go with:
+             - stderrLogTimeFormat constant (shared)
+             - StderrLogger(level log.Level) neo4j.Logger constructor (or exported type)
+        2. In query/connect.go: replace stderrLogger + stderrLoggerTimeFormat with
+             c.Log = dbconn.StderrLogger(log.DEBUG) (or equivalent)
+           All existing query tests must pass unchanged.
+        3. In admin/run.go: replace newAdminStderrLogger() with
+             c.Log = dbconn.StderrLogger(log.DEBUG) and delete adminStderrLogger,
+             adminLogTimeFormat, and newAdminStderrLogger.
+        4. Confirm: adminLogTimeFormat constant deleted, stderrLoggerTimeFormat deleted
+           from query, no duplicate time-format strings remain.
+    dependencies: []
+    acceptance_criteria:
+      - "adminStderrLogger type deleted from admin/run.go"
+      - "adminLogTimeFormat constant deleted from admin/run.go"
+      - "A shared StderrLogger constructor (or equivalent) exists in neo4j-cli/internal/dbconn/"
+      - "query/connect.go uses the dbconn logger; all existing query tests pass unchanged"
+      - "admin/run.go uses the dbconn logger"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-040
+    title: "Clarity fixes in run.go and privilege/helpers.go (fall-through + dead check)"
+    source: review
+    status: pending
+    description: |
+      Two small control-flow clarity issues identified in review:
+
+      1. executionFailedCode silent fall-through (admin/run.go translateNeo4jError):
+         The executionFailedCode case doesn't return when the community-edition message
+         doesn't match, silently falling through the switch to the Classification() check.
+         A reader must trace through Go's switch semantics to understand this. Add an
+         explicit `return clierr.NewUpstreamError("%w", ne)` at the end of the case body
+         so the intent is unambiguous.
+
+      2. Dead unknown-action check in buildPrivilegeCypher (privilege/helpers.go):
+         The function opens with:
+           cat, known := privilegeCategory[action]
+           if !known { return "", clierr.NewUsageError("unknown --action ...") }
+         But every call site first calls normalizeAction (which also consults
+         privilegeCategory) and short-circuits on !ok, so the check inside
+         buildPrivilegeCypher can never fire in production. Remove it (the function
+         now requires a pre-validated action) and update the doc comment to note
+         that the action must be a canonical key from privilegeCategory. If defensive
+         safety is desired, replace the usage error with a panic("buildPrivilegeCypher:
+         unknown action %q — caller must pre-validate", action).
+
+      Both changes are pure refactors: no behavior change for any reachable code path.
+      Update run_test.go if any tests assert on the executionFailedCode path to verify
+      the explicit return still classifies correctly as upstream_error.
+    dependencies:
+      - task-036
+    acceptance_criteria:
+      - "executionFailedCode case in translateNeo4jError has an explicit return for the non-community-edition path"
+      - "buildPrivilegeCypher no longer contains a usage-error check for unknown actions (or it is a panic)"
+      - "buildPrivilegeCypher doc comment states that action must be pre-validated"
       - "make test passes; make fmt-check and make lint pass clean"
