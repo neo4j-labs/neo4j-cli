@@ -34,7 +34,11 @@ neo4j-cli admin user get neo4j --credential local --format json`,
 			if len(rows) == 0 {
 				return clierr.NewNotFoundError("user %q not found", name)
 			}
-			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+			normalized := make([]map[string]any, len(rows))
+			for i, row := range rows {
+				normalized[i] = normalizeUserRow(row)
+			}
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
 			return nil
 		},
 	}

@@ -1283,7 +1283,8 @@ tasks:
   - id: task-038
     title: "Apply normalization in user get RunE (consistency with list and write commands)"
     source: review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T23:50:00Z"
     description: |
       user/get.go's RunE calls PrintBodyMap directly on raw rows without applying
       normalizeUserRow, while user list (via list.go RunE loop) and all write commands
@@ -1361,7 +1362,8 @@ tasks:
   - id: task-040
     title: "Clarity fixes in run.go and privilege/helpers.go (fall-through + dead check)"
     source: review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T15:00:00Z"
     description: |
       Two small control-flow clarity issues identified in review:
 

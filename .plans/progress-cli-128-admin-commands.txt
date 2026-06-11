@@ -1,3 +1,8 @@
+## task-038 — 2026-06-11T23:50:00Z
+Apply normalizeUserRow in user get RunE for consistency with list and write commands.
+Added normalization loop in `user/get.go` RunE (identical to list.go pattern): builds `normalized []map[string]any` by calling `normalizeUserRow` on each row, then passes `adminutil.Rows(normalized)` to `PrintBodyMap`. Added three tests in `get_test.go`: `TestGet_RolesArray_PreservedAsArray_InJson` (roles renders as JSON array), `TestGet_RolesArray_RenderedAsCommaString_InTable` (roles renders as comma-joined string in table), and `TestGet_NilRoles_RenderedAsEmptyArray_InJson` (nil roles → empty array in JSON, nil suspended → false). All gates pass: make test (zero failures), make fmt-check (clean), make lint (0 issues).
+Files: ~user/get.go, ~user/get_test.go
+
 ## task-037 — 2026-06-11T23:45:00Z
 Fix normalizeUserRow: introduce roleList type with MarshalJSON (array) and String (comma-join) so JSON output preserves array and table shows comma-string.
 Defined `roleList []any` in `user/helpers.go` with `String()` (comma-joined) and `MarshalJSON()` (JSON array; nil→`[]`). Updated `normalizeUserRow` to wrap nil roles as `roleList(nil)` and slice roles as `roleList(slice)` instead of joining to string. Added `fmt.Stringer` check to `common/output/output.go:getNestedField` before the slice branch so table renderer calls `String()` rather than JSON-marshaling the slice. Updated `helpers_test.go` to assert `roleList` type and both JSON/String outputs. Added `TestList_RolesArray_PreservedAsArray_InJson` in `list_test.go`. All gates pass: make test (zero failures), make fmt-check (clean), make lint (0 issues).
@@ -178,3 +183,7 @@ Files: ~neo4j-cli/internal/subcommands/admin/run.go, ~neo4j-cli/internal/subcomm
 
 ## REVIEW — 2026-06-11T14:00:00Z
 Added 4 review tasks (task-037..task-040).
+
+## task-040 — 2026-06-11T15:00:00Z
+Explicit return in executionFailedCode case; panic for dead unknown-action branch in buildPrivilegeCypher.
+Files: ~run.go, ~run_test.go, ~privilege/helpers.go

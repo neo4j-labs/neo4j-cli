@@ -98,3 +98,53 @@ func TestGet_NoArgs_CobraUsageError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "accepts 1 arg")
 }
+
+func TestGet_RolesArray_PreservedAsArray_InJson(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "alice", "roles": []any{"admin", "PUBLIC"}, "passwordChangeRequired": false, "suspended": false},
+	}
+
+	stdout, _, err := runGet(t, "alice --format json", rows, nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	rolesRaw, ok := got[0]["roles"]
+	require.True(t, ok, "roles field must be present")
+	rolesSlice, ok := rolesRaw.([]any)
+	require.True(t, ok, "roles must be a JSON array ([]any), got %T: %v", rolesRaw, rolesRaw)
+	require.Len(t, rolesSlice, 2)
+	assert.Equal(t, "admin", rolesSlice[0])
+	assert.Equal(t, "PUBLIC", rolesSlice[1])
+}
+
+func TestGet_RolesArray_RenderedAsCommaString_InTable(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "alice", "roles": []any{"admin", "PUBLIC"}, "passwordChangeRequired": false, "suspended": false},
+	}
+
+	stdout, _, err := runGet(t, "alice --format table", rows, nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, "admin, PUBLIC", "roles must be rendered as comma-joined string in table output")
+}
+
+func TestGet_NilRoles_RenderedAsEmptyArray_InJson(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "community", "roles": nil, "passwordChangeRequired": false, "suspended": nil},
+	}
+
+	stdout, _, err := runGet(t, "community --format json", rows, nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	rolesRaw, ok := got[0]["roles"]
+	require.True(t, ok)
+	rolesSlice, ok := rolesRaw.([]any)
+	require.True(t, ok, "expected roles to be []any, got %T", rolesRaw)
+	assert.Empty(t, rolesSlice, "nil roles must normalize to empty array")
+	assert.Equal(t, false, got[0]["suspended"], "nil suspended must normalize to false")
+}
