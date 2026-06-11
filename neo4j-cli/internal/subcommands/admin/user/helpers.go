@@ -5,12 +5,15 @@ package user
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	commonoutput "github.com/neo4j/cli/common/output"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"os"
 )
 
 // passwordReader is the test seam for the no-echo TTY password prompt.
@@ -50,4 +53,16 @@ func promptPassword(cmd *cobra.Command) (string, error) {
 		return "", fmt.Errorf("admin user: read password: %w", err)
 	}
 	return pw, nil
+}
+
+// outputUser fetches the current record for name and prints it using the same
+// field list as the read commands (list/get). Called by write commands after
+// a successful mutation.
+func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, name string) error {
+	rows, err := userExecFn(cmd.Context(), cfg, conn, "SHOW USERS WHERE user = $name", map[string]any{"name": name})
+	if err != nil {
+		return err
+	}
+	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+	return nil
 }

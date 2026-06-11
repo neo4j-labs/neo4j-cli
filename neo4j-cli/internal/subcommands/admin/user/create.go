@@ -61,8 +61,10 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 				params["homeDatabase"] = homeDatabase
 			}
 
-			_, err = userExecFn(cmd.Context(), cfg, *conn, cypher, params)
-			return err
+			if _, err = userExecFn(cmd.Context(), cfg, *conn, cypher, params); err != nil {
+				return err
+			}
+			return outputUser(cmd, cfg, *conn, name)
 		},
 	}
 

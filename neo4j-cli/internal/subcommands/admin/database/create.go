@@ -49,7 +49,7 @@ neo4j-cli admin database create mydb --credential local --wait --rw`,
 					return err
 				}
 			}
-			return nil
+			return outputDatabase(cmd, cfg, *conn, name)
 		},
 	}
 

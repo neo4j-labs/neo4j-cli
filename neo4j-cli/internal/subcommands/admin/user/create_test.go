@@ -6,6 +6,7 @@ package user
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -21,22 +22,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// captureExecFn returns an adminutil.ExecFn that records the last cypher+params and
-// returns execErr. It also registers a cleanup that restores userExecFn.
+// captureExecFn returns an adminutil.ExecFn that records the FIRST call's
+// cypher+params, returns execErr on that first call, and returns a stub user
+// row on any subsequent call (the follow-up SHOW USERS query). It also
+// registers a cleanup that restores userExecFn.
 func captureExecFn(t *testing.T, execErr error) (fn adminutil.ExecFn, getCypher func() string, getParams func() map[string]any) {
 	t.Helper()
 	orig := userExecFn
 	t.Cleanup(func() { userExecFn = orig })
 
-	var lastCypher string
-	var lastParams map[string]any
+	var firstCypher string
+	var firstParams map[string]any
+	callIdx := 0
 
 	fn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
-		lastCypher = cypher
-		lastParams = params
-		return nil, execErr
+		if callIdx == 0 {
+			firstCypher = cypher
+			firstParams = params
+			callIdx++
+			return nil, execErr
+		}
+		callIdx++
+		return []map[string]any{{"user": firstParams["name"], "roles": []any{}, "passwordChangeRequired": false, "suspended": false}}, nil
 	}
-	return fn, func() string { return lastCypher }, func() map[string]any { return lastParams }
+	return fn, func() string { return firstCypher }, func() map[string]any { return firstParams }
 }
 
 // runCreate builds the `admin user create` command tree and executes it.
@@ -135,6 +144,16 @@ func TestCreate_ExecError_PropagatesError(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "already exists")
+}
+
+func TestCreate_EmitsFollowUpUserRecord(t *testing.T) {
+	stdout, _, _, _, err := runCreate(t, "alice --password secret --format json", nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "alice", got[0]["user"])
 }
 
 func TestCreate_WriteAnnotation(t *testing.T) {

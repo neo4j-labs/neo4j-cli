@@ -6,6 +6,7 @@ package database
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -56,11 +57,30 @@ func runStop(t *testing.T, args string, execResponses []execResponse) (string, s
 	return out.String(), errBuf.String(), execCmdErr
 }
 
+var sampleStopDBRow = []map[string]any{
+	{"name": "mydb", "type": "standard", "currentStatus": "offline", "access": "read-write", "default": false},
+}
+
 func TestStop_HappyPath(t *testing.T) {
 	_, _, err := runStop(t, "mydb", []execResponse{
 		{rows: nil, err: nil},
+		{rows: sampleStopDBRow, err: nil},
 	})
 	require.NoError(t, err)
+}
+
+func TestStop_EmitsFollowUpRecord(t *testing.T) {
+	stdout, _, err := runStop(t, "mydb --format json", []execResponse{
+		{rows: nil, err: nil},
+		{rows: sampleStopDBRow, err: nil},
+	})
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "mydb", got[0]["name"])
+	assert.Equal(t, "offline", got[0]["currentStatus"])
 }
 
 func TestStop_ExecError_PropagatesError(t *testing.T) {
@@ -82,6 +102,7 @@ func TestStop_Wait_HappyPath(t *testing.T) {
 	_, stderr, err := runStop(t, "mydb --wait", []execResponse{
 		{rows: nil, err: nil},
 		{rows: []map[string]any{{"currentStatus": "offline"}}, err: nil},
+		{rows: sampleStopDBRow, err: nil},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "Waiting for database to go offline")
