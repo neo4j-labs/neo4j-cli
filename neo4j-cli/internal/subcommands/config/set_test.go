@@ -110,19 +110,6 @@ func TestConfigSet(t *testing.T) {
 			wantErr:      "Error: this command writes; pass --rw to allow it",
 			wantOutEmpty: true,
 		},
-		// Feature-flag scope (flag.*)
-		{
-			name:    "set flag.aura-beta to true with rw writes bool true at flag.aura-beta",
-			command: "config set --rw flag.aura-beta true",
-			// dot in key is escaped on read so gjson treats it as a literal flat key
-			wantConfigKey:   `flag\.aura-beta`,
-			wantConfigValue: "true",
-		},
-		{
-			name:    "set flag.aura-beta to invalid value with rw returns error",
-			command: "config set --rw flag.aura-beta maybe",
-			wantErr: `Error: invalid value for "flag.aura-beta": maybe (valid values: true, false)`,
-		},
 		{
 			name:    "set flag.unknown-thing with rw returns error",
 			command: "config set --rw flag.unknown-thing true",

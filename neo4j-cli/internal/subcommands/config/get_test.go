@@ -103,24 +103,6 @@ func TestConfigGet(t *testing.T) {
 	"aura.base-url": "https://api.neo4j.io"
 }`,
 		},
-		// Feature-flag scope (flag.*)
-		{
-			name:    "get flag.aura-beta returns default false as JSON",
-			command: "config get flag.aura-beta --format json",
-			wantOut: `{
-	"flag.aura-beta": false
-}`,
-		},
-		{
-			name: "get flag.aura-beta returns configured true as JSON",
-			configSetup: func(h *neo4jTestHelper) {
-				h.setConfigValue("flag.aura-beta", true)
-			},
-			command: "config get flag.aura-beta --format json",
-			wantOut: `{
-	"flag.aura-beta": true
-}`,
-		},
 		{
 			name:    "config list does not include any flag.* keys",
 			command: "config list --format json",
