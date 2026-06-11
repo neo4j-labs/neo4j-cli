@@ -156,6 +156,22 @@ func TestTranslateAdminError_ExecutionFailed_CommunityEdition(t *testing.T) {
 	assert.Contains(t, ce.Message, "not available in community edition")
 }
 
+func TestTranslateAdminError_ExecutionFailed_NonCommunity_MappedToUpstream(t *testing.T) {
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+		Code: "Neo.DatabaseError.Statement.ExecutionFailed",
+		Msg:  "Some unexpected server-side execution failure unrelated to edition.",
+	}}
+	withFakeRunner(t, fake)
+
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestConn(), "SHOW DATABASES", nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 8, ce.Code) // upstream_error
+	assert.True(t, ce.Retryable)
+}
+
 func TestTranslateAdminError_SyntaxError_UnsupportedCypherVersion(t *testing.T) {
 	for _, msg := range []string{
 		"Invalid input 'CYPHER': expected ...",

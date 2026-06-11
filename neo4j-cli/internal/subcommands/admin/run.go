@@ -182,6 +182,7 @@ func translateNeo4jError(ne *neo4j.Neo4jError) error {
 		if strings.Contains(ne.Msg, "not available in community edition") {
 			return clierr.NewValidationError("%s", ne.Msg)
 		}
+		return clierr.NewUpstreamError("%w", ne)
 	case syntaxErrorCode:
 		if strings.Contains(ne.Msg, "Invalid input 'CYPHER'") ||
 			(strings.Contains(ne.Msg, "version") && strings.Contains(ne.Msg, "not supported")) {

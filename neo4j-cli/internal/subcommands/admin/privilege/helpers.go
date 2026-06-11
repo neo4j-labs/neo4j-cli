@@ -170,12 +170,16 @@ func normalizeAction(raw string) (string, bool) {
 // validation error for mutually-exclusive flag combinations or category
 // violations.
 //
+// action must be a canonical key from privilegeCategory (i.e. pre-validated
+// via normalizeAction). Callers that bypass normalizeAction with an unknown
+// action will receive a panic.
+//
 // The caller is responsible for prepending the verb (GRANT/DENY/REVOKE) and
 // appending TO/FROM <role>.
 func buildPrivilegeCypher(action string, f privilegeFlags) (string, error) {
-	cat, known := privilegeCategory[action]
-	if !known {
-		return "", clierr.NewUsageError("unknown --action %q; valid actions: %s", action, validActionsHelp())
+	cat, ok := privilegeCategory[action]
+	if !ok {
+		panic(fmt.Sprintf("buildPrivilegeCypher: unknown action %q — caller must pre-validate via normalizeAction", action))
 	}
 
 	// --- resource exclusivity ---
