@@ -652,16 +652,22 @@ Rename a Neo4j user
 
 Rename an existing user in the system database. Not supported on Aura connections (Aura uses a non-native authentication provider).
 
-Usage: `neo4j-cli admin user rename <old-name> <new-name>`
+Usage: `neo4j-cli admin user rename <old-name> [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--new-name` | string | - | The new name for the user |
 
 Examples:
 
 ```
 # Rename a user
-neo4j-cli admin user rename alice alice2 --credential local --rw
+neo4j-cli admin user rename alice --new-name alice2 --credential local --rw
 
 # Rename a user and verify the change
-neo4j-cli admin user rename bob bob-renamed --credential local --rw && neo4j-cli admin user get bob-renamed --credential local --format json
+neo4j-cli admin user rename bob --new-name bob-renamed --credential local --rw && neo4j-cli admin user get bob-renamed --credential local --format json
 ```
 
 ### neo4j-cli admin user set-password
