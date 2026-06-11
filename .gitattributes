@@ -19,7 +19,7 @@ distribution/**/*.js text eol=lf
 distribution/**/*.sh text eol=lf
 distribution/**/*.tsv text eol=lf
 
-# Pin LF for the vendored semantic-analysis artifact: it is go:embed-ed and
+# Pin LF for the vendored lint artifact: it is go:embed-ed and
 # string-matched against an exact export marker, so embedded bytes must be
 # identical on Windows checkouts.
-neo4j-cli/query/linter/semanticAnalysis.js text eol=lf
+neo4j-cli/query/linter/cypherLint.js text eol=lf

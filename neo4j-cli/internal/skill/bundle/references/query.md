@@ -101,9 +101,9 @@ neo4j-cli query :embed "hello" --embed-provider openai --embed-model text-embedd
 
 ## neo4j-cli query :lint
 
-Lint Cypher offline: report syntax and semantic errors without a database connection
+Lint Cypher: report syntax and semantic errors, offline by default
 
-Check Cypher for syntax and semantic problems using the same semantic analysis that powers Neo4j's language tooling, fully offline — no Bolt connection is opened and no credentials are needed. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. `--cypher-version` selects the language dialect (5 or 25; default 5). Each diagnostic renders as one row with a severity of `error` or `warning`, a message, and 1-indexed line/column plus 0-indexed character offsets. Exit code is 6 when any error-severity diagnostic is found; a clean or warnings-only result exits 0. The first call in a process takes a few seconds to initialize the analysis engine.
+Check Cypher for syntax and semantic problems using the same analysis that powers Neo4j's language tooling. Offline by default: no Bolt connection is opened and no credentials are needed. With `--fetch-schema` the database schema (labels, relationship types, property keys, graph shape, default Cypher version) is fetched first — connection resolved like the other query commands — enabling additional schema-aware warnings: unknown labels or relationship types, and relationship patterns that contradict the graph's actual direction. Schema warnings never affect the exit code. Declaring parameters with `--param` switches parameter checking on: any $parameter not declared is an error; without `--param` parameter checks are skipped. Cypher is taken from the positional argument, or from stdin when no argument is provided and stdin is piped. `--cypher-version` selects the language dialect (5 or 25; default 5); a `CYPHER 5`/`CYPHER 25` prologue in the query always wins, and with `--fetch-schema` the database's default language applies unless `--cypher-version` is set explicitly. Each diagnostic renders as one row with a severity of `error` or `warning`, a message, and 1-indexed line/column plus 0-indexed character offsets. Exit code is 6 when any error-severity diagnostic is found; a clean or warnings-only result exits 0. The first call in a process takes a few seconds to initialize the analysis engine.
 
 Usage: `neo4j-cli query :lint [cypher] [flags]`
 
@@ -112,12 +112,19 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--cypher-version` | string | 5 | Cypher language version to lint against: 5 or 25 |
+| `--fetch-schema` | bool | false | Fetch the schema from the database before linting, enabling schema-aware warnings (unknown labels/relationship types, path directionality) |
 
 Examples:
 
 ```
 # Lint a Cypher statement offline; diagnostics as JSON, exit code 6 on errors
 neo4j-cli query :lint "MATCH (n) RETURN m" --format json
+
+# Lint against the connected database's schema (catches unknown labels/rel-types)
+neo4j-cli query :lint "MATCH (n:Persn)-[:ACTED_IN]->(m) RETURN m" --fetch-schema --format json
+
+# Declare parameters to catch misspelled ones (undeclared $unknown errors)
+neo4j-cli query :lint "RETURN $known + $unknown" --param known=1 --format json
 
 # Pipe Cypher from stdin and lint against Cypher 25 semantics
 cat query.cypher | neo4j-cli query :lint --cypher-version 25 --format json

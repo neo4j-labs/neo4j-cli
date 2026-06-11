@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +24,7 @@ import (
 // withLintSeam swaps the lintFn seam for the duration of the test so policy
 // paths (warnings-only exit 0, engine failure → fatal) run deterministically
 // without the real engine.
-func withLintSeam(t *testing.T, fn func(query string, version linter.Version) ([]linter.Diagnostic, error)) {
+func withLintSeam(t *testing.T, fn func(query string, version linter.Version, schema *linter.DbSchema) ([]linter.Diagnostic, error)) {
 	t.Helper()
 	orig := lintFn
 	t.Cleanup(func() { lintFn = orig })
@@ -145,7 +147,7 @@ func TestQueryLint_Cypher25FlagAccepted(t *testing.T) {
 // the command. Driven through the seam: a stable warnings-only query would
 // couple the test to analyzer release behavior.
 func TestQueryLint_WarningsOnlyExitZero(t *testing.T) {
-	withLintSeam(t, func(_ string, _ linter.Version) ([]linter.Diagnostic, error) {
+	withLintSeam(t, func(_ string, _ linter.Version, _ *linter.DbSchema) ([]linter.Diagnostic, error) {
 		return []linter.Diagnostic{{
 			Severity: "warning",
 			Message:  "deprecated thing",
@@ -167,7 +169,7 @@ func TestQueryLint_WarningsOnlyExitZero(t *testing.T) {
 // TestQueryLint_EngineErrorIsFatal verifies an engine failure maps to a fatal
 // error (exit 1) with the package's `query: lint:` prefix.
 func TestQueryLint_EngineErrorIsFatal(t *testing.T) {
-	withLintSeam(t, func(_ string, _ linter.Version) ([]linter.Diagnostic, error) {
+	withLintSeam(t, func(_ string, _ linter.Version, _ *linter.DbSchema) ([]linter.Diagnostic, error) {
 		return nil, errors.New("boom")
 	})
 
@@ -243,4 +245,287 @@ func TestLintDiagnostics_MarshalJSON(t *testing.T) {
 	b, err := json.Marshal(d)
 	require.NoError(t, err)
 	assert.Equal(t, "[]", string(b))
+}
+
+// lintFetchSeam returns a schemaSeam preloaded with the three --fetch-schema
+// statements over a minimal movies-like graph: ACTED_IN only goes
+// (Person)-[:ACTED_IN]->(Movie), default language CYPHER 5.
+func lintFetchSeam() *schemaSeam {
+	s := newSchemaSeam()
+	s.resp[lintSummaryQuery] = makeQueryResponse(
+		[]string{"result"},
+		[][]any{
+			{[]any{"Movie", "Person"}},
+			{[]any{"ACTED_IN"}},
+			{[]any{"title", "name"}},
+		},
+	)
+	s.resp[lintGraphSchemaQuery] = makeQueryResponse(
+		[]string{"nodes", "relationships"},
+		[][]any{{
+			[]any{
+				dbtype.Node{ElementId: "n1", Labels: []string{"Person"}},
+				dbtype.Node{ElementId: "n2", Labels: []string{"Movie"}},
+			},
+			[]any{
+				dbtype.Relationship{ElementId: "r1", StartElementId: "n1", EndElementId: "n2", Type: "ACTED_IN"},
+			},
+		}},
+	)
+	s.resp["SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage"] = makeQueryResponse(
+		[]string{"defaultLanguage"},
+		[][]any{{"CYPHER 5"}},
+	)
+	return s
+}
+
+// TestQueryLint_FetchSchema_UnknownLabelWarning verifies the full
+// --fetch-schema path: schema statements run through the seam, the unknown
+// label warns, and warnings alone keep exit 0. Uses the real engine.
+func TestQueryLint_FetchSchema_UnknownLabelWarning(t *testing.T) {
+	s := lintFetchSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "MATCH (n:NotALabel) RETURN n", "--fetch-schema",
+	)
+	require.NoError(t, err, "schema warnings must not affect the exit code")
+
+	assert.Contains(t, s.calls, lintSummaryQuery)
+	assert.Contains(t, s.calls, lintGraphSchemaQuery)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "warning", rows[0]["severity"])
+	assert.Contains(t, rows[0]["message"], "NotALabel")
+}
+
+// TestQueryLint_FetchSchema_PathDirectionalityWarning verifies graphSchema
+// triples from db.schema.visualization reach the analyzer: a pattern against
+// the relationship's actual direction warns.
+func TestQueryLint_FetchSchema_PathDirectionalityWarning(t *testing.T) {
+	s := lintFetchSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "MATCH (m:Movie)-[:ACTED_IN]->(p:Person) RETURN p", "--fetch-schema",
+	)
+	require.NoError(t, err)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.NotEmpty(t, rows)
+	for _, row := range rows {
+		assert.Equal(t, "warning", row["severity"])
+	}
+	assert.Contains(t, rows[0]["message"], "has no")
+}
+
+// TestQueryLint_FetchSchema_FetchedDefaultLanguageApplies verifies the
+// database's default language drives the dialect when --cypher-version is
+// not set: legacy octal literals get CYPHER 25's generic parse error, not
+// CYPHER 5's octal-specific one.
+func TestQueryLint_FetchSchema_FetchedDefaultLanguageApplies(t *testing.T) {
+	s := lintFetchSeam()
+	s.resp["SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage"] = makeQueryResponse(
+		[]string{"defaultLanguage"},
+		[][]any{{"CYPHER 25"}},
+	)
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "RETURN 0123", "--fetch-schema",
+	)
+	require.Error(t, err, "octal literal is an error in both dialects")
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.NotEmpty(t, rows)
+	assert.NotContains(t, rows[0]["message"], "octal integer literal",
+		"fetched CYPHER 25 default must apply, not the CYPHER 5 fallback")
+}
+
+// TestQueryLint_FetchSchema_ExplicitVersionBeatsFetched verifies an explicit
+// --cypher-version overrides the fetched default language.
+func TestQueryLint_FetchSchema_ExplicitVersionBeatsFetched(t *testing.T) {
+	s := lintFetchSeam()
+	s.resp["SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage"] = makeQueryResponse(
+		[]string{"defaultLanguage"},
+		[][]any{{"CYPHER 25"}},
+	)
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "RETURN 0123", "--fetch-schema", "--cypher-version", "5",
+	)
+	require.Error(t, err)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.NotEmpty(t, rows)
+	assert.Contains(t, rows[0]["message"], "octal integer literal",
+		"explicit --cypher-version 5 must beat the fetched CYPHER 25 default")
+}
+
+// TestQueryLint_FetchSchema_OptionalProbesSwallowed verifies failures of the
+// visualization and default-language probes (old server, restricted role)
+// leave the corresponding checks inactive without failing the command.
+func TestQueryLint_FetchSchema_OptionalProbesSwallowed(t *testing.T) {
+	s := lintFetchSeam()
+	delete(s.resp, lintGraphSchemaQuery)
+	s.err[lintGraphSchemaQuery] = errors.New("Neo.ClientError.Procedure.ProcedureNotFound: nope")
+	delete(s.resp, "SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage")
+	s.err["SHOW DATABASES YIELD name, home, defaultLanguage WHERE home RETURN defaultLanguage"] =
+		errors.New("Neo.ClientError.Statement.SyntaxError: no defaultLanguage column")
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "MATCH (n:NotALabel) RETURN n", "--fetch-schema",
+	)
+	require.NoError(t, err, "optional probe failures must not fail the command")
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.Len(t, rows, 1, "label warnings still work from the summary query alone")
+	assert.Contains(t, rows[0]["message"], "NotALabel")
+}
+
+// TestQueryLint_FetchSchema_SummaryFailureFails verifies the required summary
+// query failing fails the command with the categorized error.
+func TestQueryLint_FetchSchema_SummaryFailureFails(t *testing.T) {
+	s := lintFetchSeam()
+	delete(s.resp, lintSummaryQuery)
+	s.err[lintSummaryQuery] = errors.New("Neo.ClientError.Security.Forbidden: no db.labels for you")
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "RETURN 1", "--fetch-schema",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Neo.ClientError.Security.Forbidden")
+	assert.Empty(t, h.stdout.String(), "no diagnostics must print when the fetch fails")
+}
+
+// TestQueryLint_FetchSchema_LargeSchemaSkipsVisualization verifies the CLS
+// threshold heuristic: at >=200 labels+relTypes the visualization query is
+// not issued at all.
+func TestQueryLint_FetchSchema_LargeSchemaSkipsVisualization(t *testing.T) {
+	labels := make([]any, 200)
+	for i := range labels {
+		labels[i] = fmt.Sprintf("Label%03d", i)
+	}
+	s := lintFetchSeam()
+	s.resp[lintSummaryQuery] = makeQueryResponse(
+		[]string{"result"},
+		[][]any{{labels}, {[]any{"ACTED_IN"}}, {[]any{}}},
+	)
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "MATCH (n:Label000) RETURN n", "--fetch-schema",
+	)
+	require.NoError(t, err)
+	assert.NotContains(t, s.calls, lintGraphSchemaQuery,
+		"visualization must be skipped above the threshold")
+}
+
+// TestQueryLint_ParamDeclarationsEnableChecking verifies --param switches
+// parameter checking on, fully offline: undeclared $parameters error (exit
+// 6), declared ones lint clean. No connection is needed or attempted (no
+// seam installed — a Bolt attempt against example:7687 would fail).
+func TestQueryLint_ParamDeclarationsEnableChecking(t *testing.T) {
+	h := newRunHarness(t, "json")
+	err := h.execute(t, ":lint", "RETURN $known + $unknown", "--param", "known=1")
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
+	assert.Equal(t, 6, ce.Code)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(h.stdout.Bytes(), &rows))
+	require.Len(t, rows, 1)
+	assert.Equal(t, "error", rows[0]["severity"])
+	assert.Contains(t, rows[0]["message"], "$unknown is not defined")
+}
+
+// TestQueryLint_NoParamFlagsSuppressesParamErrors locks the default:
+// without --param, parameterized queries lint clean (params assumed
+// external).
+func TestQueryLint_NoParamFlagsSuppressesParamErrors(t *testing.T) {
+	h := newRunHarness(t, "json")
+	err := h.execute(t, ":lint", "RETURN $x")
+	require.NoError(t, err)
+	assert.Equal(t, "[]", strings.TrimSpace(h.stdout.String()))
+}
+
+// TestQueryLint_EmbedParamDeclaredWithoutProviderCall verifies a
+// `key:embed=` --param declares the key for checking without invoking any
+// embedding provider (no provider is configured in the harness, so a call
+// would fail).
+func TestQueryLint_EmbedParamDeclaredWithoutProviderCall(t *testing.T) {
+	h := newRunHarness(t, "json")
+	err := h.execute(t, ":lint", "RETURN $vec", "--param", "vec:embed=some text")
+	require.NoError(t, err)
+	assert.Equal(t, "[]", strings.TrimSpace(h.stdout.String()))
+}
+
+// TestQueryLint_FetchSchema_UnexpectedSummaryShapeFails verifies a summary
+// result that is not exactly 3 rows fails loudly instead of silently
+// linting schema-less.
+func TestQueryLint_FetchSchema_UnexpectedSummaryShapeFails(t *testing.T) {
+	s := lintFetchSeam()
+	s.resp[lintSummaryQuery] = makeQueryResponse([]string{"result"}, [][]any{{[]any{"Movie"}}})
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		"--password=pw",
+		":lint", "RETURN 1", "--fetch-schema",
+	)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
+	assert.Equal(t, 8, ce.Code)
+	assert.Contains(t, ce.Message, "unexpected schema summary shape")
+}
+
+// TestQueryLint_FetchSchema_PasswordRequiredNonTTY verifies the scripted
+// no-password case fails with the standard usage error instead of hanging on
+// a prompt (stdin may already be consumed by the piped query).
+func TestQueryLint_FetchSchema_PasswordRequiredNonTTY(t *testing.T) {
+	t.Setenv(envPassword, "")
+	s := lintFetchSeam()
+	s.install(t)
+
+	h := newRunHarness(t, "json")
+	stdinIsTTY = func() bool { return false }
+
+	err := h.execute(t,
+		"--uri=neo4j://example:7687",
+		":lint", "RETURN 1", "--fetch-schema",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "password is required")
 }

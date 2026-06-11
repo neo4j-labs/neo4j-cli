@@ -1,4 +1,4 @@
 project: neo4j-cli
 kind: Minor
-body: 'query: new :lint subcommand checks Cypher for syntax and semantic errors offline, without a database connection'
+body: 'query: new :lint subcommand checks Cypher for syntax and semantic errors offline, without a database connection; --fetch-schema additionally pulls the schema from a live database to warn on unknown labels/relationship types and contradicted relationship directions, and declaring --param entries switches undeclared-parameter checking on'
 time: 2026-06-10T17:05:00.000000+02:00
