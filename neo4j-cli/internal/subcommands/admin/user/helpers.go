@@ -5,6 +5,7 @@ package user
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
@@ -40,6 +41,32 @@ func promptPassword(cmd *cobra.Command, flagName string) (string, error) {
 	return pw, nil
 }
 
+// normalizeUserRow normalizes a user record row for rendering:
+//   - nil roles → []any{} (renders as [] in JSON, "" in table)
+//   - []any roles → comma-joined string (renders cleanly in table format)
+//   - nil suspended → false
+func normalizeUserRow(row map[string]any) map[string]any {
+	out := make(map[string]any, len(row))
+	for k, v := range row {
+		out[k] = v
+	}
+	if out["roles"] == nil {
+		out["roles"] = []any{}
+	} else if slice, ok := out["roles"].([]any); ok {
+		parts := make([]string, 0, len(slice))
+		for _, r := range slice {
+			if s, ok := r.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		out["roles"] = strings.Join(parts, ", ")
+	}
+	if out["suspended"] == nil {
+		out["suspended"] = false
+	}
+	return out
+}
+
 // outputUser fetches the current record for name and prints it using the same
 // field list as the read commands (list/get). Called by write commands after
 // a successful mutation.
@@ -48,6 +75,10 @@ func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, name 
 	if err != nil {
 		return err
 	}
-	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+	normalized := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		normalized[i] = normalizeUserRow(row)
+	}
+	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
 	return nil
 }

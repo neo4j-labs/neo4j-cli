@@ -15,7 +15,7 @@ func newCreateCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 		Short:       "Create a role (Enterprise only)",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Create a new role in the system database. " +
-			"Executes CREATE ROLE $name against the system database. " +
+			"Executes CREATE ROLE $name IF NOT EXISTS against the system database (idempotent: succeeds even if the role already exists). " +
 			"Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.",
 		Example: `# Create a new role
 neo4j-cli admin role create analyst --credential local --rw
@@ -26,7 +26,7 @@ neo4j-cli admin role create analyst --credential local --rw && neo4j-cli admin r
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
-			if _, err := roleExecFn(cmd.Context(), cfg, *conn, "CREATE ROLE $name", map[string]any{"name": name}); err != nil {
+			if _, err := roleExecFn(cmd.Context(), cfg, *conn, "CREATE ROLE $name IF NOT EXISTS", map[string]any{"name": name}); err != nil {
 				return err
 			}
 			return outputRoleMembers(cmd, cfg, *conn, name)

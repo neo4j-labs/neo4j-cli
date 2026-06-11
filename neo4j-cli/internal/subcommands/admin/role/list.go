@@ -62,7 +62,11 @@ neo4j-cli admin role list --credential local --user alice`,
 				rows = filtered
 			}
 
-			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+			normalized := make([]map[string]any, len(rows))
+			for i, row := range rows {
+				normalized[i] = normalizeRoleRow(row)
+			}
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
 			return nil
 		},
 	}

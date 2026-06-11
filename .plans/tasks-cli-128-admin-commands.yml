@@ -1090,7 +1090,8 @@ tasks:
   - id: task-034
     title: "role create: use IF NOT EXISTS for idempotency; fix user/role drop error code; output polish (REQ-F-060, REQ-F-061, REQ-F-062)"
     source: qa
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T21:00:00Z"
     description: |
       Bundle three small polish tasks that share no file-level conflicts:
 

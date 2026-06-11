@@ -148,3 +148,7 @@ Files: ~neo4j-cli/internal/subcommands/admin/role/get.go, ~neo4j-cli/internal/su
 ## task-032 — 2026-06-11T20:00:00Z
 Fix user/role drop not-found detection: wrong error code InvalidArguments → correct ArgumentError.
 Files: ~neo4j-cli/internal/subcommands/admin/user/drop.go, ~neo4j-cli/internal/subcommands/admin/user/drop_test.go, ~neo4j-cli/internal/subcommands/admin/role/drop.go, ~neo4j-cli/internal/subcommands/admin/role/drop_test.go
+
+## task-034 — 2026-06-11T21:00:00Z
+role create uses IF NOT EXISTS; normalizeUserRow joins roles array and nil-fills suspended; normalizeRoleRow nil-fills member.
+Files: ~role/create.go, ~role/create_test.go, ~user/helpers.go, ~user/list.go, ~user/list_test.go, ~role/helpers.go, ~role/list.go, ~role/list_test.go

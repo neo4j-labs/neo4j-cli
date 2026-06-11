@@ -382,7 +382,7 @@ neo4j-cli admin role list --credential local --format json
 
 Create a role (Enterprise only)
 
-Create a new role in the system database. Executes CREATE ROLE $name against the system database. Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.
+Create a new role in the system database. Executes CREATE ROLE $name IF NOT EXISTS against the system database (idempotent: succeeds even if the role already exists). Enterprise edition only: Community edition returns an UnsupportedAdministrationCommand error.
 
 Usage: `neo4j-cli admin role create <name>`
 

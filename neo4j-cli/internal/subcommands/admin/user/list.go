@@ -31,7 +31,11 @@ neo4j-cli admin user list --credential local --format json`,
 			if err != nil {
 				return err
 			}
-			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+			normalized := make([]map[string]any, len(rows))
+			for i, row := range rows {
+				normalized[i] = normalizeUserRow(row)
+			}
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
 			return nil
 		},
 	}

@@ -97,6 +97,36 @@ func TestList_HappyPath_FormatTable(t *testing.T) {
 	assert.Contains(t, stdout, "neo4j")
 }
 
+func TestList_RolesArray_RenderedAsCommaString_InTable(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "neo4j", "roles": []any{"admin", "PUBLIC"}, "passwordChangeRequired": false, "suspended": false},
+	}
+
+	stdout, _, err := runList(t, "--format table", rows, nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, "admin, PUBLIC", "roles must be rendered as comma-joined string in table output")
+}
+
+func TestList_NilRoles_RenderedAsEmptyArray_InJson(t *testing.T) {
+	rows := []map[string]any{
+		{"user": "community", "roles": nil, "passwordChangeRequired": false, "suspended": nil},
+	}
+
+	stdout, _, err := runList(t, "--format json", rows, nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	rolesRaw, ok := got[0]["roles"]
+	require.True(t, ok)
+	rolesSlice, ok := rolesRaw.([]any)
+	require.True(t, ok, "expected roles to be []any, got %T", rolesRaw)
+	assert.Empty(t, rolesSlice, "nil roles must normalize to empty array")
+	assert.Equal(t, false, got[0]["suspended"], "nil suspended must normalize to false")
+}
+
 func TestList_EmptyResult_FormatJson_RendersEmptyArray(t *testing.T) {
 	stdout, _, err := runList(t, "--format json", []map[string]any{}, nil)
 	require.NoError(t, err)

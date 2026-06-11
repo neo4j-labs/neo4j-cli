@@ -15,6 +15,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNormalizeUserRow_NilRoles_ReplacedWithEmptySlice(t *testing.T) {
+	row := map[string]any{"user": "neo4j", "roles": nil, "suspended": false}
+	got := normalizeUserRow(row)
+	assert.Equal(t, []any{}, got["roles"])
+}
+
+func TestNormalizeUserRow_SliceRoles_ReplacedWithCommaString(t *testing.T) {
+	row := map[string]any{"user": "neo4j", "roles": []any{"admin", "PUBLIC"}, "suspended": false}
+	got := normalizeUserRow(row)
+	assert.Equal(t, "admin, PUBLIC", got["roles"])
+}
+
+func TestNormalizeUserRow_NilSuspended_ReplacedWithFalse(t *testing.T) {
+	row := map[string]any{"user": "neo4j", "roles": nil, "suspended": nil}
+	got := normalizeUserRow(row)
+	assert.Equal(t, false, got["suspended"])
+}
+
+func TestNormalizeUserRow_OriginalRowUnchanged(t *testing.T) {
+	original := []any{"admin", "PUBLIC"}
+	row := map[string]any{"user": "neo4j", "roles": original, "suspended": nil}
+	_ = normalizeUserRow(row)
+	// original row must not be mutated
+	assert.Equal(t, original, row["roles"])
+	assert.Nil(t, row["suspended"])
+}
+
 func TestPromptPassword_FlagSet_ReturnsFlagValue(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().String("set-password", "", "password flag")

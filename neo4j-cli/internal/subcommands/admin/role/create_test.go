@@ -37,6 +37,24 @@ func withSequencedCreateFn(t *testing.T, mutationRows []map[string]any, mutation
 	t.Cleanup(func() { roleExecFn = orig })
 }
 
+// withSequencedCreateFnCapture installs a sequenced exec-fn and captures the
+// cypher of the first (mutation) call into *capturedCypher.
+func withSequencedCreateFnCapture(t *testing.T, capturedCypher *string, mutationRows []map[string]any, mutationErr error, followUpRows []map[string]any) {
+	t.Helper()
+	orig := roleExecFn
+	callIdx := 0
+	roleExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
+		if callIdx == 0 {
+			*capturedCypher = cypher
+			callIdx++
+			return mutationRows, mutationErr
+		}
+		callIdx++
+		return followUpRows, nil
+	}
+	t.Cleanup(func() { roleExecFn = orig })
+}
+
 func runCreate(t *testing.T, args string, rows []map[string]any, execErr error) (string, string, error) {
 	t.Helper()
 
@@ -85,6 +103,23 @@ func TestCreate_CommunityEditionError_ReturnsEnterpriseHint(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "Enterprise edition")
+}
+
+func TestCreate_CypherUsesIfNotExists(t *testing.T) {
+	var capturedCypher string
+	withSequencedCreateFnCapture(t, &capturedCypher, []map[string]any{}, nil, []map[string]any{})
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, roleExecFn)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	cmd.SetOut(bytes.NewBuffer(nil))
+	cmd.SetErr(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"create", "analyst"})
+	require.NoError(t, cmd.Execute())
+
+	assert.Contains(t, capturedCypher, "IF NOT EXISTS", "CREATE ROLE cypher must include IF NOT EXISTS")
 }
 
 func TestCreate_NoArgs_CobraUsageError(t *testing.T) {

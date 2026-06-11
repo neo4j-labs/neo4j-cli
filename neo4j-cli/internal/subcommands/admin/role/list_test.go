@@ -134,6 +134,20 @@ func TestList_UserFilter_FiltersRows(t *testing.T) {
 	}
 }
 
+func TestList_NilMember_RenderedAsEmptyString_InJson(t *testing.T) {
+	rows := []map[string]any{
+		{"role": "admin", "member": nil},
+	}
+
+	stdout, _, err := runList(t, "--format json", rows, nil)
+	require.NoError(t, err)
+
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	require.Len(t, got, 1)
+	assert.Equal(t, "", got[0]["member"], "nil member must normalize to empty string")
+}
+
 func TestList_EmptyResult_FormatJson_RendersEmptyArray(t *testing.T) {
 	stdout, _, err := runList(t, "--format json", []map[string]any{}, nil)
 	require.NoError(t, err)

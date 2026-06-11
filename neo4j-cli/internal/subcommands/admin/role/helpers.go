@@ -15,6 +15,19 @@ import (
 // and replaced by tests to inject fake results without a real Bolt connection.
 var roleExecFn adminutil.ExecFn
 
+// normalizeRoleRow normalizes a role member record row for rendering:
+//   - nil member → "" (renders cleanly instead of null in JSON/table)
+func normalizeRoleRow(row map[string]any) map[string]any {
+	out := make(map[string]any, len(row))
+	for k, v := range row {
+		out[k] = v
+	}
+	if out["member"] == nil {
+		out["member"] = ""
+	}
+	return out
+}
+
 // outputRoleMembers fetches the SHOW ROLES WITH USERS WHERE role=$name result
 // and prints it. Zero rows is valid (role exists but has no members). Called
 // by write commands (create) after a successful mutation.
@@ -26,7 +39,11 @@ func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn
 	if err != nil {
 		return err
 	}
-	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+	normalized := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		normalized[i] = normalizeRoleRow(row)
+	}
+	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(normalized), listFields)
 	return nil
 }
 
