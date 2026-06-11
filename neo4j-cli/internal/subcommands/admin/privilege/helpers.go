@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
+	"github.com/spf13/cobra"
 )
 
 // privilegeExecFn is the package-level test seam. It is set by NewCmd in
@@ -253,4 +256,54 @@ func buildPrivilegeCypher(action string, f privilegeFlags) (string, error) {
 // inclusion in usage error messages.
 func validActionsHelp() string {
 	return strings.Join(validActions, ", ")
+}
+
+// newPrivilegeMutationCmd is the shared constructor for grant and deny. verb is
+// "GRANT" or "DENY" and drives the Cypher prefix, help text, and examples.
+func newPrivilegeMutationCmd(cfg *clicfg.Config, conn **dbconn.Conn, verb, short, long, example string) *cobra.Command {
+	var actionFlag string
+	var roleFlag string
+	var flags privilegeFlags
+
+	lverb := strings.ToLower(verb)
+
+	cmd := &cobra.Command{
+		Use:         lverb,
+		Short:       short,
+		Annotations: map[string]string{"write": "true"},
+		Long:        long,
+		Example:     example,
+		Args:        cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
+			normalized, ok := normalizeAction(actionFlag)
+			if !ok {
+				return clierr.NewUsageError("unknown --action %q; valid actions: %s", actionFlag, validActionsHelp())
+			}
+
+			clause, err := buildPrivilegeCypher(normalized, flags)
+			if err != nil {
+				return err
+			}
+
+			cypher := fmt.Sprintf("%s %s TO $role", verb, clause)
+			_, err = privilegeExecFn(cmd.Context(), cfg, *conn, cypher, map[string]any{"role": roleFlag})
+			return err
+		},
+	}
+
+	cmd.Flags().StringVar(&actionFlag, "action", "", "Privilege action keyword (required; e.g. read, write, access, create_role)")
+	cmd.Flags().StringVar(&roleFlag, "role", "", fmt.Sprintf("Role name to %s the privilege to (required)", lverb))
+	cmd.Flags().StringVar(&flags.onGraph, "on-graph", "", "Target a specific graph by name (default: * when no resource flag is set)")
+	cmd.Flags().StringVar(&flags.onDatabase, "on-database", "", "Target a specific database by name")
+	cmd.Flags().BoolVar(&flags.onDbms, "on-dbms", false, "Target the DBMS (for DBMS-level privileges)")
+	cmd.Flags().StringArrayVar(&flags.nodeLabels, "node-label", nil, "Node label qualifier (repeatable; only valid with --on-graph)")
+	cmd.Flags().StringArrayVar(&flags.relationshipTypes, "relationship-type", nil, "Relationship type qualifier (repeatable; only valid with --on-graph)")
+	cmd.Flags().StringArrayVar(&flags.properties, "property", nil, "Property name qualifier (repeatable; only valid with --on-graph; default: all properties)")
+
+	_ = cmd.MarkFlagRequired("action")
+	_ = cmd.MarkFlagRequired("role")
+
+	return cmd
 }

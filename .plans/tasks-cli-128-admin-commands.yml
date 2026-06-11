@@ -804,7 +804,8 @@ tasks:
   - id: task-026
     title: "Collapse grant/deny into a shared constructor; eliminate copy-paste"
     source: review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T19:00:00Z"
     description: |
       privilege/grant.go and privilege/deny.go are 74-line near-identical files. The
       RunE body is character-for-character identical except for the string "GRANT" vs
