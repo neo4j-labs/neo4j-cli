@@ -42,7 +42,7 @@ func runSetPassword(t *testing.T, args string, execErr error) (string, string, s
 }
 
 func TestSetPassword_HappyPath_PasswordFlag(t *testing.T) {
-	_, _, cypher, params, err := runSetPassword(t, "alice --password newsecret", nil)
+	_, _, cypher, params, err := runSetPassword(t, "alice --new-password newsecret", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "ALTER USER $name SET PASSWORD $password")
@@ -52,7 +52,7 @@ func TestSetPassword_HappyPath_PasswordFlag(t *testing.T) {
 }
 
 func TestSetPassword_PasswordChangeRequired_IncludedInCypher(t *testing.T) {
-	_, _, cypher, _, err := runSetPassword(t, "alice --password newsecret --password-change-required", nil)
+	_, _, cypher, _, err := runSetPassword(t, "alice --new-password newsecret --password-change-required", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "CHANGE REQUIRED")
@@ -60,7 +60,7 @@ func TestSetPassword_PasswordChangeRequired_IncludedInCypher(t *testing.T) {
 }
 
 func TestSetPassword_DefaultPasswordChangeRequired_IsFalse(t *testing.T) {
-	_, _, cypher, _, err := runSetPassword(t, "alice --password newsecret", nil)
+	_, _, cypher, _, err := runSetPassword(t, "alice --new-password newsecret", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "CHANGE NOT REQUIRED")
@@ -96,7 +96,7 @@ func TestSetPassword_NoPassword_TTY_PromptsViaPasswordReader(t *testing.T) {
 
 func TestSetPassword_ExecError_PropagatesError(t *testing.T) {
 	execErr := clierr.NewValidationError("user not found")
-	_, _, _, _, err := runSetPassword(t, "alice --password newsecret", execErr)
+	_, _, _, _, err := runSetPassword(t, "alice --new-password newsecret", execErr)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError

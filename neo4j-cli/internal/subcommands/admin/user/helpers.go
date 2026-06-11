@@ -20,15 +20,16 @@ var userExecFn adminutil.ExecFn
 
 // promptPassword reads a password from the controlling terminal with no echo,
 // or returns a clear usage error when stdin is not a TTY (so scripted use
-// must supply the password via flag).
-func promptPassword(cmd *cobra.Command) (string, error) {
-	pwFlag := cmd.Flags().Lookup("password")
+// must supply the password via flag). flagName is the name of the flag to
+// check (e.g. "set-password" for create, "new-password" for set-password).
+func promptPassword(cmd *cobra.Command, flagName string) (string, error) {
+	pwFlag := cmd.Flags().Lookup(flagName)
 	if pwFlag != nil && pwFlag.Changed {
 		return pwFlag.Value.String(), nil
 	}
 	if !dbconn.StdinIsTTY() {
 		return "", clierr.NewUsageError(
-			"password is required: set --password or run interactively")
+			"password is required: set --%s or run interactively", flagName)
 	}
 	_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Password: ")
 	pw, err := dbconn.PasswordReader()

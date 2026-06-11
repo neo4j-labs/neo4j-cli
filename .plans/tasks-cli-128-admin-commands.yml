@@ -873,7 +873,8 @@ tasks:
   - id: task-029
     title: "Fix --password flag conflict: rename leaf flags to --set-password / --new-password (REQ-F-056)"
     source: qa
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T20:30:00Z"
     description: |
       user/create.go and user/set_password.go register a local --password flag for the
       new user's password. This shadows the parent persistent --password connection flag

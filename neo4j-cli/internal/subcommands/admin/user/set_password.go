@@ -20,19 +20,19 @@ func newSetPasswordCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 		Short:       "Set the password for a Neo4j user",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Set the password for an existing user in the system database. " +
-			"If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
+			"If --new-password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
 			"--password-change-required (default false) controls whether the user must change their password on next login.",
 		Example: `# Set a user's password interactively (password will be prompted)
 neo4j-cli admin user set-password alice --credential local --rw
 
 # Set a user's password with a flag and require change on next login
-neo4j-cli admin user set-password bob --password newsecret --password-change-required --credential local --rw`,
+neo4j-cli admin user set-password bob --new-password newsecret --password-change-required --credential local --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
 
-			pw, err := promptPassword(cmd)
+			pw, err := promptPassword(cmd, "new-password")
 			if err != nil {
 				return err
 			}
@@ -58,7 +58,7 @@ neo4j-cli admin user set-password bob --password newsecret --password-change-req
 		},
 	}
 
-	cmd.Flags().StringVar(&password, "password", "", "New password (prompted if not supplied on a TTY)")
+	cmd.Flags().StringVar(&password, "new-password", "", "New password (prompted if not supplied on a TTY)")
 	cmd.Flags().BoolVar(&passwordChangeRequired, "password-change-required", false, "Require the user to change their password on next login")
 
 	return cmd

@@ -73,7 +73,7 @@ func runCreate(t *testing.T, args string, execErr error) (string, string, string
 }
 
 func TestCreate_HappyPath_PasswordFlag(t *testing.T) {
-	_, _, cypher, params, err := runCreate(t, "alice --password secret", nil)
+	_, _, cypher, params, err := runCreate(t, "alice --set-password secret", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "CREATE USER $name IF NOT EXISTS")
@@ -84,7 +84,7 @@ func TestCreate_HappyPath_PasswordFlag(t *testing.T) {
 }
 
 func TestCreate_PasswordChangeNotRequired(t *testing.T) {
-	_, _, cypher, _, err := runCreate(t, "alice --password secret --password-change-required=false", nil)
+	_, _, cypher, _, err := runCreate(t, "alice --set-password secret --password-change-required=false", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "CHANGE NOT REQUIRED")
@@ -92,7 +92,7 @@ func TestCreate_PasswordChangeNotRequired(t *testing.T) {
 }
 
 func TestCreate_HomeDatabase_IncludedInCypher(t *testing.T) {
-	_, _, cypher, params, err := runCreate(t, "alice --password secret --home-database mydb", nil)
+	_, _, cypher, params, err := runCreate(t, "alice --set-password secret --home-database mydb", nil)
 	require.NoError(t, err)
 
 	assert.Contains(t, cypher, "SET HOME DATABASE $homeDatabase")
@@ -100,7 +100,7 @@ func TestCreate_HomeDatabase_IncludedInCypher(t *testing.T) {
 }
 
 func TestCreate_NoHomeDatabase_NotIncludedInCypher(t *testing.T) {
-	_, _, cypher, params, err := runCreate(t, "alice --password secret", nil)
+	_, _, cypher, params, err := runCreate(t, "alice --set-password secret", nil)
 	require.NoError(t, err)
 
 	assert.NotContains(t, cypher, "HOME DATABASE")
@@ -138,7 +138,7 @@ func TestCreate_NoPassword_TTY_PromptsViaPasswordReader(t *testing.T) {
 
 func TestCreate_ExecError_PropagatesError(t *testing.T) {
 	execErr := clierr.NewValidationError("already exists")
-	_, _, _, _, err := runCreate(t, "alice --password secret", execErr)
+	_, _, _, _, err := runCreate(t, "alice --set-password secret", execErr)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -147,7 +147,7 @@ func TestCreate_ExecError_PropagatesError(t *testing.T) {
 }
 
 func TestCreate_EmitsFollowUpUserRecord(t *testing.T) {
-	stdout, _, _, _, err := runCreate(t, "alice --password secret --format json", nil)
+	stdout, _, _, _, err := runCreate(t, "alice --set-password secret --format json", nil)
 	require.NoError(t, err)
 
 	var got []map[string]any

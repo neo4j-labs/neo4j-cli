@@ -21,23 +21,23 @@ func newCreateCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 		Short:       "Create a Neo4j user",
 		Annotations: map[string]string{"write": "true"},
 		Long: "Create a new user in the system database. " +
-			"If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
+			"If --set-password is not supplied, prompts on a TTY or returns a usage error on non-TTY. " +
 			"--password-change-required (default true) controls whether the user must change their password on first login. " +
 			"--home-database sets the user's default database (Enterprise edition only).",
 		Example: `# Create a user interactively (password will be prompted)
 neo4j-cli admin user create alice --credential local --rw
 
 # Create a user with a password and no change required
-neo4j-cli admin user create bob --password secret --password-change-required=false --credential local --rw
+neo4j-cli admin user create bob --set-password secret --password-change-required=false --credential local --rw
 
 # Create a user with a home database (Enterprise)
-neo4j-cli admin user create carol --password secret --home-database mydb --credential local --rw`,
+neo4j-cli admin user create carol --set-password secret --home-database mydb --credential local --rw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
 
-			pw, err := promptPassword(cmd)
+			pw, err := promptPassword(cmd, "set-password")
 			if err != nil {
 				return err
 			}
@@ -68,7 +68,7 @@ neo4j-cli admin user create carol --password secret --home-database mydb --crede
 		},
 	}
 
-	cmd.Flags().StringVar(&password, "password", "", "Password for the new user (prompted if not supplied on a TTY)")
+	cmd.Flags().StringVar(&password, "set-password", "", "Password for the new user (prompted if not supplied on a TTY)")
 	cmd.Flags().BoolVar(&passwordChangeRequired, "password-change-required", true, "Require the user to change their password on first login")
 	cmd.Flags().StringVar(&homeDatabase, "home-database", "", "Set the user's home database (Enterprise edition only)")
 

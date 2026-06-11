@@ -560,7 +560,7 @@ neo4j-cli admin user activate bob --credential local --rw && neo4j-cli admin use
 
 Create a Neo4j user
 
-Create a new user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default true) controls whether the user must change their password on first login. --home-database sets the user's default database (Enterprise edition only).
+Create a new user in the system database. If --set-password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default true) controls whether the user must change their password on first login. --home-database sets the user's default database (Enterprise edition only).
 
 Usage: `neo4j-cli admin user create <username> [flags]`
 
@@ -569,8 +569,8 @@ Flags:
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--home-database` | string | - | Set the user's home database (Enterprise edition only) |
-| `--password` | string | - | Password for the new user (prompted if not supplied on a TTY) |
 | `--password-change-required` | bool | true | Require the user to change their password on first login |
+| `--set-password` | string | - | Password for the new user (prompted if not supplied on a TTY) |
 
 Examples:
 
@@ -579,10 +579,10 @@ Examples:
 neo4j-cli admin user create alice --credential local --rw
 
 # Create a user with a password and no change required
-neo4j-cli admin user create bob --password secret --password-change-required=false --credential local --rw
+neo4j-cli admin user create bob --set-password secret --password-change-required=false --credential local --rw
 
 # Create a user with a home database (Enterprise)
-neo4j-cli admin user create carol --password secret --home-database mydb --credential local --rw
+neo4j-cli admin user create carol --set-password secret --home-database mydb --credential local --rw
 ```
 
 ### neo4j-cli admin user drop
@@ -674,7 +674,7 @@ neo4j-cli admin user rename bob --new-name bob-renamed --credential local --rw &
 
 Set the password for a Neo4j user
 
-Set the password for an existing user in the system database. If --password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default false) controls whether the user must change their password on next login.
+Set the password for an existing user in the system database. If --new-password is not supplied, prompts on a TTY or returns a usage error on non-TTY. --password-change-required (default false) controls whether the user must change their password on next login.
 
 Usage: `neo4j-cli admin user set-password <username> [flags]`
 
@@ -682,7 +682,7 @@ Flags:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--password` | string | - | New password (prompted if not supplied on a TTY) |
+| `--new-password` | string | - | New password (prompted if not supplied on a TTY) |
 | `--password-change-required` | bool | false | Require the user to change their password on next login |
 
 Examples:
@@ -692,7 +692,7 @@ Examples:
 neo4j-cli admin user set-password alice --credential local --rw
 
 # Set a user's password with a flag and require change on next login
-neo4j-cli admin user set-password bob --password newsecret --password-change-required --credential local --rw
+neo4j-cli admin user set-password bob --new-password newsecret --password-change-required --credential local --rw
 ```
 
 ### neo4j-cli admin user suspend

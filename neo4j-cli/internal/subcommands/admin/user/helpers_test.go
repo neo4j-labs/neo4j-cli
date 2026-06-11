@@ -17,10 +17,10 @@ import (
 
 func TestPromptPassword_FlagSet_ReturnsFlagValue(t *testing.T) {
 	cmd := &cobra.Command{}
-	cmd.Flags().String("password", "", "password flag")
-	require.NoError(t, cmd.Flags().Set("password", "secret123"))
+	cmd.Flags().String("set-password", "", "password flag")
+	require.NoError(t, cmd.Flags().Set("set-password", "secret123"))
 
-	pw, err := promptPassword(cmd)
+	pw, err := promptPassword(cmd, "set-password")
 	require.NoError(t, err)
 	assert.Equal(t, "secret123", pw)
 }
@@ -31,11 +31,11 @@ func TestPromptPassword_NoFlagNoTTY_ReturnsUsageError(t *testing.T) {
 	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
 
 	cmd := &cobra.Command{}
-	cmd.Flags().String("password", "", "password flag")
+	cmd.Flags().String("set-password", "", "password flag")
 	errBuf := bytes.NewBuffer(nil)
 	cmd.SetErr(errBuf)
 
-	_, err := promptPassword(cmd)
+	_, err := promptPassword(cmd, "set-password")
 	require.Error(t, err)
 
 	var ce *clierr.CLIError
@@ -54,10 +54,10 @@ func TestPromptPassword_TTY_ReadsFromPasswordReader(t *testing.T) {
 
 	errBuf := bytes.NewBuffer(nil)
 	cmd := &cobra.Command{}
-	cmd.Flags().String("password", "", "password flag")
+	cmd.Flags().String("set-password", "", "password flag")
 	cmd.SetErr(errBuf)
 
-	pw, err := promptPassword(cmd)
+	pw, err := promptPassword(cmd, "set-password")
 	require.NoError(t, err)
 	assert.Equal(t, "fromtty", pw)
 }
@@ -72,11 +72,11 @@ func TestPromptPassword_TTY_ReaderError_PropagatesError(t *testing.T) {
 	t.Cleanup(func() { dbconn.PasswordReader = origReader })
 
 	cmd := &cobra.Command{}
-	cmd.Flags().String("password", "", "password flag")
+	cmd.Flags().String("set-password", "", "password flag")
 	errBuf := bytes.NewBuffer(nil)
 	cmd.SetErr(errBuf)
 
-	_, err := promptPassword(cmd)
+	_, err := promptPassword(cmd, "set-password")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read error")
 }
