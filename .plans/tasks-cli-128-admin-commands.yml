@@ -773,3 +773,95 @@ tasks:
       - "Tests verify follow-up execFn is called with correct Cypher and params"
       - "go generate produces no bundle diff"
       - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-025
+    title: "Remove private user TTY/password seams; use canonical dbconn exports"
+    source: review
+    status: pending
+    description: |
+      user/helpers.go defines two private package-level vars — passwordReader and
+      stdinIsTTY — that are near-identical clones of the exported dbconn.PasswordReader
+      and dbconn.StdinIsTTY seams in dbconn/helpers.go. Having separate private seams
+      means test injection points diverge: admin_conn_test.go already sets
+      dbconn.StdinIsTTY / dbconn.PasswordReader for the root connection-prompt path,
+      while user package tests set the private vars instead. If anyone changes
+      dbconn.PasswordReader (e.g. adding a Ctrl-C handler), the user package silently
+      diverges.
+
+      Fix: remove the private passwordReader and stdinIsTTY vars from user/helpers.go.
+      Update promptPassword() to call dbconn.StdinIsTTY() and dbconn.PasswordReader()
+      directly. Update all user package tests (helpers_test.go, create_test.go,
+      set_password_test.go) to set dbconn.StdinIsTTY and dbconn.PasswordReader instead
+      of the private vars, restoring via t.Cleanup — exactly the pattern already used
+      in admin_conn_test.go.
+    acceptance_criteria:
+      - "user/helpers.go no longer defines passwordReader or stdinIsTTY package vars"
+      - "promptPassword calls dbconn.StdinIsTTY() and dbconn.PasswordReader() directly"
+      - "user package tests inject fakes by setting dbconn.StdinIsTTY / dbconn.PasswordReader with t.Cleanup restore"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-026
+    title: "Collapse grant/deny into a shared constructor; eliminate copy-paste"
+    source: review
+    status: pending
+    description: |
+      privilege/grant.go and privilege/deny.go are 74-line near-identical files. The
+      RunE body is character-for-character identical except for the string "GRANT" vs
+      "DENY"; the flag set and required-flag list are also identical. Any future change
+      to the privilege mutation flow must be applied to both files, which is a reliable
+      source of drift.
+
+      Fix: extract a shared unexported constructor (e.g. newPrivilegeMutationCmd or a
+      helper that accepts the verb string "GRANT"/"DENY") and a matching shared
+      description/example builder. newGrantCmd and newDenyCmd become thin one-line
+      callers that pass the verb and verb-specific help text. revoke.go is different
+      enough (extra --revoke-type flag, FROM instead of TO) and should stay standalone.
+      Consolidate the corresponding tests into a shared table-driven test or shared
+      helper where the only variable is the verb and expected Cypher prefix.
+    acceptance_criteria:
+      - "grant.go and deny.go no longer contain duplicated RunE bodies or flag registration blocks"
+      - "A shared constructor (or helper) accepts the verb and produces the command; grant/deny call it"
+      - "revoke.go is unchanged"
+      - "Tests cover both grant and deny, preferably via a shared table"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-027
+    title: "Remove duplicate ACCESS entry from validActions"
+    source: review
+    status: pending
+    description: |
+      privilege/helpers.go validActions slice contains "ACCESS" twice: once in the
+      graph-privileges section (line 25) and again in the database-privileges section
+      (line 55). The validActionsHelp() function explicitly de-duplicates this with a
+      seen-map, and its comment acknowledges the duplication. This reactive de-dup
+      exists solely to paper over an avoidable data defect.
+
+      Fix: remove one of the two "ACCESS" entries from validActions. The Cypher keyword
+      works across both scopes without needing to appear twice in the list; the scope
+      is determined by which --on-* flag is passed, not by the action list.
+      Delete the de-dup loop and comment from validActionsHelp() since it becomes
+      unnecessary.
+    acceptance_criteria:
+      - "validActions contains exactly one 'ACCESS' entry"
+      - "validActionsHelp() no longer needs a de-dup loop or seen-map"
+      - "make test passes; make fmt-check and make lint pass clean"
+
+  - id: task-028
+    title: "Extract URI normalisation helper to eliminate duplication in conn.go"
+    source: review
+    status: pending
+    description: |
+      dbconn/conn.go has two call sites for NormalizeURI + stderr rewrite message that
+      are copy-pasted verbatim: ResolveConn (lines 222-231) and buildConnFromPersistedCred
+      (lines 285-294). Both blocks call NormalizeURI, check didRewrite to print "info:
+      rewrote URI...", and check warning to print the cleartext warning.
+
+      Fix: extract the pattern into a small unexported helper such as
+      applyURINorm(cmd *cobra.Command, uri string) string that performs the
+      normalisation and prints both messages to cmd.ErrOrStderr(), then returns the
+      (possibly rewritten) URI. Replace both call sites with a single call to this
+      helper.
+    acceptance_criteria:
+      - "The NormalizeURI call + stderr-print pattern appears exactly once in conn.go (inside the new helper)"
+      - "ResolveConn and buildConnFromPersistedCred both call the helper"
+      - "make test passes; make fmt-check and make lint pass clean"

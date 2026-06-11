@@ -113,3 +113,6 @@ Decisions: Stub packages use _ = cfg / _ = credential blank identifiers so impor
 Created neo4j-cli/internal/subcommands/admin/run.go with the queryRunner interface (test seam via adminRunnerFn), boltAdminRunner (ExecuteWrite targeting system database), and runAdminStatement(ctx, cfg, cred, cypher, params) with all four error-translation paths; run_test.go covers all paths using fakeQueryRunner.
 Files: +neo4j-cli/internal/subcommands/admin/run.go, +neo4j-cli/internal/subcommands/admin/run_test.go
 Decisions: Added cfg *clicfg.Config parameter to runAdminStatement (vs task spec's 4-arg form) to allow User-Agent construction from cfg.Version; leaf commands have cfg anyway so this is natural.
+
+## REVIEW — 2026-06-11T12:00:00Z
+Added 4 review tasks (task-025..task-028).
