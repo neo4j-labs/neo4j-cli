@@ -136,3 +136,11 @@ Decisions: Added cfg *clicfg.Config parameter to runAdminStatement (vs task spec
 
 ## REVIEW — 2026-06-11T12:00:00Z
 Added 4 review tasks (task-025..task-028).
+
+## task-030 — 2026-06-11T20:00:00Z
+Fix role get existence-check Cypher: wrong column 'name' → correct column 'role' in SHOW ROLES WITH USERS WHERE clause.
+Files: ~neo4j-cli/internal/subcommands/admin/role/get.go, ~neo4j-cli/internal/subcommands/admin/role/get_test.go
+
+## task-032 — 2026-06-11T20:00:00Z
+Fix user/role drop not-found detection: wrong error code InvalidArguments → correct ArgumentError.
+Files: ~neo4j-cli/internal/subcommands/admin/user/drop.go, ~neo4j-cli/internal/subcommands/admin/user/drop_test.go, ~neo4j-cli/internal/subcommands/admin/role/drop.go, ~neo4j-cli/internal/subcommands/admin/role/drop_test.go

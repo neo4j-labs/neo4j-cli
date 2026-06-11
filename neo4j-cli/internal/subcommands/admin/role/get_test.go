@@ -70,7 +70,7 @@ func runGet(t *testing.T, args string, responses []struct {
 }
 
 // existsResponse returns a sequenced response pair for a role that exists.
-// First call (SHOW ROLES WHERE name = $name) returns one row; second call
+// First call (SHOW ROLES WITH USERS WHERE role = $name) returns one row; second call
 // (SHOW ROLE $name PRIVILEGES) returns the privilege rows.
 func existsResponse(privilegeRows []map[string]any) []struct {
 	rows []map[string]any
@@ -86,7 +86,7 @@ func existsResponse(privilegeRows []map[string]any) []struct {
 }
 
 // notFoundResponse returns responses for a role that does not exist.
-// First call (SHOW ROLES WHERE name = $name) returns zero rows.
+// First call (SHOW ROLES WITH USERS WHERE role = $name) returns zero rows.
 func notFoundResponse() []struct {
 	rows []map[string]any
 	err  error

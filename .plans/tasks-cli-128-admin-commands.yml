@@ -1014,8 +1014,8 @@ tasks:
   - id: task-032
     title: "Fix user/role drop not-found error code (REQ-F-053 implementation correction)"
     source: qa
-    completed_at: "2026-06-11T20:00:00Z"
     status: completed
+    completed_at: "2026-06-11T20:00:00Z"
     description: |
       task-022 was marked complete but live testing shows 'user drop <nonexistent>'
       and 'role drop <nonexistent>' still return validation_error (exit 6) instead of

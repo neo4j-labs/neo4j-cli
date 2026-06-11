@@ -30,7 +30,7 @@ neo4j-cli admin role get admin --credential local --format json`,
 			cmd.SilenceUsage = true
 			name := args[0]
 
-			existing, err := roleExecFn(cmd.Context(), cfg, *conn, "SHOW ROLES WHERE name = $name", map[string]any{"name": name})
+			existing, err := roleExecFn(cmd.Context(), cfg, *conn, "SHOW ROLES WITH USERS WHERE role = $name", map[string]any{"name": name})
 			if err != nil {
 				return err
 			}
