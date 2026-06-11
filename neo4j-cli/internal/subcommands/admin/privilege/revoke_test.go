@@ -39,7 +39,9 @@ func runRevoke(t *testing.T, args string, rows []map[string]any, execErr error) 
 	return out.String(), errBuf.String(), execCmdErr
 }
 
-func TestRevoke_WildcardGraph_EmitsCorrectCypher(t *testing.T) {
+// TestRevoke_PropertyBearer_EmitsPropertyQualifier verifies that READ (a
+// catPropertyBearer action) includes {*} in the revoke Cypher.
+func TestRevoke_PropertyBearer_EmitsPropertyQualifier(t *testing.T) {
 	gotCypher, gotParams := captureExecFn(t, []map[string]any{})
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
@@ -56,6 +58,77 @@ func TestRevoke_WildcardGraph_EmitsCorrectCypher(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "REVOKE READ {*} ON GRAPH * ELEMENTS * FROM $role", *gotCypher)
 	assert.Equal(t, map[string]any{"role": "analyst"}, *gotParams)
+}
+
+// TestRevoke_GraphOnly_NoPropertyQualifier verifies that WRITE (catGraphOnly)
+// does not emit a {*} property qualifier.
+func TestRevoke_GraphOnly_NoPropertyQualifier(t *testing.T) {
+	gotCypher, _ := captureExecFn(t, []map[string]any{})
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"revoke", "--action", "write", "--on-graph", "*", "--role", "analyst"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "REVOKE WRITE ON GRAPH * ELEMENTS * FROM $role", *gotCypher)
+}
+
+// TestRevoke_Database_EmitsOnDatabase verifies that ACCESS (catDatabase)
+// generates ON DATABASE.
+func TestRevoke_Database_EmitsOnDatabase(t *testing.T) {
+	gotCypher, _ := captureExecFn(t, []map[string]any{})
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"revoke", "--action", "access", "--on-database", "neo4j", "--role", "readonly"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "REVOKE ACCESS ON DATABASE neo4j FROM $role", *gotCypher)
+}
+
+// TestRevoke_Dbms_EmitsOnDbms verifies that CREATE ROLE (catDbms) with
+// --on-dbms generates ON DBMS.
+func TestRevoke_Dbms_EmitsOnDbms(t *testing.T) {
+	gotCypher, _ := captureExecFn(t, []map[string]any{})
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs([]string{"revoke", "--action", "create_role", "--on-dbms", "--role", "limited"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+	assert.Equal(t, "REVOKE CREATE ROLE ON DBMS FROM $role", *gotCypher)
+}
+
+// TestRevoke_Dbms_MissingOnDbms_ReturnsUsageError verifies that DBMS-level
+// actions without --on-dbms return a usage error.
+func TestRevoke_Dbms_MissingOnDbms_ReturnsUsageError(t *testing.T) {
+	_, _, err := runRevoke(t, "--action create_role --role analyst", nil, nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Contains(t, ce.Message, "requires --on-dbms")
 }
 
 func TestRevoke_RevokeTypeGrant_EmitsRevokeGrant(t *testing.T) {
@@ -141,6 +214,17 @@ func TestRevoke_NodeLabelWithOnDatabase_ReturnsUsageError(t *testing.T) {
 
 func TestRevoke_UnknownAction_ReturnsUsageError(t *testing.T) {
 	_, _, err := runRevoke(t, "--action bad_action --role analyst", nil, nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Contains(t, ce.Message, "unknown --action")
+}
+
+// TestRevoke_FindAction_ReturnsUnknownActionError verifies that FIND (removed)
+// is no longer accepted.
+func TestRevoke_FindAction_ReturnsUnknownActionError(t *testing.T) {
+	_, _, err := runRevoke(t, "--action find --role analyst", nil, nil)
 	require.Error(t, err)
 
 	var ce *clierr.CLIError

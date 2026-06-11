@@ -19,122 +19,123 @@ import (
 // connection.
 var privilegeExecFn adminutil.ExecFn
 
+// actionCategory classifies each privilege action by which Cypher resource
+// clause it requires. The category drives both Cypher generation and flag
+// validation in buildPrivilegeCypher.
+type actionCategory int
+
+const (
+	// catPropertyBearer actions (READ, MATCH, SET PROPERTY, MERGE) emit a
+	// property qualifier clause and an entity clause inside ON GRAPH.
+	catPropertyBearer actionCategory = iota
+	// catGraphOnly actions (TRAVERSE, WRITE, CREATE, DELETE, LOAD,
+	// ALL GRAPH PRIVILEGES) emit an entity clause on ON GRAPH but never a
+	// property qualifier. --property is a usage error.
+	catGraphOnly
+	// catSetLabel / catRemoveLabel actions emit "SET LABEL <label> ON GRAPH <g>"
+	// or "REMOVE LABEL <label> ON GRAPH <g>" using the first --node-label value.
+	// --node-label is required; --property is forbidden.
+	catSetLabel
+	catRemoveLabel
+	// catDatabase actions are scoped to ON DATABASE and may not be combined with
+	// --on-graph, --on-dbms, or any entity/property qualifier.
+	catDatabase
+	// catDbms actions are scoped to ON DBMS only. --on-dbms is required.
+	catDbms
+)
+
+// privilegeCategory maps every valid action keyword (canonical form) to its
+// category. The map is the single authoritative source for both validation and
+// Cypher generation.
+var privilegeCategory = map[string]actionCategory{
+	// catPropertyBearer
+	"READ":         catPropertyBearer,
+	"MATCH":        catPropertyBearer,
+	"SET PROPERTY": catPropertyBearer,
+	"MERGE":        catPropertyBearer,
+
+	// catGraphOnly
+	"TRAVERSE":             catGraphOnly,
+	"WRITE":                catGraphOnly,
+	"CREATE":               catGraphOnly,
+	"DELETE":               catGraphOnly,
+	"LOAD":                 catGraphOnly,
+	"ALL GRAPH PRIVILEGES": catGraphOnly,
+
+	// catSetLabel / catRemoveLabel
+	"SET LABEL":    catSetLabel,
+	"REMOVE LABEL": catRemoveLabel,
+
+	// catDatabase
+	"ACCESS":                       catDatabase,
+	"START":                        catDatabase,
+	"STOP":                         catDatabase,
+	"CREATE INDEX":                 catDatabase,
+	"DROP INDEX":                   catDatabase,
+	"SHOW INDEX":                   catDatabase,
+	"INDEX MANAGEMENT":             catDatabase,
+	"CREATE CONSTRAINT":            catDatabase,
+	"DROP CONSTRAINT":              catDatabase,
+	"SHOW CONSTRAINT":              catDatabase,
+	"CONSTRAINT MANAGEMENT":        catDatabase,
+	"CREATE NEW NODE LABEL":        catDatabase,
+	"CREATE NEW RELATIONSHIP TYPE": catDatabase,
+	"CREATE NEW PROPERTY NAME":     catDatabase,
+	"NAME MANAGEMENT":              catDatabase,
+	"ALL DATABASE PRIVILEGES":      catDatabase,
+	"SHOW TRANSACTION":             catDatabase,
+	"TERMINATE TRANSACTION":        catDatabase,
+	"TRANSACTION MANAGEMENT":       catDatabase,
+
+	// catDbms
+	"CREATE ROLE":                   catDbms,
+	"DROP ROLE":                     catDbms,
+	"ASSIGN ROLE":                   catDbms,
+	"REMOVE ROLE":                   catDbms,
+	"SHOW ROLE":                     catDbms,
+	"RENAME ROLE":                   catDbms,
+	"ROLE MANAGEMENT":               catDbms,
+	"CREATE USER":                   catDbms,
+	"DROP USER":                     catDbms,
+	"SHOW USER":                     catDbms,
+	"SET USER STATUS":               catDbms,
+	"SET PASSWORDS":                 catDbms,
+	"SET USER HOME DATABASE":        catDbms,
+	"ALTER USER":                    catDbms,
+	"RENAME USER":                   catDbms,
+	"USER MANAGEMENT":               catDbms,
+	"CREATE DATABASE":               catDbms,
+	"DROP DATABASE":                 catDbms,
+	"DATABASE MANAGEMENT":           catDbms,
+	"SHOW PRIVILEGE":                catDbms,
+	"ASSIGN PRIVILEGE":              catDbms,
+	"REMOVE PRIVILEGE":              catDbms,
+	"PRIVILEGE MANAGEMENT":          catDbms,
+	"EXECUTE PROCEDURE":             catDbms,
+	"EXECUTE BOOSTED PROCEDURE":     catDbms,
+	"EXECUTE ADMIN PROCEDURES":      catDbms,
+	"EXECUTE FUNCTION":              catDbms,
+	"EXECUTE BOOSTED FUNCTION":      catDbms,
+	"ALL ON PROCEDURES":             catDbms,
+	"ALL ON FUNCTIONS":              catDbms,
+	"IMPERSONATE":                   catDbms,
+	"ALL DBMS PRIVILEGES":           catDbms,
+	"SERVER MANAGEMENT":             catDbms,
+	"COMPOSITE DATABASE MANAGEMENT": catDbms,
+	"ALIAS MANAGEMENT":              catDbms,
+}
+
 // validActions is the canonical list of Neo4j privilege action keywords
 // accepted by GRANT / DENY / REVOKE. The canonical form uses spaces and
 // uppercase; the flag value accepts underscores as word separators and is
-// case-insensitive.
-var validActions = []string{
-	// Graph / element privileges
-	"ACCESS",
-	"FIND",
-	"READ",
-	"WRITE",
-	"TRAVERSE",
-	"MATCH",
-	"MERGE",
-	"CREATE",
-	"DELETE",
-	"SET LABEL",
-	"REMOVE LABEL",
-	"SET PROPERTY",
-	"ALL GRAPH PRIVILEGES",
-	"LOAD",
-	// Database privileges
-	"START",
-	"STOP",
-	"CREATE INDEX",
-	"DROP INDEX",
-	"SHOW INDEX",
-	"INDEX MANAGEMENT",
-	"CREATE CONSTRAINT",
-	"DROP CONSTRAINT",
-	"SHOW CONSTRAINT",
-	"CONSTRAINT MANAGEMENT",
-	"CREATE NEW NODE LABEL",
-	"CREATE NEW RELATIONSHIP TYPE",
-	"CREATE NEW PROPERTY NAME",
-	"NAME MANAGEMENT",
-	"ALL DATABASE PRIVILEGES",
-	"SHOW TRANSACTION",
-	"TERMINATE TRANSACTION",
-	"TRANSACTION MANAGEMENT",
-	// DBMS privileges
-	"CREATE ROLE",
-	"DROP ROLE",
-	"ASSIGN ROLE",
-	"REMOVE ROLE",
-	"SHOW ROLE",
-	"RENAME ROLE",
-	"ROLE MANAGEMENT",
-	"CREATE USER",
-	"DROP USER",
-	"SHOW USER",
-	"SET USER STATUS",
-	"SET PASSWORDS",
-	"SET USER HOME DATABASE",
-	"ALTER USER",
-	"RENAME USER",
-	"USER MANAGEMENT",
-	"CREATE DATABASE",
-	"DROP DATABASE",
-	"DATABASE MANAGEMENT",
-	"SHOW PRIVILEGE",
-	"ASSIGN PRIVILEGE",
-	"REMOVE PRIVILEGE",
-	"PRIVILEGE MANAGEMENT",
-	"EXECUTE PROCEDURE",
-	"EXECUTE BOOSTED PROCEDURE",
-	"EXECUTE ADMIN PROCEDURES",
-	"EXECUTE FUNCTION",
-	"EXECUTE BOOSTED FUNCTION",
-	"ALL ON PROCEDURES",
-	"ALL ON FUNCTIONS",
-	"IMPERSONATE",
-	"ALL DBMS PRIVILEGES",
-	"SERVER MANAGEMENT",
-	"COMPOSITE DATABASE MANAGEMENT",
-	"ALIAS MANAGEMENT",
-}
+// case-insensitive. Derived from privilegeCategory keys to avoid duplication.
+var validActions []string
 
-// dbmsActions is the set of actions that are scoped to ON DBMS only.
-// These cannot be combined with graph-level qualifiers (--node-label,
-// --relationship-type, --property).
-var dbmsActions = map[string]bool{
-	"CREATE ROLE":                   true,
-	"DROP ROLE":                     true,
-	"ASSIGN ROLE":                   true,
-	"REMOVE ROLE":                   true,
-	"SHOW ROLE":                     true,
-	"RENAME ROLE":                   true,
-	"ROLE MANAGEMENT":               true,
-	"CREATE USER":                   true,
-	"DROP USER":                     true,
-	"SHOW USER":                     true,
-	"SET USER STATUS":               true,
-	"SET PASSWORDS":                 true,
-	"SET USER HOME DATABASE":        true,
-	"ALTER USER":                    true,
-	"RENAME USER":                   true,
-	"USER MANAGEMENT":               true,
-	"CREATE DATABASE":               true,
-	"DROP DATABASE":                 true,
-	"DATABASE MANAGEMENT":           true,
-	"SHOW PRIVILEGE":                true,
-	"ASSIGN PRIVILEGE":              true,
-	"REMOVE PRIVILEGE":              true,
-	"PRIVILEGE MANAGEMENT":          true,
-	"EXECUTE PROCEDURE":             true,
-	"EXECUTE BOOSTED PROCEDURE":     true,
-	"EXECUTE ADMIN PROCEDURES":      true,
-	"EXECUTE FUNCTION":              true,
-	"EXECUTE BOOSTED FUNCTION":      true,
-	"ALL ON PROCEDURES":             true,
-	"ALL ON FUNCTIONS":              true,
-	"IMPERSONATE":                   true,
-	"ALL DBMS PRIVILEGES":           true,
-	"SERVER MANAGEMENT":             true,
-	"COMPOSITE DATABASE MANAGEMENT": true,
-	"ALIAS MANAGEMENT":              true,
+func init() {
+	validActions = make([]string, 0, len(privilegeCategory))
+	for k := range privilegeCategory {
+		validActions = append(validActions, k)
+	}
 }
 
 // privilegeFlags holds the resource and qualifier flags shared by grant, deny,
@@ -158,30 +159,24 @@ func normalizeAction(raw string) (string, bool) {
 	candidate := strings.ToUpper(strings.ReplaceAll(raw, "_", " "))
 	// Collapse multiple spaces (in case the user passed "ALL  GRAPH" etc.)
 	candidate = strings.Join(strings.Fields(candidate), " ")
-	for _, a := range validActions {
-		if a == candidate {
-			return candidate, true
-		}
-	}
-	return candidate, false
+	_, ok := privilegeCategory[candidate]
+	return candidate, ok
 }
 
 // buildPrivilegeCypher constructs the core privilege clause used in GRANT,
-// DENY, and REVOKE statements. It returns the resource + qualifier clause
-// (everything after the action keyword and before TO/FROM) or a validation
-// error for mutually-exclusive flag combinations.
+// DENY, and REVOKE statements. It returns the action + resource + qualifier
+// clause (everything after the verb keyword and before TO/FROM) or a
+// validation error for mutually-exclusive flag combinations or category
+// violations.
 //
 // The caller is responsible for prepending the verb (GRANT/DENY/REVOKE) and
-// action and appending TO/FROM <role>.
-//
-// Examples:
-//
-//	buildPrivilegeCypher("READ", privilegeFlags{onGraph:"*"})
-//	  → "READ {*} ON GRAPH * ELEMENTS *", nil
-//
-//	buildPrivilegeCypher("READ", privilegeFlags{onGraph:"neo4j", nodeLabels:["Person"], properties:["name"]})
-//	  → "READ {name} ON GRAPH neo4j NODES Person", nil
+// appending TO/FROM <role>.
 func buildPrivilegeCypher(action string, f privilegeFlags) (string, error) {
+	cat, known := privilegeCategory[action]
+	if !known {
+		return "", clierr.NewUsageError("unknown --action %q; valid actions: %s", action, validActionsHelp())
+	}
+
 	// --- resource exclusivity ---
 	resourceCount := 0
 	if f.onGraph != "" {
@@ -208,48 +203,86 @@ func buildPrivilegeCypher(action string, f privilegeFlags) (string, error) {
 		return "", clierr.NewUsageError("--node-label, --relationship-type, and --property are only valid with --on-graph")
 	}
 
-	// --- DBMS-level action + graph qualifiers ---
-	if dbmsActions[action] && hasGraphQualifiers {
-		return "", clierr.NewUsageError("--property, --node-label, and --relationship-type cannot be combined with DBMS-level action %q", action)
-	}
+	// --- per-category validation and Cypher construction ---
+	switch cat {
+	case catPropertyBearer:
+		return buildGraphClause(action, f, true), nil
 
-	// --- build resource clause ---
-	var resource string
-	switch {
-	case f.onDbms:
-		resource = "ON DBMS"
-	case f.onDatabase != "":
-		resource = fmt.Sprintf("ON DATABASE %s", f.onDatabase)
-	default:
-		// ON GRAPH (default)
+	case catGraphOnly:
+		if len(f.properties) > 0 {
+			return "", clierr.NewUsageError("--property is not valid for action %q", action)
+		}
+		return buildGraphClause(action, f, false), nil
+
+	case catSetLabel, catRemoveLabel:
+		if len(f.properties) > 0 {
+			return "", clierr.NewUsageError("--property is not valid for action %q", action)
+		}
+		if len(f.nodeLabels) == 0 {
+			return "", clierr.NewUsageError("--node-label is required for action %q", action)
+		}
 		graphName := f.onGraph
 		if graphName == "" {
 			graphName = "*"
 		}
+		label := f.nodeLabels[0]
+		return fmt.Sprintf("%s %s ON GRAPH %s", action, label, graphName), nil
 
-		// property clause
+	case catDatabase:
+		if f.onGraph != "" || f.onDbms {
+			return "", clierr.NewUsageError("action %q requires --on-database (not --on-graph or --on-dbms)", action)
+		}
+		if hasGraphQualifiers {
+			return "", clierr.NewUsageError("--node-label, --relationship-type, and --property cannot be combined with database-level action %q", action)
+		}
+		dbName := f.onDatabase
+		if dbName == "" {
+			dbName = "*"
+		}
+		return fmt.Sprintf("%s ON DATABASE %s", action, dbName), nil
+
+	case catDbms:
+		if !f.onDbms {
+			return "", clierr.NewUsageError("action %q requires --on-dbms", action)
+		}
+		return fmt.Sprintf("%s ON DBMS", action), nil
+	}
+
+	// Unreachable: every category is handled above.
+	return "", clierr.NewUsageError("unknown action category for %q", action)
+}
+
+// buildGraphClause constructs the ON GRAPH resource clause. When
+// includeProperty is true (catPropertyBearer), a property qualifier is
+// included. Otherwise (catGraphOnly) no property qualifier is emitted.
+func buildGraphClause(action string, f privilegeFlags, includeProperty bool) string {
+	graphName := f.onGraph
+	if graphName == "" {
+		graphName = "*"
+	}
+
+	// entity clause
+	var entityClause string
+	switch {
+	case len(f.nodeLabels) > 0:
+		entityClause = fmt.Sprintf("NODES %s", strings.Join(f.nodeLabels, ", "))
+	case len(f.relationshipTypes) > 0:
+		entityClause = fmt.Sprintf("RELATIONSHIPS %s", strings.Join(f.relationshipTypes, ", "))
+	default:
+		entityClause = "ELEMENTS *"
+	}
+
+	if includeProperty {
 		var propClause string
 		if len(f.properties) > 0 {
 			propClause = fmt.Sprintf("{%s}", strings.Join(f.properties, ", "))
 		} else {
 			propClause = "{*}"
 		}
-
-		// entity clause
-		var entityClause string
-		switch {
-		case len(f.nodeLabels) > 0:
-			entityClause = fmt.Sprintf("NODES %s", strings.Join(f.nodeLabels, ", "))
-		case len(f.relationshipTypes) > 0:
-			entityClause = fmt.Sprintf("RELATIONSHIPS %s", strings.Join(f.relationshipTypes, ", "))
-		default:
-			entityClause = "ELEMENTS *"
-		}
-
-		resource = fmt.Sprintf("%s ON GRAPH %s %s", propClause, graphName, entityClause)
+		return fmt.Sprintf("%s %s ON GRAPH %s %s", action, propClause, graphName, entityClause)
 	}
 
-	return fmt.Sprintf("%s %s", action, resource), nil
+	return fmt.Sprintf("%s ON GRAPH %s %s", action, graphName, entityClause)
 }
 
 // validActionsHelp returns a comma-separated list of valid action names for
