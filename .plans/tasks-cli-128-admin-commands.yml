@@ -473,7 +473,8 @@ tasks:
       Write colocated tests using the fakeExecFn pattern (same as role/grant_test.go).
       Include >=2 flush-left Example invocations in both list and the parent (if parent
       has its own help text). All new .go files must carry the Neo4j copyright header.
-    status: not_started
+    status: completed
+    completed_at: "2026-06-11T13:00:00Z"
     dependencies:
       - task-009
     acceptance_criteria:
