@@ -314,14 +314,6 @@ func removePathParametersFromUrl(originalUrl string) string {
 	return fmt.Sprintf("%s://%s", parsedUrl.Scheme, parsedUrl.Host)
 }
 
-func (config *AuraConfig) BetaPathV1() string {
-	return "v1beta5"
-}
-
-func (config *AuraConfig) BetaPathV2() string {
-	return "v2beta1"
-}
-
 func (config *AuraConfig) BindBaseUrl(flag *pflag.Flag) {
 	if err := config.viper.BindPFlag("aura.base-url", flag); err != nil {
 		panic(err)

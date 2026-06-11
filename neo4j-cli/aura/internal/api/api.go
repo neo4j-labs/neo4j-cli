@@ -78,7 +78,7 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	if config.Version == "" {
 		config.Version = AuraApiVersion1
 	}
-	versionPath := getVersionPath(cfg, config.Version)
+	versionPath := getVersionPath(config.Version)
 
 	u, err := url.ParseRequestURI(baseUrl)
 	if err != nil {
@@ -156,17 +156,14 @@ func MakeRequest(cfg *clicfg.Config, path string, config *RequestConfig) (respon
 	return responseBody, res.StatusCode, handleResponseError(res, credential, cfg)
 }
 
-func getVersionPath(cfg *clicfg.Config, version AuraApiVersion) string {
+func getVersionPath(version AuraApiVersion) string {
 	switch version {
 	case AuraApiVersion1:
-		if cfg.Flags.Enabled("flag.aura-beta") {
-			return cfg.Aura.BetaPathV1()
-		}
 		return "v1"
 	case AuraApiVersionBeta1:
-		return cfg.Aura.BetaPathV1()
+		return "v1beta5"
 	case AuraApiVersion2:
-		return cfg.Aura.BetaPathV2()
+		return "v2beta1"
 	default:
 		panic(fmt.Sprintf("version not set in requests %s", version))
 	}
