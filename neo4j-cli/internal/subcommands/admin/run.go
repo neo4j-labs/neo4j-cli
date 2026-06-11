@@ -23,6 +23,7 @@ const (
 
 	unsupportedAdminCode = "Neo.ClientError.Statement.UnsupportedAdministrationCommand"
 	argumentErrorCode    = "Neo.ClientError.Statement.ArgumentError"
+	executionFailedCode  = "Neo.DatabaseError.Statement.ExecutionFailed"
 )
 
 // queryRunner is the test seam for the admin execution path. Production code
@@ -136,6 +137,10 @@ func translateNeo4jError(ne *neo4j.Neo4jError) error {
 			return clierr.NewValidationError("renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)")
 		}
 		return clierr.NewValidationError("%w", ne)
+	case executionFailedCode:
+		if strings.Contains(ne.Msg, "not available in community edition") {
+			return clierr.NewValidationError("%s", ne.Msg)
+		}
 	}
 
 	if ne.Classification() == "ClientError" {
