@@ -1,3 +1,7 @@
+## TASK-026 — 2026-06-11T19:00:00Z
+Added `newPrivilegeMutationCmd(cfg, conn, verb, short, long, example)` shared constructor to `helpers.go` (accepting "GRANT"/"DENY" verb). Reduced `grant.go` and `deny.go` to thin 5-line wrappers that call the shared constructor with verb-specific help text. Deleted `deny_test.go` and rewrote `grant_test.go` into a consolidated table-driven test file (`grant_test.go`) where both verbs are exercised via `runMutation(t, sub, ...)` subtests. `revoke.go` is unchanged. All gates pass: make test (zero failures), make fmt-check (clean), make lint (0 issues).
+Files: ~neo4j-cli/internal/subcommands/admin/privilege/helpers.go, ~neo4j-cli/internal/subcommands/admin/privilege/grant.go, ~neo4j-cli/internal/subcommands/admin/privilege/deny.go, ~neo4j-cli/internal/subcommands/admin/privilege/grant_test.go, -neo4j-cli/internal/subcommands/admin/privilege/deny_test.go
+
 ## TASK-027 — 2026-06-11T18:00:00Z
 Removed the duplicate `"ACCESS"` entry from `validActions` (second occurrence in the database-privileges block) and simplified `validActionsHelp()` from a seen-map de-dup loop to a one-liner `strings.Join(validActions, ", ")`. All gates pass: make test (zero failures), make fmt-check (clean), make lint (0 issues).
 Files: ~neo4j-cli/internal/subcommands/admin/privilege/helpers.go
