@@ -777,7 +777,7 @@ tasks:
   - id: task-025
     title: "Remove private user TTY/password seams; use canonical dbconn exports"
     source: review
-    status: pending
+    status: in_progress
     description: |
       user/helpers.go defines two private package-level vars — passwordReader and
       stdinIsTTY — that are near-identical clones of the exported dbconn.PasswordReader
@@ -828,7 +828,7 @@ tasks:
   - id: task-027
     title: "Remove duplicate ACCESS entry from validActions"
     source: review
-    status: pending
+    status: in_progress
     description: |
       privilege/helpers.go validActions slice contains "ACCESS" twice: once in the
       graph-privileges section (line 25) and again in the database-privileges section
@@ -849,7 +849,8 @@ tasks:
   - id: task-028
     title: "Extract URI normalisation helper to eliminate duplication in conn.go"
     source: review
-    status: pending
+    status: completed
+    completed_at: "2026-06-11T17:00:00Z"
     description: |
       dbconn/conn.go has two call sites for NormalizeURI + stderr rewrite message that
       are copy-pasted verbatim: ResolveConn (lines 222-231) and buildConnFromPersistedCred

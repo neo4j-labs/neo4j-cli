@@ -219,16 +219,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		database = DefaultDatabase
 	}
 
-	rewritten, didRewrite, displayOrig, warning := NormalizeURI(uri)
-	if didRewrite {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"info: rewrote URI '%s' to '%s' (the command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
-			displayOrig, rewritten)
-		uri = rewritten
-	}
-	if warning != "" {
-		cmd.PrintErrln(warning)
-	}
+	uri = applyURINorm(cmd, uri)
 
 	version := cfg.Version
 	if version == "" {
@@ -278,10 +269,10 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMa
 	return c, nil
 }
 
-// buildConnFromPersistedCred turns a persisted DbmsCredential into a *Conn,
-// applying URI normalisation.
-func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Config, cmd *cobra.Command) *Conn {
-	uri := cred.URI
+// applyURINorm normalises uri via NormalizeURI, prints the rewrite info line
+// and any cleartext warning to cmd's stderr, and returns the (possibly
+// rewritten) URI.
+func applyURINorm(cmd *cobra.Command, uri string) string {
 	rewritten, didRewrite, displayOrig, warning := NormalizeURI(uri)
 	if didRewrite {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
@@ -292,6 +283,13 @@ func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Co
 	if warning != "" {
 		cmd.PrintErrln(warning)
 	}
+	return uri
+}
+
+// buildConnFromPersistedCred turns a persisted DbmsCredential into a *Conn,
+// applying URI normalisation.
+func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Config, cmd *cobra.Command) *Conn {
+	uri := applyURINorm(cmd, cred.URI)
 
 	version := cfg.Version
 	if version == "" {
