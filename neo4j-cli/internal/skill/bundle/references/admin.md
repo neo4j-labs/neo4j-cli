@@ -9,6 +9,8 @@
 - [neo4j-cli admin database list](#neo4j-cli-admin-database-list)
 - [neo4j-cli admin database start](#neo4j-cli-admin-database-start)
 - [neo4j-cli admin database stop](#neo4j-cli-admin-database-stop)
+- [neo4j-cli admin privilege](#neo4j-cli-admin-privilege)
+- [neo4j-cli admin privilege list](#neo4j-cli-admin-privilege-list)
 - [neo4j-cli admin role](#neo4j-cli-admin-role)
 - [neo4j-cli admin role create](#neo4j-cli-admin-role-create)
 - [neo4j-cli admin role drop](#neo4j-cli-admin-role-drop)
@@ -28,7 +30,7 @@
 
 Manage Neo4j databases, users, and roles
 
-Manage Neo4j databases, users, and roles via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke — Enterprise only).
+Manage Neo4j databases, users, roles, and privileges via the system database. Connects over Bolt using the supplied connection flags or a stored dbms credential (use '--credential <name>' for a named credential, '--credential desktop' for a running Neo4j Desktop 2 DBMS, or '--credential desktop-connection:<uuid>' for a saved Desktop connection). Subcommands: `database` (list, get, create, drop, start, stop), `user` (list, get, create, drop, rename, set-password, suspend, activate), `role` (list, get, create, drop, grant, revoke — Enterprise only), `privilege` (list — Enterprise only).
 
 Usage: `neo4j-cli admin`
 
@@ -192,6 +194,55 @@ neo4j-cli admin database stop mydb --credential local --rw
 
 # Stop a database and wait until it is offline before returning
 neo4j-cli admin database stop mydb --credential local --wait --rw
+```
+
+## neo4j-cli admin privilege
+
+Show Neo4j privileges (Enterprise only)
+
+Show Neo4j privileges (Enterprise edition only). Read commands (list) do not require --rw.
+
+Usage: `neo4j-cli admin privilege`
+
+Examples:
+
+```
+# Show help for the privilege subcommands
+neo4j-cli admin privilege --help
+
+# List all privileges as JSON for scripting
+neo4j-cli admin privilege list --credential local --format json
+```
+
+### neo4j-cli admin privilege list
+
+List privileges (Enterprise only)
+
+List privileges from the system database (Enterprise edition only). Executes SHOW PRIVILEGES by default. Use --role to show privileges for a specific role or --user to show privileges for a specific user. --role and --user are mutually exclusive.
+
+Usage: `neo4j-cli admin privilege list [flags]`
+
+Flags:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--role` | string | - | Show privileges for the specified role name (mutually exclusive with --user) |
+| `--user` | string | - | Show privileges for the specified user name (mutually exclusive with --role) |
+
+Examples:
+
+```
+# List all privileges as a table
+neo4j-cli admin privilege list --credential local
+
+# List all privileges as JSON for scripting
+neo4j-cli admin privilege list --credential local --format json
+
+# List privileges for a specific role
+neo4j-cli admin privilege list --credential local --role analyst --format json
+
+# List privileges for a specific user
+neo4j-cli admin privilege list --credential local --user alice
 ```
 
 ## neo4j-cli admin role
