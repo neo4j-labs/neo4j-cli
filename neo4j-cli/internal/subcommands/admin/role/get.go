@@ -29,12 +29,22 @@ neo4j-cli admin role get admin --credential local --format json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			name := args[0]
+
+			existing, err := roleExecFn(cmd.Context(), cfg, *conn, "SHOW ROLES WHERE name = $name", map[string]any{"name": name})
+			if err != nil {
+				return err
+			}
+			if len(existing) == 0 {
+				return clierr.NewNotFoundError("role %q not found", name)
+			}
+
 			rows, err := roleExecFn(cmd.Context(), cfg, *conn, "SHOW ROLE $name PRIVILEGES", map[string]any{"name": name})
 			if err != nil {
 				return err
 			}
 			if len(rows) == 0 {
-				return clierr.NewNotFoundError("role %q not found", name)
+				commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(nil), []string{})
+				return nil
 			}
 			var fields []string
 			for k := range rows[0] {

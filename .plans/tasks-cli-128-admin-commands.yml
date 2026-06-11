@@ -640,7 +640,8 @@ tasks:
         - nonexistent role → not_found (exit 3)
 
       Run make test, make fmt-check, make lint.
-    status: in_progress
+    status: completed
+    completed_at: "2026-06-11T15:30:00Z"
     dependencies:
       - task-009
     acceptance_criteria:
