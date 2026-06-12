@@ -55,7 +55,7 @@ func TestQueryEmbed_StdinInputWhenNoArg(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "k")
 
 	h := newRunHarness(t, "json")
-	stdinIsTTY = func() bool { return false }
+	dbconn.StdinIsTTY = func() bool { return false }
 	stdinReader = func() io.Reader { return strings.NewReader("hello\n") }
 
 	err := h.execute(t, ":embed")
@@ -72,7 +72,7 @@ func TestQueryEmbed_StdinInputWhenNoArg(t *testing.T) {
 // label, mirroring the parent command's "no Cypher" error path.
 func TestQueryEmbed_TTYStdinNoArgReturnsUsageError(t *testing.T) {
 	h := newRunHarness(t, "table")
-	// stdinIsTTY default is true via harness.
+	// dbconn.StdinIsTTY default is true via harness.
 
 	err := h.execute(t, ":embed")
 	require.Error(t, err)
@@ -151,7 +151,7 @@ func TestQueryEmbed_ProviderErrorPropagates(t *testing.T) {
 // `:embed` leaf must NOT open a Bolt driver and MUST NOT trigger the password
 // prompt even when no --password / NEO4J_PASSWORD is set. Both paths are
 // proven by panicking seams: a panicking driverOpener fails any neo4j.NewDriver
-// call, and a passwordReader that calls t.Fatal fails the test if invoked.
+// call, and a PasswordReader that calls t.Fatal fails the test if invoked.
 func TestQueryEmbed_NoBoltConnection_NoPasswordPrompt(t *testing.T) {
 	restore := embed.WithFactory(func(_ embed.Config) (embed.Provider, error) {
 		return &stubEmbedProvider{}, nil
@@ -175,8 +175,8 @@ func TestQueryEmbed_NoBoltConnection_NoPasswordPrompt(t *testing.T) {
 	}
 
 	h := newRunHarness(t, "json")
-	passwordReader = func() (string, error) {
-		t.Fatal("passwordReader must NOT be invoked from `:embed`")
+	dbconn.PasswordReader = func() (string, error) {
+		t.Fatal("PasswordReader must NOT be invoked from `:embed`")
 		return "", nil
 	}
 

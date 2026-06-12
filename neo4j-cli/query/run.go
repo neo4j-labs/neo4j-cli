@@ -17,14 +17,6 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/query/embed"
 )
 
-// passwordReader is the test seam for the no-echo TTY password prompt.
-// Delegates to dbconn.PasswordReader so the two subsystems share one seam.
-var passwordReader = dbconn.PasswordReader
-
-// stdinIsTTY is the test seam for terminal detection on stdin. Delegates to
-// dbconn.StdinIsTTY so the two subsystems share one seam.
-var stdinIsTTY = dbconn.StdinIsTTY
-
 // stdinReader is the test seam for reading piped Cypher from stdin. Production
 // reads from os.Stdin; tests substitute an in-memory reader.
 var stdinReader = func() io.Reader {
@@ -206,12 +198,12 @@ func resolveCypher(cmd *cobra.Command, args []string) (string, error) {
 // or returns a clear usage error when stdin is not a TTY (so scripted use
 // must supply the password via flag/env/.env).
 func promptPassword(cmd *cobra.Command) (string, error) {
-	if !stdinIsTTY() {
+	if !dbconn.StdinIsTTY() {
 		return "", clierr.NewUsageError(
 			"password is required: set --password, NEO4J_PASSWORD, or add it to a .env file")
 	}
 	_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Password: ")
-	pw, err := passwordReader()
+	pw, err := dbconn.PasswordReader()
 	// Always print a newline after the (echo-less) prompt so subsequent output
 	// starts on its own line.
 	_, _ = fmt.Fprintln(cmd.ErrOrStderr())

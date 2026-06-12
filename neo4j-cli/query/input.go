@@ -11,12 +11,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // readPositionalOrStdin returns text supplied either as a single positional
 // argument or via piped stdin. Precedence: a non-empty positional arg always
 // wins; otherwise the function falls back to reading the stdin pipe through
-// the package-level stdinReader / stdinIsTTY seams. A TTY-attached stdin with
+// the package-level stdinReader seam and dbconn.StdinIsTTY. A TTY-attached stdin with
 // no positional arg returns a usage error referencing the supplied input
 // label so callers can produce consistent diagnostics across the package.
 //
@@ -32,7 +33,7 @@ func readPositionalOrStdin(_ *cobra.Command, args []string, label string) (strin
 		}
 		return s, nil
 	}
-	if stdinIsTTY() {
+	if dbconn.StdinIsTTY() {
 		return "", clierr.NewUsageError(
 			"no %s provided: pass a positional argument or pipe a value on stdin", label)
 	}

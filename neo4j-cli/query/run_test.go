@@ -37,19 +37,19 @@ func newRunHarness(t *testing.T, output string) *runHarness {
 
 	// Reset stdin/password seams between tests; production behaviour is
 	// re-installed at the end via t.Cleanup.
-	origIsTTY := stdinIsTTY
+	origIsTTY := dbconn.StdinIsTTY
 	origStdin := stdinReader
-	origPwReader := passwordReader
+	origPwReader := dbconn.PasswordReader
 	t.Cleanup(func() {
-		stdinIsTTY = origIsTTY
+		dbconn.StdinIsTTY = origIsTTY
 		stdinReader = origStdin
-		passwordReader = origPwReader
+		dbconn.PasswordReader = origPwReader
 	})
 
 	// Default to "TTY" so commands that don't pipe stdin behave like an
 	// interactive session (the missing-cypher path returns a usage error
 	// rather than blocking on stdin).
-	stdinIsTTY = func() bool { return true }
+	dbconn.StdinIsTTY = func() bool { return true }
 	stdinReader = func() io.Reader { return strings.NewReader("") }
 
 	cfgJSON := `{"format":"` + output + `"}`
@@ -871,7 +871,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 
 	h := newRunHarness(t, "json")
 	// Override seams: not a TTY; supply Cypher via "stdin".
-	stdinIsTTY = func() bool { return false }
+	dbconn.StdinIsTTY = func() bool { return false }
 	stdinReader = func() io.Reader { return strings.NewReader("RETURN 1 AS n") }
 
 	err := h.execute(t,
@@ -887,7 +887,7 @@ func TestRunQuery_StdinInputWhenNoArg(t *testing.T) {
 
 func TestRunQuery_NoCypherOnTTYReturnsUsageError(t *testing.T) {
 	h := newRunHarness(t, "table")
-	// stdinIsTTY default is true via harness.
+	// dbconn.StdinIsTTY default is true via harness.
 
 	err := h.execute(t, "--uri=neo4j://example:7687", "--password=pw")
 	require.Error(t, err)
@@ -896,7 +896,7 @@ func TestRunQuery_NoCypherOnTTYReturnsUsageError(t *testing.T) {
 
 func TestRunQuery_EmptyStdinNonTTYReturnsUsageError(t *testing.T) {
 	h := newRunHarness(t, "table")
-	stdinIsTTY = func() bool { return false }
+	dbconn.StdinIsTTY = func() bool { return false }
 	stdinReader = func() io.Reader { return strings.NewReader("   \n  ") }
 
 	err := h.execute(t, "--uri=neo4j://example:7687", "--password=pw")
@@ -920,10 +920,10 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	t.Setenv(dbconn.EnvUsername, "")
 	t.Setenv(dbconn.EnvDatabase, "")
 
-	// Set passwordReader so a buggy fallthrough would surface as a test
+	// Set PasswordReader so a buggy fallthrough would surface as a test
 	// failure (returning a sentinel that wouldn't match).
-	passwordReader = func() (string, error) {
-		t.Fatal("passwordReader must NOT be invoked when env supplies password")
+	dbconn.PasswordReader = func() (string, error) {
+		t.Fatal("PasswordReader must NOT be invoked when env supplies password")
 		return "", nil
 	}
 
@@ -951,20 +951,20 @@ func TestRunQuery_PasswordPromptedOnTTY(t *testing.T) {
 	t.Setenv(dbconn.EnvPassword, "")
 
 	called := false
-	passwordReader = func() (string, error) {
+	dbconn.PasswordReader = func() (string, error) {
 		called = true
 		return "typed-at-prompt", nil
 	}
 
 	err := h.execute(t, "--uri=neo4j://example:7687", "--username=u", "RETURN 1")
 	require.NoError(t, err)
-	assert.True(t, called, "passwordReader must be invoked on TTY when no password is set")
+	assert.True(t, called, "PasswordReader must be invoked on TTY when no password is set")
 	assert.Contains(t, h.stderr.String(), "Password:")
 }
 
 func TestRunQuery_PasswordMissingNonTTYReturnsClearError(t *testing.T) {
 	h := newRunHarness(t, "json")
-	stdinIsTTY = func() bool { return false }
+	dbconn.StdinIsTTY = func() bool { return false }
 	// Provide stdin Cypher so the early Cypher check passes.
 	stdinReader = func() io.Reader { return strings.NewReader("RETURN 1") }
 	t.Setenv(dbconn.EnvPassword, "")
@@ -1290,9 +1290,9 @@ func TestRunQuery_CleartextWarningRedactsUserinfoPassword(t *testing.T) {
 }
 
 func TestPromptPassword_NonTTYReturnsUsageError(t *testing.T) {
-	origTTY := stdinIsTTY
-	t.Cleanup(func() { stdinIsTTY = origTTY })
-	stdinIsTTY = func() bool { return false }
+	origTTY := dbconn.StdinIsTTY
+	t.Cleanup(func() { dbconn.StdinIsTTY = origTTY })
+	dbconn.StdinIsTTY = func() bool { return false }
 
 	fs := afero.NewMemMapFs()
 	cfg := clicfg.NewConfig(fs, "test", clicfg.QueryScope)
