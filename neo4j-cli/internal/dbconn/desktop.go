@@ -19,23 +19,23 @@ const desktopCredentialPrefix = "desktop"
 
 const desktopConnectionPrefix = "desktop-connection:"
 
-var resolveDesktopActiveDbmsCredentialFn = resolveDesktopActiveDbmsCredential
+var resolveDesktopActiveDbmsCredentialFn func(context.Context, afero.Fs) (*DesktopMatch, error) = resolveDesktopActiveDbmsCredential
 
-var resolveDesktopConnectionCredentialFn = resolveDesktopConnectionCredential
+var resolveDesktopConnectionCredentialFn func(context.Context, afero.Fs, string) (*DesktopMatch, error) = resolveDesktopConnectionCredential
 
-// desktopMatch carries the result of a successful Desktop credential lookup.
-// Exactly one of dbms / connection is non-nil in any successful result.
-// creds is nil when Desktop returned a null credentials response — null-creds
+// DesktopMatch carries the result of a successful Desktop credential lookup.
+// Exactly one of Dbms / Connection is non-nil in any successful result.
+// Creds is nil when Desktop returned a null credentials response — null-creds
 // handling lives in finishDesktopMatch (prompt on TTY / fatal on non-TTY).
-type desktopMatch struct {
-	dbms       *desktopclient.DbmsInfo
-	connection *desktopclient.Connection
-	creds      *desktopclient.Credentials
+type DesktopMatch struct {
+	Dbms       *desktopclient.DbmsInfo
+	Connection *desktopclient.Connection
+	Creds      *desktopclient.Credentials
 }
 
 // resolveDesktopActiveDbmsCredential resolves `--credential desktop` to the
 // single running Desktop DBMS. Filters by status == "started".
-func resolveDesktopActiveDbmsCredential(ctx context.Context, fs afero.Fs) (*desktopMatch, error) {
+func resolveDesktopActiveDbmsCredential(ctx context.Context, fs afero.Fs) (*DesktopMatch, error) {
 	client, err := newDesktopFallthroughClient(ctx, fs)
 	if err != nil || client == nil {
 		return nil, desktopclient.UnreachableError()
@@ -63,7 +63,7 @@ func resolveDesktopActiveDbmsCredential(ctx context.Context, fs afero.Fs) (*desk
 		if err != nil {
 			return nil, err
 		}
-		return &desktopMatch{dbms: &dbms, creds: creds}, nil
+		return &DesktopMatch{Dbms: &dbms, Creds: creds}, nil
 	default:
 		ids := make([]string, 0, len(running))
 		for _, d := range running {
@@ -79,7 +79,7 @@ func resolveDesktopActiveDbmsCredential(ctx context.Context, fs afero.Fs) (*desk
 // resolveDesktopConnectionCredential resolves
 // `--credential desktop-connection:<uuid>` to a specific saved Desktop
 // connection. Caller has already stripped the `desktop-connection:` prefix.
-func resolveDesktopConnectionCredential(ctx context.Context, fs afero.Fs, raw string) (*desktopMatch, error) {
+func resolveDesktopConnectionCredential(ctx context.Context, fs afero.Fs, raw string) (*DesktopMatch, error) {
 	if _, err := uuid.Parse(raw); err != nil {
 		return nil, clierr.NewUsageError(
 			"--credential desktop-connection:<id> requires a UUID; got %q. "+
@@ -113,7 +113,7 @@ func resolveDesktopConnectionCredential(ctx context.Context, fs afero.Fs, raw st
 	if err != nil {
 		return nil, err
 	}
-	return &desktopMatch{connection: match, creds: creds}, nil
+	return &DesktopMatch{Connection: match, Creds: creds}, nil
 }
 
 // newDesktopFallthroughClient bundles the discovery → data-dir → salt → client
@@ -144,7 +144,7 @@ func newDesktopFallthroughClient(ctx context.Context, fs afero.Fs) (*desktopclie
 
 // SetResolveDesktopActiveDbmsCredentialFnForTest overrides the
 // `--credential desktop` resolver seam and returns a restore func.
-func SetResolveDesktopActiveDbmsCredentialFnForTest(fn func(context.Context, afero.Fs) (*desktopMatch, error)) func() {
+func SetResolveDesktopActiveDbmsCredentialFnForTest(fn func(context.Context, afero.Fs) (*DesktopMatch, error)) func() {
 	prev := resolveDesktopActiveDbmsCredentialFn
 	resolveDesktopActiveDbmsCredentialFn = fn
 	return func() { resolveDesktopActiveDbmsCredentialFn = prev }
@@ -153,15 +153,16 @@ func SetResolveDesktopActiveDbmsCredentialFnForTest(fn func(context.Context, afe
 // SetResolveDesktopConnectionCredentialFnForTest overrides the
 // `--credential desktop-connection:<uuid>` resolver seam and returns a
 // restore func.
-func SetResolveDesktopConnectionCredentialFnForTest(fn func(context.Context, afero.Fs, string) (*desktopMatch, error)) func() {
+func SetResolveDesktopConnectionCredentialFnForTest(fn func(context.Context, afero.Fs, string) (*DesktopMatch, error)) func() {
 	prev := resolveDesktopConnectionCredentialFn
 	resolveDesktopConnectionCredentialFn = fn
 	return func() { resolveDesktopConnectionCredentialFn = prev }
 }
 
-// buildConnFromDesktopMatch turns a successful desktopMatch into the *Conn
-// shape ResolveConn returns.
-func buildConnFromDesktopMatch(m *desktopMatch, version string, debug bool) *Conn {
+// buildConnFromDesktopMatch turns a successful DesktopMatch into the *Conn
+// shape ResolveConn returns. Database is intentionally left empty so the
+// server resolves the connecting user's home database.
+func buildConnFromDesktopMatch(m *DesktopMatch, version string, debug bool) *Conn {
 	if version == "" {
 		version = "dev"
 	}
@@ -171,17 +172,16 @@ func buildConnFromDesktopMatch(m *desktopMatch, version string, debug bool) *Con
 	}
 	username := DefaultUsername
 	password := ""
-	if m.creds != nil {
-		if m.creds.Username != "" {
-			username = m.creds.Username
+	if m.Creds != nil {
+		if m.Creds.Username != "" {
+			username = m.Creds.Username
 		}
-		password = m.creds.Password
+		password = m.Creds.Password
 	}
 	return &Conn{
 		URI:       uri,
 		Username:  username,
 		Password:  password,
-		Database:  DefaultDatabase,
 		UserAgent: "neo4j-cli/v" + version,
 		Debug:     debug,
 	}
@@ -189,30 +189,30 @@ func buildConnFromDesktopMatch(m *desktopMatch, version string, debug bool) *Con
 
 // desktopMatchURI returns the ConnectionURI of whichever side of the match
 // union is populated.
-func desktopMatchURI(m *desktopMatch) string {
+func desktopMatchURI(m *DesktopMatch) string {
 	if m == nil {
 		return ""
 	}
-	if m.dbms != nil {
-		return m.dbms.ConnectionURI
+	if m.Dbms != nil {
+		return m.Dbms.ConnectionURI
 	}
-	if m.connection != nil {
-		return m.connection.ConnectionURI
+	if m.Connection != nil {
+		return m.Connection.ConnectionURI
 	}
 	return ""
 }
 
 // desktopMatchIdentity returns the name and id of whichever side of the
 // match union is populated.
-func desktopMatchIdentity(m *desktopMatch) (name, id string) {
+func desktopMatchIdentity(m *DesktopMatch) (name, id string) {
 	if m == nil {
 		return "", ""
 	}
-	if m.dbms != nil {
-		return m.dbms.Name, m.dbms.ID
+	if m.Dbms != nil {
+		return m.Dbms.Name, m.Dbms.ID
 	}
-	if m.connection != nil {
-		return m.connection.Name, m.connection.ID
+	if m.Connection != nil {
+		return m.Connection.Name, m.Connection.ID
 	}
 	return "", ""
 }

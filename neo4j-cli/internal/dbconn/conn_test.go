@@ -414,6 +414,44 @@ func TestResolveConn_Query_IncludesDatabase(t *testing.T) {
 	assert.Equal(t, "mydb", conn.Database)
 }
 
+// TestResolveConn_Query_EmptyDatabaseWhenNotProvided verifies that when
+// skipDatabase=false and no database source (dotenv, env, flag) provides a
+// value, conn.Database is left empty so the server resolves the home database.
+func TestResolveConn_Query_EmptyDatabaseWhenNotProvided(t *testing.T) {
+	t.Setenv(EnvURI, "neo4j://host:7687")
+	t.Setenv(EnvUsername, "user")
+	t.Setenv(EnvPassword, "pass")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "", conn.Database, "database must remain empty so server resolves home database")
+}
+
+// TestResolveConn_Query_CredentialPath_DatabaseOverride verifies that when
+// --credential is used with --database, the flag overrides the stored
+// credential's database name.
+func TestResolveConn_Query_CredentialPath_DatabaseOverride(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	credsJSON := `{"dbms":{"default-credential":"","credentials":[{"name":"myprod","username":"prodUser","password":"prodPass","database-name":"prodDB","uri":"neo4j://prod:7687"}]}}`
+	cfg, _ := newCfgWithCreds(t, credsJSON)
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=myprod", "--database=override-db"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "override-db", conn.Database, "--database flag must override credential-supplied database")
+}
+
 // TestLoadEnvFile_NoEnvReturnsEmpty verifies that when no .env is present the
 // returned map is empty (not nil).
 func TestLoadEnvFile_NoEnvReturnsEmpty(t *testing.T) {

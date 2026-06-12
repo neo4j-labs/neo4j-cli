@@ -22,6 +22,7 @@ import (
 	"github.com/neo4j/cli/common/clicfg/credentials"
 	"github.com/neo4j/cli/common/clicfg/dotenv"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
 )
 
 const (
@@ -67,11 +68,7 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 		credName := f.Value.String()
 
 		conflicting := []string{}
-		checkFlags := []string{"uri", "username", "password"}
-		if !skipDatabase {
-			checkFlags = append(checkFlags, "database")
-		}
-		for _, name := range checkFlags {
+		for _, name := range []string{"uri", "username", "password"} {
 			if cf := cmd.Flag(name); cf != nil && cf.Changed {
 				conflicting = append(conflicting, "--"+name)
 			}
@@ -87,11 +84,17 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if ctx == nil {
 				ctx = context.Background()
 			}
+			desktopclient.SetDebug(ResolveDebug(cmd))
 			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Aura.Fs())
 			if err != nil {
 				return nil, err
 			}
-			return finishDesktopMatch(cmd, cfg, match)
+			c, err := finishDesktopMatch(cmd, cfg, match)
+			if err != nil {
+				return nil, err
+			}
+			applyDBOverride(cmd, c, skipDatabase)
+			return c, nil
 		}
 
 		if strings.HasPrefix(credName, desktopConnectionPrefix) {
@@ -100,11 +103,17 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 			if ctx == nil {
 				ctx = context.Background()
 			}
+			desktopclient.SetDebug(ResolveDebug(cmd))
 			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Aura.Fs(), raw)
 			if err != nil {
 				return nil, err
 			}
-			return finishDesktopMatch(cmd, cfg, match)
+			c, err := finishDesktopMatch(cmd, cfg, match)
+			if err != nil {
+				return nil, err
+			}
+			applyDBOverride(cmd, c, skipDatabase)
+			return c, nil
 		}
 
 		cred, err := cfg.Credentials.Dbms.Get(credName)
@@ -117,7 +126,9 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 				credName)
 		}
 
-		return buildConnFromPersistedCred(cred, cfg, cmd), nil
+		c := buildConnFromPersistedCred(cred, cfg, cmd)
+		applyDBOverride(cmd, c, skipDatabase)
+		return c, nil
 	}
 
 	envFlag := FlagString(cmd, "env")
@@ -215,9 +226,10 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 	if username == "" {
 		username = DefaultUsername
 	}
-	if !skipDatabase && database == "" {
-		database = DefaultDatabase
-	}
+	// Database is intentionally NOT defaulted: when left empty the session is
+	// opened with no DatabaseName so the server resolves the connecting user's
+	// home database. Forcing DefaultDatabase ("neo4j") breaks instances whose
+	// home database has a different name (e.g. AuraDB Free).
 
 	uri = applyURINorm(cmd, uri)
 
@@ -236,10 +248,10 @@ func ResolveConn(cmd *cobra.Command, cfg *clicfg.Config, skipDatabase bool) (*Co
 	}, nil
 }
 
-// finishDesktopMatch turns a *desktopMatch into a *Conn, applying the
+// finishDesktopMatch turns a *DesktopMatch into a *Conn, applying the
 // null-creds prompt/fatal branch when Desktop returned a match but no
 // stored credentials.
-func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMatch) (*Conn, error) {
+func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *DesktopMatch) (*Conn, error) {
 	if match == nil {
 		return nil, clierr.NewFatalError("internal: desktop resolver returned nil match without error")
 	}
@@ -248,7 +260,7 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMa
 		version = "dev"
 	}
 	debug := ResolveDebug(cmd)
-	if match.creds != nil {
+	if match.Creds != nil {
 		return buildConnFromDesktopMatch(match, version, debug), nil
 	}
 	name, id := desktopMatchIdentity(match)
@@ -267,6 +279,20 @@ func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMa
 	}
 	c.Password = pw
 	return c, nil
+}
+
+// applyDBOverride layers a --database flag or NEO4J_DATABASE env override onto
+// c when skipDatabase is false. Used in the credential path so a persisted or
+// Desktop credential's database can be overridden at the call site.
+func applyDBOverride(cmd *cobra.Command, c *Conn, skipDatabase bool) {
+	if skipDatabase {
+		return
+	}
+	if f := cmd.Flag("database"); f != nil && f.Changed {
+		c.Database = f.Value.String()
+	} else if v := os.Getenv(EnvDatabase); v != "" {
+		c.Database = v
+	}
 }
 
 // applyURINorm normalises uri via NormalizeURI, prints the rewrite info line

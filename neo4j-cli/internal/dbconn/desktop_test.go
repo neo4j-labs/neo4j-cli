@@ -23,15 +23,15 @@ func TestResolveConn_DesktopActive_Resolves(t *testing.T) {
 	t.Setenv(EnvDatabase, "")
 	t.Chdir(t.TempDir())
 
-	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
-		return &desktopMatch{
-			dbms: &desktopclient.DbmsInfo{
+	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
+		return &DesktopMatch{
+			Dbms: &desktopclient.DbmsInfo{
 				ID:            "running-dbms",
 				Name:          "running",
 				Status:        "started",
 				ConnectionURI: "neo4j://localhost:7690",
 			},
-			creds: &desktopclient.Credentials{Username: "neo4j", Password: "running-pw"},
+			Creds: &desktopclient.Credentials{Username: "neo4j", Password: "running-pw"},
 		}, nil
 	})
 	defer restore()
@@ -65,15 +65,15 @@ func TestResolveConn_DesktopActive_NullCreds_TTYPrompts(t *testing.T) {
 		PasswordReader = origPwReader
 	})
 
-	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
-		return &desktopMatch{
-			dbms: &desktopclient.DbmsInfo{
+	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
+		return &DesktopMatch{
+			Dbms: &desktopclient.DbmsInfo{
 				ID:            "legacy-dbms",
 				Name:          "legacy",
 				Status:        "started",
 				ConnectionURI: "neo4j://localhost:7777",
 			},
-			creds: nil,
+			Creds: nil,
 		}, nil
 	})
 	defer restore()
@@ -103,14 +103,14 @@ func TestResolveConn_DesktopActive_NullCreds_NonTTYFatals(t *testing.T) {
 	StdinIsTTY = func() bool { return false }
 	t.Cleanup(func() { StdinIsTTY = origIsTTY })
 
-	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
-		return &desktopMatch{
-			dbms: &desktopclient.DbmsInfo{
+	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
+		return &DesktopMatch{
+			Dbms: &desktopclient.DbmsInfo{
 				ID:     "legacy-dbms",
 				Name:   "legacy",
 				Status: "started",
 			},
-			creds: nil,
+			Creds: nil,
 		}, nil
 	})
 	defer restore()
@@ -137,7 +137,7 @@ func TestResolveConn_DesktopActive_Unreachable(t *testing.T) {
 	t.Setenv(EnvDatabase, "")
 	t.Chdir(t.TempDir())
 
-	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
+	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
 		return nil, desktopclient.UnreachableError()
 	})
 	defer restore()
@@ -161,15 +161,15 @@ func TestResolveConn_DesktopConnection_Resolves(t *testing.T) {
 	t.Setenv(EnvDatabase, "")
 	t.Chdir(t.TempDir())
 
-	restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, raw string) (*desktopMatch, error) {
+	restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, raw string) (*DesktopMatch, error) {
 		require.Equal(t, validUUID, raw)
-		return &desktopMatch{
-			connection: &desktopclient.Connection{
+		return &DesktopMatch{
+			Connection: &desktopclient.Connection{
 				ID:            validUUID,
 				Name:          "prod-aura",
 				ConnectionURI: "neo4j+s://example.databases.neo4j.io",
 			},
-			creds: &desktopclient.Credentials{Username: "aura-user", Password: "aura-pw"},
+			Creds: &desktopclient.Credentials{Username: "aura-user", Password: "aura-pw"},
 		}, nil
 	})
 	defer restore()
@@ -216,7 +216,7 @@ func TestResolveConn_DesktopConnection_UnknownUUID_Fatals(t *testing.T) {
 	t.Setenv(EnvDatabase, "")
 	t.Chdir(t.TempDir())
 
-	restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, raw string) (*desktopMatch, error) {
+	restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, raw string) (*DesktopMatch, error) {
 		require.Equal(t, unknownUUID, raw)
 		return nil, &desktopErrString{
 			s: "Neo4j Desktop 2 has no connection with id " + raw + ". " +
@@ -244,13 +244,13 @@ func TestResolveConn_UnprefixedCredName_NoDesktopFallthrough(t *testing.T) {
 	t.Setenv(EnvDatabase, "")
 	t.Chdir(t.TempDir())
 
-	restoreActive := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*desktopMatch, error) {
+	restoreActive := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
 		t.Fatal("unprefixed --credential must NOT invoke the desktop active-DBMS resolver")
 		return nil, nil
 	})
 	defer restoreActive()
 
-	restoreConn := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, _ string) (*desktopMatch, error) {
+	restoreConn := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, _ string) (*DesktopMatch, error) {
 		t.Fatal("unprefixed --credential must NOT invoke the desktop connection resolver")
 		return nil, nil
 	})
