@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 
@@ -301,9 +302,13 @@ func applyDBOverride(cmd *cobra.Command, c *Conn, skipDatabase bool) {
 func applyURINorm(cmd *cobra.Command, uri string) string {
 	rewritten, didRewrite, displayOrig, warning := NormalizeURI(uri)
 	if didRewrite {
+		rewrittenDisplay := rewritten
+		if u2, _ := url.Parse(rewritten); u2 != nil {
+			rewrittenDisplay = u2.Redacted()
+		}
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"info: rewrote URI '%s' to '%s' (the command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
-			displayOrig, rewritten)
+			displayOrig, rewrittenDisplay)
 		uri = rewritten
 	}
 	if warning != "" {
