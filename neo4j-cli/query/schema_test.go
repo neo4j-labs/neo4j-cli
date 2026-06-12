@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // schemaSeam wires a per-statement response/error map for :schema tests via
@@ -468,11 +470,13 @@ func TestSchema_FetchHelpersCompose(t *testing.T) {
 	s.install(t)
 
 	c := &conn{
-		uri:       "neo4j://example:7687",
-		username:  "u",
-		password:  "pw",
-		database:  "neo4j",
-		userAgent: "neo4j-cli/vtest",
+		Conn: dbconn.Conn{
+			URI:       "neo4j://example:7687",
+			Username:  "u",
+			Password:  "pw",
+			Database:  "neo4j",
+			UserAgent: "neo4j-cli/vtest",
+		},
 	}
 	ctx := context.Background()
 
@@ -544,11 +548,13 @@ func TestSchema_FetchRelPathsEscapesBacktick(t *testing.T) {
 	s.install(t)
 
 	c := &conn{
-		uri:       "neo4j://example:7687",
-		username:  "u",
-		password:  "pw",
-		database:  "neo4j",
-		userAgent: "neo4j-cli/vtest",
+		Conn: dbconn.Conn{
+			URI:       "neo4j://example:7687",
+			Username:  "u",
+			Password:  "pw",
+			Database:  "neo4j",
+			UserAgent: "neo4j-cli/vtest",
+		},
 	}
 
 	// Driver wrap form: leading ":`" + payload + trailing "`". stripRelTypeWrap

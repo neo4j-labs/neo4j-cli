@@ -17,6 +17,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 const (
@@ -60,11 +62,13 @@ func TestBolt_Smoke(t *testing.T) {
 
 	uri := fmt.Sprintf("neo4j://127.0.0.1:%d", boltPort)
 	c := &conn{
-		uri:       uri,
-		username:  "neo4j",
-		password:  boltPassword,
-		database:  "neo4j",
-		userAgent: "neo4j-cli/bolt-smoke",
+		Conn: dbconn.Conn{
+			URI:       uri,
+			Username:  "neo4j",
+			Password:  boltPassword,
+			Database:  "neo4j",
+			UserAgent: "neo4j-cli/bolt-smoke",
+		},
 	}
 
 	require.NoError(t, waitForBoltReady(ctx, c), "neo4j Bolt endpoint did not become ready")

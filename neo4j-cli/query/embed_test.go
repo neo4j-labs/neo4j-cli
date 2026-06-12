@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/query/embed"
 )
 
@@ -158,7 +159,7 @@ func TestQueryEmbed_NoBoltConnection_NoPasswordPrompt(t *testing.T) {
 	t.Cleanup(restore)
 	t.Setenv("NEO4J_EMBED_PROVIDER", "openai")
 	t.Setenv("OPENAI_API_KEY", "k")
-	t.Setenv(envPassword, "")
+	t.Setenv(dbconn.EnvPassword, "")
 
 	origOpener := driverOpener
 	t.Cleanup(func() { driverOpener = origOpener })

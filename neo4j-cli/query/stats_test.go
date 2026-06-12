@@ -11,6 +11,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // fakeCounters is a driver-free neo4j.Counters stub. The zero value reports no
@@ -162,7 +164,7 @@ func TestRunStatementWithMode_PopulatesStats(t *testing.T) {
 			return resp, nil
 		})
 
-		c := &conn{database: "neo4j"}
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 		res, err := runStatementWrite(context.Background(), c, "CREATE (n {x:1})", nil)
 		require.NoError(t, err)
 		require.NotNil(t, res.Stats)
@@ -177,7 +179,7 @@ func TestRunStatementWithMode_PopulatesStats(t *testing.T) {
 			return resp, nil
 		})
 
-		c := &conn{database: "neo4j"}
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 		res, err := runStatement(context.Background(), c, "RETURN 1", nil)
 		require.NoError(t, err)
 		assert.Nil(t, res.Stats)
@@ -194,7 +196,7 @@ func TestRunStatementWithMode_PopulatesStats(t *testing.T) {
 			return resps, nil
 		})
 
-		c := &conn{database: "neo4j"}
+		c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 		results, err := runStatementsWithMode(context.Background(), c, []string{"CREATE (a)", "CREATE (b)"}, nil, false)
 		require.NoError(t, err)
 		require.Len(t, results, 2)

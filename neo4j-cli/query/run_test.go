@@ -19,6 +19,7 @@ import (
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/query/embed"
 	"github.com/neo4j/cli/test/utils/testfs"
 )
@@ -914,10 +915,10 @@ func TestRunQuery_PasswordFromEnvSkipsPrompt(t *testing.T) {
 	r.install(t)
 
 	h := newRunHarness(t, "json")
-	t.Setenv(envPassword, "from-env")
-	t.Setenv(envURI, "")
-	t.Setenv(envUsername, "")
-	t.Setenv(envDatabase, "")
+	t.Setenv(dbconn.EnvPassword, "from-env")
+	t.Setenv(dbconn.EnvURI, "")
+	t.Setenv(dbconn.EnvUsername, "")
+	t.Setenv(dbconn.EnvDatabase, "")
 
 	// Set passwordReader so a buggy fallthrough would surface as a test
 	// failure (returning a sentinel that wouldn't match).
@@ -947,7 +948,7 @@ func TestRunQuery_PasswordPromptedOnTTY(t *testing.T) {
 	h := newRunHarness(t, "json")
 
 	// Clear env-based password.
-	t.Setenv(envPassword, "")
+	t.Setenv(dbconn.EnvPassword, "")
 
 	called := false
 	passwordReader = func() (string, error) {
@@ -966,7 +967,7 @@ func TestRunQuery_PasswordMissingNonTTYReturnsClearError(t *testing.T) {
 	stdinIsTTY = func() bool { return false }
 	// Provide stdin Cypher so the early Cypher check passes.
 	stdinReader = func() io.Reader { return strings.NewReader("RETURN 1") }
-	t.Setenv(envPassword, "")
+	t.Setenv(dbconn.EnvPassword, "")
 
 	err := h.execute(t, "--uri=neo4j://example:7687", "--username=u")
 	require.Error(t, err)

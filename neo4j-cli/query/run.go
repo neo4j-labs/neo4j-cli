@@ -10,31 +10,20 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/neo4j/cli/neo4j-cli/query/embed"
 )
 
-// passwordReader is the test seam for the no-echo TTY password prompt. The
-// production implementation calls golang.org/x/term.ReadPassword on
-// os.Stdin's file descriptor; tests substitute a stub that returns a fixed
-// value without touching the real terminal.
-var passwordReader = func() (string, error) {
-	pw, err := term.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
-		return "", err
-	}
-	return string(pw), nil
-}
+// passwordReader is the test seam for the no-echo TTY password prompt.
+// Delegates to dbconn.PasswordReader so the two subsystems share one seam.
+var passwordReader = dbconn.PasswordReader
 
-// stdinIsTTY is the test seam for terminal detection on stdin. Production
-// uses term.IsTerminal; tests override to simulate either piped input or
-// an interactive session.
-var stdinIsTTY = func() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
-}
+// stdinIsTTY is the test seam for terminal detection on stdin. Delegates to
+// dbconn.StdinIsTTY so the two subsystems share one seam.
+var stdinIsTTY = dbconn.StdinIsTTY
 
 // stdinReader is the test seam for reading piped Cypher from stdin. Production
 // reads from os.Stdin; tests substitute an in-memory reader.
@@ -86,12 +75,12 @@ func runQuery(cmd *cobra.Command, args []string, cfg *clicfg.Config) error {
 		return err
 	}
 
-	if c.password == "" {
+	if c.Password == "" {
 		pw, err := promptPassword(cmd)
 		if err != nil {
 			return err
 		}
-		c.password = pw
+		c.Password = pw
 	}
 
 	if err := c.openDriver(); err != nil {

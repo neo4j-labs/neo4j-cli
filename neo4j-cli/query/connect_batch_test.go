@@ -10,6 +10,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // withRunStatementsSeam swaps the package-level runStatementsResponseFn AND
@@ -52,7 +54,7 @@ func TestRunStatementsWithMode_BatchOrdering(t *testing.T) {
 		return resps, nil
 	})
 
-	c := &conn{database: "neo4j"}
+	c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 	statements := []string{"RETURN 1 AS n", "RETURN 2 AS n", "RETURN 3 AS n"}
 	results, err := runStatementsWithMode(context.Background(), c, statements, map[string]any{"k": 5}, false)
 	require.NoError(t, err)
@@ -82,7 +84,7 @@ func TestRunStatementsWithMode_ReadOnlyRouting(t *testing.T) {
 		return resps, nil
 	})
 
-	c := &conn{database: "neo4j"}
+	c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 	_, err := runStatementsWithMode(context.Background(), c, []string{"RETURN 1", "RETURN 2"}, nil, true)
 	require.NoError(t, err)
 	assert.True(t, gotReadOnly, "readOnly=true must route the batch through ExecuteRead")
@@ -115,7 +117,7 @@ func TestRunStatementsResponse_ErrorSurfacesAndCategorised(t *testing.T) {
 				return nil, tc.err
 			})
 
-			c := &conn{database: "neo4j"}
+			c := &conn{Conn: dbconn.Conn{Database: "neo4j"}}
 			results, err := runStatementsWithMode(context.Background(), c, []string{"RETURN 1", "BAD"}, nil, false)
 			require.Error(t, err)
 			assert.Nil(t, results)

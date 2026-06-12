@@ -7,35 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"github.com/subosito/gotenv"
 
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clicfg/credentials"
-	"github.com/neo4j/cli/common/clicfg/dotenv"
-	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/common/debug"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	"github.com/neo4j/cli/neo4j-cli/internal/desktopclient"
-)
-
-const (
-	defaultURI      = "neo4j://localhost:7687"
-	defaultUsername = "neo4j"
-
-	envURI      = "NEO4J_URI"
-	envUsername = "NEO4J_USERNAME"
-	envPassword = "NEO4J_PASSWORD"
-	envDatabase = "NEO4J_DATABASE"
 )
 
 // conn holds the resolved Neo4j connection details. The opened Bolt driver
@@ -44,13 +24,8 @@ const (
 // done using the connection. TLS is selected exclusively by the URI scheme
 // (e.g. neo4j+s:// for verified TLS, neo4j+ssc:// for self-signed certs).
 type conn struct {
-	uri       string
-	username  string
-	password  string
-	database  string
-	userAgent string
-	debug     bool
-	driver    neo4j.Driver
+	dbconn.Conn
+	driver neo4j.Driver
 }
 
 // queryResult is the parsed tabular payload of a successful Cypher run. The
@@ -165,287 +140,18 @@ var runStatementResponseFn = runStatementResponseImpl
 // ExecuteWrite in production; tests can assert on it.
 var runStatementsResponseFn = runStatementsResponseImpl
 
-// resolveConn merges connection settings from .env, OS environment, and
-// command-line flags (lowest → highest precedence). When --credential is set,
-// the value is dispatched on its prefix: `desktop` resolves the single
-// running Desktop DBMS; `desktop-connection:<uuid>` resolves a saved
-// Desktop connection by UUID; any other value is a persisted-store lookup
-// (no implicit Desktop fallthrough). Passing any of
-// --uri/--username/--password alongside --credential is an error; --database
-// (or the NEO4J_DATABASE OS env var, flag winning) may be combined with
-// --credential to override the credential-supplied database.
-// When none of the four connection params (uri, username, password,
-// database) are explicitly provided, the stored default database credential
-// (if any) is used instead. Partial explicit overrides (some but not all of
-// the four params) are rejected with a descriptive error. The returned conn
-// does NOT hold an open driver — callers should fill in the password
-// (prompt if needed) and then call c.openDriver(ctx) before issuing
-// queries, and defer c.driver.Close(ctx) for cleanup.
+// resolveConn resolves connection parameters from .env, OS environment, and
+// command-line flags via dbconn.ResolveConn, then wraps the result in the
+// query-local conn type which adds driver management. The returned conn does
+// NOT hold an open driver — callers should fill in the password (prompt if
+// needed) and then call c.openDriver(ctx) before issuing queries, and defer
+// c.driver.Close(ctx) for cleanup.
 func resolveConn(cmd *cobra.Command, cfg *clicfg.Config) (*conn, error) {
-	// --credential: when set, dispatch on the value's prefix. Dotenv is
-	// skipped entirely. None of --uri/--username/--password may be set
-	// alongside it; --database / NEO4J_DATABASE override the
-	// credential-supplied database.
-	if f := cmd.Flag("credential"); f != nil && f.Changed {
-		credName := f.Value.String()
-
-		// Conflict check: --credential is mutually exclusive with the
-		// params that constitute the credential itself.
-		conflicting := []string{}
-		for _, name := range []string{"uri", "username", "password"} {
-			if cf := cmd.Flag(name); cf != nil && cf.Changed {
-				conflicting = append(conflicting, "--"+name)
-			}
-		}
-		if len(conflicting) > 0 {
-			return nil, fmt.Errorf(
-				"query: --credential cannot be used together with %s; use one or the other",
-				strings.Join(conflicting, ", "))
-		}
-
-		if credName == desktopCredentialPrefix {
-			ctx := cmd.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			desktopclient.SetDebug(resolveDebug(cmd))
-			match, err := resolveDesktopActiveDbmsCredentialFn(ctx, cfg.Aura.Fs())
-			if err != nil {
-				return nil, err
-			}
-			return finishDesktopMatch(cmd, cfg, match)
-		}
-
-		// Prefix sniff happens BEFORE the persisted lookup so the literal
-		// `desktop-connection:` namespace is reserved regardless of any
-		// persisted entry that happens to share the name.
-		if strings.HasPrefix(credName, desktopConnectionPrefix) {
-			raw := strings.TrimPrefix(credName, desktopConnectionPrefix)
-			ctx := cmd.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			desktopclient.SetDebug(resolveDebug(cmd))
-			match, err := resolveDesktopConnectionCredentialFn(ctx, cfg.Aura.Fs(), raw)
-			if err != nil {
-				return nil, err
-			}
-			return finishDesktopMatch(cmd, cfg, match)
-		}
-
-		// Anything else is a persisted-store lookup. No Desktop fallthrough —
-		// a miss surfaces a single error pointing at `credential dbms add`
-		// and the two Desktop prefix forms.
-		cred, err := cfg.Credentials.Dbms.Get(credName)
-		if err != nil {
-			return nil, clierr.NewFatalError(
-				"no persisted credential %q. "+
-					"Run 'neo4j-cli credential dbms add' to register a connection, "+
-					"or use '--credential desktop' / '--credential desktop-connection:<uuid>' "+
-					"for a running Neo4j Desktop 2 DBMS or saved Neo4j Desktop 2 connection.",
-				credName)
-		}
-
-		return applyDatabaseOverride(cmd, buildConnFromPersistedCred(cred, cfg, cmd)), nil
-	}
-
-	// --credential not set: load dotenv and use the standard resolution path.
-	envFlag := flagString(cmd, "env")
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("query: cannot determine current directory: %w", err)
-	}
-	dotenvVals, err := loadEnvFile(cfg.Aura.Fs(), envFlag, cwd, cmd.ErrOrStderr())
+	base, err := dbconn.ResolveConn(cmd, cfg, false)
 	if err != nil {
 		return nil, err
 	}
-
-	// Collect values from dotenv + OS environment (before flags).
-	uri := overlay(dotenvVals[envURI], os.Getenv(envURI))
-	username := overlay(dotenvVals[envUsername], os.Getenv(envUsername))
-	password := overlay(dotenvVals[envPassword], os.Getenv(envPassword))
-	database := overlay(dotenvVals[envDatabase], os.Getenv(envDatabase))
-
-	// Apply flags (highest precedence — only when the flag was explicitly set).
-	if f := cmd.Flag("uri"); f != nil && f.Changed {
-		uri = f.Value.String()
-	}
-	if f := cmd.Flag("username"); f != nil && f.Changed {
-		username = f.Value.String()
-	}
-	if f := cmd.Flag("password"); f != nil && f.Changed {
-		password = f.Value.String()
-	}
-	if f := cmd.Flag("database"); f != nil && f.Changed {
-		database = f.Value.String()
-	}
-
-	// Determine how many of the four connection params were explicitly provided
-	// (non-empty after merging dotenv + OS env + flags).
-	explicitCount := 0
-	if uri != "" {
-		explicitCount++
-	}
-	if username != "" {
-		explicitCount++
-	}
-	if password != "" {
-		explicitCount++
-	}
-	if database != "" {
-		explicitCount++
-	}
-
-	// Try to load the stored default database credential.
-	storedCred, _ := cfg.Credentials.Dbms.GetDefault()
-	hasStoredCred := storedCred != nil
-
-	switch {
-	case !hasStoredCred && explicitCount == 0:
-		// No stored credential, no explicit params — fall through to
-		// built-in defaults. Users opt into a Desktop DBMS via
-		// `--credential desktop` or `--credential desktop-connection:<uuid>`.
-
-	case !hasStoredCred:
-		// No stored credential and some explicit params provided — apply
-		// what was given and let built-in defaults fill in the blanks below.
-
-	case explicitCount == 0:
-		// Stored credential available and no explicit params — use the credential.
-		uri = storedCred.URI
-		username = storedCred.Username
-		password = storedCred.Password
-		database = storedCred.DatabaseName
-
-	case explicitCount == 4:
-		// All four explicitly provided — bypass stored credential entirely.
-
-	default:
-		// Stored credential exists but only some params were provided — reject
-		// the ambiguous partial override.
-		return nil, fmt.Errorf(
-			"query: partial connection params: when any of --uri/NEO4J_URI, --username/NEO4J_USERNAME, " +
-				"--password/NEO4J_PASSWORD, or --database/NEO4J_DATABASE is provided, all four are required")
-	}
-
-	// Apply built-in defaults for any param still empty after all sources.
-	// Database is intentionally NOT defaulted: when left empty the session is
-	// opened with no DatabaseName so the server resolves the connecting user's
-	// home database. Forcing "neo4j" here breaks instances whose home database
-	// is named something else (e.g. AuraDB Free, where it is the instance DBID).
-	if uri == "" {
-		uri = defaultURI
-	}
-	if username == "" {
-		username = defaultUsername
-	}
-
-	rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
-	if didRewrite {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
-			displayOrig, rewritten)
-		uri = rewritten
-	}
-	if warning != "" {
-		cmd.PrintErrln(warning)
-	}
-
-	version := cfg.Version
-	if version == "" {
-		version = "dev"
-	}
-	userAgent := "neo4j-cli/v" + version
-
-	return &conn{
-		uri:       uri,
-		username:  username,
-		password:  password,
-		database:  database,
-		userAgent: userAgent,
-		debug:     resolveDebug(cmd),
-	}, nil
-}
-
-// finishDesktopMatch turns a *desktopMatch into a *conn, applying the
-// null-creds prompt/fatal branch when Desktop returned a match but no
-// stored credentials. A nil match is a programming error — resolvers MUST
-// return either a non-nil match or an error.
-func finishDesktopMatch(cmd *cobra.Command, cfg *clicfg.Config, match *desktopMatch) (*conn, error) {
-	if match == nil {
-		return nil, clierr.NewFatalError("query: internal: desktop resolver returned nil match without error")
-	}
-	if match.creds != nil {
-		return applyDatabaseOverride(cmd, buildConnFromDesktopMatch(match, cfg, cmd)), nil
-	}
-	// Desktop knows the resource but has no stored credentials (legacy DBMS
-	// / safeStorage unavailable). On a TTY prompt for the password; on a
-	// non-TTY fatal with the 3-option hint.
-	name, id := desktopMatchIdentity(match)
-	c := buildConnFromDesktopMatch(match, cfg, cmd)
-	if !stdinIsTTY() {
-		return nil, clierr.NewFatalError(
-			"Neo4j Desktop 2 has no stored credentials for %q (%s). "+
-				"Pass --password (and optionally --username) explicitly, "+
-				"or run 'credential dbms add' to register a connection, "+
-				"or open Desktop and use 'Reset password' on this resource.",
-			name, id)
-	}
-	pw, perr := promptPassword(cmd)
-	if perr != nil {
-		return nil, perr
-	}
-	c.password = pw
-	return applyDatabaseOverride(cmd, c), nil
-}
-
-// applyDatabaseOverride layers the database override onto a credential-built
-// conn: explicit --database flag (even explicitly empty) > NEO4J_DATABASE OS
-// env var > the credential-supplied database. Dotenv is intentionally not
-// consulted in the credential path.
-func applyDatabaseOverride(cmd *cobra.Command, c *conn) *conn {
-	if f := cmd.Flag("database"); f != nil && f.Changed {
-		c.database = f.Value.String()
-	} else if v := os.Getenv(envDatabase); v != "" {
-		c.database = v
-	}
-	return c
-}
-
-// buildConnFromPersistedCred turns a persisted DbmsCredential into the *conn
-// shape resolveConn returns, applying the same URI-normalisation +
-// stderr-info-line wiring the inline --credential path used to do.
-func buildConnFromPersistedCred(cred *credentials.DbmsCredential, cfg *clicfg.Config, cmd *cobra.Command) *conn {
-	uri := cred.URI
-	rewritten, didRewrite, displayOrig, warning := normalizeURI(uri)
-	if didRewrite {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-			"info: rewrote URI '%s' to '%s' (the query command speaks Bolt; pass --uri neo4j://... or neo4j+s://... to silence)\n",
-			displayOrig, rewritten)
-		uri = rewritten
-	}
-	if warning != "" {
-		cmd.PrintErrln(warning)
-	}
-
-	version := cfg.Version
-	if version == "" {
-		version = "dev"
-	}
-	return &conn{
-		uri:       uri,
-		username:  cred.Username,
-		password:  cred.Password,
-		database:  cred.DatabaseName,
-		userAgent: "neo4j-cli/v" + version,
-		debug:     resolveDebug(cmd),
-	}
-}
-
-// resolveDebug delegates to the shared debug.Resolve so the query and aura
-// trees share one source of truth for the `--debug` / NEO4J_DEBUG semantics.
-func resolveDebug(cmd *cobra.Command) bool {
-	return debug.Resolve(cmd)
+	return &conn{Conn: *base}, nil
 }
 
 // openDriver opens a Bolt driver using the resolved connection params and
@@ -463,72 +169,12 @@ func (c *conn) openDriver() error {
 	if c.driver != nil {
 		return nil
 	}
-	d, err := driverOpener(c.uri, c.username, c.password, c.userAgent, c.debug)
+	d, err := driverOpener(c.URI, c.Username, c.Password, c.UserAgent, c.Debug)
 	if err != nil {
 		return categorizeBoltError(fmt.Errorf("query: open driver: %w", err))
 	}
 	c.driver = d
 	return nil
-}
-
-// loadEnvFile reads a .env file from explicitPath if non-empty, otherwise walks
-// up from startDir using the shared dotenv.Find helper (stops at the first
-// .git ancestor or the $HOME boundary). Returns an empty (non-nil) map if no
-// file is found and no explicit path was requested. An explicit path that
-// does not exist is an error. When the discovered .env lives in a directory
-// strictly above startDir an `info: loading .env from <path>` line is written
-// to stderr so the overlay isn't silent.
-func loadEnvFile(fs afero.Fs, explicitPath, startDir string, stderr io.Writer) (map[string]string, error) {
-	path := explicitPath
-	if path == "" {
-		var (
-			ok       bool
-			aboveCWD bool
-		)
-		path, ok, aboveCWD = dotenv.Find(fs, startDir)
-		if !ok {
-			return map[string]string{}, nil
-		}
-		if aboveCWD && stderr != nil {
-			_, _ = fmt.Fprintf(stderr, "info: loading .env from %s\n", path)
-		}
-	}
-
-	f, err := fs.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("query: cannot read env file %q: %w", path, err)
-	}
-	defer f.Close() //nolint:errcheck // read-only close error is not actionable in a defer
-
-	parsed := gotenv.Parse(f)
-	out := make(map[string]string, len(parsed))
-	for k, v := range parsed {
-		out[k] = v
-	}
-	return out, nil
-}
-
-// overlay applies values left → right with each non-empty entry overriding the
-// earlier accumulator. This implements the documented `.env` < env < flag
-// precedence: pass values in increasing-precedence order.
-func overlay(values ...string) string {
-	out := ""
-	for _, v := range values {
-		if v != "" {
-			out = v
-		}
-	}
-	return out
-}
-
-// flagString returns the string value of the named flag whether it lives on
-// cmd's local FlagSet or on a persistent FlagSet up the parent chain. Returns
-// an empty string when the flag does not exist.
-func flagString(cmd *cobra.Command, name string) string {
-	if f := cmd.Flag(name); f != nil {
-		return f.Value.String()
-	}
-	return ""
 }
 
 // runStatementResponse executes a Cypher statement against the Bolt driver
@@ -614,7 +260,7 @@ func runStatementsResponse(ctx context.Context, c *conn, statements []string, pa
 }
 
 // runStatementsResponseImpl is the real Bolt-backed batch implementation. Opens
-// ONE session targeted at c.database and runs ONE managed transaction
+// ONE session targeted at c.Database and runs ONE managed transaction
 // (ExecuteRead when readOnly is true, ExecuteWrite otherwise) whose work
 // callback loops tx.Run → Collect → Consume per statement, appending a
 // *queryResponse each (reusing coerceDriverValue). Any error returned from the callback aborts the
@@ -628,9 +274,9 @@ func runStatementsResponseImpl(ctx context.Context, c *conn, statements []string
 		return nil, errors.New("query: connection driver not opened (call openDriver first)")
 	}
 
-	// An empty c.database leaves DatabaseName unset so the server resolves the
+	// An empty c.Database leaves DatabaseName unset so the server resolves the
 	// connecting user's home database
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.database})
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: c.Database})
 	defer session.Close(ctx) //nolint:errcheck // session close error not actionable in defer
 
 	work := func(tx neo4j.ManagedTransaction) (any, error) {
