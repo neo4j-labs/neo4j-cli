@@ -266,6 +266,70 @@ func TestResolveConn_UnprefixedCredName_NoDesktopFallthrough(t *testing.T) {
 	assert.Contains(t, err.Error(), "credential dbms add")
 }
 
+// TestResolveConn_DesktopActive_DatabaseOverride verifies that --database can
+// override the database when combined with --credential desktop.
+func TestResolveConn_DesktopActive_DatabaseOverride(t *testing.T) {
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	restore := SetResolveDesktopActiveDbmsCredentialFnForTest(func(_ context.Context, _ afero.Fs) (*DesktopMatch, error) {
+		return &DesktopMatch{
+			Dbms: &desktopclient.DbmsInfo{
+				ID:            "running-dbms",
+				Name:          "running",
+				Status:        "started",
+				ConnectionURI: "neo4j://localhost:7690",
+			},
+			Creds: &desktopclient.Credentials{Username: "neo4j", Password: "running-pw"},
+		}, nil
+	})
+	defer restore()
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=desktop", "--database=override-db"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "override-db", conn.Database, "--database must override the Desktop-supplied database")
+}
+
+// TestResolveConn_DesktopConnection_DatabaseOverride verifies that --database
+// can override the database when combined with --credential desktop-connection:.
+func TestResolveConn_DesktopConnection_DatabaseOverride(t *testing.T) {
+	const validUUID = "11111111-2222-3333-4444-555555555555"
+
+	t.Setenv(EnvURI, "")
+	t.Setenv(EnvUsername, "")
+	t.Setenv(EnvPassword, "")
+	t.Setenv(EnvDatabase, "")
+	t.Chdir(t.TempDir())
+
+	restore := SetResolveDesktopConnectionCredentialFnForTest(func(_ context.Context, _ afero.Fs, raw string) (*DesktopMatch, error) {
+		require.Equal(t, validUUID, raw)
+		return &DesktopMatch{
+			Connection: &desktopclient.Connection{
+				ID:            validUUID,
+				Name:          "prod-aura",
+				ConnectionURI: "neo4j+s://example.databases.neo4j.io",
+			},
+			Creds: &desktopclient.Credentials{Username: "aura-user", Password: "aura-pw"},
+		}, nil
+	})
+	defer restore()
+
+	cfg, _ := newCfgWithCreds(t, "{}")
+	cmd := newQueryCmd(cfg)
+	require.NoError(t, cmd.ParseFlags([]string{"--credential=desktop-connection:" + validUUID, "--database=override-db"}))
+
+	conn, err := ResolveConn(cmd, cfg, false)
+	require.NoError(t, err)
+	assert.Equal(t, "override-db", conn.Database, "--database must override the Desktop-supplied database")
+}
+
 // desktopErrString is a local test-only error type to construct expected
 // desktop error messages in tests that need to check specific text.
 type desktopErrString struct{ s string }
