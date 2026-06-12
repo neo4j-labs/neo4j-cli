@@ -11,14 +11,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// outputDatabase fetches the current record for name and prints it using the
-// same field list as the read commands (list/get). Called by write commands
-// (create, start, stop) after a successful mutation.
+// outputDatabase fetches the current record for name and prints it. Called by
+// write commands (create, start, stop) after a successful mutation.
 func outputDatabase(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, name string) error {
 	rows, err := dbExecFn(cmd.Context(), cfg, conn, "SHOW DATABASE $name", map[string]any{"name": name})
 	if err != nil {
 		return err
 	}
-	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+	if len(rows) == 0 {
+		return nil
+	}
+	commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(rows[0], getFields), getFields)
 	return nil
 }

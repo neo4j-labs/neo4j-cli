@@ -92,7 +92,7 @@ func TestList_HappyPath_FormatTable(t *testing.T) {
 	require.NoError(t, err)
 
 	upper := strings.ToUpper(stdout)
-	for _, col := range []string{"NAME", "TYPE", "CURRENTSTATUS", "ACCESS", "DEFAULT"} {
+	for _, col := range []string{"NAME", "CURRENT_STATUS", "TYPE", "DEFAULT"} {
 		assert.Contains(t, upper, col, "table missing column %q", col)
 	}
 	assert.Contains(t, stdout, "neo4j")

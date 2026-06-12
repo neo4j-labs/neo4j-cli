@@ -12,12 +12,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var getFields = []string{"name", "type", "access", "current_status", "requested_status", "status_message", "address", "role", "writer", "default", "home", "database_id"}
+
 func newGetCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <name>",
 		Short: "Get details of a database",
 		Long: "Get the full record for a single database by name. " +
-			"Executes SHOW DATABASE $name against the system database.",
+			"Executes SHOW DATABASE $name against the system database. " +
+			"Renders name, type, access, current_status, requested_status, status_message, address, role, writer, default, home, and database_id columns.",
 		Example: `# Get a database record as a table
 neo4j-cli admin database get neo4j --credential local
 
@@ -34,7 +37,7 @@ neo4j-cli admin database get neo4j --credential local --format json`,
 			if len(rows) == 0 {
 				return clierr.NewNotFoundError("database %q not found", name)
 			}
-			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(rows[0], getFields), getFields)
 			return nil
 		},
 	}

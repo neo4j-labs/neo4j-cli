@@ -11,14 +11,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listFields = []string{"name", "type", "currentStatus", "access", "default"}
+var listFields = []string{"name", "current_status", "type", "default"}
 
 func newListCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List all databases",
 		Long: "List all databases visible from the system database. " +
-			"Renders name, type, currentStatus, access, and default columns.",
+			"Renders an overview with name, current_status, type, and default columns. " +
+			"Use `get` for the full record of a single database.",
 		Example: `# List all databases as a table
 neo4j-cli admin database list --credential local
 
@@ -31,7 +32,7 @@ neo4j-cli admin database list --credential local --format json`,
 			if err != nil {
 				return err
 			}
-			commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), listFields)
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRows(rows, listFields), listFields)
 			return nil
 		},
 	}

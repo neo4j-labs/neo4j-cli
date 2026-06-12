@@ -82,10 +82,9 @@ func TestCreate_EmitsFollowUpRecord(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var got []map[string]any
+	var got map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
-	require.Len(t, got, 1)
-	assert.Equal(t, "mydb", got[0]["name"])
+	assert.Equal(t, "mydb", got["name"])
 }
 
 func TestCreate_ExecError_PropagatesError(t *testing.T) {

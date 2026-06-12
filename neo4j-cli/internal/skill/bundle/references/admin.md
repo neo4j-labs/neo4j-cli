@@ -98,7 +98,7 @@ neo4j-cli admin database drop mydb --credential local --rw --yes --force
 
 Get details of a database
 
-Get the full record for a single database by name. Executes SHOW DATABASE $name against the system database.
+Get the full record for a single database by name. Executes SHOW DATABASE $name against the system database. Renders name, type, access, current_status, requested_status, status_message, address, role, writer, default, home, and database_id columns.
 
 Usage: `neo4j-cli admin database get <name>`
 
@@ -116,7 +116,7 @@ neo4j-cli admin database get neo4j --credential local --format json
 
 List all databases
 
-List all databases visible from the system database. Renders name, type, currentStatus, access, and default columns.
+List all databases visible from the system database. Renders an overview with name, current_status, type, and default columns. Use `get` for the full record of a single database.
 
 Usage: `neo4j-cli admin database list`
 

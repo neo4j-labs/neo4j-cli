@@ -52,10 +52,9 @@ func TestGet_HappyPath_FormatJson(t *testing.T) {
 	stdout, _, err := runGet(t, "neo4j --format json", rows, nil)
 	require.NoError(t, err)
 
-	var got []map[string]any
+	var got map[string]any
 	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
-	require.Len(t, got, 1)
-	assert.Equal(t, "neo4j", got[0]["name"])
+	assert.Equal(t, "neo4j", got["name"])
 }
 
 func TestGet_HappyPath_FormatTable(t *testing.T) {
@@ -67,7 +66,7 @@ func TestGet_HappyPath_FormatTable(t *testing.T) {
 	require.NoError(t, err)
 
 	upper := strings.ToUpper(stdout)
-	for _, col := range []string{"NAME", "TYPE", "CURRENTSTATUS", "ACCESS", "DEFAULT"} {
+	for _, col := range []string{"NAME", "TYPE", "ACCESS", "CURRENT_STATUS", "REQUESTED_STATUS", "STATUS_MESSAGE", "ADDRESS", "ROLE", "WRITER", "DEFAULT", "HOME", "DATABASE_ID"} {
 		assert.Contains(t, upper, col, "table missing column %q", col)
 	}
 	assert.Contains(t, stdout, "neo4j")
