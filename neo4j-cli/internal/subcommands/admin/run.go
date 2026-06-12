@@ -115,7 +115,7 @@ func (r *boltAdminRunner) run(ctx context.Context, conn *dbconn.Conn, cypher str
 }
 
 // redactParams returns a copy of params with values redacted for any key that
-// matches a known secret word (password, passwd, secret, token, key, credential).
+// matches a known secret word (password, passwd, pwd, secret, token, key, credential).
 // The comparison is case-insensitive.
 func redactParams(params map[string]any) map[string]any {
 	if len(params) == 0 {
@@ -125,6 +125,7 @@ func redactParams(params map[string]any) map[string]any {
 	for k, v := range params {
 		lower := strings.ToLower(k)
 		if strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
+			strings.Contains(lower, "pwd") ||
 			strings.Contains(lower, "secret") || strings.Contains(lower, "token") ||
 			strings.Contains(lower, "key") || strings.Contains(lower, "credential") {
 			out[k] = "***"

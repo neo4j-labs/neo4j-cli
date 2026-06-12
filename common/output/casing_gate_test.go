@@ -77,7 +77,7 @@ func TestOutputFields_AreSnakeCase(t *testing.T) {
 		}
 		if info.IsDir() {
 			base := info.Name()
-			if base == "vendor" || base == ".git" || base == "testdata" {
+			if base == "vendor" || base == ".git" || base == "testdata" || base == ".claude" {
 				return filepath.SkipDir
 			}
 			return nil

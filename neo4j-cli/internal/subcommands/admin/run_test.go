@@ -12,42 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
-	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
-
-// fakeQueryRunner is the test double for queryRunner. It returns the
-// configured rows or error without touching a real Bolt connection.
-type fakeQueryRunner struct {
-	rows []map[string]any
-	err  error
-}
-
-func (f *fakeQueryRunner) run(_ context.Context, _ *dbconn.Conn, _ string, _ map[string]any) ([]map[string]any, error) {
-	return f.rows, f.err
-}
-
-// withFakeRunner replaces adminRunnerFn for the duration of t and restores it
-// after. The supplied fakeQueryRunner is returned on every call.
-func withFakeRunner(t *testing.T, fake *fakeQueryRunner) {
-	t.Helper()
-	orig := adminRunnerFn
-	adminRunnerFn = func(_ *clicfg.Config) queryRunner { return fake }
-	t.Cleanup(func() { adminRunnerFn = orig })
-}
-
-func newTestConn() *dbconn.Conn {
-	return &dbconn.Conn{
-		URI:      "neo4j://localhost:7687",
-		Username: "neo4j",
-		Password: "password",
-	}
-}
-
-func newTestCfg() *clicfg.Config {
-	return &clicfg.Config{Version: "test"}
-}
 
 func TestRunAdminStatement_HappyPath(t *testing.T) {
 	expected := []map[string]any{{"name": "neo4j"}}
@@ -247,6 +213,8 @@ func TestRedactParams(t *testing.T) {
 		{key: "user_password", value: "secret123", redacted: true},
 		{key: "passwd", value: "secret123", redacted: true},
 		{key: "PASSWD", value: "secret123", redacted: true},
+		{key: "pwd", value: "secret123", redacted: true},
+		{key: "myPwd", value: "secret123", redacted: true},
 		{key: "secret", value: "topsecret", redacted: true},
 		{key: "mySecret", value: "topsecret", redacted: true},
 		{key: "token", value: "tok123", redacted: true},
