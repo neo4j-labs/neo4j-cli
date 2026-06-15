@@ -5,72 +5,115 @@ updated_at: 2026-06-15T00:00:00Z
 
 tasks:
   - id: task-001
-    title: 'user/ package scaffold: user.go, helpers.go, user_helpers_test.go'
+    title: 'user/ package foundation: helpers.go and user_helpers_test.go only'
     description: |
-      Create the admin/user/ package foundation that all leaf commands depend on.
-      user.go holds NewCmd (sets the package-level userExecFn seam, registers all 8 leaves
-      via AddCommand). helpers.go holds userFields, normalizeUserRow, outputUser, and
-      promptUserPassword (using dbconn.StdinIsTTY / dbconn.PasswordReader — no new seam
-      vars). user_helpers_test.go holds withFakeExecFn / fakeExecFn and seam overrides for
-      dbconn.StdinIsTTY and dbconn.PasswordReader.
+      Create ONLY the shared foundation files for the admin/user/ package. Do NOT create
+      user.go, and do NOT implement any leaf command files. This task is strictly helpers.go
+      and the test helper file.
+
+      helpers.go must contain:
+        - package user declaration + copyright header
+        - var userExecFn adminutil.ExecFn  (package-level test seam; set later by NewCmd)
+        - userFields []string{"user", "roles", "password_change_required", "suspended"}
+        - normalizeUserRow(m map[string]any) map[string]any  (null roles → []any{}, null suspended → false)
+        - outputUser(cmd, cfg, conn, userName) error  (runs SHOW USERS WHERE user = $name via
+          userExecFn, normalizes + prints single row; returns nil with no output if zero rows)
+        - promptUserPassword(cmd, flagName) (string, error)  (reads flagName flag; if empty
+          and dbconn.StdinIsTTY() prompts stderr; if empty and not TTY returns usage error)
+
+      user_helpers_test.go must contain:
+        - withFakeExecFn(t, fake) — sets userExecFn for the test and restores on cleanup
+        - fakeExecFn type (func matching adminutil.ExecFn signature)
+        - helpers to override dbconn.StdinIsTTY and dbconn.PasswordReader and restore them
+
+      STOP after these two files. Do NOT add AddCommand calls, do NOT create any leaf files.
     status: pending
     dependencies: []
     acceptance_criteria:
-      - "user.go compiles with NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command"
-      - "package-level var userExecFn adminutil.ExecFn is declared and set by NewCmd"
-      - "helpers.go defines userFields, normalizeUserRow, outputUser, and promptUserPassword"
-      - "promptUserPassword calls dbconn.StdinIsTTY() and dbconn.PasswordReader() — no local seam vars declared"
-      - "user_helpers_test.go provides withFakeExecFn and helpers to override dbconn.StdinIsTTY / dbconn.PasswordReader"
+      - "helpers.go compiles as package user with userExecFn var, userFields, normalizeUserRow, outputUser, and promptUserPassword"
+      - "userExecFn is declared in helpers.go (not in any leaf file or user.go)"
+      - "promptUserPassword calls dbconn.StdinIsTTY() and dbconn.PasswordReader() — no new local seam vars declared"
+      - "user_helpers_test.go provides withFakeExecFn, fakeExecFn, and overrides for dbconn.StdinIsTTY / dbconn.PasswordReader"
+      - "NO user.go, NO leaf files created in this task"
+      - "make test passes (package compiles; test helpers compile)"
     completed_at: null
 
   - id: task-002
     title: 'user list and user get commands'
     description: |
-      Implement the two read-only leaves: list.go (SHOW USERS) and get.go (SHOW USERS WHERE
-      user = $name). Both call normalizeUserRow on each result row. list outputs all rows via
-      adminutil.NewRows; get returns not_found (exit 3) on zero rows, otherwise outputs a
-      single row via adminutil.NewRow. The roles field is rendered as a comma-joined string in
-      table/toon output; JSON retains the array. Both support --format json|table|toon and
-      require no --rw.
+      Implement ONLY list.go + list_test.go and get.go + get_test.go.
+
+      list.go: newListCmd(...) *cobra.Command that executes SHOW USERS via userExecFn,
+      normalizes each row with normalizeUserRow, and outputs all rows. For table/toon
+      format, convert the roles []any to a comma-joined string before calling PrintBodyMap;
+      JSON retains the array. Supports --format json|table|toon. No --rw.
+
+      get.go: newGetCmd(...) *cobra.Command that executes SHOW USERS WHERE user = $name via
+      userExecFn, applies normalizeUserRow, and outputs the single row. Returns
+      clierr.NewNotFoundError if zero rows. No --rw.
+
+      Both leaf constructors must be private (newListCmd / newGetCmd). They are NOT yet
+      registered anywhere — NewCmd does not exist yet. The commands will be wired in
+      task-008.
+
+      Add flush-left Example: fields with >= 2 invocations each (>= 1 --format json on reads).
     status: pending
     dependencies:
       - task-001
     acceptance_criteria:
-      - "list.go executes SHOW USERS and renders user, roles, password_change_required, suspended columns"
-      - "get.go executes SHOW USERS WHERE user = $name and returns not_found (exit 3) for zero rows"
+      - "list.go and get.go define newListCmd and newGetCmd as private constructors"
       - "roles column renders as comma-joined string in table/toon and as array in JSON"
       - "null roles normalizes to [] and null suspended normalizes to false in all output formats"
+      - "get.go returns not_found (exit 3) for zero rows"
       - "list_test.go and get_test.go use table-driven tests with fakeExecFn covering happy path, empty result, and format variants"
+      - "both files have flush-left Example: fields with >= 2 invocations"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-003
     title: 'user create command'
     description: |
-      Implement create.go: executes CREATE USER $name SET PASSWORD $password SET PASSWORD
-      CHANGE [NOT] REQUIRED. Registers --set-password (string, empty default) and
-      --password-change-required (bool, default true). When --set-password is absent, calls
-      promptUserPassword("set-password") which prompts on TTY or returns a usage error on
-      non-TTY. On success, calls outputUser to emit the created user record. Requires --rw.
+      Implement ONLY create.go + create_test.go.
+
+      create.go: newCreateCmd(...) *cobra.Command that executes CREATE USER $name SET
+      PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn. Registers:
+        - --set-password (string, empty default; NOT --password, which shadows the parent flag)
+        - --password-change-required (bool, default true)
+      When --set-password is absent, calls promptUserPassword(cmd, "set-password"). On
+      success, calls outputUser to emit the created user record. Requires --rw.
+
+      newCreateCmd is a private constructor. It is NOT yet wired into any NewCmd — that
+      happens in task-008.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
     status: pending
     dependencies:
       - task-001
     acceptance_criteria:
-      - "create.go registers --set-password (not --password) to avoid shadowing the parent connection flag"
-      - "--password-change-required defaults to true; passing --password-change-required=false emits SET PASSWORD CHANGE NOT REQUIRED"
+      - "create.go registers --set-password (not --password)"
+      - "--password-change-required defaults to true"
       - "absent --set-password on TTY prompts Password: to stderr and reads without echo"
       - "absent --set-password on non-TTY returns a usage error"
-      - "successful create emits the new user record via outputUser (SHOW USERS WHERE user = $name)"
+      - "successful create emits the new user record via outputUser"
       - "create_test.go covers: explicit password, TTY prompt, non-TTY usage error, password-change-required variants"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-004
     title: 'user drop command'
     description: |
-      Implement drop.go: executes DROP USER $name. Registers confirm.Register (--yes/--force)
-      and calls confirm.Require in RunE, mirroring database/drop.go exactly. After a Bolt
-      error, checks whether it is Neo.ClientError.Statement.ArgumentError with message
-      containing "does not exist" and translates it to clierr.NewNotFoundError (exit 3).
-      Produces no output on success. Requires --rw.
+      Implement ONLY drop.go + drop_test.go.
+
+      drop.go: newDropCmd(...) *cobra.Command that executes DROP USER $name via userExecFn.
+      Registers confirm.Register (--yes/--force) and calls confirm.Require in RunE, mirroring
+      database/drop.go. Translates Neo.ClientError.Statement.ArgumentError with "does not
+      exist" in the message to clierr.NewNotFoundError("user %q not found", name). Produces
+      no output on success. Requires --rw.
+
+      newDropCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw and --yes).
     status: pending
     dependencies:
       - task-001
@@ -78,18 +121,25 @@ tasks:
       - "drop.go calls confirm.Register and confirm.Require with the user name as the resource identifier"
       - "successful drop produces no stdout output"
       - "drop of a nonexistent user returns not_found (exit 3), not a raw Neo4jError string"
-      - "drop without --yes on a TTY prompts for confirmation"
       - "drop_test.go covers: success (no output), not-found translation, confirm gate"
+      - "flush-left Example: with >= 2 invocations including --rw and --yes"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-005
     title: 'user rename command'
     description: |
-      Implement rename.go: executes RENAME USER $oldName TO $newName. Takes one positional
-      arg (<old-name>) and a required --new-name flag; cobra.ExactArgs(1) rejects the
-      two-positional form. The Aura ArgumentError ("non-native" / "authentication provider
-      apart from native") is already translated by translateAdminError in run.go — no local
-      error check needed. On success, calls outputUser with the new name. Requires --rw.
+      Implement ONLY rename.go + rename_test.go.
+
+      rename.go: newRenameCmd(...) *cobra.Command that executes RENAME USER $oldName TO
+      $newName via userExecFn. One positional arg (<old-name>), cobra.ExactArgs(1); one
+      required --new-name string flag. Aura ArgumentError is already translated by
+      translateAdminError in run.go — no local error check needed. On success, calls
+      outputUser with the new name. Requires --rw.
+
+      newRenameCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
     status: pending
     dependencies:
       - task-001
@@ -97,18 +147,26 @@ tasks:
       - "rename.go uses cobra.ExactArgs(1) and a required --new-name string flag"
       - "passing two positional args returns an ExactArgs error"
       - "successful rename emits the renamed user record (SHOW USERS WHERE user = $newName)"
-      - "Aura ArgumentError is translated to the Aura-specific message by translateAdminError (no local handling needed)"
       - "rename_test.go covers: success with output, two-positional-arg rejection, Aura error passthrough"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-006
     title: 'user set-password command'
     description: |
-      Implement set_password.go: executes ALTER USER $name SET PASSWORD $password SET
-      PASSWORD CHANGE [NOT] REQUIRED. Registers --new-password (string, empty default) and
-      --password-change-required (bool, default false — different from create's default).
-      Uses promptUserPassword("new-password") for the same TTY/non-TTY prompt behaviour as
-      create. On success, calls outputUser. Requires --rw.
+      Implement ONLY set_password.go + set_password_test.go.
+
+      set_password.go: newSetPasswordCmd(...) *cobra.Command that executes ALTER USER $name
+      SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn. Registers:
+        - --new-password (string, empty default; NOT --password)
+        - --password-change-required (bool, default false — note: different from create's default)
+      When --new-password is absent, calls promptUserPassword(cmd, "new-password"). On
+      success, calls outputUser. Requires --rw.
+
+      newSetPasswordCmd is a private constructor. It is NOT yet wired into any NewCmd.
+
+      Add a flush-left Example: with >= 2 invocations (include --rw).
     status: pending
     dependencies:
       - task-001
@@ -118,36 +176,51 @@ tasks:
       - "absent --new-password on TTY prompts; on non-TTY returns usage error"
       - "successful set-password emits the updated user record via outputUser"
       - "set_password_test.go covers: explicit password, TTY prompt, non-TTY error, both password-change-required values"
+      - "flush-left Example: with >= 2 invocations including --rw"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-007
     title: 'user suspend and user activate commands'
     description: |
-      Implement suspend.go and activate.go. suspend executes ALTER USER $name SET STATUS
-      SUSPENDED; activate executes ALTER USER $name SET STATUS ACTIVE. Both require --rw and
-      call outputUser on success. Community-edition errors (ExecutionFailed with "not
-      available in community edition") are already classified as validation_error by
-      translateAdminError — no local translation needed. Both commands are structurally
-      identical aside from the Cypher verb and short description.
+      Implement ONLY suspend.go + suspend_test.go and activate.go + activate_test.go.
+
+      suspend.go: newSuspendCmd(...) executes ALTER USER $name SET STATUS SUSPENDED via
+      userExecFn, calls outputUser on success. Requires --rw.
+      activate.go: newActivateCmd(...) executes ALTER USER $name SET STATUS ACTIVE via
+      userExecFn, calls outputUser on success. Requires --rw.
+
+      Community ExecutionFailed errors are already classified by translateAdminError —
+      no local translation needed. Both constructors are private and NOT yet wired.
+
+      Add flush-left Example: fields on both files with >= 2 invocations (include --rw).
     status: pending
     dependencies:
       - task-001
     acceptance_criteria:
       - "suspend.go emits ALTER USER $name SET STATUS SUSPENDED and calls outputUser on success"
       - "activate.go emits ALTER USER $name SET STATUS ACTIVE and calls outputUser on success"
-      - "Community ExecutionFailed error surfaces as validation_error (exit 6) via translateAdminError — no local handling"
+      - "Community ExecutionFailed error surfaces as validation_error via translateAdminError — no local handling"
       - "suspend_test.go and activate_test.go cover: success with output, Community error passthrough"
+      - "flush-left Example: with >= 2 invocations including --rw on both files"
+      - "NO user.go AddCommand calls touched in this task"
     completed_at: null
 
   - id: task-008
-    title: 'Wire user subtree into admin.go, add Examples, regenerate skill bundle'
+    title: 'Create user.go (NewCmd) and wire all 8 leaves via AddCommand'
     description: |
-      Add cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement)) to admin.go,
-      mirroring the existing database.NewCmd call. Update admin.go Long description to
-      mention user subcommands. Verify every leaf in the user/ package has a flush-left
-      Example: field with >= 2 invocations (write commands include --rw; read commands
-      include >= 1 --format json). Then run go generate ./neo4j-cli/internal/skill/... to
-      regenerate the skill bundle. Verify make test, make fmt-check, and make lint all pass.
+      Create user.go with NewCmd that:
+        1. Sets userExecFn = execFn (the passed-in adminutil.ExecFn)
+        2. Calls cmd.AddCommand for all 8 leaves:
+             newListCmd, newGetCmd, newCreateCmd, newDropCmd, newRenameCmd,
+             newSetPasswordCmd, newSuspendCmd, newActivateCmd
+      NewCmd signature: NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command
+
+      This task does NOT modify admin.go — that wiring happens in task-009. Its only job
+      is to make the user package self-contained and usable.
+
+      Verify `neo4j-cli admin user --help` is NOT yet reachable (admin.go not updated yet),
+      but `go build ./neo4j-cli/internal/subcommands/admin/user/...` compiles clean.
     status: pending
     dependencies:
       - task-002
@@ -157,6 +230,26 @@ tasks:
       - task-006
       - task-007
     acceptance_criteria:
+      - "user.go defines NewCmd(cfg, conn, execFn) that sets userExecFn and calls AddCommand for all 8 leaves"
+      - "go build ./neo4j-cli/internal/subcommands/admin/user/... compiles clean"
+      - "make test passes"
+      - "admin.go is NOT modified in this task"
+    completed_at: null
+
+  - id: task-009
+    title: 'Wire user subtree into admin.go and regenerate skill bundle'
+    description: |
+      Add cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement)) to admin.go,
+      mirroring the existing database.NewCmd call. Update admin.go Long description to
+      mention user subcommands. Then run:
+        go generate ./neo4j-cli/internal/skill/...
+      to regenerate the skill bundle. Verify `neo4j-cli admin user --help` shows all 8
+      subcommands and that TestAllLeafCommands_HaveExamples passes.
+      Run make test, make fmt-check, and make lint — all must pass.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
       - "admin.go AddCommand line for user.NewCmd is present and compiles"
       - "neo4j-cli admin user --help shows list/get/create/drop/rename/set-password/suspend/activate"
       - "every user leaf has a flush-left Example: with >= 2 invocations; TestAllLeafCommands_HaveExamples passes"
@@ -164,17 +257,16 @@ tasks:
       - "make test, make fmt-check, make lint all pass clean"
     completed_at: null
 
-  - id: task-009
+  - id: task-010
     title: 'Add changelog entry'
     description: |
       Add a changelog entry for the new admin user commands via changie. Run:
-      changie new --projects neo4j-cli --kind Minor --body "add admin user management
-      commands (list, get, create, drop, rename, set-password, suspend, activate)".
+        changie new --projects neo4j-cli --kind Minor --body "add admin user management commands (list, get, create, drop, rename, set-password, suspend, activate)"
       Verify the generated file appears under .changes/unreleased/ with the correct
       project, kind, and body fields.
     status: pending
     dependencies:
-      - task-008
+      - task-009
     acceptance_criteria:
       - "a new .changes/unreleased/ file exists with project: neo4j-cli, kind: Minor"
       - "body mentions list, get, create, drop, rename, set-password, suspend, activate"

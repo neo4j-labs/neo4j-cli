@@ -66,7 +66,7 @@ Draft PR: [#207](https://github.com/neo4j-labs/neo4j-cli/pull/207) (full admin t
 ### Non-Functional Requirements
 
 - REQ-NF-001: One file per leaf under `neo4j-cli/internal/subcommands/admin/user/`: `user.go`, `list.go`, `get.go`, `create.go`, `drop.go`, `rename.go`, `set_password.go`, `suspend.go`, `activate.go`, `helpers.go`, and colocated `*_test.go` + `user_helpers_test.go`.
-- REQ-NF-002: Package-level `userExecFn adminutil.ExecFn` test seam in `list.go` (or `user.go`), set by `NewCmd`, replaced by `withFakeExecFn` in tests — mirrors `dbExecFn` in the database package.
+- REQ-NF-002: Package-level `userExecFn adminutil.ExecFn` test seam declared in `helpers.go`; set by `NewCmd` (in `user.go`) at wiring time, replaced by `withFakeExecFn` in tests — mirrors `dbExecFn` in the database package. Declaring `userExecFn` in `helpers.go` allows all leaf files to reference it and be tested independently before `user.go` and its `NewCmd` exist.
 - REQ-NF-003: Password prompting in `user/helpers.go` must reuse `dbconn.StdinIsTTY` and `dbconn.PasswordReader` (both exported package-level vars introduced in PR-1's `neo4j-cli/internal/dbconn/helpers.go`) rather than declaring new seam vars. Tests override `dbconn.StdinIsTTY` and `dbconn.PasswordReader` directly.
 - REQ-NF-004: All new `.go` files carry the Neo4j copyright header.
 - REQ-NF-005: Table-driven tests for every leaf using `fakeExecFn` — no live Bolt connection required.
