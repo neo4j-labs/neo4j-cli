@@ -307,11 +307,11 @@ tasks:
         changie new --projects neo4j-cli --kind Minor --body "add admin user management commands (list, get, create, drop, rename, set-password, suspend, activate)"
       Verify the generated file appears under .changes/unreleased/ with the correct
       project, kind, and body fields.
-    status: pending
+    status: completed
     dependencies:
       - task-009
     acceptance_criteria:
       - "a new .changes/unreleased/ file exists with project: neo4j-cli, kind: Minor"
       - "body mentions list, get, create, drop, rename, set-password, suspend, activate"
       - "make test still passes after the changelog file is added"
-    completed_at: null
+    completed_at: "2026-06-15T13:00:22Z"

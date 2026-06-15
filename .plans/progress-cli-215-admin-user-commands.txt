@@ -43,3 +43,7 @@ Files: +helpers_test.go
 ## TASK-009 — 2026-06-15T06:00:00Z
 Wired user.NewCmd into admin.go; regenerated skill bundle; all gates pass.
 Files: ~admin.go, ~neo4j-cli/internal/skill/bundle/ (regenerated)
+
+## TASK-010 — 2026-06-15T13:00:22Z
+Added changelog entry for admin user management commands (Minor).
+Files: +.changes/unreleased/neo4j-cli-Minor-20260615-130022.yaml
