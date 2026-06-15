@@ -2,3 +2,8 @@
 Created the admin/user/ package foundation: helpers.go with userExecFn seam, userFields, normalizeUserRow, outputUser, promptUserPassword; export_test.go bridge; user_helpers_test.go with withFakeExecFn, withFakeStdinIsTTY, withFakePasswordReader, testConn.
 Files: +neo4j-cli/internal/subcommands/admin/user/helpers.go, +neo4j-cli/internal/subcommands/admin/user/export_test.go, +neo4j-cli/internal/subcommands/admin/user/user_helpers_test.go
 Decisions: userExecFn declared in helpers.go (not user.go) so leaf files can reference it and be tested independently before NewCmd exists; export_test.go bridge exposes the var to the external test package.
+
+## TASK-002 — 2026-06-15T01:00:00Z
+Implemented list.go and get.go leaf commands with format-aware roles rendering (comma-joined for table/toon, array for JSON); added list_test.go and get_test.go with external test package covering happy path, empty result, null normalization, not-found, and exec error cases.
+Files: +list.go, +list_test.go, +get.go, +get_test.go; ~export_test.go (added NewListCmdForTest/NewGetCmdForTest for external test access)
+Decisions: Since tests are in package user_test (external), added exported test constructors to export_test.go to expose private newListCmd/newGetCmd; rolesJoined helper in list.go copies rows and converts []any roles to comma-joined string before passing to PrintBodyMap.

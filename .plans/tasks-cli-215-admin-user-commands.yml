@@ -57,7 +57,7 @@ tasks:
       task-008.
 
       Add flush-left Example: fields with >= 2 invocations each (>= 1 --format json on reads).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -68,7 +68,7 @@ tasks:
       - "list_test.go and get_test.go use table-driven tests with fakeExecFn covering happy path, empty result, and format variants"
       - "both files have flush-left Example: fields with >= 2 invocations"
       - "NO user.go AddCommand calls touched in this task"
-    completed_at: null
+    completed_at: "2026-06-15T01:00:00Z"
 
   - id: task-003
     title: 'user create command'
