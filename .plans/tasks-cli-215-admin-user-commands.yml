@@ -415,7 +415,7 @@ tasks:
       ~60-line near-duplicates differing only in flag value and expected Cypher string.
       Merge them into a single table-driven test. Do the same for the matching pair in
       set_password_test.go (TestSetPassword_PasswordChangeRequired_True/_False).
-    status: pending
+    status: in_progress
     dependencies: []
     source: review
     acceptance_criteria:
@@ -424,4 +424,4 @@ tasks:
       - "create_test.go has a single table-driven test for both password-change-required variants"
       - "set_password_test.go has a single table-driven test for both variants"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-06-15T14:00:00Z"

@@ -35,12 +35,7 @@ neo4j-cli admin user set-password alice --new-password s3cr3t --password-change-
 				return err
 			}
 
-			changeRequired := "NOT REQUIRED"
-			if passwordChangeRequired {
-				changeRequired = "REQUIRED"
-			}
-
-			cypher := "ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE " + changeRequired
+			cypher := "ALTER USER $name SET PASSWORD $password " + passwordChangeClause(passwordChangeRequired)
 			if _, err := userExecFn(cmd.Context(), cfg, *conn, cypher, map[string]any{
 				"name":     name,
 				"password": pw,

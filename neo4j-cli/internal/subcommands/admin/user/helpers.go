@@ -76,6 +76,15 @@ func promptUserPassword(cmd *cobra.Command, flagName string) (string, error) {
 	return pw, nil
 }
 
+// passwordChangeClause returns the Cypher clause fragment controlling whether
+// the user must change their password on next login.
+func passwordChangeClause(required bool) string {
+	if required {
+		return "SET PASSWORD CHANGE REQUIRED"
+	}
+	return "SET PASSWORD CHANGE NOT REQUIRED"
+}
+
 // joinRoles converts a []any of role strings to a comma-separated string.
 // A nil or empty slice becomes an empty string.
 func joinRoles(v any) string {

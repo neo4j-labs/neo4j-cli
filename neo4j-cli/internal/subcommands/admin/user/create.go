@@ -4,8 +4,6 @@
 package user
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -38,14 +36,7 @@ neo4j-cli admin user create alice --set-password s3cr3t --password-change-requir
 				return err
 			}
 
-			var changeClause string
-			if passwordChangeRequired {
-				changeClause = "SET PASSWORD CHANGE REQUIRED"
-			} else {
-				changeClause = "SET PASSWORD CHANGE NOT REQUIRED"
-			}
-
-			cypher := fmt.Sprintf("CREATE USER $name SET PASSWORD $password %s", changeClause)
+			cypher := "CREATE USER $name SET PASSWORD $password " + passwordChangeClause(passwordChangeRequired)
 			if _, err := userExecFn(cmd.Context(), cfg, *conn, cypher, map[string]any{
 				"name":     name,
 				"password": password,

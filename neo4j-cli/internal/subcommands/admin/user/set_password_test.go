@@ -84,59 +84,56 @@ func TestSetPassword_ExplicitPassword_HappyPath(t *testing.T) {
 	assert.Equal(t, "alice", got["user"])
 }
 
-func TestSetPassword_PasswordChangeRequired_True_SendsCorrectCypher(t *testing.T) {
-	var capturedCypher string
-	calls := 0
-	withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
-		calls++
-		if calls == 1 {
-			capturedCypher = cypher
-			return nil, nil
-		}
-		return setPasswordUserRow, nil
-	}))
+func TestSetPassword_PasswordChangeRequired(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		wantContains    string
+		wantNotContains string
+	}{
+		{
+			name:            "true sends SET PASSWORD CHANGE REQUIRED",
+			args:            []string{"alice", "--new-password", "s3cr3t", "--password-change-required", "--format", "json"},
+			wantContains:    "SET PASSWORD CHANGE REQUIRED",
+			wantNotContains: "NOT REQUIRED",
+		},
+		{
+			name:         "false sends SET PASSWORD CHANGE NOT REQUIRED",
+			args:         []string{"alice", "--new-password", "s3cr3t", "--format", "json"},
+			wantContains: "SET PASSWORD CHANGE NOT REQUIRED",
+		},
+	}
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
-	conn := testConn()
-	cmd := newSetPasswordCmd(cfg, &conn)
-	flags.RegisterOutputFlag(cmd, cfg)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var capturedCypher string
+			calls := 0
+			withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
+				calls++
+				if calls == 1 {
+					capturedCypher = cypher
+					return nil, nil
+				}
+				return setPasswordUserRow, nil
+			}))
 
-	out := bytes.NewBuffer(nil)
-	cmd.SetOut(out)
-	cmd.SetErr(bytes.NewBuffer(nil))
+			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+			conn := testConn()
+			cmd := newSetPasswordCmd(cfg, &conn)
+			flags.RegisterOutputFlag(cmd, cfg)
 
-	cmd.SetArgs([]string{"alice", "--new-password", "s3cr3t", "--password-change-required", "--format", "json"})
-	err := cmd.Execute()
-	require.NoError(t, err)
-	assert.Contains(t, capturedCypher, "SET PASSWORD CHANGE REQUIRED")
-	assert.NotContains(t, capturedCypher, "NOT REQUIRED")
-}
+			cmd.SetOut(bytes.NewBuffer(nil))
+			cmd.SetErr(bytes.NewBuffer(nil))
+			cmd.SetArgs(tc.args)
 
-func TestSetPassword_PasswordChangeRequired_False_SendsNotRequired(t *testing.T) {
-	var capturedCypher string
-	calls := 0
-	withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
-		calls++
-		if calls == 1 {
-			capturedCypher = cypher
-			return nil, nil
-		}
-		return setPasswordUserRow, nil
-	}))
-
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
-	conn := testConn()
-	cmd := newSetPasswordCmd(cfg, &conn)
-	flags.RegisterOutputFlag(cmd, cfg)
-
-	out := bytes.NewBuffer(nil)
-	cmd.SetOut(out)
-	cmd.SetErr(bytes.NewBuffer(nil))
-
-	cmd.SetArgs([]string{"alice", "--new-password", "s3cr3t", "--format", "json"})
-	err := cmd.Execute()
-	require.NoError(t, err)
-	assert.Contains(t, capturedCypher, "SET PASSWORD CHANGE NOT REQUIRED")
+			err := cmd.Execute()
+			require.NoError(t, err)
+			assert.Contains(t, capturedCypher, tc.wantContains)
+			if tc.wantNotContains != "" {
+				assert.NotContains(t, capturedCypher, tc.wantNotContains)
+			}
+		})
+	}
 }
 
 func TestSetPassword_TTYPrompt_HappyPath(t *testing.T) {

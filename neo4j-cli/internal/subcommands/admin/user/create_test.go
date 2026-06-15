@@ -79,73 +79,67 @@ func TestUserCreate_HappyPath_ExplicitPassword(t *testing.T) {
 	assert.Equal(t, "alice", got["user"])
 }
 
-func TestUserCreate_PasswordChangeRequired_True_EmitsCorrectCypher(t *testing.T) {
-	withFakeStdinIsTTY(t, false)
-
-	var capturedCypher string
-	idx := 0
-	responses := []createExecResponse{
-		{rows: nil, err: nil},
-		{rows: sampleUserRow, err: nil},
+func TestUserCreate_PasswordChangeRequired(t *testing.T) {
+	tests := []struct {
+		name            string
+		flag            bool
+		args            []string
+		wantContains    string
+		wantNotContains string
+	}{
+		{
+			name:            "true emits SET PASSWORD CHANGE REQUIRED",
+			flag:            true,
+			args:            []string{"alice", "--set-password", "s3cr3t", "--rw"},
+			wantContains:    "SET PASSWORD CHANGE REQUIRED",
+			wantNotContains: "NOT REQUIRED",
+		},
+		{
+			name:         "false emits SET PASSWORD CHANGE NOT REQUIRED",
+			flag:         false,
+			args:         []string{"alice", "--set-password", "s3cr3t", "--password-change-required=false", "--rw"},
+			wantContains: "SET PASSWORD CHANGE NOT REQUIRED",
+		},
 	}
-	withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
-		if idx == 0 {
-			capturedCypher = cypher
-		}
-		if idx >= len(responses) {
-			return nil, nil
-		}
-		r := responses[idx]
-		idx++
-		return r.rows, r.err
-	}))
 
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
-	conn := testConn()
-	cmd := newCreateCmd(cfg, &conn)
-	flags.RegisterOutputFlag(cmd, cfg)
-	flags.RegisterRwFlag(cmd)
-	cmd.SetOut(bytes.NewBuffer(nil))
-	cmd.SetErr(bytes.NewBuffer(nil))
-	cmd.SetArgs([]string{"alice", "--set-password", "s3cr3t", "--rw"})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			withFakeStdinIsTTY(t, false)
 
-	require.NoError(t, cmd.Execute())
-	assert.Contains(t, capturedCypher, "SET PASSWORD CHANGE REQUIRED")
-	assert.NotContains(t, capturedCypher, "NOT REQUIRED")
-}
+			var capturedCypher string
+			idx := 0
+			responses := []createExecResponse{
+				{rows: nil, err: nil},
+				{rows: sampleUserRow, err: nil},
+			}
+			withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
+				if idx == 0 {
+					capturedCypher = cypher
+				}
+				if idx >= len(responses) {
+					return nil, nil
+				}
+				r := responses[idx]
+				idx++
+				return r.rows, r.err
+			}))
 
-func TestUserCreate_PasswordChangeRequired_False_EmitsCorrectCypher(t *testing.T) {
-	withFakeStdinIsTTY(t, false)
+			cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+			conn := testConn()
+			cmd := newCreateCmd(cfg, &conn)
+			flags.RegisterOutputFlag(cmd, cfg)
+			flags.RegisterRwFlag(cmd)
+			cmd.SetOut(bytes.NewBuffer(nil))
+			cmd.SetErr(bytes.NewBuffer(nil))
+			cmd.SetArgs(tc.args)
 
-	var capturedCypher string
-	idx := 0
-	responses := []createExecResponse{
-		{rows: nil, err: nil},
-		{rows: sampleUserRow, err: nil},
+			require.NoError(t, cmd.Execute())
+			assert.Contains(t, capturedCypher, tc.wantContains)
+			if tc.wantNotContains != "" {
+				assert.NotContains(t, capturedCypher, tc.wantNotContains)
+			}
+		})
 	}
-	withFakeExecFn(t, fakeExecFn(func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, _ map[string]any) ([]map[string]any, error) {
-		if idx == 0 {
-			capturedCypher = cypher
-		}
-		if idx >= len(responses) {
-			return nil, nil
-		}
-		r := responses[idx]
-		idx++
-		return r.rows, r.err
-	}))
-
-	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
-	conn := testConn()
-	cmd := newCreateCmd(cfg, &conn)
-	flags.RegisterOutputFlag(cmd, cfg)
-	flags.RegisterRwFlag(cmd)
-	cmd.SetOut(bytes.NewBuffer(nil))
-	cmd.SetErr(bytes.NewBuffer(nil))
-	cmd.SetArgs([]string{"alice", "--set-password", "s3cr3t", "--password-change-required=false", "--rw"})
-
-	require.NoError(t, cmd.Execute())
-	assert.Contains(t, capturedCypher, "SET PASSWORD CHANGE NOT REQUIRED")
 }
 
 func TestUserCreate_TTYPrompt_UsesPasswordReader(t *testing.T) {
