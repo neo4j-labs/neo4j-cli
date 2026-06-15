@@ -4,9 +4,6 @@
 package user
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -61,18 +58,4 @@ func rolesJoined(rows []map[string]any) []map[string]any {
 		out[i] = cp
 	}
 	return out
-}
-
-// joinRoles converts a []any of role strings to a comma-separated string.
-// A nil or empty slice becomes an empty string.
-func joinRoles(v any) string {
-	roles, ok := v.([]any)
-	if !ok || len(roles) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(roles))
-	for _, r := range roles {
-		parts = append(parts, fmt.Sprintf("%v", r))
-	}
-	return strings.Join(parts, ",")
 }

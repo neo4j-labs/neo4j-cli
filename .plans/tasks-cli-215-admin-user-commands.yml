@@ -389,14 +389,14 @@ tasks:
 
       Move joinRoles (and rolesJoined if it is used by both files; leave it in list.go if
       it is genuinely list-only) to helpers.go. Update any callers. No behavior change.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
       - "joinRoles is defined in helpers.go, not list.go"
       - "get.go and list.go both compile and call joinRoles from helpers.go"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-06-15T15:00:00Z"
 
   - id: task-015
     title: 'Extract passwordChangeClause helper and table-drive the True/False tests'
