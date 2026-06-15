@@ -8,6 +8,16 @@ Implemented list.go and get.go leaf commands with format-aware roles rendering (
 Files: +list.go, +list_test.go, +get.go, +get_test.go; ~export_test.go (added NewListCmdForTest/NewGetCmdForTest for external test access)
 Decisions: Since tests are in package user_test (external), added exported test constructors to export_test.go to expose private newListCmd/newGetCmd; rolesJoined helper in list.go copies rows and converts []any roles to comma-joined string before passing to PrintBodyMap.
 
+## TASK-003 — 2026-06-15T03:00:00Z
+Implemented create.go with newCreateCmd: CREATE USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED via userExecFn; --set-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to true; calls outputUser on success. Added create_test.go covering explicit password, both password-change-required cypher variants, TTY prompt with password capture, non-TTY usage error, successful record emission with null normalization, exec error propagation, write annotation, and no-args error. Also fixed gofmt alignment issues in activate_test.go and suspend_test.go from other task agents.
+Files: +create.go, +create_test.go; ~export_test.go (added NewCreateCmdForTest); ~activate_test.go, ~suspend_test.go (gofmt fixes)
+Decisions: Used createExecResponse (not fakeResponse) to avoid name collision with suspend_test.go's type in the same test package; Cypher built with fmt.Sprintf to embed the change-required clause directly (not parametrized, matching Neo4j syntax).
+
+## TASK-004 — 2026-06-15T02:00:00Z
+Implemented drop.go with newDropCmd: DROP USER $name via userExecFn; confirm.Register/confirm.Require gate (--yes/--force); translates Neo.ClientError.Statement.ArgumentError with "does not exist" to clierr.NewNotFoundError; no output on success. Added drop_test.go (external package) covering success/no-output, two not-found variants, exec error, confirm gate via confirmtest.AssertLeafGate, and write annotation.
+Files: +drop.go, +drop_test.go; ~export_test.go (added NewDropCmdForTest)
+Decisions: Wrapped drop in a "user" cobra.Command parent in buildDropCmd so confirm.Require can use "user" as the resource type label in its prompt, matching the confirmtest.AssertLeafGate ResourceLabel assertion.
+
 ## TASK-006 — 2026-06-15T02:00:00Z
 Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values, TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
 Files: +set_password.go, +set_password_test.go; ~export_test.go (added NewSetPasswordCmdForTest)
