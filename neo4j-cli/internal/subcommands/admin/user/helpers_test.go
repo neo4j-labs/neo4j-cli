@@ -21,6 +21,48 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 )
 
+// fakeExecFn is the test-double type for adminutil.ExecFn. Tests construct a
+// value of this type to control the rows/error returned by userExecFn.
+type fakeExecFn func(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error)
+
+// withFakeExecFn replaces userExecFn for the duration of t with fake and
+// restores the original value in t.Cleanup.
+func withFakeExecFn(t *testing.T, fake fakeExecFn) {
+	t.Helper()
+	orig := userExecFn
+	userExecFn = adminutil.ExecFn(fake)
+	t.Cleanup(func() { userExecFn = orig })
+}
+
+// withFakeStdinIsTTY replaces dbconn.StdinIsTTY for the duration of t with
+// the supplied value and restores the original in t.Cleanup.
+func withFakeStdinIsTTY(t *testing.T, isTTY bool) {
+	t.Helper()
+	orig := dbconn.StdinIsTTY
+	dbconn.StdinIsTTY = func() bool { return isTTY }
+	t.Cleanup(func() { dbconn.StdinIsTTY = orig })
+}
+
+// withFakePasswordReader replaces dbconn.PasswordReader for the duration of t
+// with a function that returns pw (and no error) and restores the original in
+// t.Cleanup.
+func withFakePasswordReader(t *testing.T, pw string, err error) {
+	t.Helper()
+	orig := dbconn.PasswordReader
+	dbconn.PasswordReader = func() (string, error) { return pw, err }
+	t.Cleanup(func() { dbconn.PasswordReader = orig })
+}
+
+// testConn returns a *dbconn.Conn for use in tests. The connection params are
+// never used because tests always override userExecFn with a fake.
+func testConn() *dbconn.Conn {
+	return &dbconn.Conn{
+		URI:      "neo4j://localhost:7687",
+		Username: "neo4j",
+		Password: "test",
+	}
+}
+
 // setFakeExecFn replaces userExecFn with a function that always returns the
 // provided rows and error, and restores the original in t.Cleanup.
 func setFakeExecFn(t *testing.T, rows []map[string]any, execErr error) {
@@ -51,6 +93,12 @@ func setPasswordReader(t *testing.T, pw string, err error) {
 // newTestCfg returns a clicfg.Config backed by a fresh in-memory filesystem.
 func newTestCfg() *clicfg.Config {
 	return clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+}
+
+// fakeResponse bundles a rows slice and an error for sequential fake exec calls.
+type fakeResponse struct {
+	rows []map[string]any
+	err  error
 }
 
 // ─── TestNormalizeUserRow ───────────────────────────────────────────────────

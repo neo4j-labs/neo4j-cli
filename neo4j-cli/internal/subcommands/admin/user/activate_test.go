@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package user_test
+package user
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	. "github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/user"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +38,7 @@ func runActivate(t *testing.T, args string, execResponses []fakeResponse) (strin
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewActivateCmdForTest(cfg, &conn)
+	cmd := newActivateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -96,6 +95,6 @@ func TestUserActivate_NoArgs_CobraUsageError(t *testing.T) {
 func TestUserActivate_HasWriteAnnotation(t *testing.T) {
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewActivateCmdForTest(cfg, &conn)
+	cmd := newActivateCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])
 }

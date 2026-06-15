@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package user_test
+package user
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	. "github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/user"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +32,7 @@ func runSetPassword(t *testing.T, args string, execRows []map[string]any, execEr
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -67,7 +66,7 @@ func TestSetPassword_ExplicitPassword_HappyPath(t *testing.T) {
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -99,7 +98,7 @@ func TestSetPassword_PasswordChangeRequired_True_SendsCorrectCypher(t *testing.T
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -127,7 +126,7 @@ func TestSetPassword_PasswordChangeRequired_False_SendsNotRequired(t *testing.T)
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -156,7 +155,7 @@ func TestSetPassword_TTYPrompt_HappyPath(t *testing.T) {
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 
 	out := bytes.NewBuffer(nil)
@@ -196,7 +195,7 @@ func TestSetPassword_ExecError_PropagatesError(t *testing.T) {
 func TestSetPassword_HasWriteAnnotation(t *testing.T) {
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewSetPasswordCmdForTest(cfg, &conn)
+	cmd := newSetPasswordCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])
 }
 

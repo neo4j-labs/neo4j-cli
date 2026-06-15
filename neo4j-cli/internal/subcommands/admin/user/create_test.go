@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 
-package user_test
+package user
 
 import (
 	"bytes"
@@ -16,7 +16,6 @@ import (
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	. "github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/user"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +44,7 @@ func runCreate(t *testing.T, args string, responses []createExecResponse) (strin
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewCreateCmdForTest(cfg, &conn)
+	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
 
@@ -103,7 +102,7 @@ func TestUserCreate_PasswordChangeRequired_True_EmitsCorrectCypher(t *testing.T)
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewCreateCmdForTest(cfg, &conn)
+	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
 	cmd.SetOut(bytes.NewBuffer(nil))
@@ -138,7 +137,7 @@ func TestUserCreate_PasswordChangeRequired_False_EmitsCorrectCypher(t *testing.T
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewCreateCmdForTest(cfg, &conn)
+	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
 	cmd.SetOut(bytes.NewBuffer(nil))
@@ -173,7 +172,7 @@ func TestUserCreate_TTYPrompt_UsesPasswordReader(t *testing.T) {
 
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewCreateCmdForTest(cfg, &conn)
+	cmd := newCreateCmd(cfg, &conn)
 	flags.RegisterOutputFlag(cmd, cfg)
 	flags.RegisterRwFlag(cmd)
 
@@ -233,7 +232,7 @@ func TestUserCreate_ExecError_PropagatesError(t *testing.T) {
 func TestUserCreate_HasWriteAnnotation(t *testing.T) {
 	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
 	conn := testConn()
-	cmd := NewCreateCmdForTest(cfg, &conn)
+	cmd := newCreateCmd(cfg, &conn)
 	assert.Equal(t, "true", cmd.Annotations["write"])
 }
 

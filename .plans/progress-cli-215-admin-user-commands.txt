@@ -50,3 +50,7 @@ Files: +.changes/unreleased/neo4j-cli-Minor-20260615-130022.yaml
 
 ## REVIEW — 2026-06-15T13:30:00Z
 Added 4 review tasks (task-012..task-015): collapse external test package, consolidate duplicate response struct, move joinRoles to helpers.go, extract passwordChangeClause + table-drive tests.
+
+## TASK-012 — 2026-06-15T14:00:00Z
+Collapsed all *_test.go to package user (internal); deleted export_test.go and user_helpers_test.go; unified seam helpers in helpers_test.go.
+Files: -export_test.go, -user_helpers_test.go, ~helpers_test.go, ~list_test.go, ~get_test.go, ~create_test.go, ~drop_test.go, ~rename_test.go, ~set_password_test.go, ~suspend_test.go, ~activate_test.go

@@ -342,7 +342,7 @@ tasks:
 
       The target state mirrors database/database_helpers_test.go: one internal helper file,
       no export_test.go.
-    status: pending
+    status: completed
     dependencies: []
     source: review
     acceptance_criteria:
@@ -350,7 +350,7 @@ tasks:
       - "all *_test.go files in admin/user/ are package user (internal)"
       - "make test passes with no changes to production code"
       - "the package has a single shared test-helper set (no duplicate seam-override functions)"
-    completed_at: null
+    completed_at: "2026-06-15T14:00:00Z"
 
   - id: task-013
     title: 'Consolidate duplicate response struct: createExecResponse and fakeResponse'
