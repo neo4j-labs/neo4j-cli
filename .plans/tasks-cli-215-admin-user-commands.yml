@@ -194,7 +194,7 @@ tasks:
       no local translation needed. Both constructors are private and NOT yet wired.
 
       Add flush-left Example: fields on both files with >= 2 invocations (include --rw).
-    status: in_progress
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -204,7 +204,7 @@ tasks:
       - "suspend_test.go and activate_test.go cover: success with output, Community error passthrough"
       - "flush-left Example: with >= 2 invocations including --rw on both files"
       - "NO user.go AddCommand calls touched in this task"
-    completed_at: null
+    completed_at: "2026-06-15T02:00:00Z"
 
   - id: task-011
     title: 'Add helpers_test.go: direct unit tests for normalizeUserRow, outputUser, promptUserPassword'

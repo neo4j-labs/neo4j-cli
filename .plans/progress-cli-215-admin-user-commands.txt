@@ -22,3 +22,8 @@ Decisions: Wrapped drop in a "user" cobra.Command parent in buildDropCmd so conf
 Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values, TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
 Files: +set_password.go, +set_password_test.go; ~export_test.go (added NewSetPasswordCmdForTest)
 Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration with create_test.go's package-level var in the same test package.
+
+## TASK-007 — 2026-06-15T02:00:00Z
+Implemented suspend.go (ALTER USER $name SET STATUS SUSPENDED) and activate.go (ALTER USER $name SET STATUS ACTIVE); both call outputUser on success and carry write annotation. Added suspend_test.go and activate_test.go covering happy path with correct suspended field, exec error passthrough, no-args cobra error, and write annotation check.
+Files: +suspend.go, +suspend_test.go, +activate.go, +activate_test.go; ~export_test.go (added NewSuspendCmdForTest, NewActivateCmdForTest)
+Decisions: Tests use fakeResponse (defined in suspend_test.go, shared across user_test package) for sequential exec calls; --rw omitted from test args since rw gate is only enforced by the root PersistentPreRunE, not at the leaf level.
