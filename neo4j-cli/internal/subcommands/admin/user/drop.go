@@ -13,7 +13,9 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/confirm"
+	commonoutput "github.com/neo4j/cli/common/output"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/adminutil"
 )
 
 func newDropCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
@@ -42,6 +44,9 @@ neo4j-cli admin user drop alice --credential local --rw --yes --force`,
 				}
 				return err
 			}
+			dropFields := []string{"user", "status"}
+			row := map[string]any{"user": name, "status": "dropped"}
+			commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(row, dropFields), dropFields)
 			return nil
 		},
 	}

@@ -483,7 +483,7 @@ tasks:
 
       Update drop_test.go to assert that stdout contains the name and "dropped" rather than
       asserting empty output. Update any acceptance-criteria comment referencing "no output".
-    status: pending
+    status: completed
     dependencies:
       - task-004
     source: qa
@@ -492,7 +492,7 @@ tasks:
       - "successful drop renders a two-column table (user, status) in table format"
       - "drop_test.go asserts output contains the name and dropped status"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-06-15T16:30:00Z"
 
   - id: task-018
     title: 'QA fix: Security.Forbidden translation + rename Long description correction'

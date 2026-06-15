@@ -63,11 +63,12 @@ func runDrop(t *testing.T, args string, stdin string, execErr error) (string, st
 	return out.String(), errBuf.String(), execCmdErr
 }
 
-func TestDrop_YesForce_Succeeds_NoOutput(t *testing.T) {
+func TestDrop_YesForce_Succeeds_EmitsDroppedRecord(t *testing.T) {
 	t.Cleanup(confirm.SetStdinIsTerminal(func() bool { return false }))
 	stdout, _, err := runDrop(t, "alice --rw --yes --force", "", nil)
 	require.NoError(t, err)
-	assert.Empty(t, strings.TrimSpace(stdout))
+	assert.Contains(t, stdout, "alice")
+	assert.Contains(t, stdout, "dropped")
 }
 
 func TestDrop_NotFound_ReturnsNotFoundError(t *testing.T) {

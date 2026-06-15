@@ -72,6 +72,10 @@ QA testing against local Enterprise, Desktop, Aura Free, and Aura Professional s
 5. rename Long text says "non-native user" but Aura blocks ALL renames → task-018
 Added REQ-F-011..REQ-F-014 to PRD; added tasks task-016..task-018.
 
+## TASK-017 — 2026-06-15T16:30:00Z
+drop now emits {"user": "<name>", "status": "dropped"} on success via PrintBodyMap with a two-field dropFields slice, aligning it with other write commands.
+Files: ~drop.go, ~drop_test.go
+
 ## TASK-013 — 2026-06-15T15:30:00Z
 Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
 Files: ~create_test.go
