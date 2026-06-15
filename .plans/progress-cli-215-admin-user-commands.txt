@@ -47,3 +47,6 @@ Files: ~admin.go, ~neo4j-cli/internal/skill/bundle/ (regenerated)
 ## TASK-010 — 2026-06-15T13:00:22Z
 Added changelog entry for admin user management commands (Minor).
 Files: +.changes/unreleased/neo4j-cli-Minor-20260615-130022.yaml
+
+## REVIEW — 2026-06-15T13:30:00Z
+Added 4 review tasks (task-012..task-015): collapse external test package, consolidate duplicate response struct, move joinRoles to helpers.go, extract passwordChangeClause + table-drive tests.

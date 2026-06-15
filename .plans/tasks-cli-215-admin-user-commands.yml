@@ -315,3 +315,113 @@ tasks:
       - "body mentions list, get, create, drop, rename, set-password, suspend, activate"
       - "make test still passes after the changelog file is added"
     completed_at: "2026-06-15T13:00:22Z"
+
+  - id: task-012
+    title: 'Collapse to internal test package: delete export_test.go, merge user_helpers_test.go'
+    description: |
+      The user package chose package user_test (external) for all leaf tests while the
+      sibling database package uses package database (internal). This generated ~118 lines
+      of pure scaffolding — export_test.go (62 lines exposing 8 private constructors + one
+      seam pointer) and user_helpers_test.go (56 lines re-implementing seam helpers that
+      already exist in helpers_test.go as internal versions). There is no technical reason
+      for the external package choice: no import cycles, no end-to-end harness requirement.
+
+      The fix:
+        1. Delete export_test.go entirely.
+        2. Convert all leaf *_test.go files from package user_test to package user.
+        3. Replace all ExportedUserExecFn / NewXxxCmdForTest references with direct calls
+           to the unexported symbols (newListCmd, newGetCmd, etc.) and direct assignment
+           to userExecFn.
+        4. Merge user_helpers_test.go into helpers_test.go (or delete it and move any
+           non-duplicate helpers into helpers_test.go). Remove duplicate seam-override
+           helpers — withFakeExecFn/withFakeStdinIsTTY/withFakePasswordReader in
+           user_helpers_test.go duplicate setFakeExecFn/setStdinIsTTY/setPasswordReader
+           in helpers_test.go; keep the helpers_test.go versions (they're already there),
+           discard the external-package duplicates. testConn() can move from
+           user_helpers_test.go into helpers_test.go.
+
+      The target state mirrors database/database_helpers_test.go: one internal helper file,
+      no export_test.go.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "export_test.go is deleted"
+      - "all *_test.go files in admin/user/ are package user (internal)"
+      - "make test passes with no changes to production code"
+      - "the package has a single shared test-helper set (no duplicate seam-override functions)"
+    completed_at: null
+
+  - id: task-013
+    title: 'Consolidate duplicate response struct: createExecResponse and fakeResponse'
+    description: |
+      createExecResponse is defined in create_test.go and fakeResponse is defined in
+      suspend_test.go (and used by activate_test.go). Both have the identical shape:
+        struct { rows []map[string]any; err error }
+      This is a near-duplicate type definition that exists only because the external test
+      package forced each leaf to define its own — there was no shared location accessible
+      to package user_test.
+
+      After task-012 collapses everything into package user (internal), consolidate these
+      into a single type (e.g. execResponse or testResponse) defined once in helpers_test.go
+      and used by all leaf test files that need it. Remove the leaf-local definitions.
+
+      Note: this task depends on task-012 being completed first.
+    status: pending
+    dependencies:
+      - task-012
+    source: review
+    acceptance_criteria:
+      - "a single shared response-mock struct is defined in helpers_test.go"
+      - "create_test.go and suspend_test.go no longer define their own equivalent struct"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-014
+    title: 'Move joinRoles to helpers.go'
+    description: |
+      joinRoles is defined in list.go but is called from both list.go and get.go. An
+      unexported function in a leaf file silently becoming shared infrastructure for
+      another leaf file violates the organizational intent of the package — helpers.go is
+      the explicit home for shared helpers (normalizeUserRow, outputUser, promptUserPassword
+      are all there). rolesJoined (the list-specific []any→string wrapper) lives alongside
+      joinRoles in list.go.
+
+      Move joinRoles (and rolesJoined if it is used by both files; leave it in list.go if
+      it is genuinely list-only) to helpers.go. Update any callers. No behavior change.
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "joinRoles is defined in helpers.go, not list.go"
+      - "get.go and list.go both compile and call joinRoles from helpers.go"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-015
+    title: 'Extract passwordChangeClause helper and table-drive the True/False tests'
+    description: |
+      Two issues in one task (both localized to the same files):
+
+      (a) create.go and set_password.go each build the Cypher password-change clause
+      independently with inconsistent style:
+        create.go:      var changeClause string; if ... changeClause = "SET PASSWORD CHANGE REQUIRED" ...
+        set_password.go: changeRequired := "NOT REQUIRED"; if ... changeRequired = "REQUIRED" ...
+      Add passwordChangeClause(required bool) string to helpers.go — returns either
+      "SET PASSWORD CHANGE REQUIRED" or "SET PASSWORD CHANGE NOT REQUIRED" — and replace
+      both inline constructions with a call to it.
+
+      (b) TestUserCreate_PasswordChangeRequired_True and _False in create_test.go are
+      ~60-line near-duplicates differing only in flag value and expected Cypher string.
+      Merge them into a single table-driven test. Do the same for the matching pair in
+      set_password_test.go (TestSetPassword_PasswordChangeRequired_True/_False).
+    status: pending
+    dependencies: []
+    source: review
+    acceptance_criteria:
+      - "passwordChangeClause(bool) string is defined in helpers.go"
+      - "create.go and set_password.go call passwordChangeClause instead of building the clause inline"
+      - "create_test.go has a single table-driven test for both password-change-required variants"
+      - "set_password_test.go has a single table-driven test for both variants"
+      - "make test passes"
+    completed_at: null
