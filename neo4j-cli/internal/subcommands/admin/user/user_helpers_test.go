@@ -15,11 +15,11 @@ import (
 
 // fakeExecFn is the test-double type for adminutil.ExecFn. Tests construct a
 // value of this type to control the rows/error returned by userExecFn.
-type fakeExecFn func(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) //nolint:unused
+type fakeExecFn func(ctx context.Context, cfg *clicfg.Config, conn *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error)
 
 // withFakeExecFn replaces userExecFn for the duration of t with fake and
 // restores the original value in t.Cleanup.
-func withFakeExecFn(t *testing.T, fake fakeExecFn) { //nolint:unused
+func withFakeExecFn(t *testing.T, fake fakeExecFn) {
 	t.Helper()
 	orig := *ExportedUserExecFn
 	*ExportedUserExecFn = adminutil.ExecFn(fake)
@@ -28,7 +28,7 @@ func withFakeExecFn(t *testing.T, fake fakeExecFn) { //nolint:unused
 
 // withFakeStdinIsTTY replaces dbconn.StdinIsTTY for the duration of t with
 // the supplied value and restores the original in t.Cleanup.
-func withFakeStdinIsTTY(t *testing.T, isTTY bool) { //nolint:unused
+func withFakeStdinIsTTY(t *testing.T, isTTY bool) {
 	t.Helper()
 	orig := dbconn.StdinIsTTY
 	dbconn.StdinIsTTY = func() bool { return isTTY }
@@ -38,7 +38,7 @@ func withFakeStdinIsTTY(t *testing.T, isTTY bool) { //nolint:unused
 // withFakePasswordReader replaces dbconn.PasswordReader for the duration of t
 // with a function that returns pw (and no error) and restores the original in
 // t.Cleanup.
-func withFakePasswordReader(t *testing.T, pw string, err error) { //nolint:unused
+func withFakePasswordReader(t *testing.T, pw string, err error) {
 	t.Helper()
 	orig := dbconn.PasswordReader
 	dbconn.PasswordReader = func() (string, error) { return pw, err }
@@ -47,7 +47,7 @@ func withFakePasswordReader(t *testing.T, pw string, err error) { //nolint:unuse
 
 // testConn returns a *dbconn.Conn for use in tests. The connection params are
 // never used because tests always override userExecFn with a fake.
-func testConn() *dbconn.Conn { //nolint:unused
+func testConn() *dbconn.Conn {
 	return &dbconn.Conn{
 		URI:      "neo4j://localhost:7687",
 		Username: "neo4j",

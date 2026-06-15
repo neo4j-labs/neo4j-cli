@@ -19,14 +19,14 @@ import (
 // userExecFn is the package-level test seam. It must be set to a real
 // implementation by the parent command (NewCmd) before any leaf runs.
 // Tests replace it to inject fake results without opening a Bolt connection.
-var userExecFn adminutil.ExecFn //nolint:unused
+var userExecFn adminutil.ExecFn
 
 // userFields is the canonical ordered list of output columns for user records.
-var userFields = []string{"user", "roles", "password_change_required", "suspended"} //nolint:unused
+var userFields = []string{"user", "roles", "password_change_required", "suspended"}
 
 // normalizeUserRow fills in null values from Community edition with their
 // canonical defaults: null roles → []any{}, null suspended → false.
-func normalizeUserRow(m map[string]any) map[string]any { //nolint:unused
+func normalizeUserRow(m map[string]any) map[string]any {
 	if m["roles"] == nil {
 		m["roles"] = []any{}
 	}
@@ -39,7 +39,7 @@ func normalizeUserRow(m map[string]any) map[string]any { //nolint:unused
 // outputUser fetches the current record for userName and prints it. Called by
 // write commands (create, rename, set-password, suspend, activate) after a
 // successful mutation.
-func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userName string) error { //nolint:unused
+func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userName string) error {
 	rows, err := userExecFn(cmd.Context(), cfg, conn, "SHOW USERS WHERE user = $name", map[string]any{"name": userName})
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userN
 // If the flag is empty and stdin is not a TTY it returns a usage error.
 // Calls dbconn.StdinIsTTY and dbconn.PasswordReader (both test-overridable)
 // so no new seam vars are declared here.
-func promptUserPassword(cmd *cobra.Command, flagName string) (string, error) { //nolint:unused
+func promptUserPassword(cmd *cobra.Command, flagName string) (string, error) {
 	pw, _ := cmd.Flags().GetString(flagName)
 	if pw != "" {
 		return pw, nil
