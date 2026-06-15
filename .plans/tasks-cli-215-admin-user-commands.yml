@@ -86,7 +86,7 @@ tasks:
       happens in task-008.
 
       Add a flush-left Example: with >= 2 invocations (include --rw).
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -114,7 +114,7 @@ tasks:
       newDropCmd is a private constructor. It is NOT yet wired into any NewCmd.
 
       Add a flush-left Example: with >= 2 invocations (include --rw and --yes).
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -140,7 +140,7 @@ tasks:
       newRenameCmd is a private constructor. It is NOT yet wired into any NewCmd.
 
       Add a flush-left Example: with >= 2 invocations (include --rw).
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -167,7 +167,7 @@ tasks:
       newSetPasswordCmd is a private constructor. It is NOT yet wired into any NewCmd.
 
       Add a flush-left Example: with >= 2 invocations (include --rw).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -178,7 +178,7 @@ tasks:
       - "set_password_test.go covers: explicit password, TTY prompt, non-TTY error, both password-change-required values"
       - "flush-left Example: with >= 2 invocations including --rw"
       - "NO user.go AddCommand calls touched in this task"
-    completed_at: null
+    completed_at: "2026-06-15T02:00:00Z"
 
   - id: task-007
     title: 'user suspend and user activate commands'
@@ -194,7 +194,7 @@ tasks:
       no local translation needed. Both constructors are private and NOT yet wired.
 
       Add flush-left Example: fields on both files with >= 2 invocations (include --rw).
-    status: pending
+    status: in_progress
     dependencies:
       - task-001
     acceptance_criteria:
@@ -204,6 +204,49 @@ tasks:
       - "suspend_test.go and activate_test.go cover: success with output, Community error passthrough"
       - "flush-left Example: with >= 2 invocations including --rw on both files"
       - "NO user.go AddCommand calls touched in this task"
+    completed_at: null
+
+  - id: task-011
+    title: 'Add helpers_test.go: direct unit tests for normalizeUserRow, outputUser, promptUserPassword'
+    description: |
+      Create helpers_test.go in neo4j-cli/internal/subcommands/admin/user/ as an INTERNAL
+      test (package user, not package user_test) so it can call unexported functions directly
+      without needing export_test.go wrappers.
+
+      Test normalizeUserRow:
+        - null roles and null suspended both normalized
+        - non-null roles and non-null suspended pass through unchanged
+        - mixed (null roles, non-null suspended) and vice versa
+
+      Test outputUser:
+        - zero rows returned by fakeExecFn → nil error, no output
+        - one row returned → row printed (set userExecFn to a fake, capture stdout via
+          cobra cmd.SetOut, verify output contains expected field)
+        - fakeExecFn returns error → error propagated
+
+      Test promptUserPassword:
+        - non-empty flag value → returned immediately, no TTY/reader called
+        - empty flag + StdinIsTTY=true + PasswordReader returns "pw" → "Password: " on
+          stderr, "pw" returned
+        - empty flag + StdinIsTTY=false → usage error
+        - empty flag + StdinIsTTY=true + PasswordReader returns error → wrapped error
+
+      Since this is package user (internal), override the seams directly:
+        userExecFn = fakeExecFn(...)    (direct assignment, no ExportedUserExecFn needed)
+        dbconn.StdinIsTTY = func() bool { return ... }
+        dbconn.PasswordReader = func() (string, error) { ... }
+      Restore each via t.Cleanup.
+
+      Do NOT modify export_test.go, helpers.go, or any other existing file.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "helpers_test.go is package user (internal), not package user_test"
+      - "TestNormalizeUserRow covers null normalization and passthrough cases"
+      - "TestOutputUser covers zero-rows, one-row output, and exec error"
+      - "TestPromptUserPassword covers explicit value, TTY prompt, non-TTY error, reader error"
+      - "make test passes with the new test file"
     completed_at: null
 
   - id: task-008

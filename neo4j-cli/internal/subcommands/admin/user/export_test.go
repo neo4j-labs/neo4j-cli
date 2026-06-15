@@ -24,3 +24,39 @@ func NewListCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 func NewGetCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 	return newGetCmd(cfg, conn)
 }
+
+// NewDropCmdForTest exposes the private newDropCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewDropCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newDropCmd(cfg, conn)
+}
+
+// NewRenameCmdForTest exposes the private newRenameCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewRenameCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newRenameCmd(cfg, conn)
+}
+
+// NewSuspendCmdForTest exposes the private newSuspendCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewSuspendCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newSuspendCmd(cfg, conn)
+}
+
+// NewActivateCmdForTest exposes the private newActivateCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewActivateCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newActivateCmd(cfg, conn)
+}
+
+// NewSetPasswordCmdForTest exposes the private newSetPasswordCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewSetPasswordCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newSetPasswordCmd(cfg, conn)
+}
+
+// NewCreateCmdForTest exposes the private newCreateCmd constructor to the
+// external test package (package user_test). Only compiled during tests.
+func NewCreateCmdForTest(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
+	return newCreateCmd(cfg, conn)
+}

@@ -7,3 +7,8 @@ Decisions: userExecFn declared in helpers.go (not user.go) so leaf files can ref
 Implemented list.go and get.go leaf commands with format-aware roles rendering (comma-joined for table/toon, array for JSON); added list_test.go and get_test.go with external test package covering happy path, empty result, null normalization, not-found, and exec error cases.
 Files: +list.go, +list_test.go, +get.go, +get_test.go; ~export_test.go (added NewListCmdForTest/NewGetCmdForTest for external test access)
 Decisions: Since tests are in package user_test (external), added exported test constructors to export_test.go to expose private newListCmd/newGetCmd; rolesJoined helper in list.go copies rows and converts []any roles to comma-joined string before passing to PrintBodyMap.
+
+## TASK-006 — 2026-06-15T02:00:00Z
+Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values, TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
+Files: +set_password.go, +set_password_test.go; ~export_test.go (added NewSetPasswordCmdForTest)
+Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration with create_test.go's package-level var in the same test package.
