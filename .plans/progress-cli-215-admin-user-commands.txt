@@ -63,6 +63,15 @@ Files: ~helpers.go, ~list.go
 Extracted passwordChangeClause to helpers.go; table-drove True/False test pairs in create_test.go and set_password_test.go.
 Files: ~helpers.go, ~create.go, ~set_password.go, ~create_test.go, ~set_password_test.go
 
+## QA TESTING — 2026-06-15T16:00:00Z
+QA testing against local Enterprise, Desktop, Aura Free, and Aura Professional surfaced 5 issues:
+1. suspend/activate/rename/set-password surface raw Neo4jError for non-existent users (not_found inconsistency) → task-016
+2. create surfaces raw Neo4jError for duplicate user (no conflict code) → task-016
+3. drop produces no stdout on success unlike all other write commands → task-017
+4. Security.Forbidden (Aura Free admin restriction) shows raw error with GRANT/REVOKE hints → task-018
+5. rename Long text says "non-native user" but Aura blocks ALL renames → task-018
+Added REQ-F-011..REQ-F-014 to PRD; added tasks task-016..task-018.
+
 ## TASK-013 — 2026-06-15T15:30:00Z
 Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
 Files: ~create_test.go

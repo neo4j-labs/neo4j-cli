@@ -424,4 +424,106 @@ tasks:
       - "create_test.go has a single table-driven test for both password-change-required variants"
       - "set_password_test.go has a single table-driven test for both variants"
       - "make test passes"
-    completed_at: "2026-06-15T14:00:00Z"
+    completed_at: null
+
+  - id: task-016
+    title: 'QA fix: not-found and already-exists error translations across write commands'
+    description: |
+      QA testing revealed that suspend, activate, set-password, and rename surface raw
+      Neo4jError strings when the target user does not exist, while get and drop already
+      return a clean not_found (exit 3). This task adds consistent error translation.
+
+      (a) Add translateUserNotFoundError(err error, name string) error to helpers.go.
+      It checks errors.As(*neo4j.Neo4jError), code == "Neo.ClientError.Statement.ArgumentError",
+      and strings.Contains(ne.Msg, "does not exist"), returning clierr.NewNotFoundError(
+      "user %q not found", name). Otherwise returns err unchanged.
+
+      (b) In suspend.go, activate.go, set_password.go, and rename.go, replace the bare
+      `return err` after userExecFn with:
+        return translateUserNotFoundError(err, name)
+
+      (c) In create.go add a local check after userExecFn for "already exists":
+        var ne *neo4j.Neo4jError
+        if errors.As(err, &ne) &&
+            ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+            strings.Contains(ne.Msg, "already exists") {
+            return clierr.NewUsageError("user %q already exists", name)
+        }
+        return err
+
+      Update tests in suspend_test.go, activate_test.go, set_password_test.go, rename_test.go
+      and create_test.go to assert the clean error code/message instead of the raw Neo4j string.
+    status: pending
+    dependencies:
+      - task-013
+    source: qa
+    acceptance_criteria:
+      - "translateUserNotFoundError is defined in helpers.go and covered by helpers_test.go"
+      - "suspend/activate/set-password/rename each call translateUserNotFoundError"
+      - "a non-existent user returns not_found (exit 3) for all four commands in tests"
+      - "create with an existing name returns usage_error (exit 2) with message 'user X already exists'"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-017
+    title: 'QA fix: drop command emits success output'
+    description: |
+      QA testing found that drop is the only write command that produces no stdout on
+      success, making it impossible for callers to distinguish a successful drop from a
+      failed/silent command. All other write commands call outputUser and emit a record.
+
+      Change drop.go to emit a synthesised success record after DROP USER succeeds.
+      Because the user is deleted, do NOT run a follow-up SHOW USERS; instead build the
+      record inline:
+
+        dropFields := []string{"user", "status"}
+        row := map[string]any{"user": name, "status": "dropped"}
+        commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(row, dropFields), dropFields)
+        return nil
+
+      Update drop_test.go to assert that stdout contains the name and "dropped" rather than
+      asserting empty output. Update any acceptance-criteria comment referencing "no output".
+    status: pending
+    dependencies:
+      - task-004
+    source: qa
+    acceptance_criteria:
+      - "successful drop emits {\"user\": \"<name>\", \"status\": \"dropped\"} in JSON format"
+      - "successful drop renders a two-column table (user, status) in table format"
+      - "drop_test.go asserts output contains the name and dropped status"
+      - "make test passes"
+    completed_at: null
+
+  - id: task-018
+    title: 'QA fix: Security.Forbidden translation + rename Long description correction'
+    description: |
+      Two related QA findings addressed in one task because both touch the Aura
+      error-handling surface and neither requires new command logic.
+
+      (a) Security.Forbidden translation in run.go:
+      Translate Neo.ClientError.Security.Forbidden to a user-friendly validation_error
+      inside translateAdminError (or translateNeo4jError) in
+      neo4j-cli/internal/subcommands/admin/run.go. Add before the existing ArgumentError
+      checks:
+        if ne.Code == "Neo.ClientError.Security.Forbidden" {
+            return clierr.NewValidationError(
+                "insufficient privileges: the connected user does not have permission to manage users (requires admin role)")
+        }
+      Add a unit test to run_test.go (or a new run_translate_test.go in the admin package)
+      covering the Forbidden -> validation_error translation.
+
+      (b) rename.go Long description:
+      Change "On Aura, renaming a non-native user is rejected by the server." to
+      "On Aura, renaming any user is not supported (Aura uses a non-native authentication
+      provider globally)." Regenerate the skill bundle after this change:
+        go generate ./neo4j-cli/internal/skill/...
+    status: pending
+    dependencies: []
+    source: qa
+    acceptance_criteria:
+      - "translateAdminError returns a validation_error with 'insufficient privileges' message for Security.Forbidden"
+      - "a test asserts the Forbidden -> clean message translation"
+      - "rename.go Long text reads 'On Aura, renaming any user is not supported'"
+      - "go generate ./neo4j-cli/internal/skill/... produces no diff (TestGenerator_RoundTrip passes)"
+      - "make test, make fmt-check, make lint all pass"
+    completed_at: null
