@@ -519,7 +519,7 @@ tasks:
       "On Aura, renaming any user is not supported (Aura uses a non-native authentication
       provider globally)." Regenerate the skill bundle after this change:
         go generate ./neo4j-cli/internal/skill/...
-    status: pending
+    status: completed
     dependencies: []
     source: qa
     acceptance_criteria:
@@ -528,4 +528,4 @@ tasks:
       - "rename.go Long text reads 'On Aura, renaming any user is not supported'"
       - "go generate ./neo4j-cli/internal/skill/... produces no diff (TestGenerator_RoundTrip passes)"
       - "make test, make fmt-check, make lint all pass"
-    completed_at: null
+    completed_at: "2026-06-15T17:30:00Z"

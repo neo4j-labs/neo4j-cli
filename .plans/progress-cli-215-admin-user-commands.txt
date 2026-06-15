@@ -80,6 +80,10 @@ Files: ~drop.go, ~drop_test.go
 Added translateUserNotFoundError to helpers.go; suspend/activate/set_password/rename now return not_found (exit 3) for missing users; create returns usage_error (exit 2) for duplicate users.
 Files: ~helpers.go, ~helpers_test.go, ~suspend.go, ~suspend_test.go, ~activate.go, ~activate_test.go, ~set_password.go, ~set_password_test.go, ~rename.go, ~rename_test.go, ~create.go, ~create_test.go
 
+## TASK-018 — 2026-06-15T17:30:00Z
+Added forbiddenCode case to translateAdminError so Security.Forbidden surfaces as a clean "insufficient privileges" validation_error; corrected rename.go Long text (any user, not non-native); regenerated skill bundle.
+Files: ~run.go, ~run_test.go, ~user/rename.go, ~skill/bundle/references/admin.md
+
 ## TASK-013 — 2026-06-15T15:30:00Z
 Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
 Files: ~create_test.go

@@ -19,7 +19,7 @@ func newRenameCmd(cfg *clicfg.Config, conn **dbconn.Conn) *cobra.Command {
 		Annotations: map[string]string{"write": "true"},
 		Long: "Rename a user via RENAME USER $oldName TO $newName against the system database. " +
 			"On success, emits the updated user record for the new name. " +
-			"On Aura, renaming a non-native user is rejected by the server.",
+			"On Aura, renaming any user is not supported (Aura uses a non-native authentication provider globally).",
 		Example: `# Rename a user
 neo4j-cli admin user rename alice --new-name bob --credential local --rw
 

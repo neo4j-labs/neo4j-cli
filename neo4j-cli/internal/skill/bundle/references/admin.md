@@ -313,7 +313,7 @@ neo4j-cli admin user list --credential local --format json
 
 Rename a user
 
-Rename a user via RENAME USER $oldName TO $newName against the system database. On success, emits the updated user record for the new name. On Aura, renaming a non-native user is rejected by the server.
+Rename a user via RENAME USER $oldName TO $newName against the system database. On success, emits the updated user record for the new name. On Aura, renaming any user is not supported (Aura uses a non-native authentication provider globally).
 
 Usage: `neo4j-cli admin user rename <name> [flags]`
 
