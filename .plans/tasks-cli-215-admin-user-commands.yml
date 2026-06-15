@@ -1,0 +1,182 @@
+feature: cli-215-admin-user-commands
+prd: ./prd-cli-215-admin-user-commands.md
+created_at: 2026-06-15T00:00:00Z
+updated_at: 2026-06-15T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: 'user/ package scaffold: user.go, helpers.go, user_helpers_test.go'
+    description: |
+      Create the admin/user/ package foundation that all leaf commands depend on.
+      user.go holds NewCmd (sets the package-level userExecFn seam, registers all 8 leaves
+      via AddCommand). helpers.go holds userFields, normalizeUserRow, outputUser, and
+      promptUserPassword (using dbconn.StdinIsTTY / dbconn.PasswordReader — no new seam
+      vars). user_helpers_test.go holds withFakeExecFn / fakeExecFn and seam overrides for
+      dbconn.StdinIsTTY and dbconn.PasswordReader.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "user.go compiles with NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command"
+      - "package-level var userExecFn adminutil.ExecFn is declared and set by NewCmd"
+      - "helpers.go defines userFields, normalizeUserRow, outputUser, and promptUserPassword"
+      - "promptUserPassword calls dbconn.StdinIsTTY() and dbconn.PasswordReader() — no local seam vars declared"
+      - "user_helpers_test.go provides withFakeExecFn and helpers to override dbconn.StdinIsTTY / dbconn.PasswordReader"
+    completed_at: null
+
+  - id: task-002
+    title: 'user list and user get commands'
+    description: |
+      Implement the two read-only leaves: list.go (SHOW USERS) and get.go (SHOW USERS WHERE
+      user = $name). Both call normalizeUserRow on each result row. list outputs all rows via
+      adminutil.NewRows; get returns not_found (exit 3) on zero rows, otherwise outputs a
+      single row via adminutil.NewRow. The roles field is rendered as a comma-joined string in
+      table/toon output; JSON retains the array. Both support --format json|table|toon and
+      require no --rw.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "list.go executes SHOW USERS and renders user, roles, password_change_required, suspended columns"
+      - "get.go executes SHOW USERS WHERE user = $name and returns not_found (exit 3) for zero rows"
+      - "roles column renders as comma-joined string in table/toon and as array in JSON"
+      - "null roles normalizes to [] and null suspended normalizes to false in all output formats"
+      - "list_test.go and get_test.go use table-driven tests with fakeExecFn covering happy path, empty result, and format variants"
+    completed_at: null
+
+  - id: task-003
+    title: 'user create command'
+    description: |
+      Implement create.go: executes CREATE USER $name SET PASSWORD $password SET PASSWORD
+      CHANGE [NOT] REQUIRED. Registers --set-password (string, empty default) and
+      --password-change-required (bool, default true). When --set-password is absent, calls
+      promptUserPassword("set-password") which prompts on TTY or returns a usage error on
+      non-TTY. On success, calls outputUser to emit the created user record. Requires --rw.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "create.go registers --set-password (not --password) to avoid shadowing the parent connection flag"
+      - "--password-change-required defaults to true; passing --password-change-required=false emits SET PASSWORD CHANGE NOT REQUIRED"
+      - "absent --set-password on TTY prompts Password: to stderr and reads without echo"
+      - "absent --set-password on non-TTY returns a usage error"
+      - "successful create emits the new user record via outputUser (SHOW USERS WHERE user = $name)"
+      - "create_test.go covers: explicit password, TTY prompt, non-TTY usage error, password-change-required variants"
+    completed_at: null
+
+  - id: task-004
+    title: 'user drop command'
+    description: |
+      Implement drop.go: executes DROP USER $name. Registers confirm.Register (--yes/--force)
+      and calls confirm.Require in RunE, mirroring database/drop.go exactly. After a Bolt
+      error, checks whether it is Neo.ClientError.Statement.ArgumentError with message
+      containing "does not exist" and translates it to clierr.NewNotFoundError (exit 3).
+      Produces no output on success. Requires --rw.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "drop.go calls confirm.Register and confirm.Require with the user name as the resource identifier"
+      - "successful drop produces no stdout output"
+      - "drop of a nonexistent user returns not_found (exit 3), not a raw Neo4jError string"
+      - "drop without --yes on a TTY prompts for confirmation"
+      - "drop_test.go covers: success (no output), not-found translation, confirm gate"
+    completed_at: null
+
+  - id: task-005
+    title: 'user rename command'
+    description: |
+      Implement rename.go: executes RENAME USER $oldName TO $newName. Takes one positional
+      arg (<old-name>) and a required --new-name flag; cobra.ExactArgs(1) rejects the
+      two-positional form. The Aura ArgumentError ("non-native" / "authentication provider
+      apart from native") is already translated by translateAdminError in run.go — no local
+      error check needed. On success, calls outputUser with the new name. Requires --rw.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "rename.go uses cobra.ExactArgs(1) and a required --new-name string flag"
+      - "passing two positional args returns an ExactArgs error"
+      - "successful rename emits the renamed user record (SHOW USERS WHERE user = $newName)"
+      - "Aura ArgumentError is translated to the Aura-specific message by translateAdminError (no local handling needed)"
+      - "rename_test.go covers: success with output, two-positional-arg rejection, Aura error passthrough"
+    completed_at: null
+
+  - id: task-006
+    title: 'user set-password command'
+    description: |
+      Implement set_password.go: executes ALTER USER $name SET PASSWORD $password SET
+      PASSWORD CHANGE [NOT] REQUIRED. Registers --new-password (string, empty default) and
+      --password-change-required (bool, default false — different from create's default).
+      Uses promptUserPassword("new-password") for the same TTY/non-TTY prompt behaviour as
+      create. On success, calls outputUser. Requires --rw.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "set_password.go registers --new-password (not --password)"
+      - "--password-change-required defaults to false for set-password"
+      - "absent --new-password on TTY prompts; on non-TTY returns usage error"
+      - "successful set-password emits the updated user record via outputUser"
+      - "set_password_test.go covers: explicit password, TTY prompt, non-TTY error, both password-change-required values"
+    completed_at: null
+
+  - id: task-007
+    title: 'user suspend and user activate commands'
+    description: |
+      Implement suspend.go and activate.go. suspend executes ALTER USER $name SET STATUS
+      SUSPENDED; activate executes ALTER USER $name SET STATUS ACTIVE. Both require --rw and
+      call outputUser on success. Community-edition errors (ExecutionFailed with "not
+      available in community edition") are already classified as validation_error by
+      translateAdminError — no local translation needed. Both commands are structurally
+      identical aside from the Cypher verb and short description.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "suspend.go emits ALTER USER $name SET STATUS SUSPENDED and calls outputUser on success"
+      - "activate.go emits ALTER USER $name SET STATUS ACTIVE and calls outputUser on success"
+      - "Community ExecutionFailed error surfaces as validation_error (exit 6) via translateAdminError — no local handling"
+      - "suspend_test.go and activate_test.go cover: success with output, Community error passthrough"
+    completed_at: null
+
+  - id: task-008
+    title: 'Wire user subtree into admin.go, add Examples, regenerate skill bundle'
+    description: |
+      Add cmd.AddCommand(user.NewCmd(cfg, &adminConn, RunAdminStatement)) to admin.go,
+      mirroring the existing database.NewCmd call. Update admin.go Long description to
+      mention user subcommands. Verify every leaf in the user/ package has a flush-left
+      Example: field with >= 2 invocations (write commands include --rw; read commands
+      include >= 1 --format json). Then run go generate ./neo4j-cli/internal/skill/... to
+      regenerate the skill bundle. Verify make test, make fmt-check, and make lint all pass.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "admin.go AddCommand line for user.NewCmd is present and compiles"
+      - "neo4j-cli admin user --help shows list/get/create/drop/rename/set-password/suspend/activate"
+      - "every user leaf has a flush-left Example: with >= 2 invocations; TestAllLeafCommands_HaveExamples passes"
+      - "go generate ./neo4j-cli/internal/skill/... produces no diff; TestGenerator_RoundTrip passes"
+      - "make test, make fmt-check, make lint all pass clean"
+    completed_at: null
+
+  - id: task-009
+    title: 'Add changelog entry'
+    description: |
+      Add a changelog entry for the new admin user commands via changie. Run:
+      changie new --projects neo4j-cli --kind Minor --body "add admin user management
+      commands (list, get, create, drop, rename, set-password, suspend, activate)".
+      Verify the generated file appears under .changes/unreleased/ with the correct
+      project, kind, and body fields.
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "a new .changes/unreleased/ file exists with project: neo4j-cli, kind: Minor"
+      - "body mentions list, get, create, drop, rename, set-password, suspend, activate"
+      - "make test still passes after the changelog file is added"
+    completed_at: null
