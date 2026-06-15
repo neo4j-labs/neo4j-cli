@@ -289,7 +289,7 @@ tasks:
       to regenerate the skill bundle. Verify `neo4j-cli admin user --help` shows all 8
       subcommands and that TestAllLeafCommands_HaveExamples passes.
       Run make test, make fmt-check, and make lint — all must pass.
-    status: pending
+    status: completed
     dependencies:
       - task-008
     acceptance_criteria:
@@ -298,7 +298,7 @@ tasks:
       - "every user leaf has a flush-left Example: with >= 2 invocations; TestAllLeafCommands_HaveExamples passes"
       - "go generate ./neo4j-cli/internal/skill/... produces no diff; TestGenerator_RoundTrip passes"
       - "make test, make fmt-check, make lint all pass clean"
-    completed_at: null
+    completed_at: "2026-06-15T06:00:00Z"
 
   - id: task-010
     title: 'Add changelog entry'

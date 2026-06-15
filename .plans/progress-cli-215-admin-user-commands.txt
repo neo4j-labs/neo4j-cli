@@ -39,3 +39,7 @@ Files: +user.go; ~helpers.go (removed nolint directives), ~user_helpers_test.go 
 ## TASK-011 — 2026-06-15T05:00:00Z
 Added helpers_test.go (package user internal) with direct unit tests for normalizeUserRow, outputUser, and promptUserPassword.
 Files: +helpers_test.go
+
+## TASK-009 — 2026-06-15T06:00:00Z
+Wired user.NewCmd into admin.go; regenerated skill bundle; all gates pass.
+Files: ~admin.go, ~neo4j-cli/internal/skill/bundle/ (regenerated)
