@@ -22,6 +22,7 @@ import (
 	"github.com/neo4j/cli/neo4j-cli/internal/quip"
 	binskill "github.com/neo4j/cli/neo4j-cli/internal/skill"
 	"github.com/neo4j/cli/neo4j-cli/internal/skillrefresh"
+	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/agentcontext"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/config"
 	"github.com/neo4j/cli/neo4j-cli/internal/subcommands/credential"
@@ -90,6 +91,7 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	auraCmd := aura.NewCmd(cfg)
 	auraCmd.Use = "aura"
 	cmd.AddCommand(auraCmd)
+	cmd.AddCommand(admin.NewCmd(cfg))
 	cmd.AddCommand(credential.NewCredentialCmd(cfg))
 	cmd.AddCommand(config.NewCmd(cfg))
 	cmd.AddCommand(dataset.NewCmd(cfg))

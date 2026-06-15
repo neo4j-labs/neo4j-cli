@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 func TestNormalizeURI(t *testing.T) {
@@ -229,7 +231,7 @@ func TestNormalizeURI(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			out, did, orig, warn := normalizeURI(tc.input)
+			out, did, orig, warn := dbconn.NormalizeURI(tc.input)
 			assert.Equal(t, tc.wantOut, out, "rewritten URI")
 			assert.Equal(t, tc.wantRewrite, did, "didRewrite")
 			assert.Equal(t, tc.wantOrig, orig, "displayOrig")

@@ -113,12 +113,12 @@ func runSchema(cmd *cobra.Command, cfg *clicfg.Config) error {
 		return err
 	}
 
-	if c.password == "" {
+	if c.Password == "" {
 		pw, err := promptPassword(cmd)
 		if err != nil {
 			return err
 		}
-		c.password = pw
+		c.Password = pw
 	}
 
 	ctx := cmd.Context()
@@ -160,9 +160,9 @@ func runSchema(cmd *cobra.Command, cfg *clicfg.Config) error {
 	// one missing dbms.components in this user's role) does not fail :schema.
 	dbInfo := fetchDatabaseInfo(ctx, c)
 	if dbInfo != nil {
-		dbInfo.Name = c.database
-	} else if c.database != "" {
-		dbInfo = &databaseInfo{Name: c.database}
+		dbInfo.Name = c.Database
+	} else if c.Database != "" {
+		dbInfo = &databaseInfo{Name: c.Database}
 	}
 
 	result := schemaResult{

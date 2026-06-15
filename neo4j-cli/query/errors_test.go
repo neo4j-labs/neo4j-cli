@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 // TestCategorizeBoltError_Mapping locks the Bolt → exit-code mapping:
@@ -326,7 +327,7 @@ func TestRunStatementResponse_CategorizesDriverErrors(t *testing.T) {
 				return nil, tc.seamErr
 			})
 
-			_, err := runStatementResponse(context.Background(), &conn{database: "neo4j"}, "RETURN 1", nil, true)
+			_, err := runStatementResponse(context.Background(), &conn{Conn: dbconn.Conn{Database: "neo4j"}}, "RETURN 1", nil, true)
 			require.Error(t, err)
 			var ce *clierr.CLIError
 			require.True(t, errors.As(err, &ce), "expected *clierr.CLIError, got %T", err)
