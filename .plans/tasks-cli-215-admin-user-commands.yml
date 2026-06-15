@@ -1,7 +1,7 @@
 feature: cli-215-admin-user-commands
 prd: ./prd-cli-215-admin-user-commands.md
 created_at: 2026-06-15T00:00:00Z
-updated_at: 2026-06-15T00:00:00Z
+updated_at: 2026-06-15T16:00:00Z
 
 tasks:
   - id: task-001

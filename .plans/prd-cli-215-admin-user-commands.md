@@ -340,6 +340,13 @@ Commit the regenerated bundle alongside the source changes. `TestGenerator_Round
 - [ ] `neo4j-cli admin user suspend alice --credential local --rw` on Enterprise suspends alice and emits her updated record with `"suspended": true`.
 - [ ] `neo4j-cli admin user suspend alice --credential local --rw` on Community returns `validation_error` (exit 6, `retryable: false`).
 - [ ] `neo4j-cli admin user activate alice --credential local --rw` on Enterprise activates alice and emits her updated record with `"suspended": false`.
+- [ ] `neo4j-cli admin user suspend nonexistent --credential local --rw` returns `not_found` (exit 3), not a raw `Neo4jError` string.
+- [ ] `neo4j-cli admin user activate nonexistent --credential local --rw` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin user set-password nonexistent --new-password x --credential local --rw` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin user rename nonexistent --new-name x --credential local --rw` returns `not_found` (exit 3).
+- [ ] `neo4j-cli admin user create alice --set-password x --credential local --rw` (when alice already exists) returns `usage_error` (exit 2) with message `user "alice" already exists`, not a raw `Neo4jError` string.
+- [ ] `neo4j-cli admin user list` against a connection whose user lacks admin privileges returns `validation_error` (exit 6) with message containing "insufficient privileges", not the raw Neo4j Forbidden text with `GRANT`/`REVOKE` hints.
+- [ ] `rename` command `Long` text says "On Aura, renaming any user is not supported" (not "non-native user").
 - [ ] `helpers_test.go` (`package user`) tests `normalizeUserRow`, `outputUser`, and `promptUserPassword` directly; all cases pass.
 - [ ] All leaf commands have non-empty flush-left `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
 - [ ] `make test`, `make fmt-check`, `make lint` all pass clean.
