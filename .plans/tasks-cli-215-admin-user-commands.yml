@@ -424,7 +424,8 @@ tasks:
       - "create_test.go has a single table-driven test for both password-change-required variants"
       - "set_password_test.go has a single table-driven test for both variants"
       - "make test passes"
-    completed_at: null
+    status: completed
+    completed_at: "2026-06-15T14:00:00Z"
 
   - id: task-016
     title: 'QA fix: not-found and already-exists error translations across write commands'
