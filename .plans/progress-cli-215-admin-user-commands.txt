@@ -27,3 +27,7 @@ Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration wi
 Implemented suspend.go (ALTER USER $name SET STATUS SUSPENDED) and activate.go (ALTER USER $name SET STATUS ACTIVE); both call outputUser on success and carry write annotation. Added suspend_test.go and activate_test.go covering happy path with correct suspended field, exec error passthrough, no-args cobra error, and write annotation check.
 Files: +suspend.go, +suspend_test.go, +activate.go, +activate_test.go; ~export_test.go (added NewSuspendCmdForTest, NewActivateCmdForTest)
 Decisions: Tests use fakeResponse (defined in suspend_test.go, shared across user_test package) for sequential exec calls; --rw omitted from test args since rw gate is only enforced by the root PersistentPreRunE, not at the leaf level.
+
+## TASK-005 — 2026-06-15T04:00:00Z
+Implemented rename.go and rename_test.go: RENAME USER $oldName TO $newName, cobra.ExactArgs(1), required --new-name flag, calls outputUser with new name on success.
+Files: +rename.go, +rename_test.go; ~export_test.go (NewRenameCmdForTest added by parallel agent)

@@ -72,6 +72,10 @@ Draft PR: [#207](https://github.com/neo4j-labs/neo4j-cli/pull/207) (full admin t
 - REQ-NF-005: Table-driven tests for every leaf using `fakeExecFn` — no live Bolt connection required.
 - REQ-NF-006: Every leaf has a flush-left `Example:` with ≥2 invocations (`# comment` per invocation, `neo4j-cli` prefix, `--rw` on writes, ≥1 `--format json` on reads). Gate: `TestAllLeafCommands_HaveExamples`.
 - REQ-NF-007: Changelog entry via `changie new --projects neo4j-cli --kind Minor --body "add admin user management commands (list, get, create, drop, rename, set-password, suspend, activate)"`.
+- REQ-NF-008: A dedicated `helpers_test.go` in `neo4j-cli/internal/subcommands/admin/user/` (package `user`, internal test) that directly unit-tests the three shared helper functions:
+  - `normalizeUserRow`: null roles → `[]any{}`, null suspended → `false`, non-null values pass through unchanged.
+  - `outputUser`: zero rows → no output and no error; one row → row is printed (using fakeExecFn); execFn error → error returned.
+  - `promptUserPassword`: non-empty flag value → returned immediately; empty flag + TTY → "Password: " printed to stderr and reader called; empty flag + non-TTY → usage error; PasswordReader error → wrapped error returned.
 
 ---
 
@@ -254,6 +258,7 @@ Commit the regenerated bundle alongside the source changes. `TestGenerator_Round
 - [ ] `neo4j-cli admin user suspend alice --credential local --rw` on Enterprise suspends alice and emits her updated record with `"suspended": true`.
 - [ ] `neo4j-cli admin user suspend alice --credential local --rw` on Community returns `validation_error` (exit 6, `retryable: false`).
 - [ ] `neo4j-cli admin user activate alice --credential local --rw` on Enterprise activates alice and emits her updated record with `"suspended": false`.
+- [ ] `helpers_test.go` (`package user`) tests `normalizeUserRow`, `outputUser`, and `promptUserPassword` directly; all cases pass.
 - [ ] All leaf commands have non-empty flush-left `Example:` fields (passes `TestAllLeafCommands_HaveExamples`).
 - [ ] `make test`, `make fmt-check`, `make lint` all pass clean.
 - [ ] `go generate ./neo4j-cli/internal/skill/...` produces no diff (passes `TestGenerator_RoundTrip`).

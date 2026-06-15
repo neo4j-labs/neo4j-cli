@@ -140,7 +140,7 @@ tasks:
       newRenameCmd is a private constructor. It is NOT yet wired into any NewCmd.
 
       Add a flush-left Example: with >= 2 invocations (include --rw).
-    status: in_progress
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -150,7 +150,7 @@ tasks:
       - "rename_test.go covers: success with output, two-positional-arg rejection, Aura error passthrough"
       - "flush-left Example: with >= 2 invocations including --rw"
       - "NO user.go AddCommand calls touched in this task"
-    completed_at: null
+    completed_at: "2026-06-15T04:00:00Z"
 
   - id: task-006
     title: 'user set-password command'
