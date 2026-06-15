@@ -1,0 +1,4 @@
+## TASK-001 — 2026-06-15T00:00:00Z
+Created the admin/user/ package foundation: helpers.go with userExecFn seam, userFields, normalizeUserRow, outputUser, promptUserPassword; export_test.go bridge; user_helpers_test.go with withFakeExecFn, withFakeStdinIsTTY, withFakePasswordReader, testConn.
+Files: +neo4j-cli/internal/subcommands/admin/user/helpers.go, +neo4j-cli/internal/subcommands/admin/user/export_test.go, +neo4j-cli/internal/subcommands/admin/user/user_helpers_test.go
+Decisions: userExecFn declared in helpers.go (not user.go) so leaf files can reference it and be tested independently before NewCmd exists; export_test.go bridge exposes the var to the external test package.

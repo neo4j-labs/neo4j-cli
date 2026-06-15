@@ -27,7 +27,7 @@ tasks:
         - helpers to override dbconn.StdinIsTTY and dbconn.PasswordReader and restore them
 
       STOP after these two files. Do NOT add AddCommand calls, do NOT create any leaf files.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "helpers.go compiles as package user with userExecFn var, userFields, normalizeUserRow, outputUser, and promptUserPassword"
@@ -36,7 +36,7 @@ tasks:
       - "user_helpers_test.go provides withFakeExecFn, fakeExecFn, and overrides for dbconn.StdinIsTTY / dbconn.PasswordReader"
       - "NO user.go, NO leaf files created in this task"
       - "make test passes (package compiles; test helpers compile)"
-    completed_at: null
+    completed_at: "2026-06-15T00:00:00Z"
 
   - id: task-002
     title: 'user list and user get commands'
