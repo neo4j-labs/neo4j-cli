@@ -17,6 +17,7 @@ Draft PR: [#207](https://github.com/neo4j-labs/neo4j-cli/pull/207) (full admin t
 2. Reuse all connection infrastructure already wired in PR-1 — no new connection flags or resolution logic.
 3. Follow the exact one-file-per-leaf cobra layout established by `admin/database/`.
 4. Provide clear, actionable error messages for Community-edition restrictions and Aura platform limits.
+5. Provide consistent, structured error codes for common user-management failure modes (not-found, already-exists, permission-denied) so that scripts and agents can branch on exit code without parsing raw Neo4j error strings.
 
 ## Non-Goals
 
@@ -43,9 +44,9 @@ Draft PR: [#207](https://github.com/neo4j-labs/neo4j-cli/pull/207) (full admin t
   - On success, emit the created user record (same fields as `get`, via `SHOW USERS WHERE user = $name`).
   - Requires `--rw`.
 
-- REQ-F-004: `neo4j-cli admin user drop <name>` — execute `DROP USER $name`. Requires `--rw` and `--yes` for confirmation (same `confirm.Register` / `confirm.Require` pattern as `database drop`). Translates `Neo.ClientError.Statement.ArgumentError` whose message contains `"does not exist"` to `clierr.NewNotFoundError("user %q not found", name)` (exit 3). Produces no output on success.
+- REQ-F-004: `neo4j-cli admin user drop <name>` — execute `DROP USER $name`. Requires `--rw` and `--yes` for confirmation (same `confirm.Register` / `confirm.Require` pattern as `database drop`). Translates `Neo.ClientError.Statement.ArgumentError` whose message contains `"does not exist"` to `clierr.NewNotFoundError("user %q not found", name)` (exit 3). On success, emits a minimal acknowledgement record: `{"user": "<name>", "status": "dropped"}` — allows callers to confirm the drop completed without parsing error absence.
 
-- REQ-F-005: `neo4j-cli admin user rename <old-name> --new-name <new-name>` — execute `RENAME USER $oldName TO $newName`. One positional arg (`<old-name>`), one required flag (`--new-name`). This satisfies the one-positional-max convention; the two-positional form (`rename alice alice2`) is not supported. Translates `Neo.ClientError.Statement.ArgumentError` containing `"non-native"` or `"authentication provider apart from native"` to `"renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)"` — this is already handled by `translateAdminError` in `run.go`. On success, emit the renamed user record via `SHOW USERS WHERE user = $newName`. Requires `--rw`.
+- REQ-F-005: `neo4j-cli admin user rename <old-name> --new-name <new-name>` — execute `RENAME USER $oldName TO $newName`. One positional arg (`<old-name>`), one required flag (`--new-name`). This satisfies the one-positional-max convention; the two-positional form (`rename alice alice2`) is not supported. Translates `Neo.ClientError.Statement.ArgumentError` containing `"non-native"` or `"authentication provider apart from native"` to `"renaming users is not supported on Aura connections (Aura uses a non-native authentication provider)"` — this is already handled by `translateAdminError` in `run.go`. On success, emit the renamed user record via `SHOW USERS WHERE user = $newName`. Requires `--rw`. **Note (QA finding):** Aura rejects ALL renames (not just non-native users) because it uses a non-native auth provider globally; the command's `Long` description must say "On Aura, renaming any user is not supported" rather than "non-native user".
 
 - REQ-F-006: `neo4j-cli admin user set-password <name>` — execute `ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED`. Flags:
   - `--new-password` (string, empty default) — the new password. Same prompt-on-TTY / usage-error-on-non-TTY behavior as `create`.
@@ -62,6 +63,16 @@ Draft PR: [#207](https://github.com/neo4j-labs/neo4j-cli/pull/207) (full admin t
 - REQ-F-009: Mount `user.NewCmd(cfg, &adminConn, RunAdminStatement)` in `admin.go` via `cmd.AddCommand(...)`, mirroring the `database.NewCmd(...)` call already present. Update `admin.go` `Long` description to mention `user` subcommands.
 
 - REQ-F-010: Run `go generate ./neo4j-cli/internal/skill/...` after wiring to regenerate the skill bundle. `TestGenerator_RoundTrip` must pass after this.
+
+**QA-driven error consistency fixes**
+
+- REQ-F-011: `suspend`, `activate`, `set-password` must translate `Neo.ClientError.Statement.ArgumentError` whose message contains `"does not exist"` to `clierr.NewNotFoundError("user %q not found", name)` (exit 3), matching the behaviour already present in `drop`. The raw Neo4j error must not surface. A shared `translateUserNotFoundError(err error, name string) error` helper in `helpers.go` is the preferred implementation (avoids repeating the `errors.As` block in three leaf files).
+
+- REQ-F-012: `rename` must also apply the same not-found translation for `ArgumentError` + `"does not exist"` (exit 3). Additionally, `create` must translate `ArgumentError` whose message contains `"already exists"` to a clean `validation_error` (exit 6) with the message `user %q already exists` — replacing the raw Neo4j error string so that scripts get a predictable, parseable message.
+
+- REQ-F-013: `drop` must emit a success record on successful drop. Because the user is already deleted, the record is synthesised from the known name rather than a follow-up `SHOW USERS` query: `{"user": "<name>", "status": "dropped"}`. For table/toon format, render a single-row table with `user` and `status` columns. This aligns `drop` with all other write commands that return output on success.
+
+- REQ-F-014: Translate `Neo.ClientError.Security.Forbidden` (encountered when the connected user lacks admin privileges — e.g. the default user on Aura Free) to a clean `permission_denied`-style `validation_error` (exit 6) with the message: `"insufficient privileges: the connected user does not have permission to manage users (requires admin role)"`. This translation belongs in `translateAdminError` in `run.go` so it applies to all `admin user` commands without per-command changes.
 
 ### Non-Functional Requirements
 
@@ -210,6 +221,77 @@ func outputUser(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userN
 
 `drop` produces no output on success (resource destroyed). This is consistent with `database drop`.
 
+### QA-Driven Error Translation Additions
+
+**Shared not-found helper (helpers.go)**
+
+Add `translateUserNotFoundError` to `helpers.go` to avoid repeating the `errors.As` block across four leaf files:
+
+```go
+// translateUserNotFoundError maps Neo4j ArgumentError responses that indicate
+// "user does not exist" to clierr.NewNotFoundError so callers get exit 3 rather
+// than the raw validation_error (exit 6).
+func translateUserNotFoundError(err error, name string) error {
+    var ne *neo4j.Neo4jError
+    if errors.As(err, &ne) &&
+        ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+        strings.Contains(ne.Msg, "does not exist") {
+        return clierr.NewNotFoundError("user %q not found", name)
+    }
+    return err
+}
+```
+
+`suspend.go`, `activate.go`, `set_password.go`, and `rename.go` each call `translateUserNotFoundError(err, name)` before returning.
+
+**Create conflict translation (create.go)**
+
+`create.go` needs a local check for `"already exists"` because the desired output is a clean message, not a distinct exit code:
+
+```go
+var ne *neo4j.Neo4jError
+if errors.As(err, &ne) &&
+    ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+    strings.Contains(ne.Msg, "already exists") {
+    return clierr.NewUsageError("user %q already exists", name)
+}
+return err
+```
+
+(Using `NewUsageError` gives exit 2 and `usage_error` code — matches the "you passed invalid input" semantics.)
+
+**Drop success output**
+
+`drop.go` can no longer return `nil` directly on success. After `DROP USER` succeeds, synthesise a result record and print it using `adminutil.NewRow`:
+
+```go
+dropFields := []string{"user", "status"}
+row := map[string]any{"user": name, "status": "dropped"}
+commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(row, dropFields), dropFields)
+return nil
+```
+
+**Security.Forbidden translation (run.go)**
+
+Add a case to `translateAdminError` (or `translateNeo4jError`) in `run.go`:
+
+```go
+if ne.Code == "Neo.ClientError.Security.Forbidden" {
+    return clierr.NewValidationError(
+        "insufficient privileges: the connected user does not have permission to manage users (requires admin role)")
+}
+```
+
+This must run before the `ArgumentError` checks to avoid swallowing the more specific message.
+
+**Rename Long description correction**
+
+In `rename.go` change the `Long` text from:
+> "On Aura, renaming a non-native user is rejected by the server."
+
+to:
+> "On Aura, renaming any user is not supported (Aura uses a non-native authentication provider globally)."
+
 ### Error Handling Already in Place
 
 The following error cases are already handled by `translateAdminError` / `translateNeo4jError` in `run.go` — user commands need no local translation for these:
@@ -247,7 +329,7 @@ Commit the regenerated bundle alongside the source changes. `TestGenerator_Round
 - [ ] `neo4j-cli admin user create alice --credential local --rw` (no `--set-password`, TTY) prompts `"Password: "` on stderr and reads without echo.
 - [ ] `neo4j-cli admin user create alice --credential local --rw` on non-TTY without `--set-password` returns a usage error.
 - [ ] `neo4j-cli admin user create alice --password s3cr3t --credential local --rw` returns "unknown flag: --password" (old form rejected; --password is the connection flag).
-- [ ] `neo4j-cli admin user drop alice --credential local --rw --yes --force` drops alice and produces no output.
+- [ ] `neo4j-cli admin user drop alice --credential local --rw --yes --force` drops alice and emits `{"user": "alice", "status": "dropped"}` (JSON) / a single-row table with user and status columns.
 - [ ] `neo4j-cli admin user drop nonexistent --credential local --rw --yes --force` returns `not_found` (exit 3).
 - [ ] `neo4j-cli admin user drop alice --credential local --rw` (no `--yes`) prompts for confirmation on TTY.
 - [ ] `neo4j-cli admin user rename alice --new-name bob --credential local --rw` renames alice and emits bob's user record.
