@@ -19,9 +19,9 @@ Files: +drop.go, +drop_test.go; ~export_test.go (added NewDropCmdForTest)
 Decisions: Wrapped drop in a "user" cobra.Command parent in buildDropCmd so confirm.Require can use "user" as the resource type label in its prompt, matching the confirmtest.AssertLeafGate ResourceLabel assertion.
 
 ## TASK-006 — 2026-06-15T02:00:00Z
-Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values, TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
+Implemented set_password.go with newSetPasswordCmd: ALTER USER $name SET PASSWORD $password SET PASSWORD CHANGE [NOT] REQUIRED; --new-password flag (prompts on TTY, usage error on non-TTY), --password-change-required defaulting to false; calls outputUser on success. Added set_password_test.go covering explicit password, cypher variant for both password-change-required values (with NotContains guard), TTY prompt path, non-TTY usage error, exec error propagation, write annotation, and no-args error.
 Files: +set_password.go, +set_password_test.go; ~export_test.go (added NewSetPasswordCmdForTest)
-Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration with create_test.go's package-level var in the same test package.
+Decisions: Used setPasswordUserRow (not sampleUserRow) to avoid redeclaration with create_test.go's package-level var in the same test package. Added NotContains("NOT REQUIRED") assertion in the REQUIRED=true test (mirroring create_test.go) to prevent false-pass on condition inversion.
 
 ## TASK-007 — 2026-06-15T02:00:00Z
 Implemented suspend.go (ALTER USER $name SET STATUS SUSPENDED) and activate.go (ALTER USER $name SET STATUS ACTIVE); both call outputUser on success and carry write annotation. Added suspend_test.go and activate_test.go covering happy path with correct suspended field, exec error passthrough, no-args cobra error, and write annotation check.

@@ -110,6 +110,7 @@ func TestSetPassword_PasswordChangeRequired_True_SendsCorrectCypher(t *testing.T
 	err := cmd.Execute()
 	require.NoError(t, err)
 	assert.Contains(t, capturedCypher, "SET PASSWORD CHANGE REQUIRED")
+	assert.NotContains(t, capturedCypher, "NOT REQUIRED")
 }
 
 func TestSetPassword_PasswordChangeRequired_False_SendsNotRequired(t *testing.T) {
