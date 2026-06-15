@@ -5,9 +5,11 @@
 package user
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
@@ -83,6 +85,19 @@ func passwordChangeClause(required bool) string {
 		return "SET PASSWORD CHANGE REQUIRED"
 	}
 	return "SET PASSWORD CHANGE NOT REQUIRED"
+}
+
+// translateUserNotFoundError maps an ArgumentError whose message contains
+// "does not exist" to a clean not_found CLIError. All other errors are
+// returned unchanged.
+func translateUserNotFoundError(err error, name string) error {
+	var ne *neo4j.Neo4jError
+	if errors.As(err, &ne) &&
+		ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+		strings.Contains(ne.Msg, "does not exist") {
+		return clierr.NewNotFoundError("user %q not found", name)
+	}
+	return err
 }
 
 // joinRoles converts a []any of role strings to a comma-separated string.

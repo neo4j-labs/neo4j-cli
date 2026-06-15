@@ -11,13 +11,15 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // runRename builds the `admin user rename` command with a fake exec-fn that
@@ -87,6 +89,19 @@ func TestUserRename_ExecError_Propagates(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "authentication provider apart from native")
+}
+
+func TestUserRename_NotFound_ReturnsNotFoundError(t *testing.T) {
+	notFoundErr := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "User 'ghost' does not exist.",
+	}
+	_, _, err := runRename(t, "ghost --new-name newghost --rw", nil, notFoundErr)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Contains(t, ce.Message, `"ghost"`)
 }
 
 func TestUserRename_MissingNewNameFlag_Error(t *testing.T) {

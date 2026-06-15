@@ -12,13 +12,15 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // runCreate builds the `admin user create` command with a sequential fake exec-fn,
@@ -215,6 +217,23 @@ func TestUserCreate_ExecError_PropagatesError(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "bolt connection refused")
+}
+
+func TestUserCreate_AlreadyExists_ReturnsUsageError(t *testing.T) {
+	withFakeStdinIsTTY(t, false)
+	alreadyExistsErr := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "Failed to create the specified user 'alice': User already exists.",
+	}
+	_, _, err := runCreate(t, "alice --set-password s3cr3t --rw", []fakeResponse{
+		{rows: nil, err: alreadyExistsErr},
+	})
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code, "already exists should have exit code 2 (usage_error)")
+	assert.Contains(t, ce.Message, `"alice"`)
+	assert.Contains(t, ce.Message, "already exists")
 }
 
 func TestUserCreate_HasWriteAnnotation(t *testing.T) {

@@ -33,7 +33,7 @@ neo4j-cli admin user rename alice --new-name bob --credential local --rw --forma
 				"oldName": oldName,
 				"newName": newName,
 			}); err != nil {
-				return err
+				return translateUserNotFoundError(err, oldName)
 			}
 			return outputUser(cmd, cfg, *conn, newName)
 		},

@@ -40,7 +40,7 @@ neo4j-cli admin user set-password alice --new-password s3cr3t --password-change-
 				"name":     name,
 				"password": pw,
 			}); err != nil {
-				return err
+				return translateUserNotFoundError(err, name)
 			}
 
 			return outputUser(cmd, cfg, *conn, name)

@@ -4,9 +4,14 @@
 package user
 
 import (
+	"errors"
+	"strings"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/cobra"
 
 	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
@@ -41,6 +46,12 @@ neo4j-cli admin user create alice --set-password s3cr3t --password-change-requir
 				"name":     name,
 				"password": password,
 			}); err != nil {
+				var ne *neo4j.Neo4jError
+				if errors.As(err, &ne) &&
+					ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+					strings.Contains(ne.Msg, "already exists") {
+					return clierr.NewUsageError("user %q already exists", name)
+				}
 				return err
 			}
 

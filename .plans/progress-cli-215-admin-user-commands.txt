@@ -76,6 +76,10 @@ Added REQ-F-011..REQ-F-014 to PRD; added tasks task-016..task-018.
 drop now emits {"user": "<name>", "status": "dropped"} on success via PrintBodyMap with a two-field dropFields slice, aligning it with other write commands.
 Files: ~drop.go, ~drop_test.go
 
+## TASK-016 — 2026-06-15T17:00:00Z
+Added translateUserNotFoundError to helpers.go; suspend/activate/set_password/rename now return not_found (exit 3) for missing users; create returns usage_error (exit 2) for duplicate users.
+Files: ~helpers.go, ~helpers_test.go, ~suspend.go, ~suspend_test.go, ~activate.go, ~activate_test.go, ~set_password.go, ~set_password_test.go, ~rename.go, ~rename_test.go, ~create.go, ~create_test.go
+
 ## TASK-013 — 2026-06-15T15:30:00Z
 Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
 Files: ~create_test.go

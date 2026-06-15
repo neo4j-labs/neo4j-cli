@@ -9,6 +9,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -263,4 +264,37 @@ func TestPromptUserPassword_TTY_ReaderError_WrappedError(t *testing.T) {
 	_, err := promptUserPassword(cmd, "set-password")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, readerErr, "reader error should be wrapped in returned error")
+}
+
+// ─── TestTranslateUserNotFoundError ───────────────────────────────────────────
+
+func TestTranslateUserNotFoundError_ArgumentErrorDoesNotExist_ReturnsNotFound(t *testing.T) {
+	ne := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "User 'alice' does not exist.",
+	}
+	result := translateUserNotFoundError(ne, "alice")
+	require.Error(t, result)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(result, &ce))
+	assert.Equal(t, 3, ce.Code, "not_found should have exit code 3")
+	assert.Contains(t, ce.Message, `"alice"`)
+}
+
+func TestTranslateUserNotFoundError_ArgumentErrorDifferentMsg_ReturnsUnchanged(t *testing.T) {
+	ne := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "User 'alice' already exists.",
+	}
+	result := translateUserNotFoundError(ne, "alice")
+	assert.Equal(t, ne, result, "error with different message should be returned unchanged")
+}
+
+func TestTranslateUserNotFoundError_NonArgumentError_ReturnsUnchanged(t *testing.T) {
+	other := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Security.Forbidden",
+		Msg:  "does not exist in this context",
+	}
+	result := translateUserNotFoundError(other, "alice")
+	assert.Equal(t, other, result, "non-ArgumentError should be returned unchanged")
 }

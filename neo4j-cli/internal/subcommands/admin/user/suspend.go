@@ -28,7 +28,7 @@ neo4j-cli admin user suspend alice --credential local --rw --format json`,
 			cmd.SilenceUsage = true
 			name := args[0]
 			if _, err := userExecFn(cmd.Context(), cfg, *conn, "ALTER USER $name SET STATUS SUSPENDED", map[string]any{"name": name}); err != nil {
-				return err
+				return translateUserNotFoundError(err, name)
 			}
 			return outputUser(cmd, cfg, *conn, name)
 		},

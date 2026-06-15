@@ -11,13 +11,15 @@ import (
 	"testing"
 
 	"github.com/google/shlex"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // runSuspend builds the `admin user suspend` command with a sequential fake
@@ -94,6 +96,22 @@ func TestUserSuspend_ExecError_PropagatesError(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Contains(t, ce.Message, "community edition does not support user suspension")
+}
+
+func TestUserSuspend_NotFound_ReturnsNotFoundError(t *testing.T) {
+	notFoundErr := &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Statement.ArgumentError",
+		Msg:  "User 'ghost' does not exist.",
+	}
+	responses := []fakeResponse{
+		{rows: nil, err: notFoundErr},
+	}
+	_, _, err := runSuspend(t, "ghost --format json", responses)
+	require.Error(t, err)
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 3, ce.Code)
+	assert.Contains(t, ce.Message, `"ghost"`)
 }
 
 func TestUserSuspend_NoArgs_CobraUsageError(t *testing.T) {
