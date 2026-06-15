@@ -367,7 +367,7 @@ tasks:
       and used by all leaf test files that need it. Remove the leaf-local definitions.
 
       Note: this task depends on task-012 being completed first.
-    status: pending
+    status: completed
     dependencies:
       - task-012
     source: review
@@ -375,7 +375,7 @@ tasks:
       - "a single shared response-mock struct is defined in helpers_test.go"
       - "create_test.go and suspend_test.go no longer define their own equivalent struct"
       - "make test passes"
-    completed_at: null
+    completed_at: "2026-06-15T15:30:00Z"
 
   - id: task-014
     title: 'Move joinRoles to helpers.go'

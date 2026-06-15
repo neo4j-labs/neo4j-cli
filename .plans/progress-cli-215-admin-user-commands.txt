@@ -62,3 +62,7 @@ Files: ~helpers.go, ~list.go
 ## TASK-015 — 2026-06-15T14:00:00Z
 Extracted passwordChangeClause to helpers.go; table-drove True/False test pairs in create_test.go and set_password_test.go.
 Files: ~helpers.go, ~create.go, ~set_password.go, ~create_test.go, ~set_password_test.go
+
+## TASK-013 — 2026-06-15T15:30:00Z
+Consolidated duplicate response-mock structs into a single fakeResponse type in helpers_test.go; removed createExecResponse from create_test.go and replaced all usages with fakeResponse.
+Files: ~create_test.go

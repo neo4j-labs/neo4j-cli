@@ -21,15 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// createExecResponse pairs a row set with an error for sequential fake exec calls.
-type createExecResponse struct {
-	rows []map[string]any
-	err  error
-}
-
 // runCreate builds the `admin user create` command with a sequential fake exec-fn,
 // then executes it with args. Returns stdout, stderr, and the command error.
-func runCreate(t *testing.T, args string, responses []createExecResponse) (string, string, error) {
+func runCreate(t *testing.T, args string, responses []fakeResponse) (string, string, error) {
 	t.Helper()
 
 	idx := 0
@@ -68,7 +62,7 @@ var sampleUserRow = []map[string]any{
 func TestUserCreate_HappyPath_ExplicitPassword(t *testing.T) {
 	withFakeStdinIsTTY(t, false)
 
-	stdout, _, err := runCreate(t, "alice --set-password s3cr3t --rw --format json", []createExecResponse{
+	stdout, _, err := runCreate(t, "alice --set-password s3cr3t --rw --format json", []fakeResponse{
 		{rows: nil, err: nil},
 		{rows: sampleUserRow, err: nil},
 	})
@@ -108,7 +102,7 @@ func TestUserCreate_PasswordChangeRequired(t *testing.T) {
 
 			var capturedCypher string
 			idx := 0
-			responses := []createExecResponse{
+			responses := []fakeResponse{
 				{rows: nil, err: nil},
 				{rows: sampleUserRow, err: nil},
 			}
@@ -148,7 +142,7 @@ func TestUserCreate_TTYPrompt_UsesPasswordReader(t *testing.T) {
 
 	var capturedParams map[string]any
 	idx := 0
-	responses := []createExecResponse{
+	responses := []fakeResponse{
 		{rows: nil, err: nil},
 		{rows: sampleUserRow, err: nil},
 	}
@@ -194,7 +188,7 @@ func TestUserCreate_NonTTY_NoPassword_ReturnsUsageError(t *testing.T) {
 func TestUserCreate_EmitsUserRecordOnSuccess(t *testing.T) {
 	withFakeStdinIsTTY(t, false)
 
-	stdout, _, err := runCreate(t, "alice --set-password s3cr3t --rw --format json", []createExecResponse{
+	stdout, _, err := runCreate(t, "alice --set-password s3cr3t --rw --format json", []fakeResponse{
 		{rows: nil, err: nil},
 		{rows: sampleUserRow, err: nil},
 	})
@@ -213,7 +207,7 @@ func TestUserCreate_ExecError_PropagatesError(t *testing.T) {
 	withFakeStdinIsTTY(t, false)
 	execErr := clierr.NewValidationError("bolt connection refused")
 
-	_, _, err := runCreate(t, "alice --set-password s3cr3t --rw", []createExecResponse{
+	_, _, err := runCreate(t, "alice --set-password s3cr3t --rw", []fakeResponse{
 		{rows: nil, err: execErr},
 	})
 	require.Error(t, err)
