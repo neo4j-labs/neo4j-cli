@@ -31,3 +31,11 @@ Decisions: Tests use fakeResponse (defined in suspend_test.go, shared across use
 ## TASK-005 — 2026-06-15T04:00:00Z
 Implemented rename.go and rename_test.go: RENAME USER $oldName TO $newName, cobra.ExactArgs(1), required --new-name flag, calls outputUser with new name on success.
 Files: +rename.go, +rename_test.go; ~export_test.go (NewRenameCmdForTest added by parallel agent)
+
+## TASK-008 — 2026-06-15T05:00:00Z
+Created user.go with NewCmd that sets userExecFn and registers all 8 leaf commands; removed //nolint:unused directives now that all helpers have callers.
+Files: +user.go; ~helpers.go (removed nolint directives), ~user_helpers_test.go (removed nolint)
+
+## TASK-011 — 2026-06-15T05:00:00Z
+Added helpers_test.go (package user internal) with direct unit tests for normalizeUserRow, outputUser, and promptUserPassword.
+Files: +helpers_test.go

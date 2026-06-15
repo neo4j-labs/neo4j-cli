@@ -238,7 +238,7 @@ tasks:
       Restore each via t.Cleanup.
 
       Do NOT modify export_test.go, helpers.go, or any other existing file.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -247,7 +247,7 @@ tasks:
       - "TestOutputUser covers zero-rows, one-row output, and exec error"
       - "TestPromptUserPassword covers explicit value, TTY prompt, non-TTY error, reader error"
       - "make test passes with the new test file"
-    completed_at: null
+    completed_at: "2026-06-15T05:00:00Z"
 
   - id: task-008
     title: 'Create user.go (NewCmd) and wire all 8 leaves via AddCommand'
@@ -264,7 +264,7 @@ tasks:
 
       Verify `neo4j-cli admin user --help` is NOT yet reachable (admin.go not updated yet),
       but `go build ./neo4j-cli/internal/subcommands/admin/user/...` compiles clean.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -277,7 +277,7 @@ tasks:
       - "go build ./neo4j-cli/internal/subcommands/admin/user/... compiles clean"
       - "make test passes"
       - "admin.go is NOT modified in this task"
-    completed_at: null
+    completed_at: "2026-06-15T05:00:00Z"
 
   - id: task-009
     title: 'Wire user subtree into admin.go and regenerate skill bundle'
