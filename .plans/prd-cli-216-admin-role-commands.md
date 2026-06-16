@@ -1,0 +1,238 @@
+# PRD: CLI-216 — Admin Role Commands (PR 3 of 4)
+
+## Overview
+
+Third of four staged PRs implementing the `neo4j-cli admin` command tree (CLI-128). Adds the `admin role` subcommand tree (`list`, `get`, `create`, `drop`, `grant`, `revoke`) that exposes Neo4j role management via Cypher against the `system` database. All commands are Enterprise-only at the DB layer; Community returns a clear "requires Enterprise edition" error.
+
+This PR stacks on top of CLI-215 / PR #225 (`admin user` commands). The branch `pr3/admin-role` targets `cli-215-admin-user-commands` and will be rebased onto `main` after PR #225 merges.
+
+A draft implementation exists in `origin/feature/cli-128-admin-commands`, but PR 3 writes the role package **fresh from PR 2's patterns** with all known bugs fixed from the start — do not copy the draft directly.
+
+Linear: [CLI-216](https://linear.app/neo4j/issue/CLI-216/pr-3-admin-role-commands-enterprise)
+Parent: [CLI-128](https://linear.app/neo4j/issue/CLI-128/add-admin-commands-for-userdatabase-management)
+Foundation: [CLI-214 / PR #222](https://github.com/neo4j-labs/neo4j-cli/pull/222) (merged)
+Prereq: [CLI-215 / PR #225](https://github.com/neo4j-labs/neo4j-cli/pull/225) (in-review)
+
+---
+
+## Goals
+
+1. Ship `neo4j-cli admin role list/get/create/drop/grant/revoke` following the exact structural patterns from PR 2 (`admin user`).
+2. Fix all known bugs present in the draft branch before they reach review (wrong Cypher column name, wrong error code in drop, missing `IF NOT EXISTS`, null normalization gap, camelCase output field names).
+3. Wire the `role` subtree into `admin.go`, update the admin Long description, regenerate the skill bundle, and add one changelog entry.
+4. Keep each PR reviewable: this PR is role-only, no privilege commands.
+
+## Non-Goals
+
+- `neo4j-cli admin privilege` commands — that is CLI-217 (PR 4).
+- Database alias management, composite databases, neo4j-admin binary integration.
+- Any changes to the `admin database` or `admin user` packages.
+- Changes to `dbconn`, `adminutil`, or `run.go` — the PR 1/2 foundation is complete.
+
+---
+
+## Requirements
+
+### Functional Requirements
+
+**`admin role list`**
+
+- REQ-F-001: Execute `SHOW ROLES WITH USERS`. Output columns: `role`, `member`. Supports `--format json|table|toon`.
+- REQ-F-002: Optional `--user <name>` flag — filter output rows in-process to those where `member == name`. This is the only command that answers "what roles does user X belong to".
+- REQ-F-003: Normalize `null` `member` values to `""` (empty string) before output, in all formats. Community edition returns null for the member column on roles with no members.
+
+**`admin role get`**
+
+- REQ-F-004: First, execute `SHOW ROLES WITH USERS WHERE role = $name`. Column is `role`, **not** `name` (using `name` causes a Neo4j syntax error — this is the bug in the draft). Zero rows → `clierr.NewNotFoundError("role %q not found", name)`.
+- REQ-F-005: If role exists, execute `SHOW ROLE $name PRIVILEGES`. Zero privilege rows → return empty list (exit 0, not not_found — a freshly created role has no privileges).
+- REQ-F-006: Privilege output fields are dynamic: collect keys from `rows[0]`, sort them, pass sorted slice to `PrintBodyMap`. Supports `--format`.
+
+**`admin role create`**
+
+- REQ-F-007: Execute `CREATE ROLE $name IF NOT EXISTS` (idempotent; running twice must not return an error).
+- REQ-F-008: After successful create, fetch and output `SHOW ROLES WITH USERS WHERE role = $name` via `outputRoleMembers`. Zero rows is valid (empty member list).
+- REQ-F-009: Enterprise-only; `UnsupportedAdministrationCommand` translated per `translateAdminError` in `run.go`.
+- REQ-F-010: Requires `--rw`.
+
+**`admin role drop`**
+
+- REQ-F-011: Execute `DROP ROLE $name`. Requires `--rw` and `--yes` (confirm gate, same pattern as `user drop` and `database drop`).
+- REQ-F-012: Translate `Neo.ClientError.Statement.ArgumentError` with message containing `"does not exist"` → `clierr.NewNotFoundError("role %q not found", name)`. The correct error code is `Neo.ClientError.Statement.ArgumentError` — the draft incorrectly used `Neo.ClientError.Security.InvalidArguments`.
+- REQ-F-013: No output on success (resource destroyed).
+- REQ-F-014: Enterprise-only.
+
+**`admin role grant`**
+
+- REQ-F-015: Execute `GRANT ROLE $role TO $user`. Required flags: `--role <role>`, `--user <user>`.
+- REQ-F-016: After successful grant, fetch and output the user's updated record via `outputUserAfterRoleChange(cmd, cfg, conn, userName)` — executes `SHOW USERS WHERE user = $name`, normalizes the row (null roles → `[]any{}`, null suspended → `false`), prints with fields `["user", "roles", "password_change_required", "suspended"]` (snake_case, matching PR 2's field names).
+- REQ-F-017: Requires `--rw`. Enterprise-only.
+
+**`admin role revoke`**
+
+- REQ-F-018: Execute `REVOKE ROLE $role FROM $user`. Required flags: `--role <role>`, `--user <user>`.
+- REQ-F-019: After successful revoke, fetch and output the user's updated record via `outputUserAfterRoleChange` (same as grant follow-up).
+- REQ-F-020: Requires `--rw`. Enterprise-only.
+
+**Cross-cutting**
+
+- REQ-F-021: All role commands accept connection flags via the `admin` parent persistent flags (`--uri`, `--username`, `--password`, `--env`, `--credential`, `--debug`). No connection flags on the role subcommand tree itself.
+- REQ-F-022: `UnsupportedAdministrationCommand` from Neo4j is translated to `"... (requires Enterprise edition)"` by `translateAdminError` in `run.go` — no per-command handling needed.
+- REQ-F-023: All Cypher is automatically prefixed with `CYPHER 25` by `RunAdminStatement` in `run.go` — no per-command prefix needed.
+- REQ-F-024: Every leaf must have a flush-left `Example:` field with ≥2 invocations, `# comment` per invocation, `neo4j-cli` prefix. Mutating commands include `--rw`. At least one read command per leaf uses `--format json`. Gate: `TestAllLeafCommands_HaveExamples`.
+
+### Non-Functional Requirements
+
+- REQ-NF-001: One file per leaf under `neo4j-cli/internal/subcommands/admin/role/`. Parent in `role.go`. Shared helpers + seam var in `helpers.go`. Test helpers in `role_helpers_test.go`.
+- REQ-NF-002: `roleExecFn adminutil.ExecFn` as the package-level test seam, set by `NewCmd` and overridden by tests — identical pattern to `userExecFn` in PR 2.
+- REQ-NF-003: Table-driven tests for every leaf. No live Bolt connection; all Cypher calls go through the seam.
+- REQ-NF-004: Output field names are snake_case (e.g., `password_change_required`). Input identifiers (flag long names) are kebab-case.
+- REQ-NF-005: All new `.go` files carry the Neo4j copyright header.
+- REQ-NF-006: Run `go generate ./neo4j-cli/internal/skill/...` after wiring `role.NewCmd` into `admin.go`. `TestGenerator_RoundTrip` must pass.
+- REQ-NF-007: Changelog entry: `changie new --projects neo4j-cli --kind Minor --body "Add admin role commands: list, get, create, drop, grant, revoke"`.
+- REQ-NF-008: `make test`, `make fmt-check`, `make lint` all pass.
+
+---
+
+## Technical Considerations
+
+### File Layout
+
+```
+neo4j-cli/internal/subcommands/admin/role/
+  role.go                  — NewCmd; sets roleExecFn; AddCommands added one per leaf task
+  helpers.go               — roleExecFn seam, roleFields, normalizeRoleRow,
+                             outputRoleMembers, outputUserAfterRoleChange
+  list.go + list_test.go   — list_test.go owns runList helper
+  get.go  + get_test.go    — get_test.go owns runGet + existsResponse/notFoundResponse
+  create.go + create_test.go
+  drop.go + drop_test.go
+  grant.go + grant_test.go
+  revoke.go + revoke_test.go
+  role_helpers_test.go     — testConn(), withFakeExecFn, withSequencedExecFn only
+                             (no runXxx helpers — those live in each leaf test file)
+```
+
+### Execution Seam Pattern (mirrors PR 2 exactly)
+
+`helpers.go` contains:
+```go
+var roleExecFn adminutil.ExecFn
+
+var roleFields = []string{"role", "member"}
+
+func normalizeRoleRow(m map[string]any) map[string]any {
+    if m["member"] == nil {
+        m["member"] = ""
+    }
+    return m
+}
+
+func outputRoleMembers(cmd, cfg, conn, roleName) error {
+    // SHOW ROLES WITH USERS WHERE role = $name
+    // normalizeRoleRow each row
+    // PrintBodyMap with roleFields
+}
+
+func outputUserAfterRoleChange(cmd, cfg, conn, userName) error {
+    // SHOW USERS WHERE user = $name
+    // normalize: roles nil→[]any{}, suspended nil→false
+    // PrintBodyMap with ["user", "roles", "password_change_required", "suspended"]
+}
+```
+
+`role.go` (skeleton at task-001 time, grown incrementally):
+```go
+func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command {
+    roleExecFn = execFn
+    cmd := &cobra.Command{Use: "role", ...}
+    // AddCommand calls are added one per leaf task (002–007).
+    // Do NOT pre-wire leaves that don't compile yet.
+    return cmd
+}
+```
+
+Each leaf task (002–007) adds exactly one `cmd.AddCommand(newXxxCmd(cfg, conn))` line to `role.go` as part of that task's scope. `role.go` is never touched again after task-007 completes.
+
+### `admin.go` Changes
+
+Two lines change in `admin.go`:
+1. Import `"github.com/neo4j/cli/neo4j-cli/internal/subcommands/admin/role"` alongside database and user.
+2. `cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))` after the user `AddCommand`.
+3. Update `Long` to list `role` in the subcommands description.
+
+### Critical Bug Fixes vs. Draft
+
+| Bug | Draft code | Correct code |
+|-----|-----------|-------------|
+| `role get` existence check Cypher | `SHOW ROLES WHERE name = $name` | `SHOW ROLES WITH USERS WHERE role = $name` |
+| `role drop` not-found error code | `Neo.ClientError.Security.InvalidArguments` | `Neo.ClientError.Statement.ArgumentError` |
+| `role create` idempotency | `CREATE ROLE $name` | `CREATE ROLE $name IF NOT EXISTS` |
+| `role list/create` null normalization | missing | `member: nil → ""` |
+| `grant`/`revoke` user output field names | `"passwordChangeRequired"` (camelCase) | `"password_change_required"` (snake_case) |
+
+### Test Pattern for `get` (two-call sequenced seam)
+
+`get` calls `roleExecFn` twice (existence check + privileges). Tests must use a sequenced exec-fn that returns different results per call. See `withSequencedExecFn` in `role_helpers_test.go` — same pattern as `withSequencedExecFn` in PR 2's `user_helpers_test.go`.
+
+The `existsResponse` / `notFoundResponse` helper functions in `role_helpers_test.go` pre-build the two-call response pairs, keeping test bodies readable.
+
+### Test Pattern for `create`, `grant`, `revoke` (mutation + follow-up seam)
+
+Each has a mutation call followed by a follow-up SHOW query. Use the same sequenced seam approach: first call = mutation (returns empty rows or error), second call = follow-up SHOW (returns rows to output). Tests assert both the error propagation path and the follow-up output path.
+
+### Confirm Gate for `drop`
+
+`drop.go` imports `"github.com/neo4j/cli/common/confirm"` and calls `confirm.Require(cmd, name)` before executing. `confirm.Register(cmd)` registers `--yes` and `--force` on the leaf. Tests use `confirmtest.AssertLeafGate` from `"github.com/neo4j/cli/common/confirm/confirmtest"` — exact pattern from `user drop` and `database drop` in PR 1/2.
+
+### Not-Found Error Translation in `drop`
+
+The not-found translation lives locally in `drop.go`'s `RunE` (after calling `roleExecFn`), not in `translateAdminError`, because the `ArgumentError` code is shared with other error conditions. Pattern:
+```go
+var ne *neo4j.Neo4jError
+if errors.As(err, &ne) &&
+    ne.Code == "Neo.ClientError.Statement.ArgumentError" &&
+    strings.Contains(ne.Msg, "does not exist") {
+    return clierr.NewNotFoundError("role %q not found", name)
+}
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] `neo4j-cli admin role list --credential local --format json` returns `[{"role":"...", "member":"..."}]`
+- [ ] `neo4j-cli admin role list --user alice --credential local` filters to rows where member is alice
+- [ ] `role list` JSON output shows `"member": ""` (not `null`) for roles with no members
+- [ ] `neo4j-cli admin role get admin --credential local --format json` returns privilege rows
+- [ ] `neo4j-cli admin role get <newly-created-role> --credential local --format json` returns `[]` (not `not_found`)
+- [ ] `neo4j-cli admin role get nonexistent --credential local` returns exit code 3 (`not_found`)
+- [ ] `role get` existence check uses `SHOW ROLES WITH USERS WHERE role = $name` (verified via unit test asserting the Cypher string passed to the seam)
+- [ ] `neo4j-cli admin role create analyst --credential local --rw` succeeds; emits the role's member record
+- [ ] `neo4j-cli admin role create analyst --credential local --rw` succeeds on second invocation (`IF NOT EXISTS`)
+- [ ] `neo4j-cli admin role create analyst --credential local --rw --format json` emits `[]` when role has no members
+- [ ] `neo4j-cli admin role drop analyst --credential local --rw --yes --force` succeeds; no output
+- [ ] `neo4j-cli admin role drop nonexistent --credential local --rw --yes --force` returns exit code 3 (`not_found`)
+- [ ] `role drop` not-found test uses `Neo.ClientError.Statement.ArgumentError` with "does not exist" message
+- [ ] `neo4j-cli admin role grant --role analyst --user alice --credential local --rw` succeeds; emits alice's updated user record
+- [ ] `neo4j-cli admin role revoke --role analyst --user alice --credential local --rw` succeeds; emits alice's updated user record
+- [ ] `grant`/`revoke` follow-up user output uses snake_case fields: `password_change_required` not `passwordChangeRequired`
+- [ ] `--role` and `--user` flags are required for `grant` and `revoke`; missing either returns a usage error
+- [ ] All role commands return `(requires Enterprise edition)` on Community edition
+- [ ] All leaf commands have flush-left `Example:` fields — `TestAllLeafCommands_HaveExamples` passes
+- [ ] `TestGenerator_RoundTrip` passes (skill bundle reflects database + user + role commands)
+- [ ] `make test`, `make fmt-check`, `make lint` all pass
+- [ ] Changelog entry added
+
+---
+
+## Out of Scope
+
+- `admin privilege` commands (list, grant, deny, revoke) — CLI-217 (PR 4).
+- Changes to `dbconn`, `adminutil`, `run.go`, or `admin.go`'s connection flag surface — foundation is complete from PR 1.
+- Any changes to the `admin database` or `admin user` packages.
+
+---
+
+## Open Questions
+
+None — requirements are fully specified by the parent PRD (CLI-128) and the patterns from PR 1 (CLI-214, merged) and PR 2 (CLI-215, in-review).

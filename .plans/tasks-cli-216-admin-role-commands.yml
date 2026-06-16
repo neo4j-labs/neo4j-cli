@@ -1,0 +1,186 @@
+feature: cli-216-admin-role-commands
+prd: ./prd-cli-216-admin-role-commands.md
+created_at: 2026-06-16T00:00:00Z
+updated_at: 2026-06-16T01:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold role package: helpers.go, skeleton role.go, role_helpers_test.go"
+    description: |
+      Create the foundational files for the `neo4j-cli/internal/subcommands/admin/role/` package.
+      `helpers.go` defines the `roleExecFn` package-level seam var (`adminutil.ExecFn`), `roleFields`,
+      `normalizeRoleRow` (member nil→""), `outputRoleMembers` (SHOW ROLES WITH USERS WHERE role=$name),
+      and `outputUserAfterRoleChange` (SHOW USERS WHERE user=$name with snake_case fields including
+      `password_change_required`). `role.go` defines a skeleton `NewCmd` that sets `roleExecFn = execFn`
+      and returns the parent `*cobra.Command` with NO `AddCommand` calls — leaf wiring is added
+      incrementally by tasks 002–007 as each leaf compiles. `role_helpers_test.go` provides ONLY
+      the seam infrastructure shared across all leaf tests: `testConn()`, `withFakeExecFn`, and
+      `withSequencedExecFn`. Each leaf task owns its own `runXxx` builder in its `*_test.go` file.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "`helpers.go` compiles with all five symbols: `roleExecFn`, `roleFields`, `normalizeRoleRow`, `outputRoleMembers`, `outputUserAfterRoleChange`"
+      - "`outputUserAfterRoleChange` uses snake_case field names: `[\"user\", \"roles\", \"password_change_required\", \"suspended\"]`"
+      - "`normalizeRoleRow` converts nil `member` to `\"\"` and leaves non-nil values unchanged"
+      - "`role.go` skeleton compiles with `NewCmd` that sets `roleExecFn = execFn` and has zero `AddCommand` calls"
+      - "`role_helpers_test.go` provides `withSequencedExecFn` that returns responses in order and fails the test if called more times than expected; does NOT define any `runXxx` helpers"
+      - "All new `.go` files carry the Neo4j copyright header"
+    completed_at: null
+
+  - id: task-002
+    title: "Implement role list + tests"
+    description: |
+      Create `list.go` and `list_test.go`, and add `cmd.AddCommand(newListCmd(cfg, conn))` to
+      `role.go`. The command executes `SHOW ROLES WITH USERS`, applies `normalizeRoleRow` to every
+      row, and calls `PrintBodyMap` with `roleFields`. An optional `--user <name>` flag filters rows
+      in-process to those where `member == name` — this is the only command that answers "what roles
+      does user X belong to". `list_test.go` defines its own `runList` helper (builds `NewCmd`,
+      sets args to `["list", ...]`, executes). Tests cover: happy-path JSON, `--user` filter, null
+      member normalization, exec error propagation.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`list.go` executes `SHOW ROLES WITH USERS` and outputs `role` + `member` columns"
+      - "`cmd.AddCommand(newListCmd(cfg, conn))` added to `role.go`; `neo4j-cli admin role list --help` works"
+      - "`--user <name>` flag filters rows where `member == name`; rows for other users are excluded"
+      - "JSON output shows `\"member\": \"\"` (not `null`) for roles with a nil member value"
+      - "`TestList_HappyPath_FormatJson` parses output as `[]map[string]any` and asserts role/member values"
+      - "`TestList_NullMember_NormalizesToEmptyString` asserts member field is `\"\"` not `null`"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement role get + tests"
+    description: |
+      Create `get.go` and `get_test.go`, and add `cmd.AddCommand(newGetCmd(cfg, conn))` to `role.go`.
+      The command performs two Cypher calls: first `SHOW ROLES WITH USERS WHERE role = $name` (column
+      is `role`, NOT `name` — using `name` causes a Neo4j syntax error) to check existence; zero rows
+      returns `clierr.NewNotFoundError`. If the role exists, executes `SHOW ROLE $name PRIVILEGES`;
+      zero privilege rows returns an empty list (exit 0, not not_found). Output fields are dynamic:
+      sort keys of `rows[0]` and pass to `PrintBodyMap`. `get_test.go` defines `runGet`,
+      `existsResponse`, and `notFoundResponse` helpers; uses `withSequencedExecFn` for two-call tests.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`get.go` existence check Cypher is exactly `SHOW ROLES WITH USERS WHERE role = $name` (not `SHOW ROLES WHERE name = $name`)"
+      - "`cmd.AddCommand(newGetCmd(cfg, conn))` added to `role.go`"
+      - "Zero rows on existence check → `clierr.NewNotFoundError` (exit code 3)"
+      - "Zero privilege rows on second call → empty list returned (exit 0, no error)"
+      - "`TestGet_ExistingRole_NoPrivileges_ReturnsEmptyList` asserts `[]` output and no error"
+      - "`TestGet_NotFound_ReturnsNotFoundError` asserts exit code 3 and role name in message"
+    completed_at: null
+
+  - id: task-004
+    title: "Implement role create + tests"
+    description: |
+      Create `create.go` and `create_test.go`, and add `cmd.AddCommand(newCreateCmd(cfg, conn))` to
+      `role.go`. The command executes `CREATE ROLE $name IF NOT EXISTS` (idempotent — second
+      invocation must not error). After a successful create it calls `outputRoleMembers` to fetch and
+      print `SHOW ROLES WITH USERS WHERE role = $name`; zero rows is valid (freshly created role has
+      no members). Requires `--rw`. `create_test.go` defines `runCreate` and uses a sequenced exec-fn
+      with the mutation as call 1 and the follow-up SHOW as call 2.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`create.go` Cypher is `CREATE ROLE $name IF NOT EXISTS`"
+      - "`cmd.AddCommand(newCreateCmd(cfg, conn))` added to `role.go`"
+      - "Successful create followed by empty SHOW → outputs `[]` JSON (not an error)"
+      - "Successful create followed by member rows → outputs those rows"
+      - "`TestCreate_HappyPath_EmitsEmptyMemberList` asserts empty JSON array output"
+      - "`TestCreate_HappyPath_EmitsMemberRows` asserts member record in follow-up output"
+      - "`TestCreate_ExecError_PropagatesError` asserts error propagates without calling follow-up"
+    completed_at: null
+
+  - id: task-005
+    title: "Implement role drop + tests"
+    description: |
+      Create `drop.go` and `drop_test.go`, and add `cmd.AddCommand(newDropCmd(cfg, conn))` to
+      `role.go`. The command uses `confirm.Require`/`confirm.Register` for the `--yes`/`--force`
+      gate. Executes `DROP ROLE $name`. Translates `Neo.ClientError.Statement.ArgumentError` with
+      message containing `"does not exist"` → `clierr.NewNotFoundError` locally in `RunE` (the
+      draft incorrectly used `Neo.ClientError.Security.InvalidArguments`). No output on success.
+      `drop_test.go` defines `buildDropCmd`/`runDrop` and uses `confirmtest.AssertLeafGate`.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newDropCmd(cfg, conn))` added to `role.go`"
+      - "`drop.go` not-found translation checks `Neo.ClientError.Statement.ArgumentError` code (not `Security.InvalidArguments`)"
+      - "`TestDrop_ConfirmGate` uses `confirmtest.AssertLeafGate` and passes"
+      - "`TestDrop_YesForce_Succeeds` asserts no error and no output"
+      - "`TestDrop_NotFound_ReturnsNotFoundError` builds the Neo4j error with code `Neo.ClientError.Statement.ArgumentError` and message containing `\"does not exist\"`; asserts exit code 3"
+      - "`TestDrop_CommunityEditionError_ReturnsEnterpriseHint` asserts the Enterprise edition hint is present"
+      - "No output is written to stdout on successful drop"
+    completed_at: null
+
+  - id: task-006
+    title: "Implement role grant + tests"
+    description: |
+      Create `grant.go` and `grant_test.go`, and add `cmd.AddCommand(newGrantCmd(cfg, conn))` to
+      `role.go`. Required flags: `--role <role>` and `--user <user>`, both marked required via
+      `cmd.MarkFlagRequired`. Executes `GRANT ROLE $role TO $user`. On success calls
+      `outputUserAfterRoleChange` which fetches `SHOW USERS WHERE user = $name`, normalizes the row,
+      and prints with snake_case fields. `grant_test.go` defines `runGrant` and uses a sequenced
+      exec-fn (mutation call 1, follow-up SHOW call 2).
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newGrantCmd(cfg, conn))` added to `role.go`"
+      - "`grant.go` executes `GRANT ROLE $role TO $user` with both params"
+      - "Missing `--role` flag → cobra usage error mentioning `role`"
+      - "Missing `--user` flag → cobra usage error mentioning `user`"
+      - "Follow-up output field is `password_change_required` (snake_case), not `passwordChangeRequired`"
+      - "`TestGrant_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output"
+      - "`TestGrant_ExecError_PropagatesError` asserts error without calling follow-up"
+    completed_at: null
+
+  - id: task-007
+    title: "Implement role revoke + tests"
+    description: |
+      Create `revoke.go` and `revoke_test.go`, and add `cmd.AddCommand(newRevokeCmd(cfg, conn))` to
+      `role.go`. Mirror of `grant.go` but executes `REVOKE ROLE $role FROM $user`. Same required
+      `--role` and `--user` flags. On success calls `outputUserAfterRoleChange`. `revoke_test.go`
+      defines `runRevoke`; tests mirror the grant suite. After this task `role.go` is complete with
+      all 6 `AddCommand` calls wired.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`cmd.AddCommand(newRevokeCmd(cfg, conn))` added to `role.go`; all 6 leaves now wired"
+      - "`revoke.go` executes `REVOKE ROLE $role FROM $user`"
+      - "Missing `--role` or `--user` returns a cobra usage error"
+      - "Follow-up output field is `password_change_required` (snake_case)"
+      - "`TestRevoke_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output after revoke"
+      - "`TestRevoke_ExecError_PropagatesError` asserts error propagates and no follow-up query runs"
+      - "Community edition error surfaces `(requires Enterprise edition)` hint"
+    completed_at: null
+
+  - id: task-008
+    title: "Wire role into admin.go, regenerate skill bundle, add changelog"
+    description: |
+      Wire the role subcommand tree into the CLI. In `admin.go`: add the `role` package import,
+      add `cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))` after the user AddCommand,
+      and update the `Long` description to list `role` among the subcommands. Run
+      `go generate ./neo4j-cli/internal/skill/...` to regenerate the skill bundle. Add a Minor
+      changelog entry via `changie new --projects neo4j-cli --kind Minor --body "Add admin role
+      commands: list, get, create, drop, grant, revoke"`. Verify all final gates pass.
+    status: pending
+    dependencies:
+      - task-002
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+      - task-007
+    acceptance_criteria:
+      - "`neo4j-cli admin role --help` shows list/get/create/drop/grant/revoke subcommands"
+      - "`TestGenerator_RoundTrip` passes (skill bundle reflects database + user + role commands)"
+      - "`TestAllLeafCommands_HaveExamples` passes (all 6 role leaves have flush-left Examples)"
+      - "`make test` passes"
+      - "`make fmt-check` passes"
+      - "`make lint` passes"
+      - "Changelog entry file present under `.changes/unreleased/`"
+    completed_at: null
