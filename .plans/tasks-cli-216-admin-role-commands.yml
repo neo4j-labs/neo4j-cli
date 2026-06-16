@@ -167,7 +167,7 @@ tasks:
       `go generate ./neo4j-cli/internal/skill/...` to regenerate the skill bundle. Add a Minor
       changelog entry via `changie new --projects neo4j-cli --kind Minor --body "Add admin role
       commands: list, get, create, drop, grant, revoke"`. Verify all final gates pass.
-    status: pending
+    status: completed
     dependencies:
       - task-002
       - task-003
@@ -183,4 +183,4 @@ tasks:
       - "`make fmt-check` passes"
       - "`make lint` passes"
       - "Changelog entry file present under `.changes/unreleased/`"
-    completed_at: null
+    completed_at: "2026-06-16T14:35:00Z"
