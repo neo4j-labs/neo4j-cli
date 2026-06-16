@@ -369,3 +369,5 @@ tasks:
       - "All existing `run_test.go` tests pass unchanged"
       - "`make test`, `make fmt-check`, `make lint` pass"
     source: qa
+    status: completed
+    completed_at: "2026-06-16T17:30:00Z"

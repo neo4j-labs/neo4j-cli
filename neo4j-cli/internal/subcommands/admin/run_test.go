@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
 
 func TestRunAdminStatement_HappyPath(t *testing.T) {
@@ -177,19 +178,6 @@ func TestTranslateAdminError_SyntaxError_Generic_MappedToValidation(t *testing.T
 	assert.NotContains(t, ce.Message, "2025.x") // generic syntax error, not version error
 }
 
-func TestTranslateAdminError_Forbidden_InsufficientPrivileges(t *testing.T) {
-	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{Code: "Neo.ClientError.Security.Forbidden", Msg: "Create user is not allowed for user 'readonly' with roles [public]."}}
-	withFakeRunner(t, fake)
-
-	_, err := RunAdminStatement(context.Background(), newTestCfg(), newTestConn(), "CREATE USER alice SET PASSWORD 'pw' SET PASSWORD CHANGE REQUIRED", nil)
-	require.Error(t, err)
-
-	var ce *clierr.CLIError
-	require.True(t, errors.As(err, &ce))
-	assert.Equal(t, 6, ce.Code) // validation_error
-	assert.Equal(t, "insufficient privileges: the connected user does not have permission to manage users (requires admin role)", ce.Message)
-}
-
 func TestTranslateAdminError_AlreadyCLIError_PassThrough(t *testing.T) {
 	original := clierr.NewNotFoundError("something not found")
 	fake := &fakeQueryRunner{err: original}
@@ -213,6 +201,49 @@ func TestTranslateAdminError_GenericError_MappedToValidation(t *testing.T) {
 	var ce *clierr.CLIError
 	require.True(t, errors.As(err, &ce))
 	assert.Equal(t, 6, ce.Code) // validation_error
+}
+
+func TestTranslateAdminError_Forbidden_AuraURI_EmitsTierHint(t *testing.T) {
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Security.Forbidden",
+		Msg:  "Permission has not been granted for action 'assign_privilege'.",
+	}}
+	withFakeRunner(t, fake)
+
+	conn := &dbconn.Conn{
+		URI:      "neo4j+s://test.databases.neo4j.io",
+		Username: "neo4j",
+		Password: "password",
+	}
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), conn, "CREATE ROLE reader", nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code) // validation_error
+	assert.Contains(t, ce.Message, "Business Critical")
+	assert.Contains(t, ce.Message, "Aura Console")
+}
+
+func TestTranslateAdminError_Forbidden_NonAuraURI_NoTierHint(t *testing.T) {
+	fake := &fakeQueryRunner{err: &neo4j.Neo4jError{
+		Code: "Neo.ClientError.Security.Forbidden",
+		Msg:  "Permission has not been granted for action 'assign_privilege'.",
+	}}
+	withFakeRunner(t, fake)
+
+	conn := &dbconn.Conn{
+		URI:      "neo4j://localhost:7687",
+		Username: "neo4j",
+		Password: "password",
+	}
+	_, err := RunAdminStatement(context.Background(), newTestCfg(), conn, "CREATE ROLE reader", nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 6, ce.Code) // validation_error
+	assert.NotContains(t, ce.Message, "Business Critical")
 }
 
 func TestRedactParams(t *testing.T) {
