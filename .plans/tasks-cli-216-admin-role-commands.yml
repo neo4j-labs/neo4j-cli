@@ -59,7 +59,7 @@ tasks:
       zero privilege rows returns an empty list (exit 0, not not_found). Output fields are dynamic:
       sort keys of `rows[0]` and pass to `PrintBodyMap`. `get_test.go` defines `runGet`,
       `existsResponse`, and `notFoundResponse` helpers; uses `withSequencedExecFn` for two-call tests.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -69,7 +69,7 @@ tasks:
       - "Zero privilege rows on second call → empty list returned (exit 0, no error)"
       - "`TestGet_ExistingRole_NoPrivileges_ReturnsEmptyList` asserts `[]` output and no error"
       - "`TestGet_NotFound_ReturnsNotFoundError` asserts exit code 3 and role name in message"
-    completed_at: null
+    completed_at: "2026-06-16T03:00:00Z"
 
   - id: task-004
     title: "Implement role create + tests"
