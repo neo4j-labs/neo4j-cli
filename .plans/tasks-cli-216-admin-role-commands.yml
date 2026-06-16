@@ -145,7 +145,7 @@ tasks:
       `--role` and `--user` flags. On success calls `outputUserAfterRoleChange`. `revoke_test.go`
       defines `runRevoke`; tests mirror the grant suite. After this task `role.go` is complete with
       all 6 `AddCommand` calls wired.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -156,7 +156,7 @@ tasks:
       - "`TestRevoke_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output after revoke"
       - "`TestRevoke_ExecError_PropagatesError` asserts error propagates and no follow-up query runs"
       - "Community edition error surfaces `(requires Enterprise edition)` hint"
-    completed_at: null
+    completed_at: "2026-06-16T07:00:00Z"
 
   - id: task-008
     title: "Wire role into admin.go, regenerate skill bundle, add changelog"
