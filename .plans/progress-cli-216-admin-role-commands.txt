@@ -33,6 +33,10 @@ Files: ~neo4j-cli/internal/subcommands/admin/admin.go, ~neo4j-cli/internal/skill
 ## REVIEW — 2026-06-16T15:00:00Z
 Added 3 review tasks (task-009..task-011).
 
+## TASK-009 — 2026-06-16T15:30:00Z
+Widened runGrant/runRevoke helpers to accept full responses slice; collapsed inline cmd blocks in EmitsUpdatedUserRecord tests; added TestGrant_FollowUpExecError_PropagatesError and TestRevoke_FollowUpExecError_PropagatesError.
+Files: ~neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/internal/subcommands/admin/role/revoke_test.go
+
 ## TASK-010 — 2026-06-16T15:30:00Z
 Removed spurious //nolint:unused from testConn, withFakeExecFn, withSequencedExecFn in role_helpers_test.go.
 Files: ~neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go

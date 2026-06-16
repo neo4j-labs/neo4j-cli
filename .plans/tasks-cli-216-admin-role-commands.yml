@@ -204,7 +204,7 @@ tasks:
         assert the error propagates (mirrors `TestCreate_FollowUpExecError_PropagatesError` in
         `database/create_test.go`).
       - `TestRevoke_FollowUpExecError_PropagatesError` — same for revoke.
-    status: in_progress
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -215,7 +215,7 @@ tasks:
       - "`TestRevoke_FollowUpExecError_PropagatesError` exists and asserts the follow-up error propagates"
       - "`make test` passes after the refactor"
     source: review
-    completed_at: null
+    completed_at: "2026-06-16T15:30:00Z"
 
   - id: task-010
     title: "Remove spurious //nolint:unused from role_helpers_test.go"
