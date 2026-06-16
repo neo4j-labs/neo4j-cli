@@ -34,9 +34,7 @@ neo4j-cli admin role list --credential local --user alice --format json`,
 			if err != nil {
 				return err
 			}
-			for i, row := range rows {
-				rows[i] = normalizeRoleRow(row)
-			}
+			rows = normalizeRoleRows(rows)
 			if userFilter != "" {
 				filtered := rows[:0]
 				for _, row := range rows {

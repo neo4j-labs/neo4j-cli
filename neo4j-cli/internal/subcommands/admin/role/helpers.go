@@ -19,6 +19,9 @@ var roleExecFn adminutil.ExecFn
 // roleFields are the canonical output columns for SHOW ROLES WITH USERS output.
 var roleFields = []string{"role", "member"}
 
+// userFields are the canonical output columns for SHOW USERS output.
+var userFields = []string{"user", "roles", "password_change_required", "suspended"}
+
 // normalizeRoleRow ensures the "member" key is never nil in a SHOW ROLES WITH
 // USERS result row. Neo4j returns nil for roles that have no members; this
 // converts that to an empty string for consistent JSON output.
@@ -29,6 +32,15 @@ func normalizeRoleRow(m map[string]any) map[string]any {
 	return m
 }
 
+// normalizeRoleRows applies normalizeRoleRow to every row in the slice and
+// returns the updated slice.
+func normalizeRoleRows(rows []map[string]any) []map[string]any {
+	for i, row := range rows {
+		rows[i] = normalizeRoleRow(row)
+	}
+	return rows
+}
+
 // outputRoleMembers executes SHOW ROLES WITH USERS WHERE role = $name, normalizes
 // each result row, and prints with roleFields columns.
 func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, roleName string) error {
@@ -36,9 +48,7 @@ func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn
 	if err != nil {
 		return err
 	}
-	for i, row := range rows {
-		rows[i] = normalizeRoleRow(row)
-	}
+	rows = normalizeRoleRows(rows)
 	commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), roleFields)
 	return nil
 }
@@ -48,7 +58,6 @@ func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn
 // the updated role membership. Returns nil without printing if the user is not
 // found (unlikely in practice, but safe).
 func outputUserAfterRoleChange(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userName string) error {
-	userFields := []string{"user", "roles", "password_change_required", "suspended"}
 	rows, err := roleExecFn(cmd.Context(), cfg, conn, "SHOW USERS WHERE user = $name", map[string]any{"name": userName})
 	if err != nil {
 		return err

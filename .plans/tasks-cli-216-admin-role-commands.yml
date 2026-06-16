@@ -251,7 +251,7 @@ tasks:
          appears verbatim in both `list.go` and inside `outputRoleMembers` in `helpers.go`. Extract
          it into a `func normalizeRoleRows(rows []map[string]any) []map[string]any` helper in
          `helpers.go`, and replace both inline loops with calls to it.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -260,4 +260,4 @@ tasks:
       - "Both `list.go` and `outputRoleMembers` call `normalizeRoleRows` instead of the inline loop"
       - "`make test` and `make lint` pass"
     source: review
-    completed_at: null
+    completed_at: "2026-06-16T16:00:00Z"

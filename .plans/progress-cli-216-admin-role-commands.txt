@@ -40,3 +40,7 @@ Files: ~neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/inte
 ## TASK-010 — 2026-06-16T15:30:00Z
 Removed spurious //nolint:unused from testConn, withFakeExecFn, withSequencedExecFn in role_helpers_test.go.
 Files: ~neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go
+
+## TASK-011 — 2026-06-16T16:00:00Z
+Promoted userFields to package scope in helpers.go; extracted normalizeRoleRows helper; updated list.go and outputRoleMembers to use it.
+Files: ~neo4j-cli/internal/subcommands/admin/role/helpers.go, ~neo4j-cli/internal/subcommands/admin/role/list.go
