@@ -14,20 +14,14 @@ import (
 // roleExecFn is the package-level test seam. It is set by NewCmd from the
 // injected admin.RunAdminStatement and replaced by tests to avoid real Bolt
 // connections.
-//
-//nolint:unused
 var roleExecFn adminutil.ExecFn
 
 // roleFields are the canonical output columns for SHOW ROLES WITH USERS output.
-//
-//nolint:unused
 var roleFields = []string{"role", "member"}
 
 // normalizeRoleRow ensures the "member" key is never nil in a SHOW ROLES WITH
 // USERS result row. Neo4j returns nil for roles that have no members; this
 // converts that to an empty string for consistent JSON output.
-//
-//nolint:unused
 func normalizeRoleRow(m map[string]any) map[string]any {
 	if m["member"] == nil {
 		m["member"] = ""
