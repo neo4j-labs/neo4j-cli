@@ -47,8 +47,6 @@ func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn
 // the matching user record. Called after a successful grant or revoke to confirm
 // the updated role membership. Returns nil without printing if the user is not
 // found (unlikely in practice, but safe).
-//
-//nolint:unused
 func outputUserAfterRoleChange(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, userName string) error {
 	userFields := []string{"user", "roles", "password_change_required", "suspended"}
 	rows, err := roleExecFn(cmd.Context(), cfg, conn, "SHOW USERS WHERE user = $name", map[string]any{"name": userName})

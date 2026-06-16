@@ -36,6 +36,7 @@ neo4j-cli admin role list --credential local --format json`,
 	cmd.AddCommand(newGetCmd(cfg, conn))
 	cmd.AddCommand(newCreateCmd(cfg, conn))
 	cmd.AddCommand(newDropCmd(cfg, conn))
+	cmd.AddCommand(newGrantCmd(cfg, conn))
 
 	return cmd
 }

@@ -124,7 +124,7 @@ tasks:
       `outputUserAfterRoleChange` which fetches `SHOW USERS WHERE user = $name`, normalizes the row,
       and prints with snake_case fields. `grant_test.go` defines `runGrant` and uses a sequenced
       exec-fn (mutation call 1, follow-up SHOW call 2).
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -135,7 +135,7 @@ tasks:
       - "Follow-up output field is `password_change_required` (snake_case), not `passwordChangeRequired`"
       - "`TestGrant_HappyPath_EmitsUpdatedUserRecord` asserts user record in JSON output"
       - "`TestGrant_ExecError_PropagatesError` asserts error without calling follow-up"
-    completed_at: null
+    completed_at: "2026-06-16T06:00:00Z"
 
   - id: task-007
     title: "Implement role revoke + tests"
