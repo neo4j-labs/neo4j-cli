@@ -102,7 +102,7 @@ tasks:
       message containing `"does not exist"` → `clierr.NewNotFoundError` locally in `RunE` (the
       draft incorrectly used `Neo.ClientError.Security.InvalidArguments`). No output on success.
       `drop_test.go` defines `buildDropCmd`/`runDrop` and uses `confirmtest.AssertLeafGate`.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -113,7 +113,7 @@ tasks:
       - "`TestDrop_NotFound_ReturnsNotFoundError` builds the Neo4j error with code `Neo.ClientError.Statement.ArgumentError` and message containing `\"does not exist\"`; asserts exit code 3"
       - "`TestDrop_CommunityEditionError_ReturnsEnterpriseHint` asserts the Enterprise edition hint is present"
       - "No output is written to stdout on successful drop"
-    completed_at: null
+    completed_at: "2026-06-16T05:00:00Z"
 
   - id: task-006
     title: "Implement role grant + tests"

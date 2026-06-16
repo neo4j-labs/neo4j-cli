@@ -13,3 +13,7 @@ Files: +neo4j-cli/internal/subcommands/admin/role/get.go, +neo4j-cli/internal/su
 ## TASK-004 — 2026-06-16T04:00:00Z
 Implemented the `role create` command with idempotent `CREATE ROLE $name IF NOT EXISTS` Cypher. On success, calls `outputRoleMembers` for the follow-up SHOW. On error, returns immediately without follow-up. Removed `//nolint:unused` from `outputRoleMembers` in helpers.go. Tests use `withSequencedExecFn` for two-call flows (mutation + follow-up). Covers empty member list, member rows, exec error propagation, Enterprise edition hint, and no-args cobra error.
 Files: +neo4j-cli/internal/subcommands/admin/role/create.go, +neo4j-cli/internal/subcommands/admin/role/create_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/internal/subcommands/admin/role/helpers.go
+
+## TASK-005 — 2026-06-16T05:00:00Z
+Implemented the `role drop` command with confirm gate (`confirm.Require`/`confirm.Register` for `--yes`/`--force`). Executes `DROP ROLE $name`. Translates `Neo.ClientError.Statement.ArgumentError` with message containing "does not exist" to `clierr.NewNotFoundError` (exit code 3). No stdout output on success. Tests use `confirmtest.AssertLeafGate` for the four canonical gate scenarios. Covers: confirm gate, yes-force success (no output), not-found error with correct error code, Enterprise edition hint, and no-args cobra error.
+Files: +neo4j-cli/internal/subcommands/admin/role/drop.go, +neo4j-cli/internal/subcommands/admin/role/drop_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go
