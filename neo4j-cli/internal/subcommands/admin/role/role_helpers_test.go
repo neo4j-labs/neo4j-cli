@@ -13,8 +13,6 @@ import (
 
 // testConn returns a *dbconn.Conn for use in tests. The connection params are
 // never used because tests always override roleExecFn with a fake.
-//
-//nolint:unused
 func testConn() *dbconn.Conn {
 	return &dbconn.Conn{
 		URI:      "neo4j://localhost:7687",
@@ -25,8 +23,6 @@ func testConn() *dbconn.Conn {
 
 // withFakeExecFn replaces roleExecFn for the duration of t with a fake that
 // always returns the supplied rows or error.
-//
-//nolint:unused
 func withFakeExecFn(t *testing.T, rows []map[string]any, execErr error) {
 	t.Helper()
 	orig := roleExecFn
@@ -40,8 +36,6 @@ func withFakeExecFn(t *testing.T, rows []map[string]any, execErr error) {
 // responses in the order provided. It calls t.Fatalf if the exec function is
 // called more times than there are responses. The original is restored via
 // t.Cleanup.
-//
-//nolint:unused
 func withSequencedExecFn(t *testing.T, responses []struct {
 	rows []map[string]any
 	err  error

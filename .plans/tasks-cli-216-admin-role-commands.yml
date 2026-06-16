@@ -204,7 +204,7 @@ tasks:
         assert the error propagates (mirrors `TestCreate_FollowUpExecError_PropagatesError` in
         `database/create_test.go`).
       - `TestRevoke_FollowUpExecError_PropagatesError` — same for revoke.
-    status: pending
+    status: in_progress
     dependencies:
       - task-007
     acceptance_criteria:
@@ -228,7 +228,7 @@ tasks:
 
       Remove the `//nolint:unused` comment from all three function declarations in
       `role_helpers_test.go`. Verify `make lint` still passes after removal.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -236,7 +236,7 @@ tasks:
       - "`make lint` passes (0 issues) after removal"
       - "`make test` passes"
     source: review
-    completed_at: null
+    completed_at: "2026-06-16T15:30:00Z"
 
   - id: task-011
     title: "Promote userFields to package var and extract normalizeRoleRows helper"
