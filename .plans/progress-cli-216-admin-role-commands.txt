@@ -29,3 +29,6 @@ Files: +neo4j-cli/internal/subcommands/admin/role/revoke.go, +neo4j-cli/internal
 ## TASK-008 — 2026-06-16T14:35:00Z
 Wired the role package into admin.go: added `role` import alongside `database`, added `cmd.AddCommand(role.NewCmd(cfg, &adminConn, RunAdminStatement))` after the database AddCommand, and updated the Long description to include "`role` (list, get, create, drop, grant, revoke)". Regenerated the skill bundle via `go generate ./neo4j-cli/internal/skill/...` — admin.md now includes all 6 role leaves. Added Minor changelog entry via `changie new`. All gates pass: make test, make fmt-check, make lint.
 Files: ~neo4j-cli/internal/subcommands/admin/admin.go, ~neo4j-cli/internal/skill/bundle/references/admin.md, +.changes/unreleased/neo4j-cli-Minor-20260616-143459.yaml
+
+## REVIEW — 2026-06-16T15:00:00Z
+Added 3 review tasks (task-009..task-011).

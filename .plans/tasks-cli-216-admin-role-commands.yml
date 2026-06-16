@@ -184,3 +184,80 @@ tasks:
       - "`make lint` passes"
       - "Changelog entry file present under `.changes/unreleased/`"
     completed_at: "2026-06-16T14:35:00Z"
+
+  - id: task-009
+    title: "Fix runGrant/runRevoke helper signature and add follow-up-error tests"
+    description: |
+      The `runGrant(t, args, execErr)` and `runRevoke(t, args, execErr)` helpers hardcode the
+      follow-up response as always-empty success, making it impossible to test a non-empty follow-up
+      through the helper. As a result, `TestGrant_HappyPath_EmitsUpdatedUserRecord` and
+      `TestRevoke_HappyPath_EmitsUpdatedUserRecord` bypass the helper entirely and rebuild the full
+      cmd setup inline — 30+ lines of boilerplate that duplicates what the helper already does.
+
+      Fix: change both helpers to accept full `responses []struct{ rows []map[string]any; err error }`
+      (matching `runCreate`'s signature). Remove the hardcoded two-element response. Update all
+      existing call sites to pass their own response slice. The inline cmd blocks in the
+      EmitsUpdatedUserRecord tests can then collapse to single helper calls.
+
+      After fixing the helpers, add:
+      - `TestGrant_FollowUpExecError_PropagatesError` — mutation succeeds, follow-up returns error;
+        assert the error propagates (mirrors `TestCreate_FollowUpExecError_PropagatesError` in
+        `database/create_test.go`).
+      - `TestRevoke_FollowUpExecError_PropagatesError` — same for revoke.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`runGrant` and `runRevoke` accept `responses []struct{ rows []map[string]any; err error }` matching `runCreate`'s signature"
+      - "`TestGrant_HappyPath_EmitsUpdatedUserRecord` uses `runGrant` directly (no inline cmd setup)"
+      - "`TestRevoke_HappyPath_EmitsUpdatedUserRecord` uses `runRevoke` directly (no inline cmd setup)"
+      - "`TestGrant_FollowUpExecError_PropagatesError` exists and asserts the follow-up error propagates"
+      - "`TestRevoke_FollowUpExecError_PropagatesError` exists and asserts the follow-up error propagates"
+      - "`make test` passes after the refactor"
+    source: review
+    completed_at: null
+
+  - id: task-010
+    title: "Remove spurious //nolint:unused from role_helpers_test.go"
+    description: |
+      `role_helpers_test.go` annotates `testConn`, `withFakeExecFn`, and `withSequencedExecFn` with
+      `//nolint:unused`. All three are called from leaf test files in the same package. The
+      suppressions are unnecessary and will mask any future real "unused" warnings in this file.
+      `database/database_helpers_test.go` has the identical pattern without any nolint directives —
+      the role package should match.
+
+      Remove the `//nolint:unused` comment from all three function declarations in
+      `role_helpers_test.go`. Verify `make lint` still passes after removal.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "No `//nolint:unused` directives remain in `role_helpers_test.go`"
+      - "`make lint` passes (0 issues) after removal"
+      - "`make test` passes"
+    source: review
+    completed_at: null
+
+  - id: task-011
+    title: "Promote userFields to package var and extract normalizeRoleRows helper"
+    description: |
+      Two minor inconsistencies vs the roleFields pattern:
+
+      1. `userFields` is declared as a local variable inside `outputUserAfterRoleChange` in
+         `helpers.go`. `roleFields` is at package scope and reused by multiple callers. Promote
+         `userFields` to `var userFields = []string{...}` at package scope alongside `roleFields`.
+
+      2. The three-line normalize loop (`for i, row := range rows { rows[i] = normalizeRoleRow(row) }`)
+         appears verbatim in both `list.go` and inside `outputRoleMembers` in `helpers.go`. Extract
+         it into a `func normalizeRoleRows(rows []map[string]any) []map[string]any` helper in
+         `helpers.go`, and replace both inline loops with calls to it.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`var userFields = []string{...}` declared at package scope in `helpers.go`"
+      - "`func normalizeRoleRows(rows []map[string]any) []map[string]any` defined in `helpers.go`"
+      - "Both `list.go` and `outputRoleMembers` call `normalizeRoleRows` instead of the inline loop"
+      - "`make test` and `make lint` pass"
+    source: review
+    completed_at: null
