@@ -31,8 +31,6 @@ func normalizeRoleRow(m map[string]any) map[string]any {
 
 // outputRoleMembers executes SHOW ROLES WITH USERS WHERE role = $name, normalizes
 // each result row, and prints with roleFields columns.
-//
-//nolint:unused
 func outputRoleMembers(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, roleName string) error {
 	rows, err := roleExecFn(cmd.Context(), cfg, conn, "SHOW ROLES WITH USERS WHERE role = $name", map[string]any{"name": roleName})
 	if err != nil {

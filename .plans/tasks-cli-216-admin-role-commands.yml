@@ -80,7 +80,7 @@ tasks:
       print `SHOW ROLES WITH USERS WHERE role = $name`; zero rows is valid (freshly created role has
       no members). Requires `--rw`. `create_test.go` defines `runCreate` and uses a sequenced exec-fn
       with the mutation as call 1 and the follow-up SHOW as call 2.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -91,7 +91,7 @@ tasks:
       - "`TestCreate_HappyPath_EmitsEmptyMemberList` asserts empty JSON array output"
       - "`TestCreate_HappyPath_EmitsMemberRows` asserts member record in follow-up output"
       - "`TestCreate_ExecError_PropagatesError` asserts error propagates without calling follow-up"
-    completed_at: null
+    completed_at: "2026-06-16T04:00:00Z"
 
   - id: task-005
     title: "Implement role drop + tests"

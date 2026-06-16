@@ -9,3 +9,7 @@ Files: +neo4j-cli/internal/subcommands/admin/role/list.go, +neo4j-cli/internal/s
 ## TASK-003 — 2026-06-16T03:00:00Z
 Implemented the `role get` command with two-step Cypher: existence check via `SHOW ROLES WITH USERS WHERE role = $name` (correct column name, not `name`), followed by `SHOW ROLE $name PRIVILEGES`. Zero existence rows → clierr.NewNotFoundError (exit 3). Zero privilege rows → empty list (exit 0). Dynamic field sorting from rows[0] keys. Tests cover happy-path JSON and table, existing role with no privileges, not-found, exec error propagation, and no-args cobra usage error.
 Files: +neo4j-cli/internal/subcommands/admin/role/get.go, +neo4j-cli/internal/subcommands/admin/role/get_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go
+
+## TASK-004 — 2026-06-16T04:00:00Z
+Implemented the `role create` command with idempotent `CREATE ROLE $name IF NOT EXISTS` Cypher. On success, calls `outputRoleMembers` for the follow-up SHOW. On error, returns immediately without follow-up. Removed `//nolint:unused` from `outputRoleMembers` in helpers.go. Tests use `withSequencedExecFn` for two-call flows (mutation + follow-up). Covers empty member list, member rows, exec error propagation, Enterprise edition hint, and no-args cobra error.
+Files: +neo4j-cli/internal/subcommands/admin/role/create.go, +neo4j-cli/internal/subcommands/admin/role/create_test.go, ~neo4j-cli/internal/subcommands/admin/role/role.go, ~neo4j-cli/internal/subcommands/admin/role/helpers.go
