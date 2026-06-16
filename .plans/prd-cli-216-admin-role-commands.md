@@ -80,6 +80,12 @@ Prereq: [CLI-215 / PR #225](https://github.com/neo4j-labs/neo4j-cli/pull/225) (i
 - REQ-F-023: All Cypher is automatically prefixed with `CYPHER 25` by `RunAdminStatement` in `run.go` — no per-command prefix needed.
 - REQ-F-024: Every leaf must have a flush-left `Example:` field with ≥2 invocations, `# comment` per invocation, `neo4j-cli` prefix. Mutating commands include `--rw`. At least one read command per leaf uses `--format json`. Gate: `TestAllLeafCommands_HaveExamples`.
 
+**QA-identified fixes (from live testing across Aura tiers)**
+
+- REQ-F-025: When `Neo.ClientError.Security.Forbidden` is returned from a connection to an Aura-hosted instance (URI matches `*.neo4j.io`), `translateAdminError` must emit a clear, actionable hint explaining tier support — e.g.: `"<original message>. On Aura, role management support varies by tier: Business Critical supports all role commands; Professional supports list, grant, and revoke only; Free does not support role management."` — rather than Neo4j's raw "Permission has not been granted ... try GRANT/REVOKE" advice which is impossible to follow on Aura. For non-Aura connections the existing generic `Security.Forbidden` validation_error is returned unchanged. Implementation: add `isAuraURI(uri string) bool` helper in `run.go`; thread `conn.URI` from `RunAdminStatement` into `translateAdminError(uri, err)` and `translateNeo4jError(uri, ne)`.
+- REQ-F-026: Remove `(Enterprise only)` from `revoke`'s `Short` description. It is the only command with this annotation; all six commands require Enterprise at the DB level. Consistency: none of the six should carry this annotation (the parent Long already documents the `--rw` requirement for write commands).
+- REQ-F-027: Replace `cmd.MarkFlagRequired("role")` and `cmd.MarkFlagRequired("user")` in `grant.go` and `revoke.go` with explicit pre-validation at the top of `RunE` (before `cmd.SilenceUsage = true`) that returns `clierr.NewUsageError`. This ensures missing `--role` or `--user` exits with code 2 (`usage_error`) rather than code 1 (`fatal_error` from cobra's built-in required-flag check). Usage text must still be printed when either flag is absent (cobra prints usage whenever `RunE` returns an error and `SilenceUsage` is still false).
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: One file per leaf under `neo4j-cli/internal/subcommands/admin/role/`. Parent in `role.go`. Shared helpers + seam var in `helpers.go`. Test helpers in `role_helpers_test.go`.
@@ -90,6 +96,8 @@ Prereq: [CLI-215 / PR #225](https://github.com/neo4j-labs/neo4j-cli/pull/225) (i
 - REQ-NF-006: Run `go generate ./neo4j-cli/internal/skill/...` after wiring `role.NewCmd` into `admin.go`. `TestGenerator_RoundTrip` must pass.
 - REQ-NF-007: Changelog entry: `changie new --projects neo4j-cli --kind Minor --body "Add admin role commands: list, get, create, drop, grant, revoke"`.
 - REQ-NF-008: `make test`, `make fmt-check`, `make lint` all pass.
+- REQ-NF-009: Unit tests for the Aura `Security.Forbidden` translation path in `run_test.go` — verify that `translateAdminError` with an Aura URI and a `Neo.ClientError.Security.Forbidden` Neo4jError produces a `validation_error` CLIError whose message contains the tier hint string; verify that the same error with a non-Aura URI does NOT include the hint.
+- REQ-NF-010: Update tests in `grant_test.go` and `revoke_test.go` for missing `--role` and `--user` to assert exit code 2 (`usage_error`) rather than exit code 1, reflecting the switch from `MarkFlagRequired` to manual pre-validation.
 
 ---
 
@@ -196,6 +204,68 @@ if errors.As(err, &ne) &&
 }
 ```
 
+### Aura `Security.Forbidden` Translation (REQ-F-025)
+
+Live testing on Aura Free, Professional, and Business Critical revealed that role management commands do not return `UnsupportedAdministrationCommand` on restricted tiers — they return `Neo.ClientError.Security.Forbidden` with Neo4j's generic "Permission has not been granted … try GRANT/REVOKE" advice, which is impossible to follow on managed Aura instances.
+
+**Tier support matrix (observed):**
+
+| Command | Aura Free | Aura Pro | Aura BC |
+|---------|-----------|----------|---------|
+| `role list` | ❌ Forbidden | ✅ | ✅ |
+| `role list --user` | ❌ Forbidden | ✅ | ✅ |
+| `role grant` | ❌ Forbidden | ✅ | ✅ |
+| `role revoke` | ❌ Forbidden | ✅ | ✅ |
+| `role get` | ❌ Forbidden | ❌ Forbidden | ✅ |
+| `role create` | ❌ Forbidden | ❌ Forbidden | ✅ |
+| `role drop` | ❌ Forbidden | ❌ Forbidden | ✅ |
+
+**Implementation:**
+
+Add `isAuraURI(uri string) bool` in `run.go` that returns true when the URI domain ends in `.neo4j.io`:
+```go
+func isAuraURI(uri string) bool {
+    return strings.Contains(strings.ToLower(uri), ".neo4j.io")
+}
+```
+
+Change `translateAdminError(err error)` → `translateAdminError(uri string, err error)` and similarly thread `uri` into `translateNeo4jError`. Update `RunAdminStatement` to pass `conn.URI`.
+
+In `translateNeo4jError`, handle the `Security.Forbidden` code:
+```go
+case "Neo.ClientError.Security.Forbidden":
+    if isAuraURI(uri) {
+        return clierr.NewValidationError(
+            "%s\n\nOn Aura, role management support varies by tier: "+
+            "Business Critical supports all role commands; "+
+            "Professional supports list, grant, and revoke only; "+
+            "Free does not support role management.",
+            ne.Msg)
+    }
+    return clierr.NewValidationError("%w", ne)
+```
+
+`run_test.go` already tests `translateAdminError` via `RunAdminStatement` + `adminRunnerFn` seam. Add two new cases: one with a `neo4j+s://test.databases.neo4j.io` conn URI (hint fires) and one with `neo4j://localhost:7687` (hint does not fire).
+
+### Required Flag Validation Exit Code (REQ-F-027)
+
+Cobra's `MarkFlagRequired` fires a check _before_ `RunE`, generating a `fatal_error` (exit 1). To return `usage_error` (exit 2), remove `MarkFlagRequired` and add explicit checks in `RunE` before `cmd.SilenceUsage = true`:
+
+```go
+RunE: func(cmd *cobra.Command, args []string) error {
+    if roleName == "" {
+        return clierr.NewUsageError("--role is required")
+    }
+    if userName == "" {
+        return clierr.NewUsageError("--user is required")
+    }
+    cmd.SilenceUsage = true
+    // ... rest of command
+},
+```
+
+Because `SilenceUsage` is still false when these errors are returned, cobra will print the usage block automatically. Update existing tests in `grant_test.go` and `revoke_test.go` that asserted the cobra-style `"required flag(s) \"role\" not set"` message — they should now assert `ce.Code == 2` and a message containing `"--role is required"` / `"--user is required"`.
+
 ---
 
 ## Acceptance Criteria
@@ -222,14 +292,20 @@ if errors.As(err, &ne) &&
 - [ ] `TestGenerator_RoundTrip` passes (skill bundle reflects database + user + role commands)
 - [ ] `make test`, `make fmt-check`, `make lint` all pass
 - [ ] Changelog entry added
+- [ ] `role revoke --help` Short matches all other commands — no `(Enterprise only)` annotation
+- [ ] `neo4j-cli admin role grant --user alice --credential local --rw` (missing `--role`) exits with code 2 and prints usage
+- [ ] `neo4j-cli admin role revoke --role analyst --credential local --rw` (missing `--user`) exits with code 2 and prints usage
+- [ ] `admin role list` against an Aura Free or Professional instance returns a `validation_error` whose message contains the tier hint (verified via `run_test.go` unit test with a `*.neo4j.io` URI)
+- [ ] `admin role list` against a non-Aura instance with `Security.Forbidden` does NOT include the Aura tier hint in the message
 
 ---
 
 ## Out of Scope
 
 - `admin privilege` commands (list, grant, deny, revoke) — CLI-217 (PR 4).
-- Changes to `dbconn`, `adminutil`, `run.go`, or `admin.go`'s connection flag surface — foundation is complete from PR 1.
+- Changes to `dbconn`, `adminutil`, or `admin.go`'s connection flag surface — foundation is complete from PR 1.
 - Any changes to the `admin database` or `admin user` packages.
+- Note: `run.go` IS touched by REQ-F-025 (Aura Forbidden hint); this is the only `run.go` change in this PR.
 
 ---
 

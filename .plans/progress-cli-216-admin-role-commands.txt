@@ -44,3 +44,9 @@ Files: ~neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go
 ## TASK-011 — 2026-06-16T16:00:00Z
 Promoted userFields to package scope in helpers.go; extracted normalizeRoleRows helper; updated list.go and outputRoleMembers to use it.
 Files: ~neo4j-cli/internal/subcommands/admin/role/helpers.go, ~neo4j-cli/internal/subcommands/admin/role/list.go
+
+## QA SESSION — 2026-06-16T16:30:00Z
+Live tested against Docker Enterprise, Docker Community, Aura Free (free-db), Aura Professional, and Aura Business Critical. All Docker acceptance criteria pass. Found 3 bugs requiring fixes:
+(1) revoke Short carries "(Enterprise only)" annotation absent from all other 5 commands (REQ-F-026 → task-012).
+(2) missing --role/--user on grant/revoke returns fatal_error exit 1 instead of usage_error exit 2 (REQ-F-027 → task-012).
+(3) Security.Forbidden on Aura Free/Pro returns raw Neo4j "Permission has not been granted ... try GRANT/REVOKE" advice which users cannot follow on Aura; the UnsupportedAdministrationCommand/Aura hint path never fires for role commands on those tiers (REQ-F-025 → task-013). Aura BC confirmed fully functional. Added task-012 and task-013.

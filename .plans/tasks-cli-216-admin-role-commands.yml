@@ -1,7 +1,7 @@
 feature: cli-216-admin-role-commands
 prd: ./prd-cli-216-admin-role-commands.md
 created_at: 2026-06-16T00:00:00Z
-updated_at: 2026-06-16T01:00:00Z
+updated_at: 2026-06-16T16:30:00Z
 
 tasks:
   - id: task-001
@@ -261,3 +261,110 @@ tasks:
       - "`make test` and `make lint` pass"
     source: review
     completed_at: "2026-06-16T16:00:00Z"
+
+  - id: task-012
+    title: "Fix revoke Short + replace MarkFlagRequired with manual validation in grant/revoke"
+    description: |
+      Two consistency fixes surfaced during live QA testing:
+
+      1. `revoke.go` Short is `"Revoke a role from a user (Enterprise only)"` — the only command with
+         this annotation. Remove `(Enterprise only)` so all six commands are consistent (REQ-F-026).
+
+      2. `grant.go` and `revoke.go` use `cmd.MarkFlagRequired("role")` / `cmd.MarkFlagRequired("user")`.
+         Cobra fires required-flag validation before `RunE`, producing `fatal_error` (exit 1). Replace
+         both `MarkFlagRequired` calls in each file with explicit checks at the start of `RunE`
+         (before `cmd.SilenceUsage = true`) that return `clierr.NewUsageError` (exit 2) (REQ-F-027).
+
+      Pattern in `RunE` after removing `MarkFlagRequired`:
+      ```go
+      RunE: func(cmd *cobra.Command, args []string) error {
+          if roleName == "" {
+              return clierr.NewUsageError("--role is required")
+          }
+          if userName == "" {
+              return clierr.NewUsageError("--user is required")
+          }
+          cmd.SilenceUsage = true
+          // ... rest unchanged
+      },
+      ```
+
+      Update tests in `grant_test.go` and `revoke_test.go` that previously asserted cobra's
+      `"required flag(s) \"role\" not set"` message — they should now assert a CLIError with
+      `ce.Code == 2` and message containing `"--role is required"` / `"--user is required"`.
+      Verify `make test`, `make fmt-check`, `make lint` all pass.
+    status: pending
+    dependencies:
+      - task-007
+    acceptance_criteria:
+      - "`revoke.go` Short is `\"Revoke a role from a user\"` (no `(Enterprise only)` annotation)"
+      - "No `cmd.MarkFlagRequired` calls remain in `grant.go` or `revoke.go`"
+      - "`grant.go` RunE returns `clierr.NewUsageError(\"--role is required\")` when `--role` is absent"
+      - "`grant.go` RunE returns `clierr.NewUsageError(\"--user is required\")` when `--user` is absent"
+      - "`revoke.go` RunE has the same two pre-validation checks in the same order"
+      - "`TestGrant_MissingRole_ReturnsUsageError` asserts `ce.Code == 2` and message contains `\"--role is required\"`"
+      - "`TestGrant_MissingUser_ReturnsUsageError` asserts `ce.Code == 2` and message contains `\"--user is required\"`"
+      - "`TestRevoke_MissingRole_ReturnsUsageError` and `TestRevoke_MissingUser_ReturnsUsageError` assert the same"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    source: qa
+
+  - id: task-013
+    title: "Aura Security.Forbidden: add tier hint in translateAdminError (run.go)"
+    description: |
+      Live testing across Aura Free, Professional, and Business Critical revealed that role management
+      commands return `Neo.ClientError.Security.Forbidden` on restricted tiers rather than
+      `UnsupportedAdministrationCommand`. The raw Neo4j error message ("Permission has not been
+      granted … try GRANT/REVOKE") is impossible for users to follow on Aura-managed instances.
+
+      Changes in `neo4j-cli/internal/subcommands/admin/run.go`:
+
+      1. Add `isAuraURI(uri string) bool`:
+         ```go
+         func isAuraURI(uri string) bool {
+             return strings.Contains(strings.ToLower(uri), ".neo4j.io")
+         }
+         ```
+
+      2. Change `translateAdminError(err error) error` → `translateAdminError(uri string, err error) error`.
+         Thread `uri` into `translateNeo4jError(uri string, ne *neo4j.Neo4jError) error`.
+
+      3. Update `RunAdminStatement` to pass `conn.URI`:
+         ```go
+         return nil, translateAdminError(conn.URI, err)
+         ```
+
+      4. In `translateNeo4jError`, add a case for `Security.Forbidden`:
+         ```go
+         case "Neo.ClientError.Security.Forbidden":
+             if isAuraURI(uri) {
+                 return clierr.NewValidationError(
+                     "%s\n\nOn Aura, role management support varies by tier: "+
+                         "Business Critical supports all role commands; "+
+                         "Professional supports list, grant, and revoke only; "+
+                         "Free does not support role management.",
+                     ne.Msg)
+             }
+             return clierr.NewValidationError("%w", ne)
+         ```
+
+      Add two test cases to `run_test.go` (or a new `run_aura_test.go` in the same package):
+      - Aura URI (`neo4j+s://test.databases.neo4j.io`) + `Security.Forbidden` error → `validation_error`
+        message contains `"Business Critical"` and `"Professional"`.
+      - Non-Aura URI (`neo4j://localhost:7687`) + same error → message does NOT contain `"Business Critical"`.
+
+      All existing `run_test.go` tests must still pass (function signature change propagates only
+      to `RunAdminStatement`'s internal call; all existing call sites in tests use the seam and
+      don't call `translateAdminError` directly unless test-tested explicitly).
+    status: pending
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "`isAuraURI(\"neo4j+s://abc.databases.neo4j.io\")` returns `true`"
+      - "`isAuraURI(\"neo4j://localhost:7687\")` returns `false`"
+      - "`translateAdminError` signature is `(uri string, err error) error`"
+      - "`translateNeo4jError` handles `Neo.ClientError.Security.Forbidden` with Aura check"
+      - "Test: Aura URI + Forbidden error → validation_error message contains `\"Business Critical\"` and `\"Professional\"`"
+      - "Test: non-Aura URI + Forbidden error → message does NOT contain `\"Business Critical\"`"
+      - "All existing `run_test.go` tests pass unchanged"
+      - "`make test`, `make fmt-check`, `make lint` pass"
+    source: qa
