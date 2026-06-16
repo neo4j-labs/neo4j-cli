@@ -1,0 +1,3 @@
+## TASK-001 — 2026-06-16T01:30:00Z
+Scaffolded the role package foundation with helpers.go (roleExecFn seam, roleFields, normalizeRoleRow, outputRoleMembers, outputUserAfterRoleChange), skeleton role.go (NewCmd with zero AddCommand calls), and role_helpers_test.go (testConn, withFakeExecFn, withSequencedExecFn). Added //nolint:unused directives to satisfy the golangci-lint unused gate on pre-declared helpers before leaf commands exist.
+Files: +neo4j-cli/internal/subcommands/admin/role/helpers.go, +neo4j-cli/internal/subcommands/admin/role/role.go, +neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go

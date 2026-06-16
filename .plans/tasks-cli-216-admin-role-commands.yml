@@ -16,7 +16,7 @@ tasks:
       incrementally by tasks 002–007 as each leaf compiles. `role_helpers_test.go` provides ONLY
       the seam infrastructure shared across all leaf tests: `testConn()`, `withFakeExecFn`, and
       `withSequencedExecFn`. Each leaf task owns its own `runXxx` builder in its `*_test.go` file.
-    status: pending
+    status: completed
     dependencies: []
     acceptance_criteria:
       - "`helpers.go` compiles with all five symbols: `roleExecFn`, `roleFields`, `normalizeRoleRow`, `outputRoleMembers`, `outputUserAfterRoleChange`"
@@ -25,7 +25,7 @@ tasks:
       - "`role.go` skeleton compiles with `NewCmd` that sets `roleExecFn = execFn` and has zero `AddCommand` calls"
       - "`role_helpers_test.go` provides `withSequencedExecFn` that returns responses in order and fails the test if called more times than expected; does NOT define any `runXxx` helpers"
       - "All new `.go` files carry the Neo4j copyright header"
-    completed_at: null
+    completed_at: "2026-06-16T01:30:00Z"
 
   - id: task-002
     title: "Implement role list + tests"
