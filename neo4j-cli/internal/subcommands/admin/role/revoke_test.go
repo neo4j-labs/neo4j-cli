@@ -121,20 +121,26 @@ func TestRevoke_CommunityEditionError_ReturnsEnterpriseHint(t *testing.T) {
 	assert.Contains(t, ce.Message, "Enterprise edition")
 }
 
-func TestRevoke_MissingRole_CobraUsageError(t *testing.T) {
+func TestRevoke_MissingRole_ReturnsUsageError(t *testing.T) {
 	_, _, err := runRevoke(t, "--user alice", []struct {
 		rows []map[string]any
 		err  error
 	}{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "role")
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--role is required")
 }
 
-func TestRevoke_MissingUser_CobraUsageError(t *testing.T) {
+func TestRevoke_MissingUser_ReturnsUsageError(t *testing.T) {
 	_, _, err := runRevoke(t, "--role analyst", []struct {
 		rows []map[string]any
 		err  error
 	}{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "user")
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--user is required")
 }

@@ -45,6 +45,10 @@ Files: ~neo4j-cli/internal/subcommands/admin/role/role_helpers_test.go
 Promoted userFields to package scope in helpers.go; extracted normalizeRoleRows helper; updated list.go and outputRoleMembers to use it.
 Files: ~neo4j-cli/internal/subcommands/admin/role/helpers.go, ~neo4j-cli/internal/subcommands/admin/role/list.go
 
+## TASK-012 — 2026-06-16T17:00:00Z
+Removed "(Enterprise only)" from revoke.go Short; replaced cmd.MarkFlagRequired("role")/("user") in grant.go and revoke.go with explicit pre-validation in RunE that returns clierr.NewUsageError (exit 2); renamed and updated the missing-flag tests to assert ce.Code == 2 and message content; regenerated skill bundle to reflect the Short change.
+Files: ~neo4j-cli/internal/subcommands/admin/role/grant.go, ~neo4j-cli/internal/subcommands/admin/role/revoke.go, ~neo4j-cli/internal/subcommands/admin/role/grant_test.go, ~neo4j-cli/internal/subcommands/admin/role/revoke_test.go, ~neo4j-cli/internal/skill/bundle/references/admin.md
+
 ## QA SESSION — 2026-06-16T16:30:00Z
 Live tested against Docker Enterprise, Docker Community, Aura Free (free-db), Aura Professional, and Aura Business Critical. All Docker acceptance criteria pass. Found 3 bugs requiring fixes:
 (1) revoke Short carries "(Enterprise only)" annotation absent from all other 5 commands (REQ-F-026 → task-012).

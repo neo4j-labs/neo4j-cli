@@ -293,7 +293,7 @@ tasks:
       `"required flag(s) \"role\" not set"` message — they should now assert a CLIError with
       `ce.Code == 2` and message containing `"--role is required"` / `"--user is required"`.
       Verify `make test`, `make fmt-check`, `make lint` all pass.
-    status: pending
+    status: completed
     dependencies:
       - task-007
     acceptance_criteria:
@@ -307,6 +307,7 @@ tasks:
       - "`TestRevoke_MissingRole_ReturnsUsageError` and `TestRevoke_MissingUser_ReturnsUsageError` assert the same"
       - "`make test`, `make fmt-check`, `make lint` pass"
     source: qa
+    completed_at: "2026-06-16T17:00:00Z"
 
   - id: task-013
     title: "Aura Security.Forbidden: add tier hint in translateAdminError (run.go)"
@@ -355,7 +356,7 @@ tasks:
       All existing `run_test.go` tests must still pass (function signature change propagates only
       to `RunAdminStatement`'s internal call; all existing call sites in tests use the seam and
       don't call `translateAdminError` directly unless test-tested explicitly).
-    status: pending
+    status: in_progress
     dependencies:
       - task-008
     acceptance_criteria:

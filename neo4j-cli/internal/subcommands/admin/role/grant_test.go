@@ -121,20 +121,26 @@ func TestGrant_CommunityEditionError_ReturnsEnterpriseHint(t *testing.T) {
 	assert.Contains(t, ce.Message, "Enterprise edition")
 }
 
-func TestGrant_MissingRole_CobraUsageError(t *testing.T) {
+func TestGrant_MissingRole_ReturnsUsageError(t *testing.T) {
 	_, _, err := runGrant(t, "--user alice", []struct {
 		rows []map[string]any
 		err  error
 	}{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "role")
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--role is required")
 }
 
-func TestGrant_MissingUser_CobraUsageError(t *testing.T) {
+func TestGrant_MissingUser_ReturnsUsageError(t *testing.T) {
 	_, _, err := runGrant(t, "--role analyst", []struct {
 		rows []map[string]any
 		err  error
 	}{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "user")
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--user is required")
 }
