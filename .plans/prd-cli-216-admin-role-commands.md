@@ -86,6 +86,13 @@ Prereq: [CLI-215 / PR #225](https://github.com/neo4j-labs/neo4j-cli/pull/225) (i
 - REQ-F-026: Remove `(Enterprise only)` from `revoke`'s `Short` description. It is the only command with this annotation; all six commands require Enterprise at the DB level. Consistency: none of the six should carry this annotation (the parent Long already documents the `--rw` requirement for write commands).
 - REQ-F-027: Replace `cmd.MarkFlagRequired("role")` and `cmd.MarkFlagRequired("user")` in `grant.go` and `revoke.go` with explicit pre-validation at the top of `RunE` (before `cmd.SilenceUsage = true`) that returns `clierr.NewUsageError`. This ensures missing `--role` or `--user` exits with code 2 (`usage_error`) rather than code 1 (`fatal_error` from cobra's built-in required-flag check). Usage text must still be printed when either flag is absent (cobra prints usage whenever `RunE` returns an error and `SilenceUsage` is still false).
 
+**Output shape refinement**
+
+- REQ-F-028: `role list` and `outputRoleMembers` (called by `role create` follow-up) must group the flat `SHOW ROLES WITH USERS` rows by `role`, collecting all member values into a `members` list (plural). The output field `member` (singular) is renamed to `members` (plural). Null `member` values from the flat query are excluded from the collected `members` list, so a role with no members produces `"members": []`. The `--user` filter in `list` is adapted to retain only roles where the named user appears in the `members` list. The `roles` field on `SHOW USERS` output (used by `grant`/`revoke` follow-up via `outputUserAfterRoleChange`) is already returned as a list by Neo4j and is unaffected.
+- REQ-F-029: `role get` must return a **single object** (not a flat list of privilege rows) with three fields: `role` (string), `members` (list), and `privileges` (list). This supersedes REQ-F-005 and REQ-F-006. The `members` list is extracted from the `SHOW ROLES WITH USERS WHERE role = $name` existence-check result using `groupRoleRows` — the same two-call structure is retained, but the first call now also feeds member data. The `privileges` list contains the rows from `SHOW ROLE $name PRIVILEGES` with the redundant `role` column removed (it is always the role name, already the key of the outer object) and the remaining fields sorted alphabetically (`access`, `action`, `resource`, `segment` for standard privileges). A role with no privileges yields `"privileges": []`. Output fields on the wrapping object: `["role", "members", "privileges"]`.
+- REQ-F-030: **Format-dependent rendering of `members` in `role list` and `role create` follow-up.** In JSON and toon formats, `members` is emitted as a proper JSON list (the raw `[]any`). In table format, `members` is pre-converted to a comma-joined string (e.g., `"alice, bob"`) before passing to `PrintBodyMap`, keeping table rows compact and readable. Implementation: resolve the output format before printing (via `commonoutput.ResolveOutput(cmd, cfg)`) and convert the `members` value in each row to `strings.Join(...)` when format is `"table"`. Applies to both `list.go` and `outputRoleMembers` in `helpers.go`.
+- REQ-F-031: **`role get` table format is best-effort.** The `members` and `privileges` fields are nested structures; in table format they render as multi-line indented JSON blobs inside table cells. This is accepted as a known limitation — `--format json` is the intended format for `role get`. The `Long` description of `role get` should note this: `"Use --format json for machine-readable output; table format renders nested fields as JSON."`
+
 ### Non-Functional Requirements
 
 - REQ-NF-001: One file per leaf under `neo4j-cli/internal/subcommands/admin/role/`. Parent in `role.go`. Shared helpers + seam var in `helpers.go`. Test helpers in `role_helpers_test.go`.
@@ -98,6 +105,8 @@ Prereq: [CLI-215 / PR #225](https://github.com/neo4j-labs/neo4j-cli/pull/225) (i
 - REQ-NF-008: `make test`, `make fmt-check`, `make lint` all pass.
 - REQ-NF-009: Unit tests for the Aura `Security.Forbidden` translation path in `run_test.go` — verify that `translateAdminError` with an Aura URI and a `Neo.ClientError.Security.Forbidden` Neo4jError produces a `validation_error` CLIError whose message contains the tier hint string; verify that the same error with a non-Aura URI does NOT include the hint.
 - REQ-NF-010: Update tests in `grant_test.go` and `revoke_test.go` for missing `--role` and `--user` to assert exit code 2 (`usage_error`) rather than exit code 1, reflecting the switch from `MarkFlagRequired` to manual pre-validation.
+- REQ-NF-011: In `helpers.go`: rename `roleFields` to `["role", "members"]`, remove `normalizeRoleRow`/`normalizeRoleRows`, and add `groupRoleRows(rows []map[string]any) []map[string]any` that groups by role (preserving SHOW output order) and collects non-nil member values into a `[]any` list. Update `outputRoleMembers` to call `groupRoleRows` and apply format-dependent member rendering (REQ-F-030). Update `list.go` to call `groupRoleRows`, adapt the `--user` filter, and apply the same format-dependent rendering before printing. Update `list_test.go` and `create_test.go` to assert the new grouped shape; include table-format assertions confirming comma-joined output.
+- REQ-NF-012: Update `get.go` to assemble and output a single object `{"role": <name>, "members": <[]any from groupRoleRows>, "privileges": <[]any of privilege maps>}` using output fields `["role", "members", "privileges"]`. Delete the dynamic-field sort (`sort.Strings(fields)` over `rows[0]`). Remove the `role` key from each privilege row before assembling. Use `adminutil.NewRow` (single-row output) with `PrintBodyMap`. Update the `Long` description to note that `--format json` is intended for `role get`. Update `get_test.go`: update `existsResponse` to provide member data in the existence-check row, update all output assertions to the new shape, add a test for `TestGet_ExistingRole_NoPrivileges_ReturnsObjectWithEmptyPrivileges`.
 
 ---
 
@@ -188,6 +197,92 @@ The `existsResponse` / `notFoundResponse` helper functions in `role_helpers_test
 
 Each has a mutation call followed by a follow-up SHOW query. Use the same sequenced seam approach: first call = mutation (returns empty rows or error), second call = follow-up SHOW (returns rows to output). Tests assert both the error propagation path and the follow-up output path.
 
+### Format-Dependent `members` Rendering (REQ-F-030)
+
+The output package renders `[]any` values as multi-line indented JSON (`json.MarshalIndent`) in table cells. For `role list` and `role create` follow-up, this is too wide. Instead, resolve the format before calling `PrintBodyMap` and convert `members` to a comma-joined string when table:
+
+```go
+format := commonoutput.ResolveOutput(cmd, cfg)
+for i, row := range rows {
+    if format == "table" {
+        members, _ := row["members"].([]any)
+        strs := make([]string, len(members))
+        for j, m := range members { strs[j] = fmt.Sprintf("%v", m) }
+        rows[i]["members"] = strings.Join(strs, ", ")
+    }
+}
+commonoutput.PrintBodyMap(cmd, cfg, adminutil.Rows(rows), roleFields)
+```
+
+This runs in both `list.go` (after `groupRoleRows`) and `outputRoleMembers` (in `helpers.go`, after `groupRoleRows`). JSON and toon formats skip the conversion and receive the raw `[]any`.
+
+### `role get` Single-Object Output (REQ-F-029)
+
+The two-call structure of `get.go` is preserved, but the first call now feeds member data as well as the existence check:
+
+```go
+// Step 1: check existence and collect members.
+existRows, err := roleExecFn(ctx, cfg, conn, "SHOW ROLES WITH USERS WHERE role = $name", ...)
+if err != nil { return err }
+if len(existRows) == 0 { return clierr.NewNotFoundError(...) }
+members := groupRoleRows(existRows)[0]["members"]  // []any
+
+// Step 2: fetch privileges.
+privRows, err := roleExecFn(ctx, cfg, conn, "SHOW ROLE $name PRIVILEGES", ...)
+if err != nil { return err }
+
+// Drop the redundant "role" field from each privilege row.
+privObjs := make([]any, len(privRows))
+for i, row := range privRows {
+    delete(row, "role")
+    privObjs[i] = row
+}
+
+out := map[string]any{"role": name, "members": members, "privileges": privObjs}
+commonoutput.PrintBodyMap(cmd, cfg, adminutil.NewRow(out, getFields), getFields)
+```
+
+`getFields = []string{"role", "members", "privileges"}` (logical order, not alphabetic — mirrors `userFields` in `helpers.go`).
+
+For the no-privilege case `privObjs` is `[]any{}` and the output is a single object with `"privileges": []`. The `sort.Strings` dynamic-field logic is deleted; the four standard privilege fields (`access`, `action`, `resource`, `segment`) will appear naturally after the `role` deletion.
+
+Table output renders `members` and `privileges` as JSON-marshaled cell values (same mechanism as `roles` in the user output from PR 2).
+
+### groupRoleRows Helper (REQ-F-028)
+
+`SHOW ROLES WITH USERS` emits one row per `(role, member)` pair. Roles with multiple members produce multiple rows; roles with no members produce one row with `member: nil`. `groupRoleRows` collapses these into one row per role:
+
+```go
+func groupRoleRows(rows []map[string]any) []map[string]any {
+    type entry struct{ members []any }
+    order := []string{}
+    seen  := map[string]*entry{}
+    for _, row := range rows {
+        role := fmt.Sprintf("%v", row["role"])
+        if _, ok := seen[role]; !ok {
+            seen[role] = &entry{}
+            order = append(order, role)
+        }
+        if m := row["member"]; m != nil {
+            seen[role].members = append(seen[role].members, m)
+        }
+    }
+    result := make([]map[string]any, len(order))
+    for i, r := range order {
+        members := seen[r].members
+        if members == nil {
+            members = []any{}
+        }
+        result[i] = map[string]any{"role": r, "members": members}
+    }
+    return result
+}
+```
+
+`outputRoleMembers` replaces the `normalizeRoleRows` call with `groupRoleRows`. `list.go` replaces its `normalizeRoleRows` call with `groupRoleRows` and updates the `--user` filter to iterate over `row["members"].([]any)`.
+
+`normalizeRoleRow` and `normalizeRoleRows` are deleted (their null-handling is subsumed by the nil-exclusion in `groupRoleRows`).
+
 ### Confirm Gate for `drop`
 
 `drop.go` imports `"github.com/neo4j/cli/common/confirm"` and calls `confirm.Require(cmd, name)` before executing. `confirm.Register(cmd)` registers `--yes` and `--force` on the leaf. Tests use `confirmtest.AssertLeafGate` from `"github.com/neo4j/cli/common/confirm/confirmtest"` — exact pattern from `user drop` and `database drop` in PR 1/2.
@@ -270,16 +365,17 @@ Because `SilenceUsage` is still false when these errors are returned, cobra will
 
 ## Acceptance Criteria
 
-- [ ] `neo4j-cli admin role list --credential local --format json` returns `[{"role":"...", "member":"..."}]`
-- [ ] `neo4j-cli admin role list --user alice --credential local` filters to rows where member is alice
-- [ ] `role list` JSON output shows `"member": ""` (not `null`) for roles with no members
-- [ ] `neo4j-cli admin role get admin --credential local --format json` returns privilege rows
-- [ ] `neo4j-cli admin role get <newly-created-role> --credential local --format json` returns `[]` (not `not_found`)
+- [ ] `neo4j-cli admin role list --credential local --format json` returns `[{"role":"...", "members":[...]}]` — one entry per role, members as a list
+- [ ] `neo4j-cli admin role list --user alice --credential local` filters to roles where `alice` appears in the `members` list
+- [ ] `role list` JSON output shows `"members": []` (not `null` or `[""]`) for roles with no members
+- [ ] `neo4j-cli admin role get admin --credential local --format json` returns a single object `{"role":"admin","members":[...],"privileges":[...]}` — NOT a flat privilege list
+- [ ] `neo4j-cli admin role get <newly-created-role> --credential local --format json` returns `{"role":"<name>","members":[],"privileges":[]}` (not `not_found`, not `[]`)
 - [ ] `neo4j-cli admin role get nonexistent --credential local` returns exit code 3 (`not_found`)
+- [ ] `role get` JSON output does NOT contain a `role` field inside each privilege object (the redundant column is dropped)
 - [ ] `role get` existence check uses `SHOW ROLES WITH USERS WHERE role = $name` (verified via unit test asserting the Cypher string passed to the seam)
 - [ ] `neo4j-cli admin role create analyst --credential local --rw` succeeds; emits the role's member record
 - [ ] `neo4j-cli admin role create analyst --credential local --rw` succeeds on second invocation (`IF NOT EXISTS`)
-- [ ] `neo4j-cli admin role create analyst --credential local --rw --format json` emits `[]` when role has no members
+- [ ] `neo4j-cli admin role create analyst --credential local --rw --format json` emits `[]` when the SHOW follow-up returns zero rows (Enterprise new role), or `[{"role":"analyst","members":[]}]` when it returns a null-member row (Community)
 - [ ] `neo4j-cli admin role drop analyst --credential local --rw --yes --force` succeeds; no output
 - [ ] `neo4j-cli admin role drop nonexistent --credential local --rw --yes --force` returns exit code 3 (`not_found`)
 - [ ] `role drop` not-found test uses `Neo.ClientError.Statement.ArgumentError` with "does not exist" message
