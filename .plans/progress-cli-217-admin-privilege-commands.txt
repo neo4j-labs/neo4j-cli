@@ -21,3 +21,8 @@ Decisions: Role target is parameterised (`TO $role`) rather than inlined, mirror
 ## task-005 — 2026-06-22T00:00:00Z
 Implemented the `admin privilege deny` leaf as a structural mirror of grant: required --action/--role pre-validated, delegates to buildPrivilegeCypher("DENY", ...), sends `<cypher> TO $role` then outputPrivileges. Wired newDenyCmd into privilege.go. Tests reuse the shared sequencedCall/withRecordingSequencedExecFn/twoOK helpers from grant_test.go (same package) and cover propertyBearer, dbms, required-flag/flag-conflict errors, and mutation-error-skips-follow-up. All four gates pass.
 Files: +deny.go, +deny_test.go, ~privilege.go
+
+## task-006 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege revoke` leaf mirroring grant/deny: required --action/--role pre-validated, optional --revoke-type (grant|deny) resolves the verb via revokeVerb (plain REVOKE / REVOKE GRANT / REVOKE DENY), delegates to buildPrivilegeCypher, sends `<cypher> FROM $role` then outputPrivileges. Wired newRevokeCmd into privilege.go. All four gates pass.
+Files: +revoke.go, +revoke_test.go, ~privilege.go
+Decisions: --revoke-type normalises with ToLower+TrimSpace (consistent with --action leniency); invalid values are a usage error before any seam call.

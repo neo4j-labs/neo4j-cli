@@ -130,7 +130,7 @@ tasks:
       calls the seam, then calls `outputPrivileges` on success. Wire `newRevokeCmd` into
       `privilege.go`. Tests cover plain REVOKE, REVOKE GRANT, REVOKE DENY, missing required flags
       (exit 2), and the two-call sequence.
-    status: pending
+    status: completed
     dependencies:
       - task-001
       - task-002
@@ -141,7 +141,7 @@ tasks:
       - "`privilege revoke --role analyst --rw` (missing --action) returns exit code 2"
       - "Mutation exec error propagates and skips follow-up"
       - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-007
     title: "Wire privilege into admin.go, regenerate skill bundle, add changelog entry"

@@ -1,0 +1,129 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+
+package privilege
+
+import (
+	"bytes"
+	"errors"
+	"testing"
+
+	"github.com/google/shlex"
+	"github.com/neo4j/cli/common/clicfg"
+	"github.com/neo4j/cli/common/clierr"
+	"github.com/neo4j/cli/common/flags"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// runRevoke builds the `admin privilege revoke` command tree, installs a
+// recording sequenced exec-fn, then executes with args.
+func runRevoke(t *testing.T, args string, calls *[]sequencedCall, responses []struct {
+	rows []map[string]any
+	err  error
+}) (string, string, error) {
+	t.Helper()
+
+	withRecordingSequencedExecFn(t, calls, responses)
+
+	cfg := clicfg.NewConfig(afero.NewMemMapFs(), "test", clicfg.GlobalScope)
+	conn := testConn()
+	cmd := NewCmd(cfg, &conn, privilegeExecFn)
+	flags.RegisterOutputFlag(cmd, cfg)
+
+	out := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
+	cmd.SetOut(out)
+	cmd.SetErr(errBuf)
+
+	argv, splitErr := shlex.Split(args)
+	require.NoError(t, splitErr)
+	cmd.SetArgs(append([]string{"revoke"}, argv...))
+
+	execCmdErr := cmd.Execute()
+	return out.String(), errBuf.String(), execCmdErr
+}
+
+func TestRevoke_Plain_RevokesAndShowsPrivileges(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst", &calls, twoOK())
+	require.NoError(t, err)
+
+	require.Len(t, calls, 2)
+	assert.Equal(t, "REVOKE READ {*} ON GRAPH * ELEMENTS * FROM $role", calls[0].cypher)
+	assert.Equal(t, "analyst", calls[0].params["role"])
+	assert.Equal(t, "SHOW ROLE $name PRIVILEGES", calls[1].cypher)
+	assert.Equal(t, "analyst", calls[1].params["name"])
+}
+
+func TestRevoke_TypeGrant_EmitsRevokeGrant(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type grant", &calls, twoOK())
+	require.NoError(t, err)
+
+	require.Len(t, calls, 2)
+	assert.Equal(t, "REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM $role", calls[0].cypher)
+}
+
+func TestRevoke_TypeDeny_EmitsRevokeDeny(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type deny", &calls, twoOK())
+	require.NoError(t, err)
+
+	require.Len(t, calls, 2)
+	assert.Equal(t, "REVOKE DENY READ {*} ON GRAPH * ELEMENTS * FROM $role", calls[0].cypher)
+}
+
+func TestRevoke_InvalidType_ReturnsUsageErrorWithoutSeam(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst --revoke-type bogus", &calls, nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--revoke-type must be grant or deny")
+	assert.Empty(t, calls, "seam must not be called on an invalid --revoke-type")
+}
+
+func TestRevoke_MissingAction_ReturnsUsageError(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--role analyst", &calls, nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--action is required")
+	assert.Empty(t, calls, "seam must not be called when --action is missing")
+}
+
+func TestRevoke_MissingRole_ReturnsUsageError(t *testing.T) {
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read", &calls, nil)
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Equal(t, 2, ce.Code)
+	assert.Contains(t, ce.Message, "--role is required")
+	assert.Empty(t, calls, "seam must not be called when --role is missing")
+}
+
+func TestRevoke_MutationExecError_SkipsFollowUp(t *testing.T) {
+	execErr := clierr.NewValidationError("bolt connection refused")
+	var calls []sequencedCall
+	_, _, err := runRevoke(t, "--action read --on-graph * --role analyst", &calls, []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: nil, err: execErr},
+	})
+	require.Error(t, err)
+
+	var ce *clierr.CLIError
+	require.True(t, errors.As(err, &ce))
+	assert.Contains(t, ce.Message, "bolt connection refused")
+	require.Len(t, calls, 1, "follow-up SHOW must not run after a mutation error")
+}
