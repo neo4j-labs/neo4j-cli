@@ -18,7 +18,7 @@ import (
 func NewCmd(cfg *clicfg.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query [cypher]",
-		Short: "Run Cypher, inspect the database schema (:schema), and embed text against a Neo4j database via the Bolt protocol",
+		Short: "Run Cypher, inspect the database schema (:schema), lint Cypher offline (:lint), and embed text against a Neo4j database via the Bolt protocol",
 		Long: "Use the :schema subcommand to introspect labels, relationship types, and properties before writing Cypher — never guess the schema. " +
 			"Run a Cypher statement against a Neo4j database via the Bolt " +
 			"protocol. Cypher is taken from the positional argument, or from " +
@@ -28,6 +28,8 @@ func NewCmd(cfg *clicfg.Config) *cobra.Command {
 			"is bound to $NAME for both EXPLAIN preflight and the real run). " +
 			"The sibling `query :embed [text]` leaf computes a vector standalone " +
 			"without opening a Bolt connection. " +
+			"The sibling `query :lint [cypher]` leaf checks Cypher for syntax and " +
+			"semantic errors offline, also without opening a Bolt connection. " +
 			"Multiple statements may be passed in a single string: they are split on " +
 			"a `;` at the end of a line (a mid-line `;` is kept verbatim; the " +
 			"terminating `;` is stripped). By default each statement runs in its own " +
@@ -107,6 +109,7 @@ neo4j-cli query "CREATE (:Person {name: \"Alice\"}); CREATE (:Person {name: \"Bo
 
 	cmd.AddCommand(newSchemaCmd(cfg))
 	cmd.AddCommand(newEmbedCmd(cfg))
+	cmd.AddCommand(newLintCmd(cfg))
 
 	return cmd
 }
