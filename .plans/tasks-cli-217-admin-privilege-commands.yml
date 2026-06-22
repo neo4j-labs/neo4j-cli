@@ -1,0 +1,170 @@
+feature: cli-217-admin-privilege-commands
+prd: ./prd-cli-217-admin-privilege-commands.md
+created_at: 2026-06-22T00:00:00Z
+updated_at: 2026-06-22T00:00:00Z
+
+tasks:
+  - id: task-001
+    title: "Scaffold privilege package foundation (seam, helpers, test infrastructure)"
+    description: |
+      Create the `neo4j-cli/internal/subcommands/admin/privilege/` package with the
+      shared infrastructure that all leaf commands depend on. This includes: `privilege.go`
+      with a skeleton `NewCmd(cfg, conn, execFn)` (no AddCommand calls yet — those are
+      added one per leaf task); `helpers.go` with `privilegeExecFn adminutil.ExecFn`,
+      `privilegeFields`, and `outputPrivileges`; and `privilege_helpers_test.go` with
+      `testConn()`, `withFakePrivilegeExecFn`, and `withSequencedPrivilegeExecFn` mirroring
+      `role/role_helpers_test.go` exactly.
+    status: pending
+    dependencies: []
+    acceptance_criteria:
+      - "privilege.go compiles: NewCmd signature is `func NewCmd(cfg *clicfg.Config, conn **dbconn.Conn, execFn adminutil.ExecFn) *cobra.Command`, sets `privilegeExecFn = execFn`, registers no leaf commands yet"
+      - "helpers.go declares `var privilegeExecFn adminutil.ExecFn`, `var privilegeFields = []string{\"access\", \"action\", \"resource\", \"segment\", \"role\"}`, and `outputPrivileges(cmd, cfg, conn, roleName)` that calls SHOW ROLE $name PRIVILEGES via the seam and prints with adminutil.NewRows"
+      - "privilege_helpers_test.go provides testConn(), withFakePrivilegeExecFn(t, rows, err), and withSequencedPrivilegeExecFn(t, responses) — same shape as role/role_helpers_test.go"
+      - "All new .go files carry the Neo4j copyright header"
+      - "`make test` passes (package compiles and test helpers compile)"
+    completed_at: null
+
+  - id: task-002
+    title: "Implement buildPrivilegeCypher helper with all action categories and validation"
+    description: |
+      Add `buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[string]any, error)`
+      to `helpers.go` — the central Cypher construction function. Define `privilegeOpts` struct
+      capturing all flag values, `actionCategory` type with constants for all six categories
+      (propertyBearer, graphOnly, setLabel, removeLabel, database, dbms), and `validActions` map
+      classifying every supported action keyword. Implement `normalizeAction` for
+      case-insensitive, underscore-tolerant action input. `buildPrivilegeCypher` returns a
+      usage error for any invalid flag/category combination (all REQ-F-011 cases) before
+      producing Cypher. Write direct unit tests in `privilege_helpers_test.go` covering one
+      happy-path case per category and every error path.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`validActions` covers all categories from REQ-F-010; `FIND` is absent"
+      - "`normalizeAction` converts `\"all_graph_privileges\"` and `\"ALL GRAPH PRIVILEGES\"` both to `\"ALL GRAPH PRIVILEGES\"`; returns error for unrecognised actions"
+      - "propertyBearer category: `buildPrivilegeCypher(\"GRANT\", \"READ\", {onGraph:\"*\"})` → `GRANT READ {*} ON GRAPH * ELEMENTS *`; with --property name → `{name}`; with --node-label Person → `NODES Person`"
+      - "graphOnly category: `buildPrivilegeCypher(\"GRANT\", \"TRAVERSE\", {onGraph:\"*\"})` → `GRANT TRAVERSE ON GRAPH * ELEMENTS *` (no property clause)"
+      - "setLabel/removeLabel: requires --node-label; emits `SET LABEL <label> ON GRAPH <name>`"
+      - "database category: emits `ON DATABASE *` when no --on-database supplied; errors on --on-graph or --on-dbms"
+      - "dbms category: emits `ON DBMS`; returns usage error when --on-dbms is false/absent"
+      - "All REQ-F-011 flag conflict combinations return a usage error (not a DB call)"
+      - "`make test` passes for `privilege_helpers_test.go`"
+    completed_at: null
+
+  - id: task-003
+    title: "Implement privilege list command"
+    description: |
+      Create `list.go` and `list_test.go`. The command executes `SHOW PRIVILEGES` by default;
+      `--role <name>` switches to `SHOW ROLE $name PRIVILEGES`; `--user <name>` switches to
+      `SHOW USER $name PRIVILEGES`. Specifying both `--role` and `--user` returns a usage error
+      before `cmd.SilenceUsage = true`. Output via `adminutil.NewRows(rows, privilegeFields)` +
+      `PrintBodyMap`. Wire `newListCmd` into `privilege.go`. Tests cover: no-filter happy path,
+      `--role` filter, `--user` filter, both-flags usage error, Enterprise-only error translation.
+    status: pending
+    dependencies:
+      - task-001
+    acceptance_criteria:
+      - "`privilege list` with no flags sends `SHOW PRIVILEGES` to the seam and renders `access`, `action`, `resource`, `segment`, `role` columns"
+      - "`privilege list --role analyst` sends `SHOW ROLE $name PRIVILEGES` with `params[\"name\"] == \"analyst\"`"
+      - "`privilege list --user alice` sends `SHOW USER $name PRIVILEGES` with `params[\"name\"] == \"alice\"`"
+      - "`privilege list --role analyst --user alice` returns a usage error (exit 2) before any seam call"
+      - "Enterprise-only error (UnsupportedAdministrationCommand) surfaces as validation_error with `(requires Enterprise edition)` hint"
+      - "Flush-left `Example:` field with ≥ 2 invocations including one with `--format json`; `TestAllLeafCommands_HaveExamples` passes"
+    completed_at: null
+
+  - id: task-004
+    title: "Implement privilege grant command"
+    description: |
+      Create `grant.go` and `grant_test.go`. Required flags `--action` and `--role` use explicit
+      pre-validation in `RunE` (before `cmd.SilenceUsage = true`) returning `clierr.NewUsageError`
+      — do NOT use `cmd.MarkFlagRequired`. Resource scope flags: `--on-graph` (string, default
+      empty), `--on-database` (string, default empty), `--on-dbms` (bool). Graph qualifier flags:
+      `--node-label` (string array), `--relationship-type` (string array), `--property` (string
+      array). Delegates to `buildPrivilegeCypher("GRANT", ...)` for Cypher construction, calls the
+      seam with the result, then calls `outputPrivileges` on success. Wire `newGrantCmd` into
+      `privilege.go`. Tests cover at least one case per action category, all required-flag paths
+      (exit code 2), flag conflict errors, Enterprise-only error, and the two-call
+      mutation+follow-up sequence.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege grant --role analyst --rw` (missing --action) returns exit code 2 with message `\"--action is required\"`"
+      - "`privilege grant --action read --rw` (missing --role) returns exit code 2 with message `\"--role is required\"`"
+      - "`privilege grant --action read --on-graph * --role analyst --rw` sends `GRANT READ {*} ON GRAPH * ELEMENTS * TO analyst` then `SHOW ROLE $name PRIVILEGES` and emits the privilege list"
+      - "`privilege grant --action traverse --property name --role analyst --rw` returns a flag-conflict usage error without calling the seam"
+      - "`privilege grant --action create_role --role analyst --rw` (missing --on-dbms) returns a usage error"
+      - "Tests use `withSequencedPrivilegeExecFn` for the two-call flow; mutation exec error propagates and skips follow-up"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: null
+
+  - id: task-005
+    title: "Implement privilege deny command"
+    description: |
+      Create `deny.go` and `deny_test.go`. The deny command is a structural mirror of `grant.go`
+      with `DENY` as the verb instead of `GRANT`. Same flag surface, same `buildPrivilegeCypher`
+      delegation, same explicit required-flag pre-validation, same `outputPrivileges` follow-up.
+      Wire `newDenyCmd` into `privilege.go`. Tests mirror the grant test suite using `DENY` Cypher
+      assertions; no need to repeat every category — cover at least one propertyBearer case and one
+      dbms case plus the required-flag and flag-conflict error paths.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege deny --action write --on-graph * --role readonly --rw` sends `DENY WRITE ON GRAPH * ELEMENTS * TO readonly` then `SHOW ROLE $name PRIVILEGES`"
+      - "`privilege deny --role analyst --rw` (missing --action) returns exit code 2"
+      - "`privilege deny --action read --rw` (missing --role) returns exit code 2"
+      - "Mutation exec error propagates and skips follow-up (tested via withSequencedPrivilegeExecFn)"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: null
+
+  - id: task-006
+    title: "Implement privilege revoke command"
+    description: |
+      Create `revoke.go` and `revoke_test.go`. Same flag surface as grant/deny plus an optional
+      `--revoke-type` string flag accepting `"grant"` or `"deny"`. When `--revoke-type grant` is
+      set, the verb becomes `REVOKE GRANT`; when `--revoke-type deny`, it becomes `REVOKE DENY`;
+      when absent, plain `REVOKE`. Delegates to `buildPrivilegeCypher` with the resolved verb,
+      calls the seam, then calls `outputPrivileges` on success. Wire `newRevokeCmd` into
+      `privilege.go`. Tests cover plain REVOKE, REVOKE GRANT, REVOKE DENY, missing required flags
+      (exit 2), and the two-call sequence.
+    status: pending
+    dependencies:
+      - task-001
+      - task-002
+    acceptance_criteria:
+      - "`privilege revoke --action read --on-graph * --role analyst --rw` (no --revoke-type) sends `REVOKE READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --action read --on-graph * --role analyst --revoke-type grant --rw` sends `REVOKE GRANT READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --action read --on-graph * --role analyst --revoke-type deny --rw` sends `REVOKE DENY READ {*} ON GRAPH * ELEMENTS * FROM analyst`"
+      - "`privilege revoke --role analyst --rw` (missing --action) returns exit code 2"
+      - "Mutation exec error propagates and skips follow-up"
+      - "Flush-left `Example:` with ≥ 2 invocations including `--rw`"
+    completed_at: null
+
+  - id: task-007
+    title: "Wire privilege into admin.go, regenerate skill bundle, add changelog entry"
+    description: |
+      Update `admin/admin.go`: add the `privilege` package import, add
+      `cmd.AddCommand(privilege.NewCmd(cfg, &adminConn, RunAdminStatement))` after the role
+      AddCommand, update `Short` from "Manage Neo4j databases, users, and roles" to "Manage Neo4j
+      databases, users, roles, and privileges", append `` , `privilege` (list, grant, deny,
+      revoke). `` to the `Long` string, and update the package comment. Run
+      `go generate ./neo4j-cli/internal/skill/...` to regenerate the final skill bundle (all four
+      admin subcommand groups). Add a Minor changelog entry via `changie new`. Verify all gates
+      pass: `make test`, `make fmt-check`, `make lint`, `TestGenerator_RoundTrip`.
+    status: pending
+    dependencies:
+      - task-003
+      - task-004
+      - task-005
+      - task-006
+    acceptance_criteria:
+      - "`admin.go` Short is `\"Manage Neo4j databases, users, roles, and privileges\"`"
+      - "`admin.go` Long ends with `` `privilege` (list, grant, deny, revoke). ``"
+      - "`neo4j-cli admin privilege --help` is reachable from the CLI binary"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no diff — `TestGenerator_RoundTrip` passes"
+      - "`.changes/unreleased/` contains a new Minor entry mentioning admin privilege commands"
+      - "`make test`, `make fmt-check`, `make lint` all pass clean"
+    completed_at: null
