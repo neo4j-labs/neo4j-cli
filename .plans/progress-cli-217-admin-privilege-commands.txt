@@ -33,3 +33,7 @@ Files: ~admin.go, +.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~sk
 
 ## REVIEW — 2026-06-22T00:00:00Z
 Added 3 review tasks (task-008..task-010).
+
+## task-008 — 2026-06-22T14:10:00Z
+Deleted the two unused test helpers (withFakePrivilegeExecFn, withSequencedPrivilegeExecFn) plus their //nolint:unused pragmas and stale comment from privilege_helpers_test.go, and trimmed the now-unused context/clicfg imports. Leaf tests already use withRecordingSequencedExecFn from grant_test.go. All four gates pass; reviewer LGTM.
+Files: ~privilege_helpers_test.go

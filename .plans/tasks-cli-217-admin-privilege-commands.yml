@@ -171,6 +171,7 @@ tasks:
 
   - id: task-008
     title: "Remove dead test helpers from privilege_helpers_test.go"
+    status: completed
     description: |
       The end-of-feature audit found that `withFakePrivilegeExecFn` (privilege_helpers_test.go:31)
       and `withSequencedPrivilegeExecFn` (:46) are both unused. They survive only via
@@ -180,14 +181,13 @@ tasks:
       have swept: ~30 lines of dead code plus two stale lint suppressions and a now-false comment.
       Delete both helpers and their `//nolint:unused` pragmas. If anything in them is still wanted,
       fold it into the one recording helper that's actually used.
-    status: pending
     source: review
     dependencies: []
     acceptance_criteria:
       - "`withFakePrivilegeExecFn` and `withSequencedPrivilegeExecFn` are removed from privilege_helpers_test.go along with their `//nolint:unused` pragmas and the now-false comment"
       - "No remaining unused test helpers in the privilege package; `make lint` passes with 0 issues and no new `//nolint` directives"
       - "`make test` passes — all leaf tests still compile and pass using the surviving recording helper"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-009
     title: "De-duplicate grant/deny/revoke write leaves behind shared helpers"
