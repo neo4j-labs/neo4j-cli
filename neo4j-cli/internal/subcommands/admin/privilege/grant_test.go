@@ -114,7 +114,7 @@ func TestGrant_SetLabel_EmitsLabelClause(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
-	assert.Equal(t, "GRANT SET LABEL Person ON GRAPH neo4j TO $role", calls[0].cypher)
+	assert.Equal(t, "GRANT SET LABEL `Person` ON GRAPH `neo4j` TO $role", calls[0].cypher)
 }
 
 func TestGrant_Database_EmitsDatabaseClause(t *testing.T) {
@@ -123,7 +123,7 @@ func TestGrant_Database_EmitsDatabaseClause(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, calls, 2)
-	assert.Equal(t, "GRANT ACCESS ON DATABASE neo4j TO $role", calls[0].cypher)
+	assert.Equal(t, "GRANT ACCESS ON DATABASE `neo4j` TO $role", calls[0].cypher)
 }
 
 func TestGrant_Dbms_EmitsDbmsClause(t *testing.T) {

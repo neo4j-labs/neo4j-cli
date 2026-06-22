@@ -241,6 +241,7 @@ tasks:
 
   - id: task-011
     title: "Escape user-supplied Cypher identifiers in buildPrivilegeCypher to prevent injection"
+    status: completed
     description: |
       The CI security-review check (golang-security skill, review mode) flagged a Medium-severity
       Cypher injection in `buildPrivilegeCypher` (helpers.go). Five flag values that supply Cypher
@@ -262,7 +263,6 @@ tasks:
       cited lines 248, 260, 269, 288, 297, 299 — verify against current code). Add unit tests proving
       the comment-injection payload no longer escapes the intended scope and that ordinary
       identifiers and the `*` wildcard render unchanged.
-    status: pending
     source: review
     dependencies:
       - task-010
@@ -273,4 +273,4 @@ tasks:
       - "Ordinary identifiers and the `*` wildcard still produce the same Cypher as before for the existing happy-path cases (existing tests pass, possibly with backtick-quoted expectations where a non-wildcard identifier is used)"
       - "New unit test(s) cover the injection payload and the backtick-doubling case"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
-    completed_at: null
+    completed_at: 2026-06-22

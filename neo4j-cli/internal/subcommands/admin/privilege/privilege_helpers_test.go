@@ -86,21 +86,21 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 			verb:   "GRANT",
 			action: "READ",
 			opts:   privilegeOpts{onGraph: "neo4j", nodeLabels: []string{"Person"}, properties: []string{"name"}},
-			want:   "GRANT READ {name} ON GRAPH neo4j NODES Person",
+			want:   "GRANT READ {`name`} ON GRAPH `neo4j` NODES `Person`",
 		},
 		{
 			name:   "propertyBearer multi property and rel type",
 			verb:   "GRANT",
 			action: "MATCH",
 			opts:   privilegeOpts{onGraph: "neo4j", relTypes: []string{"KNOWS"}, properties: []string{"weight", "since"}},
-			want:   "GRANT MATCH {weight, since} ON GRAPH neo4j RELATIONSHIPS KNOWS",
+			want:   "GRANT MATCH {`weight`, `since`} ON GRAPH `neo4j` RELATIONSHIPS `KNOWS`",
 		},
 		{
 			name:   "propertyBearer default graph when on-graph absent",
 			verb:   "GRANT",
 			action: "READ",
 			opts:   privilegeOpts{nodeLabels: []string{"Person"}},
-			want:   "GRANT READ {*} ON GRAPH * NODES Person",
+			want:   "GRANT READ {*} ON GRAPH * NODES `Person`",
 		},
 		{
 			name:   "graphOnly default",
@@ -114,28 +114,28 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 			verb:   "GRANT",
 			action: "all_graph_privileges",
 			opts:   privilegeOpts{onGraph: "neo4j"},
-			want:   "GRANT ALL GRAPH PRIVILEGES ON GRAPH neo4j ELEMENTS *",
+			want:   "GRANT ALL GRAPH PRIVILEGES ON GRAPH `neo4j` ELEMENTS *",
 		},
 		{
 			name:   "setLabel",
 			verb:   "GRANT",
 			action: "set_label",
 			opts:   privilegeOpts{onGraph: "neo4j", nodeLabels: []string{"Person"}},
-			want:   "GRANT SET LABEL Person ON GRAPH neo4j",
+			want:   "GRANT SET LABEL `Person` ON GRAPH `neo4j`",
 		},
 		{
 			name:   "removeLabel",
 			verb:   "GRANT",
 			action: "remove_label",
 			opts:   privilegeOpts{onGraph: "neo4j", nodeLabels: []string{"Person"}},
-			want:   "GRANT REMOVE LABEL Person ON GRAPH neo4j",
+			want:   "GRANT REMOVE LABEL `Person` ON GRAPH `neo4j`",
 		},
 		{
 			name:   "database with explicit database",
 			verb:   "GRANT",
 			action: "access",
 			opts:   privilegeOpts{onDatabase: "neo4j"},
-			want:   "GRANT ACCESS ON DATABASE neo4j",
+			want:   "GRANT ACCESS ON DATABASE `neo4j`",
 		},
 		{
 			name:   "database default star",
@@ -170,6 +170,70 @@ func TestBuildPrivilegeCypher_HappyPaths(t *testing.T) {
 			}
 			if params == nil {
 				t.Fatal("params map must be non-nil")
+			}
+		})
+	}
+}
+
+func TestBuildPrivilegeCypher_EscapesIdentifiers(t *testing.T) {
+	cases := []struct {
+		name   string
+		verb   string
+		action string
+		opts   privilegeOpts
+		want   string
+	}{
+		{
+			name:   "database injection payload is a single quoted identifier",
+			verb:   "GRANT",
+			action: "access",
+			opts:   privilegeOpts{onDatabase: "neo4j TO adminRole-- "},
+			want:   "GRANT ACCESS ON DATABASE `neo4j TO adminRole-- `",
+		},
+		{
+			name:   "graph injection payload is a single quoted identifier",
+			verb:   "GRANT",
+			action: "traverse",
+			opts:   privilegeOpts{onGraph: "neo4j TO adminRole-- "},
+			want:   "GRANT TRAVERSE ON GRAPH `neo4j TO adminRole-- ` ELEMENTS *",
+		},
+		{
+			name:   "node label with internal backtick is doubled",
+			verb:   "GRANT",
+			action: "read",
+			opts:   privilegeOpts{onGraph: "*", nodeLabels: []string{"Pe`rson"}},
+			want:   "GRANT READ {*} ON GRAPH * NODES `Pe``rson`",
+		},
+		{
+			name:   "property with internal backtick is doubled",
+			verb:   "GRANT",
+			action: "read",
+			opts:   privilegeOpts{onGraph: "*", properties: []string{"na`me"}},
+			want:   "GRANT READ {`na``me`} ON GRAPH * ELEMENTS *",
+		},
+		{
+			name:   "relationship type injection payload is a single quoted identifier",
+			verb:   "GRANT",
+			action: "traverse",
+			opts:   privilegeOpts{onGraph: "*", relTypes: []string{"KNOWS TO adminRole-- "}},
+			want:   "GRANT TRAVERSE ON GRAPH * RELATIONSHIPS `KNOWS TO adminRole-- `",
+		},
+		{
+			name:   "set label injection payload is a single quoted identifier",
+			verb:   "GRANT",
+			action: "set_label",
+			opts:   privilegeOpts{onGraph: "*", nodeLabels: []string{"Person TO adminRole-- "}},
+			want:   "GRANT SET LABEL `Person TO adminRole-- ` ON GRAPH *",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _, err := buildPrivilegeCypher(tc.verb, tc.action, tc.opts)
+			if err != nil {
+				t.Fatalf("buildPrivilegeCypher returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("cypher = %q, want %q", got, tc.want)
 			}
 		})
 	}

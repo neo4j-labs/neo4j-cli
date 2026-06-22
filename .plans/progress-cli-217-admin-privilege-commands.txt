@@ -49,3 +49,7 @@ Files: ~helpers.go
 
 ## REVIEW — 2026-06-22T16:00:00Z
 Added 1 review task (task-011) from CI security-review (Cypher injection in buildPrivilegeCypher).
+
+## task-011 — 2026-06-22T16:40:00Z
+Added cypherIdentifier helper (returns `*` unchanged; otherwise backtick-wraps with internal backticks doubled) and applied it via escapeIdentifiers to onGraph, onDatabase, and every nodeLabels/relTypes/properties element at all buildPrivilegeCypher inlining sites, closing the `--`-comment injection that could redirect the trailing $role. Updated happy-path/leaf-test expectations to backtick-quoted output and added injection + backtick-doubling unit tests. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~privilege_helpers_test.go, ~grant_test.go

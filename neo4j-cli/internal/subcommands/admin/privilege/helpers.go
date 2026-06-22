@@ -245,7 +245,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		if category == propertyBearer {
 			prop = " " + propertyClause(opts.properties)
 		}
-		clause = normalized + prop + " ON GRAPH " + graph + " " + entityClause(opts.nodeLabels, opts.relTypes)
+		clause = normalized + prop + " ON GRAPH " + cypherIdentifier(graph) + " " + entityClause(opts.nodeLabels, opts.relTypes)
 	case labelScoped:
 		if hasDatabase || opts.onDbms {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
@@ -257,7 +257,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		if graph == "" {
 			graph = "*"
 		}
-		clause = normalized + " " + opts.nodeLabels[0] + " ON GRAPH " + graph
+		clause = normalized + " " + cypherIdentifier(opts.nodeLabels[0]) + " ON GRAPH " + cypherIdentifier(graph)
 	case database:
 		if hasGraph || opts.onDbms {
 			return "", nil, clierr.NewUsageError("action %s is a database privilege and accepts only --on-database", normalized)
@@ -266,7 +266,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 		if db == "" {
 			db = "*"
 		}
-		clause = normalized + " ON DATABASE " + db
+		clause = normalized + " ON DATABASE " + cypherIdentifier(db)
 	case dbms:
 		if hasGraph || hasDatabase {
 			return "", nil, clierr.NewUsageError("action %s is a DBMS privilege and accepts only --on-dbms", normalized)
@@ -286,7 +286,7 @@ func propertyClause(properties []string) string {
 	if len(properties) == 0 {
 		return "{*}"
 	}
-	return "{" + strings.Join(properties, ", ") + "}"
+	return "{" + strings.Join(escapeIdentifiers(properties), ", ") + "}"
 }
 
 // entityClause renders the entity qualifier shared by propertyBearer and
@@ -295,10 +295,30 @@ func propertyClause(properties []string) string {
 func entityClause(nodeLabels, relTypes []string) string {
 	switch {
 	case len(nodeLabels) > 0:
-		return "NODES " + strings.Join(nodeLabels, ", ")
+		return "NODES " + strings.Join(escapeIdentifiers(nodeLabels), ", ")
 	case len(relTypes) > 0:
-		return "RELATIONSHIPS " + strings.Join(relTypes, ", ")
+		return "RELATIONSHIPS " + strings.Join(escapeIdentifiers(relTypes), ", ")
 	default:
 		return "ELEMENTS *"
 	}
+}
+
+// cypherIdentifier renders a user-supplied identifier for safe inlining into
+// privilege Cypher. The * wildcard is returned unchanged (it is a keyword, not
+// an identifier). Every other value is backtick-quoted with any internal
+// backtick doubled, so Neo4j treats it as an opaque identifier — blocking
+// comment (--) and keyword injection through flag values.
+func cypherIdentifier(id string) string {
+	if id == "*" {
+		return id
+	}
+	return "`" + strings.ReplaceAll(id, "`", "``") + "`"
+}
+
+func escapeIdentifiers(ids []string) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = cypherIdentifier(id)
+	}
+	return out
 }
