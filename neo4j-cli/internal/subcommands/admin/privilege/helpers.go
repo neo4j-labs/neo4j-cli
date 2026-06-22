@@ -91,8 +91,7 @@ type actionCategory int
 const (
 	propertyBearer actionCategory = iota
 	graphOnly
-	setLabel
-	removeLabel
+	labelScoped
 	database
 	dbms
 )
@@ -112,8 +111,8 @@ var validActions = map[string]actionCategory{
 	"LOAD":                 graphOnly,
 	"ALL GRAPH PRIVILEGES": graphOnly,
 
-	"SET LABEL":    setLabel,
-	"REMOVE LABEL": removeLabel,
+	"SET LABEL":    labelScoped,
+	"REMOVE LABEL": labelScoped,
 
 	"ACCESS":                       database,
 	"START":                        database,
@@ -247,7 +246,7 @@ func buildPrivilegeCypher(verb, action string, opts privilegeOpts) (string, map[
 			prop = " " + propertyClause(opts.properties)
 		}
 		clause = normalized + prop + " ON GRAPH " + graph + " " + entityClause(opts.nodeLabels, opts.relTypes)
-	case setLabel, removeLabel:
+	case labelScoped:
 		if hasDatabase || opts.onDbms {
 			return "", nil, clierr.NewUsageError("action %s is a graph privilege and accepts only --on-graph", normalized)
 		}

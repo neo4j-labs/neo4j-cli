@@ -229,7 +229,7 @@ tasks:
       Collapse to a single `labelScoped` (or similarly named) category unless a future divergence is
       concretely planned. The action keywords `SET LABEL` and `REMOVE LABEL` must still both be
       accepted and produce the same Cypher as before; only the internal category enum collapses.
-    status: pending
+    status: completed
     source: review
     dependencies:
       - task-009
@@ -237,4 +237,4 @@ tasks:
       - "The two identical category constants are replaced by one (e.g. `labelScoped`); `validActions` routes both `SET LABEL` and `REMOVE LABEL` to it"
       - "`SET LABEL` and `REMOVE LABEL` still produce the same Cypher as before for grant/deny/revoke (no behavior change)"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes"
-    completed_at: null
+    completed_at: 2026-06-22
