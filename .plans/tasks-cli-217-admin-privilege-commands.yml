@@ -36,7 +36,7 @@ tasks:
       usage error for any invalid flag/category combination (all REQ-F-011 cases) before
       producing Cypher. Write direct unit tests in `privilege_helpers_test.go` covering one
       happy-path case per category and every error path.
-    status: pending
+    status: completed
     dependencies:
       - task-001
     acceptance_criteria:
@@ -49,7 +49,7 @@ tasks:
       - "dbms category: emits `ON DBMS`; returns usage error when --on-dbms is false/absent"
       - "All REQ-F-011 flag conflict combinations return a usage error (not a DB call)"
       - "`make test` passes for `privilege_helpers_test.go`"
-    completed_at: null
+    completed_at: 2026-06-22T00:00:00Z
 
   - id: task-003
     title: "Implement privilege list command"
