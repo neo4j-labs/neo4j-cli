@@ -238,3 +238,39 @@ tasks:
       - "`SET LABEL` and `REMOVE LABEL` still produce the same Cypher as before for grant/deny/revoke (no behavior change)"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes"
     completed_at: 2026-06-22
+
+  - id: task-011
+    title: "Escape user-supplied Cypher identifiers in buildPrivilegeCypher to prevent injection"
+    description: |
+      The CI security-review check (golang-security skill, review mode) flagged a Medium-severity
+      Cypher injection in `buildPrivilegeCypher` (helpers.go). Five flag values that supply Cypher
+      identifiers — graph name (`--on-graph`), database name (`--on-database`), node labels
+      (`--node-label`), relationship types (`--relationship-type`), and property names
+      (`--property`) — are concatenated directly into the Cypher string without backtick-escaping
+      or format validation. Because the leaf commands append `TO $role` / `FROM $role` AFTER this
+      fragment, Cypher's `--` comment syntax inside a flag value can suppress the trailing `$role`
+      parameter and redirect the privilege to an attacker-controlled role: e.g.
+      `--on-database "neo4j TO adminRole-- "` produces
+      `GRANT ACCESS ON DATABASE neo4j TO adminRole` with the real `$role` commented out. This is
+      exploitable in any automation that passes external/user-supplied input to these flags.
+      Fix: backtick-escape every user-supplied identifier before inlining it (Neo4j Cypher treats
+      backtick-quoted names as opaque identifiers, blocking comment/keyword injection). Add a helper
+      like `cypherIdentifier(id string) string` that returns `*` unchanged (the wildcard is a
+      keyword, not an identifier) and otherwise wraps the value in backticks with internal backticks
+      doubled (`` ` `` → `` `` ``). Apply it to `onGraph`, `onDatabase`, and each element of
+      `nodeLabels`, `relTypes`, and `properties` at every inlining site in helpers.go (the finding
+      cited lines 248, 260, 269, 288, 297, 299 — verify against current code). Add unit tests proving
+      the comment-injection payload no longer escapes the intended scope and that ordinary
+      identifiers and the `*` wildcard render unchanged.
+    status: pending
+    source: review
+    dependencies:
+      - task-010
+    acceptance_criteria:
+      - "A `cypherIdentifier` (or similar) helper backtick-escapes user-supplied identifiers, doubling internal backticks, and returns `*` unchanged"
+      - "`onGraph`, `onDatabase`, every `nodeLabels`/`relTypes`/`properties` element are escaped via the helper at all inlining sites in buildPrivilegeCypher"
+      - "An injection payload like `--on-database \"neo4j TO adminRole-- \"` is rendered as a single backtick-quoted identifier and can no longer comment out the trailing `$role` target"
+      - "Ordinary identifiers and the `*` wildcard still produce the same Cypher as before for the existing happy-path cases (existing tests pass, possibly with backtick-quoted expectations where a non-wildcard identifier is used)"
+      - "New unit test(s) cover the injection payload and the backtick-doubling case"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+    completed_at: null

@@ -46,3 +46,6 @@ Decisions: verbWord parameterises the flag usage strings (rolePreposition yields
 ## task-010 — 2026-06-22T15:10:00Z
 Collapsed the identical setLabel/removeLabel action-category constants into a single labelScoped category; validActions routes both SET LABEL and REMOVE LABEL to it and the switch arm became `case labelScoped:`. Emitted Cypher unchanged (uses the normalized keyword), both keywords still accepted; all four gates pass and no bundle drift. Reviewer LGTM.
 Files: ~helpers.go
+
+## REVIEW — 2026-06-22T16:00:00Z
+Added 1 review task (task-011) from CI security-review (Cypher injection in buildPrivilegeCypher).
