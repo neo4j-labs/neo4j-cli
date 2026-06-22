@@ -56,3 +56,7 @@ Files: ~helpers.go, ~privilege_helpers_test.go, ~grant_test.go
 
 ## REVIEW — 2026-06-22T16:30:00Z
 Added 1 review task (task-012) from CI conventions-review (shared test helpers misplaced in grant_test.go).
+
+## task-012 — 2026-06-22T17:00:00Z
+Relocated the cross-leaf shared test helpers (sequencedCall, withRecordingSequencedExecFn, twoOK) verbatim from grant_test.go into privilege_helpers_test.go, satisfying AGENTS.md's resource-level shared-helper rule; grant_test.go keeps only its grant-specific runGrant helper and tests. Moved context/clicfg imports accordingly. All four gates pass and no bundle drift; reviewer LGTM.
+Files: ~grant_test.go, ~privilege_helpers_test.go

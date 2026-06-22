@@ -5,7 +5,6 @@ package privilege
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"testing"
 
@@ -13,38 +12,10 @@ import (
 	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/common/flags"
-	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type sequencedCall struct {
-	cypher string
-	params map[string]any
-}
-
-// withRecordingSequencedExecFn replaces privilegeExecFn with a sequenced fake
-// that records each call's cypher/params into calls and returns responses in
-// order. It fails the test if called more times than there are responses.
-func withRecordingSequencedExecFn(t *testing.T, calls *[]sequencedCall, responses []struct {
-	rows []map[string]any
-	err  error
-}) {
-	t.Helper()
-	orig := privilegeExecFn
-	idx := 0
-	privilegeExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
-		*calls = append(*calls, sequencedCall{cypher: cypher, params: params})
-		if idx >= len(responses) {
-			t.Fatalf("privilegeExecFn called %d times but only %d response(s) were provided", idx+1, len(responses))
-		}
-		r := responses[idx]
-		idx++
-		return r.rows, r.err
-	}
-	t.Cleanup(func() { privilegeExecFn = orig })
-}
 
 // runGrant builds the `admin privilege grant` command tree, installs a
 // recording sequenced exec-fn, then executes with args.
@@ -72,19 +43,6 @@ func runGrant(t *testing.T, args string, calls *[]sequencedCall, responses []str
 
 	execCmdErr := cmd.Execute()
 	return out.String(), errBuf.String(), execCmdErr
-}
-
-func twoOK() []struct {
-	rows []map[string]any
-	err  error
-} {
-	return []struct {
-		rows []map[string]any
-		err  error
-	}{
-		{rows: nil, err: nil},
-		{rows: []map[string]any{}, err: nil},
-	}
 }
 
 func TestGrant_PropertyBearer_GrantsAndShowsPrivileges(t *testing.T) {

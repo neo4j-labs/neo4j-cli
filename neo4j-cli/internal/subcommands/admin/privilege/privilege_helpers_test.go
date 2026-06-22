@@ -4,10 +4,12 @@
 package privilege
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 
+	"github.com/neo4j/cli/common/clicfg"
 	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 )
@@ -19,6 +21,46 @@ func testConn() *dbconn.Conn {
 		URI:      "neo4j://localhost:7687",
 		Username: "neo4j",
 		Password: "test",
+	}
+}
+
+type sequencedCall struct {
+	cypher string
+	params map[string]any
+}
+
+// withRecordingSequencedExecFn replaces privilegeExecFn with a sequenced fake
+// that records each call's cypher/params into calls and returns responses in
+// order. It fails the test if called more times than there are responses.
+func withRecordingSequencedExecFn(t *testing.T, calls *[]sequencedCall, responses []struct {
+	rows []map[string]any
+	err  error
+}) {
+	t.Helper()
+	orig := privilegeExecFn
+	idx := 0
+	privilegeExecFn = func(_ context.Context, _ *clicfg.Config, _ *dbconn.Conn, cypher string, params map[string]any) ([]map[string]any, error) {
+		*calls = append(*calls, sequencedCall{cypher: cypher, params: params})
+		if idx >= len(responses) {
+			t.Fatalf("privilegeExecFn called %d times but only %d response(s) were provided", idx+1, len(responses))
+		}
+		r := responses[idx]
+		idx++
+		return r.rows, r.err
+	}
+	t.Cleanup(func() { privilegeExecFn = orig })
+}
+
+func twoOK() []struct {
+	rows []map[string]any
+	err  error
+} {
+	return []struct {
+		rows []map[string]any
+		err  error
+	}{
+		{rows: nil, err: nil},
+		{rows: []map[string]any{}, err: nil},
 	}
 }
 

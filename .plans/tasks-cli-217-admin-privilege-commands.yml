@@ -277,6 +277,7 @@ tasks:
 
   - id: task-012
     title: "Move shared privilege test helpers into privilege_helpers_test.go"
+    status: completed
     description: |
       The CI conventions-review check (AGENTS.md gates) flagged a Medium violation: the shared test
       helpers `sequencedCall`, `withRecordingSequencedExecFn`, and `twoOK` are defined in
@@ -294,4 +295,4 @@ tasks:
       - "`grant_test.go`, `deny_test.go`, `revoke_test.go` contain only their own per-command test functions and reference the shared helpers from the helpers file"
       - "No duplicate symbol definitions; the privilege package test build is clean"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
-    completed_at: null
+    completed_at: 2026-06-22
