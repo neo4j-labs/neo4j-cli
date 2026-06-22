@@ -5,7 +5,6 @@ package privilege
 
 import (
 	"github.com/neo4j/cli/common/clicfg"
-	"github.com/neo4j/cli/common/clierr"
 	"github.com/neo4j/cli/neo4j-cli/internal/dbconn"
 	"github.com/spf13/cobra"
 )
@@ -30,35 +29,11 @@ neo4j-cli admin privilege deny --action write --on-graph * --role readonly --cre
 neo4j-cli admin privilege deny --action create_role --on-dbms --role analyst --credential local --rw --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if action == "" {
-				return clierr.NewUsageError("--action is required")
-			}
-			if roleName == "" {
-				return clierr.NewUsageError("--role is required")
-			}
-
-			cypher, params, err := buildPrivilegeCypher("DENY", action, opts)
-			if err != nil {
-				return err
-			}
-			cmd.SilenceUsage = true
-
-			params["role"] = roleName
-			if _, err := privilegeExecFn(cmd.Context(), cfg, *conn, cypher+" TO $role", params); err != nil {
-				return err
-			}
-			return outputPrivileges(cmd, cfg, *conn, roleName)
+			return runPrivilegeMutation(cmd, cfg, *conn, "DENY", action, roleName, opts, "TO")
 		},
 	}
 
-	cmd.Flags().StringVar(&action, "action", "", "Privilege action to deny (e.g. read, traverse, create_role)")
-	cmd.Flags().StringVar(&roleName, "role", "", "Name of the role to deny the privilege to")
-	cmd.Flags().StringVar(&opts.onGraph, "on-graph", "", "Scope the privilege to a graph (use * for all)")
-	cmd.Flags().StringVar(&opts.onDatabase, "on-database", "", "Scope the privilege to a database (use * for all)")
-	cmd.Flags().BoolVar(&opts.onDbms, "on-dbms", false, "Scope the privilege to the DBMS")
-	cmd.Flags().StringArrayVar(&opts.nodeLabels, "node-label", nil, "Restrict a graph privilege to node labels")
-	cmd.Flags().StringArrayVar(&opts.relTypes, "relationship-type", nil, "Restrict a graph privilege to relationship types")
-	cmd.Flags().StringArrayVar(&opts.properties, "property", nil, "Restrict a property privilege to properties")
+	addPrivilegeFlags(cmd, &action, &roleName, &opts, "deny")
 
 	return cmd
 }

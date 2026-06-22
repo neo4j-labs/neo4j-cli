@@ -36,6 +36,53 @@ func outputPrivileges(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn,
 	return nil
 }
 
+// addPrivilegeFlags registers the flag surface shared by grant, deny, and
+// revoke onto cmd. verbWord ("grant", "deny", or "revoke") parameterises the
+// usage strings; the per-command --revoke-type flag is registered by revoke
+// itself.
+func addPrivilegeFlags(cmd *cobra.Command, action, roleName *string, opts *privilegeOpts, verbWord string) {
+	cmd.Flags().StringVar(action, "action", "", "Privilege action to "+verbWord+" (e.g. read, traverse, create_role)")
+	cmd.Flags().StringVar(roleName, "role", "", "Name of the role to "+verbWord+" the privilege "+rolePreposition(verbWord))
+	cmd.Flags().StringVar(&opts.onGraph, "on-graph", "", "Scope the privilege to a graph (use * for all)")
+	cmd.Flags().StringVar(&opts.onDatabase, "on-database", "", "Scope the privilege to a database (use * for all)")
+	cmd.Flags().BoolVar(&opts.onDbms, "on-dbms", false, "Scope the privilege to the DBMS")
+	cmd.Flags().StringArrayVar(&opts.nodeLabels, "node-label", nil, "Restrict a graph privilege to node labels")
+	cmd.Flags().StringArrayVar(&opts.relTypes, "relationship-type", nil, "Restrict a graph privilege to relationship types")
+	cmd.Flags().StringArrayVar(&opts.properties, "property", nil, "Restrict a property privilege to properties")
+}
+
+func rolePreposition(verbWord string) string {
+	if verbWord == "revoke" {
+		return "from"
+	}
+	return "to"
+}
+
+// runPrivilegeMutation runs the shared write sequence: required-flag checks,
+// buildPrivilegeCypher, SilenceUsage, exec via the seam (appending the role
+// target with the given keyword, "TO" or "FROM"), then outputPrivileges. verb
+// is the resolved privilege verb ("GRANT", "DENY", "REVOKE", ...).
+func runPrivilegeMutation(cmd *cobra.Command, cfg *clicfg.Config, conn *dbconn.Conn, verb, action, roleName string, opts privilegeOpts, target string) error {
+	if action == "" {
+		return clierr.NewUsageError("--action is required")
+	}
+	if roleName == "" {
+		return clierr.NewUsageError("--role is required")
+	}
+
+	cypher, params, err := buildPrivilegeCypher(verb, action, opts)
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	params["role"] = roleName
+	if _, err := privilegeExecFn(cmd.Context(), cfg, conn, cypher+" "+target+" $role", params); err != nil {
+		return err
+	}
+	return outputPrivileges(cmd, cfg, conn, roleName)
+}
+
 // actionCategory classifies a privilege action keyword. The category controls
 // which resource scope and qualifier flags are valid and which Cypher template
 // is emitted.

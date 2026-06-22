@@ -34,41 +34,16 @@ neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --cre
 neo4j-cli admin privilege revoke --action read --on-graph * --role analyst --revoke-type grant --credential local --rw --format json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if action == "" {
-				return clierr.NewUsageError("--action is required")
-			}
-			if roleName == "" {
-				return clierr.NewUsageError("--role is required")
-			}
-
 			verb, err := revokeVerb(revokeType)
 			if err != nil {
 				return err
 			}
-
-			cypher, params, err := buildPrivilegeCypher(verb, action, opts)
-			if err != nil {
-				return err
-			}
-			cmd.SilenceUsage = true
-
-			params["role"] = roleName
-			if _, err := privilegeExecFn(cmd.Context(), cfg, *conn, cypher+" FROM $role", params); err != nil {
-				return err
-			}
-			return outputPrivileges(cmd, cfg, *conn, roleName)
+			return runPrivilegeMutation(cmd, cfg, *conn, verb, action, roleName, opts, "FROM")
 		},
 	}
 
-	cmd.Flags().StringVar(&action, "action", "", "Privilege action to revoke (e.g. read, traverse, create_role)")
-	cmd.Flags().StringVar(&roleName, "role", "", "Name of the role to revoke the privilege from")
 	cmd.Flags().StringVar(&revokeType, "revoke-type", "", "Restrict the revoke to grant or deny privileges (grant|deny); omit to revoke both")
-	cmd.Flags().StringVar(&opts.onGraph, "on-graph", "", "Scope the privilege to a graph (use * for all)")
-	cmd.Flags().StringVar(&opts.onDatabase, "on-database", "", "Scope the privilege to a database (use * for all)")
-	cmd.Flags().BoolVar(&opts.onDbms, "on-dbms", false, "Scope the privilege to the DBMS")
-	cmd.Flags().StringArrayVar(&opts.nodeLabels, "node-label", nil, "Restrict a graph privilege to node labels")
-	cmd.Flags().StringArrayVar(&opts.relTypes, "relationship-type", nil, "Restrict a graph privilege to relationship types")
-	cmd.Flags().StringArrayVar(&opts.properties, "property", nil, "Restrict a property privilege to properties")
+	addPrivilegeFlags(cmd, &action, &roleName, &opts, "revoke")
 
 	return cmd
 }

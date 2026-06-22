@@ -37,3 +37,8 @@ Added 3 review tasks (task-008..task-010).
 ## task-008 — 2026-06-22T14:10:00Z
 Deleted the two unused test helpers (withFakePrivilegeExecFn, withSequencedPrivilegeExecFn) plus their //nolint:unused pragmas and stale comment from privilege_helpers_test.go, and trimmed the now-unused context/clicfg imports. Leaf tests already use withRecordingSequencedExecFn from grant_test.go. All four gates pass; reviewer LGTM.
 Files: ~privilege_helpers_test.go
+
+## task-009 — 2026-06-22T14:40:00Z
+Extracted addPrivilegeFlags + runPrivilegeMutation into helpers.go and collapsed the grant/deny/revoke RunE bodies and eight flag registrations to call them; each leaf keeps its own constructor and Short/Long/Example. Emitted Cypher, required-flag validation, and exec sequence unchanged; all existing tests pass. All four gates plus no bundle drift; reviewer LGTM.
+Files: ~helpers.go, ~grant.go, ~deny.go, ~revoke.go
+Decisions: verbWord parameterises the flag usage strings (rolePreposition yields to/from); revoke resolves revokeVerb before runPrivilegeMutation per the task spec (a benign reorder of two usage-error messages in an unreachable-in-practice edge).

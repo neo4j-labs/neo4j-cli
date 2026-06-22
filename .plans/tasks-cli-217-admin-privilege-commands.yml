@@ -191,6 +191,7 @@ tasks:
 
   - id: task-009
     title: "De-duplicate grant/deny/revoke write leaves behind shared helpers"
+    status: completed
     description: |
       The audit found grant.go and deny.go are byte-identical apart from the verb string, and
       revoke.go duplicates the same body minus the extra `--revoke-type` flag: the `RunE` body, the
@@ -207,7 +208,6 @@ tasks:
       per-command docs), but their bodies collapse to a few lines. `revoke` just additionally
       resolves `revokeVerb(revokeType)` first. Given the strict one-leaf-per-file rule, do NOT merge
       the files — share the body, keep the shells. Behavior must be unchanged.
-    status: pending
     source: review
     dependencies:
       - task-008
@@ -217,7 +217,7 @@ tasks:
       - "revoke resolves its verb (REVOKE / REVOKE GRANT / REVOKE DENY) and uses the shared mutation helper with the FROM target; grant/deny use the TO target"
       - "All existing grant/deny/revoke tests pass unchanged (behavior identical); `make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
       - "`go generate ./neo4j-cli/internal/skill/...` produces no bundle drift — `TestGenerator_RoundTrip` passes"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-010
     title: "Collapse setLabel/removeLabel into a single action category"
