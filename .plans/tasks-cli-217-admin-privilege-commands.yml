@@ -154,7 +154,7 @@ tasks:
       `go generate ./neo4j-cli/internal/skill/...` to regenerate the final skill bundle (all four
       admin subcommand groups). Add a Minor changelog entry via `changie new`. Verify all gates
       pass: `make test`, `make fmt-check`, `make lint`, `TestGenerator_RoundTrip`.
-    status: pending
+    status: completed
     dependencies:
       - task-003
       - task-004
@@ -167,4 +167,4 @@ tasks:
       - "`go generate ./neo4j-cli/internal/skill/...` produces no diff — `TestGenerator_RoundTrip` passes"
       - "`.changes/unreleased/` contains a new Minor entry mentioning admin privilege commands"
       - "`make test`, `make fmt-check`, `make lint` all pass clean"
-    completed_at: null
+    completed_at: 2026-06-22

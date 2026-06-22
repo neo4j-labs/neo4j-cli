@@ -1,0 +1,4 @@
+project: neo4j-cli
+kind: Minor
+body: Add admin privilege commands (list, grant, deny, revoke) for managing Neo4j Enterprise privileges via the system database
+time: 2026-06-22T13:37:20.838729+01:00
