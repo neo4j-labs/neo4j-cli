@@ -30,3 +30,6 @@ Decisions: --revoke-type normalises with ToLower+TrimSpace (consistent with --ac
 ## task-007 — 2026-06-22T13:40:00Z
 Wired privilege.NewCmd into admin.go (import + AddCommand after role), updated Short to "Manage Neo4j databases, users, roles, and privileges", appended `privilege` (list, grant, deny, revoke) to Long, and refreshed the package/NewCmd doc comments. Regenerated the skill bundle and added a Minor changelog entry. All four gates plus build/--help check pass; reviewer LGTM.
 Files: ~admin.go, +.changes/unreleased/neo4j-cli-Minor-20260622-133720.yaml, ~skill/bundle/SKILL.md, ~skill/bundle/references/admin.md
+
+## REVIEW — 2026-06-22T00:00:00Z
+Added 3 review tasks (task-008..task-010).

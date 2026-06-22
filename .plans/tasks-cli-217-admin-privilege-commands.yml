@@ -168,3 +168,73 @@ tasks:
       - "`.changes/unreleased/` contains a new Minor entry mentioning admin privilege commands"
       - "`make test`, `make fmt-check`, `make lint` all pass clean"
     completed_at: 2026-06-22
+
+  - id: task-008
+    title: "Remove dead test helpers from privilege_helpers_test.go"
+    description: |
+      The end-of-feature audit found that `withFakePrivilegeExecFn` (privilege_helpers_test.go:31)
+      and `withSequencedPrivilegeExecFn` (:46) are both unused. They survive only via
+      `//nolint:unused` with the comment "consumed by leaf command tests added in later tasks" —
+      but the later tasks landed and the leaf tests all use `withRecordingSequencedExecFn` (defined
+      in grant_test.go:27) instead. This is scaffolding from task-001/002 that the final task should
+      have swept: ~30 lines of dead code plus two stale lint suppressions and a now-false comment.
+      Delete both helpers and their `//nolint:unused` pragmas. If anything in them is still wanted,
+      fold it into the one recording helper that's actually used.
+    status: pending
+    source: review
+    dependencies: []
+    acceptance_criteria:
+      - "`withFakePrivilegeExecFn` and `withSequencedPrivilegeExecFn` are removed from privilege_helpers_test.go along with their `//nolint:unused` pragmas and the now-false comment"
+      - "No remaining unused test helpers in the privilege package; `make lint` passes with 0 issues and no new `//nolint` directives"
+      - "`make test` passes — all leaf tests still compile and pass using the surviving recording helper"
+    completed_at: null
+
+  - id: task-009
+    title: "De-duplicate grant/deny/revoke write leaves behind shared helpers"
+    description: |
+      The audit found grant.go and deny.go are byte-identical apart from the verb string, and
+      revoke.go duplicates the same body minus the extra `--revoke-type` flag: the `RunE` body, the
+      validation block, and all eight `cmd.Flags().*Var(&opts...)` lines are duplicated verbatim
+      across all three write leaves. The judo move that fits the existing seam: extract a single
+      private helper in `helpers.go` that registers the shared privilege flags onto a command and a
+      second that runs the build/exec/output sequence, e.g.
+      `addPrivilegeFlags(cmd, &action, &roleName, &opts, verbWord)` for the eight identical
+      `Flags()` calls (only per-command variation is the word "grant"/"deny"/"revoke" in usage
+      strings — make it a parameter), and `runPrivilegeMutation(cmd, cfg, conn, verb, action,
+      roleName, opts, "TO"|"FROM")` for the required-flag checks + `buildPrivilegeCypher` +
+      `SilenceUsage` + exec + `outputPrivileges`. Then grant.go/deny.go/revoke.go keep their own
+      `newXxxCmd` constructor and `Short`/`Long`/`Example` (preserving one-file-per-leaf and
+      per-command docs), but their bodies collapse to a few lines. `revoke` just additionally
+      resolves `revokeVerb(revokeType)` first. Given the strict one-leaf-per-file rule, do NOT merge
+      the files — share the body, keep the shells. Behavior must be unchanged.
+    status: pending
+    source: review
+    dependencies:
+      - task-008
+    acceptance_criteria:
+      - "Shared flag-registration and mutation-sequence helpers live in helpers.go; grant.go/deny.go/revoke.go retain their own constructors, Short/Long/Example, and one-file-per-leaf layout"
+      - "The duplicated RunE body and the eight flag-registration lines no longer appear copy-pasted across grant.go/deny.go/revoke.go"
+      - "revoke resolves its verb (REVOKE / REVOKE GRANT / REVOKE DENY) and uses the shared mutation helper with the FROM target; grant/deny use the TO target"
+      - "All existing grant/deny/revoke tests pass unchanged (behavior identical); `make test`, `make fmt-check`, `make lint`, `make license-check` pass clean"
+      - "`go generate ./neo4j-cli/internal/skill/...` produces no bundle drift — `TestGenerator_RoundTrip` passes"
+    completed_at: null
+
+  - id: task-010
+    title: "Collapse setLabel/removeLabel into a single action category"
+    description: |
+      The audit flagged (non-blocking) that helpers.go:48-49 defines both `setLabel` and
+      `removeLabel` action-category constants, the `validActions` map routes `SET LABEL`/`REMOVE
+      LABEL` to each, and the switch handles them in a single `case setLabel, removeLabel:` arm with
+      identical clause construction. They are never distinguished — one category masquerading as two.
+      Collapse to a single `labelScoped` (or similarly named) category unless a future divergence is
+      concretely planned. The action keywords `SET LABEL` and `REMOVE LABEL` must still both be
+      accepted and produce the same Cypher as before; only the internal category enum collapses.
+    status: pending
+    source: review
+    dependencies:
+      - task-009
+    acceptance_criteria:
+      - "The two identical category constants are replaced by one (e.g. `labelScoped`); `validActions` routes both `SET LABEL` and `REMOVE LABEL` to it"
+      - "`SET LABEL` and `REMOVE LABEL` still produce the same Cypher as before for grant/deny/revoke (no behavior change)"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes"
+    completed_at: null
