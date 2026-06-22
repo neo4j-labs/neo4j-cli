@@ -53,6 +53,7 @@ tasks:
 
   - id: task-003
     title: "Implement privilege list command"
+    status: completed
     description: |
       Create `list.go` and `list_test.go`. The command executes `SHOW PRIVILEGES` by default;
       `--role <name>` switches to `SHOW ROLE $name PRIVILEGES`; `--user <name>` switches to
@@ -60,7 +61,6 @@ tasks:
       before `cmd.SilenceUsage = true`. Output via `adminutil.NewRows(rows, privilegeFields)` +
       `PrintBodyMap`. Wire `newListCmd` into `privilege.go`. Tests cover: no-filter happy path,
       `--role` filter, `--user` filter, both-flags usage error, Enterprise-only error translation.
-    status: pending
     dependencies:
       - task-001
     acceptance_criteria:
@@ -70,7 +70,7 @@ tasks:
       - "`privilege list --role analyst --user alice` returns a usage error (exit 2) before any seam call"
       - "Enterprise-only error (UnsupportedAdministrationCommand) surfaces as validation_error with `(requires Enterprise edition)` hint"
       - "Flush-left `Example:` field with ≥ 2 invocations including one with `--format json`; `TestAllLeafCommands_HaveExamples` passes"
-    completed_at: null
+    completed_at: 2026-06-22
 
   - id: task-004
     title: "Implement privilege grant command"

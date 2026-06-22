@@ -18,14 +18,10 @@ import (
 // privilegeExecFn is the package-level test seam. It is set by NewCmd from the
 // injected admin.RunAdminStatement and replaced by tests to avoid real Bolt
 // connections.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 var privilegeExecFn adminutil.ExecFn
 
 // privilegeFields are the canonical output columns for SHOW PRIVILEGES output.
 // The immutable column returned by some Neo4j versions is excluded.
-//
-//nolint:unused // consumed by leaf commands added in later tasks
 var privilegeFields = []string{"access", "action", "resource", "segment", "role"}
 
 // outputPrivileges executes SHOW ROLE $name PRIVILEGES and prints the result

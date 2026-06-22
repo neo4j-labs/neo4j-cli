@@ -7,3 +7,8 @@ Decisions: Foundation symbols are unused until leaf tasks land, so each carries 
 Added buildPrivilegeCypher + privilegeOpts, actionCategory constants, validActions map (FIND absent), normalizeAction, and propertyClause/entityClause helpers; full direct unit tests cover one happy path per category plus all REQ-F-011 error paths with pinned-message assertions. All four gates pass.
 Files: ~privilege/helpers.go, ~privilege/privilege_helpers_test.go
 Decisions: buildPrivilegeCypher returns the Cypher fragment WITHOUT the trailing TO/FROM $role target (leaf commands append it) and a non-nil empty params map — matches the task's acceptance-criteria examples (e.g. "GRANT READ {*} ON GRAPH * ELEMENTS *").
+
+## task-003 — 2026-06-22T00:00:00Z
+Implemented the `admin privilege list` leaf: SHOW PRIVILEGES by default, --role/--user switch to SHOW ROLE/USER $name PRIVILEGES, both-flags usage error before SilenceUsage and any seam call, output via adminutil.NewRows + PrintBodyMap. Wired newListCmd into privilege.go and dropped the now-consumed nolint:unused on privilegeExecFn/privilegeFields. All four gates pass.
+Files: +list.go, +list_test.go, ~privilege.go, ~helpers.go
+Decisions: list_test.go uses a local capturing exec fake (records cypher/params) rather than the shared withFakePrivilegeExecFn, since the acceptance criteria assert on the exact statement and params["name"].
