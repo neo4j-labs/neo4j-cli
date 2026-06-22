@@ -274,3 +274,24 @@ tasks:
       - "New unit test(s) cover the injection payload and the backtick-doubling case"
       - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
     completed_at: 2026-06-22
+
+  - id: task-012
+    title: "Move shared privilege test helpers into privilege_helpers_test.go"
+    description: |
+      The CI conventions-review check (AGENTS.md gates) flagged a Medium violation: the shared test
+      helpers `sequencedCall`, `withRecordingSequencedExecFn`, and `twoOK` are defined in
+      `grant_test.go` but are used across `deny_test.go` and `revoke_test.go` too. The "Cobra Command
+      Layout" rule in AGENTS.md requires shared test helpers to live in the resource-level
+      `<resource>_helpers_test.go` — here `privilege_helpers_test.go` — not in a single leaf's test
+      file. Move those three shared symbols (and any other helper in grant_test.go that deny/revoke
+      tests depend on) from `grant_test.go` into `privilege_helpers_test.go`, leaving grant_test.go
+      with only its grant-specific test functions. No behavior or assertion changes — pure relocation.
+    source: review
+    dependencies:
+      - task-011
+    acceptance_criteria:
+      - "`sequencedCall`, `withRecordingSequencedExecFn`, and `twoOK` (plus any other cross-leaf shared helper) are defined in `privilege_helpers_test.go`, not in `grant_test.go`"
+      - "`grant_test.go`, `deny_test.go`, `revoke_test.go` contain only their own per-command test functions and reference the shared helpers from the helpers file"
+      - "No duplicate symbol definitions; the privilege package test build is clean"
+      - "`make test`, `make fmt-check`, `make lint`, `make license-check` pass clean; `TestGenerator_RoundTrip` passes (no bundle drift)"
+    completed_at: null
